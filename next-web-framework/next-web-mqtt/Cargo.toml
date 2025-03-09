@@ -1,0 +1,11 @@
+[package]
+name = "next-web-mqtt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1.0.217"
+async-trait = "0.1.83"
+
+rumqttc = "0.24.0"
+

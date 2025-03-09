@@ -1,0 +1,73 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use rbatis::{Page, PageRequest};
+use rbatis::rbatis_codegen::ops::AsProxy;
+use rudi::Singleton;
+
+use crate::infrastructure::po::{{ small_struct }}::{{ struct_name }};
+use crate::domain::repository::{{ small_struct }}_repository::{{ struct_name }}Repository;
+
+
+
+//! Author: {{ author }}
+//! DateTime: {{ dateTime }}
+//! Description: {{ structName }}RepositoryImpl
+
+/// {{ struct_name }} 仓储接口实现
+#[derive(Clone)]
+#[Singleton(name = "{{ bean_name }}RepositoryImpl", binds = [Self::into_repository])]
+pub struct {{ struct_name }}RepositoryImpl {
+    #[di(name = "datasourceMaster")]
+    rbs: rbatis::RBatis
+}
+
+#[async_trait]
+impl {{ struct_name }}Repository  for {{ struct_name }}RepositoryImpl {
+
+    async fn find_by_id(&self, id: u64) -> Option<{{ struct_name }}> {
+        {{ struct_name }}::select_by_id(&self.rbs, id).await.unwrap_or_default()
+    }
+
+    async fn find_all_by_entity(&self, {{ small_struct }}: &{{ struct_name }}) -> Vec<{{ struct_name }}> {
+        {{ struct_name }}::select_all_by_entity(&self.rbs, {{ small_struct }}).await.unwrap_or_default()
+    }
+    
+    async fn find_all(&self) -> Vec<{{ struct_name }}> {
+        {{ struct_name }}::select_all(&self.rbs).await.unwrap_or_default()
+    }
+
+    async fn find_with_page(&self, page_request: &PageRequest) -> Page<{{ struct_name }}> {
+        {{ struct_name }}::select_page(&self.rbs, page_request, "").await.unwrap_or_default()
+    }
+
+    async fn save(&self, {{ small_struct }}: &{{ struct_name }}) -> bool {
+        {{ struct_name }}::insert(&self.rbs, {{ small_struct }}).await.is_ok()
+    }
+
+    async fn save_batch(&self, {{ small_struct }}: &Vec<{{ struct_name }}>) -> bool {
+        {{ struct_name }}::insert_batch(&self.rbs, {{ small_struct }}, {{ small_struct }}.len().u64()).await.is_ok()
+    }
+
+    async fn update(&self, {{ small_struct }}: &{{ struct_name }}) -> bool {
+        {{ struct_name }}::update_by_column(&self.rbs, {{ small_struct }}, "id").await.is_ok()
+    }
+
+    async fn delete(&self, id: u64) -> bool {
+        {{ struct_name }}::delete_by_column(&self.rbs, "id", id).await.is_ok()
+    }
+
+    async fn count(&self, {{ small_struct }}: &{{ struct_name }}) -> i64 {
+        {{ struct_name }}::count(&self.rbs, {{ small_struct }}).await.unwrap_or(-1)
+    }
+}
+
+
+
+impl {{ struct_name }}RepositoryImpl {
+
+    fn into_repository(self) -> Arc<dyn {{ struct_name }}Repository> {
+        Arc::new(self)
+    }
+
+}

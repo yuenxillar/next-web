@@ -1,0 +1,27 @@
+use async_trait::async_trait;
+use rbatis::{Page, PageRequest};
+
+use crate::model::entity::{{ structSmallName }}::{{ structName }};
+
+
+//! Author: {{ author }}
+//! DateTime: {{ dateTime }}
+//! Description: {{ structName }}Service
+
+#[async_trait]
+pub trait {{ structName }}Service: Send + Sync + 'static {
+
+    type ServiceResult<T>;
+
+    async fn select_page(&self, page_request: &PageRequest, company_id: &str) -> Self::ServiceResult<Page<{{ structName }}>>;
+
+    async fn select_by_id(&self, id: {{ id }}) -> Self::ServiceResult<Option<{{ structName }}>>;
+
+    async fn insert(&self, data: &{{ structName }}) -> Self::ServiceResult<Option<bool>>;
+
+    async fn insert_batch(&self, data: &Vec<{{ structName }}>) -> Self::ServiceResult<Option<bool>>;
+
+    async fn update_by_id(&self, data: &{{ structName }}) -> Self::ServiceResult<Option<bool>>;
+
+    async fn delete_by_id(&self, id: {{ id }}) -> Self::ServiceResult<Option<bool>>;
+}

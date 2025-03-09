@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+# List of all the crates that are part of this workspace.
+members = [
+    "next-web-dev", 
+    "next-web-utils", 
+    "next-web-document", 
+    "next-web-email",
+    "next-web-macro", 
+    "next-web-mqtt", 
+    "next-web-sms", 
+    "next-web-mq",  
+    "next-web-ai", 
+    "next-web-gateway", 
+    "next-web-security", 
+    "next-web-common", "next-web-id", "next-web-ip",
+]

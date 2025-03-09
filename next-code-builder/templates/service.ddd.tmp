@@ -1,0 +1,26 @@
+use async_trait::async_trait;
+use rbatis::{Page, PageRequest};
+use next_web_dev::error::api_error::ApiError;
+use crate::domain::entity::{{ structSmallName }}::{{ structName }};
+
+
+//! Author: {{ author }}
+//! DateTime: {{ dateTime }}
+//! Description: {{ structName }}Service
+
+type ApiResult<T> = Result<T, ApiError>;
+
+#[async_trait]
+pub trait {{ structName }}Service: Send + Sync + 'static {
+    async fn select_page(&self, page_request: &PageRequest, company_id: &str) -> ApiResult<Page<{{ structName }}>>;
+
+    async fn select_by_id(&self, id: {{ id }}) -> ApiResult<Option<{{ structName }}>>;
+
+    async fn insert(&self, data: &{{ structName }}) -> ApiResult<Option<bool>>;
+
+    async fn insert_batch(&self, data: &Vec<{{ structName }}>) -> ApiResult<Option<bool>>;
+
+    async fn update_by_id(&self, data: &{{ structName }}) -> ApiResult<Option<bool>>;
+
+    async fn delete_by_id(&self, id: {{ id }}) -> ApiResult<Option<bool>>;
+}

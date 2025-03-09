@@ -1,0 +1,39 @@
+use rbatis::{crud, html_sql, impl_select, impl_select_page, py_sql};
+use serde::{Deserialize, Serialize};
+use rbatis::executor::Executor;
+
+use next_web_macro::GetSet;
+
+{{ import }}
+
+
+//! Author: {{ author }}
+//! DateTime: {{ dateTime }}
+//! Description: {{ structName }}
+
+/// {{ comment }}
+#[derive(Clone, Default, Serialize, Deserialize，GetSet)]
+pub struct {{ structName }} {
+{{ entity }}
+}
+
+
+impl {{ structName }} {
+
+}
+
+
+
+impl {{ structName }} {
+
+    #[py_sql("SELECT COUNT(1) FROM {{ structSmallName }}")]
+    pub async fn count(rbs: &dyn Executor) -> Result<usize, rbatis::Error> { impled!() }
+
+
+    #[html_sql("{{ project }}/resources/mapper/{{ structName }}Mapper.html")]
+    pub async fn select_all_by_entity(rbs: &dyn Executor, arg: &{{ structName }}) -> Vec<{{ structName }}> { impled!() }
+}
+
+crud!({{ structName }} {}, "{{ structSmallName }}");
+impl_select!({{ structName }} { select_by_id(id: {{ id }}) -> Option => "`where id = #{id}`"});
+impl_select_page!({{ structName }} { select_page(company_id: &str) => "`where company_id = #{company_id}`"});

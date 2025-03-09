@@ -1,0 +1,22 @@
+[package]
+name = "next-web-utils"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+md5 = "0.7.0"
+rand = "0.8.5"
+chrono = "0.4.38"
+regex = "1.10.4"
+dirs = "5.0.1"
+sysinfo = "0.33.1"
+
+
+notify = { version = "8.0.0", optional = true }
+
+[features]
+default = ["notify"]
+watch = ["notify"]

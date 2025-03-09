@@ -1,0 +1,36 @@
+use async_trait::async_trait;
+use rbatis::{Page, PageRequest};
+
+use crate::infrastructure::po::{{ small_struct }}::{{ struct_name }};
+
+/**
+ * @author  {{ author }}
+ * @date    {{ date }}
+ * @description 
+ **/
+
+
+/// {{ struct_name }} 仓储接口
+#[async_trait]
+pub trait {{ struct_name }}Repository: Send + Sync {
+
+    async fn find_by_id(&self, id: u64) -> Option<{{ struct_name }}>;
+
+    async fn find_all_by_entity(&self, {{ small_struct }}: &{{ struct_name }}) -> Vec<{{ struct_name }}>;
+
+    async fn find_all(&self) -> Vec<{{ struct_name }}>;
+
+    async fn find_with_page(&self, page_request: &PageRequest) -> Page<{{ struct_name }}>;
+
+    async fn save(&self, {{ small_struct }}: &{{ struct_name }}) -> bool;
+
+    async fn save_batch(&self, {{ small_struct }}: &Vec<{{ struct_name }}>) -> bool;
+
+    async fn update(&self, {{ small_struct }}: &{{ struct_name }}) -> bool;
+
+    async fn delete(&self, id: u64) -> bool;
+
+    async fn count(&self, {{ small_struct }}: &{{ struct_name }}) -> i64;
+
+}
+

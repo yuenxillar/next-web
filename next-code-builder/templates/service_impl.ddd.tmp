@@ -1,0 +1,60 @@
+use rbatis::{Page, PageRequest};
+use std::sync::Arc;
+use async_trait::async_trait;
+use rudi::Singleton;
+
+use next_web_dev::error::api_error::ApiError;
+
+use crate::domain::repository::{{ structSmallName }}_repository::{{ structName }}Repository;
+use crate::domain::service::{{ structSmallName }}_service::{{ structName }}Service;
+use crate::domain::model::entity::{{ structSmallName }}::{{ structName }};
+
+
+//! Author: {{ author }}
+//! DateTime: {{ dateTime }}
+//! Description: {{ structName }}ServiceImpl
+
+#[derive(Clone)]
+#[Singleton(name = "{{ beanName }}ServiceImpl", binds = [Self::into_service])]
+pub struct {{ structName }}ServiceImpl {
+    #[di(name = "{{ beanName }}RepositoryImpl")]
+    {{ structSmallName }}_repository: Arc<dyn {{ structName }}Repository>
+}
+
+
+#[async_trait]
+impl {{ structName }}Service for {{ structName }}ServiceImpl {
+
+    type ServiceResult<T> = Result<T, ApiError>;
+    
+    async fn select_page(&self, page_request: &PageRequest, company_id: &str) -> Self::ServiceResult<Page<{{ structName }}>> {
+        return Ok(self.{{ structSmallName }}_repository.find_with_page(page_request).await);
+    }
+
+    async fn select_by_id(&self, id: {{ id }}) -> Self::ServiceResult<Option<{{ structName }}>> {
+        return Ok(self.{{ structSmallName }}_repository.find_by_id(id).await);
+    }
+
+    async fn insert(&self, data: &{{ structName }}) -> Self::ServiceResult<Option<bool>> {
+        return Ok(Some(self.{{ structSmallName }}_repository.save(data).await));
+    }
+
+    async fn insert_batch(&self, data: &Vec<{{ structName }}>) -> Self::ServiceResult<Option<bool>> {
+        return Ok(Some(self.{{ structSmallName }}_repository.save_batch(data).await));
+    }
+
+    async fn update_by_id(&self, data: &{{ structName }}) -> Self::ServiceResult<Option<bool>> {
+        return Ok(Some(self.{{ structSmallName }}_repository.update(data).await));
+    }
+
+    async fn delete_by_id(&self, id: {{ id }}) -> Self::ServiceResult<Option<bool>> {
+        return Ok(Some(self.{{ structSmallName }}_repository.delete(id).await));
+    }
+}
+
+impl {{ structName }}ServiceImpl {
+    
+    pub fn into_service(self) -> Arc<dyn {{ structName }}Service> {
+        Arc::new(self)
+    }
+}

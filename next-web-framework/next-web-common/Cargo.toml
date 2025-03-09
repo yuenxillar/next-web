@@ -1,0 +1,18 @@
+[package]
+name = "next-web-common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"]}
+serde_json = { version = "1"}
+
+axum-core = "0.5.0"
+
+log = "0.4"
+
+
+[features]
+default = []
+thread-pool = []
+query-wrapper = []

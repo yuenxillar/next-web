@@ -1,0 +1,19 @@
+[package]
+name = "next-web-ai"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1.0.217"
+
+[dev-dependencies]
+tokio = { version = "1.41.0", features = ["full"] }
+
+reqwest = { version = "0.12", features = ["json"] }
+
+
+[features]
+default = ["deep-seek"]
+
+deep-seek = []
+

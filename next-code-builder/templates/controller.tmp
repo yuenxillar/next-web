@@ -1,0 +1,76 @@
+use std::sync::Arc;
+use axum::extract::{Path, State, Query};
+use axum::{Json, Router};
+use axum::routing::{get, post, delete, put};
+use rbatis::{Page, PageRequest};
+
+use next_web_dev::converter::api_converter::Converter;
+use next_web_dev::application::api::api_response::ApiResponse;
+use next_web_dev::error::api_error::ApiError;
+use crate::infrastructure::po::{{ structSmallName }}::{{ structName }};
+use crate::domain::service::{{ structSmallName }}_service::{{ structName }}Service;
+
+
+//! Author: {{ author }}
+//! DateTime: {{ dateTime }}
+//! Description: {{ structName }}Controller
+
+pub struct {{ structName }}Controller;
+
+type Service            =  State<Arc<dyn {{ structName }}Service>>;
+type ApiResult<T>       =  Result<ApiResponse<T>, ApiError>;
+
+
+impl {{ structName }}Controller {
+    pub fn routes(ctx: &mut rudi::Context) -> Router {
+        let service = ctx
+            .resolve_option_with_name::<Arc<dyn {{ structName }}Service>>("{{ beanName }}ServiceImpl")
+            .unwrap();
+        Router::new().nest(
+            "/api/{{ apiRoute }}",
+            Router::new()
+                .route("/v1/query/{id}",   get(Self::query))
+                .route("/v1/page",        get(Self::page))
+                .route("/v1/add",         post(Self::add))
+                .route("/v1/edit",        put(Self::edit))
+                .route("/v1/delete/{id}",  delete(Self::delete))
+                .with_state(service))
+    }
+}
+
+impl {{ structName }}Controller {
+    pub async fn query(
+                    State(service): Service,
+                    Path(id): Path<u64>,
+    ) -> ApiResult<Option<{{ structName }}>> {
+        return service.select_by_id(id).await?.into_api_result();
+    }
+
+    pub async fn page(
+                    State(service): Service,
+                    Query(page_request): Query<PageRequest>,
+    ) -> ApiResult<Page<{{ structName }}>> {
+        return service.select_page( &page_request, "").await?.into_api_result();
+    }
+
+    pub async fn add(
+                    State(service): Service,
+                    Json(data): Json<{{ structName }}>,
+        ) -> ApiResult<Option<bool>> {
+        return service.insert(&data).await?.into_api_result();
+    }
+
+    pub async fn edit(
+                    State(service): Service,
+                    Json(data): Json<{{ structName }}>,
+    ) -> ApiResult<Option<bool>> {
+        return service.update_by_id(&data).await?.into_api_result();
+    }
+
+    pub async fn delete(
+                    State(service): Service,
+                    Path(id): Path<u64>,
+    ) -> ApiResult<Option<bool>> {
+        return service.delete_by_id(id).await?.into_api_result();
+    }
+}
