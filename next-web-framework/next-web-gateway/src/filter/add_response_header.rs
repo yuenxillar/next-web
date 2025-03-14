@@ -10,9 +10,14 @@ pub struct AddResponseHeaderFilter {
 impl DefaultGatewayFilter for AddResponseHeaderFilter {
     fn filter(
         &self,
-        ctx: &mut ApplicationContext,
-        request_header: &mut pingora::http::RequestHeader,
+        _ctx: &mut ApplicationContext,
+        _request_header: &mut pingora::http::RequestHeader,
         respnose_header: &mut pingora::http::ResponseHeader,
     ) {
+        for header in &self.headers {
+            respnose_header
+                .append_header(header.k.clone(), header.v.as_str())
+                .ok();
+        }
     }
 }

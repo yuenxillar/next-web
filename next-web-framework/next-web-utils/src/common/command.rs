@@ -4,11 +4,25 @@ use std::{
 };
 
 use std::sync::mpsc::Sender;
+
+///Command utility for executing system commands
+/// 系统命令执行工具类
+#[derive(Debug)]
 pub struct CommandUtil;
 
 /// 运行命令工具类
 impl CommandUtil {
     //! 运行命令 例如 linux shell 命令
+    /// Execute system command and return output
+    /// 执行系统命令并返回输出
+    ///
+    /// # Arguments
+    /// - `program`: Command name (e.g. "ls")
+    /// - `args`: Command arguments vector
+    ///
+    /// # Returns
+    /// - Ok(String): Command output
+    /// - Err(Error): Execution failure
     pub fn exec(program: &str, args: Vec<&str>) -> Result<String, Error> {
         // run the ls command
 
@@ -24,6 +38,13 @@ impl CommandUtil {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
 
+    /// Execute command from string format
+    /// 从字符串格式执行命令
+    ///
+    /// Example:
+    /// ```
+    /// CommandUtil::exec_from_str("ls -l")
+    /// ```
     pub fn exec_from_str(command: &str) -> Result<String, Error> {
         let mut args = command.split_whitespace();
         let program = args.next().unwrap_or("");
@@ -31,6 +52,11 @@ impl CommandUtil {
         return Self::exec(program, args);
     }
 
+    /// Execute command with fallback function
+    /// 带后备函数的命令执行
+    ///
+    /// # Parameters
+    /// - `fallback`: Function to call when command fails
     pub fn exec_and_fallback<F>(command: &str, fallback: F) -> Result<String, Error>
     where
         F: FnOnce(),
@@ -53,6 +79,17 @@ impl CommandUtil {
     ///
     /// # 返回值
     /// 如果命令执行成功，则返回 `Ok(())`；否则返回错误 <button class="citation-flag" data-index="1">。
+    /// Execute command and stream output through channel
+    /// 执行命令并通过通道流式传输输出
+    ///
+    /// # Parameters
+    /// - `command`: Full command string
+    /// - `sender`: Channel sender for output lines
+    /// - `block`: Block thread until completion
+    ///
+    /// # Channel Behavior
+    /// - Sends output line by line
+    /// - Closes channel when command completes
     pub fn exec_to_channel(
         command: &str,
         sender: Sender<String>,
@@ -70,14 +107,15 @@ impl CommandUtil {
             .spawn()?;
 
         // 获取子进程的标准输出流
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| Error::new(ErrorKind::Other, "无法获取子进程的标准输出"))?;
+        let stdout = child.stdout.take().ok_or_else(|| {
+            Error::new(
+                ErrorKind::Other,
+                "Unable to obtain the standard output of the child process",
+            )
+        })?;
 
         // 使用缓冲区逐行读取子进程的输出
         let mut reader = BufReader::new(stdout);
-        
 
         let mut func = move || -> Result<(), Error> {
             loop {

@@ -5,11 +5,11 @@ use axum::{
     response::Response,
     // Extension,
 };
+use next_web_common::response::api_response::ApiResponse;
 // use tracing::info;
 
 use super::{authorization_service::AuthorizationService, login_type::LoginType};
 use crate::{
-    application::api::api_response::ApiResponse,
     manager::user_authorization_manager::UserAuthorizationManager, util::token_util::TokenUtil,
 };
 
@@ -46,7 +46,6 @@ async fn request_auth_middleware<T: AuthorizationService<Vec<String>> + Clone>(
             return Err(ApiResponse::fail("Unauthorized access".into()));
         }
     }
-
     // set the user info in the request
     req.extensions_mut().insert(user_info);
 

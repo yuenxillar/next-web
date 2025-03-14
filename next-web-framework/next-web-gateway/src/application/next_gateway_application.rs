@@ -44,6 +44,7 @@ impl ProxyHttp for NextGatewayApplication {
         Self::CTX {
             fallback_id: None,
             route_id: None,
+            session: None,
         }
     }
 
@@ -152,46 +153,6 @@ impl ProxyHttp for NextGatewayApplication {
         Ok(())
     }
 
-    // 当连接上游服务器失败时触发（如DNS解析失败、TCP连接超时等）
-    fn fail_to_connect(
-        &self,
-        _session: &mut Session,
-        _peer: &HttpPeer,
-        ctx: &mut Self::CTX,
-        e: Box<Error>,
-    ) -> Box<Error> {
-        // Error recored
-        ctx.fallback_id.as_ref().map(|id| {
-            self.circuit_breaker_service_manager
-                .as_ref()
-                .map(|m| m.services.get(id).map(|s| s.controller.process(false)))
-        });
-        e
-    }
-
-    // 当与上游服务器建立连接后出现代理错误时触发（如上游连接意外断开、响应解析失败等）
-    fn error_while_proxy(
-        &self,
-        peer: &HttpPeer,
-        session: &mut Session,
-        e: Box<Error>,
-        ctx: &mut Self::CTX,
-        client_reused: bool,
-    ) -> Box<Error> {
-        // Error recored
-        ctx.fallback_id.as_ref().map(|id| {
-            self.circuit_breaker_service_manager
-                .as_ref()
-                .map(|m| m.services.get(id).map(|s| s.controller.process(false)))
-        });
-
-        let mut e = e.more_context(format!("Peer: {}", peer));
-        // only reused client connections where retry buffer is not truncated
-        e.retry
-            .decide_reuse(client_reused && !session.as_ref().retry_buffer_truncated());
-        e
-    }
-
     fn response_body_filter(
         &self,
         _session: &mut Session,
@@ -209,12 +170,53 @@ impl ProxyHttp for NextGatewayApplication {
     fn suppress_error_log(&self, _session: &Session, _ctx: &Self::CTX, _error: &Error) -> bool {
         true
     }
+
+    // 当与上游服务器建立连接后出现代理错误时触发（如上游连接意外断开、响应解析失败等）
+    fn error_while_proxy(
+        &self,
+        peer: &HttpPeer,
+        session: &mut Session,
+        e: Box<Error>,
+        ctx: &mut Self::CTX,
+        client_reused: bool,
+    ) -> Box<Error> {
+        // Error record
+        ctx.fallback_id.as_ref().map(|id| {
+            self.circuit_breaker_service_manager
+                .as_ref()
+                .map(|m| m.services.get(id).map(|s| s.controller.process(false)))
+        });
+
+        let mut e = e.more_context(format!("Peer: {}", peer));
+        // only reused client connections where retry buffer is not truncated
+        e.retry
+            .decide_reuse(client_reused && !session.as_ref().retry_buffer_truncated());
+        e
+    }
+
+    // 当连接上游服务器失败时触发（如DNS解析失败、TCP连接超时等）
+    fn fail_to_connect(
+        &self,
+        _session: &mut Session,
+        _peer: &HttpPeer,
+        ctx: &mut Self::CTX,
+        e: Box<Error>,
+    ) -> Box<Error> {
+        // Error record
+        ctx.fallback_id.as_ref().map(|id| {
+            self.circuit_breaker_service_manager
+                .as_ref()
+                .map(|m| m.services.get(id).map(|s| s.controller.process(false)))
+        });
+        e
+    }
 }
 
 #[derive(Clone)]
 pub struct ApplicationContext {
     pub fallback_id: Option<String>,
     pub route_id: Option<String>,
+    pub session: Option<String>
 }
 
 pub fn set_request_timeout(http: &mut HttpPeer, timeout: Duration) {

@@ -10,7 +10,15 @@ impl DefaultGatewayFilter for SaveSessionFilter {
         &self,
         ctx: &mut ApplicationContext,
         request_header: &mut pingora::http::RequestHeader,
-        respnose_header: &mut pingora::http::ResponseHeader,
+        _respnose_header: &mut pingora::http::ResponseHeader,
     ) {
+        if let Some(session) = &ctx.session {
+            request_header
+                .insert_header(
+                    "Set-Cookie".to_string(),
+                    format!("session_id={}; Path=/", session).as_str(),
+                )
+                .ok();
+        }
     }
 }

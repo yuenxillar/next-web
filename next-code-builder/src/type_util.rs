@@ -38,7 +38,6 @@ impl TypeUtil {
             return "u8".to_string();
         }
 
-        
         if str.contains("SERIAL") {
             return "i32".to_string(); // PostgreSQL 的自增类型
         } else if str.contains("UUID") {

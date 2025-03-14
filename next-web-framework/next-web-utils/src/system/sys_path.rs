@@ -12,7 +12,7 @@ impl SystemPathUtil {
     }
 
     /// 获取用户的主目录路径。
-    /// 如果无法获取主目录路径，则返回 `None` 
+    /// 如果无法获取主目录路径，则返回 `None`
     pub fn home_dir() -> Option<String> {
         dirs::home_dir()
             .map(|s| s.to_str().map(|s| s.to_string()))
@@ -20,19 +20,19 @@ impl SystemPathUtil {
     }
 
     /// 获取系统的临时目录路径。
-    /// 如果无法获取临时目录路径，则返回 `None` 
+    /// 如果无法获取临时目录路径，则返回 `None`
     pub fn temp_dir() -> Option<String> {
         std::env::temp_dir().to_str().map(|s| s.to_string())
     }
 
     /// 获取模板目录路径（如果存在）。
-    /// 如果无法获取模板目录路径，则返回 `None` 
+    /// 如果无法获取模板目录路径，则返回 `None`
     pub fn template_dir() -> Option<String> {
         dirs::template_dir().and_then(|f| f.to_str().map(|s| s.to_string()))
     }
 
     /// 获取下载目录路径（如果存在）。
-    /// 如果无法获取下载目录路径，则返回 `None` 
+    /// 如果无法获取下载目录路径，则返回 `None`
     pub fn download_dir() -> Option<String> {
         dirs::download_dir()
             .map(|s| s.to_str().map(|s| s.to_string()))
@@ -40,7 +40,7 @@ impl SystemPathUtil {
     }
 
     /// 获取图片目录路径（如果存在）。
-    /// 如果无法获取图片目录路径，则返回 `None` 
+    /// 如果无法获取图片目录路径，则返回 `None`
     pub fn picture_dir() -> Option<String> {
         dirs::picture_dir()
             .map(|s| s.to_str().map(|s| s.to_string()))
@@ -48,7 +48,7 @@ impl SystemPathUtil {
     }
 
     /// 获取配置目录路径（如果存在）。
-    /// 如果无法获取配置目录路径，则返回 `None` 
+    /// 如果无法获取配置目录路径，则返回 `None`
     pub fn config_dir() -> Option<String> {
         dirs::config_dir()
             .map(|s| s.to_str().map(|s| s.to_string()))
@@ -56,7 +56,7 @@ impl SystemPathUtil {
     }
 
     /// 获取数据目录路径（如果存在）。
-    /// 如果无法获取数据目录路径，则返回 `None` 
+    /// 如果无法获取数据目录路径，则返回 `None`
     pub fn data_dir() -> Option<String> {
         dirs::data_dir()
             .map(|s| s.to_str().map(|s| s.to_string()))
@@ -64,7 +64,7 @@ impl SystemPathUtil {
     }
 
     /// 获取可执行文件所在的目录路径（如果存在）。
-    /// 如果无法获取可执行文件目录路径，则返回 `None` 
+    /// 如果无法获取可执行文件目录路径，则返回 `None`
     pub fn executable_dir() -> Option<String> {
         dirs::executable_dir()
             .map(|s| s.to_str().map(|s| s.to_string()))
@@ -72,7 +72,7 @@ impl SystemPathUtil {
     }
 
     /// 获取缓存目录路径（如果存在）。
-    /// 如果无法获取缓存目录路径，则返回 `None` 
+    /// 如果无法获取缓存目录路径，则返回 `None`
     pub fn cache_dir() -> Option<String> {
         dirs::cache_dir()
             .map(|s| s.to_str().map(|s| s.to_string()))
@@ -80,7 +80,7 @@ impl SystemPathUtil {
     }
 
     /// 获取运行时目录路径（如果存在）。
-    /// 如果无法获取运行时目录路径，则返回 `None` 
+    /// 如果无法获取运行时目录路径，则返回 `None`
     pub fn runtime_dir() -> Option<String> {
         dirs::runtime_dir()
             .map(|s| s.to_str().map(|s| s.to_string()))
@@ -88,7 +88,7 @@ impl SystemPathUtil {
     }
 
     /// 获取当前可执行文件的目录路径（仅限 Windows 平台）。
-    /// 如果无法获取可执行文件路径，则返回 `None` 
+    /// 如果无法获取可执行文件路径，则返回 `None`
     #[cfg(target_os = "windows")]
     pub fn current_exe_dir() -> Option<String> {
         std::env::current_exe()
@@ -96,7 +96,6 @@ impl SystemPathUtil {
             .unwrap_or(None)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

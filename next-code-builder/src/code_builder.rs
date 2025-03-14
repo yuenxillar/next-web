@@ -80,7 +80,10 @@ impl CodeBuilder {
         context.set_value("beanName", &bean_name);
         context.set_value("author", &self.author);
         context.set_value("project", &self.project);
-        context.set_value("dateTime", &Local::now().format("%Y/%m/%d %H:%M").to_string());
+        context.set_value(
+            "dateTime",
+            &Local::now().format("%Y/%m/%d %H:%M").to_string(),
+        );
         context.set_value("tableName", &self.database_meta.table_name);
         context.set_value("columns", &columns);
         context.set_value("apiRoute", &Self::camel_to_kebab_case(&struct_name));
@@ -183,7 +186,7 @@ impl CodeBuilder {
 
     fn camel_to_kebab_case(input: &str) -> String {
         let mut result = String::new();
-    
+
         for (i, c) in input.chars().enumerate() {
             if c.is_uppercase() {
                 // 如果不是第一个字符，在前面添加短横线
@@ -196,7 +199,7 @@ impl CodeBuilder {
                 result.push(c);
             }
         }
-    
+
         result
     }
 

@@ -29,8 +29,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3.0",  features = ["fmt", "env-filter", "json", "chrono"] }
 tracing-appender = "0.2"
 
-jemallocator = { version = "0.5.4", optional = true }
+#jemallocator = { version = "0.5.4", optional = true }
 
 [features]
 default = []
-global-allocator = ["jemallocator"]
+#global-allocator = ["jemallocator"]

@@ -11,9 +11,10 @@ pub mod middleware;
 pub mod security;
 pub mod transaction;
 pub mod util;
-pub mod subsidiary;
-mod tests;
+pub mod router;
 
+
+mod tests;
 
 extern crate bcrypt;
 extern crate anyhow;
@@ -23,9 +24,7 @@ pub extern crate tracing;
 pub extern crate once_cell;
 pub extern crate rudi;
 
-
 #[cfg(feature = "redis_enabled")]
 pub extern crate deadpool_redis;
 #[cfg(feature = "job_scheduler")]
 pub extern crate tokio_cron_scheduler;
-

@@ -9,14 +9,16 @@ pub struct AddRequestHeaderIfNotPresentFilter {
 impl DefaultGatewayFilter for AddRequestHeaderIfNotPresentFilter {
     fn filter(
         &self,
-        ctx: &mut ApplicationContext,
+        _ctx: &mut ApplicationContext,
         request_header: &mut pingora::http::RequestHeader,
-        respnose_header: &mut pingora::http::ResponseHeader,
+        _respnose_header: &mut pingora::http::ResponseHeader,
     ) {
-        // if let Some(request_header) = request_header {
-        //     for header in self.headers.iter() {
-        //         request_header.append_header(header.k.clone(), &header.v);
-        //     }
-        // }
+        for header in &self.headers {
+            if !request_header.headers.contains_key(header.k.as_str()) {
+                request_header
+                    .insert_header(header.k.clone(), header.v.as_str())
+                    .ok();
+            }
+        }
     }
 }

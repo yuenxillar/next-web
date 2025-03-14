@@ -13,5 +13,8 @@ members = [
     "next-web-ai", 
     "next-web-gateway", 
     "next-web-security", 
-    "next-web-common", "next-web-id", "next-web-ip",
+    "next-web-common",
+    "next-web-id",
+    "next-web-ip",
+    "next-web-core",
 ]

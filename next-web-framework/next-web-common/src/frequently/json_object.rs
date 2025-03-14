@@ -21,7 +21,7 @@ impl JsonObject {
     /// - `is_order`: 是否保持键值对的顺序（当前未实现）。
     ///
     /// # 返回值
-    /// 返回一个初始化的 `JsonObject` 实例，默认容量为 12 <button class="citation-flag" data-index="1">。
+    /// 返回一个初始化的 `JsonObject` 实例，默认容量为 12 
     pub fn new(is_order: bool) -> Self {
         Self {
             raw_value: HashMap::with_capacity(12),
@@ -90,7 +90,7 @@ impl JsonObject {
     /// - `key`: 需要查找的键。
     ///
     /// # 返回值
-    /// 如果键存在且反序列化成功，返回对应的值；否则返回 `None` <button class="citation-flag" data-index="1">。
+    /// 如果键存在且反序列化成功，返回对应的值；否则返回 `None` 
     fn get<V: DeserializeOwned>(&self, key: &str) -> Option<V> {
         self.raw_value
             .get(key)

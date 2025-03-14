@@ -1,1 +1,1 @@
-mod properties;
+pub mod properties;

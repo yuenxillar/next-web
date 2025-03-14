@@ -92,9 +92,6 @@ impl GatewayFilter {
             GatewayFilter::StripPrefix(gateway_filter) => {
                 gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
             }
-            // GatewayFilter::CircuitBreaker(gateway_filter) => {
-            //     gateway_filter.filter(session, upstream_request_header, upstream_response_header)
-            // }
             GatewayFilter::Nothing => {}
         }
     }
@@ -137,9 +134,23 @@ impl Into<GatewayFilter> for &String {
 
             // TODO
             "RewritePath" => GatewayFilter::RewritePath(RewritePathFilter {}),
-            // TODO
+
             "RewriteResponseHeader" => {
-                GatewayFilter::RewriteResponseHeader(RewriteResponseHeaderFilter {})
+                let header = handle_two(value);
+                let regex = if header.len() == 2 {
+                    None
+                } else {
+                    Some(regex::Regex::new(&header[2]).unwrap())
+                };
+                GatewayFilter::RewriteResponseHeader(RewriteResponseHeaderFilter {
+                    header: (
+                        KeyValue {
+                            k: header[0].to_string(),
+                            v: header[1].to_string(),
+                        },
+                        regex,
+                    ),
+                })
             }
             "SaveSession" => GatewayFilter::SaveSession(SaveSessionFilter {}),
             "SetRequestHeader" => {

@@ -1,34 +1,34 @@
 
 
 #[derive(Debug, Clone)]
-pub struct BigDecimal {
+pub struct Number {
     value: u32,
 }
 
-impl From<u32> for BigDecimal {
+impl From<u32> for Number {
     
     fn from(value: u32) -> Self {
-        BigDecimal { value }
+        Number { value }
     }
 }
 
-impl From<f32> for BigDecimal {
+impl From<f32> for Number {
     
     fn from(value: f32) -> Self {
         let value = (value * 100.0) as u32;
-        BigDecimal { value }
+        Number { value }
     }
 }
 
-impl From<f64> for BigDecimal {
+impl From<f64> for Number {
     
     fn from(value: f64) -> Self {
         let value = (value * 100.0) as u32;
-        BigDecimal { value }
+        Number { value }
     }
 }
 
-impl From<String> for BigDecimal {
+impl From<String> for Number {
 
     fn from(value: String) -> Self {
         let value = if value.contains(".") {
@@ -37,11 +37,11 @@ impl From<String> for BigDecimal {
         else {
             value.parse::<u32>().unwrap_or_default()
         };
-        BigDecimal { value }
+        Number { value }
     }
 }
 
-impl From<&str> for BigDecimal {
+impl From<&str> for Number {
 
     fn from(value: &str) -> Self {
         let value = if value.contains(".") {
@@ -50,7 +50,7 @@ impl From<&str> for BigDecimal {
         else {
             value.parse::<u32>().unwrap_or_default()
         };
-        BigDecimal { value }
+        Number { value }
     }
 }
 
@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn test_from_u32() {
-        let big_decimal = BigDecimal::from("132.15");
+        let big_decimal = Number::from("132.15");
         assert_eq!(big_decimal.value, 13215);
     }
 }

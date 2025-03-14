@@ -10,9 +10,10 @@ pub struct SetStatusFilter {
 impl DefaultGatewayFilter for SetStatusFilter {
     fn filter(
         &self,
-        ctx: &mut ApplicationContext,
-        request_header: &mut pingora::http::RequestHeader,
+        _ctx: &mut ApplicationContext,
+        _request_header: &mut pingora::http::RequestHeader,
         respnose_header: &mut pingora::http::ResponseHeader,
     ) {
+        respnose_header.set_status(self.status).ok();
     }
 }

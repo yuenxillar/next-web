@@ -10,9 +10,12 @@ pub struct SetRequestHostHeaderFilter {
 impl DefaultGatewayFilter for SetRequestHostHeaderFilter {
     fn filter(
         &self,
-        session: &mut ApplicationContext,
+        _session: &mut ApplicationContext,
         request_header: &mut pingora::http::RequestHeader,
-        respnose_header: &mut pingora::http::ResponseHeader,
+        _respnose_header: &mut pingora::http::ResponseHeader,
     ) {
+        request_header
+            .insert_header("host".to_string(), self.host.as_str())
+            .ok();
     }
 }

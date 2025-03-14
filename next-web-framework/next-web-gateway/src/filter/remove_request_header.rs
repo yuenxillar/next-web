@@ -10,9 +10,14 @@ pub struct RemoveRequestHeaderFilter {
 impl DefaultGatewayFilter for RemoveRequestHeaderFilter {
     fn filter(
         &self,
-        ctx: &mut ApplicationContext,
+        _ctx: &mut ApplicationContext,
         request_header: &mut pingora::http::RequestHeader,
-        respnose_header: &mut pingora::http::ResponseHeader,
+        _response_header: &mut pingora::http::ResponseHeader,
     ) {
+        // Traverse the list of headers that need to be removed
+        for header_name in &self.headers {
+            let header_name = header_name.to_lowercase();
+            request_header.remove_header(&header_name);
+        }
     }
 }

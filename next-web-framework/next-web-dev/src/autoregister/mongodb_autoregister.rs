@@ -5,6 +5,8 @@ use futures::executor::block_on;
 use mongodb::Client;
 use tracing::info;
 
+
+
 pub struct MongoDBAutoRegister(pub MongoDBProperties);
 
 impl AutoRegister for MongoDBAutoRegister {

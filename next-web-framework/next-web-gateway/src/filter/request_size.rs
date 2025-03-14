@@ -11,9 +11,18 @@ pub struct RequestSizeFilter {
 impl DefaultGatewayFilter for RequestSizeFilter {
     fn filter(
         &self,
-        ctx: &mut ApplicationContext,
+        _ctx: &mut ApplicationContext,
         request_header: &mut pingora::http::RequestHeader,
-        respnose_header: &mut pingora::http::ResponseHeader,
+        _response_header: &mut pingora::http::ResponseHeader,
     ) {
+        if let Some(content_length) = request_header.headers.get("content-length") {
+            if let Ok(content_length) = content_length.to_str() {
+                if let Ok(size) = content_length.parse::<u64>() {
+                    if size > self.max_size {
+                        return;
+                    }
+                }
+            }
+        }
     }
 }

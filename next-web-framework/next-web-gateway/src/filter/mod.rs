@@ -1,7 +1,6 @@
 pub mod add_request_header;
 pub mod add_request_headers_if_not_present;
 pub mod add_response_header;
-pub mod circuit_breaker;
 pub mod gateway_filter;
 pub mod global_filter;
 pub mod remove_request_header;

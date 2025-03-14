@@ -7,7 +7,7 @@ use rust_embed_for_web::RustEmbed;
 #[derive(RustEmbed)]
 #[folder = "resources/"]
 #[include = "*.html"]
-#[include = "*.properties"]
+#[include = "*.register"]
 #[include = "*.yaml"]
 #[include = "*.json"]
 pub struct ApplicationResources;

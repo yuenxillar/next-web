@@ -25,7 +25,7 @@ impl<A: Application + Default> NextApplication<A> {
     }
 
 
-    /// Get the application properties.
+    /// Get the application register.
     pub fn application_properties(&self) -> &ApplicationProperties {
         &self.application_properties
     }
@@ -65,7 +65,7 @@ impl<A: Application + Default> NextApplication<A> {
     }
 
 
-    /// Set the application properties.
+    /// Set the application register.
     pub fn set_application_properties(&mut self, application_properties: ApplicationProperties) {
         self.application_properties = application_properties;
     }

@@ -68,7 +68,7 @@ pub trait GatewayApplication: Send + Sync {
             circuitbreaker_service_manager,
         );
 
-        // Create backgroud services
+        // Create background services
         let traffic_monitoring_service =
             background_service("TrafficMonitoringService", TrafficMonitoringService::new());
 

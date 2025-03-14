@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use super::http_properties::HttpProperties;
 
-/// Application server properties
+/// Application server register
 #[derive(Debug, Deserialize, Clone)]
 pub struct ServerProperties {
     port: u16,

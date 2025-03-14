@@ -1,17 +1,14 @@
-
 use chrono::{Datelike, NaiveDate, Utc};
-
 
 /// 身份证工具类
 pub struct IdCardUtil;
 
 impl IdCardUtil {
-
     /// 验证身份证是否合法。
-    /// 
+    ///
     /// # 参数
     /// - `id_card`: 身份证号码（支持15位或18位）。
-    /// 
+    ///
     /// # 返回值
     /// 如果身份证合法，则返回 `true`；否则返回 `false`
     pub fn is_valid_card(id_card: &str) -> bool {
@@ -31,10 +28,10 @@ impl IdCardUtil {
     }
 
     /// 将15位身份证转换为18位。
-    /// 
+    ///
     /// # 参数
     /// - `id_card`: 15位身份证号码。
-    /// 
+    ///
     /// # 返回值
     /// 返回转换后的18位身份证号码。如果输入不合法，则返回 `None`
     pub fn convert_15_to_18(id_card: &str) -> Option<String> {
@@ -51,10 +48,10 @@ impl IdCardUtil {
     }
 
     /// 获取身份证中的生日。
-    /// 
+    ///
     /// # 参数
     /// - `id_card`: 身份证号码（支持15位或18位）。
-    /// 
+    ///
     /// # 返回值
     /// 返回生日的 `NaiveDate` 对象。如果身份证不合法，则返回 `None`。
     pub fn get_birth_by_id_card(id_card: &str) -> Option<NaiveDate> {
@@ -69,12 +66,11 @@ impl IdCardUtil {
         NaiveDate::parse_from_str(&birth_str, "%Y%m%d").ok()
     }
 
-
     /// 获取身份证中的年龄。
-    /// 
+    ///
     /// # 参数
     /// - `id_card`: 身份证号码（支持15位或18位）。
-    /// 
+    ///
     /// # 返回值
     /// 返回年龄。如果身份证不合法，则返回 `None`。
     pub fn get_age_by_id_card(id_card: &str) -> Option<i32> {
@@ -90,10 +86,10 @@ impl IdCardUtil {
     }
 
     /// 获取身份证中的生日年份。
-    /// 
+    ///
     /// # 参数
     /// - `id_card`: 身份证号码（支持15位或18位）。
-    /// 
+    ///
     /// # 返回值
     /// 返回生日年份。如果身份证不合法，则返回 `None`。
     pub fn get_year_by_id_card(id_card: &str) -> Option<i32> {
@@ -102,10 +98,10 @@ impl IdCardUtil {
     }
 
     /// 获取身份证中的生日月份。
-    /// 
+    ///
     /// # 参数
     /// - `id_card`: 身份证号码（支持15位或18位）。
-    /// 
+    ///
     /// # 返回值
     /// 返回生日月份。如果身份证不合法，则返回 `None`。
     pub fn get_month_by_id_card(id_card: &str) -> Option<u32> {
@@ -114,10 +110,10 @@ impl IdCardUtil {
     }
 
     /// 获取身份证中的生日日期。
-    /// 
+    ///
     /// # 参数
     /// - `id_card`: 身份证号码（支持15位或18位）。
-    /// 
+    ///
     /// # 返回值
     /// 返回生日日期。如果身份证不合法，则返回 `None`。
     pub fn get_day_by_id_card(id_card: &str) -> Option<u32> {
@@ -126,10 +122,10 @@ impl IdCardUtil {
     }
 
     /// 获取身份证中的性别。
-    /// 
+    ///
     /// # 参数
     /// - `id_card`: 身份证号码（支持15位或18位）。
-    /// 
+    ///
     /// # 返回值
     /// 返回性别（"男" 或 "女"）。如果身份证不合法，则返回 `None`。
     pub fn get_gender_by_id_card(id_card: &str) -> Option<&'static str> {
@@ -149,10 +145,10 @@ impl IdCardUtil {
     }
 
     /// 获取身份证中的省份代码。
-    /// 
+    ///
     /// # 参数
     /// - `id_card`: 身份证号码（支持15位或18位）。
-    /// 
+    ///
     /// # 返回值
     /// 返回省份代码。如果身份证不合法，则返回 `None`。
     pub fn get_province_by_id_card(id_card: &str) -> Option<&str> {
@@ -216,7 +212,8 @@ impl IdCardUtil {
     fn calculate_checksum(id_card: &str) -> char {
         const WEIGHTS: [u32; 17] = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
         const CHECK_DIGITS: [char; 11] = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2'];
-        let sum: u32 = id_card.chars()
+        let sum: u32 = id_card
+            .chars()
             .zip(WEIGHTS.iter())
             .map(|(c, w)| c.to_digit(10).unwrap_or(0) * w)
             .sum();
@@ -224,7 +221,6 @@ impl IdCardUtil {
         CHECK_DIGITS[mod_value as usize]
     }
 }
-
 
 #[cfg(test)]
 mod id_card_tests {
@@ -238,42 +234,65 @@ mod id_card_tests {
 
     #[test]
     fn test_convert_15_to_18() {
-        assert_eq!(IdCardUtil::convert_15_to_18("111111111111111"), Some("111111191111116".to_string()));
+        assert_eq!(
+            IdCardUtil::convert_15_to_18("111111111111111"),
+            Some("111111191111116".to_string())
+        );
     }
 
     #[test]
     fn test_get_birth_by_id_card() {
-        assert_eq!(IdCardUtil::get_birth_by_id_card("350201198701146613"), NaiveDate::from_ymd_opt(1987, 1, 14));
+        assert_eq!(
+            IdCardUtil::get_birth_by_id_card("350201198701146613"),
+            NaiveDate::from_ymd_opt(1987, 1, 14)
+        );
     }
 
     #[test]
     fn test_get_age_by_id_card() {
-        assert_eq!(IdCardUtil::get_age_by_id_card("350201198701146613"), Some(38));
+        assert_eq!(
+            IdCardUtil::get_age_by_id_card("350201198701146613"),
+            Some(38)
+        );
     }
 
     #[test]
     fn test_get_year_by_id_card() {
-        assert_eq!(IdCardUtil::get_year_by_id_card("350201198701146613"), Some(1987));
+        assert_eq!(
+            IdCardUtil::get_year_by_id_card("350201198701146613"),
+            Some(1987)
+        );
     }
 
     #[test]
     fn test_get_month_by_id_card() {
-        assert_eq!(IdCardUtil::get_month_by_id_card("350201198701146613"), Some(1));
+        assert_eq!(
+            IdCardUtil::get_month_by_id_card("350201198701146613"),
+            Some(1)
+        );
     }
 
     #[test]
     fn test_get_day_by_id_card() {
-        assert_eq!(IdCardUtil::get_day_by_id_card("350201198701146613"), Some(14));
+        assert_eq!(
+            IdCardUtil::get_day_by_id_card("350201198701146613"),
+            Some(14)
+        );
     }
 
     #[test]
     fn test_get_gender_by_id_card() {
-        assert_eq!(IdCardUtil::get_gender_by_id_card("350201198701146613"), Some("男"));
+        assert_eq!(
+            IdCardUtil::get_gender_by_id_card("350201198701146613"),
+            Some("男")
+        );
     }
 
     #[test]
     fn test_get_province_by_id_card() {
-        assert_eq!(IdCardUtil::get_province_by_id_card("350201198701146613"), Some("福建省"));
+        assert_eq!(
+            IdCardUtil::get_province_by_id_card("350201198701146613"),
+            Some("福建省")
+        );
     }
-
 }

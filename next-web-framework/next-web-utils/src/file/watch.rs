@@ -37,8 +37,8 @@ impl Watcher {
         follow_symlinks: bool,
     ) -> Result<bool, notify::Error> {
         let config = notify::Config::default()
-        .with_compare_contents(compare_contents)
-        .with_follow_symlinks(follow_symlinks);
+            .with_compare_contents(compare_contents)
+            .with_follow_symlinks(follow_symlinks);
         poll_interval.map(|c| config.with_poll_interval(c));
         self.0.configure(config)
     }

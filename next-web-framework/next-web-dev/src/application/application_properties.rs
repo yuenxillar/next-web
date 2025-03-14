@@ -12,7 +12,7 @@ pub struct ApplicationProperties {
     /// This Properties is Mapping data from the configuration file
     next: NextProperties,
 
-    /// Only for properties that have not been deserialized
+    /// Only for register that have not been deserialized
     #[serde(skip_deserializing)]
     mapping_value: Option<HashMap<String, serde_yaml::Value>>,
 }

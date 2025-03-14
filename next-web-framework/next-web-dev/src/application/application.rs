@@ -30,10 +30,11 @@ use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::util::date_time_util::LocalDateTimeUtil;
 use crate::util::file_util::FileUtil;
 use crate::util::sys_path::resources;
+use crate::router::open_router::OpenRouter;
+use crate::router::private_router::PrivateRouter;
 
 use super::application_properties::ApplicationProperties;
-use super::router::open_router::OpenRouter;
-use super::router::private_router::PrivateRouter;
+
 
 #[cfg(feature = "job_scheduler")]
 use crate::autoregister::job_scheduler_autoregister::JobSchedulerAutoRegister;
@@ -236,7 +237,7 @@ pub trait Application: Send + Sync {
         ctx: &mut rudi::Context,
         application_properties: &ApplicationProperties,
     ) {
-        // register properties singleton
+        // register register singleton
         application_properties.next().data().map(|data| {
             for element in data.registrable() {
                 if let Some(auto_register) = element {

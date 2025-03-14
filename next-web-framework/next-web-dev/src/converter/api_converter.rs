@@ -1,4 +1,4 @@
-use crate::{application::api::api_response::ApiResponse, error::api_error::ApiError};
+use next_web_common::{error::api_error::ApiError, response::api_response::ApiResponse};
 
 pub trait Converter<T: serde::Serialize> {
     type Output: serde::Serialize;
@@ -12,7 +12,10 @@ impl<T: serde::Serialize> Converter<T> for bool {
     fn into_api_result(self) -> Result<ApiResponse<Self::Output>, ApiError> {
         match self {
             true => Ok(ApiResponse::ok(true)),
-            false => Err(ApiError::BusinessError(String::new())),
+            false => Err(ApiError::BusinessError {
+                status: 2,
+                message: "".into(),
+            }),
         }
     }
 }
@@ -23,7 +26,10 @@ impl<T: serde::Serialize> Converter<T> for Option<T> {
     fn into_api_result(self) -> Result<ApiResponse<Self::Output>, ApiError> {
         match self {
             Some(var) => Ok(ApiResponse::ok(Some(var))),
-            None => Err(ApiError::BusinessError(String::new())),
+            None => Err(ApiError::BusinessError {
+                status: 2,
+                message: "".into(),
+            }),
         }
     }
 }
