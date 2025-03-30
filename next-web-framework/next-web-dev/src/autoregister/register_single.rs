@@ -1,22 +1,23 @@
 use crate::autoregister::auto_register::AutoRegister;
-use std::sync::Arc;
 
-pub struct ApplicationDefaultRegisterSingle(Vec<Arc<dyn AutoRegister>>);
+pub struct ApplicationDefaultRegisterSingle {
+    registers: Vec<Box<dyn AutoRegister + Send + Sync>>
+}
 
 impl ApplicationDefaultRegisterSingle {
     pub fn new() -> Self {
-        Self(Vec::new())
+        Self { registers: Vec::new() }
     }
 
     pub fn push<T>(&mut self)
     where
-        T: AutoRegister + Default,
+        T: AutoRegister + Default + Send + Sync + 'static,
     {
-        self.0.push(Arc::new(T::default()));
+        self.registers.push(Box::new(T::default()));
     }
 
     pub fn register_all(&mut self, ctx: &mut rudi::Context) {
-        for register in self.0.iter() {
+        for register in self.registers.iter() {
             // If panic early exit.
             register.register(ctx).unwrap();
         }

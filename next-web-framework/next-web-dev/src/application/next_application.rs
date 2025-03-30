@@ -55,12 +55,7 @@ impl<A: Application + Default> NextApplication<A> {
     }
 
     /// Get the application.
-    pub fn application(&self) -> &A {
-        &self.application
-    }
-
-    /// Get the mutable application.
-    pub fn application_mut(&mut self) -> &mut A {
+    pub fn application(&mut self) ->  &mut A {
         &mut self.application
     }
 

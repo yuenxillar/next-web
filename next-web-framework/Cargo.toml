@@ -1,20 +1,117 @@
+[workspace.package]
+edition = "2021"
+authors = ["Listening <yuenxillar@163.com>"]
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/Listening/next-web-framework"
+repository = "https://github.com/Listening/next-web-framework"
+include = ["**/*.rs", "Cargo.toml"]
+readme = "README.md"
+version = "0.1.0"
+
+
 [workspace]
 resolver = "2"
 # List of all the crates that are part of this workspace.
 members = [
-    "next-web-dev", 
-    "next-web-utils", 
-    "next-web-document", 
+    "next-web-dev",
+    "next-web-utils",
+    "next-web-document",
     "next-web-email",
-    "next-web-macro", 
-    "next-web-mqtt", 
-    "next-web-sms", 
-    "next-web-mq",  
-    "next-web-ai", 
-    "next-web-gateway", 
-    "next-web-security", 
+    "next-web-macro",
+    "next-web-mqtt",
+    "next-web-sms",
+    "next-web-mq",
+    "next-web-ai",
+    "next-web-gateway",
+    "next-web-security",
     "next-web-common",
     "next-web-id",
     "next-web-ip",
     "next-web-core",
+
+
+    "rudi-main/rudi",
+    "rudi-main/rudi-core",
+    "rudi-main/rudi-macro",
 ]
+
+
+[workspace.dependencies]
+# dev dependencies
+tokio = { version = "1.44.1", features = ["full"] }
+axum = { version = "0.8.3" }
+tower-http = { version = "0.6.2"}
+axum-prometheus = { version = "0.7.0"}
+
+# serialization and deserialization
+serde = { version = "1.0.219", features = ["derive"] }
+serde_yaml = { version = "0.9.34" }
+serde_json = { version = "1.0.133" }
+
+once_cell = { version = "1.20.2" }
+async-trait = { version = "0.1.88" }
+chrono = { version = "0.4.40" }
+hashbrown = { version = "0.15.2", features = ["serde"] }
+regex = { version = "1.11.1" }
+jsonwebtoken = { version = "9.3.0" }
+rust-embed-for-web = { version = "11.2.1" }
+matchit = { version = "0.8.4" }
+bcrypt = { version = "0.16.0" }
+rand = { version = "0.8.5" }
+uuid = { version = "1.16.0", features = ["v4"] }
+tokio-cron-scheduler = { version = "0.13.0" }
+http-body-util = { version = "0.1.2" }
+
+thiserror = { version = "2.0.8" }
+anyhow = { version = "1.0.94" }
+
+futures = { version = "0.3.31" }
+
+
+# services
+rbs = { version = "4.5" }
+rbatis = { version = "4.5" }
+rbdc = { version = "4.5", default-features = false }
+rbdc-pg = { version = "4.5" }
+rbdc-mysql = { version = "4.5" }
+rbdc-pool-fast = { version = "4.5" }
+
+
+mongodb = { version = "3.2.0", features = ["zstd-compression"] }
+redis = { version = "0.27.6", default-features = false, features = [
+    "script",
+    "json",
+] }
+deadpool-redis = { version = "0.18.0" }
+minio-rsc = { version = "0.2.3" }
+
+
+# macro dependencies
+proc-macro2 = { version = "1", default-features = false }
+quote = { version = "1", default-features = false }
+syn = { version = "2", default-features = false }
+from-attr = { version = "0.1", default-features = false }
+
+
+# rudi
+rudi = { version = "0.1.0", path = "./rudi-main/rudi" }
+rudi-macro = { version = "0.1.0", path = "./rudi-main/rudi-macro"}
+rudi-core = { version = "0.1.0", path = "./rudi-main/rudi-core" }
+
+# optional dependencies
+inventory = { version = "0.3", default-features = false }
+tracing = { version = "0.1" }
+tracing-appender = { version = "0.2" }
+tracing-subscriber = { version = "0.3.0", features = [
+    "fmt",
+    "env-filter",
+    "json",
+    "chrono",
+] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+private_interfaces = "deny"
+private_bounds = "deny"
+unreachable_pub = "deny"
+missing_docs = "warn"

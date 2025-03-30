@@ -85,7 +85,7 @@ impl AutoRegister for DatabaseAutoRegister {
 
             // check  status
             futures::executor::block_on(rbs.status())?;
-
+            
             ctx.insert_singleton_with_name::<DatabaseManager, String>(rbs, id.clone());
             println!(
                 "DatabaseAutoRegister registered successfully! datasource id: {}",

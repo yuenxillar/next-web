@@ -20,6 +20,7 @@ use futures::executor::block_on;
 use crate::manager::rabbitmq_manager::RabbiqMQManager;
 
 use super::auto_register::AutoRegister;
+use super::auto_register::AutoRegisterInstanceHelper;
 
 pub struct RabbitMQAutoregister(pub RabbitMQClientProperties);
 
@@ -31,13 +32,16 @@ impl AutoRegister for RabbitMQAutoregister {
     fn register(&self, ctx: &mut rudi::Context) -> Result<(), Box<dyn std::error::Error>> {
         let bind_exchange_builder = ctx.resolve_option::<Arc<dyn BindExchangeBuilder>>();
         if let Some(bind) = bind_exchange_builder {
-            let bind_exchanges = bind.value();
+            let bind_exchange = bind.value();
 
-            let channel = block_on(RabbitMQAutoregister::__register(
-                self.0.clone(),
-                bind_exchanges.clone(),
+            let options = self.0.clone();
+            let bind_exchanges = bind_exchange.clone();
+            let channel = self.instance(move || RabbitMQAutoregister::__register(
+                options,
+                bind_exchanges,
             ));
-            let rabbitmq_manager = RabbiqMQManager::new(self.0.clone(), bind_exchanges, channel);
+
+            let rabbitmq_manager = RabbiqMQManager::new(self.0.clone(), bind_exchange, channel);
             ctx.insert_singleton_with_name::<RabbiqMQManager, String>(
                 rabbitmq_manager,
                 String::from("rabbitmqManager"),
@@ -49,6 +53,8 @@ impl AutoRegister for RabbitMQAutoregister {
 
         Ok(())
     }
+
+    
 }
 
 impl RabbitMQAutoregister {

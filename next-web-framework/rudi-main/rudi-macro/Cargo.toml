@@ -1,0 +1,43 @@
+[package]
+name = "rudi-macro"
+description = "Macros for Rudi."
+keywords = ["dependency-injection", "ioc", "di", "dependency"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+include.workspace = true
+readme.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+rudi-core = { workspace = true }
+from-attr = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = [
+    "extra-traits",
+    "parsing",
+    "proc-macro",
+    "printing",
+    "full",
+] }
+
+[dev-dependencies]
+# cannot contain `workspace = true` to avoid circular dependencies.
+rudi = { path = "../rudi", default-features = false, features = [
+    "rudi-macro",
+    "auto-register",
+] }
+
+tokio = { workspace = true }
+
+[features]
+default = ["auto-register"]
+auto-register = []

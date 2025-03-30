@@ -2,13 +2,14 @@ use std::fs::{self};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use async_trait::async_trait;
+// use async_trait::async_trait;
 use axum::body::Bytes;
 use axum::http::{Response, StatusCode};
 use axum::Router;
 use hashbrown::HashMap;
 use http_body_util::Full;
 use once_cell::sync::Lazy;
+use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use tokio::sync::Mutex;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
@@ -27,14 +28,14 @@ use crate::event::application_listener::ApplicationListener;
 use crate::autoconfigure::context::next_properties::NextProperties;
 use crate::autoregister::register_single::ApplicationDefaultRegisterSingle;
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
+use crate::router::open_router::OpenRouter;
+use crate::router::private_router::PrivateRouter;
 use crate::util::date_time_util::LocalDateTimeUtil;
 use crate::util::file_util::FileUtil;
 use crate::util::sys_path::resources;
-use crate::router::open_router::OpenRouter;
-use crate::router::private_router::PrivateRouter;
 
 use super::application_properties::ApplicationProperties;
-
+use super::application_resources::ApplicationResources;
 
 #[cfg(feature = "job_scheduler")]
 use crate::autoregister::job_scheduler_autoregister::JobSchedulerAutoRegister;
@@ -46,17 +47,17 @@ use crate::event::redis_expired_event::RedisExpiredEvent;
 #[cfg(feature = "redis_enabled")]
 use crate::manager::redis_manager::RedisManager;
 
-pub const APPLICATION_BANNER_NAME: &str = "resources/banner.txt";
-pub const APPLICATION_USER_PERMISSION_RESOURCE: &str = "resources/user_permission_resource.json";
+pub const APPLICATION_BANNER_NAME: &str = "banner.txt";
+pub const APPLICATION_USER_PERMISSION_RESOURCE: &str = "user_permission_resource.json";
 
 /// The application shutdown services.
 #[cfg(not(feature = "tls_rustls"))]
 static SHUTDOWN_SERVICES: Lazy<Mutex<Vec<Arc<dyn ApplicationShutdown>>>> =
     Lazy::new(|| Mutex::new(Vec::new()));
 
-#[async_trait]
-pub trait Application: Send + Sync {
+pub trait Application {
     /// Initialize the middleware.
+    #[allow(async_fn_in_trait)]
     async fn init_middleware(&mut self, properties: &ApplicationProperties);
 
     /// Register the rpc server.
@@ -69,18 +70,15 @@ pub trait Application: Send + Sync {
 
     /// Show the banner of the application.
     fn banner_show() {
-        let path = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .join(APPLICATION_BANNER_NAME);
-        if path.exists() {
-            if let Ok(content) = FileUtil::read_file_to_string(&path.display().to_string()) {
-                TopBanner::show(&content);
-            }
+        if let Some(content) = ApplicationResources::get(APPLICATION_BANNER_NAME) {
+            TopBanner::show(std::str::from_utf8(&content.data()).unwrap_or(DEFAULT_TOP_BANNER));
         } else {
             TopBanner::show(DEFAULT_TOP_BANNER);
         }
     }
 
     /// Initialize the message source.
+    #[allow(async_fn_in_trait)]
     async fn init_message_source<T>(
         &mut self,
         application_properties: &NextProperties,
@@ -153,16 +151,19 @@ pub trait Application: Send + Sync {
     }
 
     fn context(&self) -> rudi::Context {
-        rudi::Context::options().auto_register()
+        rudi::Context::options().eager_create(true).auto_register()
     }
 
     /// Initialize the application infrastructure
-    fn init_infrastructure(&self, application_properties: &ApplicationProperties) {
+    fn init_infrastructure(
+        &self,
+        ctx: &mut rudi::Context,
+        application_properties: &ApplicationProperties,
+    ) {
         println!("\n========================================================================");
-        let mut ctx = self.context();
 
         // 1. register singleton
-        self.register_singleton(&mut ctx, application_properties);
+        self.register_singleton(ctx, application_properties);
 
         // 2. register job
         #[cfg(feature = "job_scheduler")]
@@ -174,7 +175,7 @@ pub trait Application: Send + Sync {
             }
             schedluer_manager.start();
         } else {
-            println!("Job scheduler manager not found");
+            info!("Job scheduler manager not found");
         }
 
         // 3. register redis expired event
@@ -264,7 +265,8 @@ pub trait Application: Send + Sync {
     }
 
     // Get the application router. (open api  and private api)
-    fn applicatlion_router(&self) -> (OpenRouter, PrivateRouter);
+    #[allow(async_fn_in_trait)]
+    async fn applicatlion_router(&self, context: &rudi::Context) -> (OpenRouter, PrivateRouter);
 
     /// Initialize the logger.
     fn init_logger(&self, application_properties: &ApplicationProperties) {
@@ -332,14 +334,16 @@ pub trait Application: Send + Sync {
     }
 
     /// Bind tcp server.
+    #[allow(async_fn_in_trait)]
     async fn bind_tcp_server(
         &self,
         application_properties: &ApplicationProperties,
+        context: &rudi::Context,
         time: std::time::Instant,
     ) {
         let config = application_properties.next().server();
 
-        let (open_router, private_router) = self.applicatlion_router();
+        let (open_router, private_router) = self.applicatlion_router(context).await;
         // run our app with hyper, listening globally on port
         let mut app = Router::new()
             .route("/", axum::routing::get(root))
@@ -444,50 +448,53 @@ pub trait Application: Send + Sync {
     }
 
     /// Run the application.
+    #[allow(async_fn_in_trait)]
     async fn run() -> NextApplication<Self>
     where
         Self: Application + Default,
     {
         // record application start time
-        let start = std::time::Instant::now();
+        let start_time = std::time::Instant::now();
 
         // banner show
         Self::banner_show();
 
         // get a base applcation instance
         let mut next_application: NextApplication<Self> = NextApplication::new();
+        let properties = next_application.application_properties().clone();
 
-        let application_properties = next_application.application_properties().clone();
-        let application = next_application.application_mut();
+        let application = next_application.application();
 
-        application.init_logger(&application_properties);
+        application.init_logger(&properties);
         info!("init logger success");
 
-        // init infrastructure
-        application.init_infrastructure(&application_properties);
+        let mut ctx = application.context();
 
-        application.init_middleware(&application_properties).await;
+        // init infrastructure
+        application.init_infrastructure(&mut ctx, &properties);
+
+        // init middleware
+        application.init_middleware(&properties).await;
         info!("init middleware success");
 
         #[cfg(feature = "grpc_enabled")]
         {
             application
-                .register_rpc_server(&application_properties)
+                .register_rpc_server(&properties)
                 .await;
             info!("register rpc server success");
 
             application
-                .connect_rpc_client(&application_properties)
+                .connect_rpc_client(&properties)
                 .await;
             info!("connect rpc client success");
         }
 
         // application.init_cache().await;
         application
-            .bind_tcp_server(&application_properties, start)
+            .bind_tcp_server(&properties, &mut ctx, start_time)
             .await;
 
-        // end
         next_application
     }
 }

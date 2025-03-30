@@ -1,18 +1,18 @@
 [workspace]
 resolver = "2"
 
-members = [ 
-    "next-code-builder", 
+members = [
+    "next-code-builder",
     "next-web-framework/Cargo.toml",
-    "next-test-server"
+    "railway-12306",
 ]
 
 [profile.release]
 codegen-units = 1
 incremental = true
 lto = true
-opt-level = 'z' # Optimize for size
+opt-level = 'z'    # Optimize for size
 
 
- [profile.release.package.next-test-server]
- opt-level = 3
+[profile.release.package.railway-12306]
+opt-level = 3
