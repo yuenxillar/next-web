@@ -44,7 +44,7 @@ matchit = { workspace = true, optional = true }
 bcrypt = { workspace = true }
 rand = { workspace = true }
 
-rudi = { version = "0.8.3" }
+rudi = { workspace = true}
 
 anyhow = { workspace = true }
 thiserror = { workspace = true, optional = true }

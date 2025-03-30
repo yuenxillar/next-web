@@ -1,7 +1,7 @@
 use bcrypt::{hash, verify, BcryptError, DEFAULT_COST};
-use rudi::Singleton;
+use rudi::Singleton as Component;
 
-#[Singleton(name = "passwordEncoder")]
+#[Component(name = "passwordEncoder")]
 #[derive(Clone)]
 pub struct PasswordEncoder {
     salt: String,

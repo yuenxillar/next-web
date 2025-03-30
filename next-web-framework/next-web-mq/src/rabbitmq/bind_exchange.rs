@@ -19,6 +19,6 @@ impl BindExchange {
     }
 }
 
-pub trait BindExchangeBuilder {
+pub trait BindExchangeBuilder: Send + Sync {
     fn value(&self) -> Vec<BindExchange>;
 }

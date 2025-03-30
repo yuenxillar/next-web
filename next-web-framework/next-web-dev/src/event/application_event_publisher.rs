@@ -4,7 +4,7 @@ use super::application_event::ApplicationEvent;
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait ApplicationEventPublisher<E>
+pub trait ApplicationEventPublisher<E>: Send + Sync
 where
     E: ApplicationEvent,
 {

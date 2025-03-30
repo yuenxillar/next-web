@@ -1,12 +1,4 @@
-pub mod bencher;
-pub mod calendar_util;
-
-pub mod date_time_util;
-pub mod env_util;
-pub mod file_util;
-pub mod password_encoder;
-pub mod regex_util;
-
+pub mod qr_code;
 pub mod calendar;
 pub mod captcha;
 pub mod common;

@@ -1,11 +1,9 @@
-use std::{any::Any, sync::Arc};
+use crate::util::date_time_util::LocalDateTimeUtil;
 
-pub trait ApplicationEvent: Any + Send + Sync + 'static {
-    fn get_timestamp(&self) -> u128;
-}
 
-impl ApplicationEvent for Arc<dyn ApplicationEvent> {
-    fn get_timestamp(&self) -> u128 {
-        0
+
+pub trait ApplicationEvent: Send + Sync + 'static {
+    fn get_timestamp(&self) -> i64 {
+        LocalDateTimeUtil::timestamp()
     }
 }
