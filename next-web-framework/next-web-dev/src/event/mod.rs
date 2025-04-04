@@ -1,3 +1,4 @@
+mod key;
 pub mod default_application_event_multicaster;
 pub mod application_event_multicaster;
 #[cfg(feature = "redis_enabled")]

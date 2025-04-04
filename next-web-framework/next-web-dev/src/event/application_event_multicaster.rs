@@ -1,7 +1,19 @@
-use super::application_event::ApplicationEvent;
+use std::borrow::Cow;
 
+use super::{application_event::ApplicationEvent, application_listener::ApplicationListener, key::Key};
+
+/// 应用事件多播器
+/// Application event multicaster
 pub trait ApplicationEventMulticaster: Send + Sync {
-    fn add_application_listener(listener: ApplicationListener<ApplicationEvent>);
-    fn remove_application_listener(listener: ApplicationListener<ApplicationEvent>);
-    fn multicast_event(event: ApplicationEvent);
+    /// 添加应用事件监听器
+    /// Add application event listener
+    fn add_application_listener(&mut self, listener: Box<dyn ApplicationListener>);
+
+    /// 移除应用事件监听器
+    /// Remove application event listener
+    fn remove_application_listener(&mut self, key: &Key);
+
+    /// 多播应用事件
+    /// Multicast application event
+    async fn multicast_event(&mut self, id: &Cow<'static, str>, event: &dyn ApplicationEvent);
 }

@@ -23,12 +23,14 @@ use crate::application::application_shutdown::ApplicationShutdown;
 use crate::application::next_application::NextApplication;
 
 use crate::event::application_event::ApplicationEvent;
+use crate::event::application_event_multicaster::ApplicationEventMulticaster;
 use crate::event::application_event_publisher::ApplicationEventPublisher;
 use crate::event::application_listener::ApplicationListener;
 
 use crate::autoconfigure::context::next_properties::NextProperties;
 use crate::autoregister::register_single::ApplicationDefaultRegisterSingle;
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
+use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::router::open_router::OpenRouter;
 use crate::router::private_router::PrivateRouter;
 use crate::util::date_time_util::LocalDateTimeUtil;
@@ -165,6 +167,7 @@ pub trait Application: Send + Sync {
         // 1. register singleton
         self.register_singleton(ctx, application_properties);
 
+
         // 2. register job
         #[cfg(feature = "job_scheduler")]
         if let Some(mut schedluer_manager) =
@@ -194,40 +197,22 @@ pub trait Application: Send + Sync {
         }
 
         // 3. register application event
-        type Listener = Box<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>;
-        type Publisher = Box<dyn ApplicationEventPublisher<Arc<dyn ApplicationEvent>>>;
-        let listeners = ctx.resolve_by_type::<Listener>();
-        let mut publishers = ctx.resolve_by_type::<Publisher>();
+        let listeners = ctx.resolve_by_type::<Box<dyn ApplicationListener>>();
+        let publishers = ctx.resolve_by_type::<Box<dyn ApplicationEventPublisher>>();
 
         let event_match =
             |listener: (std::any::TypeId, &str), publisher: (std::any::TypeId, &str)| -> bool {
                 return listener.0 == publisher.0 && listener.1.eq(publisher.1);
             };
 
-        listeners.into_iter().for_each(|mut listener| {
-            for publisher in publishers.iter_mut() {
-                if event_match(
-                    (listener.eid(), &listener.id()),
-                    (publisher.eid(), &publisher.id()),
-                ) {
-                    let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
-                    publisher.set_channel(Some(sender));
+        let mut multicaster = DefaultApplicationEventMulticaster::new();
 
-                    tokio::spawn(async move {
-                        info!(
-                            "Application event listener channel start!\neid: {:?}, id: {} ",
-                            listener.eid(),
-                            listener.id()
-                        );
-                        while let Some(event) = receiver.recv().await {
-                            listener.on_application_event(event).await;
-                        }
-                        info!("Application listener channel closed");
-                    });
-                    break;
-                }
-            }
+        listeners.into_iter().for_each(|listener| {
+            multicaster.add_application_listener(listener);
         });
+ 
+        ctx.insert_singleton_with_name::<DefaultApplicationEventMulticaster, String>(multicaster, String::from("defaultApplicationEventMulticaster"));
+
 
         println!("========================================================================\n");
     }

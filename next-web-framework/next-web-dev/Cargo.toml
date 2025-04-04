@@ -43,6 +43,7 @@ rust-embed-for-web = { workspace = true }
 matchit = { workspace = true, optional = true }
 bcrypt = { workspace = true }
 rand = { workspace = true }
+parking_lot = { workspace = true }
 
 rudi = { workspace = true}
 

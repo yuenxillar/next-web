@@ -1,24 +1,21 @@
-use std::any::TypeId;
+use async_trait::async_trait;
+use tokio::sync::mpsc::Sender;
 
 use super::application_event::ApplicationEvent;
-use async_trait::async_trait;
 
+/// 应用事件发布者
+/// Application event publisher
 #[async_trait]
-pub trait ApplicationEventPublisher<E>: Send + Sync
-where
-    E: ApplicationEvent,
+pub trait ApplicationEventPublisher: Send + Sync
 {
-    fn eid(&self) -> TypeId {
-        TypeId::of::<E>()
-    }
 
-    fn id(&self) -> String;
+    /// 获取事件通道
+    /// Get event channel
+    fn channel(&self) -> Option<&Sender<dyn ApplicationEvent>>;
 
-    fn channel(&self) -> Option<&tokio::sync::mpsc::Sender<E>>;
-
-    fn set_channel(&mut self, channel: Option<tokio::sync::mpsc::Sender<E>>);
-
-    async fn publish_event(&self, event: E) -> Result<(), Box<dyn std::error::Error>> {
+    /// 发布事件
+    /// Publish event
+    async fn publish_event(&self, event: &dyn ApplicationEvent) -> Result<(), Box<dyn std::error::Error>> {
         let _ = if let Some(sender) = self.channel() {
             sender.send(event).await?
         };

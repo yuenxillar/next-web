@@ -15,15 +15,9 @@ pub mod router;
 
 mod tests;
 
-extern crate bcrypt;
-extern crate anyhow;
 
-pub extern crate chrono;
-pub extern crate tracing;
-pub extern crate once_cell;
-
-pub use rudi::Singleton as Component;
-pub use rudi::Transient as Prototype;
+pub use rudi::Singleton;
+pub use rudi::Transient;
 pub use rudi::Context   as ApplicationContext;
 
 

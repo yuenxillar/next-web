@@ -16,7 +16,7 @@ where
     T: DeserializeOwned,
     T: TableName,
 {
-    fn generate_sql(&self) -> Cow<'static, str>;
+    fn generate_sql(&self) -> String;
 }
 
 /// 比较操作符枚举
@@ -704,8 +704,8 @@ where
     T: DeserializeOwned,
     T: TableName,
 {
-    fn generate_sql(&self) -> Cow<'static, str> {
-        self.build_sql(T::table_name()).into()
+    fn generate_sql(&self) -> String {
+        self.build_sql(T::table_name())
     }
 }
 
