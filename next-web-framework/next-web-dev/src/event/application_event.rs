@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::any::TypeId;
 
 use crate::util::date_time_util::LocalDateTimeUtil;
 
@@ -15,4 +16,11 @@ pub trait ApplicationEvent: Send + Sync + 'static {
 
      /// 获取事件源
      fn source(&self) -> Option<&dyn Any>;
+
+
+     /// 获取事件类型ID
+     /// Get event type ID
+     fn tid(&self) -> TypeId {
+        TypeId::of::<Self>()
+     }
 }

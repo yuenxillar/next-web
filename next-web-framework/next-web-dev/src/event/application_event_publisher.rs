@@ -1,24 +1,17 @@
-use async_trait::async_trait;
-use tokio::sync::mpsc::Sender;
+use std::borrow::Cow;
 
 use super::application_event::ApplicationEvent;
 
 /// 应用事件发布者
 /// Application event publisher
-#[async_trait]
-pub trait ApplicationEventPublisher: Send + Sync
-{
 
-    /// 获取事件通道
-    /// Get event channel
-    fn channel(&self) -> Option<&Sender<dyn ApplicationEvent>>;
+pub(crate) trait ApplicationEventPublisher: Send + Sync
+{
+    fn id(&self) -> Cow<'static, str> {
+        "".into()
+    }
 
     /// 发布事件
     /// Publish event
-    async fn publish_event(&self, event: &dyn ApplicationEvent) -> Result<(), Box<dyn std::error::Error>> {
-        let _ = if let Some(sender) = self.channel() {
-            sender.send(event).await?
-        };
-        Ok(())
-    }
+    fn publish_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), Box<dyn std::error::Error>>;
 }

@@ -9,7 +9,7 @@ use syn::{
 
 use crate::{
     commons::{self, ArgumentResolveStmts},
-    di_attr::DiAttr,
+    autowired_attr::AutowiredAttr,
     impl_fn_or_enum_variant_attr::ImplFnOrEnumVariantAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
@@ -20,8 +20,8 @@ use crate::{
 
 // #[Singleton]
 // impl A {
-//     #[di]
-//     fn new(#[di(name = "hello")] a:i32) -> Self {
+//     #[autowired]
+//     fn new(#[autowired(name = "hello")] a:i32) -> Self {
 //         Self { a }
 //     }
 // }
@@ -31,9 +31,9 @@ pub(crate) fn generate(
     mut item_impl: ItemImpl,
     scope: Scope,
 ) -> syn::Result<TokenStream> {
-    let DiAttr { rudi_path } = match DiAttr::remove_attributes(&mut item_impl.attrs) {
+    let AutowiredAttr { rudi_path } = match AutowiredAttr::remove_attributes(&mut item_impl.attrs) {
         Ok(Some(AttrsValue { value: attr, .. })) => attr,
-        Ok(None) => DiAttr::default(),
+        Ok(None) => AutowiredAttr::default(),
         Err(AttrsValue { value: e, .. }) => return Err(e),
     };
 
@@ -79,7 +79,7 @@ pub(crate) fn generate(
         })
         .reduce(|first, (_, attrs)| {
             attrs.into_iter().for_each(|attr| {
-                let err = syn::Error::new(attr.span(), "duplicate `#[di]` attribute");
+                let err = syn::Error::new(attr.span(), "duplicate `#[autowired]` attribute");
                 duplicate_errors.push(err);
             });
 
@@ -89,7 +89,7 @@ pub(crate) fn generate(
     if matched.is_none() {
         no_matched_fn_errors.push(syn::Error::new(
             impl_span.span(),
-            "there must be an associated function annotated by `#[di]`",
+            "there must be an associated function annotated by `#[autowired]`",
         ));
     }
 

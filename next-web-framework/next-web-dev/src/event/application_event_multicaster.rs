@@ -12,8 +12,4 @@ pub trait ApplicationEventMulticaster: Send + Sync {
     /// 移除应用事件监听器
     /// Remove application event listener
     fn remove_application_listener(&mut self, key: &Key);
-
-    /// 多播应用事件
-    /// Multicast application event
-    async fn multicast_event(&mut self, id: &Cow<'static, str>, event: &dyn ApplicationEvent);
 }

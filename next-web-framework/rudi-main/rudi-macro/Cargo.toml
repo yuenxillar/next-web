@@ -28,6 +28,7 @@ syn = { workspace = true, features = [
     "printing",
     "full",
 ] }
+getset = "0.1.5"
 
 [dev-dependencies]
 # cannot contain `workspace = true` to avoid circular dependencies.

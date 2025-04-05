@@ -354,13 +354,19 @@ impl Context {
         T: 'static + Clone + Send + Sync,
         N: Into<Cow<'static, str>>,
     {
+        let name = name.into();
         let provider: DynProvider =
-            Provider::<T>::never_construct(name.into(), Scope::Singleton).into();
+            Provider::<T>::never_construct(name.clone(), Scope::Singleton).into();
         let single = Single::new(instance, Some(Clone::clone)).into();
 
         let key = provider.key().clone();
         self.provider_registry.insert(provider, self.allow_override);
-        self.single_registry.insert(key, single);
+        self.single_registry.insert(key.clone(), single);
+
+        println!(
+            "Singleton registry insert registered successfully! name: {:?}, key: {:?}",
+            name, key
+        );
     }
 
     /// Appends a standalone [`SingleOwner`](crate::Scope::SingleOwner) instance to the context with default name `""`.
@@ -709,7 +715,10 @@ impl Context {
     /// # }
     /// ```
     #[track_caller]
-    pub fn resolve_with_name<T: 'static + Send + Sync>(&mut self, name: impl Into<Cow<'static, str>>) -> T {
+    pub fn resolve_with_name<T: 'static + Send + Sync>(
+        &mut self,
+        name: impl Into<Cow<'static, str>>,
+    ) -> T {
         match self.inner_resolve(name.into(), Behaviour::CreateThenReturnSingletonOrTransient) {
             Resolved::SingletonOrTransient(instance) => instance,
             Resolved::NotFoundProvider(key) => no_provider_panic(key),
@@ -899,7 +908,10 @@ impl Context {
     /// # }
     /// ```
     #[track_caller]
-    pub fn just_create_single_with_name<T: 'static + Send + Sync>(&mut self, name: impl Into<Cow<'static, str>>) {
+    pub fn just_create_single_with_name<T: 'static + Send + Sync>(
+        &mut self,
+        name: impl Into<Cow<'static, str>>,
+    ) {
         match self.inner_resolve::<T>(name.into(), Behaviour::JustCreateSingletonOrSingleOwner) {
             Resolved::NoReturn => {}
             Resolved::NotFoundProvider(key) => no_provider_panic(key),
@@ -1455,7 +1467,9 @@ impl Context {
     ///     assert_eq!(cx.get_singles_by_type::<i32>(), vec![&1]);
     /// }
     /// ```
-    pub async fn try_just_create_singles_by_type_async<T: 'static + Send + Sync>(&mut self) -> Vec<bool> {
+    pub async fn try_just_create_singles_by_type_async<T: 'static + Send + Sync>(
+        &mut self,
+    ) -> Vec<bool> {
         let names = self.names::<T>();
         let mut results = Vec::with_capacity(names.len());
 

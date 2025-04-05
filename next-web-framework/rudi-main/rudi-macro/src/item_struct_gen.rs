@@ -6,7 +6,7 @@ use syn::ItemStruct;
 
 use crate::{
     commons::{self, FieldResolveStmts, ResolvedFields},
-    di_attr::DiAttr,
+    autowired_attr::AutowiredAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
 
@@ -15,9 +15,9 @@ pub(crate) fn generate(
     mut item_struct: ItemStruct,
     scope: Scope,
 ) -> syn::Result<TokenStream> {
-    let DiAttr { rudi_path } = match DiAttr::remove_attributes(&mut item_struct.attrs) {
+    let AutowiredAttr { rudi_path } = match AutowiredAttr::remove_attributes(&mut item_struct.attrs) {
         Ok(Some(AttrsValue { value: attr, .. })) => attr,
-        Ok(None) => DiAttr::default(),
+        Ok(None) => AutowiredAttr::default(),
         Err(AttrsValue { value: e, .. }) => return Err(e),
     };
 

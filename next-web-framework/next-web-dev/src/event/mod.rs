@@ -1,3 +1,4 @@
+pub mod default_application_event_publisher;
 mod key;
 pub mod default_application_event_multicaster;
 pub mod application_event_multicaster;

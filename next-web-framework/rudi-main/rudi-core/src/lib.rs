@@ -19,6 +19,13 @@ pub enum Scope {
     SingleOwner,
 }
 
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RunType {
+
+    Properties,
+}
+
 /// Represents the color of the function, i.e., async or sync.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Color {

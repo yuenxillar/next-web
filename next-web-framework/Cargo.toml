@@ -40,8 +40,8 @@ members = [
 # dev dependencies
 tokio = { version = "1.44.1", features = ["full"] }
 axum = { version = "0.8.3" }
-tower-http = { version = "0.6.2"}
-axum-prometheus = { version = "0.7.0"}
+tower-http = { version = "0.6.2" }
+axum-prometheus = { version = "0.7.0" }
 
 # serialization and deserialization
 serde = { version = "1.0.219", features = ["derive"] }
@@ -61,7 +61,8 @@ rand = { version = "0.8.5" }
 uuid = { version = "1.16.0", features = ["v4"] }
 tokio-cron-scheduler = { version = "0.13.0" }
 http-body-util = { version = "0.1.2" }
-parking_lot = {version = "0.12.3"}
+parking_lot = { version = "0.12.3" }
+flume = { version = "0.11.1" }
 
 thiserror = { version = "2.0.8" }
 anyhow = { version = "1.0.94" }
@@ -96,7 +97,7 @@ from-attr = { version = "0.1", default-features = false }
 
 # rudi
 rudi = { version = "0.1.0", path = "./rudi-main/rudi" }
-rudi-macro = { version = "0.1.0", path = "./rudi-main/rudi-macro"}
+rudi-macro = { version = "0.1.0", path = "./rudi-main/rudi-macro" }
 rudi-core = { version = "0.1.0", path = "./rudi-main/rudi-core" }
 
 # optional dependencies

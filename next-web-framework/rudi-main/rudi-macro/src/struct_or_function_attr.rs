@@ -2,7 +2,7 @@ use from_attr::{ConvertParsed, FromAttr, PathValue};
 use syn::{parse_quote, spanned::Spanned, Expr, ExprPath};
 
 #[derive(FromAttr)]
-#[attribute(idents = [di])]
+#[attribute(idents = [autowired])]
 pub(crate) struct StructOrFunctionAttr {
     #[attribute(default = default_name())]
     pub(crate) name: Expr,

@@ -31,6 +31,7 @@ use crate::autoconfigure::context::next_properties::NextProperties;
 use crate::autoregister::register_single::ApplicationDefaultRegisterSingle;
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
+use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::router::open_router::OpenRouter;
 use crate::router::private_router::PrivateRouter;
 use crate::util::date_time_util::LocalDateTimeUtil;
@@ -164,8 +165,7 @@ pub trait Application: Send + Sync {
     ) {
         println!("\n========================================================================");
 
-        // 1. register singleton
-        self.register_singleton(ctx, application_properties);
+      
 
 
         // 2. register job
@@ -197,21 +197,23 @@ pub trait Application: Send + Sync {
         }
 
         // 3. register application event
-        let listeners = ctx.resolve_by_type::<Box<dyn ApplicationListener>>();
-        let publishers = ctx.resolve_by_type::<Box<dyn ApplicationEventPublisher>>();
-
-        let event_match =
-            |listener: (std::any::TypeId, &str), publisher: (std::any::TypeId, &str)| -> bool {
-                return listener.0 == publisher.0 && listener.1.eq(publisher.1);
-            };
-
+        let (tx, rx) = flume::unbounded();
+        let mut default_event_publisher = DefaultApplicationEventPublisher::new();
         let mut multicaster = DefaultApplicationEventMulticaster::new();
 
+        default_event_publisher.set_channel(Some(tx));
+        multicaster.set_event_channel(rx);
+
+
+        let listeners = ctx.resolve_by_type::<Box<dyn ApplicationListener>>();
         listeners.into_iter().for_each(|listener| {
             multicaster.add_application_listener(listener);
         });
+
+        multicaster.run();
  
-        ctx.insert_singleton_with_name::<DefaultApplicationEventMulticaster, String>(multicaster, String::from("defaultApplicationEventMulticaster"));
+        ctx.insert_singleton_with_name(default_event_publisher, String::from("defaultApplicationEventPublisher"));
+        ctx.insert_singleton_with_name(multicaster, String::from("defaultApplicationEventMulticaster"));
 
 
         println!("========================================================================\n");
@@ -223,7 +225,7 @@ pub trait Application: Send + Sync {
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
     ) {
-        // register register singleton
+        // register application data
         application_properties.next().data().map(|data| {
             for element in data.registrable() {
                 if let Some(auto_register) = element {
@@ -457,6 +459,9 @@ pub trait Application: Send + Sync {
         let mut ctx = ApplicationContext::options()
             .eager_create(true)
             .auto_register();
+
+        // register singleton
+        application.register_singleton(&mut ctx, &properties);
 
         // init infrastructure
         application.init_infrastructure(&mut ctx, &properties);

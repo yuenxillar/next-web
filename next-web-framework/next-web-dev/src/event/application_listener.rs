@@ -7,13 +7,9 @@ use super::application_event::ApplicationEvent;
 #[async_trait]
 pub trait ApplicationListener: Send + Sync
 {
+    /// 获取事件类型
+    /// Get event type
     fn tid(&self) -> TypeId;
-
-    // 获取监听器顺序
-    // Get listener order
-    fn order(&self) -> i32 {
-        i32::MAX
-    }
 
     /// 获取事件ID
     /// Get event ID
@@ -23,5 +19,5 @@ pub trait ApplicationListener: Send + Sync
 
     /// 处理应用事件
     /// Handle application event
-    async fn on_application_event(&mut self, event: &dyn ApplicationEvent);
+    async fn on_application_event(&mut self, event: &Box<dyn ApplicationEvent>);
 }

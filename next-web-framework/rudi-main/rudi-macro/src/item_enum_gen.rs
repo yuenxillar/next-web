@@ -6,7 +6,7 @@ use syn::{spanned::Spanned, ItemEnum};
 
 use crate::{
     commons::{self, FieldResolveStmts, ResolvedFields},
-    di_attr::DiAttr,
+    autowired_attr::AutowiredAttr,
     impl_fn_or_enum_variant_attr::ImplFnOrEnumVariantAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
@@ -16,9 +16,9 @@ pub(crate) fn generate(
     mut item_enum: ItemEnum,
     scope: Scope,
 ) -> syn::Result<TokenStream> {
-    let DiAttr { rudi_path } = match DiAttr::remove_attributes(&mut item_enum.attrs) {
+    let AutowiredAttr { rudi_path } = match AutowiredAttr::remove_attributes(&mut item_enum.attrs) {
         Ok(Some(AttrsValue { value: attr, .. })) => attr,
-        Ok(None) => DiAttr::default(),
+        Ok(None) => AutowiredAttr::default(),
         Err(AttrsValue { value: e, .. }) => return Err(e),
     };
 
@@ -76,7 +76,7 @@ pub(crate) fn generate(
         })
         .reduce(|first, (_, attrs)| {
             attrs.into_iter().for_each(|attr| {
-                let err = syn::Error::new(attr.span(), "duplicate `#[di]` attribute");
+                let err = syn::Error::new(attr.span(), "duplicate `#[autowired]` attribute");
                 duplicate_errors.push(err);
             });
 
@@ -87,7 +87,7 @@ pub(crate) fn generate(
         variant_spans.iter().for_each(|span| {
             no_matched_variant_errors.push(syn::Error::new(
                 *span,
-                "there must be a variant annotated by `#[di]`",
+                "there must be a variant annotated by `#[autowired]`",
             ));
         });
     }
