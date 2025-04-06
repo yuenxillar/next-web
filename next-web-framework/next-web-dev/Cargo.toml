@@ -48,7 +48,6 @@ flume = { workspace = true }
 
 rudi = { workspace = true}
 
-anyhow = { workspace = true }
 thiserror = { workspace = true, optional = true }
 
 tracing-subscriber = { workspace = true }
@@ -66,6 +65,7 @@ deadpool-redis = { workspace = true, optional = true }
 minio-rsc = { workspace = true, optional = true }
 
 # self dependencies
+next-web-core = { path = "../next-web-core", version = "0.1.0"}
 next-web-mq = { path = "../next-web-mq", version = "0.1.0", features = [
     "rabbitmq",
 ], optional = true }

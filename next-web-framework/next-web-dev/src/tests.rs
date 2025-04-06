@@ -51,7 +51,7 @@ mod web_dev_tests {
             }
         }
 
-        #[derive(Default)]
+        #[derive(Default,Clone)]
         struct A;
         impl Test<B> for A {}
 
@@ -63,5 +63,6 @@ mod web_dev_tests {
         let b = Box::new(B);
 
         println!("a: {:?}, b: {:?}", a.id(), b.id());
+
     }
 }

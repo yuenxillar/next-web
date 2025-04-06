@@ -1,7 +1,0 @@
-
-
-
-pub trait ApplicationProperties  {
-    
- 
-}

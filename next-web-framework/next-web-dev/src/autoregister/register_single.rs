@@ -1,4 +1,5 @@
-use crate::autoregister::auto_register::AutoRegister;
+use next_web_core::{autoregister::auto_register::AutoRegister, context::application_context::ApplicationContext};
+
 
 pub struct ApplicationDefaultRegisterSingle {
     registers: Vec<Box<dyn AutoRegister + Send + Sync>>
@@ -16,10 +17,10 @@ impl ApplicationDefaultRegisterSingle {
         self.registers.push(Box::new(T::default()));
     }
 
-    pub fn register_all(&mut self, ctx: &mut rudi::Context) {
+    pub fn register_all(&mut self, ctx: &mut ApplicationContext) {
         for register in self.registers.iter() {
             // If panic early exit.
-            register.register(ctx).unwrap();
+            // register.register(ctx, &Default::default()).unwrap();
         }
     }
 }

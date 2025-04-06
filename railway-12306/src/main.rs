@@ -1,9 +1,8 @@
 
-pub struct Test {
-    pub name: String,
-    age: usize,
-    len: usize,
-    address: String,
+
+#[derive(Default, Clone)]
+pub struct RailWayApplication {
+    
 }
 
 

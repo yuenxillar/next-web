@@ -21,5 +21,4 @@ pub mod database_autoregister;
 
 
 pub mod register_single;
-pub mod auto_register;
 

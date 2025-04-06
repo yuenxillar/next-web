@@ -1,4 +1,8 @@
-use crate::autoregister::auto_register::AutoRegister;
+use next_web_core::autoregister::auto_register::AutoRegister;
+use next_web_core::context::application_context::ApplicationContext;
+use next_web_core::context::properties::ApplicationProperties;
+use rbatis::async_trait;
+
 use crate::interceptor::default_database_interceptor::DefaultDatabaseInterceptor;
 use crate::middleware::check_status::MiddlewareCheckStatus;
 use crate::{
@@ -10,14 +14,17 @@ use std::sync::Arc;
 
 pub struct DatabaseAutoRegister(pub Vec<DataSourceProperties>);
 
+#[async_trait]
 impl AutoRegister for DatabaseAutoRegister {
-
-    fn name(&self) -> &'static str {
+    fn singleton_name(&self) -> &'static str {
         "DatabaseAutoRegister"
     }
 
-
-    fn register(&self, ctx: &mut rudi::Context) -> Result<(), Box<dyn std::error::Error>> {
+    async fn register(
+        &self,
+        ctx: &mut ApplicationContext,
+        properties: &ApplicationProperties,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         use rbdc_pool_fast::FastPool;
 
         for var in self.0.iter() {
@@ -60,7 +67,7 @@ impl AutoRegister for DatabaseAutoRegister {
                         .password(var.password())
                         .database(var.database())
                         .options(options);
-                    
+
                     rbs.init_option::<PgDriver, PgConnectOptions, FastPool>(PgDriver {}, opts)?;
                     rbs
                 }
@@ -85,7 +92,7 @@ impl AutoRegister for DatabaseAutoRegister {
 
             // check  status
             futures::executor::block_on(rbs.status())?;
-            
+
             ctx.insert_singleton_with_name::<DatabaseManager, String>(rbs, id.clone());
             println!(
                 "DatabaseAutoRegister registered successfully! datasource id: {}",

@@ -28,7 +28,8 @@ syn = { workspace = true, features = [
     "printing",
     "full",
 ] }
-getset = "0.1.5"
+
+next-web-core = { path = "../../next-web-core",version = "0.1.0" }
 
 [dev-dependencies]
 # cannot contain `workspace = true` to avoid circular dependencies.
@@ -36,7 +37,7 @@ rudi = { path = "../rudi", default-features = false, features = [
     "rudi-macro",
     "auto-register",
 ] }
-
+serde = { workspace = true }
 tokio = { workspace = true }
 
 [features]

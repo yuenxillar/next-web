@@ -11,7 +11,7 @@ pub(crate) struct AutowiredAttr {
 }
 
 fn default_rudi_path() -> Path {
-    parse_quote!(::rudi)
+    parse_quote!(::next_web_core)
 }
 
 impl Default for AutowiredAttr {

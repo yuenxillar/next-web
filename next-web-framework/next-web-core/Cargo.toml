@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# rudi = "0.8.3"
-serde = { version = "1.0.216", features = ["derive"] }
-rudi = { workspace = true}
+serde = { workspace = true}
+serde_yaml = { workspace = true }
+hashbrown = { workspace = true }
+rust-embed-for-web = { workspace = true }
+dyn-clone = { workspace = true }
+
+inventory = {workspace = true}
+
+async-trait ={ workspace = true }

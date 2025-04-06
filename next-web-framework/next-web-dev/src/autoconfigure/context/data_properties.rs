@@ -1,9 +1,9 @@
 use std::sync::Arc;
-use crate::autoregister::auto_register::AutoRegister;
 
 
 #[cfg(feature = "rabbitmq_enabled")]
 use crate::autoregister::rabbitmq_autoregister::RabbitMQAutoregister;
+use next_web_core::autoregister::auto_register::AutoRegister;
 #[cfg(feature = "rabbitmq_enabled")]
 use next_web_mq::rabbitmq::core::client_properties::RabbitMQClientProperties;
 

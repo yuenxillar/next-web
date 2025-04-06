@@ -1,15 +1,15 @@
 use std::fs::{self};
 use std::path::PathBuf;
 use std::sync::Arc;
-
 use async_trait::async_trait;
 use axum::body::Bytes;
 use axum::http::{Response, StatusCode};
 use axum::Router;
 use hashbrown::HashMap;
 use http_body_util::Full;
+use next_web_core::context::application_context::ApplicationContext;
+use next_web_core::context::properties::{ApplicationProperties, Properties};
 use once_cell::sync::Lazy;
-use rudi::Context as ApplicationContext;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use tokio::sync::Mutex;
 use tower_http::catch_panic::CatchPanicLayer;
@@ -22,9 +22,7 @@ use tracing::{error, info};
 use crate::application::application_shutdown::ApplicationShutdown;
 use crate::application::next_application::NextApplication;
 
-use crate::event::application_event::ApplicationEvent;
 use crate::event::application_event_multicaster::ApplicationEventMulticaster;
-use crate::event::application_event_publisher::ApplicationEventPublisher;
 use crate::event::application_listener::ApplicationListener;
 
 use crate::autoconfigure::context::next_properties::NextProperties;
@@ -38,8 +36,7 @@ use crate::util::date_time_util::LocalDateTimeUtil;
 use crate::util::file_util::FileUtil;
 use crate::util::sys_path::resources;
 
-use super::application_properties::ApplicationProperties;
-use super::application_resources::ApplicationResources;
+use next_web_core::context::application_resources::ApplicationResources;
 
 #[cfg(feature = "job_scheduler")]
 use crate::autoregister::job_scheduler_autoregister::JobSchedulerAutoRegister;
@@ -64,6 +61,12 @@ pub trait Application: Send + Sync {
     /// initialize the middleware.
     async fn init_middleware(&mut self, properties: &ApplicationProperties);
 
+    // get the application router. (open api  and private api)
+    async fn applicatlion_router(
+        &self,
+        context: &ApplicationContext,
+    ) -> (OpenRouter, PrivateRouter);
+
     /// register the rpc server.
     #[cfg(feature = "grpc_enabled")]
     async fn register_rpc_server(&mut self, properties: &ApplicationProperties);
@@ -81,8 +84,21 @@ pub trait Application: Send + Sync {
         }
     }
 
-    async fn register_services(&mut self, properties: &ApplicationProperties) {
-        
+    async fn register_services(&mut self, properties: &ApplicationProperties) {}
+
+
+    /// autowire properties
+    fn autowire_properties(
+        &mut self,
+        ctx: &mut ApplicationContext,
+        application_properties: &ApplicationProperties,
+    ) {
+        let mut properties = ctx.resolve_by_type::<Box<dyn Properties>>();
+        // properties.into_iter().for_each(|property| {
+        //     property.insert_properties(application_properties);
+        //     let name = property.singleton_name().to_string();
+        //     ctx.insert_singleton_with_name(property.into_self(), name);
+        // });
     }
 
     /// initialize the message source.
@@ -165,9 +181,6 @@ pub trait Application: Send + Sync {
     ) {
         println!("\n========================================================================");
 
-      
-
-
         // 2. register job
         #[cfg(feature = "job_scheduler")]
         if let Some(mut schedluer_manager) =
@@ -204,17 +217,21 @@ pub trait Application: Send + Sync {
         default_event_publisher.set_channel(Some(tx));
         multicaster.set_event_channel(rx);
 
-
         let listeners = ctx.resolve_by_type::<Box<dyn ApplicationListener>>();
         listeners.into_iter().for_each(|listener| {
             multicaster.add_application_listener(listener);
         });
 
         multicaster.run();
- 
-        ctx.insert_singleton_with_name(default_event_publisher, String::from("defaultApplicationEventPublisher"));
-        ctx.insert_singleton_with_name(multicaster, String::from("defaultApplicationEventMulticaster"));
 
+        ctx.insert_singleton_with_name(
+            default_event_publisher,
+            String::from("defaultApplicationEventPublisher"),
+        );
+        ctx.insert_singleton_with_name(
+            multicaster,
+            String::from("defaultApplicationEventMulticaster"),
+        );
 
         println!("========================================================================\n");
     }
@@ -226,22 +243,22 @@ pub trait Application: Send + Sync {
         application_properties: &ApplicationProperties,
     ) {
         // register application data
-        application_properties.next().data().map(|data| {
-            for element in data.registrable() {
-                if let Some(auto_register) = element {
-                    auto_register
-                        .register(ctx)
-                        .map_err(|e| {
-                            error!(
-                                "Application Data register error, name: <{}>, error: {}",
-                                auto_register.name(),
-                                e.to_string()
-                            )
-                        })
-                        .unwrap();
-                }
-            }
-        });
+        // application_properties.next().data().map(|data| {
+        //     for element in data.registrable() {
+        //         if let Some(auto_register) = element {
+        //             auto_register
+        //                 .register(ctx)
+        //                 .map_err(|e| {
+        //                     error!(
+        //                         "Application Data register error, name: <{}>, error: {}",
+        //                         auto_register.name(),
+        //                         e.to_string()
+        //                     )
+        //                 })
+        //                 .unwrap();
+        //         }
+        //     }
+        // });
 
         // register application singleton
         let mut container = ApplicationDefaultRegisterSingle::new();
@@ -250,13 +267,6 @@ pub trait Application: Send + Sync {
 
         container.register_all(ctx);
     }
-
-    // get the application router. (open api  and private api)
-
-    async fn applicatlion_router(
-        &self,
-        context: &ApplicationContext,
-    ) -> (OpenRouter, PrivateRouter);
 
     /// initialize the logger.
     fn init_logger(&self, application_properties: &ApplicationProperties) {
@@ -459,12 +469,19 @@ pub trait Application: Send + Sync {
         let mut ctx = ApplicationContext::options()
             .eager_create(true)
             .auto_register();
+        info!("init context success");
+
+        // autowire properties
+        application.autowire_properties(&mut ctx, &properties);
+        info!("autowire properties success");
 
         // register singleton
         application.register_singleton(&mut ctx, &properties);
+        info!("register singleton success");
 
         // init infrastructure
         application.init_infrastructure(&mut ctx, &properties);
+        info!("init infrastructure success");
 
         // init middleware
         application.init_middleware(&properties).await;

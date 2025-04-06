@@ -4,4 +4,3 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-next-web-macro = { path = "../next-web-framework/next-web-macro", version = "0.1.0"}

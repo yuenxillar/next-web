@@ -32,7 +32,7 @@ members = [
 
     "rudi-main/rudi",
     "rudi-main/rudi-core",
-    "rudi-main/rudi-macro",
+    "rudi-main/rudi-macro", "next-web-tests",
 ]
 
 
@@ -63,6 +63,8 @@ tokio-cron-scheduler = { version = "0.13.0" }
 http-body-util = { version = "0.1.2" }
 parking_lot = { version = "0.12.3" }
 flume = { version = "0.11.1" }
+dyn-clone = { version = "1.0.19" }
+
 
 thiserror = { version = "2.0.8" }
 anyhow = { version = "1.0.94" }

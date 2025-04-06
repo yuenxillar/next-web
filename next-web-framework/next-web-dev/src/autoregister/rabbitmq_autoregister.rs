@@ -1,5 +1,9 @@
 use std::sync::Arc;
 
+use futures::executor::block_on;
+use next_web_core::autoregister::auto_register::AutoRegister;
+use next_web_core::context::application_context::ApplicationContext;
+use next_web_core::context::properties::ApplicationProperties;
 use next_web_mq::amqprs::callbacks::DefaultChannelCallback;
 use next_web_mq::amqprs::callbacks::DefaultConnectionCallback;
 use next_web_mq::amqprs::channel::BasicConsumeArguments;
@@ -14,47 +18,43 @@ use next_web_mq::amqprs::BasicProperties;
 use next_web_mq::rabbitmq::bind_exchange::BindExchange;
 use next_web_mq::rabbitmq::bind_exchange::BindExchangeBuilder;
 use next_web_mq::rabbitmq::core::client_properties::RabbitMQClientProperties;
+use rbatis::async_trait;
 use tracing::{error, info};
-use futures::executor::block_on;
 
 use crate::manager::rabbitmq_manager::RabbiqMQManager;
 
-use super::auto_register::AutoRegister;
-use super::auto_register::AutoRegisterInstanceHelper;
-
 pub struct RabbitMQAutoregister(pub RabbitMQClientProperties);
 
+#[async_trait]
 impl AutoRegister for RabbitMQAutoregister {
-    fn name(&self) -> &'static str {
+    fn singleton_name(&self) -> &'static str {
         "RabbitMQAutoRegister"
     }
 
-    fn register(&self, ctx: &mut rudi::Context) -> Result<(), Box<dyn std::error::Error>> {
+    async fn register(
+        &self,
+        ctx: &mut ApplicationContext,
+        properties: &ApplicationProperties,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let bind_exchange_builder = ctx.resolve_option::<Arc<dyn BindExchangeBuilder>>();
         if let Some(bind) = bind_exchange_builder {
             let bind_exchange = bind.value();
 
             let options = self.0.clone();
             let bind_exchanges = bind_exchange.clone();
-            let channel = self.instance(move || RabbitMQAutoregister::__register(
-                options,
-                bind_exchanges,
-            ));
+            let channel = RabbitMQAutoregister::__register(options, bind_exchanges).await;
 
             let rabbitmq_manager = RabbiqMQManager::new(self.0.clone(), bind_exchange, channel);
             ctx.insert_singleton_with_name::<RabbiqMQManager, String>(
                 rabbitmq_manager,
                 String::from("rabbitmqManager"),
             );
-
         } else {
             error!("Failed to resolve BindExchangeBuilder");
         }
 
         Ok(())
     }
-
-    
 }
 
 impl RabbitMQAutoregister {

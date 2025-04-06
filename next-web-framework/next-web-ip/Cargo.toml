@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rudi = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+next-web-core = { path = "../next-web-core", version = "0.1.0" }

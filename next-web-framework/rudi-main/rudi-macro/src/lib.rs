@@ -82,6 +82,9 @@ pub fn SingleOwner(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate(attr, item, Scope::SingleOwner)
 }
 
+/// Define a properties. 
+/// Please use in conjunction with this macro: `#[rudi::Singleton(eager_create = true)]`
+/// Please add serde_yaml to your dependencies.
 #[doc = ""]
 #[doc = include_str!("./docs/attribute_macro.md")]
 #[proc_macro_attribute]

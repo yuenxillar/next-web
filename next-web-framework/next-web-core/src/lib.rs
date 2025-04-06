@@ -1,10 +1,10 @@
-use rudi::Properties;
 
-mod context;
+pub mod context;
+pub mod autoconfigure;
+pub mod traits;
+pub mod autoregister;
 
-#[Properties(prefix = "test")]
-#[derive(Debug, Clone, Default, serde::Deserialize)]
-struct TestProperties {
-    #[pro_name = "test"]
-    test: String,
-}
+
+pub use self::context::application_context::*;
+pub use self::autoregister::auto_register::*;
+pub use async_trait::async_trait;

@@ -3,7 +3,7 @@ use syn::parse_quote;
 use syn::Expr;
 
 #[derive(FromAttr)]
-#[attribute(idents = [pro_name])]
+#[attribute(idents = [value])]
 pub(crate) struct PropertiesAttr {
     #[attribute(default = default_name())]
     pub(crate) prefix: Expr,

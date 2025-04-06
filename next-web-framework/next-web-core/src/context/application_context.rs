@@ -1,23 +1,29 @@
-use std::{any::TypeId, borrow::Cow, collections::HashMap, rc::Rc, sync::Arc};
-
-use crate::{
-    BoxFuture, Constructor, Definition, DynProvider, DynSingle, EagerCreateFunction, Key, Provider,
-    ProviderRegistry, ResolveModule, Scope, Single, SingleRegistry, Type,
+use std::any::{self, Any};
+use std::cmp::Ordering;
+use std::{
+    any::TypeId, borrow::Cow, collections::HashMap, future::Future, hash::Hasher, pin::Pin,
+    sync::Arc,
 };
+
+#[doc(hidden)]
+pub use inventory::submit;
+use std::hash::Hash;
+
+use crate::autoregister::auto_register::AutoRegisterModule;
 
 /// A context is a container for all the providers and instances.
 ///
 /// It is the main entry point for the dependency injection.
 /// It is also used to create new instances.
 ///
-/// When creating a `Context`, you can use options to change the
-/// default creation behavior, see [`ContextOptions`] for details.
+/// When creating a `ApplicationContext`, you can use options to change the
+/// default creation behavior, see [`ApplicationContextOptions`] for details.
 ///
 /// # Example
 ///
 /// Creating context with customized modules:
 /// ```rust
-/// use rudi::{components, modules, Context, DynProvider, Module, Transient};
+/// use rudi::{components, modules, ApplicationContext, DynProvider, Module, Transient};
 ///
 /// #[Transient]
 /// struct A;
@@ -43,7 +49,7 @@ use crate::{
 /// }
 ///
 /// # fn main() {
-/// let mut cx = Context::create(modules![Module1, Module2]);
+/// let mut cx = ApplicationContext::create(modules![Module1, Module2]);
 ///
 /// let b = cx.resolve::<B>();
 ///
@@ -55,7 +61,7 @@ use crate::{
 /// With the `auto-register` feature enabled (which is enabled by default),
 /// it is also possible to create contexts in a simpler way:
 /// ```rust
-/// use rudi::{Context, Transient};
+/// use rudi::{ApplicationContext, Transient};
 ///
 /// #[Transient]
 /// struct A;
@@ -65,9 +71,9 @@ use crate::{
 /// struct B;
 ///
 /// # fn main() {
-/// let mut cx = Context::auto_register();
+/// let mut cx = ApplicationContext::auto_register();
 /// // This is a simplified version of the following
-/// // let mut cx = Context::create(modules![AutoRegisterModule]);
+/// // let mut cx = ApplicationContext::create(modules![AutoRegisterModule]);
 ///
 /// let b = cx.resolve::<B>();
 ///
@@ -80,12 +86,12 @@ use crate::{
 /// 1. in context, there exists a provider whose constructor is async.
 /// 2. the `eager_create` method of the provider is set to true, e.g., [`SingletonProvider::eager_create`](crate::SingletonProvider::eager_create).
 /// 3. the `eager_create` method of the module to which the provide belongs is set to true, i.e., [`Module::eager_create`](crate::Module::eager_create).
-/// 4. the `eager_create` field of the context, is set to true, i.e., [`ContextOptions::eager_create`].
+/// 4. the `eager_create` field of the context, is set to true, i.e., [`ApplicationContextOptions::eager_create`].
 ///
-/// Then when creating the context, you must use the async creation methods, [`Context::create_async`] or [`Context::auto_register_async`]:
+/// Then when creating the context, you must use the async creation methods, [`ApplicationContext::create_async`] or [`ApplicationContext::auto_register_async`]:
 ///
 /// ```rust
-/// use rudi::{Context, Singleton, Transient};
+/// use rudi::{ApplicationContext, Singleton, Transient};
 ///
 /// #[Singleton]
 /// async fn Foo() -> i32 {
@@ -98,7 +104,7 @@ use crate::{
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let mut cx = Context::options()
+///     let mut cx = ApplicationContext::options()
 ///         .eager_create(true)
 ///         .auto_register_async()
 ///         .await;
@@ -107,7 +113,7 @@ use crate::{
 /// }
 /// ```
 #[derive(Clone)]
-pub struct Context {
+pub struct ApplicationContext {
     allow_override: bool,
     allow_only_single_eager_create: bool,
 
@@ -123,7 +129,7 @@ pub struct Context {
     dependency_chain: DependencyChain,
 }
 
-impl Default for Context {
+impl Default for ApplicationContext {
     fn default() -> Self {
         Self {
             allow_override: true,
@@ -139,19 +145,19 @@ impl Default for Context {
     }
 }
 
-impl Context {
+impl ApplicationContext {
     /// Creates a new context with the given modules.
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider whose constructor is async and the provider will be eagerly created.
     /// - Panics if there is a provider that panics on construction.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{components, modules, Context, DynProvider, Module, Transient};
+    /// use rudi::{components, modules, ApplicationContext, DynProvider, Module, Transient};
     ///
     /// #[Transient]
     /// struct A;
@@ -165,96 +171,94 @@ impl Context {
     /// }
     ///
     /// # fn main() {
-    /// let mut cx = Context::create(modules![MyModule]);
+    /// let mut cx = ApplicationContext::create(modules![MyModule]);
     /// assert!(cx.resolve_option::<A>().is_some());
     /// # }
     /// ```
     #[track_caller]
-    pub fn create(modules: Vec<ResolveModule>) -> Context {
-        ContextOptions::default().create(modules)
+    pub fn create(modules: Vec<ResolveModule>) -> ApplicationContext {
+        ApplicationContextOptions::default().create(modules)
     }
 
     /// Creates a new context with the [`AutoRegisterModule`].
     ///
-    /// Same as `Context::create(modules![AutoRegisterModule])`.
+    /// Same as `ApplicationContext::create(modules![AutoRegisterModule])`.
     ///
-    /// See [`Context::create`] for more details.
+    /// See [`ApplicationContext::create`] for more details.
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider whose constructor is async and the provider will be eagerly created.
     /// - Panics if there is a provider that panics on construction.
     ///
     /// [`AutoRegisterModule`]: crate::AutoRegisterModule
     #[cfg_attr(docsrs, doc(cfg(feature = "auto-register")))]
-    #[cfg(feature = "auto-register")]
     #[track_caller]
-    pub fn auto_register() -> Context {
-        ContextOptions::default().auto_register()
+    pub fn auto_register() -> ApplicationContext {
+        ApplicationContextOptions::default().auto_register()
     }
 
-    /// Async version of [`Context::create`].
+    /// Async version of [`ApplicationContext::create`].
     ///
     /// If no provider in the context has an async constructor and that provider needs to be eagerly created,
-    /// this method is the same as [`Context::create`].
+    /// this method is the same as [`ApplicationContext::create`].
     ///
-    /// See [`Context::create`] for more details.
+    /// See [`ApplicationContext::create`] for more details.
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider that panics on construction.
-    pub async fn create_async(modules: Vec<ResolveModule>) -> Context {
-        ContextOptions::default().create_async(modules).await
+    pub async fn create_async(modules: Vec<ResolveModule>) -> ApplicationContext {
+        ApplicationContextOptions::default().create_async(modules).await
     }
 
-    /// Async version of [`Context::auto_register`].
+    /// Async version of [`ApplicationContext::auto_register`].
     ///
     /// If no provider in the context has an async constructor and that provider needs to be eagerly created,
-    /// this method is the same as [`Context::auto_register`].
+    /// this method is the same as [`ApplicationContext::auto_register`].
     ///
-    /// See [`Context::auto_register`] for more details.
+    /// See [`ApplicationContext::auto_register`] for more details.
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider that panics on construction.
     #[cfg_attr(docsrs, doc(cfg(feature = "auto-register")))]
-    #[cfg(feature = "auto-register")]
-    pub async fn auto_register_async() -> Context {
-        ContextOptions::default().auto_register_async().await
+    pub async fn auto_register_async() -> ApplicationContext {
+        ApplicationContextOptions::default().auto_register_async().await
     }
 
-    /// Returns a new ContextOptions object.
+    /// Returns a new ApplicationContextOptions object.
     ///
-    /// This function return a new ContextOptions object that you can use to create a context with specific options
+    /// This function return a new ApplicationContextOptions object that you can use to create a context with specific options
     /// if `create()` or `auto_register()` are not appropriate.
     ///
-    /// It is equivalent to `ContextOptions::default()`, but allows you to write more readable code.
-    /// Instead of `ContextOptions::default().eager_create(true).auto_register()`,
-    /// you can write `Context::options().eager_create(true).auto_register()`.
-    /// This also avoids the need to import `ContextOptions`.
+    /// It is equivalent to `ApplicationContextOptions::default()`, but allows you to write more readable code.
+    /// Instead of `ApplicationContextOptions::default().eager_create(true).auto_register()`,
+    /// you can write `ApplicationContext::options().eager_create(true).auto_register()`.
+    /// This also avoids the need to import `ApplicationContextOptions`.
     ///
-    /// See the [`ContextOptions`] for more details.
+    /// See the [`ApplicationContextOptions`] for more details.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::options().eager_create(true).auto_register();
+    /// let cx = ApplicationContext::options().eager_create(true).auto_register();
     ///
     /// assert!(cx.contains_single::<A>());
     /// # }
     /// ```
-    pub fn options() -> ContextOptions {
-        ContextOptions::default()
+    pub fn options() -> ApplicationContextOptions {
+        ApplicationContextOptions::default()
     }
 
     /// Returns whether the context should allow overriding existing providers.
@@ -306,15 +310,15 @@ impl Context {
     ///
     /// # Panics
     ///
-    /// - Panics if a `Provider<T>` with the same name as the inserted instance exists in the `Context` and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if a `Provider<T>` with the same name as the inserted instance exists in the `ApplicationContext` and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::Context;
+    /// use rudi::ApplicationContext;
     ///
     /// # fn main() {
-    /// let mut cx = Context::default();
+    /// let mut cx = ApplicationContext::default();
     /// cx.insert_singleton(42);
     /// assert_eq!(cx.get_single::<i32>(), &42);
     /// # }
@@ -331,15 +335,15 @@ impl Context {
     ///
     /// # Panics
     ///
-    /// - Panics if a `Provider<T>` with the same name as the inserted instance exists in the `Context` and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if a `Provider<T>` with the same name as the inserted instance exists in the `ApplicationContext` and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::Context;
+    /// use rudi::ApplicationContext;
     ///
     /// # fn main() {
-    /// let mut cx = Context::default();
+    /// let mut cx = ApplicationContext::default();
     ///
     /// cx.insert_singleton_with_name(1, "one");
     /// cx.insert_singleton_with_name(2, "two");
@@ -373,18 +377,18 @@ impl Context {
     ///
     /// # Panics
     ///
-    /// - Panics if a `Provider<T>` with the same name as the inserted instance exists in the `Context` and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if a `Provider<T>` with the same name as the inserted instance exists in the `ApplicationContext` and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::Context;
+    /// use rudi::ApplicationContext;
     ///
     /// #[derive(PartialEq, Eq, Debug)]
     /// struct NotClone(i32);
     ///
     /// # fn main() {
-    /// let mut cx = Context::default();
+    /// let mut cx = ApplicationContext::default();
     /// cx.insert_single_owner(NotClone(42));
     /// assert_eq!(cx.get_single::<NotClone>(), &NotClone(42));
     /// # }
@@ -401,18 +405,18 @@ impl Context {
     ///
     /// # Panics
     ///
-    /// - Panics if a `Provider<T>` with the same name as the inserted instance exists in the `Context` and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if a `Provider<T>` with the same name as the inserted instance exists in the `ApplicationContext` and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::Context;
+    /// use rudi::ApplicationContext;
     ///
     /// #[derive(PartialEq, Eq, Debug)]
     /// struct NotClone(i32);
     ///
     /// # fn main() {
-    /// let mut cx = Context::default();
+    /// let mut cx = ApplicationContext::default();
     ///
     /// cx.insert_single_owner_with_name(NotClone(1), "one");
     /// cx.insert_single_owner_with_name(NotClone(2), "two");
@@ -433,7 +437,12 @@ impl Context {
 
         let key = provider.key().clone();
         self.provider_registry.insert(provider, self.allow_override);
-        self.single_registry.insert(key, single);
+        self.single_registry.insert(key.clone(), single);
+
+        println!(
+            "SingleOwner registry insert registered successfully!\nkey: {:?}\n",
+            key
+        );
     }
 
     /// Load the given modules.
@@ -446,19 +455,19 @@ impl Context {
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, AutoRegisterModule, Context, Singleton};
+    /// use rudi::{modules, AutoRegisterModule, ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton]
     /// struct A;
     ///
     /// # fn main() {
-    /// let mut cx = Context::default();
+    /// let mut cx = ApplicationContext::default();
     /// assert!(cx.get_provider::<A>().is_none());
     ///
     /// cx.load_modules(modules![AutoRegisterModule]);
@@ -482,20 +491,20 @@ impl Context {
     /// Unload the given modules.
     ///
     /// This method will convert the given module into a collection of providers like
-    /// the [`Context::load_modules`] method, and then remove all providers in the context
+    /// the [`ApplicationContext::load_modules`] method, and then remove all providers in the context
     /// that are equal to the providers in the collection and their possible instances.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, AutoRegisterModule, Context, Singleton};
+    /// use rudi::{modules, AutoRegisterModule, ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton]
     /// struct A;
     ///
     /// # fn main() {
-    /// let mut cx = Context::default();
+    /// let mut cx = ApplicationContext::default();
     /// assert!(cx.get_provider::<A>().is_none());
     ///
     /// cx.load_modules(modules![AutoRegisterModule]);
@@ -532,12 +541,12 @@ impl Context {
     ///    Whether an instance need to be created eagerly depends on
     ///    the [`eager_create`](crate::Provider::eager_create) field of the Provider that defines it,
     ///    the [`eager_create`](crate::ResolveModule::eager_create) field of the Module to which this Provider belongs,
-    ///    and the [`eager_create`](crate::Context::eager_create) field of the Context to which this Module belongs.
+    ///    and the [`eager_create`](crate::ApplicationContext::eager_create) field of the ApplicationContext to which this Module belongs.
     ///    As long as one of these is true, the instance need to be created eagerly.
     ///
     ///    Whether an instance is allowed to be created eagerly depends on
     ///    the [`scope`](crate::Definition::scope) field in the [`definition`](crate::Provider::definition) field of the Provider that defines it,
-    ///    and the [`allow_only_single_eager_create`](crate::Context::allow_only_single_eager_create) field of the Context to which this Provider belongs.
+    ///    and the [`allow_only_single_eager_create`](crate::ApplicationContext::allow_only_single_eager_create) field of the ApplicationContext to which this Provider belongs.
     ///    If `allow_only_single_eager_create` is false, or `allow_only_single_eager_create` is true and `scope` is [`Singleton`](crate::Scope::Singleton) or [`SingleOwner`](crate::Scope::SingleOwner),
     ///    the instance is allowed to be created eagerly.
     ///
@@ -545,14 +554,14 @@ impl Context {
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider whose constructor is async and the provider will be eagerly created.
     /// - Panics if there is a provider that panics on construction.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, AutoRegisterModule, Context, Singleton, Transient};
+    /// use rudi::{modules, AutoRegisterModule, ApplicationContext, Singleton, Transient};
     ///
     /// #[Transient(condition = |_| true)]
     /// struct A;
@@ -562,7 +571,7 @@ impl Context {
     /// struct B;
     ///
     /// # fn main() {
-    /// let mut cx = Context::default();
+    /// let mut cx = ApplicationContext::default();
     ///
     /// cx.load_modules(modules![AutoRegisterModule]);
     ///
@@ -580,13 +589,13 @@ impl Context {
     ///
     /// # Note
     ///
-    /// This method needs to be called after the [`Context::load_modules`] method,
+    /// This method needs to be called after the [`ApplicationContext::load_modules`] method,
     /// but why not put the logic of this method in the `load_modules` method? Please see the example below:
     ///
     /// ```rust
-    /// use rudi::{components, modules, Context, DynProvider, Module, Transient};
+    /// use rudi::{components, modules, ApplicationContext, DynProvider, Module, Transient};
     ///
-    /// fn a_condition(cx: &Context) -> bool {
+    /// fn a_condition(cx: &ApplicationContext) -> bool {
     ///     cx.contains_provider::<B>()
     /// }
     ///
@@ -613,7 +622,7 @@ impl Context {
     /// }
     ///
     /// fn main() {
-    ///     let mut cx = Context::default();
+    ///     let mut cx = ApplicationContext::default();
     ///
     ///     // Method 1, call `load_modules` and then call `flush` immediately
     ///     cx.load_modules(modules![AModule]);
@@ -624,7 +633,7 @@ impl Context {
     ///     // The evaluation result of `A`'s `condition` is `false`, so `A` will not be created
     ///     assert!(!cx.contains_provider::<A>());
     ///
-    ///     let mut cx = Context::default();
+    ///     let mut cx = ApplicationContext::default();
     ///
     ///     // Method 2, call all `load_modules` first, then call `flush`
     ///     cx.load_modules(modules![AModule]);
@@ -643,16 +652,16 @@ impl Context {
         self.create_eager_instances();
     }
 
-    /// Async version of [`Context::flush`].
+    /// Async version of [`ApplicationContext::flush`].
     ///
     /// If no provider in the context has an async constructor and that provider needs to be eagerly created,
-    /// this method is the same as [`Context::flush`].
+    /// this method is the same as [`ApplicationContext::flush`].
     ///
-    /// See [`Context::flush`] for more details.
+    /// See [`ApplicationContext::flush`] for more details.
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider that panics on construction.
     pub async fn flush_async(&mut self) {
         self.create_eager_instances_async().await;
@@ -673,14 +682,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
     /// #[Singleton]
     /// struct A;
     ///
     /// # fn main() {
-    /// let mut cx = Context::auto_register();
+    /// let mut cx = ApplicationContext::auto_register();
     /// let a = cx.resolve::<A>();
     /// assert_eq!(format!("{:?}", a), "A");
     /// # }
@@ -702,14 +711,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
     /// #[Singleton(name = "a")]
     /// struct A;
     ///
     /// # fn main() {
-    /// let mut cx = Context::auto_register();
+    /// let mut cx = ApplicationContext::auto_register();
     /// let a = cx.resolve_with_name::<A>("a");
     /// assert_eq!(format!("{:?}", a), "A");
     /// # }
@@ -744,14 +753,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
     /// #[Singleton]
     /// struct A;
     ///
     /// # fn main() {
-    /// let mut cx = Context::auto_register();
+    /// let mut cx = ApplicationContext::auto_register();
     /// assert!(cx.resolve_option::<A>().is_some());
     /// # }
     /// ```
@@ -775,14 +784,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
     /// #[Singleton(name = "a")]
     /// struct A;
     ///
     /// # fn main() {
-    /// let mut cx = Context::auto_register();
+    /// let mut cx = ApplicationContext::auto_register();
     /// assert!(cx.resolve_option_with_name::<A>("a").is_some());
     /// # }
     /// ```
@@ -813,7 +822,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Transient};
+    /// use rudi::{ApplicationContext, Transient};
     ///
     /// #[Transient(name = "a")]
     /// fn A() -> i32 {
@@ -826,7 +835,7 @@ impl Context {
     /// }
     ///
     /// # fn main() {
-    /// let mut cx = Context::auto_register();
+    /// let mut cx = ApplicationContext::auto_register();
     /// assert_eq!(cx.resolve_by_type::<i32>().into_iter().sum::<i32>(), 3);
     /// # }
     /// ```
@@ -864,14 +873,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton]
     /// struct A;
     ///
     /// # fn main() {
-    /// let mut cx = Context::auto_register();
+    /// let mut cx = ApplicationContext::auto_register();
     /// assert!(!cx.contains_single::<A>());
     /// cx.just_create_single::<A>();
     /// assert!(cx.contains_single::<A>());
@@ -894,14 +903,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton(name = "a")]
     /// struct A;
     ///
     /// # fn main() {
-    /// let mut cx = Context::auto_register();
+    /// let mut cx = ApplicationContext::auto_register();
     /// assert!(!cx.contains_single_with_name::<A>("a"));
     /// cx.just_create_single_with_name::<A>("a");
     /// assert!(cx.contains_single_with_name::<A>("a"));
@@ -939,7 +948,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton, Transient};
+    /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
     /// #[derive(Clone)]
     /// #[Singleton]
@@ -949,7 +958,7 @@ impl Context {
     /// struct B;
     ///
     /// # fn main() {
-    /// let mut cx = Context::auto_register();
+    /// let mut cx = ApplicationContext::auto_register();
     ///
     /// assert!(!cx.contains_single::<A>());
     /// assert!(!cx.contains_single::<B>());
@@ -981,7 +990,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton, Transient};
+    /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
     /// #[derive(Clone)]
     /// #[Singleton(name = "a")]
@@ -991,7 +1000,7 @@ impl Context {
     /// struct B;
     ///
     /// # fn main() {
-    /// let mut cx = Context::auto_register();
+    /// let mut cx = ApplicationContext::auto_register();
     ///
     /// assert!(!cx.contains_single_with_name::<A>("a"));
     /// assert!(!cx.contains_single_with_name::<B>("b"));
@@ -1032,7 +1041,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton, Transient};
+    /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
     /// #[Singleton(name = "one")]
     /// fn One() -> i32 {
@@ -1045,7 +1054,7 @@ impl Context {
     /// }
     ///
     /// fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///
     ///     assert!(!cx.contains_single::<i32>());
     ///
@@ -1065,7 +1074,7 @@ impl Context {
             .collect()
     }
 
-    /// Async version of [`Context::resolve`].
+    /// Async version of [`ApplicationContext::resolve`].
     ///
     /// # Panics
     ///
@@ -1076,7 +1085,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Transient};
+    /// use rudi::{ApplicationContext, Transient};
     ///
     /// #[Transient]
     /// async fn Number() -> i32 {
@@ -1088,7 +1097,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///     assert_eq!(cx.resolve_async::<i32>().await, 1);
     ///     assert!(cx.resolve_option_async::<A>().await.is_some());
     /// }
@@ -1097,7 +1106,7 @@ impl Context {
         self.resolve_with_name_async("").await
     }
 
-    /// Async version of [`Context::resolve_with_name`].
+    /// Async version of [`ApplicationContext::resolve_with_name`].
     ///
     /// # Panics
     ///
@@ -1108,7 +1117,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Transient};
+    /// use rudi::{ApplicationContext, Transient};
     ///
     /// #[Transient(name = "a")]
     /// async fn Number() -> i32 {
@@ -1120,7 +1129,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///     assert_eq!(cx.resolve_with_name_async::<i32>("a").await, 1);
     ///     assert!(cx.resolve_option_with_name_async::<A>("A").await.is_some());
     /// }
@@ -1142,7 +1151,7 @@ impl Context {
         }
     }
 
-    /// Async version of [`Context::resolve_option`].
+    /// Async version of [`ApplicationContext::resolve_option`].
     ///
     /// # Panics
     ///
@@ -1151,7 +1160,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Transient};
+    /// use rudi::{ApplicationContext, Transient};
     ///
     /// #[Transient]
     /// async fn Number() -> i32 {
@@ -1163,7 +1172,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///     assert_eq!(cx.resolve_async::<i32>().await, 1);
     ///     assert!(cx.resolve_option_async::<A>().await.is_some());
     /// }
@@ -1172,7 +1181,7 @@ impl Context {
         self.resolve_option_with_name_async("").await
     }
 
-    /// Async version of [`Context::resolve_option_with_name`].
+    /// Async version of [`ApplicationContext::resolve_option_with_name`].
     ///
     /// # Panics
     ///
@@ -1181,7 +1190,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Transient};
+    /// use rudi::{ApplicationContext, Transient};
     ///
     /// #[Transient(name = "a")]
     /// async fn Number() -> i32 {
@@ -1193,7 +1202,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///     assert_eq!(cx.resolve_with_name_async::<i32>("a").await, 1);
     ///     assert!(cx.resolve_option_with_name_async::<A>("A").await.is_some());
     /// }
@@ -1212,7 +1221,7 @@ impl Context {
         }
     }
 
-    /// Async version of [`Context::resolve_by_type`].
+    /// Async version of [`ApplicationContext::resolve_by_type`].
     ///
     /// # Panics
     ///
@@ -1221,7 +1230,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Transient};
+    /// use rudi::{ApplicationContext, Transient};
     ///
     /// #[Transient(name = "a")]
     /// async fn A() -> i32 {
@@ -1235,7 +1244,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///     assert_eq!(
     ///         cx.resolve_by_type_async::<i32>()
     ///             .await
@@ -1275,7 +1284,7 @@ impl Context {
         }
     }
 
-    /// Async version of [`Context::just_create_single`].
+    /// Async version of [`ApplicationContext::just_create_single`].
     ///
     /// # Panics
     ///
@@ -1286,7 +1295,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton(async)]
@@ -1294,7 +1303,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///     assert!(!cx.contains_single::<A>());
     ///     cx.just_create_single_async::<A>().await;
     ///     assert!(cx.contains_single::<A>());
@@ -1304,7 +1313,7 @@ impl Context {
         self.just_create_single_with_name_async::<T>("").await;
     }
 
-    /// Async version of [`Context::just_create_single_with_name`].
+    /// Async version of [`ApplicationContext::just_create_single_with_name`].
     ///
     /// # Panics
     ///
@@ -1315,7 +1324,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton(async, name = "a")]
@@ -1323,7 +1332,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///     assert!(!cx.contains_single_with_name::<A>("a"));
     ///     cx.just_create_single_with_name_async::<A>("a").await;
     ///     assert!(cx.contains_single_with_name::<A>("a"));
@@ -1348,7 +1357,7 @@ impl Context {
         }
     }
 
-    /// Async version of [`Context::try_just_create_single`].
+    /// Async version of [`ApplicationContext::try_just_create_single`].
     ///
     /// # Panics
     ///
@@ -1357,7 +1366,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton, Transient};
+    /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
     /// #[derive(Clone)]
     /// #[Singleton(async)]
@@ -1368,7 +1377,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///
     ///     assert!(!cx.contains_single::<A>());
     ///     assert!(!cx.contains_single::<B>());
@@ -1384,7 +1393,7 @@ impl Context {
         self.try_just_create_single_with_name_async::<T>("").await
     }
 
-    /// Async version of [`Context::try_just_create_single_with_name`].
+    /// Async version of [`ApplicationContext::try_just_create_single_with_name`].
     ///
     /// # Panics
     ///
@@ -1393,7 +1402,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton, Transient};
+    /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
     /// #[derive(Clone)]
     /// #[Singleton(async, name = "a")]
@@ -1404,7 +1413,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///
     ///     assert!(!cx.contains_single_with_name::<A>("a"));
     ///     assert!(!cx.contains_single_with_name::<B>("b"));
@@ -1432,7 +1441,7 @@ impl Context {
         }
     }
 
-    /// Async version of [`Context::try_just_create_singles_by_type`].
+    /// Async version of [`ApplicationContext::try_just_create_singles_by_type`].
     ///
     /// # Panics
     ///
@@ -1441,7 +1450,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton, Transient};
+    /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
     /// #[Singleton(name = "one")]
     /// async fn One() -> i32 {
@@ -1455,7 +1464,7 @@ impl Context {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mut cx = Context::auto_register();
+    ///     let mut cx = ApplicationContext::auto_register();
     ///
     ///     assert!(!cx.contains_single::<i32>());
     ///
@@ -1486,14 +1495,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// assert!(cx.contains_provider::<A>());
     /// # }
     /// ```
@@ -1506,14 +1515,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton(name = "a")]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// assert!(cx.contains_provider_with_name::<A>("a"));
     /// # }
     /// ```
@@ -1530,13 +1539,13 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Transient};
+    /// use rudi::{ApplicationContext, Transient};
     ///
     /// #[Transient]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// assert!(cx.get_provider::<A>().is_some());
     /// # }
     /// ```
@@ -1549,13 +1558,13 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Transient};
+    /// use rudi::{ApplicationContext, Transient};
     ///
     /// #[Transient(name = "a")]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// assert!(cx.get_provider_with_name::<A>("a").is_some());
     /// # }
     /// ```
@@ -1572,7 +1581,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Transient};
+    /// use rudi::{ApplicationContext, Transient};
     ///
     /// #[Transient(name = "a")]
     /// fn A() -> i32 {
@@ -1585,7 +1594,7 @@ impl Context {
     /// }
     ///
     /// fn main() {
-    ///     let cx = Context::auto_register();
+    ///     let cx = ApplicationContext::auto_register();
     ///     assert_eq!(cx.get_providers_by_type::<i32>().len(), 2);
     /// }
     /// ```
@@ -1604,14 +1613,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton(eager_create)]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// assert!(cx.contains_single::<A>());
     /// # }
     /// ```
@@ -1624,14 +1633,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
     /// #[Singleton(eager_create, name = "a")]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// assert!(cx.contains_single_with_name::<A>("a"));
     /// # }
     /// ```
@@ -1652,14 +1661,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
     /// #[Singleton(eager_create)]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// let a = cx.get_single::<A>();
     /// assert_eq!(format!("{:?}", a), "A");
     /// # }
@@ -1678,14 +1687,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
     /// #[Singleton(eager_create, name = "a")]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// let a = cx.get_single_with_name::<A>("a");
     /// assert_eq!(format!("{:?}", a), "A");
     /// # }
@@ -1703,14 +1712,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
     /// #[Singleton(eager_create)]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// assert!(cx.get_single_option::<A>().is_some());
     /// # }
     /// ```
@@ -1723,14 +1732,14 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
     /// #[Singleton(eager_create, name = "a")]
     /// struct A;
     ///
     /// # fn main() {
-    /// let cx = Context::auto_register();
+    /// let cx = ApplicationContext::auto_register();
     /// assert!(cx.get_single_option_with_name::<A>("a").is_some());
     /// # }
     /// ```
@@ -1747,7 +1756,7 @@ impl Context {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{Context, Singleton};
+    /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[Singleton(eager_create, name = "a")]
     /// fn A() -> i32 {
@@ -1760,7 +1769,7 @@ impl Context {
     /// }
     ///
     /// fn main() {
-    ///     let cx = Context::auto_register();
+    ///     let cx = ApplicationContext::auto_register();
     ///     assert_eq!(cx.get_singles_by_type::<i32>().into_iter().sum::<i32>(), 3);
     /// }
     /// ```
@@ -1776,7 +1785,7 @@ impl Context {
     }
 }
 
-impl Context {
+impl ApplicationContext {
     #[track_caller]
     fn load_provider(&mut self, eager_create: bool, provider: DynProvider) {
         let definition = provider.definition();
@@ -1846,10 +1855,10 @@ impl Context {
                         "unable to call an async eager create function in a sync context for: {:?}
 
 please use instead:
-1. Context::create_async(modules).await
-2. Context::auto_register_async().await
-3. ContextOptions::create_async(options, modules).await
-4. ContextOptions::auto_register_async(options).await
+1. ApplicationContext::create_async(modules).await
+2. ApplicationContext::auto_register_async().await
+3. ApplicationContextOptions::create_async(options, modules).await
+4. ApplicationContextOptions::auto_register_async(options).await
 ",
                         definition
                     )
@@ -2016,7 +2025,7 @@ please use instead:
                     "unable to call an async constructor in a sync context for: {:?}
 
 please check all the references to the above type, there are 3 scenarios that will be referenced:
-1. use `Context::resolve_xxx::<Type>(cx)` to get instances of the type, change to `Context::resolve_xxx_async::<Type>(cx).await`.
+1. use `ApplicationContext::resolve_xxx::<Type>(cx)` to get instances of the type, change to `ApplicationContext::resolve_xxx_async::<Type>(cx).await`.
 2. use `yyy: Type` as a field of a struct, or a field of a variant of a enum, use `#[Singleton(async)]`, `#[Transient(async)]` or `#[SingleOwner(async)]` on the struct or enum.
 3. use `zzz: Type` as a argument of a function, add the `async` keyword to the function.
 ",
@@ -2064,7 +2073,7 @@ please check all the references to the above type, there are 3 scenarios that wi
     fn resolve_instance<T: 'static + Send + Sync>(
         &mut self,
         key: Key,
-        constructor: Arc<dyn Fn(&mut Context) -> T>,
+        constructor: Arc<dyn Fn(&mut ApplicationContext) -> T>,
     ) -> T {
         self.dependency_chain.push(key);
         let instance = constructor(self);
@@ -2076,7 +2085,7 @@ please check all the references to the above type, there are 3 scenarios that wi
     async fn resolve_instance_async<T: 'static>(
         &mut self,
         key: Key,
-        constructor: Arc<dyn for<'a> Fn(&'a mut Context) -> BoxFuture<'a, T> + Send + Sync>,
+        constructor: Arc<dyn for<'a> Fn(&'a mut ApplicationContext) -> BoxFuture<'a, T> + Send + Sync>,
     ) -> T {
         self.dependency_chain.push(key);
         let instance = constructor(self).await;
@@ -2094,6 +2103,12 @@ please check all the references to the above type, there are 3 scenarios that wi
             .collect()
     }
 }
+
+
+
+
+
+/// =======================================================================================================
 
 #[derive(Clone, Copy)]
 enum Behaviour {
@@ -2168,20 +2183,20 @@ where
 
 /// Options and flags which can be used to configure how a context is created.
 ///
-/// This builder expose the ability to configure how a [`Context`] is created.
-/// The [`Context::create`] and [`Context::auto_register`] methods are aliases
+/// This builder expose the ability to configure how a [`ApplicationContext`] is created.
+/// The [`ApplicationContext::create`] and [`ApplicationContext::auto_register`] methods are aliases
 /// for commonly used options using this builder.
 ///
-/// Generally speaking, when using `ContextOptions`, you'll first call [`ContextOptions::default`],
-/// then chain calls to methods to set each option, then call [`ContextOptions::create`], paasing the modules you've built,
-/// or call [`ContextOptions::auto_register`]. This will give you a [`Context`].
+/// Generally speaking, when using `ApplicationContextOptions`, you'll first call [`ApplicationContextOptions::default`],
+/// then chain calls to methods to set each option, then call [`ApplicationContextOptions::create`], paasing the modules you've built,
+/// or call [`ApplicationContextOptions::auto_register`]. This will give you a [`ApplicationContext`].
 ///
 /// # Example
 ///
 /// Creating a context with a module:
 ///
 /// ```rust
-/// use rudi::{modules, Context, ContextOptions, DynProvider, Module};
+/// use rudi::{modules, ApplicationContext, ApplicationContextOptions, DynProvider, Module};
 ///
 /// struct MyModule;
 ///
@@ -2192,29 +2207,29 @@ where
 /// }
 ///
 /// # fn main() {
-/// let _cx: Context = ContextOptions::default().create(modules![MyModule]);
+/// let _cx: ApplicationContext = ApplicationContextOptions::default().create(modules![MyModule]);
 /// # }
 /// ```
 ///
 /// Creating a context with [`AutoRegisterModule`]:
 ///
 /// ```rust
-/// use rudi::{modules, AutoRegisterModule, Context, ContextOptions};
+/// use rudi::{modules, AutoRegisterModule, ApplicationContext, ApplicationContextOptions};
 ///
 /// # fn main() {
-/// let _cx: Context = ContextOptions::default().create(modules![AutoRegisterModule]);
+/// let _cx: ApplicationContext = ApplicationContextOptions::default().create(modules![AutoRegisterModule]);
 /// // or use simpler method
-/// // let _cx: Context = ContextOptions::default().auto_register();
+/// // let _cx: ApplicationContext = ApplicationContextOptions::default().auto_register();
 /// # }
 /// ```
 ///
 /// Creating a context with both options:
 ///
 /// ```rust
-/// use rudi::{modules, AutoRegisterModule, Context, ContextOptions};
+/// use rudi::{modules, AutoRegisterModule, ApplicationContext, ApplicationContextOptions};
 ///
 /// # fn main() {
-/// let _cx: Context = ContextOptions::default()
+/// let _cx: ApplicationContext = ApplicationContextOptions::default()
 ///     .allow_override(true)
 ///     .allow_only_single_eager_create(true)
 ///     .eager_create(false)
@@ -2226,7 +2241,7 @@ where
 /// ```
 ///
 /// [`AutoRegisterModule`]: crate::AutoRegisterModule
-pub struct ContextOptions {
+pub struct ApplicationContextOptions {
     allow_override: bool,
     allow_only_single_eager_create: bool,
     eager_create: bool,
@@ -2234,7 +2249,7 @@ pub struct ContextOptions {
     singles: Vec<DynSingle>,
 }
 
-impl Default for ContextOptions {
+impl Default for ApplicationContextOptions {
     fn default() -> Self {
         Self {
             allow_override: true,
@@ -2246,7 +2261,7 @@ impl Default for ContextOptions {
     }
 }
 
-impl ContextOptions {
+impl ApplicationContextOptions {
     /// Sets the option for whether the context should allow overriding existing providers.
     ///
     /// This option, when true, allows a provider to override an existing provider with the same key.
@@ -2254,10 +2269,10 @@ impl ContextOptions {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, Context, ContextOptions};
+    /// use rudi::{modules, ApplicationContext, ApplicationContextOptions};
     ///
     /// # fn main() {
-    /// let cx: Context = ContextOptions::default()
+    /// let cx: ApplicationContext = ApplicationContextOptions::default()
     ///     .allow_override(true)
     ///     .create(modules![]);
     /// assert!(cx.allow_override());
@@ -2275,10 +2290,10 @@ impl ContextOptions {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, Context, ContextOptions};
+    /// use rudi::{modules, ApplicationContext, ApplicationContextOptions};
     ///
     /// # fn main() {
-    /// let cx: Context = ContextOptions::default()
+    /// let cx: ApplicationContext = ApplicationContextOptions::default()
     ///     .allow_only_single_eager_create(false)
     ///     .create(modules![]);
     /// assert!(!cx.allow_only_single_eager_create());
@@ -2296,10 +2311,10 @@ impl ContextOptions {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, Context, ContextOptions};
+    /// use rudi::{modules, ApplicationContext, ApplicationContextOptions};
     ///
     /// # fn main() {
-    /// let cx: Context = ContextOptions::default()
+    /// let cx: ApplicationContext = ApplicationContextOptions::default()
     ///     .eager_create(false)
     ///     .create(modules![]);
     /// assert!(!cx.eager_create());
@@ -2315,10 +2330,10 @@ impl ContextOptions {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, Context, ContextOptions};
+    /// use rudi::{modules, ApplicationContext, ApplicationContextOptions};
     ///
     /// # fn main() {
-    /// let cx: Context = ContextOptions::default().singleton(42).create(modules![]);
+    /// let cx: ApplicationContext = ApplicationContextOptions::default().singleton(42).create(modules![]);
     /// assert_eq!(cx.get_single::<i32>(), &42);
     /// # }
     /// ```
@@ -2334,10 +2349,10 @@ impl ContextOptions {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, Context, ContextOptions};
+    /// use rudi::{modules, ApplicationContext, ApplicationContextOptions};
     ///
     /// # fn main() {
-    /// let cx: Context = ContextOptions::default()
+    /// let cx: ApplicationContext = ApplicationContextOptions::default()
     ///     .singleton_with_name(1, "one")
     ///     .singleton_with_name(2, "two")
     ///     .create(modules![]);
@@ -2365,13 +2380,13 @@ impl ContextOptions {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, Context, ContextOptions};
+    /// use rudi::{modules, ApplicationContext, ApplicationContextOptions};
     ///
     /// #[derive(PartialEq, Eq, Debug)]
     /// struct NotClone(i32);
     ///
     /// # fn main() {
-    /// let cx: Context = ContextOptions::default()
+    /// let cx: ApplicationContext = ApplicationContextOptions::default()
     ///     .single_owner(NotClone(42))
     ///     .create(modules![]);
     /// assert_eq!(cx.get_single::<NotClone>(), &NotClone(42));
@@ -2389,13 +2404,13 @@ impl ContextOptions {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{modules, Context, ContextOptions};
+    /// use rudi::{modules, ApplicationContext, ApplicationContextOptions};
     ///
     /// #[derive(PartialEq, Eq, Debug)]
     /// struct NotClone(i32);
     ///
     /// # fn main() {
-    /// let cx: Context = ContextOptions::default()
+    /// let cx: ApplicationContext = ApplicationContextOptions::default()
     ///     .single_owner_with_name(NotClone(1), "one")
     ///     .single_owner_with_name(NotClone(2), "two")
     ///     .create(modules![]);
@@ -2419,11 +2434,11 @@ impl ContextOptions {
     }
 
     #[track_caller]
-    fn inner_create<F>(self, init: F) -> Context
+    fn inner_create<F>(self, init: F) -> ApplicationContext
     where
-        F: FnOnce(&mut Context),
+        F: FnOnce(&mut ApplicationContext),
     {
-        let ContextOptions {
+        let ApplicationContextOptions {
             allow_override,
             allow_only_single_eager_create,
             eager_create,
@@ -2431,7 +2446,7 @@ impl ContextOptions {
             singles,
         } = self;
 
-        let mut cx = Context {
+        let mut cx = ApplicationContext {
             allow_override,
             allow_only_single_eager_create,
             eager_create,
@@ -2455,15 +2470,12 @@ impl ContextOptions {
     }
 
     #[track_caller]
-    fn inner_create_with_modules(self, modules: Vec<ResolveModule>) -> Context {
+    fn inner_create_with_modules(self, modules: Vec<ResolveModule>) -> ApplicationContext {
         self.inner_create(|cx| cx.load_modules(modules))
     }
 
-    #[cfg(feature = "auto-register")]
     #[track_caller]
-    fn inner_create_with_auto(self) -> Context {
-        use crate::AutoRegisterModule;
-
+    fn inner_create_with_auto(self) -> ApplicationContext {
         self.inner_create(|cx| {
             let module = ResolveModule::new::<AutoRegisterModule>();
             cx.loaded_modules.push(module.ty());
@@ -2475,14 +2487,14 @@ impl ContextOptions {
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider whose constructor is async and the provider will be eagerly created.
     /// - Panics if there is a provider that panics on construction.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{components, modules, Context, ContextOptions, DynProvider, Module, Transient};
+    /// use rudi::{components, modules, ApplicationContext, ApplicationContextOptions, DynProvider, Module, Transient};
     ///
     /// #[Transient]
     /// struct A;
@@ -2496,12 +2508,12 @@ impl ContextOptions {
     /// }
     ///
     /// # fn main() {
-    /// let mut cx: Context = ContextOptions::default().create(modules![MyModule]);
+    /// let mut cx: ApplicationContext = ApplicationContextOptions::default().create(modules![MyModule]);
     /// assert!(cx.resolve_option::<A>().is_some());
     /// # }
     /// ```
     #[track_caller]
-    pub fn create(self, modules: Vec<ResolveModule>) -> Context {
+    pub fn create(self, modules: Vec<ResolveModule>) -> ApplicationContext {
         let mut cx = self.inner_create_with_modules(modules);
         cx.flush();
         cx
@@ -2509,57 +2521,55 @@ impl ContextOptions {
 
     /// Creates a new context with the [`AutoRegisterModule`].
     ///
-    /// Same as `ContextOptions::default().create(modules![AutoRegisterModule])`.
+    /// Same as `ApplicationContextOptions::default().create(modules![AutoRegisterModule])`.
     ///
-    /// See [`ContextOptions::create`] for more details.
+    /// See [`ApplicationContextOptions::create`] for more details.
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider whose constructor is async and the provider will be eagerly created.
     /// - Panics if there is a provider that panics on construction.
     ///
     /// [`AutoRegisterModule`]: crate::AutoRegisterModule
     #[cfg_attr(docsrs, doc(cfg(feature = "auto-register")))]
-    #[cfg(feature = "auto-register")]
     #[track_caller]
-    pub fn auto_register(self) -> Context {
+    pub fn auto_register(self) -> ApplicationContext {
         let mut cx = self.inner_create_with_auto();
         cx.flush();
         cx
     }
 
-    /// Async version of [`ContextOptions::create`].
+    /// Async version of [`ApplicationContextOptions::create`].
     ///
     /// If no provider in the context has an async constructor and that provider needs to be eagerly created,
-    /// this method is the same as [`ContextOptions::create`].
+    /// this method is the same as [`ApplicationContextOptions::create`].
     ///
-    /// See [`ContextOptions::create`] for more details.
+    /// See [`ApplicationContextOptions::create`] for more details.
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider that panics on construction.
-    pub async fn create_async(self, modules: Vec<ResolveModule>) -> Context {
+    pub async fn create_async(self, modules: Vec<ResolveModule>) -> ApplicationContext {
         let mut cx = self.inner_create_with_modules(modules);
         cx.flush_async().await;
         cx
     }
 
-    /// Async version of [`ContextOptions::auto_register`].
+    /// Async version of [`ApplicationContextOptions::auto_register`].
     ///
     /// If no provider in the context has an async constructor and that provider needs to be eagerly created,
-    /// this method is the same as [`ContextOptions::auto_register`].
+    /// this method is the same as [`ApplicationContextOptions::auto_register`].
     ///
-    /// See [`ContextOptions::auto_register`] for more details.
+    /// See [`ApplicationContextOptions::auto_register`] for more details.
     ///
     /// # Panics
     ///
-    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](Context::allow_override) is false.
+    /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider that panics on construction.
     #[cfg_attr(docsrs, doc(cfg(feature = "auto-register")))]
-    #[cfg(feature = "auto-register")]
-    pub async fn auto_register_async(self) -> Context {
+    pub async fn auto_register_async(self) -> ApplicationContext {
         let mut cx = self.inner_create_with_auto();
         cx.flush_async().await;
         cx
@@ -2604,3 +2614,1095 @@ impl DependencyChain {
         self.stack.pop();
     }
 }
+
+/// Represents a type.
+#[derive(Clone, Copy, Debug)]
+pub struct Type {
+    /// The name of the type.
+    pub name: &'static str,
+    /// The unique identifier of the type.
+    pub id: TypeId,
+}
+
+impl Type {
+    pub(crate) fn new<T: 'static>() -> Type {
+        Type {
+            name: any::type_name::<T>(),
+            id: TypeId::of::<T>(),
+        }
+    }
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for Type {}
+
+impl PartialOrd for Type {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Type {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
+impl Hash for Type {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+/// An owned dynamically typed [`Future`] for use in cases where you can't
+/// statically type your result or need to add some indirection.
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+impl<T: ?Sized + Send + Sync> FutureExt for T where T: Future {}
+
+/// An extension trait for `Future`s that provides a convenient adapter.
+pub trait FutureExt: Future {
+    /// Wrap the future in a Box, pinning it.
+    fn boxed<'a>(self) -> BoxFuture<'a, Self::Output>
+    where
+        Self: Sized + 'static + Send + Sync,
+    {
+        Box::pin(self)
+    }
+}
+
+#[derive(Default, Clone)]
+pub(crate) struct SingleRegistry {
+    registry: HashMap<Key, DynSingle>,
+}
+
+impl SingleRegistry {
+    pub(crate) fn inner(&self) -> &HashMap<Key, DynSingle> {
+        &self.registry
+    }
+
+    pub(crate) fn insert(&mut self, key: Key, single: DynSingle) {
+        // There is no need to check the value of `allow_override` here,
+        // because when inserting a provider and a single with the same key into the context,
+        // the provider must be inserted first, followed by the single,
+        // and the checking of `allow_override` has already been done when the provider is inserted.
+        self.registry.insert(key, single);
+    }
+
+    pub(crate) fn get_owned<T: 'static>(&self, key: &Key) -> Option<T> {
+        self.registry.get(key)?.as_single::<T>()?.get_owned()
+    }
+
+    pub(crate) fn get_ref<T: 'static>(&self, key: &Key) -> Option<&T> {
+        Some(self.registry.get(key)?.as_single::<T>()?.get_ref())
+    }
+
+    pub(crate) fn contains(&self, key: &Key) -> bool {
+        self.registry.contains_key(key)
+    }
+
+    pub(crate) fn remove(&mut self, key: &Key) -> Option<DynSingle> {
+        self.registry.remove(key)
+    }
+}
+
+#[derive(Default, Clone)]
+pub(crate) struct ProviderRegistry {
+    registry: HashMap<Key, DynProvider>,
+}
+
+impl ProviderRegistry {
+    pub(crate) fn inner(&self) -> &HashMap<Key, DynProvider> {
+        &self.registry
+    }
+
+    #[track_caller]
+    pub(crate) fn insert(&mut self, provider: DynProvider, allow_override: bool) {
+        let definition = provider.definition();
+        let key = provider.key().clone();
+
+        if !self.registry.contains_key(&key) {
+            #[cfg(feature = "tracing")]
+            tracing::debug!("(+) insert new: {:?}", definition);
+        } else if allow_override {
+            #[cfg(feature = "tracing")]
+            tracing::warn!("(!) override by `key`: {:?}", definition);
+        } else {
+            panic!(
+                "already existing a provider with the same `key`: {:?}",
+                definition
+            );
+        }
+
+        self.registry.insert(key, provider);
+    }
+
+    pub(crate) fn get<T: 'static + Send + Sync>(&self, key: &Key) -> Option<&Provider<T>> {
+        self.registry.get(key)?.as_provider()
+    }
+
+    pub(crate) fn contains(&self, key: &Key) -> bool {
+        self.registry.contains_key(key)
+    }
+
+    pub(crate) fn remove(&mut self, key: &Key) -> Option<DynProvider> {
+        self.registry.remove(key)
+    }
+}
+
+/// Represents a module.
+///
+/// # Example
+///
+/// ```rust
+/// use rudi::{
+///     modules, providers, singleton, transient, ApplicationContext, DynProvider, Module, ResolveModule,
+/// };
+///
+/// struct Module1;
+///
+/// impl Module for Module1 {
+///     fn eager_create() -> bool {
+///         true
+///     }
+///
+///     fn providers() -> Vec<DynProvider> {
+///         providers![singleton(|_| "Hello").name("1")]
+///     }
+/// }
+///
+/// struct Module2;
+///
+/// impl Module for Module2 {
+///     fn submodules() -> Option<Vec<ResolveModule>> {
+///         Some(modules![Module1])
+///     }
+///
+///     fn providers() -> Vec<DynProvider> {
+///         providers![transient(|_| "World").name("2")]
+///     }
+/// }
+///
+/// # fn main() {
+/// let mut cx = ApplicationContext::create(modules![Module2]);
+/// let mut a = cx.resolve_by_type::<&'static str>();
+/// a.sort();
+/// assert!(format!("{:?}", a) == *r#"["Hello", "World"]"#);
+/// # }
+/// ```
+pub trait Module {
+    /// Whether the providers included in the module should be created eagerly, default is false.
+    fn eager_create() -> bool {
+        false
+    }
+
+    /// Included submodules, default is None.
+    fn submodules() -> Option<Vec<ResolveModule>> {
+        None
+    }
+
+    /// Included providers.
+    fn providers() -> Vec<DynProvider>;
+}
+
+/// A type representing a Module, converted from a type that implements [`Module`].
+pub struct ResolveModule {
+    ty: Type,
+    eager_create: bool,
+    submodules: Option<Vec<ResolveModule>>,
+    providers: Vec<DynProvider>,
+}
+
+impl ResolveModule {
+    /// Create a [`ResolveModule`] from a type that implements [`Module`].
+    pub fn new<T: Module + 'static>() -> Self {
+        Self {
+            ty: Type::new::<T>(),
+            eager_create: T::eager_create(),
+            submodules: T::submodules(),
+            providers: T::providers(),
+        }
+    }
+
+    /// Represents the type that is converted to a ResolveModule.
+    pub fn ty(&self) -> Type {
+        self.ty
+    }
+
+    /// Whether the providers included in the module should be created eagerly.
+    pub fn eager_create(&self) -> bool {
+        self.eager_create
+    }
+
+    pub(crate) fn submodules(&mut self) -> Option<Vec<ResolveModule>> {
+        self.submodules.take()
+    }
+
+    pub(crate) fn providers(self) -> Vec<DynProvider> {
+        self.providers
+    }
+}
+
+/// Represents a unique key for a provider.
+#[derive(Clone, Debug)]
+pub struct Key {
+    /// The name of the provider.
+    pub name: Cow<'static, str>,
+    /// The type of the provider generic.
+    pub ty: Type,
+}
+
+impl Key {
+    pub(crate) fn new<T: 'static>(name: Cow<'static, str>) -> Self {
+        Self {
+            name,
+            ty: Type::new::<T>(),
+        }
+    }
+}
+
+impl PartialEq for Key {
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty && self.name == other.name
+    }
+}
+
+impl Eq for Key {}
+
+impl PartialOrd for Key {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Key {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.ty.cmp(&other.ty) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.name.cmp(&other.name)
+    }
+}
+
+impl Hash for Key {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ty.hash(state);
+        self.name.hash(state);
+    }
+}
+
+/// Represents a definition of a provider.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Definition {
+    /// The unique key of the provider.
+    pub key: Key,
+    /// The origin type of the provider.
+    ///
+    /// When the following methods are called, current definition represents the
+    /// return type of the method, and this field represents the parameter type of the method:
+    /// - [`SingletonProvider::bind`](crate::SingletonProvider::bind)
+    /// - [`TransientProvider::bind`](crate::TransientProvider::bind)
+    /// - [`SingleOwnerProvider::bind`](crate::SingleOwnerProvider::bind)
+    /// - [`SingletonAsyncProvider::bind`](crate::SingletonAsyncProvider::bind)
+    /// - [`TransientAsyncProvider::bind`](crate::TransientAsyncProvider::bind)
+    /// - [`SingleOwnerAsyncProvider::bind`](crate::SingleOwnerAsyncProvider::bind)
+    pub origin: Option<Type>,
+    /// The scope of the provider.
+    pub scope: Scope,
+    /// The color of the constructor.
+    pub color: Option<Color>,
+    /// Whether the provider is conditional.
+    pub conditional: bool,
+}
+
+impl Definition {
+    pub(crate) fn new<T: 'static>(
+        name: Cow<'static, str>,
+        scope: Scope,
+        color: Option<Color>,
+        conditional: bool,
+    ) -> Self {
+        Self {
+            key: Key::new::<T>(name),
+            origin: None,
+            scope,
+            color,
+            conditional,
+        }
+    }
+
+    pub(crate) fn bind<T: 'static>(self) -> Definition {
+        let Definition {
+            key: Key { name, ty },
+            scope,
+            color,
+            conditional,
+            origin: _origin,
+        } = self;
+
+        Self {
+            key: Key::new::<T>(name),
+            origin: Some(ty),
+            scope,
+            color,
+            conditional,
+        }
+    }
+}
+
+/// Represents the scope of the provider.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Scope {
+    /// singleton scope.
+    ///
+    /// 1. the constructor run only once.
+    /// 2. the type implements [`Clone`] trait.
+    /// 3. instances taken from context can be either instances with ownership or reference instances.
+    Singleton,
+    /// transient scope.
+    ///
+    /// 1. the constructor run every time.
+    /// 2. instances taken from the context are instances with ownership.
+    Transient,
+    /// single owner scope.
+    ///
+    /// 1. the constructor run only once.
+    /// 2. instances taken from the context are reference instances.
+    SingleOwner,
+}
+
+/// Represents the color of the function, i.e., async or sync.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Color {
+    /// async function
+    Async,
+    /// sync function
+    Sync,
+}
+
+/// A trait for giving a type a default [`Provider`].
+///
+/// Define this trait so that the purpose is not to be implemented manually,
+/// but to use the [`#[Singleton]`](crate::Singleton), [`#[Transient]`](crate::Transient) or [`#[SingleOwner]`](crate::SingleOwner) attribute macros to generate the implementation.
+///
+/// # Example
+///
+/// ```rust
+/// use rudi::{DefaultProvider, Provider, Singleton, Transient};
+///
+/// #[Transient]
+/// struct A;
+///
+/// #[Singleton]
+/// fn Number() -> i32 {
+///     42
+/// }
+///
+/// fn main() {
+///     let _: Provider<A> = <A as DefaultProvider>::provider();
+///     let _: Provider<i32> = <Number as DefaultProvider>::provider();
+/// }
+/// ```
+pub trait DefaultProvider {
+    /// The generic of the [`Provider`].
+    type Type: Send + Sync + 'static;
+
+    /// Returns a default [`Provider`] for the implementation.
+    fn provider() -> Provider<Self::Type>;
+}
+
+pub(crate) enum Constructor<T: Send + Sync> {
+    Async(Arc<dyn for<'a> Fn(&'a mut ApplicationContext) -> BoxFuture<'a, T> + Send + Sync>),
+    Sync(Arc<dyn Fn(&mut ApplicationContext) -> T + Send + Sync>),
+}
+
+impl<T: Send + Sync> Clone for Constructor<T> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Async(c) => Self::Async(Arc::clone(c)),
+            Self::Sync(c) => Self::Sync(Arc::clone(c)),
+        }
+    }
+}
+
+/// Represents the eager create function.
+#[derive(Clone)]
+pub enum EagerCreateFunction {
+    /// async eager create function.
+    Async(fn(&mut ApplicationContext, Cow<'static, str>) -> BoxFuture<'static, ()>),
+    /// sync eager create function.
+    Sync(fn(&mut ApplicationContext, Cow<'static, str>)),
+    /// no eager create function.
+    None,
+}
+
+/// Represents the provider of an instance of type `T`.
+///
+/// This struct is just a generic, intermediate representation of `Provider`,
+/// there is no pub method to direct create this struct,
+/// Please use the following functions or attribute macros to create the various `Provider` types that implement `Into<Provider>`:
+/// - functions
+///   - [`singleton`](crate::singleton)
+///   - [`transient`](crate::transient)
+///   - [`single_owner`](crate::single_owner)
+///   - [`singleton_async`](crate::singleton_async)
+///   - [`transient_async`](crate::transient_async)
+///   - [`single_owner_async`](crate::single_owner_async)
+/// - attribute macros
+///   - [`Singleton`](crate::Singleton)
+///   - [`Transient`](crate::Transient)
+///   - [`SingleOwner`](crate::SingleOwner)
+#[derive(Clone)]
+pub struct Provider<T: Send + Sync> {
+    definition: Definition,
+    eager_create: bool,
+    condition: Option<fn(&ApplicationContext) -> bool>,
+    constructor: Constructor<T>,
+    clone_instance: Option<fn(&T) -> T>,
+    eager_create_function: EagerCreateFunction,
+    binding_providers: Option<Vec<DynProvider>>,
+    binding_definitions: Option<Vec<Definition>>,
+}
+
+impl<T: Send + Sync> Provider<T> {
+    /// Returns the [`Definition`] of the provider.
+    pub fn definition(&self) -> &Definition {
+        &self.definition
+    }
+
+    /// Returns whether the provider is eager create.
+    pub fn eager_create(&self) -> bool {
+        self.eager_create
+    }
+
+    /// Returns definitions of the binding providers.
+    pub fn binding_definitions(&self) -> Option<&Vec<Definition>> {
+        self.binding_definitions.as_ref()
+    }
+
+    /// Returns an option of the condition function.
+    pub fn condition(&self) -> Option<fn(&ApplicationContext) -> bool> {
+        self.condition
+    }
+
+    pub(crate) fn constructor(&self) -> Constructor<T> {
+        self.constructor.clone()
+    }
+
+    pub(crate) fn clone_instance(&self) -> Option<fn(&T) -> T> {
+        self.clone_instance
+    }
+}
+
+impl<T: 'static + Send + Sync> Provider<T> {
+    pub(crate) fn with_name(
+        name: Cow<'static, str>,
+        scope: Scope,
+        eager_create: bool,
+        condition: Option<fn(&ApplicationContext) -> bool>,
+        constructor: Constructor<T>,
+        clone_instance: Option<fn(&T) -> T>,
+        eager_create_function: EagerCreateFunction,
+    ) -> Self {
+        let definition = Definition::new::<T>(
+            name,
+            scope,
+            Some(match constructor {
+                Constructor::Async(_) => Color::Async,
+                Constructor::Sync(_) => Color::Sync,
+            }),
+            condition.is_some(),
+        );
+
+        Provider {
+            definition,
+            eager_create,
+            condition,
+            constructor,
+            clone_instance,
+            eager_create_function,
+            binding_providers: None,
+            binding_definitions: None,
+        }
+    }
+
+    pub(crate) fn with_definition(
+        definition: Definition,
+        eager_create: bool,
+        condition: Option<fn(&ApplicationContext) -> bool>,
+        constructor: Constructor<T>,
+        clone_instance: Option<fn(&T) -> T>,
+        eager_create_function: EagerCreateFunction,
+    ) -> Self {
+        Provider {
+            definition,
+            eager_create,
+            condition,
+            constructor,
+            clone_instance,
+            eager_create_function,
+            binding_providers: None,
+            binding_definitions: None,
+        }
+    }
+
+    pub(crate) fn never_construct(name: Cow<'static, str>, scope: Scope) -> Self {
+        Provider {
+            definition: Definition::new::<T>(name, scope, None, false),
+            eager_create: false,
+            condition: None,
+            constructor: Constructor::Sync(Arc::new(|_| panic!("never construct"))),
+            clone_instance: None,
+            eager_create_function: EagerCreateFunction::None,
+            binding_providers: None,
+            binding_definitions: None,
+        }
+    }
+}
+
+/// Represents a [`Provider`] that erased its type.
+
+pub struct DynProvider {
+    definition: Definition,
+    eager_create: bool,
+    condition: Option<fn(&ApplicationContext) -> bool>,
+    eager_create_function: EagerCreateFunction,
+    binding_providers: Option<Vec<DynProvider>>,
+    binding_definitions: Option<Vec<Definition>>,
+    origin: Arc<dyn Any + Send + Sync>,
+}
+
+impl Clone for DynProvider {
+    fn clone(&self) -> Self {
+        Self {
+            definition: self.definition.clone(),
+            eager_create: self.eager_create.clone(),
+            condition: self.condition.clone(),
+            eager_create_function: self.eager_create_function.clone(),
+            binding_providers: self.binding_providers.clone(),
+            binding_definitions: self.binding_definitions.clone(),
+            origin: Arc::clone(&self.origin),
+        }
+    }
+}
+
+impl DynProvider {
+    /// Returns the [`Definition`] of the provider.
+    pub fn definition(&self) -> &Definition {
+        &self.definition
+    }
+
+    /// Returns whether the provider is eager create.
+    pub fn eager_create(&self) -> bool {
+        self.eager_create
+    }
+
+    /// Returns definitions of the binding providers.
+    pub fn binding_definitions(&self) -> Option<&Vec<Definition>> {
+        self.binding_definitions.as_ref()
+    }
+
+    /// Returns a reference of the origin [`Provider`].
+    pub fn as_provider<T: 'static + Send + Sync>(&self) -> Option<&Provider<T>> {
+        self.origin.downcast_ref::<Provider<T>>()
+    }
+
+    /// Returns an option of the condition function.
+    pub fn condition(&self) -> Option<fn(&ApplicationContext) -> bool> {
+        self.condition
+    }
+
+    pub(crate) fn key(&self) -> &Key {
+        &self.definition.key
+    }
+
+    pub(crate) fn eager_create_function(&self) -> EagerCreateFunction {
+        self.eager_create_function.clone()
+    }
+
+    pub(crate) fn binding_providers(&mut self) -> Option<Vec<DynProvider>> {
+        self.binding_providers.take()
+    }
+}
+
+impl<T: 'static + Send + Sync> From<Provider<T>> for DynProvider {
+    fn from(mut value: Provider<T>) -> Self {
+        Self {
+            definition: value.definition.clone(),
+            eager_create: value.eager_create,
+            condition: value.condition,
+            eager_create_function: value.eager_create_function.clone(),
+            binding_providers: value.binding_providers.take(),
+            binding_definitions: value.binding_definitions.clone(),
+            origin: Arc::new(value),
+        }
+    }
+}
+
+fn sync_constructor<T, U, F>(
+    name: Cow<'static, str>,
+    transform: F,
+) -> Arc<dyn Fn(&mut ApplicationContext) -> U + Send + Sync>
+where
+    T: 'static + Send + Sync,
+    F: Fn(T) -> U + 'static + Send + Sync,
+    U: Send + Sync,
+{
+    let constructor = move |cx: &mut ApplicationContext| {
+        let instance = cx.resolve_with_name(name.clone());
+        transform(instance)
+    };
+
+    Arc::new(constructor)
+}
+
+fn sync_eager_create_function<T: 'static + Send + Sync>() -> fn(&mut ApplicationContext, Cow<'static, str>) {
+    |cx, name| {
+        cx.just_create::<T>(name);
+    }
+}
+
+fn create_async<T: 'static + Send + Sync>(
+    _cx: &mut ApplicationContext,
+    name: Cow<'static, str>,
+) -> BoxFuture<'static, ()> {
+    let name = name.clone();
+    Box::pin(async move {
+        let mut temp_cx = ApplicationContext::default();
+        temp_cx.just_create_async::<T>(name).await;
+    })
+}
+
+fn async_eager_create_function<T: 'static + Send + Sync>(
+) -> fn(&mut ApplicationContext, Cow<'static, str>) -> BoxFuture<'static, ()> {
+    create_async::<T>
+}
+
+macro_rules! define_provider_common {
+    (
+        $provider:ident,
+        $function:ident,
+        $clone_instance:expr,
+        $(+ $bound:ident)*
+    ) => {
+        /// Represents a specialized [`Provider`].
+        ///
+        #[doc = concat!("Use the [`", stringify!($function), "`] function to create this provider.")]
+        pub struct $provider<T: Send + Sync> {
+            constructor: Constructor<T>,
+            name: Cow<'static, str>,
+            eager_create: bool,
+            condition: Option<fn(&ApplicationContext) -> bool>,
+            bind_closures: Vec<Box<dyn FnOnce(Definition, bool, Option<fn(&ApplicationContext) -> bool>) -> DynProvider>>,
+        }
+
+        impl<T: Send + Sync> $provider<T> {
+            /// Sets the name of the provider.
+            pub fn name<N>(mut self, name: N) -> Self
+            where
+                N: Into<Cow<'static, str>>,
+            {
+                self.name = name.into();
+                self
+            }
+
+            /// Sets whether the provider is eager to create.
+            pub fn eager_create(mut self, eager_create: bool) -> Self {
+                self.eager_create = eager_create;
+                self
+            }
+
+            /// Sets whether or not to insert the provider into the [`ApplicationContext`] based on the condition.
+            pub fn condition(mut self, condition: Option<fn(&ApplicationContext) -> bool>) -> Self {
+                self.condition = condition;
+                self
+            }
+        }
+
+        impl<T: 'static + Send + Sync $(+ $bound)*> From<$provider<T>> for DynProvider {
+            fn from(value: $provider<T>) -> Self {
+                DynProvider::from(Provider::from(value))
+            }
+        }
+    };
+}
+
+macro_rules! define_provider_sync {
+    (
+        $provider:ident,
+        $scope:expr,
+        $function:ident,
+        $clone_instance:expr,
+        $(+ $bound:ident)*
+    ) => {
+        #[doc = concat!("create a [`", stringify!($provider), "`] instance")]
+        ///
+        /// # Example
+        ///
+        /// ```rust
+        #[doc = concat!("use rudi::{", stringify!($function), ", ", stringify!($provider), "};")]
+        ///
+        /// #[derive(Clone)]
+        /// struct A(i32);
+        ///
+        /// fn main() {
+        #[doc = concat!("    let _: ", stringify!($provider), "<A> = ", stringify!($function), "(|cx| A(cx.resolve()));")]
+        /// }
+        /// ```
+        pub fn $function<T: Send + Sync, C>(constructor: C) -> $provider<T>
+        where
+            C: Fn(&mut ApplicationContext) -> T + 'static + Send + Sync,
+        {
+            $provider {
+                constructor: Constructor::Sync(Arc::new(constructor)),
+                name: Cow::Borrowed(""),
+                eager_create: false,
+                condition: None,
+                bind_closures: Vec::new(),
+            }
+        }
+
+        impl<T: 'static + Send + Sync> $provider<T> {
+            /// Create a provider of type [`Provider<U>`], save it to the current provider.
+            ///
+            /// This method accepts a parameter of `fn(T) -> U`, which in combination
+            /// with the current provider's constructor of type `fn(&mut ApplicationContext) -> T`,
+            /// creates a `Provider<U>` with constructor `fn(&mut ApplicationContext) -> U`
+            /// and other fields consistent with the current provider.
+            ///
+            /// All bound providers will be registered together
+            /// when the current provider is registered in the [`ApplicationContext`].
+            ///
+            /// # Example
+            ///
+            /// ```rust
+            /// use std::{fmt::Debug, rc::Arc, sync::Arc};
+            ///
+            #[doc = concat!("use rudi::{", stringify!($function), ", Provider, ", stringify!($provider), "};")]
+            ///
+            /// #[derive(Clone, Debug)]
+            /// struct A(i32);
+            ///
+            /// fn into_debug(a: A) -> Arc<dyn Debug> {
+            ///     Arc::new(a)
+            /// }
+            ///
+            /// fn main() {
+            #[doc = concat!("    let p: ", stringify!($provider), "<A> = ", stringify!($function), "(|cx| A(cx.resolve()))")]
+            ///         .bind(Arc::new)
+            ///         .bind(Arc::new)
+            ///         .bind(Box::new)
+            ///         .bind(into_debug);
+            ///
+            ///     let p: Provider<A> = p.into();
+            ///
+            ///     assert_eq!(p.binding_definitions().unwrap().len(), 4);
+            /// }
+            /// ```
+            pub fn bind<U, F>(mut self, transform: F) -> Self
+            where
+                U: 'static + Send + Sync $(+ $bound)*,
+                F: Fn(T) -> U + 'static + Send + Sync,
+            {
+                let bind_closure = |definition: Definition, eager_create: bool, condition: Option<fn(&ApplicationContext) -> bool>| {
+                    let name = definition.key.name.clone();
+
+                    Provider::with_definition(
+                        definition.bind::<U>(),
+                        eager_create,
+                        condition,
+                        Constructor::Sync(sync_constructor(name, transform)),
+                        $clone_instance,
+                        EagerCreateFunction::Sync(
+                            sync_eager_create_function::<U>()
+                        ),
+                    )
+                    .into()
+                };
+
+                let bind_closure = Box::new(bind_closure);
+                self.bind_closures.push(bind_closure);
+
+                self
+            }
+        }
+
+        impl<T: 'static + Send + Sync $(+ $bound)*> From<$provider<T>> for Provider<T> {
+            fn from(value: $provider<T>) -> Self {
+                let $provider {
+                    constructor,
+                    name,
+                    eager_create,
+                    condition,
+                    bind_closures,
+                } = value;
+
+                let mut provider = Provider::with_name(
+                    name,
+                    $scope,
+                    eager_create,
+                    condition,
+                    constructor,
+                    $clone_instance,
+                    EagerCreateFunction::Sync(
+                        sync_eager_create_function::<T>()
+                    ),
+                );
+
+                if bind_closures.is_empty() {
+                    return provider;
+                }
+
+                let definition = &provider.definition;
+
+                let (definitions, providers) = bind_closures.into_iter()
+                    .map(|bind_closure| {
+                        let provider = bind_closure(definition.clone(), eager_create, condition);
+                        (provider.definition.clone(), provider)
+                    })
+                    .unzip();
+
+                provider.binding_definitions = Some(definitions);
+                provider.binding_providers = Some(providers);
+
+                provider
+            }
+        }
+    };
+}
+
+macro_rules! define_provider_async {
+    (
+        $provider:ident,
+        $scope:expr,
+        $function:ident,
+        $clone_instance:expr,
+        $(+ $bound:ident)*
+    ) => {
+        #[doc = concat!("Create a [`", stringify!($provider), "`] instance")]
+        ///
+        /// # Example
+        ///
+        /// ```rust
+        #[doc = concat!("use rudi::{", stringify!($function), ", FutureExt, ", stringify!($provider), "};")]
+        ///
+        /// #[derive(Clone)]
+        /// struct A(i32);
+        ///
+        /// fn main() {
+        #[doc = concat!("    let _: ", stringify!($provider), "<A> =")]
+        #[doc = concat!("        ", stringify!($function), "(|cx| async { A(cx.resolve_async().await) }.boxed());")]
+        /// }
+        /// ```
+        pub fn $function<T: Send + Sync + 'static, C>(constructor: C) -> $provider<T>
+        where
+            C: Fn(&mut ApplicationContext) -> BoxFuture<'static, T> + 'static + Send + Sync,
+        {
+            $provider {
+                constructor: Constructor::Async(Arc::new(move |cx| {
+                    let fut = constructor(cx);
+                    Box::pin(async move { fut.await }) as BoxFuture<'_, T>
+                })),
+                name: Cow::Borrowed(""),
+                eager_create: false,
+                condition: None,
+                bind_closures: Vec::new(),
+            }
+        }
+
+        impl<T: 'static + Send + Sync> $provider<T> {
+            /// Create a provider of type [`Provider<U>`], save it to the current provider.
+            ///
+            /// This method accepts a parameter of `fn(T) -> U`, which in combination
+            /// with the current provider's constructor of type `async fn(&mut ApplicationContext) -> T`,
+            /// creates a `Provider<U>` with constructor `async fn(&mut ApplicationContext) -> U`
+            /// and other fields consistent with the current provider.
+            ///
+            /// All bound providers will be registered together
+            /// when the current provider is registered in the [`ApplicationContext`].
+            ///
+            /// # Example
+            ///
+            /// ```rust
+            /// use std::{fmt::Debug, rc::Arc, sync::Arc};
+            ///
+            #[doc = concat!("use rudi::{", stringify!($function), ", FutureExt, Provider, ", stringify!($provider), "};")]
+            ///
+            /// #[derive(Clone, Debug)]
+            /// struct A(i32);
+            ///
+            /// fn into_debug(a: A) -> Arc<dyn Debug> {
+            ///     Arc::new(a)
+            /// }
+            ///
+            /// fn main() {
+            #[doc = concat!("    let p: ", stringify!($provider), "<A> =")]
+            #[doc = concat!("        ", stringify!($function), "(|cx| async { A(cx.resolve_async().await) }.boxed())")]
+            ///             .bind(Arc::new)
+            ///             .bind(Arc::new)
+            ///             .bind(Box::new)
+            ///             .bind(into_debug);
+            ///
+            ///     let p: Provider<A> = p.into();
+            ///
+            ///     assert_eq!(p.binding_definitions().unwrap().len(), 4);
+            /// }
+            /// ```
+            pub fn bind<U, F>(mut self, transform: F) -> Self
+            where
+                U: 'static + Send + Sync $(+ $bound)*,
+                F: Fn(T) -> U + 'static + Clone + Send + Sync,
+            {
+                let bind_closure = |definition: Definition, eager_create: bool, condition: Option<fn(&ApplicationContext) -> bool>| {
+                    let name = definition.key.name.clone();
+
+                    Provider::with_definition(
+                        definition.bind::<U>(),
+                        eager_create,
+                        condition,
+                        Constructor::Async(Arc::new(move |cx| {
+                            let instance = cx.resolve_with_name(name.clone());
+                            let transform_clone = transform.clone();
+                            Box::pin(async move { transform_clone(instance) }) as BoxFuture<'_, U>
+                        })),
+                        $clone_instance,
+                        EagerCreateFunction::Async(
+                            async_eager_create_function::<U>()
+                        ),
+                    )
+                    .into()
+                };
+
+                let bind_closure = Box::new(bind_closure);
+                self.bind_closures.push(bind_closure);
+
+                self
+            }
+        }
+
+        impl<T: 'static + Send + Sync $(+ $bound)*> From<$provider<T>> for Provider<T> {
+            fn from(value: $provider<T>) -> Self {
+                let $provider {
+                    constructor,
+                    name,
+                    eager_create,
+                    condition,
+                    bind_closures,
+                } = value;
+
+                let mut provider = Provider::with_name(
+                    name,
+                    $scope,
+                    eager_create,
+                    condition,
+                    constructor,
+                    $clone_instance,
+                    EagerCreateFunction::Async(
+                        async_eager_create_function::<T>()
+                    ),
+                );
+
+                if bind_closures.is_empty() {
+                    return provider;
+                }
+
+                let definition = &provider.definition;
+
+                let (definitions, providers) = bind_closures.into_iter()
+                    .map(|bind_closure| {
+                        let provider = bind_closure(definition.clone(), eager_create, condition);
+                        (provider.definition.clone(), provider)
+                    })
+                    .unzip();
+
+                provider.binding_definitions = Some(definitions);
+                provider.binding_providers = Some(providers);
+
+                provider
+            }
+        }
+    };
+}
+
+define_provider_common!(SingletonProvider, singleton, Some(Clone::clone), + Clone);
+define_provider_common!(TransientProvider, transient, None,);
+define_provider_common!(SingleOwnerProvider, single_owner, None,);
+define_provider_common!(SingletonAsyncProvider, singleton_async, Some(Clone::clone), + Clone);
+define_provider_common!(TransientAsyncProvider, transient_async, None,);
+define_provider_common!(SingleOwnerAsyncProvider, single_owner_async, None,);
+
+define_provider_sync!(SingletonProvider, Scope::Singleton, singleton, Some(Clone::clone), + Clone);
+define_provider_sync!(TransientProvider, Scope::Transient, transient, None,);
+define_provider_sync!(SingleOwnerProvider, Scope::SingleOwner, single_owner, None,);
+
+define_provider_async!(SingletonAsyncProvider, Scope::Singleton, singleton_async, Some(Clone::clone), + Clone);
+define_provider_async!(
+    TransientAsyncProvider,
+    Scope::Transient,
+    transient_async,
+    None,
+);
+define_provider_async!(
+    SingleOwnerAsyncProvider,
+    Scope::SingleOwner,
+    single_owner_async,
+    None,
+);
+
+/// Represents a [`Singleton`](crate::Scope::Singleton) or [`SingleOwner`](crate::Scope::SingleOwner) instance.
+pub struct Single<T> {
+    instance: T,
+    clone: Option<fn(&T) -> T>,
+}
+
+impl<T> Single<T> {
+    pub(crate) fn new(instance: T, clone: Option<fn(&T) -> T>) -> Self {
+        Self { instance, clone }
+    }
+
+    /// Returns the owned instance.
+    pub fn get_owned(&self) -> Option<T> {
+        self.clone.map(|clone| clone(&self.instance))
+    }
+
+    /// Returns a reference to the instance.
+    pub fn get_ref(&self) -> &T {
+        &self.instance
+    }
+}
+
+/// Represents a [`Single`] that erased its type.
+
+pub struct DynSingle {
+    origin: Arc<dyn Any + Send + Sync>,
+}
+
+impl Clone for DynSingle {
+    fn clone(&self) -> Self {
+        Self {
+            origin: Arc::new(self.origin.clone()),
+        }
+    }
+}
+
+impl DynSingle {
+    /// Returns a reference of the origin [`Single`].
+    pub fn as_single<T: 'static>(&self) -> Option<&Single<T>> {
+        self.origin.downcast_ref::<Single<T>>()
+    }
+}
+
+impl<T: 'static + Send + Sync> From<Single<T>> for DynSingle {
+    fn from(value: Single<T>) -> Self {
+        Self {
+            origin: Arc::new(value),
+        }
+    }
+}
+
