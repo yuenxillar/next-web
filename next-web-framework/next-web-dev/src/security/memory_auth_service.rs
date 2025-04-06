@@ -11,9 +11,9 @@ pub struct MemoryAuthService {
     users: HashMap<String, UserInfo>,
 }
 
-#[Singleton(name = "memoryAuthService")]
+// #[Singleton(name = "memoryAuthService")]
 impl MemoryAuthService {
-    #[di]
+    // #[autowired]
     pub fn new() -> Self {
         Self {
             users: HashMap::new()

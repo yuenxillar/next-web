@@ -15,12 +15,11 @@ pub mod router;
 
 mod tests;
 
-pub use rudi::Singleton;
-pub use rudi::Transient;
-pub use next_web_core::context::properties::ApplicationProperties;
-pub use next_web_core::context::application_context::ApplicationContext;
+pub use rudi::{Singleton, Transient, SingleOwner, Properties};
+
 
 #[cfg(feature = "redis_enabled")]
 pub extern crate deadpool_redis;
 #[cfg(feature = "job_scheduler")]
 pub extern crate tokio_cron_scheduler;
+

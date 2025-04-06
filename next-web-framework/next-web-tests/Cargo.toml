@@ -11,8 +11,9 @@ version.workspace = true
 
 [dependencies]
 next-web-dev = { path = "../next-web-dev", version = "0.1.0" }
-async-trait = { workspace = true }
 tokio = { workspace = true }
+serde ={ workspace = true}
+next-web-core = { path = "../next-web-core", version = "0.1.0" }
 
 [lints]
 workspace = true

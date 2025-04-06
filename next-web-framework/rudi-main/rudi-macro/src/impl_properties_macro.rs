@@ -1,5 +1,5 @@
 use crate::PropertiesAttr;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{Fields, ItemStruct, LitStr};
 
@@ -16,6 +16,11 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         })
         .collect::<Vec<_>>();
 
+    println!("item_struct: {:#?}", item_struct.attrs);
+    println!("existing_derives: {:#?}", existing_derives);
+
+    println!("required_derives: {:#?}", required_derives);
+    
     for required in required_derives {
         if !existing_derives.iter().any(|d| d.contains(required)) {
             return Err(syn::Error::new(
@@ -236,6 +241,6 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         }
     };
 
-    // println!("cfff:{}", expanded.to_string());
+    println!("cfff:{}", expanded.to_string());
     Ok(expanded.into())
 }

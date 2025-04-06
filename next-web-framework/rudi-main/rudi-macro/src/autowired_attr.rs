@@ -6,18 +6,18 @@ use syn::{parse_quote, Path};
 #[derive(FromAttr)]
 #[attribute(idents = [autowired])]
 pub(crate) struct AutowiredAttr {
-    #[attribute(default = default_rudi_path())]
-    pub(crate) rudi_path: Path,
+    #[attribute(default = default_path())]
+    pub(crate) path: Path,
 }
 
-fn default_rudi_path() -> Path {
+fn default_path() -> Path {
     parse_quote!(::next_web_core)
 }
 
 impl Default for AutowiredAttr {
     fn default() -> Self {
         Self {
-            rudi_path: default_rudi_path(),
+            path: default_path(),
         }
     }
 }

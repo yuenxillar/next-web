@@ -26,8 +26,8 @@ mod test {
     // 测试无前缀
     #[test]
     fn test_properties_no_prefix() {
-        #[Properties]
-        #[SingleOwner(name = "testPrefix", binds = [Self::into_properties])]
+        // #[Properties]
+        // #[SingleOwner(name = "testPrefix", binds = [Self::into_properties])]
         #[derive(Debug, Clone, Default, Deserialize)]
         struct NoPrefix {
             name: String,

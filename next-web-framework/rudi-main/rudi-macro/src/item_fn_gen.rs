@@ -20,7 +20,7 @@ pub(crate) fn generate(
     mut item_fn: ItemFn,
     scope: Scope,
 ) -> syn::Result<TokenStream> {
-    let AutowiredAttr { rudi_path } = match AutowiredAttr::remove_attributes(&mut item_fn.attrs) {
+    let AutowiredAttr { path } = match AutowiredAttr::remove_attributes(&mut item_fn.attrs) {
         Ok(Some(AttrsValue { value: attr, .. })) => attr,
         Ok(None) => AutowiredAttr::default(),
         Err(AttrsValue { value: e, .. }) => return Err(e),
@@ -145,7 +145,7 @@ pub(crate) fn generate(
     #[cfg(feature = "auto-register")]
     let auto_register = if auto_register {
         quote! {
-            #rudi_path::register_provider!(<#ident as #rudi_path::DefaultProvider>::provider());
+            #path::register_provider!(<#ident as #path::DefaultProvider>::provider());
         }
     } else {
         quote! {}
@@ -156,15 +156,15 @@ pub(crate) fn generate(
         #[allow(non_camel_case_types)]
         #struct_definition
 
-        impl #impl_generics #rudi_path::DefaultProvider for #ident #ty_generics #where_clause {
+        impl #impl_generics #path::DefaultProvider for #ident #ty_generics #where_clause {
             type Type = #return_type_ident;
 
-            fn provider() -> #rudi_path::Provider<Self::Type> {
+            fn provider() -> #path::Provider<Self::Type> {
                 #[allow(non_snake_case, clippy::too_many_arguments)]
                 #item_fn
 
-                <#rudi_path::Provider<_> as ::core::convert::From<_>>::from(
-                    #rudi_path::#create_provider(#constructor)
+                <#path::Provider<_> as ::core::convert::From<_>>::from(
+                    #path::#create_provider(#constructor)
                         .name(#name)
                         .eager_create(#eager_create)
                         .condition(#condition)

@@ -31,7 +31,7 @@ pub(crate) fn generate(
     mut item_impl: ItemImpl,
     scope: Scope,
 ) -> syn::Result<TokenStream> {
-    let AutowiredAttr { rudi_path } = match AutowiredAttr::remove_attributes(&mut item_impl.attrs) {
+    let AutowiredAttr { path } = match AutowiredAttr::remove_attributes(&mut item_impl.attrs) {
         Ok(Some(AttrsValue { value: attr, .. })) => attr,
         Ok(None) => AutowiredAttr::default(),
         Err(AttrsValue { value: e, .. }) => return Err(e),
@@ -108,7 +108,7 @@ pub(crate) fn generate(
     let (f, _) = matched.unwrap();
 
     let default_provider_impl =
-        generate_default_provider_impl(f, &trait_, self_ty, generics, attr, scope, rudi_path)?;
+        generate_default_provider_impl(f, &trait_, self_ty, generics, attr, scope, path)?;
 
     let expand = quote! {
         #item_impl
@@ -126,7 +126,7 @@ fn generate_default_provider_impl<'a>(
     generics: &'a Generics,
     attr: StructOrFunctionAttr,
     scope: Scope,
-    rudi_path: Path,
+    path: Path,
 ) -> syn::Result<TokenStream> {
     let StructOrFunctionAttr {
         name,
@@ -231,19 +231,19 @@ fn generate_default_provider_impl<'a>(
     #[cfg(feature = "auto-register")]
     let auto_register = if auto_register {
         quote! {
-            #rudi_path::register_provider!(<#type_with_generics as #rudi_path::DefaultProvider>::provider());
+            #path::register_provider!(<#type_with_generics as #path::DefaultProvider>::provider());
         }
     } else {
         quote! {}
     };
 
     let expand = quote! {
-        impl #impl_generics #rudi_path::DefaultProvider for #type_with_generics #where_clause {
+        impl #impl_generics #path::DefaultProvider for #type_with_generics #where_clause {
             type Type = Self;
 
-            fn provider() -> #rudi_path::Provider<Self> {
-                <#rudi_path::Provider<_> as ::core::convert::From<_>>::from(
-                    #rudi_path::#create_provider(#constructor)
+            fn provider() -> #path::Provider<Self> {
+                <#path::Provider<_> as ::core::convert::From<_>>::from(
+                    #path::#create_provider(#constructor)
                         .name(#name)
                         .eager_create(#eager_create)
                         .condition(#condition)

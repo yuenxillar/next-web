@@ -1,6 +1,3 @@
-use std::fs::{self};
-use std::path::PathBuf;
-use std::sync::Arc;
 use async_trait::async_trait;
 use axum::body::Bytes;
 use axum::http::{Response, StatusCode};
@@ -11,6 +8,9 @@ use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use once_cell::sync::Lazy;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
+use std::fs::{self};
+use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
@@ -86,19 +86,17 @@ pub trait Application: Send + Sync {
 
     async fn register_services(&mut self, properties: &ApplicationProperties) {}
 
-
     /// autowire properties
-    fn autowire_properties(
+    async fn autowire_properties(
         &mut self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
     ) {
-        let mut properties = ctx.resolve_by_type::<Box<dyn Properties>>();
-        // properties.into_iter().for_each(|property| {
-        //     property.insert_properties(application_properties);
-        //     let name = property.singleton_name().to_string();
-        //     ctx.insert_singleton_with_name(property.into_self(), name);
-        // });
+        let properties = ctx.resolve_by_type::<Box<dyn Properties>>();
+        for item in properties {
+            println!("Register properties: {}", item.singleton_name());
+            item.register(ctx, application_properties).await.unwrap();
+        }
     }
 
     /// initialize the message source.
@@ -174,7 +172,7 @@ pub trait Application: Send + Sync {
     }
 
     /// initialize the application infrastructure
-    fn init_infrastructure(
+    async fn init_infrastructure(
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
@@ -237,7 +235,7 @@ pub trait Application: Send + Sync {
     }
 
     /// register application singleton
-    fn register_singleton(
+    async fn register_singleton(
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
@@ -472,15 +470,15 @@ pub trait Application: Send + Sync {
         info!("init context success");
 
         // autowire properties
-        application.autowire_properties(&mut ctx, &properties);
+        application.autowire_properties(&mut ctx, &properties).await;
         info!("autowire properties success");
 
         // register singleton
-        application.register_singleton(&mut ctx, &properties);
+        application.register_singleton(&mut ctx, &properties).await;
         info!("register singleton success");
 
         // init infrastructure
-        application.init_infrastructure(&mut ctx, &properties);
+        application.init_infrastructure(&mut ctx, &properties).await;
         info!("init infrastructure success");
 
         // init middleware

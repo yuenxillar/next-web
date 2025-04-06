@@ -3,3 +3,6 @@ next:
     port: 8080
     host: 0.0.0.0
     context_path: /test
+test:
+  message: "Hello, World!"
+  age: 25

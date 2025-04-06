@@ -16,7 +16,7 @@ pub(crate) fn generate(
     mut item_enum: ItemEnum,
     scope: Scope,
 ) -> syn::Result<TokenStream> {
-    let AutowiredAttr { rudi_path } = match AutowiredAttr::remove_attributes(&mut item_enum.attrs) {
+    let AutowiredAttr { path } = match AutowiredAttr::remove_attributes(&mut item_enum.attrs) {
         Ok(Some(AttrsValue { value: attr, .. })) => attr,
         Ok(None) => AutowiredAttr::default(),
         Err(AttrsValue { value: e, .. }) => return Err(e),
@@ -175,7 +175,7 @@ pub(crate) fn generate(
     #[cfg(feature = "auto-register")]
     let auto_register = if auto_register {
         quote! {
-            #rudi_path::register_provider!(<#enum_ident as #rudi_path::DefaultProvider>::provider());
+            #path::register_provider!(<#enum_ident as #path::DefaultProvider>::provider());
         }
     } else {
         quote! {}
@@ -184,12 +184,12 @@ pub(crate) fn generate(
     let expand = quote! {
         #item_enum
 
-        impl #impl_generics #rudi_path::DefaultProvider for #enum_ident #ty_generics #where_clause {
+        impl #impl_generics #path::DefaultProvider for #enum_ident #ty_generics #where_clause {
             type Type = Self;
 
-            fn provider() -> #rudi_path::Provider<Self> {
-                <#rudi_path::Provider<_> as ::core::convert::From<_>>::from(
-                    #rudi_path::#create_provider(#constructor)
+            fn provider() -> #path::Provider<Self> {
+                <#path::Provider<_> as ::core::convert::From<_>>::from(
+                    #path::#create_provider(#constructor)
                         .name(#name)
                         .eager_create(#eager_create)
                         .condition(#condition)
