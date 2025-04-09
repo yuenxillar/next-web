@@ -62,10 +62,7 @@ pub trait Application: Send + Sync {
     async fn init_middleware(&mut self, properties: &ApplicationProperties);
 
     // get the application router. (open api  and private api)
-    async fn applicatlion_router(
-        &self,
-        context: &ApplicationContext,
-    ) -> (OpenRouter, PrivateRouter);
+    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> (OpenRouter, PrivateRouter);
 
     /// register the rpc server.
     #[cfg(feature = "grpc_enabled")]
@@ -175,7 +172,7 @@ pub trait Application: Send + Sync {
     async fn init_infrastructure(
         &self,
         ctx: &mut ApplicationContext,
-        application_properties: &ApplicationProperties,
+        _application_properties: &ApplicationProperties,
     ) {
         println!("\n========================================================================");
 
@@ -333,14 +330,14 @@ pub trait Application: Send + Sync {
 
     /// bind tcp server.
     async fn bind_tcp_server(
-        &self,
+        &mut self,
+        ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
-        context: &ApplicationContext,
         time: std::time::Instant,
     ) {
         let config = application_properties.next().server();
 
-        let (open_router, private_router) = self.applicatlion_router(context).await;
+        let (open_router, private_router) = self.application_router(ctx).await;
         // run our app with hyper, listening globally on port
         let mut app = Router::new()
             .route("/", axum::routing::get(root))
@@ -445,7 +442,7 @@ pub trait Application: Send + Sync {
     }
 
     /// run the application.
-    async fn run() -> NextApplication<Self>
+    async fn run()
     where
         Self: Application + Default,
     {
@@ -455,7 +452,7 @@ pub trait Application: Send + Sync {
         // banner show
         Self::banner_show();
 
-        // get a base applcation instance
+        // get a base application instance
         let mut next_application: NextApplication<Self> = NextApplication::new();
         let properties = next_application.application_properties().clone();
 
@@ -465,7 +462,7 @@ pub trait Application: Send + Sync {
         info!("init logger success");
 
         let mut ctx = ApplicationContext::options()
-            .eager_create(true)
+            .allow_override(true)
             .auto_register();
         info!("init context success");
 
@@ -488,18 +485,16 @@ pub trait Application: Send + Sync {
         #[cfg(feature = "grpc_enabled")]
         {
             application.register_rpc_server(&properties).await;
-            info!("register rpc server success");
+            info!("register grpc server success");
 
             application.connect_rpc_client(&properties).await;
-            info!("connect rpc client success");
+            info!("connect grpc client success");
         }
 
         // application.init_cache().await;
         application
-            .bind_tcp_server(&properties, &mut ctx, start_time)
+            .bind_tcp_server(&mut ctx,&properties,  start_time)
             .await;
-
-        next_application
     }
 }
 

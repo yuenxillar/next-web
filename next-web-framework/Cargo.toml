@@ -32,7 +32,8 @@ members = [
 
     "rudi-main/rudi",
     "rudi-main/rudi-core",
-    "rudi-main/rudi-macro", "next-web-tests",
+    "rudi-main/rudi-macro", 
+    "next-web-tests",
 ]
 
 

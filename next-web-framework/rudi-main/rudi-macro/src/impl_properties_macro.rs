@@ -15,12 +15,6 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
             Some(meta.tokens.to_string())
         })
         .collect::<Vec<_>>();
-
-    println!("item_struct: {:#?}", item_struct.attrs);
-    println!("existing_derives: {:#?}", existing_derives);
-
-    println!("required_derives: {:#?}", required_derives);
-    
     for required in required_derives {
         if !existing_derives.iter().any(|d| d.contains(required)) {
             return Err(syn::Error::new(
@@ -203,7 +197,8 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
     let singleton_name_value = if let Some(name) = singleton_name {
         name
     } else {
-        default_name
+        // default_name
+        String::new()
     };
 
     let singleton_name = LitStr::new(&singleton_name_value, struct_name.span());
@@ -223,7 +218,7 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                     #(#field_assignments)*
 
                 };
-                ctx.insert_singleton_with_name(instance, self.singleton_name());
+                ctx.insert_singleton(instance);
                 Ok(())
             }
 
@@ -242,5 +237,6 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
     };
 
     println!("cfff:{}", expanded.to_string());
+
     Ok(expanded.into())
 }

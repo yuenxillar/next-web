@@ -41,6 +41,7 @@ pub(crate) fn generate(
         async_: _,
         #[cfg(feature = "auto-register")]
         auto_register,
+        default
     } = attr;
 
     #[cfg(feature = "auto-register")]

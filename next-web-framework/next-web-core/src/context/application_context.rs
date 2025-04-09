@@ -1,5 +1,6 @@
 use std::any::{self, Any};
 use std::cmp::Ordering;
+use std::collections::hash_map::Keys;
 use std::{
     any::TypeId, borrow::Cow, collections::HashMap, future::Future, hash::Hasher, pin::Pin,
     sync::Arc,
@@ -728,7 +729,8 @@ impl ApplicationContext {
         &mut self,
         name: impl Into<Cow<'static, str>>,
     ) -> T {
-        match self.inner_resolve(name.into(), Behaviour::CreateThenReturnSingletonOrTransient) {
+        let name = name.into();
+        match self.inner_resolve(name, Behaviour::CreateThenReturnSingletonOrTransient) {
             Resolved::SingletonOrTransient(instance) => instance,
             Resolved::NotFoundProvider(key) => no_provider_panic(key),
             Resolved::NotSingletonOrTransient(definition) => {
@@ -1687,7 +1689,7 @@ impl ApplicationContext {
     /// # Example
     ///
     /// ```rust
-    /// use rudi::{ApplicationContext, Singleton};
+    ///
     ///
     /// #[derive(Clone, Debug)]
     /// #[Singleton(eager_create, name = "a")]
@@ -1702,6 +1704,7 @@ impl ApplicationContext {
     #[track_caller]
     pub fn get_single_with_name<T: 'static>(&self, name: impl Into<Cow<'static, str>>) -> &T {
         let key = Key::new::<T>(name.into());
+        // println!("keys: {:?}", self.single_registry.keys());
         self.single_registry
             .get_ref(&key)
             .unwrap_or_else(|| panic!("no instance registered for: {:?}", key))
@@ -2708,6 +2711,10 @@ impl SingleRegistry {
 
     pub(crate) fn remove(&mut self, key: &Key) -> Option<DynSingle> {
         self.registry.remove(key)
+    }
+
+    pub(crate) fn keys(&self) -> Keys<Key, DynSingle> {
+        self.registry.keys()
     }
 }
 

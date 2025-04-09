@@ -4,5 +4,6 @@ next:
     host: 0.0.0.0
     context_path: /test
 test:
-  message: "Hello, World!"
-  age: 25
+  message: "777"
+  age: 90
+  run: true

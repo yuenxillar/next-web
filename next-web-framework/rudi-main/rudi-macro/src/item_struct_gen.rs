@@ -29,6 +29,7 @@ pub(crate) fn generate(
         async_,
         #[cfg(feature = "auto-register")]
         auto_register,
+        default
     } = attr;
 
     #[cfg(feature = "auto-register")]
@@ -87,31 +88,58 @@ pub(crate) fn generate(
         }
     };
 
+    
     let constructor = match color {
         Color::Async => {
-            quote! {
-                #[allow(unused_variables)]
-                |cx| ::std::boxed::Box::pin(async {
-                    #(#ref_mut_cx_stmts)*
-                    #(#ref_cx_stmts)*
-                    #instance
-                })
+            if default {
+                quote! {
+                    #[allow(unused_variables)]
+                    |cx| {
+                        #struct_ident::default()
+                    }
+                }
+            }else {
+                quote! {
+                    #[allow(unused_variables)]
+                    |cx| ::std::boxed::Box::pin(async {
+                        #(#ref_mut_cx_stmts)*
+                        #(#ref_cx_stmts)*
+                        #instance
+                    })
+                }
+                
             }
+            
         }
         Color::Sync => {
-            quote! {
-                #[allow(unused_variables)]
-                |cx| {
-                    #(#ref_mut_cx_stmts)*
-                    #(#ref_cx_stmts)*
-                    #instance
+            if default {
+                quote! {
+                    #[allow(unused_variables)]
+                    |cx| {
+                        #struct_ident::default()
+                    }
                 }
             }
+            else {
+                quote! {
+                    #[allow(unused_variables)]
+                    |cx| {
+                        #(#ref_mut_cx_stmts)*
+                        #(#ref_cx_stmts)*
+                        #instance
+                    }
+                }
+
+            }
+            
         }
     };
+    println!("constructor: {}", constructor.to_string());
+
 
     #[cfg(not(feature = "auto-register"))]
     let auto_register = quote! {};
+
 
     #[cfg(feature = "auto-register")]
     let auto_register = if auto_register {
@@ -143,6 +171,8 @@ pub(crate) fn generate(
 
         #auto_register
     };
+
+    println!("expand11: {}\n", expand.to_string());
 
     Ok(expand)
 }

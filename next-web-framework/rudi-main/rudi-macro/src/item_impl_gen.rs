@@ -136,6 +136,7 @@ fn generate_default_provider_impl<'a>(
         async_: _,
         #[cfg(feature = "auto-register")]
         auto_register,
+        default
     } = attr;
 
     #[cfg(feature = "auto-register")]

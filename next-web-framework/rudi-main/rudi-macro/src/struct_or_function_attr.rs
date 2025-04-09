@@ -19,6 +19,8 @@ pub(crate) struct StructOrFunctionAttr {
     #[cfg(feature = "auto-register")]
     #[attribute(default = DEFAULT_AUTO_REGISTER)]
     pub(crate) auto_register: bool,
+
+    pub(crate) default: bool
 }
 
 fn default_name() -> Expr {
