@@ -196,9 +196,14 @@ where
     }
 
     /// 等于条件
-    pub fn eq<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn eq<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::Eq,
             value: ConditionValue::Single(value.into()),
         });
@@ -206,9 +211,14 @@ where
     }
 
     /// 不等于条件
-    pub fn ne<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn ne<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::Ne,
             value: ConditionValue::Single(value.into()),
         });
@@ -216,9 +226,14 @@ where
     }
 
     /// 大于条件
-    pub fn gt<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn gt<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::Gt,
             value: ConditionValue::Single(value.into()),
         });
@@ -226,9 +241,14 @@ where
     }
 
     /// 大于等于条件
-    pub fn ge<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn ge<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::Ge,
             value: ConditionValue::Single(value.into()),
         });
@@ -236,9 +256,14 @@ where
     }
 
     /// 小于条件
-    pub fn lt<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn lt<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::Lt,
             value: ConditionValue::Single(value.into()),
         });
@@ -246,9 +271,14 @@ where
     }
 
     /// 小于等于条件
-    pub fn le<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn le<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::Le,
             value: ConditionValue::Single(value.into()),
         });
@@ -256,25 +286,33 @@ where
     }
 
     /// 模糊匹配条件
-    pub fn like<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn like<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         let value_str = value.into();
-        let formatted_value = format!("%{}%", value_str);
-
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::Like,
-            value: ConditionValue::Single(Cow::Owned(formatted_value)),
+            value: ConditionValue::Single(value_str),
         });
         self
     }
 
     /// 不匹配条件
-    pub fn not_like<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn not_like<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         let value_str = value.into();
         let formatted_value = format!("%{}%", value_str);
 
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::NotLike,
             value: ConditionValue::Single(Cow::Owned(formatted_value)),
         });
@@ -282,12 +320,17 @@ where
     }
 
     /// 左模糊匹配条件
-    pub fn like_left<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn like_left<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         let value_str = value.into();
         let formatted_value = format!("%{}", value_str);
 
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::LikeLeft,
             value: ConditionValue::Single(Cow::Owned(formatted_value)),
         });
@@ -295,12 +338,17 @@ where
     }
 
     /// 右模糊匹配条件
-    pub fn like_right<V: Into<Cow<'a, str>>>(mut self, column: V, value: V) -> Self {
+    pub fn like_right<F, V>(mut self, column: F, value: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         let value_str = value.into();
         let formatted_value = format!("{}%", value_str);
 
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::LikeRight,
             value: ConditionValue::Single(Cow::Owned(formatted_value)),
         });
@@ -308,9 +356,14 @@ where
     }
 
     /// 为空条件
-    pub fn is_null<V: Into<Cow<'a, str>>>(mut self, column: V) -> Self {
+    pub fn is_null<F, V>(mut self, column: F) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::IsNull,
             value: ConditionValue::None,
         });
@@ -318,9 +371,14 @@ where
     }
 
     /// 不为空条件
-    pub fn is_not_null<V: Into<Cow<'a, str>>>(mut self, column: V) -> Self {
+    pub fn is_not_null<F, V>(mut self, column: F) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::IsNotNull,
             value: ConditionValue::None,
         });
@@ -328,15 +386,17 @@ where
     }
 
     /// 在列表中条件
-    pub fn r#in<V: Into<Cow<'a, str>>, I: IntoIterator<Item = V>>(
-        mut self,
-        column: V,
-        values: I,
-    ) -> Self {
+    pub fn r#in<F, V, I>(mut self, column: F, values: I) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+        I: IntoIterator<Item = V>,
+    {
+        let column_str = column().into();
         let values_vec: Vec<Cow<'a, str>> = values.into_iter().map(|v| v.into()).collect();
 
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::In,
             value: ConditionValue::Multiple(values_vec),
         });
@@ -344,14 +404,16 @@ where
     }
 
     /// 不在列表中条件
-    pub fn not_in<V: Into<Cow<'a, str>>, I: IntoIterator<Item = V>>(
-        mut self,
-        column: V,
-        values: I,
-    ) -> Self {
+    pub fn not_in<F, V, I>(mut self, column: F, values: I) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+        I: IntoIterator<Item = V>,
+    {
+        let column_str = column().into();
         let values_vec: Vec<Cow<'a, str>> = values.into_iter().map(|v| v.into()).collect();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::NotIn,
             value: ConditionValue::Multiple(values_vec),
         });
@@ -359,9 +421,14 @@ where
     }
 
     /// 在范围内条件
-    pub fn between<V: Into<Cow<'a, str>>>(mut self, column: V, value1: V, value2: V) -> Self {
+    pub fn between<F, V>(mut self, column: F, value1: V, value2: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::Between,
             value: ConditionValue::Range(value1.into(), value2.into()),
         });
@@ -369,9 +436,14 @@ where
     }
 
     /// 不在范围内条件
-    pub fn not_between<V: Into<Cow<'a, str>>>(mut self, column: V, value1: V, value2: V) -> Self {
+    pub fn not_between<F, V>(mut self, column: F, value1: V, value2: V) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.add_condition(Condition {
-            column: column.into(),
+            column: column_str,
             operator: CompareOperator::NotBetween,
             value: ConditionValue::Range(value1.into(), value2.into()),
         });
@@ -443,29 +515,43 @@ where
     }
 
     /// 设置排序条件
-    pub fn order_by<V: Into<Cow<'a, str>>>(mut self, column: V, direction: OrderDirection) -> Self {
+    pub fn order_by<F, V>(mut self, column: F, direction: OrderDirection) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
+        let column_str = column().into();
         self.order_by.push(OrderBy {
-            column: column.into(),
+            column: column_str,
             direction,
         });
         self
     }
 
     /// 设置升序排序
-    pub fn order_by_asc<V: Into<Cow<'a, str>>>(self, column: V) -> Self {
+    pub fn order_by_asc<F, V>(self, column: F) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
         self.order_by(column, OrderDirection::Asc)
     }
 
     /// 设置降序排序
-    pub fn order_by_desc<V: Into<Cow<'a, str>>>(self, column: V) -> Self {
+    pub fn order_by_desc<F, V>(self, column: F) -> Self 
+    where
+        F: FnOnce() -> V,
+        V: Into<Cow<'a, str>>,
+    {
         self.order_by(column, OrderDirection::Desc)
     }
 
     /// 设置分组条件
-    pub fn group_by<V: Into<Cow<'a, str>>, I: IntoIterator<Item = V>>(
-        mut self,
-        columns: I,
-    ) -> Self {
+    pub fn group_by<V, I>(mut self, columns: I) -> Self 
+    where
+        V: Into<Cow<'a, str>>,
+        I: IntoIterator<Item = V>,
+    {
         self.group_by = columns.into_iter().map(|c| c.into()).collect();
         self
     }
@@ -477,7 +563,11 @@ where
     }
 
     /// 设置查询列
-    pub fn select<V: Into<Cow<'a, str>>, I: IntoIterator<Item = V>>(mut self, columns: I) -> Self {
+    pub fn select<V, I>(mut self, columns: I) -> Self 
+    where
+        V: Into<Cow<'a, str>>,
+        I: IntoIterator<Item = V>,
+    {
         self.select_columns = columns.into_iter().map(|c| c.into()).collect();
         self
     }
@@ -717,6 +807,12 @@ mod tests {
     #[derive(Clone, Default, Deserialize)]
     struct Test;
 
+    impl Test {
+        pub fn name() -> &'static str {
+            "name"
+        }
+    }
+
     impl TableName for Test {
         fn table_name() -> &'static str {
             "test"
@@ -726,8 +822,8 @@ mod tests {
     #[test]
     fn test_simple_query() {
         let query = QueryWrapper::<Test>::new()
-            .eq("name", "张三")
-            .gt("age", "18")
+            .eq(|| "name", "张三")
+            .gt(|| "age", "18")
             .build_sql("users");
 
         assert_eq!(
@@ -739,10 +835,10 @@ mod tests {
     #[test]
     fn test_complex_query() {
         let query = QueryWrapper::<Test>::new()
-            .eq("status", "active")
+            .eq(|| "status", "active")
             .or()
-            .nested(|q| q.eq("role", "admin").gt("level", "5"))
-            .order_by_desc("created_at")
+            .nested(|q| q.eq(|| "role", "admin").gt(|| "level", "5"))
+            .order_by_desc(|| "created_at")
             .limit(10)
             .offset(20)
             .build_sql("users");
@@ -756,7 +852,7 @@ mod tests {
     #[test]
     fn test_in_condition() {
         let query = QueryWrapper::<Test>::new()
-            .r#in("id", vec!["1", "2", "3"])
+            .r#in(|| "id", vec!["1", "2", "3"])
             .build_sql("users");
 
         assert_eq!(query, "SELECT * FROM users WHERE id IN ('1', '2', '3')");
@@ -765,7 +861,7 @@ mod tests {
     #[test]
     fn test_between_condition() {
         let query = QueryWrapper::<Test>::new()
-            .between("age", "18", "30")
+            .between(|| "age", "18", "30")
             .build_sql("users");
 
         assert_eq!(query, "SELECT * FROM users WHERE age BETWEEN '18' AND '30'");
@@ -773,8 +869,9 @@ mod tests {
 
     #[test]
     fn test_like_condition() {
+        let name = || { "张三"};
         let query = QueryWrapper::<Test>::new()
-            .like("name", "张")
+            .like(Test::name, "张")
             .build_sql("users");
 
         assert_eq!(query, "SELECT * FROM users WHERE name LIKE '%张%'");
@@ -798,7 +895,7 @@ mod tests {
     fn test_count() {
         let query = QueryWrapper::<Test>::new()
         .select(vec!["COUNT(1) as count"])
-        .eq("name", "huihui")
+        .eq(||"name", "huihui")
         .generate_sql();
         assert_eq!(query, "SELECT COUNT(1) as count FROM test WHERE name = 'huihui'");
     }

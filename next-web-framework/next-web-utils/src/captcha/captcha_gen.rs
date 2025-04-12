@@ -1,8 +1,25 @@
 use super::captcha_error::CaptchaError;
 
+/// 验证码生成结果
+#[derive(Debug)]
+pub struct CaptchaResult {
+    /// 验证码文本
+    pub text: String,
+    /// 原始图片数据
+    pub image_data: Vec<u8>,
+    /// 图片宽度
+    pub width: u32,
+    /// 图片高度
+    pub height: u32,
+    /// 验证码长度
+    pub length: usize,
+    /// 验证码复杂度
+    pub complexity: u32,
+}
+
 // 定义 CaptchaBuilder 结构体，用于配置验证码生成器的参数
 #[derive(Debug, Default, Clone)]
-struct CaptchaBuilder {
+pub(crate) struct CaptchaBuilder {
     text: Option<String>, // 自定义文本（可选）
     length: usize,        // 验证码长度
     complexity: u32,      // 验证码复杂度
@@ -59,8 +76,8 @@ pub struct CaptchaGen {
 }
 
 impl CaptchaGen {
-    // 生成验证码并返回结果
-    pub fn gen(self) -> Result<(String, String), CaptchaError> {
+    // 生成验证码并返回原始数据
+    fn _gen(&self, base64: bool) -> Result<(String, Vec<u8>), CaptchaError> {
         // 检查宽度是否有效
         if self.config.width <= 0 {
             return Err(CaptchaError::WidthNotApplicable);
@@ -76,8 +93,8 @@ impl CaptchaGen {
             .width(self.config.width)
             .height(self.config.height)
             .dark_mode(false)
-            .complexity(self.config.complexity) // 设置复杂度（最小值为 1，最大值为 10）
-            .compression(40); // 设置压缩率（最小值为 1，最大值为 99）
+            .complexity(self.config.complexity)
+            .compression(40);
 
         // 如果设置了自定义文本，则使用该文本
         if let Some(text) = self.config.text.as_deref() {
@@ -89,13 +106,43 @@ impl CaptchaGen {
 
         // 获取生成的验证码文本
         let text = if let Some(text) = self.config.text.as_ref() {
-            text.into() // 如果设置了自定义文本，则使用该文本
+            text.into()
         } else {
-            captcha.text.clone() // 否则使用随机生成的文本
+            captcha.text.clone()
         };
 
-        // 返回验证码文本和 Base64 编码的图片数据
-        Ok((text, captcha.to_base64()))
+        if base64 {
+            Ok((text, captcha.to_base64().into_bytes()))
+        } else {
+            // 获取原始图片数据
+            let image_data = captcha.image.into_bytes();
+            Ok((text, image_data))
+        }
+    }
+
+    pub fn gen(self) -> Result<CaptchaResult, CaptchaError> {
+        let result = self._gen(false)?;
+        Ok(CaptchaResult {
+            text: result.0,
+            image_data: result.1,
+            width: self.config.width,
+            height: self.config.height,
+            length: self.config.length,
+            complexity: self.config.complexity,
+        })
+    }
+
+    pub fn gen_to_base64(self) -> Result<CaptchaResult, CaptchaError> {
+        let result = self._gen(true)?;
+
+        Ok(CaptchaResult {
+            text: result.0,
+            image_data: result.1,
+            width: self.config.width,
+            height: self.config.height,
+            length: self.config.length,
+            complexity: self.config.complexity,
+        })
     }
 
     // 提供一个静态方法来创建 CaptchaBuilder 实例
@@ -180,8 +227,17 @@ mod tests {
         let result = captcha_gen.gen();
         assert!(result.is_ok(), "Captcha generation should succeed");
 
-        let (text, _) = result.unwrap();
-        assert_eq!(text.len(), 6, "Generated text length should match default length of 6");
+        let captcha_result = result.unwrap();
+        assert_eq!(
+            captcha_result.text.len(),
+            6,
+            "Generated text length should match default length of 6"
+        );
+        assert_eq!(captcha_result.width, 150);
+        assert_eq!(captcha_result.height, 50);
+        assert_eq!(captcha_result.length, 6);
+        assert_eq!(captcha_result.complexity, 1);
+        assert!(!captcha_result.image_data.is_empty());
     }
 
     // 测试自定义配置下生成的验证码
@@ -197,22 +253,34 @@ mod tests {
         let result = captcha_gen.gen();
         assert!(result.is_ok(), "Captcha generation should succeed");
 
-        let (text, _) = result.unwrap();
-        assert_eq!(text, "CUSTOM", "Generated text should match custom text");
+        let captcha_result = result.unwrap();
+        assert_eq!(captcha_result.text, "CUSTOM");
+        assert_eq!(captcha_result.width, 400);
+        assert_eq!(captcha_result.height, 200);
+        assert_eq!(captcha_result.length, 10);
+        assert_eq!(captcha_result.complexity, 5);
+        assert!(!captcha_result.image_data.is_empty());
     }
 
     // 测试未设置自定义文本时生成的验证码
     #[test]
     fn test_captcha_gen_without_custom_text() {
-        let captcha_gen = CaptchaBuilder::builder()
-            .length(8)
-            .build();
+        let captcha_gen = CaptchaBuilder::builder().length(8).build();
 
         let result = captcha_gen.gen();
         assert!(result.is_ok(), "Captcha generation should succeed");
 
-        let (text, _) = result.unwrap();
-        assert_eq!(text.len(), 8, "Generated text length should match configured length of 8");
+        let captcha_result = result.unwrap();
+        assert_eq!(
+            captcha_result.text.len(),
+            8,
+            "Generated text length should match configured length of 8"
+        );
+        assert_eq!(captcha_result.width, 150);
+        assert_eq!(captcha_result.height, 50);
+        assert_eq!(captcha_result.length, 8);
+        assert_eq!(captcha_result.complexity, 1);
+        assert!(!captcha_result.image_data.is_empty());
     }
 
     // 测试生成验证码并保存为图片文件
@@ -226,14 +294,37 @@ mod tests {
             .gen();
 
         // 处理生成结果
-        let _ = result.map(|(code, base64)| {
-            println!("code: {}", code); // 打印验证码文本
-            println!("base64: {}", base64); // 打印 Base64 编码的图片数据
+        result.map(|captcha_result| {
+            println!("code: {}", captcha_result.text); // 打印验证码文本
+            println!("width: {}", captcha_result.width); // 打印图片宽度
+            println!("height: {}", captcha_result.height); // 打印图片高度
+            println!("length: {}", captcha_result.length); // 打印验证码长度
+            println!("complexity: {}", captcha_result.complexity); // 打印验证码复杂度
 
-            // 将 Base64 数据保存为图片文件
-            std::fs::write("test.png", base64).unwrap();
-        });
+            // 将图片数据保存为文件
+            std::fs::write("test.png", &captcha_result.image_data)?;
+            Ok(())
+        })?
+    }
 
-        Ok(())
+    #[test]
+    fn test_gen() {
+        let captcha_gen = CaptchaBuilder::builder()
+            .length(6)
+            .complexity(3)
+            .size(200, 100)
+            .text("TEST123")
+            .build();
+
+        let result = captcha_gen.gen();
+        assert!(result.is_ok(), "Captcha generation should succeed");
+
+        let captcha_result = result.unwrap();
+        assert_eq!(captcha_result.text, "TEST123");
+        assert_eq!(captcha_result.width, 200);
+        assert_eq!(captcha_result.height, 100);
+        assert_eq!(captcha_result.length, 6);
+        assert_eq!(captcha_result.complexity, 3);
+        assert!(!captcha_result.image_data.is_empty());
     }
 }

@@ -1,3 +1,4 @@
+pub mod digester;
 pub mod qr_code;
 pub mod calendar;
 pub mod captcha;

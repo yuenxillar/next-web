@@ -1,6 +1,6 @@
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::error::json_object_error::JsonObjectError;
 
@@ -9,7 +9,7 @@ use crate::error::json_object_error::JsonObjectError;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct JsonObject {
     /// 存储 JSON 键值对的核心数据结构。
-    raw_value: HashMap<String, Value>,
+    raw_value: HashMap<Cow<'static, str>, Value>,
     /// 是否保持键值对的顺序（暂时不支持）。
     is_order: bool,
 }
@@ -194,7 +194,20 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键已存在，返回被覆盖的旧值；否则返回 `None`。
-    fn set<V: Into<Value>>(&mut self, key: impl Into<String>, value: V) -> Option<Value> {
+    fn set<V: Into<Value>>(mut self, key: impl Into<Cow<'static, str>>, value: V) -> Self {
+        self.raw_value.insert(key.into(), value.into());
+        return self;
+    }
+
+    /// 设置指定键的值，如果键已存在则覆盖原有值。
+    ///
+    /// # 参数
+    /// - `key`: 需要设置的键。
+    /// - `value`: 需要设置的值。
+    ///
+    /// # 返回值
+    /// 如果键已存在，返回被覆盖的旧值；否则返回 `None`。
+    fn set_opt<V: Into<Value>>(&mut self, key: impl Into<Cow<'static, str>>, value: V) -> Option<Value> {
         self.raw_value.insert(key.into(), value.into())
     }
 
@@ -208,7 +221,7 @@ impl JsonObject {
     /// 如果键不存在且设置成功，返回 `Ok(())`；否则返回相应的错误。
     fn put_once<V: Into<Value>>(
         &mut self,
-        key: impl Into<String>,
+        key: impl Into<Cow<'static, str>>,
         value: V,
     ) -> Result<(), JsonObjectError> {
         let key = key.into();
@@ -218,7 +231,7 @@ impl JsonObject {
         if self.raw_value.contains_key(&key) {
             return Err(JsonObjectError::KeyAlreadyExists);
         }
-        self.set(key, value);
+        self.set_opt(key, value);
         Ok(())
     }
 
@@ -245,7 +258,7 @@ impl JsonObject {
             return Err(JsonObjectError::KeyOrValueIsNull);
         }
 
-        self.set(key, value);
+        self.set_opt(key, value);
         Ok(())
     }
 
@@ -253,7 +266,7 @@ impl JsonObject {
     ///
     /// # 参数
     /// - `data`: 包含键值对的可迭代集合。
-    fn put_all(&mut self, data: impl IntoIterator<Item = (String, Value)>) {
+    fn put_all(&mut self, data: impl IntoIterator<Item = (Cow<'static, str>, Value)>) {
         self.raw_value.extend(data);
     }
 
@@ -261,7 +274,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 返回底层 `HashMap` 的不可变引用。
-    fn raw_value(&self) -> &HashMap<String, Value> {
+    fn raw_value(&self) -> &HashMap<Cow<'static, str>, Value> {
         &self.raw_value
     }
 
@@ -282,7 +295,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 返回所有键的引用列表。
-    fn keys(&self) -> Vec<&String> {
+    fn keys(&self) -> Vec<&Cow<'static, str>> {
         self.raw_value.keys().collect()
     }
 

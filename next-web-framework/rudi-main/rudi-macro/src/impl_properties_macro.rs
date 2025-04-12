@@ -182,7 +182,7 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
     });
 
     // 如果没有找到 Singleton 属性或者 name 参数，生成默认名称
-    let default_name = {
+    let _default_name = {
         let struct_name_str = struct_name.to_string();
         let mut chars = struct_name_str.chars();
         // 将首字母小写
@@ -235,8 +235,6 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
             }
         }
     };
-
-    println!("cfff:{}", expanded.to_string());
 
     Ok(expanded.into())
 }

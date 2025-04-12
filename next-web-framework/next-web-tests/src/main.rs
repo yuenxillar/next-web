@@ -34,7 +34,13 @@ pub struct TestAA {
 fn Number() -> i32 {
     42
 }
-// 
+
+pub struct TestModule {
+    pub name: String,
+    pub age: u32,
+    pub message: String,
+    pub run: bool,
+}
 
 /// Implementation of `Application` trait for `TestApplication`
 #[async_trait]

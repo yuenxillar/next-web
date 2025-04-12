@@ -4,4 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-lettre = { version = "0.11.11" }
+lettre = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+
+next-web-core = { path = "../next-web-core", version = "0.1.0"}
+rudi = { workspace = true}

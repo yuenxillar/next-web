@@ -171,8 +171,5 @@ pub(crate) fn generate(
 
         #auto_register
     };
-
-    println!("expand11: {}\n", expand.to_string());
-
     Ok(expand)
 }

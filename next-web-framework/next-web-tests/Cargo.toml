@@ -15,6 +15,7 @@ tokio = { workspace = true }
 serde ={ workspace = true}
 next-web-core = { path = "../next-web-core", version = "0.1.0" }
 next-web-ip ={ path = "../next-web-ip", version = "0.1.0" }
+next-web-macro ={ path = "../next-web-macro", version = "0.1.0" }
 
 [lints]
 workspace = true

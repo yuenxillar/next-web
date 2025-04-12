@@ -5,6 +5,11 @@ use rand::{thread_rng, Rng};
 pub struct StringUtil;
 
 impl StringUtil {
+
+    /// 空字符串。
+    /// 
+    pub const EMPTY: &'static str = "";
+
     /// 生成指定长度的随机字母数字字符串 <button class="citation-flag" data-index="1">。
     ///
     /// # 参数
@@ -193,5 +198,39 @@ impl StringUtil {
     /// 如果字符串包含空白，则返回 `true`；否则返回 `false`。
     pub fn contains_whitespace(s: &str) -> bool {
         s.chars().any(|c| c.is_whitespace())
+    }
+
+
+    /// 移除字符串中的指定前缀和后缀。
+    ///
+    /// # 参数
+    /// - `s`: 原始字符串。
+    /// - `prefix`: 待移除的前缀。
+    /// - `suffix`: 待移除的后缀。
+    ///
+    /// # 返回值
+    /// 返回移除前缀和后缀后的字符串。
+    pub fn remove_suffix(s: &str, suffix: &str) -> String {
+        if s.ends_with(suffix) {
+            s[..s.len() - suffix.len()].to_string()
+        } else {
+            s.to_string()
+        }
+    }
+
+    /// 移除字符串中的指定前缀。
+    ///
+    /// # 参数
+    /// - `s`: 原始字符串。
+    /// - `prefix`: 待移除的前缀。
+    ///
+    /// # 返回值
+    /// 返回移除前缀后的字符串。
+    pub fn remove_prefix(s: &str, prefix: &str) -> String {
+        if s.starts_with(prefix) {
+            s[prefix.len()..].to_string()
+        } else {
+            s.to_string()
+        }
     }
 }
