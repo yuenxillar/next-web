@@ -1,26 +1,42 @@
-use next_web_core::{autoregister::auto_register::AutoRegister, context::application_context::ApplicationContext};
+use next_web_core::{
+    autoregister::auto_register::AutoRegister,
+    context::{
+        application_context::ApplicationContext,
+        properties::{self, ApplicationProperties},
+    },
+};
 
+use super::job_scheduler_autoregister::JobSchedulerAutoRegister;
 
-pub struct ApplicationDefaultRegisterSingle {
-    registers: Vec<Box<dyn AutoRegister + Send + Sync>>
+pub struct ApplicationDefaultRegisterContainer {
+    registers: Vec<Box<dyn AutoRegister + Send + Sync>>,
 }
 
-impl ApplicationDefaultRegisterSingle {
+impl ApplicationDefaultRegisterContainer {
     pub fn new() -> Self {
-        Self { registers: Vec::new() }
+        Self {
+            registers: Vec::new(),
+        }
     }
 
-    pub fn push<T>(&mut self)
+    fn push<T>(&mut self)
     where
-        T: AutoRegister + Default + Send + Sync + 'static,
+        T: AutoRegister + Default + 'static,
     {
         self.registers.push(Box::new(T::default()));
     }
 
-    pub fn register_all(&mut self, ctx: &mut ApplicationContext) {
+    pub async fn register_all(
+        &mut self,
+        ctx: &mut ApplicationContext,
+        properties: &ApplicationProperties,
+    ) {
+        self.push::<JobSchedulerAutoRegister>();
+
+
+
         for register in self.registers.iter() {
-            // If panic early exit.
-            // register.register(ctx, &Default::default()).unwrap();
+            register.register(ctx, properties).await.ok();
         }
     }
 }

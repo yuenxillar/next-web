@@ -80,6 +80,7 @@ default = [
     "user_security",
     "mongodb_enabled",
     "rabbitmq_enabled",
+    "job_scheduler"
 ]
 tls_rustls = ["axum-server"]
 

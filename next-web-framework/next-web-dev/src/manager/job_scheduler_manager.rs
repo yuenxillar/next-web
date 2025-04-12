@@ -1,14 +1,15 @@
-use std::sync::{Arc, Mutex};
+use std::{future::Future, pin::Pin, sync::Arc};
 
+use flume::Sender;
 use hashbrown::HashSet;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::Mutex;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::info;
 
 #[derive(Clone)]
 pub struct JobSchedulerManager {
     ids: Arc<Mutex<HashSet<Vec<u8>>>>,
-    jobs: Vec<Job>,
+    jobs: Arc<Mutex<Vec<Job>>>,
     tx: Option<Sender<SchedulerEvent>>,
 }
 
@@ -16,26 +17,41 @@ impl JobSchedulerManager {
     pub fn new() -> Self {
         Self {
             ids: Arc::new(Mutex::new(HashSet::new())),
-            jobs: Vec::new(),
+            jobs: Arc::new(Mutex::new(Vec::new())),
             tx: None,
         }
     }
 
-    pub fn add_job(&mut self, job: Job) {
-        self.jobs.push(job);
+    pub async fn add_job(&self, job: Job) {
+        if let Some(sender) = &self.tx {
+            sender.send_async(SchedulerEvent::AddJob(job)).await.ok();
+        }
+    }
+
+    pub async fn remove_job(&self, guid: Vec<u8>) {
+        if let Some(sender) = &self.tx {
+            sender
+                .send_async(SchedulerEvent::RemoveJob(guid))
+                .await
+                .ok();
+        }
+    }
+
+    pub async fn check_job_exists(&self, guid: Vec<u8>) -> bool {
+        self.ids.lock().await.contains(&guid)
     }
 
     pub fn start(&mut self) {
         let jobs = self.jobs.clone();
         let ids = self.ids.clone();
-        let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+        let (tx, rx) = flume::unbounded();
         self.tx = Some(tx);
 
         tokio::spawn(async move {
             let mut scheduler = JobScheduler::new().await.unwrap();
-
-            for job in jobs {
-                let job_id = scheduler.add(job).await.unwrap();
+            let jobs = jobs.lock().await;
+            for job in jobs.iter() {
+                let job_id = scheduler.add(job.clone()).await.unwrap();
                 let _ = ids
                     .try_lock()
                     .map(|mut ids| ids.insert(job_id.as_bytes().to_vec()))
@@ -53,7 +69,7 @@ impl JobSchedulerManager {
             // spawn a task to listen for job removal
 
             tokio::spawn(async move {
-                while let Some(event) = rx.recv().await {
+                while let Ok(event) = rx.recv() {
                     match event {
                         SchedulerEvent::AddJob(job) => {
                             let job_id = scheduler.add(job).await.unwrap();
@@ -78,8 +94,8 @@ impl JobSchedulerManager {
         });
     }
 
-    pub fn job_count(&self) -> usize {
-        self.ids.try_lock().map(|ids| ids.len()).unwrap_or(0)
+    pub async fn job_count(&self) -> usize {
+        self.ids.lock().await.len()
     }
 }
 
@@ -91,5 +107,11 @@ pub enum SchedulerEvent {
 }
 
 pub trait ApplicationJob: Send + Sync {
-    fn generate_job(&self) -> Job;
+    fn gen_job<T>(
+        &self,
+    ) -> Result<
+        (&'static str, Box<T>),
+        Box<dyn std::error::Error + Send>
+    >
+    where T: Future<Output = ()>;
 }

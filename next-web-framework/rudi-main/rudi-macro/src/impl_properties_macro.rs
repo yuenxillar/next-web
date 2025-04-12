@@ -1,7 +1,7 @@
 use crate::PropertiesAttr;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{Fields, ItemStruct, LitStr};
+use syn::{Fields, ItemStruct, Lit, LitStr};
 
 pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Result<TokenStream> {
     let required_derives = vec!["Debug", "Clone", "Deserialize", "Default"];
@@ -36,6 +36,12 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
             ))
         }
     };
+
+    // 得到字段的总计数
+    let field_count = Lit::Int(syn::LitInt::new(
+        &fields.len().to_string(),
+        item_struct.ident.span(),
+    ));
 
     // 生成字段访问和赋值代码
     let field_assignments = fields
@@ -120,8 +126,13 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
             if is_option {
                 let inner = inner_type.unwrap();
                 Some(quote! {
-                    // 对于 Option<T> 字段，直接将 Option<T> 赋值给它
-                    #field_name: properties.one_value::<#inner>(#key_str),
+                    // 对于 Option<T> 字段
+                    #field_name: if let Some(value) = properties.one_value::<#inner>(#key_str) {
+                        Some(value)
+                    }else {
+                        noting += 1;
+                        None
+                    },
                 })
             } else {
                 Some(quote! {
@@ -129,6 +140,7 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                     #field_name: if let Some(value) = properties.one_value::<#field_type>(#key_str) {
                         value
                     }else {
+                        noting += 1;
                         Default::default()
                     },
                 })
@@ -145,7 +157,6 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
 
     let struct_name = &item_struct.ident;
 
-
     // 检查是否有 #[Singleton(name = "")] 属性
     let singleton_name = item_struct.attrs.iter().find_map(|attr| {
         if !attr.path().is_ident("Singleton") && !attr.path().is_ident("SingleOwner") {
@@ -156,7 +167,6 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         let mut name = None;
         let mut binds_exist = false;
         let _ = attr.parse_nested_meta(|meta| {
-
             if meta.path.is_ident("name") {
                 let value = meta.value()?;
                 let string_value = value.parse::<syn::LitStr>()?;
@@ -213,11 +223,16 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                 ctx: &mut next_web_core::context::application_context::ApplicationContext,
                 properties: &next_web_core::context::properties::ApplicationProperties,
             ) -> Result<(), Box<dyn std::error::Error>> {
-                
+                let mut noting = 0;
+
                 let instance = Self {
                     #(#field_assignments)*
-
                 };
+
+                if noting == #field_count {
+                    panic!("\nIncorrect assembly of properties! Struct: {} \n", stringify!(#struct_name));
+                }
+
                 ctx.insert_singleton(instance);
                 Ok(())
             }

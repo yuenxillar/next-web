@@ -127,16 +127,16 @@ pub fn read_file_into_application<T: DeserializeOwned + Debug>(
 ) -> (T, HashMap<String, serde_yaml::Value>) {
     use serde_yaml::Value;
 
-    println!("read application file: {}", file_path);
+    println!("Read Application file: {}", file_path);
     match std::fs::metadata(file_path) {
         Ok(_) => (),
         Err(_error) => panic!("The application config file is not exits!!"),
     }
     let mut file = File::open(file_path).expect("application file open is _error!!");
     let mut str = String::new();
-    let _ = file.read_to_string(&mut str).unwrap();
+    file.read_to_string(&mut str).unwrap();
 
-    // // replace var
+    // replace var
     // let replace_var = |content: &str| -> String {
     //     let re = Regex::new(r"\$\{server_ip\}").unwrap();
 
@@ -148,7 +148,7 @@ pub fn read_file_into_application<T: DeserializeOwned + Debug>(
     // let buf = replace_var(str.as_str());
     let buf = str;
 
-    // mapping value
+    // Mapping value
     let docs = serde_yaml::from_str::<Value>(&buf).unwrap();
     let mut data_map: HashMap<String, Value> = HashMap::new();
 

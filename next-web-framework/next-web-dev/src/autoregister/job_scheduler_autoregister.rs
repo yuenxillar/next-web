@@ -1,21 +1,25 @@
-use crate::autoregister::auto_register::AutoRegister;
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
+use next_web_core::async_trait;
+use next_web_core::context::properties::ApplicationProperties;
+use next_web_core::{ApplicationContext, AutoRegister};
 
 #[derive(Default)]
 pub struct JobSchedulerAutoRegister;
 
+#[async_trait]
 impl AutoRegister for JobSchedulerAutoRegister {
-
-    fn name(&self) -> &'static str {
-        "JobSchedulerAutoRegister"
+    fn singleton_name(&self) -> &'static str {
+        "jobSchedulerManager"
     }
-    fn register(&self, ctx: &mut rudi::Context) -> Result<(), Box<dyn std::error::Error>> {
+
+    async fn register(
+        &self,
+        ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let job_scheduler_manager = JobSchedulerManager::new();
-        ctx.insert_singleton_with_name::<JobSchedulerManager, String>(
-            job_scheduler_manager,
-            String::from("jobSchedulerManager"),
-        );
-        println!("JobSchedulerAutoRegister registered successfully!");
+        ctx.insert_singleton_with_name(job_scheduler_manager, self.singleton_name());
+
         Ok(())
     }
 }

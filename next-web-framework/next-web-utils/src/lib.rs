@@ -1,3 +1,5 @@
+pub mod html;
+pub mod cache;
 pub mod digester;
 pub mod qr_code;
 pub mod calendar;
@@ -8,7 +10,6 @@ pub mod crypto;
 pub mod datetime;
 pub mod env;
 pub mod file;
-pub mod matchs;
 pub mod mock;
 pub mod script;
 pub mod socket;

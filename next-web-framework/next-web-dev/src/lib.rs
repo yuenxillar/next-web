@@ -17,9 +17,9 @@ mod tests;
 
 pub use rudi::{Singleton, Transient, SingleOwner, Properties};
 
-
 #[cfg(feature = "redis_enabled")]
 pub extern crate deadpool_redis;
+
 #[cfg(feature = "job_scheduler")]
-pub extern crate tokio_cron_scheduler;
+pub use tokio_cron_scheduler::Job;
 

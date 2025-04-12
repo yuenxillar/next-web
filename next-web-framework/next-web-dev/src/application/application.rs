@@ -10,14 +10,16 @@ use once_cell::sync::Lazy;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use std::fs::{self};
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio_cron_scheduler::Job;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::application::application_shutdown::ApplicationShutdown;
 use crate::application::next_application::NextApplication;
@@ -62,7 +64,10 @@ pub trait Application: Send + Sync {
     async fn init_middleware(&mut self, properties: &ApplicationProperties);
 
     // get the application router. (open api  and private api)
-    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> (OpenRouter, PrivateRouter);
+    async fn application_router(
+        &mut self,
+        ctx: &mut ApplicationContext,
+    ) -> (OpenRouter, PrivateRouter);
 
     /// register the rpc server.
     #[cfg(feature = "grpc_enabled")]
@@ -81,8 +86,6 @@ pub trait Application: Send + Sync {
         }
     }
 
-    async fn register_services(&mut self, properties: &ApplicationProperties) {}
-
     /// autowire properties
     async fn autowire_properties(
         &mut self,
@@ -91,7 +94,6 @@ pub trait Application: Send + Sync {
     ) {
         let properties = ctx.resolve_by_type::<Box<dyn Properties>>();
         for item in properties {
-            println!("Register properties: {}", item.singleton_name());
             item.register(ctx, application_properties).await.unwrap();
         }
     }
@@ -176,35 +178,41 @@ pub trait Application: Send + Sync {
     ) {
         println!("\n========================================================================");
 
-        // 2. register job
-        #[cfg(feature = "job_scheduler")]
-        if let Some(mut schedluer_manager) =
-            ctx.resolve_option_with_name::<JobSchedulerManager>("jobSchedulerManager")
+        // Register job
+        let producers: Vec<_> = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
+        if let Some(schedluer_manager) =
+            ctx.get_single_option_with_name::<JobSchedulerManager>("jobSchedulerManager")
         {
-            for ele in ctx.resolve_by_type::<Arc<dyn ApplicationJob>>().iter() {
-                schedluer_manager.add_job(ele.generate_job());
+            let mut schedluer_manager = schedluer_manager.clone();
+            for producer in producers {
+                if let Ok((schedule, run)) = producer.gen_job() { 
+                    let job = Job::new_async(schedule,  |_uuid, _lock| Box::pin(async move {}));
+                    if let Ok(job) = job {
+                        schedluer_manager.add_job(job).await;
+                    } else {
+                        warn!("Job scheduler add job failed");
+                    }
+                }
             }
             schedluer_manager.start();
         } else {
-            info!("Job scheduler manager not found");
+            warn!("Job scheduler manager not found");
         }
 
-        // 3. register redis expired event
+        // Register redis expired event
         #[cfg(feature = "redis_enabled")]
         if let Some(redis_manager) = ctx.resolve_option_with_name::<RedisManager>("redisManager") {
             if let Some(handle) =
                 ctx.resolve_option::<Arc<tokio::sync::Mutex<dyn RedisExpiredEvent>>>()
             {
-                tokio::task::spawn(async move {
-                    let _ = redis_manager
-                        .expired_event(handle)
-                        .await
-                        .map(|_| info!("Redis expired event listen success!"));
-                });
+                let _ = redis_manager
+                    .expired_event(handle)
+                    .await
+                    .map(|_| info!("Redis expired event listen success!"));
             }
         }
 
-        // 3. register application event
+        // Register application event
         let (tx, rx) = flume::unbounded();
         let mut default_event_publisher = DefaultApplicationEventPublisher::new();
         let mut multicaster = DefaultApplicationEventMulticaster::new();
@@ -219,14 +227,8 @@ pub trait Application: Send + Sync {
 
         multicaster.run();
 
-        ctx.insert_singleton_with_name(
-            default_event_publisher,
-            String::from("defaultApplicationEventPublisher"),
-        );
-        ctx.insert_singleton_with_name(
-            multicaster,
-            String::from("defaultApplicationEventMulticaster"),
-        );
+        ctx.insert_singleton_with_name(default_event_publisher, "");
+        ctx.insert_singleton_with_name(multicaster, "");
 
         println!("========================================================================\n");
     }
@@ -235,27 +237,9 @@ pub trait Application: Send + Sync {
     async fn register_singleton(
         &self,
         ctx: &mut ApplicationContext,
-        application_properties: &ApplicationProperties,
+        _application_properties: &ApplicationProperties,
     ) {
-        // register application data
-        // application_properties.next().data().map(|data| {
-        //     for element in data.registrable() {
-        //         if let Some(auto_register) = element {
-        //             auto_register
-        //                 .register(ctx)
-        //                 .map_err(|e| {
-        //                     error!(
-        //                         "Application Data register error, name: <{}>, error: {}",
-        //                         auto_register.name(),
-        //                         e.to_string()
-        //                     )
-        //                 })
-        //                 .unwrap();
-        //         }
-        //     }
-        // });
-
-        // register application singleton
+        // Register application singleton
         let mut container = ApplicationDefaultRegisterSingle::new();
         #[cfg(feature = "job_scheduler")]
         container.push::<JobSchedulerAutoRegister>();
@@ -493,7 +477,7 @@ pub trait Application: Send + Sync {
 
         // application.init_cache().await;
         application
-            .bind_tcp_server(&mut ctx,&properties,  start_time)
+            .bind_tcp_server(&mut ctx, &properties, start_time)
             .await;
     }
 }

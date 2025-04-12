@@ -2,13 +2,13 @@
 
 use next_web_core::{
     async_trait,
-    context::properties::{ApplicationProperties, Properties},
-    ApplicationContext, AutoRegister,
+    context::properties::ApplicationProperties,
+    ApplicationContext,
 };
 use next_web_dev::{
     application::application::Application,
     router::{open_router::OpenRouter, private_router::PrivateRouter},
-    Properties, SingleOwner, Singleton,
+    Properties, Singleton,
 };
 
 /// Test application
@@ -19,20 +19,10 @@ pub struct TestApplication;
 #[Properties(prefix = "test")]
 #[derive(Clone, Debug, serde::Deserialize, Default)]
 pub struct TestBB {
-    message: Option<String>,
-    age: Option<u32>,
-    run: Option<bool>
-}
-
-#[Singleton(name = "foo")]
-#[derive(Clone, Debug, serde::Deserialize, Default)]
-pub struct TestAA {
-    bb: TestBB
-}
-
-#[Singleton(name = "number")]
-fn Number() -> i32 {
-    42
+    pub message: Option<String>,
+    pub age: Option<u32>,
+    #[value = "run1"]
+    pub run: Option<bool>
 }
 
 pub struct TestModule {
@@ -48,13 +38,9 @@ impl Application for TestApplication {
     async fn init_middleware(&mut self, properties: &ApplicationProperties) {}
 
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> (OpenRouter, PrivateRouter) {
-        ctx.resolve_with_name::<i32>("number");
+
         let var = ctx.resolve::<TestBB>();
         println!("testbb: {:?}", var);
-        
-        let var = ctx.resolve_with_name::<TestAA>("foo");
-        println!("testaa: {:?}", var);
-       
         (OpenRouter::default(), PrivateRouter::default())
     }
 }
