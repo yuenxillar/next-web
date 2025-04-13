@@ -1,17 +1,22 @@
-#[derive(Clone, Debug, serde::Deserialize)]
+use rudi::{Properties, Singleton};
+
+#[Singleton(default, binds=[Self::into_properties])]
+#[Properties(prefix = "next.mqtt")]
+#[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct MQTTClientProperties {
-    id: Option<String>,
+    client_id: Option<String>,
     host: Option<String>,
     port: Option<u16>,
     username: Option<String>,
     password: Option<String>,
     topics: Option<Vec<String>>,
     keep_alive: Option<u64>,
+    clean_session: Option<bool>
 }
 
 impl MQTTClientProperties {
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn client_id(&self) -> Option<&str> {
+        self.client_id.as_deref()
     }
 
     pub fn host(&self) -> Option<&str> {
@@ -40,18 +45,8 @@ impl MQTTClientProperties {
     pub fn keep_alive(&self) -> Option<u64> {
         self.keep_alive
     }
-}
 
-impl Default for MQTTClientProperties {
-    fn default() -> Self {
-        Self {
-            id: Some(String::from("next-web-mqtt")),
-            host: Some(String::from("localhost")),
-            port: Some(1883),
-            keep_alive: Some(5),
-            username: Some(String::new()),
-            password: Some(String::new()),
-            topics: Some(vec![String::from("test/#")]),
-        }
+    pub fn clean_session(&self) -> Option<bool> {
+        self.clean_session
     }
 }

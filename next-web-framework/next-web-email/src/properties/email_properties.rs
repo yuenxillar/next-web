@@ -1,7 +1,7 @@
 use rudi::{Properties, Singleton};
 
 #[Singleton(default, binds=[Self::into_properties])]
-#[Properties( prefix = "email")]
+#[Properties( prefix = "next.email")]
 #[derive(Debug, Default, Clone, serde::Deserialize)]
 pub struct EmailProperties {
       /// SMTP 服务器地址

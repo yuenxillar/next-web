@@ -2,7 +2,7 @@ use next_web_core::{
     autoregister::auto_register::AutoRegister,
     context::{
         application_context::ApplicationContext,
-        properties::{self, ApplicationProperties},
+        properties::ApplicationProperties,
     },
 };
 
@@ -32,8 +32,6 @@ impl ApplicationDefaultRegisterContainer {
         properties: &ApplicationProperties,
     ) {
         self.push::<JobSchedulerAutoRegister>();
-
-
 
         for register in self.registers.iter() {
             register.register(ctx, properties).await.ok();

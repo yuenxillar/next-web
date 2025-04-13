@@ -1,4 +1,4 @@
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 use flume::Sender;
 use hashbrown::HashSet;
@@ -107,11 +107,5 @@ pub enum SchedulerEvent {
 }
 
 pub trait ApplicationJob: Send + Sync {
-    fn gen_job<T>(
-        &self,
-    ) -> Result<
-        (&'static str, Box<T>),
-        Box<dyn std::error::Error + Send>
-    >
-    where T: Future<Output = ()>;
+    fn gen_job(&self) -> Job;
 }

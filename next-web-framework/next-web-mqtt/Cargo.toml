@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde = "1.0.217"
-async-trait = "0.1.83"
+serde = {workspace = true}
+next-web-core = { path = "../next-web-core", version = "0.1.0"}
+rudi = { workspace = true}
+rumqttc = { workspace = true}
 
-rumqttc = "0.24.0"
-
+tokio = { workspace = true}
+tracing ={ workspace = true}
+hashbrown = { workspace = true}

@@ -95,7 +95,7 @@ redis = { version = "0.27.6", default-features = false, features = [
 ] }
 deadpool-redis = { version = "0.18.0" }
 minio-rsc = { version = "0.2.3" }
-
+rumqttc = {version = "0.24.0"}
 
 # macro dependencies
 proc-macro2 = { version = "1", default-features = false }

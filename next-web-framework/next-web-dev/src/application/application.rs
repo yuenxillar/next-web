@@ -6,14 +6,11 @@ use hashbrown::HashMap;
 use http_body_util::Full;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
-use once_cell::sync::Lazy;
+use next_web_core::AutoRegister;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use std::fs::{self};
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio_cron_scheduler::Job;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
@@ -24,11 +21,11 @@ use tracing::{error, info, warn};
 use crate::application::application_shutdown::ApplicationShutdown;
 use crate::application::next_application::NextApplication;
 
+use crate::autoregister::register_single::ApplicationDefaultRegisterContainer;
 use crate::event::application_event_multicaster::ApplicationEventMulticaster;
 use crate::event::application_listener::ApplicationListener;
 
 use crate::autoconfigure::context::next_properties::NextProperties;
-use crate::autoregister::register_single::ApplicationDefaultRegisterSingle;
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
@@ -41,8 +38,6 @@ use crate::util::sys_path::resources;
 use next_web_core::context::application_resources::ApplicationResources;
 
 #[cfg(feature = "job_scheduler")]
-use crate::autoregister::job_scheduler_autoregister::JobSchedulerAutoRegister;
-#[cfg(feature = "job_scheduler")]
 use crate::manager::job_scheduler_manager::{ApplicationJob, JobSchedulerManager};
 
 #[cfg(feature = "redis_enabled")]
@@ -52,11 +47,6 @@ use crate::manager::redis_manager::RedisManager;
 
 pub const APPLICATION_BANNER_NAME: &str = "banner.txt";
 pub const APPLICATION_USER_PERMISSION_RESOURCE: &str = "user_permission_resource.json";
-
-/// The application shutdown services.
-#[cfg(not(feature = "tls_rustls"))]
-static SHUTDOWN_SERVICES: Lazy<Mutex<Vec<Arc<dyn ApplicationShutdown>>>> =
-    Lazy::new(|| Mutex::new(Vec::new()));
 
 #[async_trait]
 pub trait Application: Send + Sync {
@@ -83,18 +73,6 @@ pub trait Application: Send + Sync {
             TopBanner::show(std::str::from_utf8(&content.data()).unwrap_or(DEFAULT_TOP_BANNER));
         } else {
             TopBanner::show(DEFAULT_TOP_BANNER);
-        }
-    }
-
-    /// autowire properties
-    async fn autowire_properties(
-        &mut self,
-        ctx: &mut ApplicationContext,
-        application_properties: &ApplicationProperties,
-    ) {
-        let properties = ctx.resolve_by_type::<Box<dyn Properties>>();
-        for item in properties {
-            item.register(ctx, application_properties).await.unwrap();
         }
     }
 
@@ -170,83 +148,7 @@ pub trait Application: Send + Sync {
         None
     }
 
-    /// initialize the application infrastructure
-    async fn init_infrastructure(
-        &self,
-        ctx: &mut ApplicationContext,
-        _application_properties: &ApplicationProperties,
-    ) {
-        println!("\n========================================================================");
-
-        // Register job
-        let producers: Vec<_> = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
-        if let Some(schedluer_manager) =
-            ctx.get_single_option_with_name::<JobSchedulerManager>("jobSchedulerManager")
-        {
-            let mut schedluer_manager = schedluer_manager.clone();
-            for producer in producers {
-                if let Ok((schedule, run)) = producer.gen_job() { 
-                    let job = Job::new_async(schedule,  |_uuid, _lock| Box::pin(async move {}));
-                    if let Ok(job) = job {
-                        schedluer_manager.add_job(job).await;
-                    } else {
-                        warn!("Job scheduler add job failed");
-                    }
-                }
-            }
-            schedluer_manager.start();
-        } else {
-            warn!("Job scheduler manager not found");
-        }
-
-        // Register redis expired event
-        #[cfg(feature = "redis_enabled")]
-        if let Some(redis_manager) = ctx.resolve_option_with_name::<RedisManager>("redisManager") {
-            if let Some(handle) =
-                ctx.resolve_option::<Arc<tokio::sync::Mutex<dyn RedisExpiredEvent>>>()
-            {
-                let _ = redis_manager
-                    .expired_event(handle)
-                    .await
-                    .map(|_| info!("Redis expired event listen success!"));
-            }
-        }
-
-        // Register application event
-        let (tx, rx) = flume::unbounded();
-        let mut default_event_publisher = DefaultApplicationEventPublisher::new();
-        let mut multicaster = DefaultApplicationEventMulticaster::new();
-
-        default_event_publisher.set_channel(Some(tx));
-        multicaster.set_event_channel(rx);
-
-        let listeners = ctx.resolve_by_type::<Box<dyn ApplicationListener>>();
-        listeners.into_iter().for_each(|listener| {
-            multicaster.add_application_listener(listener);
-        });
-
-        multicaster.run();
-
-        ctx.insert_singleton_with_name(default_event_publisher, "");
-        ctx.insert_singleton_with_name(multicaster, "");
-
-        println!("========================================================================\n");
-    }
-
-    /// register application singleton
-    async fn register_singleton(
-        &self,
-        ctx: &mut ApplicationContext,
-        _application_properties: &ApplicationProperties,
-    ) {
-        // Register application singleton
-        let mut container = ApplicationDefaultRegisterSingle::new();
-        #[cfg(feature = "job_scheduler")]
-        container.push::<JobSchedulerAutoRegister>();
-
-        container.register_all(ctx);
-    }
-
+    
     /// initialize the logger.
     fn init_logger(&self, application_properties: &ApplicationProperties) {
         let application_name = application_properties
@@ -302,15 +204,91 @@ pub trait Application: Send + Sync {
         }
     }
 
-    #[cfg(not(feature = "tls_rustls"))]
-    fn graceful_shutdown(&self, ctx: &mut ApplicationContext) {
-        info!("Graceful Shutdown Start");
-        // By Order
-        let services = ctx.resolve_by_type::<Arc<dyn ApplicationShutdown>>();
-        if let Ok(mut container) = SHUTDOWN_SERVICES.try_lock() {
-            container.extend(services);
+    /// Autowire properties
+    async fn autowire_properties(
+        &mut self,
+        ctx: &mut ApplicationContext,
+        application_properties: &ApplicationProperties,
+    ) {
+        let properties = ctx.resolve_by_type::<Box<dyn Properties>>();
+        for item in properties {
+            item.register(ctx, application_properties).await.unwrap();
         }
     }
+
+    /// Register application singleton
+    async fn register_singleton(
+        &self,
+        ctx: &mut ApplicationContext,
+        application_properties: &ApplicationProperties,
+    ) {
+        // Register application singleton
+        let mut container = ApplicationDefaultRegisterContainer::new();
+        container.register_all(ctx, application_properties).await;
+
+        // Resove AutoRegister
+        let auto_register = ctx.resolve_by_type::<Box<dyn AutoRegister>>();
+        for item in auto_register.iter() {
+            item.register(ctx, application_properties).await.unwrap();
+        }
+    }
+
+    /// initialize the application infrastructure
+    async fn init_infrastructure(
+        &self,
+        ctx: &mut ApplicationContext,
+        _application_properties: &ApplicationProperties,
+    ) {
+        println!("\n========================================================================");
+
+        // Register job
+        let producers = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
+        if let Some(schedluer_manager) =
+            ctx.get_single_option_with_name::<JobSchedulerManager>("jobSchedulerManager")
+        {
+            let mut schedluer_manager = schedluer_manager.clone();
+            for producer in producers {
+                schedluer_manager.add_job(producer.gen_job()).await;
+            }
+            schedluer_manager.start();
+        } else {
+            warn!("Job scheduler manager not found");
+        }
+
+        // Register redis expired event
+        #[cfg(feature = "redis_enabled")]
+        if let Some(redis_manager) = ctx.resolve_option_with_name::<RedisManager>("redisManager") {
+            if let Some(handle) =
+                ctx.resolve_option::<Arc<tokio::sync::Mutex<dyn RedisExpiredEvent>>>()
+            {
+                let _ = redis_manager
+                    .expired_event(handle)
+                    .await
+                    .map(|_| info!("Redis expired event listen success!"));
+            }
+        }
+
+        // Register application event
+        let (tx, rx) = flume::unbounded();
+        let mut default_event_publisher = DefaultApplicationEventPublisher::new();
+        let mut multicaster = DefaultApplicationEventMulticaster::new();
+
+        default_event_publisher.set_channel(Some(tx));
+        multicaster.set_event_channel(rx);
+
+        let listeners = ctx.resolve_by_type::<Box<dyn ApplicationListener>>();
+        listeners.into_iter().for_each(|listener| {
+            multicaster.add_application_listener(listener);
+        });
+
+        multicaster.run();
+
+        ctx.insert_singleton_with_name(default_event_publisher, "");
+        ctx.insert_singleton_with_name(multicaster, "");
+
+        println!("========================================================================\n");
+    }
+
 
     /// bind tcp server.
     async fn bind_tcp_server(
@@ -418,8 +396,42 @@ pub trait Application: Send + Sync {
                 .await
                 .unwrap();
 
+            let shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
             axum::serve(listener, app.into_make_service())
-                .with_graceful_shutdown(shutdown_signal())
+                .with_graceful_shutdown(async move {
+                    let ctrl_c = async {
+                        tokio::signal::ctrl_c()
+                            .await
+                            .expect("failed to install Ctrl+C handler");
+                    };
+
+                    #[cfg(unix)]
+                    let terminate = async {
+                        signal::unix::signal(signal::unix::SignalKind::terminate())
+                            .expect("failed to install signal handler")
+                            .recv()
+                            .await;
+                    };
+
+                    #[cfg(not(unix))]
+                    let terminate = std::future::pending::<()>();
+
+                    tokio::select! {
+                        _ = ctrl_c =>  {
+                            info!("Received Ctrl+C. Shutting down...");
+                            for service in shutdowns.iter() {
+                                service.shutdown().await;
+                            }
+
+                        },
+                        _ = terminate =>  {
+                            info!("Received terminate signal. Shutting down...");
+                            for service in shutdowns.iter() {
+                                service.shutdown().await;
+                            }
+                        },
+                    }
+                })
                 .await
                 .unwrap();
         }
@@ -505,40 +517,4 @@ async fn fall_back() -> (StatusCode, &'static str) {
 /// basic handler that responds with a static string
 async fn root() -> axum::response::Html<&'static str> {
     axum::response::Html("<html><body><h1>Welcome to Rust Web</h1></body></html>")
-}
-
-#[cfg(not(feature = "tls_rustls"))]
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c =>  {
-            info!("Received Ctrl+C. Shutting down...");
-            for service in SHUTDOWN_SERVICES.lock().await.iter() {
-                service.shutdown().await;
-            }
-
-        },
-        _ = terminate =>  {
-            info!("Received terminate signal. Shutting down...");
-            for service in SHUTDOWN_SERVICES.lock().await.iter() {
-                service.shutdown().await;
-            }
-        },
-    }
 }

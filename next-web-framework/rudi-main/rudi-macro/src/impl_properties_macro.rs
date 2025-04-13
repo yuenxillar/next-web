@@ -4,7 +4,7 @@ use quote::{quote, ToTokens};
 use syn::{Fields, ItemStruct, Lit, LitStr};
 
 pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Result<TokenStream> {
-    let required_derives = vec!["Debug", "Clone", "Deserialize", "Default"];
+    let required_derives = vec!["Debug", "Clone", "Deserialize"];
     let existing_derives = item_struct
         .clone()
         .attrs
