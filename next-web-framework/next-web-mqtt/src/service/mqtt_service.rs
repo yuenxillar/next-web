@@ -1,5 +1,5 @@
 use crate::{
-    core::topic::base_topic::BaseTopic, properties::mqtt_properties::MQTTClientProperties,
+    core::{interceptor::message_interceptor::MessageInterceptor, topic::base_topic::BaseTopic}, properties::mqtt_properties::MQTTClientProperties,
 };
 
 use hashbrown::HashMap;
@@ -17,16 +17,21 @@ pub struct MQTTService {
 impl Service for MQTTService {}
 
 impl MQTTService {
-    pub fn new(properties: MQTTClientProperties, base_topics: HashMap<String,Box<dyn BaseTopic>>) -> Self {
-        let client = Self::build_client(&properties, base_topics);
+    pub fn new(
+        properties: MQTTClientProperties,
+        base_topics: HashMap<String, Box<dyn BaseTopic>>,
+        interceptor: Box<dyn MessageInterceptor>
+    ) -> Self {
+        let client = Self::build_client(&properties, base_topics, interceptor);
         Self { properties, client }
     }
 
     fn build_client(
         properties: &MQTTClientProperties,
-        mut base_topics: HashMap<String, Box<dyn BaseTopic>>
+        mut base_topics: HashMap<String, Box<dyn BaseTopic>>,
+        interceptor: Box<dyn MessageInterceptor>
     ) -> AsyncClient {
-        let mut options  = MqttOptions::new(
+        let mut options = MqttOptions::new(
             properties.client_id().unwrap_or("Next-Web-Client-ID"),
             properties.host().unwrap_or("localhost"),
             properties.port().unwrap_or(1883),
@@ -47,20 +52,20 @@ impl MQTTService {
         let topics = properties.topics();
         let client_1 = client.clone();
 
-        
         tokio::spawn(async move {
             loop {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Packet::Publish(packet))) => {
                         let data = packet.payload;
                         let topic = packet.topic;
+                        interceptor.message_entry(&topic, &data).await;
                         if let Some(basic) = base_topics.get_mut(&topic) {
                             basic.consume(&topic, &data).await;
                         }
                     }
 
                     Ok(Event::Incoming(Packet::ConnAck(ack))) => {
-                        // 这里可以接受 ack 信息 重新订阅 topic
+                        // 这里一般泛指重连之后 ，需要接受 ack 信息 并重新订阅 topic
                         match ack.code {
                             ConnectReturnCode::Success => {
                                 for topic in topics.iter() {
