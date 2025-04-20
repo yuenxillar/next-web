@@ -1,6 +1,6 @@
 use fast_qr::{
     convert::{image::ImageBuilder, svg::SvgBuilder, Builder, Shape},
-    QRBuilder, 
+    QRBuilder,
 };
 
 pub struct QrCodeUtil;
@@ -13,32 +13,32 @@ impl QrCodeUtil {
     /// 返回值：成功时返回 `QrCodeOutput`，失败时返回错误 | Returns: `QrCodeOutput` on success, error on failure.
     /// 使用 `QRBuilder` 创建二维码对象 | Create a QR code object using `QRBuilder`.
     pub fn generate_qr_code(
-        content: &str, 
-        qr_code_type: QrCodeType, 
-    ) -> Result<QrCodeOutput, Box<dyn std::error::Error>> { 
-        let qrcode = QRBuilder::new(content).build()?; 
+        content: &str,
+        qr_code_type: QrCodeType,
+    ) -> Result<QrCodeOutput, Box<dyn std::error::Error>> {
+        let qrcode = QRBuilder::new(content).build()?;
         // 根据指定的类型生成二维码输出
         // Generate QR code output based on the specified type.
         let output = match qr_code_type {
             QrCodeType::Svg => {
                 let svg = SvgBuilder::default()
                     .shape(Shape::RoundedSquare)
-                    .to_str(&qrcode); 
-                QrCodeOutput::Svg(svg) 
+                    .to_str(&qrcode);
+                QrCodeOutput::Svg(svg)
             }
             QrCodeType::Png(width, height) => {
                 // 使用默认的图像构建器 | Use the default image builder.
-                let png = ImageBuilder::default() 
-                    .shape(Shape::RoundedSquare) 
-                    .background_color([255, 255, 255, 0]) 
+                let png = ImageBuilder::default()
+                    .shape(Shape::RoundedSquare)
+                    .background_color([255, 255, 255, 0])
                     .fit_width(width)
-                    .fit_height(height) 
+                    .fit_height(height)
                     .to_bytes(&qrcode)?;
-                QrCodeOutput::Png(png) 
+                QrCodeOutput::Png(png)
             }
         };
         // 返回生成的二维码输出 | Return the generated QR code output.
-        Ok(output) 
+        Ok(output)
     }
 }
 
@@ -46,8 +46,8 @@ impl QrCodeUtil {
 /// Defines the output format of the QR code.
 pub enum QrCodeOutput {
     // SVG 格式的二维码，存储为字符串 | SVG format QR code, stored as a string.
-    Svg(String), 
-     // PNG 格式的二维码，存储为字节数组 | PNG format QR code, stored as a byte array.
+    Svg(String),
+    // PNG 格式的二维码，存储为字节数组 | PNG format QR code, stored as a byte array.
     Png(Vec<u8>),
 }
 
@@ -56,7 +56,7 @@ pub enum QrCodeOutput {
 #[derive(Debug, Clone, Copy)]
 pub enum QrCodeType {
     // 表示生成 SVG 格式的二维码 | Indicates generating an SVG format QR code.
-    Svg, 
+    Svg,
     // 表示生成 PNG 格式的二维码，并指定宽度和高度 | Indicates generating a PNG format QR code with specified width and height.
-    Png(u32, u32), 
+    Png(u32, u32),
 }
