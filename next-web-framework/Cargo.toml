@@ -36,7 +36,7 @@ next-web-common = { version = "0.1.0", path = "./next-web-common", optional = tr
 
 # # next-web-tests = { version = "0.1.0", path = "./next-web-tests"}
 # next-web-wechat = { version = "0.1.0", path = "./next-web-wechat", optional = true }
-# next-web-websocket = { version = "0.1.0", path = "./next-web-websocket", optional = true }
+next-web-websocket = { version = "0.1.0", path = "./next-web-websocket", optional = true }
 
 
 [features]
@@ -57,4 +57,4 @@ utils = ["next-web-utils"]
 # gateway = ["next-web-gateway"]
 
 # wechat = ["next-web-wechat"]
-# ws = ["next-web-websocket"]
+ws = ["next-web-websocket"]
