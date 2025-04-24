@@ -71,7 +71,6 @@ next-web-core = { path = "../next-web-core", version = "0.1.0"}
 next-web-mq = { path = "../next-web-mq", version = "0.1.0", features = [
     "rabbitmq",
 ], optional = true }
-next-web-mqtt = { path = "../next-web-mqtt", version = "0.1.0", optional = true }
 next-web-common = { path = "../next-web-common", version = "0.1.0", default-features = false, features = [
     "query-wrapper",
 ] }
@@ -97,5 +96,4 @@ redis_enabled = ["redis", "deadpool-redis"]
 database_enabled = ["rbs", "rbatis", "rbdc-pg", "rbdc-mysql", "rbdc-pool-fast"]
 minio_enabled = ["minio-rsc"]
 rabbitmq_enabled = ["next-web-mq"]
-mqtt_enabled = ["next-web-mqtt"]
 mongodb_enabled = ["mongodb"]

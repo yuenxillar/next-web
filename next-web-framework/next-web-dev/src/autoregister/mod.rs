@@ -13,9 +13,6 @@ pub mod redis_autoregister;
 #[cfg(feature = "rabbitmq_enabled")]
 pub mod rabbitmq_autoregister;
 
-#[cfg(feature = "mqtt_enabled")]
-pub mod mqtt_autoregister;
-
 #[cfg(feature = "database_enabled")]
 pub mod database_autoregister;
 

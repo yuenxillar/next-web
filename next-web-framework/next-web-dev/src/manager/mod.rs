@@ -1,8 +1,6 @@
 #[cfg(feature = "mongodb_enabled")]
 pub mod mongodb_manager;
 
-#[cfg(feature = "mqtt_enabled")]
-pub mod mqtt_manager;
 
 #[cfg(feature = "user_security")]
 pub mod user_authorization_manager;

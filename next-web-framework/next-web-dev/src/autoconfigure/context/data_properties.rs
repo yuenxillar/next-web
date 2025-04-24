@@ -12,9 +12,6 @@ use super::redis_properties::RedisProperties;
 #[cfg(feature = "redis_enabled")]
 use crate::autoregister::redis_autoregister::RedisAutoregister;
 
-#[cfg(feature = "mqtt_enabled")]
-use next_web_mqtt::core::client_properties::MQTTClientProperties;
-
 #[cfg(feature = "minio_enabled")]
 use super::minio_properties::MinioProperties;
 #[cfg(feature = "minio_enabled")]
@@ -38,9 +35,7 @@ pub struct DataProperties {
     minio: Option<MinioProperties>,
     #[cfg(feature = "rabbitmq_enabled")]
     rabbitmq: Option<RabbitMQClientProperties>,
-    
-    #[cfg(feature = "mqtt_enabled")]
-    mqtt: Option<MQTTClientProperties>,
+
 }
 
 impl DataProperties {
