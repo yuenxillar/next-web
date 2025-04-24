@@ -1,10 +1,12 @@
 [package]
 name = "next-web-wechat"
+version = "0.1.0"
+description = "Secondary encapsulation of Axum ws features"
+license.workspace = true
 edition.workspace = true
 authors.workspace = true
 include.workspace = true
 readme.workspace = true
-version.workspace = true
 
 
 [dependencies]
