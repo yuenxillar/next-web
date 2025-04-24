@@ -10,4 +10,5 @@ use rust_embed_for_web::RustEmbed;
 #[include = "*.register"]
 #[include = "*.yaml"]
 #[include = "*.json"]
+#[include = "*.properties"]
 pub struct ApplicationResources;

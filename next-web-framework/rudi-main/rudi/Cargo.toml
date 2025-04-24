@@ -14,8 +14,8 @@ version.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rudi-core = { workspace = true}
-rudi-macro = { workspace = true, optional = true }
+rudi-core = { version = "0.1.0", path = "../rudi-core" }
+rudi-macro = { version = "0.1.0", path = "../rudi-macro", optional = true }
 inventory = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
 

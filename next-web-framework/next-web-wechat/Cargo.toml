@@ -1,10 +1,10 @@
 [package]
 name = "next-web-wechat"
-edition = "2021"
-authors = ["Listening <yuenxillar@163.com>"]
-include = ["src/**/*", "Cargo.toml"]
-readme = "README.md"
-
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+readme.workspace = true
+version.workspace = true
 
 
 [dependencies]

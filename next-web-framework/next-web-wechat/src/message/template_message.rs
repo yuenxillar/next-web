@@ -8,13 +8,15 @@ use crate::Result;
 use crate::{client::Client, response::Response};
 
 #[async_trait]
-pub(crate) trait TemplateMessageInterface {
+pub trait TemplateMessageInterface {
     const GET_TEMPLATE_LIST_URL: &'static str =
         "https://api.weixin.qq.com/cgi-bin/template/get_all_private_template?access_token=";
+
     async fn get_template_list(&self, access_token: &str) -> Result<Response<TemplateMessageList>>;
 
     const DELETE_TEMPLATE_URL: &'static str =
         "https://api.weixin.qq.com/cgi-bin/template/del_private_template?access_token=";
+
     async fn delete_template(
         &self,
         access_token: &str,
@@ -23,6 +25,7 @@ pub(crate) trait TemplateMessageInterface {
 
     const SEND_TEMPLATE_URL: &'static str =
         "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=";
+
     async fn send_template_message(
         &self,
         access_token: &str,

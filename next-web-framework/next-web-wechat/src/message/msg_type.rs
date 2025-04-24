@@ -15,6 +15,5 @@ pub enum MsgType {
     News,
     Link,
     Event,
-    
     // 更多....
 }

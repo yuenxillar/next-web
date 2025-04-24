@@ -8,7 +8,7 @@ use crate::Result;
 /// 微信小程序返回的数据结构
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum Response<T> {
+pub enum Response<T> {
     Success {
         #[serde(flatten)]
         data: T,
@@ -23,7 +23,7 @@ pub(crate) enum Response<T> {
 
 impl<T> Response<T> {
     /// 获取微信小程序返回的数据
-    pub(crate) fn extract(self) -> Result<T> {
+    pub fn extract(self) -> Result<T> {
         match self {
             Self::Success { data } => Ok(data),
             Self::Error { code, message } => {

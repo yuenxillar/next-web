@@ -1,6 +1,4 @@
 
 
 
-pub trait Service: Send + Sync {
-    
-}
+pub trait Service: Send + Sync {}

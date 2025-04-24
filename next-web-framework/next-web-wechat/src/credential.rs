@@ -378,7 +378,7 @@ impl GetStableAccessToken for GenericAccessToken<StableAccessToken> {
 }
 
 #[derive(Deserialize)]
-pub(crate) struct AccessTokenBuilder {
+pub struct AccessTokenBuilder {
     access_token: String,
     #[serde(
         deserialize_with = "AccessTokenBuilder::deserialize_expired_at",

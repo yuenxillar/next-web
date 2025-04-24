@@ -134,8 +134,7 @@ pub(crate) fn generate(
             
         }
     };
-    println!("constructor: {}", constructor.to_string());
-
+    // println!("constructor: {}", constructor.to_string());
 
     #[cfg(not(feature = "auto-register"))]
     let auto_register = quote! {};

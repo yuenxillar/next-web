@@ -1,4 +1,5 @@
-[workspace.package]
+[package]
+name = "next-web-framework"
 edition = "2021"
 authors = ["Listening <yuenxillar@163.com>"]
 license = "MIT OR Apache-2.0"
@@ -7,129 +8,52 @@ repository = "https://github.com/Listening/next-web-framework"
 include = ["**/*.rs", "Cargo.toml"]
 readme = "README.md"
 version = "0.1.0"
+rust-version = "1.86.0"
+description = "Just a simple web infrastructure framework"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# next-web libs
+next-web-dev = { version = "0.1.0", path = "./next-web-dev"}
+next-web-core = { version = "0.1.0", path = "./next-web-core" }
+
+next-web-utils = { version = "0.1.0", path = "./next-web-utils", optional = true }
+next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }
+next-web-email = { version = "0.1.0", path = "./next-web-email", optional = true }
+next-web-macro = { version = "0.1.0", path = "./next-web-macro", optional = true }
+next-web-mqtt = { version = "0.1.0", path = "./next-web-mqtt", optional = true }
+next-web-sms = { version = "0.1.0", path = "./next-web-sms", optional = true }
+next-web-mq = { version = "0.1.0", path = "./next-web-mq", optional = true }
+next-web-ai = { version = "0.1.0", path = "./next-web-ai", optional = true }
+next-web-security = { version = "0.1.0", path = "./next-web-security", optional = true }
+next-web-common = { version = "0.1.0", path = "./next-web-common", optional = true }
+next-web-id = { version = "0.1.0", path = "./next-web-id", optional = true }
+next-web-ip = { version = "0.1.0", path = "./next-web-ip", optional = true }
+next-web-gateway = { version = "0.1.0", path = "./next-web-gateway", optional = true }
+
+# next-web-tests = { version = "0.1.0", path = "./next-web-tests"}
+next-web-wechat = { version = "0.1.0", path = "./next-web-wechat", optional = true }
+next-web-websocket = { version = "0.1.0", path = "./next-web-websocket", optional = true }
 
 
-[workspace]
-resolver = "2"
-# List of all the crates that are part of this workspace.
-members = [
-    "next-web-dev",
-    "next-web-utils",
-    "next-web-document",
-    "next-web-email",
-    "next-web-macro",
-    "next-web-mqtt",
-    "next-web-sms",
-    "next-web-mq",
-    "next-web-ai",
-    "next-web-gateway",
-    "next-web-security",
-    "next-web-common",
-    "next-web-id",
-    "next-web-ip",
-    "next-web-core",
+[features]
+default = []
 
+utils = ["next-web-utils"]
+document = ["next-web-document"]
+email = ["next-web-email"]
+macro = ["next-web-macro"]
+mqtt = ["next-web-mqtt"]
+sms = ["next-web-sms"]
+mq = ["next-web-mq"]
+ai = ["next-web-ai/default"]
+security =  ["next-web-security"]
+common =  ["next-web-common"]
+id = ["next-web-id"]
+ip = ["next-web-ip"]
+gateway = ["next-web-gateway"]
 
-    "rudi-main/rudi",
-    "rudi-main/rudi-core",
-    "rudi-main/rudi-macro", 
-    "next-web-tests", 
-    "next-web-wechat",
-]
-
-
-[workspace.dependencies]
-# dev dependencies
-tokio = { version = "1.44.1", features = ["full"] }
-axum = { version = "0.8.3" }
-tower-http = { version = "0.6.2" }
-axum-prometheus = { version = "0.7.0" }
-
-# serialization and deserialization
-serde = { version = "1.0.219", features = ["derive"] }
-serde_yaml = { version = "0.9.34" }
-serde_json = { version = "1.0.133" }
-serde_repr = { version = "0.1.20" }
-quick-xml = { version = "0.37.4", features = ["serialize"]}
-strum = { version = "0.27", features = ["derive"] }
-
-
-reqwest = { version = "0.12.15", features = ["json"]}
-aes = { version = "^0.8.4" }
-once_cell = { version = "1.20.2" }
-async-trait = { version = "0.1.88" }
-chrono = { version = "0.4.40" }
-hashbrown = { version = "0.15.2", features = ["serde"] }
-regex = { version = "1.11.1" }
-jsonwebtoken = { version = "9.3.0" }
-rust-embed-for-web = { version = "11.2.1" }
-matchit = { version = "0.8.4" }
-bcrypt = { version = "0.16.0" }
-rand = { version = "0.8.5" }
-uuid = { version = "1.16.0", features = ["v4"] }
-tokio-cron-scheduler = { version = "0.13.0" }
-http-body-util = { version = "0.1.2" }
-parking_lot = { version = "0.12.3" }
-flume = { version = "0.11.1" }
-dyn-clone = { version = "1.0.19" }
-lettre = { version = "0.11.15",  features = ["smtp-transport", "builder", "tokio1-native-tls"]}
-base64 = { version = "0.22.1" }
-
-thiserror = { version = "2.0.8" }
-anyhow = { version = "1.0.94" }
-
-futures = { version = "0.3.31" }
-
-sha1 = { version = "0.10.6" }
-sha2 = { version = "0.10.8" }
-md5 =  { version = "0.7.0" }
-md2 =  { version = "0.10.2" }
-hex =  { version = "0.4.3"} 
-
-# services
-rbs = { version = "4.5" }
-rbatis = { version = "4.5" }
-rbdc = { version = "4.5", default-features = false }
-rbdc-pg = { version = "4.5" }
-rbdc-mysql = { version = "4.5" }
-rbdc-pool-fast = { version = "4.5" }
-
-
-mongodb = { version = "3.2.0", features = ["zstd-compression"] }
-redis = { version = "0.27.6", default-features = false, features = [
-    "script",
-    "json",
-] }
-deadpool-redis = { version = "0.18.0" }
-minio-rsc = { version = "0.2.3" }
-rumqttc = {version = "0.24.0"}
-
-# macro dependencies
-proc-macro2 = { version = "1", default-features = false }
-quote = { version = "1", default-features = false }
-syn = { version = "2", default-features = false }
-from-attr = { version = "0.1", default-features = false }
-
-
-# rudi
-rudi = { version = "0.1.0", path = "./rudi-main/rudi" }
-rudi-macro = { version = "0.1.0", path = "./rudi-main/rudi-macro" }
-rudi-core = { version = "0.1.0", path = "./rudi-main/rudi-core" }
-
-# optional dependencies
-inventory = { version = "0.3", default-features = false }
-tracing = { version = "0.1" }
-tracing-appender = { version = "0.2" }
-tracing-subscriber = { version = "0.3.0", features = [
-    "fmt",
-    "env-filter",
-    "json",
-    "chrono",
-] }
-
-[workspace.lints.rust]
-unsafe_code = "forbid"
-private_interfaces = "deny"
-private_bounds = "deny"
-unreachable_pub = "deny"
-missing_docs = "warn"
+wechat = ["next-web-wechat"]
+ws = ["next-web-websocket"]

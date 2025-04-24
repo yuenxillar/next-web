@@ -2,7 +2,7 @@
 name = "rudi-macro"
 description = "Macros for Rudi."
 keywords = ["dependency-injection", "ioc", "di", "dependency"]
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -17,7 +17,7 @@ readme.workspace = true
 proc-macro = true
 
 [dependencies]
-rudi-core = { workspace = true }
+rudi-core = { version = "0.1.0", path = "../rudi-core"}
 from-attr = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }

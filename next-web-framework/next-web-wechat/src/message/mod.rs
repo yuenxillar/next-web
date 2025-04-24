@@ -1,3 +1,4 @@
+pub mod reply_message;
 pub mod template_message;
 pub mod message_body;
 pub mod msg_type;

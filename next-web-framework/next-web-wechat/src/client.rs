@@ -44,7 +44,7 @@ impl Client {
         }
     }
 
-    pub(crate) fn request(&self) -> &reqwest::Client {
+    pub fn request(&self) -> &reqwest::Client {
         &self.inner.client
     }
 
@@ -59,11 +59,11 @@ impl Client {
     ///
     /// #[derive(Deserialize, Default)]
     /// #[serde(default)]
-    /// pub(crate) struct Logger {
+    /// pub struct Logger {
     ///     code: String,
     /// }
     ///
-    /// pub(crate) async fn login(
+    /// pub async fn login(
     ///     State(client): State<Client>,
     ///     Json(logger): Json<Logger>,
     /// ) -> Result<impl IntoResponse> {
@@ -111,7 +111,7 @@ impl Client {
     /// 获取小程序全局唯一后台接口调用凭据（access_token）
     /// https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/access-token/auth.getAccessToken.html
     #[instrument(skip(self))]
-    pub(crate) async fn get_access_token(&self) -> Result<AccessTokenBuilder> {
+    pub async fn get_access_token(&self) -> Result<AccessTokenBuilder> {
         let mut map: HashMap<&str, &str> = HashMap::new();
 
         map.insert("grant_type", "client_credential");
@@ -146,7 +146,7 @@ impl Client {
     /// 获取小程序全局唯一后台接口调用凭据（access_token）
     /// https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/mp-access-token/getStableAccessToken.html
     #[instrument(skip(self, force_refresh))]
-    pub(crate) async fn get_stable_access_token(
+    pub async fn get_stable_access_token(
         &self,
         force_refresh: impl Into<Option<bool>>,
     ) -> Result<AccessTokenBuilder> {

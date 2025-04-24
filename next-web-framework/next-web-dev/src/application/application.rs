@@ -6,9 +6,10 @@ use hashbrown::HashMap;
 use http_body_util::Full;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
+use next_web_core::core::router::ApplyRouter;
 use next_web_core::AutoRegister;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
-use std::fs::{self};
+use std::io::BufRead;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::catch_panic::CatchPanicLayer;
@@ -33,7 +34,6 @@ use crate::router::open_router::OpenRouter;
 use crate::router::private_router::PrivateRouter;
 use crate::util::date_time_util::LocalDateTimeUtil;
 use crate::util::file_util::FileUtil;
-use crate::util::sys_path::resources;
 
 use next_web_core::context::application_resources::ApplicationResources;
 
@@ -84,42 +84,35 @@ pub trait Application: Send + Sync {
         // message source
         let mut messages = HashMap::new();
         if let Some(message_source) = application_properties.messages() {
-            let path = PathBuf::from(resources())
-                .join(message_source.basename().unwrap_or_else(|| "/messages"));
-            if let Ok(entries) = fs::read_dir(path) {
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        let var = entry.path();
-                        let path = var.to_string_lossy();
-
-                        let var3 = FileUtil::read_file_to_string(&path).map(|msg| {
-                            if !msg.is_empty() {
-                                let mut map = HashMap::new();
-                                let _ = msg.lines().into_iter().map(|var1| {
-                                    let var2: Vec<&str> = var1.split("=").collect();
-                                    if var2.len() == 2 {
-                                        let key = var2.get(0).unwrap();
-                                        let value = var2.get(1).unwrap();
-                                        map.insert(key.to_string(), value.to_string());
-                                    }
-                                });
-                                return map;
-                            } else {
-                                HashMap::with_capacity(0)
-                            }
+            let mut load_local_message = |name: &str| {
+                if let Some(dyn_file) = ApplicationResources::get(&format!("messages/{}", &name)) {
+                    let data = dyn_file.data();
+                    if !data.is_empty() {
+                        let mut map = HashMap::new();
+                        let _ = data.lines().map(|var| {
+                            var.map(|var1| {
+                                let var2: Vec<&str> = var1.split("=").collect();
+                                if var2.len() == 2 {
+                                    let key = var2.get(0).unwrap();
+                                    let value = var2.get(1).unwrap();
+                                    map.insert(key.to_string(), value.to_string());
+                                }
+                            })
                         });
-
-                        if let Ok(var4) = var3 {
-                            if let Some(name) = var.file_name() {
-                                messages.insert(
-                                    name.to_string_lossy().to_string().to_lowercase(),
-                                    var4,
-                                );
-                            }
-                        }
-                    };
+                        messages.insert(name.to_string(), map);
+                    }
                 }
-            }
+            };
+
+            // load default messages
+            load_local_message(&"messages.properties");
+
+            message_source.local().map(|item| {
+                item.trim_end().split(",").for_each(|s| {
+                    let name = format!("messages_{}.properties", s);
+                    load_local_message(&name);
+                });
+            });
         }
         messages
     }
@@ -148,7 +141,6 @@ pub trait Application: Send + Sync {
         None
     }
 
-    
     /// initialize the logger.
     fn init_logger(&self, application_properties: &ApplicationProperties) {
         let application_name = application_properties
@@ -289,7 +281,6 @@ pub trait Application: Send + Sync {
         println!("========================================================================\n");
     }
 
-
     /// bind tcp server.
     async fn bind_tcp_server(
         &mut self,
@@ -359,6 +350,12 @@ pub trait Application: Send + Sync {
             app = app.nest(config.context_path(), router);
         } else {
             app = app.merge(router);
+        }
+
+        // apply router
+        let routers = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
+        for item in routers.into_iter() {
+            app = app.merge(item.router(ctx));
         }
 
         println!(
@@ -460,7 +457,7 @@ pub trait Application: Send + Sync {
         let mut ctx = ApplicationContext::options()
             .allow_override(true)
             .auto_register();
-        info!("init context success");
+        info!("init application context success");
 
         // autowire properties
         application.autowire_properties(&mut ctx, &properties).await;
@@ -487,6 +484,7 @@ pub trait Application: Send + Sync {
             info!("connect grpc client success");
         }
 
+        //
         // application.init_cache().await;
         application
             .bind_tcp_server(&mut ctx, &properties, start_time)
