@@ -2,6 +2,8 @@
 name = "next-web-utils"
 version = "0.1.0"
 edition = "2021"
+description = "Web Utils"
+license.workspace = true
 
 [lib]
 path = "src/lib.rs"

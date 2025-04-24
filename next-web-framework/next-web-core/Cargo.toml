@@ -1,7 +1,9 @@
 [package]
 name = "next-web-core"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+description = "Core library for the Next Web framework, providing essential web server and middleware abstractions."
+license.workspace = true
 
 [dependencies]
 serde = { workspace = true }

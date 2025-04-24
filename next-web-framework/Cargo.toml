@@ -2,7 +2,7 @@
 name = "next-web-framework"
 edition = "2021"
 authors = ["Listening <yuenxillar@163.com>"]
-license = "MIT OR Apache-2.0"
+license = "MIT"
 homepage = "https://github.com/Listening/next-web-framework"
 repository = "https://github.com/Listening/next-web-framework"
 include = ["**/*.rs", "Cargo.toml"]
@@ -10,6 +10,7 @@ readme = "README.md"
 version = "0.1.0"
 rust-version = "1.86.0"
 description = "Just a simple web infrastructure framework"
+
 
 [lib]
 path = "src/lib.rs"
@@ -20,40 +21,40 @@ next-web-dev = { version = "0.1.0", path = "./next-web-dev"}
 next-web-core = { version = "0.1.0", path = "./next-web-core" }
 
 next-web-utils = { version = "0.1.0", path = "./next-web-utils", optional = true }
-next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }
-next-web-email = { version = "0.1.0", path = "./next-web-email", optional = true }
-next-web-macro = { version = "0.1.0", path = "./next-web-macro", optional = true }
-next-web-mqtt = { version = "0.1.0", path = "./next-web-mqtt", optional = true }
-next-web-sms = { version = "0.1.0", path = "./next-web-sms", optional = true }
-next-web-mq = { version = "0.1.0", path = "./next-web-mq", optional = true }
-# next-web-ai = { version = "0.1.0", path = "./next-web-ai", optional = true }
-next-web-security = { version = "0.1.0", path = "./next-web-security", optional = true }
+# next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }
+# next-web-email = { version = "0.1.0", path = "./next-web-email", optional = true }
+# next-web-macro = { version = "0.1.0", path = "./next-web-macro", optional = true }
+# next-web-mqtt = { version = "0.1.0", path = "./next-web-mqtt", optional = true }
+# next-web-sms = { version = "0.1.0", path = "./next-web-sms", optional = true }
+# next-web-mq = { version = "0.1.0", path = "./next-web-mq", optional = true }
+# # next-web-ai = { version = "0.1.0", path = "./next-web-ai", optional = true }
+# next-web-security = { version = "0.1.0", path = "./next-web-security", optional = true }
 next-web-common = { version = "0.1.0", path = "./next-web-common", optional = true }
-next-web-id = { version = "0.1.0", path = "./next-web-id", optional = true }
-next-web-ip = { version = "0.1.0", path = "./next-web-ip", optional = true }
-next-web-gateway = { version = "0.1.0", path = "./next-web-gateway", optional = true }
+# next-web-id = { version = "0.1.0", path = "./next-web-id", optional = true }
+# next-web-ip = { version = "0.1.0", path = "./next-web-ip", optional = true }
+# next-web-gateway = { version = "0.1.0", path = "./next-web-gateway", optional = true }
 
-# next-web-tests = { version = "0.1.0", path = "./next-web-tests"}
-next-web-wechat = { version = "0.1.0", path = "./next-web-wechat", optional = true }
-next-web-websocket = { version = "0.1.0", path = "./next-web-websocket", optional = true }
+# # next-web-tests = { version = "0.1.0", path = "./next-web-tests"}
+# next-web-wechat = { version = "0.1.0", path = "./next-web-wechat", optional = true }
+# next-web-websocket = { version = "0.1.0", path = "./next-web-websocket", optional = true }
 
 
 [features]
 default = []
 
-utils = ["next-web-utils"]
-document = ["next-web-document"]
-email = ["next-web-email"]
-macro = ["next-web-macro"]
-mqtt = ["next-web-mqtt"]
-sms = ["next-web-sms"]
-mq = ["next-web-mq"]
-# ai = ["next-web-ai"]
-security =  ["next-web-security"]
 common =  ["next-web-common"]
-id = ["next-web-id"]
-ip = ["next-web-ip"]
-gateway = ["next-web-gateway"]
+utils = ["next-web-utils"]
+# document = ["next-web-document"]
+# email = ["next-web-email"]
+# macro = ["next-web-macro"]
+# mqtt = ["next-web-mqtt"]
+# sms = ["next-web-sms"]
+# mq = ["next-web-mq"]
+# # ai = ["next-web-ai"]
+# security =  ["next-web-security"]
+# id = ["next-web-id"]
+# ip = ["next-web-ip"]
+# gateway = ["next-web-gateway"]
 
-wechat = ["next-web-wechat"]
-ws = ["next-web-websocket"]
+# wechat = ["next-web-wechat"]
+# ws = ["next-web-websocket"]

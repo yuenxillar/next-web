@@ -3,6 +3,8 @@ name = "next-web-dev"
 version = "0.1.0"
 edition = "2021"
 keywords = ["http", "web", "framework"]
+description = "Development."
+license.workspace = true
 
 [lib]
 path = "src/lib.rs"
