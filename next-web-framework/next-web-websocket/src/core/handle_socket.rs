@@ -5,7 +5,7 @@ use axum::{
     extract::ws::{Message, WebSocket},
 };
 use futures::{stream::StreamExt, SinkExt};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use super::{session::WebSocketSession, ws_context::WebSocketContext};
 
@@ -16,7 +16,7 @@ pub async fn handle_socket(
     remote_address: SocketAddr,
     path: String,
 ) {
-    info!("开始处理WebSocket连接: {remote_address}, 路径: {path}");
+    debug!("Start processing WebSocket connections: {remote_address}, Path: {path}");
 
     // send a ping (unsupported by some browsers) just to kick things off and get a response
     if socket
@@ -24,7 +24,7 @@ pub async fn handle_socket(
         .await
         .is_err()
     {
-        error!("无法发送ping包到客户端 {remote_address}，连接可能已断开");
+        error!("Unable to send ping packet to client {remote_address}, The connection may have been disconnected");
         return;
     }
 
@@ -32,7 +32,7 @@ pub async fn handle_socket(
     let handler = match ctx.get_handler(&path) {
         Some(handler) => handler,
         None => {
-            error!("找不到路径 {path} 对应的处理器，连接将被关闭");
+            error!("Path not found {path} The corresponding processor's connection will be closed");
             return;
         }
     };
