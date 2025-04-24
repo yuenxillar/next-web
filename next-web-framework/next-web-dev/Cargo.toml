@@ -8,8 +8,8 @@ keywords = ["http", "web", "framework"]
 path = "src/lib.rs"
 
 [dependencies]
-tokio = { workspace = true }
-axum = { workspace = true, default-features = false, features = [
+tokio = { workspace = true, features = ["full"]}
+axum = { workspace = true, features = [
     "http2",
     "json",
     "tokio",

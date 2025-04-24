@@ -125,7 +125,3 @@ codegen-units = 1
 incremental = true
 lto = true
 opt-level = 'z'    # Optimize for size
-
-
-[profile.release.package.railway-12306]
-opt-level = 3

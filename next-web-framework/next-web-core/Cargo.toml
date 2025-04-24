@@ -4,17 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde = { workspace = true}
+serde = { workspace = true }
 serde_yaml = { workspace = true }
 hashbrown = { workspace = true }
 rust-embed-for-web = { workspace = true }
 dyn-clone = { workspace = true }
-serde_json = {workspace = true }
+serde_json = { workspace = true }
 
-axum = {  workspace = true}
-inventory = {workspace = true}
+axum = { workspace = true }
+inventory = { workspace = true }
 
-async-trait ={ workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true, optional = true }
 
 serde_path_to_error = "0.1.17"
 mime = "0.3.17"
