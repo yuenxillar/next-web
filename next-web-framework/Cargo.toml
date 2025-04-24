@@ -26,7 +26,7 @@ next-web-macro = { version = "0.1.0", path = "./next-web-macro", optional = true
 next-web-mqtt = { version = "0.1.0", path = "./next-web-mqtt", optional = true }
 next-web-sms = { version = "0.1.0", path = "./next-web-sms", optional = true }
 next-web-mq = { version = "0.1.0", path = "./next-web-mq", optional = true }
-next-web-ai = { version = "0.1.0", path = "./next-web-ai", optional = true }
+# next-web-ai = { version = "0.1.0", path = "./next-web-ai", optional = true }
 next-web-security = { version = "0.1.0", path = "./next-web-security", optional = true }
 next-web-common = { version = "0.1.0", path = "./next-web-common", optional = true }
 next-web-id = { version = "0.1.0", path = "./next-web-id", optional = true }
@@ -48,7 +48,7 @@ macro = ["next-web-macro"]
 mqtt = ["next-web-mqtt"]
 sms = ["next-web-sms"]
 mq = ["next-web-mq"]
-ai = ["next-web-ai"]
+# ai = ["next-web-ai"]
 security =  ["next-web-security"]
 common =  ["next-web-common"]
 id = ["next-web-id"]
