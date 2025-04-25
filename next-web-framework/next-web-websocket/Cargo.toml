@@ -20,7 +20,8 @@ flume = { workspace = true }
 matchit = {  workspace = true }
 tokio = { workspace = true}
 
-next-web-core = { path = "../next-web-core", version = "0.1.0"}
+# next-web-core = { path = "../next-web-core", version = "0.1.0"}
+next-web-core = "0.1.0"
 
 [lints]
 workspace = true
