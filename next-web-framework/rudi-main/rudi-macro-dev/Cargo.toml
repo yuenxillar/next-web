@@ -1,5 +1,5 @@
 [package]
-name = "rudi-macro"
+name = "rudi-macro-dev"
 description = "Macros for Rudi."
 keywords = ["dependency-injection", "ioc", "di", "dependency"]
 version = "0.1.0"

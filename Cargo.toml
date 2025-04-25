@@ -91,7 +91,7 @@ rumqttc = { version = "0.24.0" }
 
 
 # rudi
-rudi = { version = "0.1.0", path = "./next-web-framework/rudi-main/rudi" }
+rudi-dev = { version = "0.1.0", path = "./next-web-framework/rudi-main/rudi-dev" }
 
 
 # macro dependencies

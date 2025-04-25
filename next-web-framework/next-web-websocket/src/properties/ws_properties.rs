@@ -1,8 +1,6 @@
 use rudi::{Properties, Singleton};
 
-
 /// WebSocket配置属性，用于配置WebSocket连接的相关参数
-
 #[Singleton(default, binds=[Self::into_properties])]
 #[Properties(prefix = "next.mqtt")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
