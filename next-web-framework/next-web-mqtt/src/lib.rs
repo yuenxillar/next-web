@@ -10,7 +10,7 @@
 /// # Examples
 ///
 /// ```
-/// use rudi::Singleton;
+/// use rudi_dev::Singleton;
 /// use next_web_core::async_trait;
 /// 
 /// #[SingleOwner(binds = [Self::into_base_topic])]

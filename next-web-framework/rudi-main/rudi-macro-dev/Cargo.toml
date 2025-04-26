@@ -17,7 +17,7 @@ readme.workspace = true
 proc-macro = true
 
 [dependencies]
-rudi-core = { version = "0.1.0", path = "../rudi-core"}
+rudi-core = { version = "0.1.0"}
 from-attr = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
@@ -29,11 +29,11 @@ syn = { workspace = true, features = [
     "full",
 ] }
 
-next-web-core = { path = "../../next-web-core",version = "0.1.0" }
+next-web-core = { version = "0.1.0" }
 
 [dev-dependencies]
 # cannot contain `workspace = true` to avoid circular dependencies.
-rudi = { path = "../rudi", default-features = false, features = [
+rudi = { version = "0.8.3", default-features = false, features = [
     "rudi-macro",
     "auto-register",
 ] }

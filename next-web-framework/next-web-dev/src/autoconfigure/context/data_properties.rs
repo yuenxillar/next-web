@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
 
-#[cfg(feature = "rabbitmq_enabled")]
-use crate::autoregister::rabbitmq_autoregister::RabbitMQAutoregister;
+
 use next_web_core::autoregister::auto_register::AutoRegister;
-#[cfg(feature = "rabbitmq_enabled")]
-use next_web_mq::rabbitmq::core::client_properties::RabbitMQClientProperties;
 
 #[cfg(feature = "redis_enabled")]
 use super::redis_properties::RedisProperties;
@@ -33,9 +30,6 @@ pub struct DataProperties {
     redis: Option<RedisProperties>,
     #[cfg(feature = "minio_enabled")]
     minio: Option<MinioProperties>,
-    #[cfg(feature = "rabbitmq_enabled")]
-    rabbitmq: Option<RabbitMQClientProperties>,
-
 }
 
 impl DataProperties {
@@ -54,11 +48,6 @@ impl DataProperties {
         self.minio.as_ref()
     }
 
-    #[cfg(feature = "rabbitmq_enabled")]
-    pub fn rabbitmq(&self) -> Option<&RabbitMQClientProperties> {
-        self.rabbitmq.as_ref()
-    }
-
     pub fn registrable(&self) -> Vec<Option<Arc<dyn AutoRegister>>> {
         vec![
             #[cfg(feature = "database_enabled")]
@@ -70,9 +59,6 @@ impl DataProperties {
             #[cfg(feature = "minio_enabled")]
             self.minio()
                 .map(|v| Arc::new(MinioAutoRegister(v.clone())) as Arc<dyn AutoRegister>),
-            #[cfg(feature = "rabbitmq_enabled")]
-            self.rabbitmq()
-                .map(|v| Arc::new(RabbitMQAutoregister(v.clone())) as Arc<dyn AutoRegister>),
         ]
     }
 }

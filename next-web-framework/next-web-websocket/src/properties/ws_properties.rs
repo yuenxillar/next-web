@@ -1,4 +1,4 @@
-use rudi::{Properties, Singleton};
+use rudi_dev::{Properties, Singleton};
 
 /// WebSocket配置属性，用于配置WebSocket连接的相关参数
 #[Singleton(default, binds=[Self::into_properties])]

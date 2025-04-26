@@ -1,4 +1,4 @@
-use rudi::{Properties, Singleton};
+use rudi_dev::{Properties, Singleton};
 
 #[Singleton(default, binds=[Self::into_properties])]
 #[Properties(prefix = "next.mqtt")]

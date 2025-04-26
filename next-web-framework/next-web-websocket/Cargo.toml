@@ -1,19 +1,18 @@
 [package]
 name = "next-web-websocket"
+version = "0.1.0"
+description = "Next Web Websocket"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-homepage.workspace = true
-repository.workspace = true
 include.workspace = true
 readme.workspace = true
-version.workspace = true
 
 [dependencies]
 axum = { workspace = true, features = ["ws"] }
 
 serde = { workspace = true }
-rudi = { workspace = true}
+rudi-dev = { version = "0.8.5"} 
 tracing = { workspace = true }
 futures = {  workspace =  true}
 flume = { workspace = true }

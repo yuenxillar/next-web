@@ -1,21 +1,43 @@
-use crate::rabbitmq::bind_exchange::BindExchange;
-use crate::rabbitmq::core::client_properties::RabbitMQClientProperties;
-use amqprs::callbacks::DefaultChannelCallback;
-use amqprs::callbacks::DefaultConnectionCallback;
+use amqprs::channel::Channel;
+use amqprs::BasicProperties;
+use amqprs::consumer::DefaultConsumer;
 use amqprs::channel::BasicConsumeArguments;
-use amqprs::channel::BasicPublishArguments;
+use next_web_core::core::service::Service;
 use amqprs::channel::QueueBindArguments;
 use amqprs::channel::QueueDeclareArguments;
+use amqprs::callbacks::DefaultChannelCallback;
+use amqprs::callbacks::DefaultConnectionCallback;
 use amqprs::connection::Connection;
+use amqprs::channel::BasicPublishArguments;
 use amqprs::connection::OpenConnectionArguments;
-use amqprs::consumer::DefaultConsumer;
-use amqprs::BasicProperties;
-use log::{error, info};
+use crate::rabbitmq::bind_exchange::BindExchange;
 
-pub struct RabbitMQAutoregister(pub RabbitMQClientProperties, pub Vec<BindExchange>);
+use tracing::{ error, info};
 
-impl RabbitMQAutoregister {
-    pub async fn __register(options: RabbitMQClientProperties, bind: Vec<BindExchange>) {
+use crate::rabbitmq::properties::rabbitmq_properties::RabbitMQClientProperties;
+
+///  Service
+#[derive(Clone)]
+pub struct RabbitmqService {
+    properties: RabbitMQClientProperties,
+    channel: Channel,
+}
+
+impl Service for RabbitmqService {}
+
+impl RabbitmqService {
+    pub async fn new(properties: RabbitMQClientProperties, binds: Vec<BindExchange>) -> Self {
+        let channel = Self::build_channel(&properties, &binds).await;
+        Self {
+            properties,
+            channel,
+        }
+    }
+
+    async fn build_channel(
+        options: &RabbitMQClientProperties,
+        binds: &Vec<BindExchange>,
+    ) -> Channel {
         // open a connection to RabbitMQ server
         let mut properties = OpenConnectionArguments::new(
             options.host().unwrap_or("localhost"),
@@ -33,12 +55,12 @@ impl RabbitMQAutoregister {
 
         // open a channel on the connection
         let channel = connection.open_channel(None).await.unwrap();
-        channel
-            .register_callback(DefaultChannelCallback)
-            .await
-            .unwrap();
+        for bind_exchange in binds.iter() {
+            channel
+                .register_callback(DefaultChannelCallback)
+                .await
+                .unwrap();
 
-        for bind_exchange in bind.iter() {
             // Declare a queue
             match channel
                 .queue_declare(QueueDeclareArguments::durable_client_named(
@@ -73,8 +95,11 @@ impl RabbitMQAutoregister {
                             .basic_consume(DefaultConsumer::new(args.no_ack), args)
                             .await
                         {
-                            Ok(consumer) => {
-                                info!("Consumer started for queue {}.", queue_name);
+                            Ok(consumer_tag) => {
+                                info!(
+                                    "Consumer started for queue {}. Consumer tag: {}",
+                                    queue_name, consumer_tag
+                                );
                                 // Process messages or manage the consumer as needed
                             }
                             Err(err) => {
@@ -118,5 +143,14 @@ impl RabbitMQAutoregister {
                 }
             }
         }
+        channel
+    }
+
+    pub fn get_channel(&self) -> &Channel {
+        &self.channel
+    }
+
+    pub fn properties(&self) -> &RabbitMQClientProperties {
+        &self.properties
     }
 }

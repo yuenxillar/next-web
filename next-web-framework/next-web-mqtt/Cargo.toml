@@ -1,12 +1,14 @@
 [package]
 name = "next-web-mqtt"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
+description = "Next Web Mqtt"
+license.workspace = true
 
 [dependencies]
 serde = {workspace = true}
-next-web-core = { path = "../next-web-core", version = "0.1.0"}
-rudi = { workspace = true}
+next-web-core = { workspace = true}
+rudi-dev = { workspace = true }
 rumqttc = { workspace = true}
 
 tokio = { workspace = true}

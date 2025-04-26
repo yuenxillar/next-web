@@ -1,7 +1,8 @@
+use next_web_core::autoconfigure::context::{application_properties::AppliationProperties, logger_properties::LoggerProperties, message_source_properties::MessageSourceProperties, server_properties::ServerProperties};
+
 use super::{
-    application_properties::AppliationProperties, data_properties::DataProperties,
-    logger_properties::LoggerProperties, message_source_properties::MessageSourceProperties,
-    security_properties::SecurityProperties, server_properties::ServerProperties,
+     data_properties::DataProperties,
+    security_properties::SecurityProperties,
 };
 
 #[derive(Debug, Clone, serde::Deserialize, Default)]

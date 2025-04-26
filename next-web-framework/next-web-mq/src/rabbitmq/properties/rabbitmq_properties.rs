@@ -1,6 +1,10 @@
 use serde::Deserialize;
+use rudi_dev::{Properties, Singleton};
 
-#[derive(Debug, Clone, Deserialize)]
+
+#[Singleton(default, binds=[Self::into_properties])]
+#[Properties(prefix = "next.rabbitmq")]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct RabbitMQClientProperties {
     host: Option<String>,
     port: Option<u16>,

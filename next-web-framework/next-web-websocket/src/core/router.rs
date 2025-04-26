@@ -7,7 +7,7 @@ use axum::{
     Router, http::Uri,
 };
 use next_web_core::{core::router::ApplyRouter, ApplicationContext};
-use rudi::SingleOwner;
+use rudi_dev::SingleOwner;
 
 use super::{
     handle_socket::handle_socket, handler_registry::WebSocketHandlerRegistry,

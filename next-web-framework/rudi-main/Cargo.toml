@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["rudi", "rudi-core", "rudi-macro"]
+members = ["rudi-dev",  "rudi-macro-dev"]
 
 [workspace.package]
 version = "0.8.3"
@@ -14,9 +14,9 @@ readme = "README.md"
 
 [workspace.dependencies]
 # self
-rudi = { version = "0.8.3", path = "./rudi", default-features = false }
-rudi-macro = { version = "0.8.3", path = "./rudi-macro", default-features = false }
-rudi-core = { version = "0.1.0", path = "./rudi-core", default-features = false }
+rudi-dev = { version = "0.8.3", path = "./rudi-dev", default-features = false }
+rudi-macro-dev = { version = "0.1.0", default-features = false }
+rudi-core = { version = "0.1.0" }
 
 # dependencies
 proc-macro2 = { version = "1", default-features = false }
@@ -43,6 +43,8 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
     "env-filter",
 ] }
 leptos = { version = "0.7", default-features = false }
+
+serde = { version = "1.0.219", features = ["derive"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

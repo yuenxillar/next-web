@@ -10,12 +10,13 @@ readme.workspace = true
 version.workspace = true
 
 [dependencies]
-next-web-dev = { path = "../next-web-dev", version = "0.1.0" }
+next-web-dev = { workspace = true}
 tokio = { workspace = true }
 serde ={ workspace = true}
-next-web-core = { path = "../next-web-core", version = "0.1.0" }
+next-web-core = { workspace = true }
 next-web-ip ={ path = "../next-web-ip", version = "0.1.0" }
 next-web-macro ={ path = "../next-web-macro", version = "0.1.0" }
+next-web-mqtt = {workspace = true}
 axum = { workspace = true}
 
 [lints]

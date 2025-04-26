@@ -1,9 +1,9 @@
 [package]
 name = "next-web-dev"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 keywords = ["http", "web", "framework"]
-description = "Development."
+description = "Next Web Dev!"
 license.workspace = true
 
 [lib]
@@ -48,7 +48,7 @@ rand = { workspace = true }
 parking_lot = { workspace = true }
 flume = { workspace = true }
 
-rudi = { workspace = true}
+rudi-dev = { workspace = true}
 
 thiserror = { workspace = true, optional = true }
 
@@ -67,11 +67,8 @@ deadpool-redis = { workspace = true, optional = true }
 minio-rsc = { workspace = true, optional = true }
 
 # self dependencies
-next-web-core = { path = "../next-web-core", version = "0.1.0"}
-next-web-mq = { path = "../next-web-mq", version = "0.1.0", features = [
-    "rabbitmq",
-], optional = true }
-next-web-common = { path = "../next-web-common", version = "0.1.0", default-features = false, features = [
+next-web-core = { workspace = true }
+next-web-common = { version = "0.1.0", default-features = false, features = [
     "query-wrapper",
 ] }
 
@@ -80,7 +77,6 @@ default = [
     "database_enabled",
     "user_security",
     "mongodb_enabled",
-    "rabbitmq_enabled",
     "job_scheduler"
 ]
 tls_rustls = ["axum-server"]
@@ -95,5 +91,5 @@ prometheus_enabled = ["axum-prometheus"]
 redis_enabled = ["redis", "deadpool-redis"]
 database_enabled = ["rbs", "rbatis", "rbdc-pg", "rbdc-mysql", "rbdc-pool-fast"]
 minio_enabled = ["minio-rsc"]
-rabbitmq_enabled = ["next-web-mq"]
+# rabbitmq_enabled = ["next-web-mq"]
 mongodb_enabled = ["mongodb"]

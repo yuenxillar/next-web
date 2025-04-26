@@ -3,41 +3,47 @@ use serde::Deserialize;
 use super::http_properties::HttpProperties;
 
 /// Application server register
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Default, Deserialize, Clone)]
 pub struct ServerProperties {
-    port: u16,
-    context_path: String,
+    #[serde(default = "default_port")]
+    port: Option<u16>,
+    context_path: Option<String>,
     http: Option<HttpProperties>,
+    local: Option<bool>,
 }
 
 impl ServerProperties {
-    pub fn new(port: u16, context_path: String, http: Option<HttpProperties>) -> Self {
+    pub fn new(
+        port: Option<u16>,
+        context_path: Option<String>,
+        http: Option<HttpProperties>,
+        local: Option<bool>,
+    ) -> Self {
         Self {
             port,
             context_path,
             http,
+            local,
         }
     }
 
-    pub fn port(&self) -> u16 {
+    pub fn port(&self) -> Option<u16> {
         self.port
     }
 
-    pub fn context_path(&self) -> &str {
-        &self.context_path
+    pub fn context_path(&self) -> Option<&str> {
+        self.context_path.as_deref()
     }
 
     pub fn http(&self) -> Option<&HttpProperties> {
         self.http.as_ref()
     }
+
+    pub fn local(&self) -> Option<bool> {
+        self.local
+    }
+
 }
 
-impl Default for ServerProperties {
-    fn default() -> Self {
-        ServerProperties {
-            port: 10001,
-            context_path: String::new(),
-            http: None,
-        }
-    }
-}
+
+fn default_port() -> Option<u16> { Some(63018)}

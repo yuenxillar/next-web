@@ -16,6 +16,3 @@ pub mod redis_manager;
 
 #[cfg(feature = "job_scheduler")]
 pub mod job_scheduler_manager;
-
-#[cfg(feature = "rabbitmq_enabled")]
-pub mod rabbitmq_manager;

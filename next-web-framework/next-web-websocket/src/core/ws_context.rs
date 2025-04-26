@@ -1,4 +1,4 @@
-use rudi::Singleton;
+use rudi_dev::Singleton;
 use std::sync::Arc;
 
 use crate::properties::ws_properties::WebSocketProperties;

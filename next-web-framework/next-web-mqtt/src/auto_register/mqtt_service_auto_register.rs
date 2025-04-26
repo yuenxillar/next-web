@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 use next_web_core::{
     async_trait, context::properties::ApplicationProperties, ApplicationContext, AutoRegister,
 };
-use rudi::SingleOwner;
+use rudi_dev::SingleOwner;
 
 use crate::{
     core::{interceptor::message_interceptor::MessageInterceptor, topic::base_topic::BaseTopic},

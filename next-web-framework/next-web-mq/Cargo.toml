@@ -2,13 +2,21 @@
 name = "next-web-mq"
 version = "0.1.0"
 edition = "2021"
+description = "Next Web Mq"
+authors.workspace = true
+readme.workspace = true
+license.workspace = true
+
 
 [dependencies]
-amqprs = { version = "2.1.0", optional = true, features = ["traces"]}
-serde = "1.0.217"
-log = "0.4.22"
+amqprs = { workspace = true, optional = true }
+serde = { workspace = true }
+tracing =  { workspace = true }
+rudi-dev = { workspace = true }
+next-web-core = { workspace = true }
+
+
 
 [features]
-default = ["amqprs"]
+default = ["rabbitmq"]
 rabbitmq = ["amqprs"]
-rabbitmq-core = []

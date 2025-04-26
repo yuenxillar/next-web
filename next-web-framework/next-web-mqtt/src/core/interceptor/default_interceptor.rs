@@ -1,6 +1,6 @@
 use next_web_core::async_trait;
 
-use rudi::SingleOwner;
+use rudi_dev::SingleOwner;
 
 use super::message_interceptor::MessageInterceptor;
 

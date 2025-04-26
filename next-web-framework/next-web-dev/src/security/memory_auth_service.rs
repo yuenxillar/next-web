@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use hashbrown::HashMap;
-use rudi::Singleton;
+use rudi_dev::Singleton;
 
 use super::{
     authorization_service::AuthorizationService, login_type::LoginType, user_info::UserInfo,
