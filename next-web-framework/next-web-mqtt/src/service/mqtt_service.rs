@@ -1,5 +1,10 @@
 use crate::{
-    core::{interceptor::message_interceptor::MessageInterceptor, topic::base_topic::BaseTopic}, properties::mqtt_properties::MQTTClientProperties,
+    core::{
+        interceptor::message_interceptor::MessageInterceptor,
+        router::{MacthType, TopicRouter},
+        topic::base_topic::BaseTopic,
+    },
+    properties::mqtt_properties::MQTTClientProperties,
 };
 
 use hashbrown::HashMap;
@@ -19,35 +24,37 @@ impl Service for MQTTService {}
 impl MQTTService {
     pub fn new(
         properties: MQTTClientProperties,
-        base_topics: HashMap<String, Box<dyn BaseTopic>>,
-        interceptor: Box<dyn MessageInterceptor>
+        router_map: HashMap<String, Box<dyn BaseTopic>>,
+        router: Vec<TopicRouter>,
+        interceptor: Box<dyn MessageInterceptor>,
     ) -> Self {
-        let client = Self::build_client(&properties, base_topics, interceptor);
+        let client = Self::build_client(&properties, router_map, router, interceptor);
         Self { properties, client }
     }
 
     fn build_client(
         properties: &MQTTClientProperties,
         mut base_topics: HashMap<String, Box<dyn BaseTopic>>,
-        interceptor: Box<dyn MessageInterceptor>
+        mut router: Vec<TopicRouter>,
+        interceptor: Box<dyn MessageInterceptor>,
     ) -> AsyncClient {
         let mut options = MqttOptions::new(
             properties.client_id().unwrap_or("Next-Web-Client-ID"),
-            properties.host().unwrap_or("localhost"),
+            properties.host().unwrap_or("127.0.0.1"),
             properties.port().unwrap_or(1883),
         );
 
         options
-            .set_keep_alive(std::time::Duration::from_secs(
-                properties.keep_alive().unwrap_or(5),
+            .set_keep_alive(std::time::Duration::from_millis(
+                properties.keep_alive().unwrap_or(60000),
             ))
-            .set_clean_session(properties.clean_session().unwrap_or(false))
+            .set_clean_session(properties.clean_session().unwrap_or(true))
             .set_credentials(
                 properties.username().unwrap_or_default(),
                 properties.password().unwrap_or_default(),
             );
 
-        let (client, mut eventloop) = AsyncClient::new(options, 666);
+        let (client, mut eventloop) = AsyncClient::new(options, 999);
 
         let topics = properties.topics();
         let client_1 = client.clone();
@@ -56,11 +63,37 @@ impl MQTTService {
             loop {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Packet::Publish(packet))) => {
-                        let data = packet.payload;
+                        let message = packet.payload;
                         let topic = packet.topic;
-                        interceptor.message_entry(&topic, &data).await;
+                        interceptor.message_entry(&topic, &message).await;
+
                         if let Some(basic) = base_topics.get_mut(&topic) {
-                            basic.consume(&topic, &data).await;
+                            basic.consume(&topic, &message).await;
+                        }
+
+                        for item in router.iter_mut() {
+                            match item.match_type {
+                                MacthType::Anything => {
+                                    item.base_topic.consume(&topic, &message).await;
+                                }
+
+                                MacthType::Multilayer(index) => {
+                                    if topic[0..index].eq(&item.topic[0..index]) {
+                                        item.base_topic.consume(&topic, &message).await;
+                                    }
+                                }
+
+                                MacthType::Singlelayer(left_inddex, right_index) => {
+                                    if topic[0..left_inddex].eq(&item.topic[0..left_inddex]) {
+                                        if right_index != 0 {
+                                            if !topic[right_index..].eq(&item.topic[right_index..]) {
+                                                continue;
+                                            }
+                                        }
+                                        item.base_topic.consume(&topic, &message).await;
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -77,7 +110,7 @@ impl MQTTService {
                     }
 
                     Err(e) => {
-                        error!("Mqtt Eventloop Pool Error, ConnectionError Case: {:?}", e);
+                        error!("Mqtt Eventloop Error, ConnectionError Case: {:?}", e);
                     }
 
                     _ => {

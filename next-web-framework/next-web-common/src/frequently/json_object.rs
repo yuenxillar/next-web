@@ -39,20 +39,6 @@ impl JsonObject {
     pub fn parse_object<T: DeserializeOwned>(json_str: &str) -> Result<T, JsonObjectError> {
         serde_json::from_str::<T>(json_str).map_err(|_| JsonObjectError::PaseError)
     }
-
-    /// 检查键是否为空。
-    ///
-    /// # 参数
-    /// - `key`: 需要检查的键。
-    ///
-    /// # 返回值
-    /// 如果键为空，返回 `false`；否则返回 `true`。
-    fn check_key(&self, key: &str) -> bool {
-        if key.is_empty() {
-            return false;
-        }
-        true
-    }
 }
 
 ///  为 `JsonObject` 提供功能接口。
@@ -61,7 +47,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 返回键值对的总数。
-    fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         self.raw_value.len()
     }
 
@@ -69,7 +55,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果没有任何键值对，返回 `true`；否则返回 `false`。
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.raw_value.is_empty()
     }
 
@@ -80,7 +66,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果包含指定键，返回 `true`；否则返回 `false`。
-    fn contains_key(&self, key: &str) -> bool {
+    pub fn contains_key(&self, key: &str) -> bool {
         self.raw_value.contains_key(key)
     }
 
@@ -91,7 +77,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键存在且反序列化成功，返回对应的值；否则返回 `None` 
-    fn get<V: DeserializeOwned>(&self, key: &str) -> Option<V> {
+    pub fn get<V: DeserializeOwned>(&self, key: &str) -> Option<V> {
         self.raw_value
             .get(key)
             .and_then(|v| serde_json::from_value(v.clone()).ok())
@@ -105,7 +91,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键存在且反序列化成功，返回对应的值；否则返回默认值。
-    fn get_or_default<V: DeserializeOwned>(&self, key: &str, default: V) -> V {
+    pub fn get_or_default<V: DeserializeOwned>(&self, key: &str, default: V) -> V {
         if let Some(v) = self.raw_value.get(key) {
             return serde_json::from_value(v.clone()).unwrap_or(default);
         }
@@ -119,7 +105,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键存在且值为浮点数，返回对应的值；否则返回 `None`。
-    fn get_double(&self, key: &str) -> Option<f64> {
+    pub fn get_double(&self, key: &str) -> Option<f64> {
         self.raw_value.get(key).and_then(|v| v.as_f64())
     }
 
@@ -130,7 +116,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键存在且值为整数，返回对应的值；否则返回 `None`。
-    fn get_int(&self, key: &str) -> Option<i64> {
+    pub fn get_int(&self, key: &str) -> Option<i64> {
         self.raw_value.get(key).and_then(|v| v.as_i64())
     }
 
@@ -141,7 +127,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键存在且值为无符号整数，返回对应的值；否则返回 `None`。
-    fn get_uint(&self, key: &str) -> Option<u64> {
+    pub fn get_uint(&self, key: &str) -> Option<u64> {
         self.raw_value.get(key).and_then(|v| v.as_u64())
     }
 
@@ -152,7 +138,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键存在且值为字符串，返回对应的值；否则返回 `None`。
-    fn get_str(&self, key: &str) -> Option<&str> {
+    pub fn get_str(&self, key: &str) -> Option<&str> {
         self.raw_value.get(key).and_then(|v| v.as_str())
     }
 
@@ -163,7 +149,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键存在且值为布尔值，返回对应的值；否则返回 `None`。
-    fn get_bool(&self, key: &str) -> Option<bool> {
+    pub fn get_bool(&self, key: &str) -> Option<bool> {
         self.raw_value.get(key).and_then(|v| v.as_bool())
     }
 
@@ -174,7 +160,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键存在且值为数组，返回反序列化后的列表；否则返回空列表。
-    fn get_json_array<V: DeserializeOwned>(&self, key: &str) -> Vec<V> {
+    pub fn get_json_array<V: DeserializeOwned>(&self, key: &str) -> Vec<V> {
         self.raw_value
             .get(key)
             .and_then(|v| v.as_array())
@@ -194,7 +180,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键已存在，返回被覆盖的旧值；否则返回 `None`。
-    fn set<V: Into<Value>>(mut self, key: impl Into<Cow<'static, str>>, value: V) -> Self {
+    pub fn set<V: Into<Value>>(mut self, key: impl Into<Cow<'static, str>>, value: V) -> Self {
         self.raw_value.insert(key.into(), value.into());
         return self;
     }
@@ -207,7 +193,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键已存在，返回被覆盖的旧值；否则返回 `None`。
-    fn set_opt<V: Into<Value>>(&mut self, key: impl Into<Cow<'static, str>>, value: V) -> Option<Value> {
+    pub fn set_opt<V: Into<Value>>(&mut self, key: impl Into<Cow<'static, str>>, value: V) -> Option<Value> {
         self.raw_value.insert(key.into(), value.into())
     }
 
@@ -219,13 +205,14 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果键不存在且设置成功，返回 `Ok(())`；否则返回相应的错误。
-    fn put_once<V: Into<Value>>(
+    pub fn put_once<V: Into<Value>>(
         &mut self,
         key: impl Into<Cow<'static, str>>,
         value: V,
     ) -> Result<(), JsonObjectError> {
         let key = key.into();
-        if !self.check_key(&key) {
+
+        if !key.is_empty() {
             return Err(JsonObjectError::KeyIsEmpty);
         }
         if self.raw_value.contains_key(&key) {
@@ -243,14 +230,14 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 如果值不为 `null` 且设置成功，返回 `Ok(())`；否则返回相应的错误。
-    fn put_opt<V: Into<Value>>(
+    pub fn put_opt<V: Into<Value>>(
         &mut self,
         key: impl Into<String>,
         value: V,
     ) -> Result<(), JsonObjectError> {
         let key = key.into();
         let value = value.into();
-        if !self.check_key(&key) {
+        if !key.is_empty() {
             return Err(JsonObjectError::KeyIsEmpty);
         }
 
@@ -266,7 +253,7 @@ impl JsonObject {
     ///
     /// # 参数
     /// - `data`: 包含键值对的可迭代集合。
-    fn put_all(&mut self, data: impl IntoIterator<Item = (Cow<'static, str>, Value)>) {
+    pub fn put_all(&mut self, data: impl IntoIterator<Item = (Cow<'static, str>, Value)>) {
         self.raw_value.extend(data);
     }
 
@@ -274,12 +261,12 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 返回底层 `HashMap` 的不可变引用。
-    fn raw_value(&self) -> &HashMap<Cow<'static, str>, Value> {
+    pub fn raw_value(&self) -> &HashMap<Cow<'static, str>, Value> {
         &self.raw_value
     }
 
     /// 清空 `JsonObject` 中的所有键值对。
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.raw_value.clear()
     }
 
@@ -287,7 +274,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 返回所有值的引用列表。
-    fn values(&self) -> Vec<&Value> {
+    pub fn values(&self) -> Vec<&Value> {
         self.raw_value.values().collect()
     }
 
@@ -295,7 +282,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 返回所有键的引用列表。
-    fn keys(&self) -> Vec<&Cow<'static, str>> {
+    pub fn keys(&self) -> Vec<&Cow<'static, str>> {
         self.raw_value.keys().collect()
     }
 
@@ -303,7 +290,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 返回紧凑格式的 JSON 字符串。
-    fn to_json_string(&self) -> String {
+    pub fn to_json_string(&self) -> String {
         serde_json::to_string(&self.raw_value).unwrap_or_default()
     }
 
@@ -311,7 +298,7 @@ impl JsonObject {
     ///
     /// # 返回值
     /// 返回格式化的 JSON 字符串。
-    fn to_json_string_pretty(&self) -> String {
+    pub fn to_json_string_pretty(&self) -> String {
         serde_json::to_string_pretty(&self.raw_value).unwrap_or_default()
     }
 }

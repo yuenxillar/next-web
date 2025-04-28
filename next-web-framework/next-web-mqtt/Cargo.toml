@@ -1,8 +1,8 @@
 [package]
 name = "next-web-mqtt"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
-description = "Next Web Mqtt"
+description = "Next Web Mqtt."
 license.workspace = true
 
 [dependencies]

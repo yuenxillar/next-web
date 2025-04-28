@@ -5,7 +5,7 @@ use next_web_core::{
 use rudi_dev::SingleOwner;
 
 use crate::{
-    core::{interceptor::message_interceptor::MessageInterceptor, topic::base_topic::BaseTopic},
+    core::{interceptor::message_interceptor::MessageInterceptor, router::TopicRouter, topic::base_topic::BaseTopic},
     properties::mqtt_properties::MQTTClientProperties,
     service::mqtt_service::MQTTService,
 };
@@ -49,11 +49,17 @@ impl AutoRegister for MqttServiceAutoRegister {
         // 从上下文中解析所有实现了 `BaseTopic` 的组件
         // Resolve all components implementing `BaseTopic` from the context
         let base_topics = ctx.resolve_by_type::<Box<dyn BaseTopic>>(); 
-        let mut map = HashMap::new(); 
+        let mut router_map = HashMap::new(); 
+        let mut router = Vec::new();
         base_topics.into_iter().for_each(|item| {
-            // 遍历所有 `BaseTopic` 并将其主题名插入哈希表
-            // Iterate over all `BaseTopic` and insert their topic names into the hash map
-            map.insert(item.topic().into(), item);
+            let topic = item.topic();
+            if topic.contains("#") || topic.contains("+") {
+                router.push(TopicRouter::new(topic, item));
+            } else {
+                // 遍历所有 `BaseTopic` 并将其主题名插入哈希表
+                // Iterate over all `BaseTopic` and insert their topic names into the hash map
+                router_map.insert(topic.into(), item);
+            }
         });
 
         // 尝试从上下文中解析消息拦截器
@@ -72,7 +78,7 @@ impl AutoRegister for MqttServiceAutoRegister {
 
         // 创建 MQTT 服务实例，传入配置、主题映射和消息拦截器
         // Create an MQTT service instance, passing in the configuration, topic mapping, and message interceptor
-        let mqtt_service = MQTTService::new(mqtt_properties, map, interceptor);
+        let mqtt_service = MQTTService::new(mqtt_properties, router_map, router, interceptor);
 
         // 将 MQTT 服务插入上下文，并命名为单例名称
         // Insert the MQTT service into the context and name it with the singleton name
