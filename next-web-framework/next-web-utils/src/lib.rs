@@ -1,3 +1,4 @@
+pub mod url;
 pub mod html;
 pub mod cache;
 pub mod digester;
