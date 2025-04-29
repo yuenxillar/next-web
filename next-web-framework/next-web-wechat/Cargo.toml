@@ -11,7 +11,7 @@ readme.workspace = true
 
 [dependencies]
 rudi = {  workspace = true }
-next-web-core = {  version = "0.1.0", registry = "crates-io" }
+next-web-core = {  workspace = true}
 
 aes = { workspace = true}
 serde_json = { workspace = true}

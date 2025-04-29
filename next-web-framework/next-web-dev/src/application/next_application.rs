@@ -35,12 +35,12 @@ impl<A: Application + Default> NextApplication<A> {
     }
 
     /// Get the application context path.
-    pub fn server_context_path(&mut self) -> &str {
+    pub fn server_context_path(&mut self) -> Option<&str> {
         self.server_properties().context_path()
     }
 
     /// Get the application server port.
-    pub fn server_port(&mut self) -> u16 {
+    pub fn server_port(&mut self) -> Option<u16> {
         self.server_properties().port()
     }
 

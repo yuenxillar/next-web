@@ -1,18 +1,19 @@
-use amqprs::channel::Channel;
-use amqprs::BasicProperties;
-use amqprs::consumer::DefaultConsumer;
-use amqprs::channel::BasicConsumeArguments;
-use next_web_core::core::service::Service;
-use amqprs::channel::QueueBindArguments;
-use amqprs::channel::QueueDeclareArguments;
+use crate::rabbitmq::core::bind_exchange::BindExchange;
 use amqprs::callbacks::DefaultChannelCallback;
 use amqprs::callbacks::DefaultConnectionCallback;
-use amqprs::connection::Connection;
+use amqprs::channel::BasicConsumeArguments;
 use amqprs::channel::BasicPublishArguments;
+use amqprs::channel::Channel;
+use amqprs::channel::ConsumerMessage;
+use amqprs::channel::QueueBindArguments;
+use amqprs::channel::QueueDeclareArguments;
+use amqprs::connection::Connection;
 use amqprs::connection::OpenConnectionArguments;
-use crate::rabbitmq::bind_exchange::BindExchange;
+use amqprs::consumer::AsyncConsumer;
+use amqprs::BasicProperties;
+use next_web_core::core::service::Service;
 
-use tracing::{ error, info};
+use tracing::{error, info};
 
 use crate::rabbitmq::properties::rabbitmq_properties::RabbitMQClientProperties;
 
@@ -88,50 +89,6 @@ impl RabbitmqService {
                                 error!("Failed to bind queue {} to exchange {} with routing key {}: {}", queue_name, bind_exchange.exchange_name(), bind_exchange.routing_key(), err);
                             }
                         }
-
-                        // Start consumer with given name
-                        let args = BasicConsumeArguments::new(&queue_name, "example_basic_pub_sub");
-                        match channel
-                            .basic_consume(DefaultConsumer::new(args.no_ack), args)
-                            .await
-                        {
-                            Ok(consumer_tag) => {
-                                info!(
-                                    "Consumer started for queue {}. Consumer tag: {}",
-                                    queue_name, consumer_tag
-                                );
-                                // Process messages or manage the consumer as needed
-                            }
-                            Err(err) => {
-                                error!(
-                                    "Failed to start consumer for queue {}: {}",
-                                    queue_name, err
-                                );
-                            }
-                        }
-
-                        // Create arguments for basic_publish
-                        let args = BasicPublishArguments::new(
-                            bind_exchange.exchange_name(),
-                            bind_exchange.routing_key(),
-                        );
-
-                        // Publish the message
-                        match channel
-                            .basic_publish(BasicProperties::default(), "content".into(), args)
-                            .await
-                        {
-                            Ok(_) => {
-                                info!(
-                                    "Message published to exchange {} with routing key {}.",
-                                    bind_exchange.exchange_name(),
-                                    bind_exchange.routing_key()
-                                );
-                            }
-                            Err(err) => {
-                                error!("Failed to publish message to exchange {} with routing key {}: {}", bind_exchange.exchange_name(), bind_exchange.routing_key(), err);
-                            }
-                        }
                     }
                 }
                 Err(err) => {
@@ -146,7 +103,47 @@ impl RabbitmqService {
         channel
     }
 
-    pub fn get_channel(&self) -> &Channel {
+    /// basic_publish
+    pub async fn send_message<M: Into<Vec<u8>>>(
+        &self,
+        exchange: &str,
+        routing_key: &str,
+        message: M,
+    ) -> Result<(), amqprs::error::Error> {
+        let args = BasicPublishArguments::new(exchange, routing_key);
+        self.channel
+            .basic_publish(BasicProperties::default(), message.into(), args)
+            .await
+    }
+
+    /// basic_publish and properties
+    pub async fn send_message_and_properties<M: Into<Vec<u8>>>(
+        &self,
+        exchange: &str,
+        routing_key: &str,
+        message: M,
+        properties: BasicProperties,
+    ) -> Result<(), amqprs::error::Error> {
+        let args = BasicPublishArguments::new(exchange, routing_key);
+        self.channel
+            .basic_publish(properties, message.into(), args)
+            .await
+    }
+
+    pub async fn add_consumer(
+        &self,
+        basic_consume_arguments: BasicConsumeArguments,
+    ) -> Result<
+        (
+            String,
+            tokio::sync::mpsc::UnboundedReceiver<ConsumerMessage>,
+        ),
+        amqprs::error::Error,
+    > {
+        self.channel.basic_consume_rx(basic_consume_arguments).await
+    }
+
+    pub fn channel(&self) -> &Channel {
         &self.channel
     }
 

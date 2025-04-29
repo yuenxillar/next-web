@@ -1,6 +1,6 @@
 [package]
 name = "next-web-dev"
-version = "0.1.2"
+version = "0.1.4"
 edition = "2021"
 keywords = ["http", "web", "framework"]
 description = "Next Web Dev!"

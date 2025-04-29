@@ -17,8 +17,8 @@ path = "src/lib.rs"
 
 [dependencies]
 # next-web libs
-next-web-dev = { version = "0.1.0", path = "./next-web-dev"}
-next-web-core = { version = "0.1.0", path = "./next-web-core" }
+next-web-dev = { version = "0.1.4", path = "./next-web-dev"}
+next-web-core = { version = "0.1.1", path = "./next-web-core" }
 
 next-web-utils = { version = "0.1.0", path = "./next-web-utils", optional = true }
 # next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }
@@ -34,7 +34,7 @@ next-web-common = { version = "0.1.0", path = "./next-web-common", optional = tr
 # next-web-ip = { version = "0.1.0", path = "./next-web-ip", optional = true }
 # next-web-gateway = { version = "0.1.0", path = "./next-web-gateway", optional = true }
 
-next-web-tests = { version = "0.1.0", path = "./next-web-tests"}
+# next-web-tests = { version = "0.1.0", path = "./next-web-tests" , optional = true}
 # next-web-wechat = { version = "0.1.0", path = "./next-web-wechat", optional = true }
 next-web-websocket = { version = "0.1.0", path = "./next-web-websocket", optional = true }
 

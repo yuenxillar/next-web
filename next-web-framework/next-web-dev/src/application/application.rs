@@ -346,8 +346,8 @@ pub trait Application: Send + Sync {
             );
         // #[cfg(feature = "user_security")]
         // router = router.layer(axum::middleware::from_fn_with_state(crate::security::request_auth_middleware));
-        if !config.context_path().is_empty() {
-            app = app.nest(config.context_path(), router);
+        if let Some(path) = config.context_path() {
+            app = app.nest(path, router);
         } else {
             app = app.merge(router);
         }
@@ -360,7 +360,7 @@ pub trait Application: Send + Sync {
 
         println!(
             "\napplication listening on: [{}]",
-            format!("0.0.0.0:{}", config.port())
+            format!("0.0.0.0:{}", config.port().unwrap_or(63018))
         );
 
         println!("application start time: {:?}", time.elapsed());
@@ -389,7 +389,7 @@ pub trait Application: Send + Sync {
         #[cfg(not(feature = "tls_rustls"))]
         {
             // run http server
-            let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port()))
+            let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port().unwrap_or(63018)))
                 .await
                 .unwrap();
 

@@ -2,7 +2,7 @@
 name = "rudi-macro-dev"
 description = "Macros for Rudi."
 keywords = ["dependency-injection", "ioc", "di", "dependency"]
-version = "0.1.0"
+version = "0.1.1"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -29,7 +29,7 @@ syn = { workspace = true, features = [
     "full",
 ] }
 
-next-web-core = { version = "0.1.0" }
+next-web-core = { version = "0.1.1"}
 
 [dev-dependencies]
 # cannot contain `workspace = true` to avoid circular dependencies.
