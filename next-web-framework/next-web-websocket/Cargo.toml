@@ -1,25 +1,25 @@
 [package]
 name = "next-web-websocket"
-version = "0.1.0"
+version = "0.1.2"
 description = "Next Web Websocket"
+readme = "README.md"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-include.workspace = true
-readme.workspace = true
 
 [dependencies]
 axum = { workspace = true, features = ["ws"] }
 
 serde = { workspace = true }
-rudi-dev = { workspace = true} 
+rudi-dev = { workspace = true }
 tracing = { workspace = true }
-futures = {  workspace =  true}
+futures = { workspace = true }
 flume = { workspace = true }
-matchit = {  workspace = true }
-tokio = { workspace = true}
+matchit = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
 
-next-web-core = {  workspace = true }
+next-web-core = { workspace = true }
 
 [lints]
 workspace = true

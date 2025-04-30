@@ -2,10 +2,12 @@ use std::net::SocketAddr;
 
 use axum::extract::ws::{CloseFrame, Message};
 use flume::Sender;
+use uuid::Uuid;
 
 ///
 #[derive(Debug, Clone)]
 pub struct WebSocketSession {
+    id: uuid::Uuid,
     msg_channel: Sender<Message>,
     remote_address: SocketAddr,
 }
@@ -13,15 +15,20 @@ pub struct WebSocketSession {
 impl WebSocketSession {
     ///
     pub fn new(msg_channel: Sender<Message>, remote_address: SocketAddr) -> Self {
+        let id = Uuid::new_v4();
         Self {
+            id,
             msg_channel,
             remote_address,
         }
     }
 
     ///
-    pub async fn send_message(&self, message: Message) {
-        let _ = self.msg_channel.send_async(message).await;
+    pub async fn send_message(&self, message: Message) -> Result<(), Message> {
+        if let Err(error) = self.msg_channel.send_async(message).await {
+            return Err(error.0);
+        }
+        Ok(())
     }
 
     ///
@@ -31,16 +38,23 @@ impl WebSocketSession {
 
     /// 123
     pub async fn close(&self) {
-        let _ = self.msg_channel
+        let _ = self
+            .msg_channel
             .send_async(Message::Close(Some(CloseFrame {
                 code: axum::extract::ws::close_code::NORMAL,
-                reason: "Goodbye".into(),
+                reason: "0".into(),
             })))
             .await;
     }
 
+    /// Get session id
+    pub fn id(&self) -> &Uuid {
+        &self.id
+    }
+
     ///
-    pub fn get_remote_address(&self) -> &SocketAddr {
+    pub fn remote_address(&self) -> &SocketAddr {
         &self.remote_address
     }
+    
 }

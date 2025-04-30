@@ -2,16 +2,16 @@ use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
     extract::{ConnectInfo, State, WebSocketUpgrade},
+    http::Uri,
     response::IntoResponse,
     routing::any,
-    Router, http::Uri,
+    Router,
 };
 use next_web_core::{core::router::ApplyRouter, ApplicationContext};
 use rudi_dev::SingleOwner;
 
 use super::{
-    handle_socket::handle_socket, handler_registry::WebSocketHandlerRegistry,
-    ws_context::WebSocketContext,
+    handle_socket::handle_socket, handler::WebSocketHandler, ws_context::WebSocketContext,
 };
 
 #[SingleOwner(binds = [Self::into_router])]
@@ -27,12 +27,12 @@ impl ApplyRouter for WSRouter {
     fn router(&self, ctx: &mut ApplicationContext) -> axum::Router {
         let mut router = Router::new();
         let mut context = ctx.resolve::<WebSocketContext>();
-        let handler_registry = ctx.resolve::<Box<dyn WebSocketHandlerRegistry>>();
+        let handlers = ctx.resolve_by_type::<Arc<dyn WebSocketHandler>>();
 
-        for item in handler_registry.handlers().iter() {
-            for path in &item.paths {
+        for item in handlers.iter() {
+            for path in item.paths() {
                 router = router.route(path, any(ws_handler));
-                context.add_handler(path, item.handler.clone());
+                context.add_handler(path, item.clone());
             }
         }
         router.with_state(Arc::new(context))

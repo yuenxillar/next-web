@@ -14,20 +14,20 @@ use super::credential::{AccessTokenBuilder, Credential};
 /// 
 /// 存储微信小程序的 appid 和 secret
 #[derive(Debug, Clone)]
-pub struct Client {
+pub struct WechatClient {
     inner: Arc<ClientInner>,
 }
 
-impl Client {
+impl WechatClient {
     /// ```ignore
-    /// use open_wechat::client::Client;
+    /// use open_wechat::client::WechatClient;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let app_id = "your app id";
     ///     let secret = "your app secret";
     ///     
-    ///     let client = Client::new(app_id, secret);
+    ///     let client = WechatClient::new(app_id, secret);
     ///
     ///     Ok(())
     /// }
@@ -54,7 +54,7 @@ impl Client {
     /// https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/user-login/code2Session.html
     /// ```rust
     /// use axum::{extract::State, response::IntoResponse, Json};
-    /// use open_wechat::{client::Client, Result};
+    /// use open_wechat::{client::WechatClient, Result};
     /// use serde::Deserialize;
     ///
     /// #[derive(Deserialize, Default)]
@@ -64,7 +64,7 @@ impl Client {
     /// }
     ///
     /// pub async fn login(
-    ///     State(client): State<Client>,
+    ///     State(client): State<WechatClient>,
     ///     Json(logger): Json<Logger>,
     /// ) -> Result<impl IntoResponse> {
     ///    let credential = client.login(&logger.code).await?;

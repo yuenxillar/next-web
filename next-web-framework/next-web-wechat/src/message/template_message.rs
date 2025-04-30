@@ -5,7 +5,7 @@ use next_web_core::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
-use crate::{client::Client, response::Response};
+use crate::{client::WechatClient, response::Response};
 
 #[async_trait]
 pub trait TemplateMessageInterface {
@@ -65,7 +65,7 @@ pub struct Miniprogram {
 }
 
 #[async_trait]
-impl TemplateMessageInterface for Client {
+impl TemplateMessageInterface for WechatClient {
     async fn get_template_list(&self, access_token: &str) -> Result<Response<TemplateMessageList>> {
         let result = self
             .request()

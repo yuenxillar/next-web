@@ -56,9 +56,18 @@ pub async fn handle_socket(
     // send message to client
     tokio::spawn(async move {
         while let Ok(msg) = msg_receiver.recv_async().await {
+            let close = if let Message::Close(_) = &msg {
+                true
+            } else {
+                false
+            };
             if let Err(e) = stream_sender.send(msg).await {
                 error!("Sending message to client failed: {e}, Client: {remote_address}");
                 break;
+            } else {
+                if close {
+                    break;
+                }
             }
         }
     });
