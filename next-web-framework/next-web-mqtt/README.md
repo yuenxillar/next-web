@@ -8,100 +8,111 @@ If you want to use it, please ensure that the file contains the following conten
 
 And lib
 
-next-web-dev  
+next-web-dev
 
 # Used in conjunction, otherwise useless
 
------------------------------------------
+```yaml
+
 next:
     mqtt:
-        client_id: test-id
         host: localhost
         port: 1883
-        username: test
-        password: test
-        topics: test/#,test2/#
-        keep_alive: 5000
+        username: user1
+        password: 123
+        topics:
+            - test/#
+            - testtopic/#
+        # from secs
+        connect_timeout: 10
         clean_session: true
 
--------------------------------------------
+```
 
 ```rust
-use next_web_dev::{SingleOwner, Singleton};
-use next_web_core::async_trait;
+#![allow(missing_docs)]
 
+use next_web_core::async_trait;
+use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
+use next_web_dev::{
+    application::Application,
+    router::{open_router::OpenRouter, private_router::PrivateRouter},
+     Singleton,
+};
 use next_web_mqtt::{core::topic::base_topic::BaseTopic, service::mqtt_service::MQTTService};
 
-// use async_trait::async_trait
+/// Test application
+#[derive(Default, Clone)]
+pub struct TestApplication;
 
+#[async_trait]
+impl Application for TestApplication {
+    /// initialize the middleware.
+    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
 
-#[SingleOwner(binds = [Self::into_base_topic])]
+    // get the application router. (open api  and private api)
+    async fn application_router(
+        &mut self,
+        ctx: &mut ApplicationContext,
+    ) -> (OpenRouter, PrivateRouter) {
+        let mqtt = ctx.get_single_with_name::<MQTTService>("mqttService");
+        mqtt.publish("test/two", "hello world!").await;
+        (OpenRouter::default(), PrivateRouter::default())
+    }
+}
+
+#[Singleton(binds = [Self::into_base_topic])]
 #[derive(Clone)]
-pub struct TestBaseTopic;
+pub struct TestOneBaseTopic;
 
-impl TestBaseTopic {
-
+impl TestOneBaseTopic {
     fn into_base_topic(self) -> Box<dyn BaseTopic> {
         Box::new(self)
     }
 }
-
-#[SingleOwner(binds = [Self::into_base_topic])]
+ 
+#[Singleton(binds = [Self::into_base_topic])]
 #[derive(Clone)]
 pub struct TestTwoBaseTopic;
 
-
 impl TestTwoBaseTopic {
-
     fn into_base_topic(self) -> Box<dyn BaseTopic> {
         Box::new(self)
     }
 }
 
 #[async_trait]
-impl BaseTopic for TestBaseTopic {
-
+impl BaseTopic for TestOneBaseTopic {
     fn topic(&self) -> &'static str {
-        "test/hello"
+        "test/+/event"
     }
 
-    async fn consume(&mut self, topic: &str, message: &[u8]) {
-        println!("Received message, Topic: {}, Data Content: {:?}", topic,  String::from_utf8_lossy(message));
+    async fn consume(&self, topic: &str, message: &[u8]) {
+        println!(
+            "Received message0, Topic: {}, Data Content: {:?}",
+            topic,
+            String::from_utf8_lossy(message)
+        );
     }
 }
 
 #[async_trait]
 impl BaseTopic for TestTwoBaseTopic {
-
     fn topic(&self) -> &'static str {
-        "test/two"
+        "test/#"
     }
 
-    async fn consume(&mut self, topic: &str, message: &[u8]) {
-        println!("Received message, Topic: {}, Data Content: {:?}", topic,  String::from_utf8_lossy(message));
+    async fn consume(&self, topic: &str, message: &[u8]) {
+        println!(
+            "Received message1, Topic: {}, Data Content: {:?}",
+            topic,
+            String::from_utf8_lossy(message)
+        );
     }
 }
-
-#[Singleton( name = "testService")]
-#[derive(Clone)]
-pub struct TestService {
-    #[autowired(name = "mqttService")]
-    pub service: MQTTService
-}
-
-impl TestService {
-
-    pub async fn publish(&self) {
-        self.service.publish("test/publish", "hello mqtt!").await;
-        self.service.publish_and_qos("test/publish", 0, "hello mqtt!").await;
-    }
-}
-
-
 #[tokio::main]
 async fn main() {
-   
-    // 
+    TestApplication::run().await;
 }
 
 ```

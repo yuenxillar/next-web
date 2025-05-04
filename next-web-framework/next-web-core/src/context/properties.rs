@@ -1,14 +1,19 @@
+use clap::Parser;
 use dyn_clone::DynClone;
+use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use hashbrown::HashMap;
-use serde::de::DeserializeOwned;
 
+use regex::Regex;
 use std::fmt::Debug;
 use std::io::Read;
-use std::{fs::File, path::PathBuf};
 
-use crate::AutoRegister;
+
+use crate::context::application_args::ApplicationArgs;
+use crate::context::application_resources::ApplicationResources;
 
 use super::next_properties::NextProperties;
+use crate::constants::application_constants::APPLICATION_CONFIG_FILE;
+use crate::AutoRegister;
 
 /// ApplicationProperties trait
 ///
@@ -18,7 +23,6 @@ use super::next_properties::NextProperties;
 ///
 ///
 pub trait Properties: DynClone + AutoRegister {}
-
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ApplicationProperties {
@@ -50,7 +54,7 @@ impl ApplicationProperties {
     pub fn one_value<T: serde::de::DeserializeOwned>(&self, key: &str) -> Option<T> {
         if let Some(map) = self.mapping_value.as_ref() {
             if let Some(value) = map.get(key) {
-                return serde_yaml::from_value::<T>(value.clone())
+                return serde_yaml::from_value::<T>(value.to_owned())
                     .map(|v| Some(v))
                     .unwrap_or_default();
             }
@@ -65,11 +69,15 @@ impl ApplicationProperties {
         }
         self.mapping_value = Some(mapping);
     }
+
+    pub fn mapping_value(&self) -> Option<&HashMap<String, serde_yaml::Value>> {
+        self.mapping_value.as_ref()
+    }
 }
 
 impl ApplicationProperties {
     pub fn new() -> Self {
-        parse_to_application()
+        into_application_properties()
     }
 }
 
@@ -82,81 +90,63 @@ impl Default for ApplicationProperties {
     }
 }
 
-pub const SERVER_PROFILE_NAME: &str = "server.profile";
-
-pub const RESOURCES_NAME: &str = "resources";
-
-fn parse_to_application() -> ApplicationProperties {
-    let mut data: HashMap<String, String> = HashMap::new();
-    // 解析命令行参数
-    // 格式：--key=value 或者 -key2=value2
-    let args: Vec<String> = std::env::args().collect();
-    for item in args {
-        if !item.starts_with("--") || !item.starts_with("-") {
-            continue;
-        }
-        if !item.contains("=") {
-            continue;
-        }
-
-        let mut split_arg = item.split('=');
-        let key = split_arg.next().unwrap().to_string();
-        let value = split_arg.next().unwrap().to_string();
-        data.insert(key, value);
-    }
-
-    let file_path;
-    if let Some(var) = data.get(SERVER_PROFILE_NAME) {
-        file_path = var.to_string();
-    } else {
-        file_path = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .join(RESOURCES_NAME)
-            .join("application.yaml")
-            .display()
-            .to_string();
-    }
-    let (mut application, mapping) =
-        read_file_into_application::<ApplicationProperties>(&file_path);
-    application.set_mapping(mapping);
-
-    application
-}
-
-pub fn read_file_into_application<T: DeserializeOwned + Debug>(
-    file_path: &str,
-) -> (T, HashMap<String, serde_yaml::Value>) {
+pub fn into_application_properties() -> ApplicationProperties {
     use serde_yaml::Value;
 
-    println!("Read Application file: {}", file_path);
-    match std::fs::metadata(file_path) {
-        Ok(_) => (),
-        Err(_error) => panic!("The application config file is not exits!!"),
+    let args = ApplicationArgs::parse();
+
+    let config_path: Option<String> = args.config_location;
+
+    let mut config_data = String::new();
+
+    if config_path.as_ref().map(|s| !s.is_empty()).unwrap_or(false) {
+        let path = config_path.unwrap();
+        if let Ok(_) = std::fs::exists(&path) {
+            let mut file = std::fs::File::open(&path).unwrap();
+            let mut _buffer = String::new();
+            file.read_to_string(&mut _buffer).unwrap();
+
+            if _buffer.is_empty() {
+                panic!(
+                    "The application configuration file is empty, file path: {}",
+                    &path
+                );
+            }
+
+            config_data = _buffer;
+        } else {
+            panic!(
+                "Please check if the configuration file of the application exists: {:?}",
+                &path
+            );
+        }
+    } else {
+        if let Some(var) = ApplicationResources::get(APPLICATION_CONFIG_FILE) {
+            config_data = String::from_utf8(var.data()).unwrap();
+        }
     }
-    let mut file = File::open(file_path).expect("application file open is _error!!");
-    let mut str = String::new();
-    file.read_to_string(&mut str).unwrap();
 
     // replace var
-    // let replace_var = |content: &str| -> String {
-    //     let re = Regex::new(r"\$\{server_ip\}").unwrap();
+    let mut pre_replace = Vec::new();
+    if let Ok(re) = Regex::new(r"\$\{(.*?)\}") {
+        re.captures_iter(&config_data.as_ref()).for_each(|item| {
+            item.get(1)
+                .map(|s| s.as_str())
+                .map(|s1| pre_replace.push(s1.to_string()));
+        });
+    };
 
-    //     // 替换 ${server_ip} 为新的 IP 地址
-    //     let updated_content = re.replace_all(&content, "192.168.1.130");
-    //     updated_content.to_string()
-    // };
+    // TODO
 
-    // let buf = replace_var(str.as_str());
-    let buf = str;
+    // mapping value
+    let values = serde_yaml::from_str::<Value>(&config_data).unwrap();
+    let mut mapping: HashMap<String, Value> = HashMap::new();
 
-    // Mapping value
-    let docs = serde_yaml::from_str::<Value>(&buf).unwrap();
-    let mut data_map: HashMap<String, Value> = HashMap::new();
-
-    // Prepare a recursive function to fill in
+    // prepare a recursive function to fill in
     fn populate_map(prefix: String, value: &Value, map: &mut HashMap<String, Value>) {
         match value {
-            Value::Mapping(mapping) => {
-                for (k, v) in mapping {
+            Value::Mapping(map_value) => {
+                for (k, v) in map_value {
                     if let Some(key) = k.as_str() {
                         populate_map(
                             format!(
@@ -180,14 +170,16 @@ pub fn read_file_into_application<T: DeserializeOwned + Debug>(
         }
     }
 
-    // Fill in the map
-    populate_map(String::new(), &docs, &mut data_map);
+    // fill in the map
+    populate_map(String::new(), &values, &mut mapping);
 
-    // into application
-    let application: T = serde_yaml::from_str(buf.as_str()).unwrap();
+    // into application properties
+    let mut application_properties: ApplicationProperties =
+        serde_yaml::from_str(config_data.as_str()).unwrap();
+    application_properties.set_mapping(mapping);
 
     // return
-    return (application, data_map);
+    return application_properties;
 }
 
 impl Drop for ApplicationProperties {

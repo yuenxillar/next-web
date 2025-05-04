@@ -1,9 +1,11 @@
 use async_trait::async_trait;
 use axum::body::Bytes;
 use axum::http::{Response, StatusCode};
-use axum::Router;
+use axum::{Router, ServiceExt};
 use hashbrown::HashMap;
 use http_body_util::Full;
+use next_web_core::constants::application_constants::APPLICATION_BANNER_FILE;
+use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::core::router::ApplyRouter;
@@ -45,7 +47,6 @@ use crate::event::redis_expired_event::RedisExpiredEvent;
 #[cfg(feature = "redis_enabled")]
 use crate::manager::redis_manager::RedisManager;
 
-pub const APPLICATION_BANNER_NAME: &str = "banner.txt";
 pub const APPLICATION_USER_PERMISSION_RESOURCE: &str = "user_permission_resource.json";
 
 #[async_trait]
@@ -69,7 +70,7 @@ pub trait Application: Send + Sync {
 
     /// show the banner of the application.
     fn banner_show() {
-        if let Some(content) = ApplicationResources::get(APPLICATION_BANNER_NAME) {
+        if let Some(content) = ApplicationResources::get(APPLICATION_BANNER_FILE) {
             TopBanner::show(std::str::from_utf8(&content.data()).unwrap_or(DEFAULT_TOP_BANNER));
         } else {
             TopBanner::show(DEFAULT_TOP_BANNER);
@@ -213,13 +214,18 @@ pub trait Application: Send + Sync {
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
+        application_args: &ApplicationArgs,
     ) {
-        // Register application singleton
+        // register application singleton
         let mut container = ApplicationDefaultRegisterContainer::new();
         container.register_all(ctx, application_properties).await;
 
-        // Resove AutoRegister
-        let auto_register = ctx.resolve_by_type::<Box<dyn AutoRegister>>();
+        // register singletion with properties and args
+        ctx.insert_singleton_with_name(application_properties.clone(), "");
+        ctx.insert_singleton_with_name(application_args.clone(), "");
+
+        // resove autoRegister
+        let auto_register = ctx.resolve_by_type::<Arc<dyn AutoRegister>>();
         for item in auto_register.iter() {
             item.register(ctx, application_properties).await.unwrap();
         }
@@ -231,8 +237,6 @@ pub trait Application: Send + Sync {
         ctx: &mut ApplicationContext,
         _application_properties: &ApplicationProperties,
     ) {
-        println!("\n========================================================================");
-
         // Register job
         let producers = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
         if let Some(schedluer_manager) =
@@ -277,8 +281,6 @@ pub trait Application: Send + Sync {
 
         ctx.insert_singleton_with_name(default_event_publisher, "");
         ctx.insert_singleton_with_name(multicaster, "");
-
-        println!("========================================================================\n");
     }
 
     /// bind tcp server.
@@ -293,7 +295,6 @@ pub trait Application: Send + Sync {
         let (open_router, private_router) = self.application_router(ctx).await;
         // run our app with hyper, listening globally on port
         let mut app = Router::new()
-            .route("/", axum::routing::get(root))
             .merge(Router::new().nest("/open", open_router.0))
             // handle not found route
             .fallback(fall_back);
@@ -355,15 +356,31 @@ pub trait Application: Send + Sync {
         // apply router
         let routers = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
         for item in routers.into_iter() {
-            app = app.merge(item.router(ctx));
+            let router = item.router(ctx);
+            if !router.has_routes() { continue; }
+            if let Some(path) = config.context_path() {
+                if !path.is_empty() {
+                    app = app.nest(path, router);
+                    continue;
+                }
+            }
+            app = app.merge(router);
         }
 
+        let server_port = config.port().unwrap_or(8080);
+        let server_addr = if config.local().unwrap_or(false) {
+            "127.0.0.1"
+        } else {
+            "0.0.0.0"
+        };
         println!(
-            "\napplication listening on: [{}]",
-            format!("0.0.0.0:{}", config.port().unwrap_or(63018))
+            "\napplication listening  on:  {}",
+            format!("{}:{}", server_addr, server_port)
         );
 
-        println!("application start time: {:?}", time.elapsed());
+        println!("application running    on:  {}", LocalDateTimeUtil::now());
+        println!("application startTime  on:  {:?}", time.elapsed());
+        println!("application currentPid on:  {:?}\n", std::process::id());
 
         // configure certificate and private key used by https
         #[cfg(feature = "tls_rustls")]
@@ -389,12 +406,13 @@ pub trait Application: Send + Sync {
         #[cfg(not(feature = "tls_rustls"))]
         {
             // run http server
-            let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port().unwrap_or(63018)))
-                .await
-                .unwrap();
+            let listener =
+                tokio::net::TcpListener::bind(format!("{}:{}", server_addr, server_port))
+                    .await
+                    .unwrap();
 
-            let shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
-            axum::serve(listener, app.into_make_service())
+            let mut shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
+            axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
                 .with_graceful_shutdown(async move {
                     let ctrl_c = async {
                         tokio::signal::ctrl_c()
@@ -416,14 +434,13 @@ pub trait Application: Send + Sync {
                     tokio::select! {
                         _ = ctrl_c =>  {
                             info!("Received Ctrl+C. Shutting down...");
-                            for service in shutdowns.iter() {
+                            for service in shutdowns.iter_mut() {
                                 service.shutdown().await;
                             }
-
                         },
                         _ = terminate =>  {
                             info!("Received terminate signal. Shutting down...");
-                            for service in shutdowns.iter() {
+                            for service in shutdowns.iter_mut() {
                                 service.shutdown().await;
                             }
                         },
@@ -448,44 +465,75 @@ pub trait Application: Send + Sync {
         // get a base application instance
         let mut next_application: NextApplication<Self> = NextApplication::new();
         let properties = next_application.application_properties().clone();
+        let args = next_application.application_args().clone();
 
         let application = next_application.application();
 
+        println!("========================================================================\n");
+
         application.init_logger(&properties);
-        info!("init logger success");
+        println!(
+            "init logger success!\ncurrent time: {}\n",
+            LocalDateTimeUtil::now()
+        );
 
         let mut ctx = ApplicationContext::options()
-            .allow_override(true)
+            .allow_override(false)
             .auto_register();
-        info!("init application context success");
+        println!(
+            "init application context success!\ncurrent time: {}\n",
+            LocalDateTimeUtil::now()
+        );
 
         // autowire properties
         application.autowire_properties(&mut ctx, &properties).await;
-        info!("autowire properties success");
+        println!(
+            "autowire properties success!\ncurrent time: {}\n",
+            LocalDateTimeUtil::now()
+        );
 
         // register singleton
-        application.register_singleton(&mut ctx, &properties).await;
-        info!("register singleton success");
+        application
+            .register_singleton(&mut ctx, &properties, &args)
+            .await;
+        println!(
+            "register singleton success!\ncurrent time: {}\n",
+            LocalDateTimeUtil::now()
+        );
 
         // init infrastructure
         application.init_infrastructure(&mut ctx, &properties).await;
-        info!("init infrastructure success");
+        println!(
+            "init infrastructure success!\ncurrent time: {}\n",
+            LocalDateTimeUtil::now()
+        );
 
         // init middleware
         application.init_middleware(&properties).await;
-        info!("init middleware success");
+        println!(
+            "init middleware success!\ncurrent time: {}\n",
+            LocalDateTimeUtil::now()
+        );
 
         #[cfg(feature = "grpc_enabled")]
         {
             application.register_rpc_server(&properties).await;
-            info!("register grpc server success");
+            println!(
+                "register grpc server success!\ncurrent time: {}\n",
+                LocalDateTimeUtil::now()
+            );
 
             application.connect_rpc_client(&properties).await;
-            info!("connect grpc client success");
+            println!(
+                "connect grpc client success!\ncurrent time: {}\n",
+                LocalDateTimeUtil::now()
+            );
         }
 
-        //
+        println!("========================================================================");
+
         // application.init_cache().await;
+
         application
             .bind_tcp_server(&mut ctx, &properties, start_time)
             .await;
@@ -493,26 +541,19 @@ pub trait Application: Send + Sync {
 }
 
 fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response<Full<Bytes>> {
-    error!("Http server handle panic: {:?}", err);
-    let err_str = r#"
-{
-    "status": 500,
-    "message": "Internal Server Error",
-    "data": null
-}"#;
+    error!("application handle panic, case: {:?}", err);
+    let err_str = format!(
+        "internal server error, case: {:?},\ntimestamp: {}",
+        err,
+        LocalDateTimeUtil::timestamp()
+    );
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
-        .header("content-type", "application/json")
-        .body(Full::from(err_str))
+        .body(err_str.into())
         .unwrap()
 }
 
 /// no route match handler
 async fn fall_back() -> (StatusCode, &'static str) {
-    (StatusCode::NOT_FOUND, "Not Found Route")
-}
-
-/// basic handler that responds with a static string
-async fn root() -> axum::response::Html<&'static str> {
-    axum::response::Html("<html><body><h1>Welcome to Rust Web</h1></body></html>")
+    (StatusCode::NOT_FOUND, "not macth route")
 }

@@ -17,13 +17,16 @@ include = ["**/*.rs", "Cargo.toml"]
 [workspace.dependencies]
 # next dependencies
 next-web-dev ={ version = "0.1.4"}
-next-web-core = { version = "0.1.1"}
+next-web-core = { path = "./next-web-framework/next-web-core", version = "0.1.1"}
 next-web-common ={ version = "0.1.0"}
 next-web-mq = {  version = "0.1.0" }
-next-web-mqtt = {  version = "0.1.0" }
+next-web-mqtt = {  version = "0.1.3" }
+
+# rudi-dev = { version = "0.8.6"}
 
 # next-web-mq = {  version = "0.1.0", path = "./next-web-framework/next-web-mq"}
 
+rudi-dev = { version = "0.8.6", path = "./next-web-framework/rudi-main/rudi-dev"}
 
 # dev dependencies
 tokio = { version = "1.44.1" }
@@ -49,7 +52,9 @@ chrono = { version = "0.4.40" }
 hashbrown = { version = "0.15.2", features = ["serde"] }
 regex = { version = "1.11.1" }
 jsonwebtoken = { version = "9.3.0" }
-rust-embed-for-web = { version = "11.2.1" }
+rust-embed = { version =  "8.7.0", features = ["include-exclude", "interpolate-folder-path"]} 
+rust-embed-for-web = {version =  "11.2.1"}
+clap = {version =  "4.5.37", features = ["derive"]}
 matchit = { version = "0.8.4" }
 bcrypt = { version = "0.16.0" }
 rand = { version = "0.8.5" }
@@ -99,11 +104,6 @@ rumqttc = { version = "0.24.0" }
 # mq
 rocketmq = { version = "5.0.0" }
 amqprs = { version = "2.1.1", features = ["traces"]}
-
-# rudi
-rudi-dev = { version = "0.8.6"}
-# rudi-dev = { version = "0.8.4", path = "./next-web-framework/rudi-main/rudi-dev"}
-# rudi-macro-dev = { version = "0.1.1" }
 
 # macro dependencies
 proc-macro2 = { version = "1", default-features = false }

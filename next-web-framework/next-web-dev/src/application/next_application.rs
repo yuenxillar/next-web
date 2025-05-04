@@ -1,14 +1,17 @@
 use std::ops::Deref;
 
 use hashbrown::HashMap;
-use next_web_core::context::properties::ApplicationProperties;
+use next_web_core::context::{
+    application_args::ApplicationArgs, properties::ApplicationProperties,
+};
 
 use super::application::Application;
 use next_web_core::autoconfigure::context::server_properties::ServerProperties;
 
-#[derive(serde::Deserialize, Default)]
+#[derive(Default)]
 pub struct NextApplication<A: Application> {
     application_properties: ApplicationProperties,
+    application_args: ApplicationArgs,
     application: A,
 }
 
@@ -16,6 +19,7 @@ impl<A: Application + Default> NextApplication<A> {
     pub fn new() -> Self {
         Self {
             application_properties: ApplicationProperties::new(),
+            application_args: ApplicationArgs::default(),
             application: A::default(),
         }
     }
@@ -23,6 +27,11 @@ impl<A: Application + Default> NextApplication<A> {
     /// Get the application register.
     pub fn application_properties(&self) -> &ApplicationProperties {
         &self.application_properties
+    }
+
+    /// Get the application args
+    pub fn application_args(&self) -> &ApplicationArgs {
+        &self.application_args
     }
 
     /// Get the application name.

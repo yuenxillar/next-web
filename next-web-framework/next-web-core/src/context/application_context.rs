@@ -6,8 +6,7 @@ use std::{
     sync::Arc,
 };
 
-#[doc(hidden)]
-pub use inventory::submit;
+
 use std::hash::Hash;
 
 use crate::autoregister::auto_register::AutoRegisterModule;

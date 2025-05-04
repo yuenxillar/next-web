@@ -2,7 +2,7 @@ use rudi_dev::{Properties, Singleton};
 
 /// WebSocket配置属性，用于配置WebSocket连接的相关参数
 #[Singleton(default, binds=[Self::into_properties])]
-#[Properties(prefix = "next.mqtt")]
+#[Properties(prefix = "next.ws")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct WebSocketProperties {
     max_msg_size: Option<usize>,

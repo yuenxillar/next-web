@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use hashbrown::HashMap;
 use next_web_core::{
     async_trait, context::properties::ApplicationProperties, ApplicationContext, AutoRegister,
 };
-use rudi_dev::SingleOwner;
+use rudi_dev::Singleton;
 
 use crate::{
     core::{interceptor::message_interceptor::MessageInterceptor, router::TopicRouter, topic::base_topic::BaseTopic},
@@ -13,14 +15,15 @@ use crate::{
 
 /// 定义一个单例拥有者，并绑定到 `into_auto_register` 方法
 /// Define a singleton owner and bind it to the `into_auto_register` method
-#[SingleOwner(binds = [Self::into_auto_register])] 
+#[Singleton(binds = [Self::into_auto_register])]
+#[derive(Clone)]
 pub struct MqttServiceAutoRegister(pub MQTTClientProperties);
 
 impl MqttServiceAutoRegister {
     /// 将当前结构体转换为 `AutoRegister` 的动态分发类型
     /// Convert the current structure into a dynamically dispatched `AutoRegister` type
-    fn into_auto_register(self) -> Box<dyn AutoRegister> {
-        Box::new(self)
+    fn into_auto_register(self) -> Arc<dyn AutoRegister> {
+        Arc::new(self)
     }
 }
 
@@ -48,7 +51,8 @@ impl AutoRegister for MqttServiceAutoRegister {
 
         // 从上下文中解析所有实现了 `BaseTopic` 的组件
         // Resolve all components implementing `BaseTopic` from the context
-        let base_topics = ctx.resolve_by_type::<Box<dyn BaseTopic>>(); 
+
+        let base_topics = ctx.resolve_by_type::<Box<dyn BaseTopic>>();
         let mut router_map = HashMap::new(); 
         let mut router = Vec::new();
         base_topics.into_iter().for_each(|item| {

@@ -122,28 +122,101 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
 
             let key_str = LitStr::new(&key, field_name.span());
 
+            // 检查是否为字符串类型
+            let is_string_type = if is_option {
+                let inner = inner_type.as_ref().unwrap();
+                let inner_str = quote!(#inner).to_string();
+                inner_str.eq("String")
+            } else {
+                let type_str = quote!(#field_type).to_string();
+                type_str.eq("String")
+            };
+
             // 根据字段类型生成不同的代码
             if is_option {
                 let inner = inner_type.unwrap();
-                Some(quote! {
-                    // 对于 Option<T> 字段
-                    #field_name: if let Some(value) = properties.one_value::<#inner>(#key_str) {
-                        Some(value)
-                    }else {
-                        noting += 1;
-                        None
-                    },
-                })
+
+                if is_string_type {
+                    // 针对 Option<String> 类型生成带类型转换的代码
+                    Some(quote! {
+                        // 对于 Option<String> 字段，需要支持从数字转换
+                        #field_name: {
+                            if let Some(value) = properties.one_value::<#inner>(#key_str) {
+                                Some(value)
+                            } else if let Some(map_value) = properties.mapping_value() {
+                                map_value.get(#key_str).map(|item| {
+                                    let var1 = item
+                                        .as_f64()
+                                        .map(|var2| Some(var2.to_string()))
+                                        .unwrap_or_default();
+
+                                    if item.is_number() {
+                                        item.as_i64().map(|var| var.to_string()).or(var1)
+                                    } else {
+                                        None
+                                    }
+                                }).unwrap_or_default()
+                            } else {
+                                noting += 1;
+                                None
+                            }
+                        },
+                    })
+                } else {
+                    // 针对其他 Option<T> 类型生成标准代码
+                    Some(quote! {
+                        // 对于普通的 Option<T> 字段
+                        #field_name: {
+                            if let Some(value) = properties.one_value::<#inner>(#key_str) {
+                                Some(value)
+                            } else {
+                                noting += 1;
+                                None
+                            }
+                        },
+                    })
+                }
             } else {
-                Some(quote! {
-                    // 对于普通类型 T，需要检查 Option<T> 是否有值
-                    #field_name: if let Some(value) = properties.one_value::<#field_type>(#key_str) {
-                        value
-                    }else {
-                        noting += 1;
-                        Default::default()
-                    },
-                })
+                if is_string_type {
+                    // 针对 String 类型生成带类型转换的代码
+                    Some(quote! {
+                        // 对于 String 类型字段，需要支持从数字转换
+                        #field_name: {
+                            if let Some(value) = properties.one_value::<#field_type>(#key_str) {
+                                value
+                            } else if let Some(map) = properties.mapping_value() {
+                                if let Some(value) = map.get(#key_str) {
+                                    if value.is_number() {
+                                        value.as_str().map(|t| t.to_string()).unwrap_or_default()
+                                    } else {
+
+                                        noting += 1;
+                                        Default::default()
+                                    }
+                                } else {
+                                    noting += 1;
+                                    Default::default()
+                                }
+                            } else {
+                                noting += 1;
+                                Default::default()
+                            }
+                        },
+                    })
+                } else {
+                    // 针对其他普通类型生成标准代码
+                    Some(quote! {
+                        // 对于普通类型 T
+                        #field_name: {
+                            if let Some(value) = properties.one_value::<#field_type>(#key_str) {
+                                value
+                            } else {
+                                noting += 1;
+                                Default::default()
+                            }
+                        },
+                    })
+                }
             }
         })
         .collect::<Vec<_>>();

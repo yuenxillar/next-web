@@ -16,7 +16,7 @@ readme.workspace = true
 
 [dependencies]
 rudi-core = { version = "0.1.0" }
-rudi-macro-dev = { version = "0.1.1", optional = true }
+rudi-macro-dev = { path = "../rudi-macro-dev" ,version = "0.1.1", optional = true }
 inventory = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
 

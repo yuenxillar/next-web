@@ -1,9 +1,21 @@
+test: "nihao"
 next:
   server:
     port: 8080
-    host: 0.0.0.0
     context_path: /test
-test:
-  message: 777
-  age: 90
-  run1: true
+  coco: ${test}
+  mqtt:
+   host: localhost
+   port: 1883
+   username: user1
+   password: 123
+   topics:
+      - test/#
+      - robot/#
+   # from secs
+   connect_timeout: 10
+   clean_session: true
+  ws:
+    max_msg_size: 30000
+    max_write_buffer_size: 131073
+    max_session_idle_timeout: 30000

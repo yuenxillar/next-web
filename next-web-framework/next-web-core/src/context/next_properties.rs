@@ -28,6 +28,4 @@ impl NextProperties {
     pub fn logger(&self) -> Option<&LoggerProperties> {
         self.logger.as_ref()
     }
-
-
 }

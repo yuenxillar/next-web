@@ -11,6 +11,7 @@ pub struct MQTTClientProperties {
     password: Option<String>,
     topics: Option<Vec<String>>,
     keep_alive: Option<u64>,
+    connect_timeout: Option<u64>,
     clean_session: Option<bool>
 }
 
@@ -44,6 +45,11 @@ impl MQTTClientProperties {
 
     pub fn keep_alive(&self) -> Option<u64> {
         self.keep_alive
+    }
+
+    // from secs
+    pub fn connect_timeout(&self) -> Option<u64> {
+        self.connect_timeout
     }
 
     pub fn clean_session(&self) -> Option<bool> {

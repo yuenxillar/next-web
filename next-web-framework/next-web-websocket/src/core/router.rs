@@ -8,13 +8,14 @@ use axum::{
     Router,
 };
 use next_web_core::{core::router::ApplyRouter, ApplicationContext};
-use rudi_dev::SingleOwner;
+use rudi_dev::Singleton;
 
 use super::{
     handle_socket::handle_socket, handler::WebSocketHandler, ws_context::WebSocketContext,
 };
 
-#[SingleOwner(binds = [Self::into_router])]
+#[Singleton(binds = [Self::into_router])]
+#[derive(Clone)]
 pub(crate) struct WSRouter;
 
 impl WSRouter {
@@ -46,8 +47,8 @@ impl ApplyRouter for WSRouter {
 /// as well as things from HTTP headers such as user-agent of the browser etc.
 async fn ws_handler(
     ws: WebSocketUpgrade,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(ctx): State<Arc<WebSocketContext>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     uri: Uri,
 ) -> impl IntoResponse {
     // finalize the upgrade process by returning upgrade callback.

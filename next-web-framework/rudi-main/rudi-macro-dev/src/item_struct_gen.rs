@@ -1,6 +1,6 @@
 use from_attr::{AttrsValue, FromAttr, PathValue};
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use rudi_core::{Color, Scope};
 use syn::ItemStruct;
 
@@ -149,6 +149,25 @@ pub(crate) fn generate(
         quote! {}
     };
 
+    let struct_name = &item_struct.ident;
+    let default_name = {
+        let singleton_name = name.to_token_stream().to_string().replacen("\"", "", 2);
+    
+        if singleton_name.is_empty() {
+            let struct_name_str = struct_name.to_string();
+            let mut chars = struct_name_str.chars();
+            // 将首字母小写
+            if let Some(first_char) = chars.next() {
+                let first_char_lower = first_char.to_lowercase().to_string();
+                first_char_lower + chars.as_str()
+            } else {
+                struct_name_str
+            }
+        }else {
+            singleton_name
+        }
+    };
+    
     let expand = quote! {
         #item_struct
 
@@ -156,9 +175,11 @@ pub(crate) fn generate(
             type Type = Self;
 
             fn provider() -> #path::Provider<Self> {
+                #[allow(unused_variables)]
+                
                 <#path::Provider<_> as ::core::convert::From<_>>::from(
                     #path::#create_provider(#constructor)
-                        .name(#name)
+                        .name(#default_name)
                         .eager_create(#eager_create)
                         .condition(#condition)
                         #(
@@ -170,5 +191,6 @@ pub(crate) fn generate(
 
         #auto_register
     };
+    // println!("expand: {:?}", expand.to_string());
     Ok(expand)
 }

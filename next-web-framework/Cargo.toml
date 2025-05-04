@@ -11,7 +11,6 @@ version = "0.1.0"
 rust-version = "1.86.0"
 description = "Just a simple web infrastructure framework"
 
-
 [lib]
 path = "src/lib.rs"
 
@@ -34,10 +33,11 @@ next-web-common = { version = "0.1.0", path = "./next-web-common", optional = tr
 # next-web-ip = { version = "0.1.0", path = "./next-web-ip", optional = true }
 # next-web-gateway = { version = "0.1.0", path = "./next-web-gateway", optional = true }
 
-# next-web-tests = { version = "0.1.0", path = "./next-web-tests" , optional = true}
+next-web-tests = { version = "0.1.0", path = "./next-web-tests" , optional = true}
 # next-web-wechat = { version = "0.1.0", path = "./next-web-wechat", optional = true }
 next-web-websocket = { version = "0.1.0", path = "./next-web-websocket", optional = true }
 
+rudi-macro-dev = { path = "./rudi-main/rudi-macro-dev", version = "0.1.1"}
 
 [features]
 default = ["mq"]

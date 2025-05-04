@@ -34,7 +34,7 @@ impl ApplicationDefaultRegisterContainer {
         self.push::<JobSchedulerAutoRegister>();
 
         for register in self.registers.iter() {
-            register.register(ctx, properties).await.ok();
+            register.register(ctx, properties).await.unwrap();
         }
     }
 }
