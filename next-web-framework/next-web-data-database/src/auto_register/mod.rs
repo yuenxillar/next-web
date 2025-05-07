@@ -1,0 +1,1 @@
+pub mod database_service_auto_register;

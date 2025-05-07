@@ -1,0 +1,9 @@
+[package]
+name = "next-web-data-redis"
+version = "0.1.0"
+edition = "2024"
+description = "Redis data provider for Next Web Framework"
+readme = "README.md"
+license.workspace = true
+
+[dependencies]

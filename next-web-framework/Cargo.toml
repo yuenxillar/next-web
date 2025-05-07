@@ -37,6 +37,11 @@ next-web-tests = { version = "0.1.0", path = "./next-web-tests" , optional = tru
 # next-web-wechat = { version = "0.1.0", path = "./next-web-wechat", optional = true }
 next-web-websocket = { version = "0.1.0", path = "./next-web-websocket", optional = true }
 
+# data
+next-web-data-redis = { version = "0.1.0", path = "./next-web-data-redis", optional = true }
+next-web-data-mongodb = { version = "0.1.0", path = "./next-web-data-mongodb", optional = true }
+next-web-data-database = { version = "0.1.0", path = "./next-web-data-database", optional = true }
+
 rudi-macro-dev = { path = "./rudi-main/rudi-macro-dev", version = "0.1.1"}
 
 [features]
