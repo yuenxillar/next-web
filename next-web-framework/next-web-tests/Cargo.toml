@@ -10,16 +10,18 @@ readme.workspace = true
 version.workspace = true
 
 [dependencies]
-next-web-dev = { path = "../next-web-dev", version = "0.1.4"}
 tokio = { workspace = true }
-serde ={ workspace = true}
-next-web-ip ={ path = "../next-web-ip", version = "0.1.0" }
-next-web-macro ={ path = "../next-web-macro", version = "0.1.0" }
-next-web-websocket ={ path = "../next-web-websocket", version = "0.1.2"}
+serde = { workspace = true }
+serde_json = { workspace = true }
+next-web-ip = { path = "../next-web-ip", version = "0.1.0" }
+next-web-macro = { path = "../next-web-macro", version = "0.1.0" }
+next-web-websocket = { path = "../next-web-websocket", version = "0.1.2" }
 next-web-mqtt = { path = "../next-web-mqtt", version = "0.1.2" }
-next-web-core = { workspace = true}
+next-web-dev = { path = "../next-web-dev", version = "0.1.4" }
+next-web-core = { workspace = true }
+next-web-data-database = { path = "../next-web-data-database", version = "0.1.0" }
 
-axum = { workspace = true}
+axum = { workspace = true }
 
 [lints]
 workspace = true

@@ -17,7 +17,6 @@ use crate::{
 pub struct DatabaseServiceAutoRegister(pub DatabaseClientProperties);
 
 impl DatabaseServiceAutoRegister {
-    /// 将当前结构体转换为 `AutoRegister` 的动态分发类型
     /// Convert the current structure into a dynamically dispatched `AutoRegister` type
     fn into_auto_register(self) -> Arc<dyn AutoRegister> {
         Arc::new(self)

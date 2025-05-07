@@ -4,14 +4,18 @@ use std::error::Error;
 use std::sync::Arc;
 
 use axum::extract::ws::CloseFrame;
+use axum::extract::State;
+use axum::routing::get;
+use axum::Router;
 use next_web_core::async_trait;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
+use next_web_data_database::service::database_service::DatabaseService;
 use next_web_dev::{
     application::Application,
     router::{open_router::OpenRouter, private_router::PrivateRouter},
-     Singleton,
+    Singleton,
 };
-use next_web_mqtt::{core::topic::base_topic::BaseTopic, service::mqtt_service::MQTTService};
+use next_web_mqtt::core::topic::base_topic::BaseTopic;
 use next_web_websocket::core::handler::WebSocketHandler;
 use next_web_websocket::core::session::WebSocketSession;
 
@@ -29,10 +33,22 @@ impl Application for TestApplication {
         &mut self,
         ctx: &mut ApplicationContext,
     ) -> (OpenRouter, PrivateRouter) {
-        let mqtt = ctx.get_single_with_name::<MQTTService>("mqttService");
-        mqtt.publish("test/two", "hello world!").await;
-        (OpenRouter::default(), PrivateRouter::default())
+        let service = ctx
+            .get_single_with_name::<DatabaseService>("databaseService")
+            .to_owned();
+        let interface = Router::new()
+            .route("/test_api", get(test_api))
+            .with_state(service);
+        (OpenRouter::default(), PrivateRouter(interface))
     }
+}
+
+async fn test_api(State(service): State<DatabaseService>) -> impl axum::response::IntoResponse {
+    let version: String = service
+        .query_decode("SELECT VERSION();", vec![])
+        .await
+        .unwrap();
+    version
 }
 
 #[Singleton( binds = [Self::into_base_topic])]
@@ -44,7 +60,7 @@ impl TestOneBaseTopic {
         Box::new(self)
     }
 }
- 
+
 #[Singleton( binds = [Self::into_base_topic])]
 #[derive(Clone)]
 pub struct TestTwoBaseTopic;
@@ -85,13 +101,13 @@ impl BaseTopic for TestTwoBaseTopic {
     }
 }
 
-
-
 /// Test
 #[Singleton(binds = [Self::into_websocket_handler])]
 #[derive(Clone)]
-pub struct TestWebSocket;
-
+pub struct TestWebSocket {
+    #[autowired(name = "databaseService")]
+    pub database_service: DatabaseService,
+}
 
 impl TestWebSocket {
     fn into_websocket_handler(self) -> Arc<dyn WebSocketHandler> {
@@ -102,6 +118,16 @@ impl TestWebSocket {
 use next_web_websocket::core::handler::Result;
 use next_web_websocket::Message;
 
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+struct User {
+    pub id: u64,
+    pub username: String,
+    pub password: String,
+    pub salt: String,
+    pub nickname: Option<String>,
+    pub email: String,
+    pub name: String,
+}
 
 #[async_trait]
 impl WebSocketHandler for TestWebSocket {
@@ -120,9 +146,18 @@ impl WebSocketHandler for TestWebSocket {
     }
 
     /// When the client sends a message, it will enter the following method
-    async fn on_message(&self, _session: &WebSocketSession, message: Message) -> Result<()> {
+    async fn on_message(&self, session: &WebSocketSession, message: Message) -> Result<()> {
         if let Message::Text(msg) = message {
-            println!("User message: {:?}", msg);
+            if msg.contains("test") {
+                let result: Vec<User> = self
+                    .database_service
+                    .query_decode("SELECT * FROM `user`", vec![])
+                    .await?;
+                println!("users: {:?}", result);
+                let _ = session
+                    .send_message(Message::Text(serde_json::to_string(&result)?.into()))
+                    .await;
+            }
         }
         Ok(())
     }

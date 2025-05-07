@@ -20,8 +20,7 @@ rbdc-mysql = { workspace = true, optional = true }
 rbdc-pool-fast = { workspace = true, optional = true }
 
 
-
 [features]
-default = ["rbdc-pool-fast", "enable_postgres", "enable_mysql"]
+default = ["rbdc-pool-fast", "enable_mysql"]
 enable_mysql = ["rbdc-mysql"]
 enable_postgres = ["rbdc-pg"]

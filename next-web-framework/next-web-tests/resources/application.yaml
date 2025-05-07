@@ -4,6 +4,15 @@ next:
     port: 8080
     context_path: /test
   coco: ${test}
+
+  data: 
+    database:
+      driver: mysql
+      host: localhost
+      port: 3306
+      username: root
+      password: 123456
+      database: hkv_master
   mqtt:
    host: localhost
    port: 1883
