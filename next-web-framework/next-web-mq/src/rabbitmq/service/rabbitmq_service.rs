@@ -9,7 +9,6 @@ use amqprs::channel::QueueBindArguments;
 use amqprs::channel::QueueDeclareArguments;
 use amqprs::connection::Connection;
 use amqprs::connection::OpenConnectionArguments;
-use amqprs::consumer::AsyncConsumer;
 use amqprs::BasicProperties;
 use next_web_core::core::service::Service;
 
@@ -24,7 +23,11 @@ pub struct RabbitmqService {
     channel: Channel,
 }
 
-impl Service for RabbitmqService {}
+impl Service for RabbitmqService {
+    fn service_name(&self) -> String {
+        "rabbitmqService".into()
+    }
+}
 
 impl RabbitmqService {
     pub async fn new(properties: RabbitMQClientProperties, binds: Vec<BindExchange>) -> Self {

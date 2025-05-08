@@ -14,7 +14,11 @@ pub struct MongodbService {
     client: Client,
 }
 
-impl Service for MongodbService {}
+impl Service for MongodbService {
+    fn service_name(&self) -> String {
+        "mongodbService".into()
+    }
+}
 
 impl MongodbService {
     pub fn new(properties: MongodbClientProperties) -> Self {

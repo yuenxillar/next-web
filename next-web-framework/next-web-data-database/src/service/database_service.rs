@@ -11,7 +11,11 @@ pub struct DatabaseService {
     rbs: RBatis,
 }
 
-impl Service for DatabaseService {}
+impl Service for DatabaseService {
+    fn service_name(&self) -> String {
+        "databaseService".into()
+    }
+}
 
 impl DatabaseService {
     pub fn new(properties: DatabaseClientProperties) -> Self {

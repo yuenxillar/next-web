@@ -22,7 +22,11 @@ pub struct MQTTService {
     client: AsyncClient,
 }
 
-impl Service for MQTTService {}
+impl Service for MQTTService {
+    fn service_name(&self) -> String {
+        "mqttService".into()
+    }
+}
 
 impl MQTTService {
     pub fn new(

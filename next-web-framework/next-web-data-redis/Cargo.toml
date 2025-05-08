@@ -7,3 +7,18 @@ readme = "README.md"
 license.workspace = true
 
 [dependencies]
+serde = { workspace = true }
+next-web-core = { workspace = true }
+rudi-dev = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+
+redis = { workspace = true }
+deadpool-redis = { workspace = true, optional = true }
+
+
+[features]
+default = []
+deadpol = ["deadpool-redis"]
+expired-key-listener = []

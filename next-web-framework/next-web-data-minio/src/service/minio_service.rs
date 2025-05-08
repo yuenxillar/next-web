@@ -11,7 +11,11 @@ pub struct MinioService {
     client: Minio,
 }
 
-impl Service for MinioService {}
+impl Service for MinioService {
+    fn service_name(&self) -> String {
+        "minioService".into()
+    }
+}
 
 impl MinioService {
     pub fn new(properties: MinioClientProperties) -> Self {

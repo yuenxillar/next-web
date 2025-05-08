@@ -50,12 +50,8 @@ flume = { workspace = true }
 rudi-dev = { workspace = true}
 
 thiserror = { workspace = true, optional = true }
-
 tracing-subscriber = { workspace = true }
 
-mongodb = { workspace = true, optional = true }
-redis = { workspace = true, optional = true }
-deadpool-redis = { workspace = true, optional = true }
 
 # self dependencies
 next-web-core = { workspace = true }
@@ -66,7 +62,6 @@ next-web-common = { version = "0.1.0", default-features = false, features = [
 [features]
 default = [
     "user_security",
-    "mongodb_enabled",
     "job_scheduler"
 ]
 tls_rustls = ["axum-server"]
@@ -77,6 +72,3 @@ job_scheduler = ["tokio-cron-scheduler"]
 
 grpc_enabled = []
 prometheus_enabled = ["axum-prometheus"]
-
-redis_enabled = ["redis", "deadpool-redis"]
-mongodb_enabled = ["mongodb"]

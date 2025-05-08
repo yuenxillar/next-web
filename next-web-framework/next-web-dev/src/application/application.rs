@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use axum::body::Bytes;
 use axum::http::{Response, StatusCode};
-use axum::{Router, ServiceExt};
+use axum::Router;
 use hashbrown::HashMap;
 use http_body_util::Full;
 use next_web_core::constants::application_constants::APPLICATION_BANNER_FILE;

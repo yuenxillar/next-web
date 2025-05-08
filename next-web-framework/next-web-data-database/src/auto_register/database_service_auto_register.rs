@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use next_web_core::{
-    ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
+    async_trait, context::properties::ApplicationProperties, core::service::Service, ApplicationContext, AutoRegister
 };
 use rudi_dev::Singleton;
 
@@ -27,7 +27,7 @@ impl DatabaseServiceAutoRegister {
 impl AutoRegister for DatabaseServiceAutoRegister {
     /// Return the singleton name to identify the service
     fn singleton_name(&self) -> &'static str {
-        "databaseService"
+        ""
     }
 
     /// Asynchronous registration method
@@ -41,7 +41,7 @@ impl AutoRegister for DatabaseServiceAutoRegister {
 
         let mut database_service = DatabaseService::new(client_properties);
 
-        let var = database_service.get_client_mut();
+        let rbs = database_service.get_client_mut();
 
         // Find interceptors
         let mut intercepts = ctx.resolve_by_type::<Arc<dyn rbatis::intercept::Intercept>>();
@@ -51,13 +51,14 @@ impl AutoRegister for DatabaseServiceAutoRegister {
             as Arc<dyn rbatis::intercept::Intercept>;
 
         intercepts.insert(0, default_database_interceptor);
-        var.set_intercepts(intercepts);
+        rbs.set_intercepts(intercepts);
 
         // Check  status
         database_service.exec("SELECT 1", vec![]).await?;
 
         // Insert the  service into the context and name it with the singleton name
-        ctx.insert_singleton_with_name(database_service, self.singleton_name());
+        let service_name = database_service.service_name();
+        ctx.insert_singleton_with_name(database_service, service_name);
 
         Ok(())
     }

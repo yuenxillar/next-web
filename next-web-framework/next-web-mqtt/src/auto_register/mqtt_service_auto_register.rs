@@ -2,16 +2,22 @@ use std::sync::Arc;
 
 use hashbrown::HashMap;
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, ApplicationContext, AutoRegister,
+    async_trait,
+    context::properties::ApplicationProperties,
+    core::service::{self, Service},
+    ApplicationContext, AutoRegister,
 };
 use rudi_dev::Singleton;
+use serde::ser;
 
 use crate::{
-    core::{interceptor::message_interceptor::MessageInterceptor, router::TopicRouter, topic::base_topic::BaseTopic},
+    core::{
+        interceptor::message_interceptor::MessageInterceptor, router::TopicRouter,
+        topic::base_topic::BaseTopic,
+    },
     properties::mqtt_properties::MQTTClientProperties,
     service::mqtt_service::MQTTService,
 };
-
 
 /// 定义一个单例拥有者，并绑定到 `into_auto_register` 方法
 /// Define a singleton owner and bind it to the `into_auto_register` method
@@ -29,11 +35,10 @@ impl MqttServiceAutoRegister {
 
 #[async_trait]
 impl AutoRegister for MqttServiceAutoRegister {
-
     /// 返回单例名称，用于标识服务
     /// Return the singleton name used to identify the service
     fn singleton_name(&self) -> &'static str {
-        "mqttService"
+        ""
     }
 
     /// 异步注册方法，用于在应用上下文中注册 MQTT 服务
@@ -43,17 +48,15 @@ impl AutoRegister for MqttServiceAutoRegister {
         ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
-
         // 克隆 MQTT 配置属性
         // Clone the MQTT configuration properties
-        let mqtt_properties = self.0.clone(); 
-                                            
+        let mqtt_properties = self.0.clone();
 
         // 从上下文中解析所有实现了 `BaseTopic` 的组件
         // Resolve all components implementing `BaseTopic` from the context
 
         let base_topics = ctx.resolve_by_type::<Box<dyn BaseTopic>>();
-        let mut router_map = HashMap::new(); 
+        let mut router_map = HashMap::new();
         let mut router = Vec::new();
         base_topics.into_iter().for_each(|item| {
             let topic = item.topic();
@@ -68,7 +71,7 @@ impl AutoRegister for MqttServiceAutoRegister {
 
         // 尝试从上下文中解析消息拦截器
         // Attempt to resolve a message interceptor from the context
-        let var = ctx.resolve_option::<Box<dyn MessageInterceptor>>(); 
+        let var = ctx.resolve_option::<Box<dyn MessageInterceptor>>();
 
         let interceptor = if let Some(var1) = var {
             // 如果解析成功，直接使用解析到的拦截器
@@ -86,7 +89,8 @@ impl AutoRegister for MqttServiceAutoRegister {
 
         // 将 MQTT 服务插入上下文，并命名为单例名称
         // Insert the MQTT service into the context and name it with the singleton name
-        ctx.insert_singleton_with_name(mqtt_service, self.singleton_name());
+        let service_name = mqtt_service.service_name();
+        ctx.insert_singleton_with_name(mqtt_service, service_name);
 
         Ok(())
     }

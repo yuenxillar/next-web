@@ -1,11 +1,6 @@
-#[cfg(feature = "mongodb_enabled")]
-pub mod mongodb_manager;
 
 #[cfg(feature = "user_security")]
 pub mod user_authorization_manager;
-
-#[cfg(feature = "minio_enabled")]
-pub mod minio_manager;
 
 #[cfg(feature = "redis_enabled")]
 pub mod redis_manager;
