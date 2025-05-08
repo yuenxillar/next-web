@@ -34,10 +34,10 @@ impl<T: serde::Serialize> Converter<T> for Option<T> {
     }
 }
 
-impl<T: serde::Serialize + Sync + Send> Converter<T> for rbatis::Page<T> {
-    type Output = rbatis::Page<T>;
+// impl<T: serde::Serialize + Sync + Send> Converter<T> for rbatis::Page<T> {
+//     type Output = rbatis::Page<T>;
 
-    fn into_api_result(self) -> Result<ApiResponse<Self::Output>, ApiError> {
-        Ok(ApiResponse::ok(self))
-    }
-}
+//     fn into_api_result(self) -> Result<ApiResponse<Self::Output>, ApiError> {
+//         Ok(ApiResponse::ok(self))
+//     }
+// }

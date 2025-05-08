@@ -1,0 +1,1 @@
+pub mod mongodb_service_auto_register;

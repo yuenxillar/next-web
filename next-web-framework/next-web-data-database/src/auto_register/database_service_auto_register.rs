@@ -62,3 +62,18 @@ impl AutoRegister for DatabaseServiceAutoRegister {
         Ok(())
     }
 }
+
+
+fn generate_datasource_id(id: &str) -> String {
+    let binding = id.to_lowercase();
+    let database_id = binding.as_str();
+    if database_id.is_empty() {
+        return String::from("dataSourceSlave");
+    }
+    // Capitalize the first letter of id
+    let first_str = database_id[0..1].to_uppercase();
+    let mut suffix = String::from(first_str);
+    suffix.push_str(&database_id[1..]);
+
+    format!("dataSource{}", suffix)
+}

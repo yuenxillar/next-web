@@ -9,7 +9,7 @@ use next_web_core::{
     autoregister::auto_register::AutoRegister,
     context::{application_context::ApplicationContext, properties::ApplicationProperties},
 };
-use rbatis::async_trait;
+use next_web_core::async_trait;
 use tracing::info;
 
 pub struct MongoDBAutoRegister(pub MongoDBProperties);

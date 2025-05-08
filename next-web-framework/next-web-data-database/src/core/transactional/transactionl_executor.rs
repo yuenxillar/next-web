@@ -1,16 +1,17 @@
 use std::{error::Error, future::Future};
 use tracing::error;
 
-pub struct Transactional;
+pub struct TransactionalExecutor;
 
-impl Transactional {
-    pub async fn execute<F, Fut>(rbs: &rbatis::RBatis, func: F)
+impl TransactionalExecutor {
+
+    pub async fn execute<F, Fut>(rbs: &rbatis::RBatis, f: F)
     where
         F: FnOnce(rbatis::RBatis) -> Fut,
         Fut: Future<Output = Result<(), Box<dyn Error + Send + Sync>>>,
     {
-        if let Ok(mut tx) = rbs.acquire_begin().await {
-            match func(rbs.to_owned()).await {
+        if let Ok( tx) = rbs.acquire_begin().await {
+            match f(rbs.to_owned()).await {
                 Ok(_) => {
                     let _ = tx
                         .commit()
@@ -26,13 +27,4 @@ impl Transactional {
             }
         }
     }
-}
-
-
-async fn test() {
-    Transactional::execute(&rbatis::RBatis::new() , | rb | async move {
-        
-
-        Ok(())
-    }).await;
 }

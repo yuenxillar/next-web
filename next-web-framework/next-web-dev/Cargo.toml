@@ -53,17 +53,9 @@ thiserror = { workspace = true, optional = true }
 
 tracing-subscriber = { workspace = true }
 
-rbs = { workspace = true, optional = true }
-rbatis = { workspace = true, optional = true }
-rbdc = { workspace = true, default-features = false, optional = true }
-rbdc-pg = { workspace = true, optional = true }
-rbdc-mysql = { workspace = true, optional = true }
-rbdc-pool-fast = { workspace = true, optional = true }
-
 mongodb = { workspace = true, optional = true }
 redis = { workspace = true, optional = true }
 deadpool-redis = { workspace = true, optional = true }
-minio-rsc = { workspace = true, optional = true }
 
 # self dependencies
 next-web-core = { workspace = true }
@@ -73,7 +65,6 @@ next-web-common = { version = "0.1.0", default-features = false, features = [
 
 [features]
 default = [
-    "database_enabled",
     "user_security",
     "mongodb_enabled",
     "job_scheduler"
@@ -88,7 +79,4 @@ grpc_enabled = []
 prometheus_enabled = ["axum-prometheus"]
 
 redis_enabled = ["redis", "deadpool-redis"]
-database_enabled = ["rbs", "rbatis", "rbdc-pg", "rbdc-mysql", "rbdc-pool-fast"]
-minio_enabled = ["minio-rsc"]
-# rabbitmq_enabled = ["next-web-mq"]
 mongodb_enabled = ["mongodb"]
