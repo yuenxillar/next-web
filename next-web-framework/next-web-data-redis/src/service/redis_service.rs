@@ -2,9 +2,12 @@ use std::ops::{Deref, DerefMut};
 
 use futures::StreamExt;
 use next_web_core::core::service::Service;
-use redis::{aio::tokio, Client, Value};
+use redis::{Client, RedisError, Value, aio::MultiplexedConnection};
 
-use crate::properties::redis_properties::RedisClientProperties;
+use crate::{
+    core::event::expired_keys_event::RedisExpiredKeysEvent,
+    properties::redis_properties::RedisClientProperties,
+};
 
 #[derive(Clone)]
 pub struct RedisService {
@@ -25,18 +28,7 @@ impl RedisService {
     }
 
     fn build_client(config: &RedisClientProperties) -> Client {
-        let password = config.password();
-        let host = config.host().unwrap_or("localhost".into());
-        let port = config.port().unwrap_or(6379);
-
-        // connect to redis
-        let url = format!(
-            "redis://{}{}:{}{}?protocol=resp3",
-            password.map(|s| format!(":{}@", s)).unwrap_or_default(),
-            host,
-            port,
-            format!("/{}", config.database().unwrap_or(0))
-        );
+        let url = crate::service::gen_url(config, true);
 
         let client = Client::open(url).unwrap();
 
@@ -51,7 +43,14 @@ impl RedisService {
         &mut self.client
     }
 
-    pub(crate) async fn expired_key_listen(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn get_connection(&self) -> Result<MultiplexedConnection, RedisError> {
+        self.client.get_multiplexed_tokio_connection().await
+    }
+
+    pub(crate) async fn expired_key_listen(
+        &self,
+        mut service: Box<dyn RedisExpiredKeysEvent>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let (mut sink, mut stream) = self.get_client().get_async_pubsub().await?.split();
         sink.psubscribe(format!(
             "__keyevent@{}__:expired",
@@ -62,9 +61,8 @@ impl RedisService {
         ::tokio::spawn(async move {
             while let Some(msg) = stream.next().await {
                 if let Ok(key) = msg.get_pattern() {
-                    if let Value::BulkString(data) = key {
-                        let key = String::from_utf8(data.to_vec()).unwrap();
-                        println!("key expired: {}", key);
+                    if let Value::BulkString(pattern) = key {
+                        service.on_message(msg.get_payload_bytes(), &pattern).await;
                     }
                 }
             }

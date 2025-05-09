@@ -1,9 +1,9 @@
 use rudi_dev::{Properties, Singleton};
 
-/// Properties for Mongod client.
+/// Properties for Redis client.
 #[Singleton(default, binds=[Self::into_properties])]
 #[Properties(prefix = "next.data.redis")]
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct RedisClientProperties {
     host: Option<String>,
     port: Option<u16>,
@@ -39,15 +39,15 @@ impl RedisClientProperties {
     }
 }
 
-impl Default for RedisClientProperties {
-    fn default() -> Self {
-        Self {
-            host: Some("localhost".into()),
-            port: Some(6379),
-            username: None,
-            password: None,
-            database: None,
-            connect_timeout: Some(5000),
-        }
-    }
-}
+// impl Default for RedisClientProperties {
+//     fn default() -> Self {
+//         Self {
+//             host: Some("localhost".into()),
+//             port: Some(6379),
+//             username: None,
+//             password: None,
+//             database: None,
+//             connect_timeout: Some(5000),
+//         }
+//     }
+// }

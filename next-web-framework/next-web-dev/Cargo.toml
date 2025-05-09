@@ -43,13 +43,11 @@ regex = { workspace = true }
 jsonwebtoken = { workspace = true }
 matchit = { workspace = true, optional = true }
 bcrypt = { workspace = true }
-rand = { workspace = true }
 parking_lot = { workspace = true }
 flume = { workspace = true }
 
 rudi-dev = { workspace = true}
 
-thiserror = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true }
 
 
@@ -66,7 +64,6 @@ default = [
 ]
 tls_rustls = ["axum-server"]
 
-redis_lock = ["thiserror"]
 user_security = ["matchit"]
 job_scheduler = ["tokio-cron-scheduler"]
 

@@ -42,11 +42,6 @@ use next_web_core::context::application_resources::ApplicationResources;
 #[cfg(feature = "job_scheduler")]
 use crate::manager::job_scheduler_manager::{ApplicationJob, JobSchedulerManager};
 
-#[cfg(feature = "redis_enabled")]
-use crate::event::redis_expired_event::RedisExpiredEvent;
-#[cfg(feature = "redis_enabled")]
-use crate::manager::redis_manager::RedisManager;
-
 pub const APPLICATION_USER_PERMISSION_RESOURCE: &str = "user_permission_resource.json";
 
 #[async_trait]
@@ -205,6 +200,7 @@ pub trait Application: Send + Sync {
     ) {
         let properties = ctx.resolve_by_type::<Box<dyn Properties>>();
         for item in properties {
+            println!("name: {}", item.singleton_name());
             item.register(ctx, application_properties).await.unwrap();
         }
     }
@@ -249,19 +245,6 @@ pub trait Application: Send + Sync {
             schedluer_manager.start();
         } else {
             warn!("Job scheduler manager not found");
-        }
-
-        // Register redis expired event
-        #[cfg(feature = "redis_enabled")]
-        if let Some(redis_manager) = ctx.resolve_option_with_name::<RedisManager>("redisManager") {
-            if let Some(handle) =
-                ctx.resolve_option::<Arc<tokio::sync::Mutex<dyn RedisExpiredEvent>>>()
-            {
-                let _ = redis_manager
-                    .expired_event(handle)
-                    .await
-                    .map(|_| info!("Redis expired event listen success!"));
-            }
         }
 
         // Register application event

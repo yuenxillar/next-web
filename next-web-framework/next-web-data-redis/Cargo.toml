@@ -14,11 +14,13 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
 
-redis = { workspace = true }
-deadpool-redis = { workspace = true, optional = true }
 
+redis = { workspace = true }
+rslock = { workspace = true, optional = true }
+deadpool-redis = { workspace = true, optional = true }
 
 [features]
 default = []
 deadpol = ["deadpool-redis"]
 expired-key-listener = []
+lock = ["rslock"]

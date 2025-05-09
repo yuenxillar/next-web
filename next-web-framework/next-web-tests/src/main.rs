@@ -10,6 +10,8 @@ use axum::Router;
 use next_web_core::async_trait;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 use next_web_data_database::service::database_service::DatabaseService;
+use next_web_data_redis::core::event::expired_keys_event::RedisExpiredKeysEvent;
+use next_web_data_redis::service::redis_service::RedisService;
 use next_web_dev::{
     application::Application,
     router::{open_router::OpenRouter, private_router::PrivateRouter},
@@ -107,6 +109,8 @@ impl BaseTopic for TestTwoBaseTopic {
 pub struct TestWebSocket {
     #[autowired(name = "databaseService")]
     pub database_service: DatabaseService,
+    #[autowired(name = "redisService")]
+    pub redis_service: RedisService,
 }
 
 impl TestWebSocket {
@@ -115,6 +119,7 @@ impl TestWebSocket {
     }
 }
 
+use next_web_data_redis::AsyncCommands;
 use next_web_websocket::core::handler::Result;
 use next_web_websocket::Message;
 
@@ -157,6 +162,9 @@ impl WebSocketHandler for TestWebSocket {
                 let _ = session
                     .send_message(Message::Text(serde_json::to_string(&result)?.into()))
                     .await;
+            } else if msg.contains("redis") {
+                let mut con = self.redis_service.get_connection().await.unwrap();
+                let _: () = con.set(msg.to_string(), 42).await.unwrap();
             }
         }
         Ok(())
@@ -176,6 +184,27 @@ impl WebSocketHandler for TestWebSocket {
     async fn on_close(&self, session: &WebSocketSession, _close: Option<CloseFrame>) -> Result<()> {
         println!("User left: {:?}", session.id());
         Ok(())
+    }
+}
+
+#[Singleton(binds = [Self::into_expired_key_listener])]
+#[derive(Clone)]
+pub struct TestExpiredKeyListener;
+
+impl TestExpiredKeyListener {
+    fn into_expired_key_listener(self) -> Box<dyn RedisExpiredKeysEvent> {
+        Box::new(self)
+    }
+}
+
+#[async_trait]
+impl RedisExpiredKeysEvent for TestExpiredKeyListener {
+    async fn on_message(&mut self, message: &[u8], pattern: &[u8]) {
+        println!(
+            "Expired key: {}, pattern: {}",
+            String::from_utf8_lossy(message),
+            String::from_utf8_lossy(pattern)
+        );
     }
 }
 

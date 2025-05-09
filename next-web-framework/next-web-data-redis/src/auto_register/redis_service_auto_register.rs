@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, core::service::{self, Service}, ApplicationContext, AutoRegister
+    ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
+    core::service::Service,
 };
-use redis::{Cmd, Commands, ConnectionLike};
+use redis::{Cmd, ConnectionLike};
 use rudi_dev::Singleton;
-use tracing::debug;
 
 use crate::{
-    properties::redis_properties::RedisClientProperties,
-    service::redis_service::RedisService,
+    core::event::expired_keys_event::RedisExpiredKeysEvent,
+    properties::redis_properties::RedisClientProperties, service::redis_service::RedisService,
 };
 
 /// Register the `DatabaseService` as a singleton with the `DatabaseServiceAutoRegister` type.
@@ -40,20 +40,29 @@ impl AutoRegister for RedisServiceAutoRegister {
         // Clone theconfiguration properties
         let client_properties = self.0.clone();
 
-       
         let mut redis_service = RedisService::new(client_properties);
-        
+
         redis_service.req_command(Cmd::new().arg("PING"))?;
 
-        // register redis_lock manager to context
-        #[cfg(feature = "redis_lock")]
+        // Register redis_lock manager to context
+        #[cfg(feature = "lock")]
         {
-            let redis_lock_manager = RedisLockManager::new(vec![url]);
-            ctx.insert_singleton_with_name::<RedisLockManager, String>(
-                redis_lock_manager,
-                String::from("redisLockManager"),
+            let url = crate::service::gen_url(&self.0, false);
+            let redis_lock_service = crate::service::redis_lock_service::RedisLockService::new(vec![url]);
+            let service_name = redis_lock_service.service_name();
+            ctx.insert_singleton_with_name(
+                redis_lock_service,
+                service_name
             );
-            println!("RedisLockAutoregister registered successfully!");
+        }
+
+        // Listen for expired keys
+        #[cfg(feature = "expired-key-listener")]
+        {
+            let services = ctx.resolve_by_type::<Box<dyn RedisExpiredKeysEvent>>();
+            if let Some(service) = services.first() {
+                redis_service.expired_key_listen(service.to_owned()).await?;
+            }
         }
 
         let service_name = redis_service.service_name();

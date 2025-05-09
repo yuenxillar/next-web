@@ -96,12 +96,13 @@ rbdc-pool-fast = { version = "4.5" }
 
 
 mongodb = { version = "3.2.0", features = ["zstd-compression"] }
-redis = { version = "0.30.0", default-features = false, features = [
+redis = { version = "0.30.0", features = [
     "tokio-comp",
     "script",
     "json",
 ] }
-deadpool-redis = { version = "0.18.0" }
+rslock = { version = "0.7.1", default-features = false, features = ["tokio-comp"]}
+deadpool-redis = { version = "0.20.0" }
 minio-rsc = { version = "0.2.3" }
 rumqttc = { version = "0.24.0" }
 
