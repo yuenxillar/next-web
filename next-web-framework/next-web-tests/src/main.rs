@@ -10,6 +10,8 @@ use axum::Router;
 use next_web_core::async_trait;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 use next_web_data_database::service::database_service::DatabaseService;
+use next_web_data_mongodb::{doc, Document};
+use next_web_data_mongodb::service::mongodb_service::MongodbService;
 use next_web_data_redis::core::event::expired_keys_event::RedisExpiredKeysEvent;
 use next_web_data_redis::service::redis_service::RedisService;
 use next_web_dev::{
@@ -111,6 +113,8 @@ pub struct TestWebSocket {
     pub database_service: DatabaseService,
     #[autowired(name = "redisService")]
     pub redis_service: RedisService,
+    #[autowired(name = "mongodbService")]
+    pub mongdob_service: MongodbService,
 }
 
 impl TestWebSocket {
@@ -132,6 +136,11 @@ struct User {
     pub nickname: Option<String>,
     pub email: String,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+struct TestUser {
+    pub id: u64,
 }
 
 #[async_trait]
@@ -165,6 +174,21 @@ impl WebSocketHandler for TestWebSocket {
             } else if msg.contains("redis") {
                 let mut con = self.redis_service.get_connection().await.unwrap();
                 let _: () = con.set(msg.to_string(), 42).await.unwrap();
+            } else if msg.contains("mongodb") {
+                if let Some(db) = self.mongdob_service.default_database() {
+                    let collection =
+                        db.collection::<TestUser>("user_media_log");
+                    let docs = vec![
+                        doc! { "title": "1984", "author": "George Orwell" },
+                        doc! { "title": "Animal Farm", "author": "George Orwell" },
+                        doc! { "title": "The Great Gatsby", "author": "F. Scott Fitzgerald" },
+                    ];
+                    // Document::new().get_object_id(key)
+                    let var = collection.update_one(filter).await;
+                    let var = collection.insert_many(&vec![TestUser { id: 6666 }]).await;
+                    let var = collection.delete_many(query).await;
+                    let var = collection.count_documents(filter).await;
+                }
             }
         }
         Ok(())

@@ -18,6 +18,12 @@ next:
       port: 6379
       password: 123
       database: 0
+    mongodb:
+      host: localhost
+      port: 27017
+      username: root
+      password: 123456
+      database: robot
   mqtt:
    host: localhost
    port: 1883

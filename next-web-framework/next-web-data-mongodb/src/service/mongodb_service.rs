@@ -12,6 +12,7 @@ use crate::properties::mongodb_properties::MongodbClientProperties;
 pub struct MongodbService {
     properties: MongodbClientProperties,
     client: Client,
+    database: mongodb::Database,
 }
 
 impl Service for MongodbService {
@@ -23,7 +24,8 @@ impl Service for MongodbService {
 impl MongodbService {
     pub fn new(properties: MongodbClientProperties) -> Self {
         let client = Self::build_client(&properties);
-        Self { properties, client }
+        let database = client.database(properties.database().unwrap());
+        Self { properties, client, database}
     }
 
     fn build_client(config: &MongodbClientProperties) -> Client {
@@ -38,7 +40,7 @@ impl MongodbService {
                 None
             })
             .credential(
-                if config.username().is_some() && config.password().is_some() {
+                if config.username().is_none() && config.password().is_none() {
                     None
                 } else {
                     Some(
@@ -70,6 +72,10 @@ impl MongodbService {
 
     pub fn properties(&self) -> &MongodbClientProperties {
         &self.properties
+    }
+
+    pub(crate) fn get_database(&self) -> &mongodb::Database {
+        &self.database
     }
 }
 

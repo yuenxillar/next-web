@@ -200,7 +200,6 @@ pub trait Application: Send + Sync {
     ) {
         let properties = ctx.resolve_by_type::<Box<dyn Properties>>();
         for item in properties {
-            println!("name: {}", item.singleton_name());
             item.register(ctx, application_properties).await.unwrap();
         }
     }
