@@ -50,6 +50,7 @@ async fn ws_handler(
     State(ctx): State<Arc<WebSocketContext>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     uri: Uri,
+    header: axum::http::HeaderMap,
 ) -> impl IntoResponse {
     // finalize the upgrade process by returning upgrade callback.
     // we can customize the callback by sending additional info such as address.
@@ -57,5 +58,5 @@ async fn ws_handler(
     let path = uri.path().to_string();
     ws.max_message_size(properties.max_msg_size().unwrap_or(64 << 20))
         .max_write_buffer_size(properties.max_write_buffer_size().unwrap_or(usize::MAX))
-        .on_upgrade(move |socket| handle_socket(socket, ctx, addr, path))
+        .on_upgrade(move |socket| handle_socket(socket, ctx, addr, path, header))
 }

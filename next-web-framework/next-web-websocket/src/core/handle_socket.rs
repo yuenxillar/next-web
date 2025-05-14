@@ -2,7 +2,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
     body::Bytes,
-    extract::ws::{Message, WebSocket},
+    extract::ws::{Message, WebSocket}, http::HeaderMap,
 };
 use futures::{stream::StreamExt, SinkExt};
 use tracing::{debug, error, info};
@@ -15,6 +15,7 @@ pub async fn handle_socket(
     ctx: Arc<WebSocketContext>,
     remote_address: SocketAddr,
     path: String,
+    header: HeaderMap
 ) {
     debug!("Start processing WebSocket connections: {remote_address}, Path: {path}");
 
@@ -39,7 +40,7 @@ pub async fn handle_socket(
     };
 
     let (msg_sender, msg_receiver) = flume::unbounded();
-    let session = WebSocketSession::new(msg_sender, remote_address);
+    let session = WebSocketSession::new(msg_sender, remote_address, header);
 
     // By splitting socket we can send and receive at the same time. In this example we will send
     // unsolicited messages to client based on some sort of server's internal event (i.e .timer).

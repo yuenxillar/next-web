@@ -184,10 +184,10 @@ impl WebSocketHandler for TestWebSocket {
                         doc! { "title": "The Great Gatsby", "author": "F. Scott Fitzgerald" },
                     ];
                     // Document::new().get_object_id(key)
-                    let var = collection.update_one(filter).await;
-                    let var = collection.insert_many(&vec![TestUser { id: 6666 }]).await;
-                    let var = collection.delete_many(query).await;
-                    let var = collection.count_documents(filter).await;
+                    // let var = collection.update_one(filter).await;
+                    // let var = collection.insert_many(&vec![TestUser { id: 6666 }]).await;
+                    // let var = collection.delete_many(query).await;
+                    // let var = collection.count_documents(filter).await;
                 }
             }
         }
