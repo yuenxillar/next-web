@@ -56,6 +56,7 @@ impl MongodbService {
             )))
             .default_database(config.database().map(|s| s.to_string()).unwrap_or_default())
             .app_name(Some("nextWebMongodbApp".into()))
+            .max_pool_size(Some(21))
             .build();
         let client = Client::with_options(client_options).unwrap();
 

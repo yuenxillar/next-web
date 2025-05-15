@@ -1,10 +1,7 @@
-use std::str::FromStr;
-
 use crate::MongoResult;
 use crate::service::mongodb_service::MongodbService;
 use futures::TryStreamExt;
 use mongodb::Collection;
-use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{Document, doc};
 use mongodb::options::FindOptions;
 use mongodb::results::*;
@@ -64,12 +61,17 @@ where
         Self::collection::<Self>(service).insert_many(docs).await
     }
 
-    async fn update_one();
+    // async fn update_one(service: &MongodbService, query: Document) -> MongoResult<UpdateResult> {
+    //     Self::collection::<Self>(service)
+    //         .update_one(
+    //             query,
+    //             doc! {
+    //             "$set": doc! { "name": "Jill Gillison" } },
+    //         )
+    //         .await
+    // }
 
-    async fn update_by_id(
-        service: &MongodbService,
-        id: &str,
-    ) -> MongoResult<UpdateResult> {
+    async fn update_by_id(service: &MongodbService, id: &str) -> MongoResult<UpdateResult> {
         Self::collection::<Self>(service)
             .update_one(
                 doc! {"_id": id},
@@ -78,9 +80,16 @@ where
             )
             .await
     }
-    async fn update_many();
 
-    async fn delete_one();
+    // async fn update_many(service: &MongodbService,)-> MongoResult<UpdateResult> {
+    //     let var = Document::from(Self);
+    //     Self::collection::<Self>(service)
+    //         .update_many(query, update)
+    // }
+
+    async fn delete_one(service: &MongodbService, query: Document) -> MongoResult<DeleteResult> {
+        Self::collection::<Self>(service).delete_one(query).await
+    }
 
     async fn delete_by_id(service: &MongodbService, id: &str) -> MongoResult<DeleteResult> {
         Self::collection::<Self>(service)

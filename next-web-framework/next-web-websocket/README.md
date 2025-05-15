@@ -36,10 +36,11 @@ impl WebSocketHandler for TestWebSocket {
     // When the socket connection enters, this method will be entered first
     async fn on_open(&self, session: &WebSocketSession) -> Result<()> {
         println!(
-            "Client remote address: {:?}, session id: {:?}",
+            "Client remote address: {:?}, Session id: {:?}, Client header: {:?}, Client path: {:?}",
             session.remote_address(),
-            session.id()
-        );
+            session.id(),
+            session.header(),
+            session.path());
         Ok(())
     }
 
@@ -68,8 +69,10 @@ impl WebSocketHandler for TestWebSocket {
     }
 }
 
-fn main() {
-    //
+
+#[tokio::main]
+async fn main() {
+    // TestApplication::run().await;
 }
 
 ```

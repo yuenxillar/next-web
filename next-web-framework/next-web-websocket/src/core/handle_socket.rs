@@ -40,7 +40,7 @@ pub async fn handle_socket(
     };
 
     let (msg_sender, msg_receiver) = flume::unbounded();
-    let session = WebSocketSession::new(msg_sender, remote_address, header);
+    let session = WebSocketSession::new(msg_sender, remote_address, header, path.to_owned());
 
     // By splitting socket we can send and receive at the same time. In this example we will send
     // unsolicited messages to client based on some sort of server's internal event (i.e .timer).
@@ -71,6 +71,8 @@ pub async fn handle_socket(
                 }
             }
         }
+        
+        drop(msg_receiver);
     });
 
     // receive client messages

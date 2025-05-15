@@ -1,6 +1,9 @@
 use std::net::SocketAddr;
 
-use axum::{extract::ws::{CloseFrame, Message}, http::HeaderMap};
+use axum::{
+    extract::ws::{CloseFrame, Message},
+    http::HeaderMap,
+};
 use flume::Sender;
 use uuid::Uuid;
 
@@ -30,7 +33,8 @@ pub struct WebSocketSession {
     id: uuid::Uuid,
     msg_channel: Sender<Message>,
     remote_address: SocketAddr,
-    header: HeaderMap
+    header: HeaderMap,
+    path: String,
 }
 
 impl WebSocketSession {
@@ -53,13 +57,19 @@ impl WebSocketSession {
     /// # Returns
     /// A new instance of `WebSocketSession`.
     ///
-    pub fn new(msg_channel: Sender<Message>, remote_address: SocketAddr, header: HeaderMap) -> Self {
+    pub fn new(
+        msg_channel: Sender<Message>,
+        remote_address: SocketAddr,
+        header: HeaderMap,
+        path: String,
+    ) -> Self {
         let id = Uuid::new_v4();
         Self {
             id,
             msg_channel,
             remote_address,
-            header
+            header,
+            path,
         }
     }
 
@@ -160,7 +170,6 @@ impl WebSocketSession {
         &self.remote_address
     }
 
-
     ///
     /// 获取当前连接客户端的请求头部数据
     ///
@@ -175,5 +184,19 @@ impl WebSocketSession {
     pub fn header(&self) -> &HeaderMap {
         &self.header
     }
-    
+
+    ///
+    /// 获取当前连接客户端的请求路径
+    ///
+    /// # 返回值
+    /// 返回对 `String` 的引用。
+    ///
+    /// Get the request path of the current connected client
+    ///
+    /// # Returns
+    /// A reference to  `String`.
+    ///
+    pub fn path(&self) -> &str {
+        self.path.as_str()
+    }
 }
