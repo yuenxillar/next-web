@@ -10,7 +10,7 @@ use axum::Router;
 use next_web_core::async_trait;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 use next_web_data_database::service::database_service::DatabaseService;
-use next_web_data_mongodb::{doc, Document};
+use next_web_data_mongodb::bson::{doc, Document};
 use next_web_data_mongodb::service::mongodb_service::MongodbService;
 use next_web_data_redis::core::event::expired_keys_event::RedisExpiredKeysEvent;
 use next_web_data_redis::service::redis_service::RedisService;

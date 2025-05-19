@@ -1,1 +1,2 @@
-pub mod qr_code_util;
+pub mod input;
+pub mod generator;

@@ -3,9 +3,9 @@ use fast_qr::{
     QRBuilder,
 };
 
-pub struct QrCodeUtil;
+pub struct QrCodeGenerator;
 
-impl QrCodeUtil {
+impl QrCodeGenerator {
     /// 生成二维码的方法
     /// Generates a QR code based on the provided content and type.
     /// 内容：要编码为二维码的字符串数据 | Content: The string data to encode into the QR code.

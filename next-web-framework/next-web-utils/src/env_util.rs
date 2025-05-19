@@ -1,11 +1,3 @@
-/**
-*struct:    EnvUtil
-*desc:      系统环境变量相关工具类
-*author:    Listening
-*email:     yuenxillar@163.com
-*date:      2024/10/02
-*/
-
 pub struct EnvUtil;
 
 impl EnvUtil {

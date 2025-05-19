@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rust_xlsxwriter = "0.80.0"
-docx-rs = "0.4.17"
+rust_xlsxwriter = { workspace = true, optional = true}
+calamine = { workspace = true, optional = true}
 
 
 [features]
 default = ["excel"]
-excel = []
+excel = ["rust_xlsxwriter", "calamine"]
 docx = []

@@ -3,7 +3,5 @@ pub mod core;
 pub mod properties;
 pub mod service;
 
-
-pub use mongodb::{bson::*,error::Result as MongoResult, results::{
-    InsertManyResult, InsertOneResult, UpdateResult, DeleteResult
-}};
+pub use mongodb::*;
+pub use mongodb::error::Result as MongoResult;
