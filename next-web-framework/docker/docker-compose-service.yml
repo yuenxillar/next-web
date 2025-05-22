@@ -1,0 +1,9 @@
+version: "3.5"
+
+services:
+
+
+networks:
+  network:
+    external:
+      name: next_web_network

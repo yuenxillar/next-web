@@ -12,7 +12,7 @@ next:
       port: 3306
       username: root
       password: 123456
-      database: hkv_master
+      database: next_web
     redis:
       host: localhost
       port: 6379
@@ -21,9 +21,9 @@ next:
     mongodb:
       host: localhost
       port: 27017
-      username: root
+      username: admin
       password: 123456
-      database: robot
+      database: next_web
   mqtt:
    host: localhost
    port: 1883

@@ -1,5 +1,5 @@
 use rudi_dev::Singleton;
-use std::sync::Arc;
+use std::{panic, sync::Arc};
 
 use crate::properties::ws_properties::WebSocketProperties;
 
@@ -50,9 +50,11 @@ impl WebSocketContext {
     /// - `handler`: A handler implementing the `WebSocketHandler` trait, wrapped in `Arc` for thread-safe sharing.
     ///
     pub fn add_handler(&mut self, path: &str, handler: Arc<dyn WebSocketHandler>) {
-        self.handlers.insert(path, handler).unwrap();
+        self.handlers
+            .insert(path, handler)
+            .unwrap_or_else(|e| panic!("Failed to add handler: {:?}", e));
     }
-    
+
     ///
     /// 根据路径获取对应的 WebSocket 处理器。
     ///
@@ -75,7 +77,7 @@ impl WebSocketContext {
     pub fn get_handler(&self, path: &str) -> Option<&Arc<dyn WebSocketHandler>> {
         match self.handlers.at(path) {
             Ok(matched) => Some(matched.value),
-            Err(_) => None
+            Err(_) => None,
         }
     }
 }

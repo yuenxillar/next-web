@@ -1,0 +1,181 @@
+version: "3.5"
+
+services:
+  postgres:
+    image: postgres:17
+    restart: always
+    privileged: true
+    environment:
+      POSTGRES_DB: next_web
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+    networks:
+      - next_web_network
+    volumes:
+      - ${WORK_SPACE}docker/docker-data/pgdata:/var/lib/postgresql/data # 将数据挂载到本地目录，这样即使容器被删除数据也不会丢失
+    ports:
+      - "5432:5432"
+
+  mysql:
+    image: mysql:8.0.12
+    container_name: mysql
+    restart: always
+    privileged: true
+    ports:
+      - "3306:3306"
+    environment:
+      - TZ=Asia/Shanghai
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_DATABASE=robot_master
+      - MYSQL_ROOT_USER=root
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_CHARSET=utf8mb4
+      - MYSQL_COLLATION=utf8mb4_general_ci
+
+    networks:
+      - next_web_network
+    volumes:
+      - ${WORK_SPACE}docker/docker-config/mysql/mysqld.cnf:/etc/mysql/conf.d/mysqld.cnf
+      - ${WORK_SPACE}docker/docker-data/mysql/db:/var/lib/mysql
+      - ${WORK_SPACE}docker/docker-log/mysql/log:/var/log/mysql
+      #- ${WORK_SPACE}docker/docker-init/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # 定义 Redis 服务（容器）
+  redis:
+    image: redis:7.2
+    container_name: redis
+    privileged: true
+    command: redis-server --requirepass 123
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "6379:6379"
+    networks:
+      - next_web_network
+    volumes:
+      - ${WORK_SPACE}docker/docker-data/redis/data:/data
+      - ${WORK_SPACE}docker/docker-config/redis/redis.conf:/etc/redis/redis.conf
+      - ${WORK_SPACE}docker/docker-log/redis/log:/var/log/redis
+
+  minio:
+    image: minio/minio:RELEASE.2023-09-30T07-02-29Z
+    container_name: minio
+    privileged: true
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    networks:
+      - next_web_network
+    environment:
+      - TZ=Asia/Shanghai
+      - MINIO_ROOT_USER=minioadmin#@
+      - MINIO_ROOT_PASSWORD=minioadmin#@
+      - MINIO_PROMETHEUS_AUTH_TYPE=public
+
+    command: server /data --console-address ":9000" -address ":9090"
+    volumes:
+      - ${WORK_SPACE}docker/docker-data/minio/data/AnalysisResult:/min/data
+
+  mongodb:
+    image: mongo:latest
+    privileged: true
+    container_name: mongodb
+    restart: always
+    command:
+      - "--auth"
+    environment:
+      - TZ=Asia/Shanghai
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=123456
+      - MONGO_INITDB_DATABASE=next_web
+
+    ports:
+      - "27017:27017"
+    networks:
+      - next_web_network
+    volumes:
+      - ${WORK_SPACE}docker/docker-data/mongodb/db:/data/db
+      # 初始化表
+      # - ${WORK_SPACE}docker/docker-init/mongodb/rlc.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+
+  rabbitmq:
+    image: rabbitmq:latest
+    container_name: rabbitmq
+    privileged: true
+    environment:
+      - TZ: Asia/Shanghai
+      - RABBITMQ_DEFAULT_VHOST: /
+      - RABBITMQ_DEFAULT_USER: guest
+      - RABBITMQ_DEFAULT_PASS: guest
+
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - next_web_network
+    volumes:
+      - ${WORK_SPACE}docker/docker-data/rabbitmq/data:/var/lib/rabbitmq
+      # 插件地址
+      # https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download/3.10.0/rabbitmq_delayed_message_exchange-3.10.0.ez
+
+
+  mqtt:
+    image: eclipse-mosquitto:latest
+    container_name: proxy-mqtt
+    networks:
+      - next_web_network
+    privileged: true
+    command:
+      - mosquitto
+      - -c
+      - /etc/mosquitto/conf/mosquitto.conf
+
+    environment:
+      - TZ=Asia/Shanghai
+      - LANG=en_US.UTF-8
+
+    ports:
+      - "1883:1883"
+    volumes:
+      # 映射配置文件
+      - ${WORK_SPACE}docker/docker-config/mosquitto/conf:/etc/mosquitto/conf
+      - ${WORK_SPACE}docker/docker-config/mosquitto/pwfile:/etc/mosquitto/pwfile
+      - ${WORK_SPACE}docker/docker-config/mosquitto/acl:/etc/mosquitto/aclfile
+      - ${WORK_SPACE}docker/docker-data/mosquitto/data:/mosquitto/data
+      - ${WORK_SPACE}docker/docker-log/mosquitto/log:/mosquitto/log
+
+
+  nacos:
+    image: nacos/nacos-server:latest
+    container_name: nacos-standalone-mysql
+    environment:
+      - PREFER_HOST_MODE=hostname
+      - MODE=standalone
+      - SPRING_DATASOURCE_PLATFORM=mysql
+      - MYSQL_SERVICE_HOST=mysql
+      - MYSQL_SERVICE_DB_NAME=nacos
+      - MYSQL_SERVICE_PORT=3306
+      - MYSQL_SERVICE_USER=root
+      - MYSQL_SERVICE_PASSWORD=123456
+      - MYSQL_SERVICE_DB_PARAM=characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      - NACOS_AUTH_IDENTITY_KEY=2222
+      - NACOS_AUTH_IDENTITY_VALUE=2xxx
+      - NACOS_AUTH_TOKEN=SecretKey012345678901234567890123456789012345678901234567890123456789xxxxx
+      - NACOS_AUTH_ENABLE=true
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    depends_on:
+      - mysql
+    restart: always
+    networks:
+      - next_web_network
+    volumes:
+      # - ${WORK_SPACE}docker/docker-config/nacos/custom.properties:/home/nacos/init.d/custom.properties
+      - ${WORK_SPACE}docker/docker-log/nacos/standalone-logs/:/home/nacos/logs
+    # restart: always
+
+networks:
+  next_web_network:
+    name: next_web_network
+    driver: bridge

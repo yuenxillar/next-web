@@ -15,20 +15,45 @@ use rumqttc::{
 };
 use tracing::error;
 
-/// 邮件 Service
+/// MQTT Service
+/// MQTT 服务
+/// 
+/// This struct provides MQTT client functionality including:
+/// 这个结构体提供MQTT客户端功能，包括:
+/// - Connection management 连接管理
+/// - Topic subscription 主题订阅
+/// - Message publishing 消息发布
+/// - Message routing 消息路由
+/// - Interception handling 拦截处理
 #[derive(Clone)]
 pub struct MQTTService {
+    /// MQTT client configuration properties
+    /// MQTT客户端配置属性
     properties: MQTTClientProperties,
+    
+    /// Async MQTT client instance
+    /// 异步MQTT客户端实例
     client: AsyncClient,
 }
 
 impl Service for MQTTService {
+    /// Returns the service name
+    /// 返回服务名称
     fn service_name(&self) -> String {
         "mqttService".into()
     }
 }
 
 impl MQTTService {
+    /// Creates a new MQTTService instance
+    /// 创建新的MQTTService实例
+    /// 
+    /// # Arguments
+    /// 参数
+    /// - properties: MQTT client configuration 客户端配置
+    /// - router_map: Topic handlers map 主题处理器映射
+    /// - router: Topic routers 主题路由器
+    /// - interceptor: Message interceptor 消息拦截器
     pub fn new(
         properties: MQTTClientProperties,
         router_map: HashMap<String, Box<dyn BaseTopic>>,
@@ -39,6 +64,15 @@ impl MQTTService {
         Self { properties, client }
     }
 
+    /// Builds and configures the MQTT client
+    /// 构建并配置MQTT客户端
+    /// 
+    /// Handles:
+    /// 处理:
+    /// - Connection options 连接选项
+    /// - Topic subscription 主题订阅
+    /// - Message event loop 消息事件循环
+    /// - Error handling 错误处理
     fn build_client(
         properties: &MQTTClientProperties,
         mut base_topics: HashMap<String, Box<dyn BaseTopic>>,
@@ -144,6 +178,13 @@ impl MQTTService {
         client
     }
 
+    /// Publishes a message to a topic with default QoS (AtLeastOnce)
+    /// 使用默认QoS(AtLeastOnce)向主题发布消息
+    /// 
+    /// # Arguments
+    /// 参数
+    /// - topic: Target topic 目标主题
+    /// - message: Message content 消息内容
     pub async fn publish<M: Into<Vec<u8>>>(&self, topic: &str, message: M) {
         let _ = self
             .client
@@ -151,16 +192,28 @@ impl MQTTService {
             .await;
     }
 
+    /// Publishes a message with custom QoS level
+    /// 使用自定义QoS级别发布消息
+    /// 
+    /// # Arguments
+    /// 参数
+    /// - topic: Target topic 目标主题
+    /// - q: QoS level (0-2) QoS级别(0-2)
+    /// - message: Message content 消息内容
     pub async fn publish_and_qos<M: Into<Vec<u8>>>(&self, topic: &str, q: u8, message: M) {
         if let Ok(qos) = rumqttc::qos(q) {
             let _ = self.client.publish(topic, qos, false, message).await;
         }
     }
 
+    /// Returns a reference to the MQTT client
+    /// 返回MQTT客户端的引用
     pub fn get_client(&self) -> &AsyncClient {
         &self.client
     }
 
+    /// Returns a reference to the MQTT properties
+    /// 返回MQTT配置属性的引用
     pub fn properties(&self) -> &MQTTClientProperties {
         &self.properties
     }
