@@ -3,7 +3,7 @@ mod tests {
     // use docx_rs::*;
 
     #[test]
-    fn doc_generation_test() -> Result<(), DocxError> {
+    fn doc_generation_test() -> Result<(), Box<dyn std::error::Error>> {
         // let path = std::path::Path::new("./hello.docx");
         // let file = std::fs::File::create(path).unwrap();
         // Docx::new()
@@ -12,6 +12,6 @@ mod tests {
         //     )
         //     .build()
         //     .pack(file)?;
-        // Ok(())
+        Ok(())
     }
 }

@@ -44,7 +44,7 @@ quick-xml = { version = "0.37.4", features = ["serialize"] }
 strum = { version = "0.27", features = ["derive"] }
 
 # document
-calamine = { version = "0.27.0" }
+calamine = { version = "0.26.1" }
 rust_xlsxwriter = { version = "0.87.0", features = ["serde"] }
 csv = { version = "1.3.1" }
 printpdf = { version = "0.8.2" }

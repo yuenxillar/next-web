@@ -1,0 +1,8 @@
+[package]
+name = "next-web-document-excel"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+excel-core ={  path = "./excel-core", version = "*" }
+excel-macro ={  path = "./excel-macro", version = "*" }

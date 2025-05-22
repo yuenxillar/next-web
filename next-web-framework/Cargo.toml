@@ -34,6 +34,7 @@ next-web-websocket = { version = "0.1.2", path = "./next-web-websocket", optiona
 
 # document
 next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }
+next-web-document-excel = { version = "0.1.0", path = "./next-web-document-excel", optional = true }
 
 # next-web-email = { version = "0.1.0", path = "./next-web-email", optional = true }
 # next-web-macro = { version = "0.1.0", path = "./next-web-macro", optional = true }

@@ -1,0 +1,12 @@
+[package]
+name = "excel-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rust_xlsxwriter = { workspace = true}
+calamine = { workspace = true }
+serde = { workspace = true}
+
+
+thiserror = {workspace = true }

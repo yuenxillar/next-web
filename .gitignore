@@ -24,6 +24,13 @@ Cargo.lock
 # Log file
 *.log
 .log.*
+*.xlsx
+*.xls
+*.xlsb
+*.doc
+*.docx
+*.ppt
+*.pptx
 
 
 application-local.yaml
