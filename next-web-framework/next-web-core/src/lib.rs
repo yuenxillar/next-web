@@ -3,6 +3,7 @@ pub mod context;
 pub mod autoconfigure;
 pub mod autoregister;
 pub mod core;
+pub mod error;
 
 pub use self::context::application_context::*;
 pub use self::autoregister::auto_register::*;

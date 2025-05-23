@@ -58,8 +58,9 @@ where
                 }
             }
             return Ok(data_array);
+        }else {
+            return Err(Error::Msg("Workbook is none").into());
         }
-        Err(Error::Msg("workbook is None").into())
     }
 
     pub fn sheet_names(&self) -> Vec<String> {
@@ -116,15 +117,17 @@ where
         },
     };
 
+    let excel_type = ExcelType::from_meta_data(&read_meta_data);
+    if let Err(_) = excel_type {
+        return Err(Error::Msg("Unsupported type or header bytes  do not match"));
+    }
+    
     let mut excel_reader = ExcelReader {
         sheet_names: Vec::new(),
         read_meta_data: None,
         workbook: None,
     };
-    let excel_type = ExcelType::from_workbook(&read_meta_data);
-    if let Err(_) = excel_type {
-        return Err(Error::Msg("Unsupported type or header bytes  do not match"));
-    }
+    
 
     let excel_type = excel_type.unwrap();
     excel_reader.read_meta_data = Some(read_meta_data);

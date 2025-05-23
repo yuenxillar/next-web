@@ -31,7 +31,7 @@ impl ExcelType {
     //     }
     // }
 
-    pub fn from_workbook(meta_data: &ReadMetaData) -> Result<Self, ExcelTypeError>  {
+    pub fn from_meta_data(meta_data: &ReadMetaData) -> Result<Self, ExcelTypeError>  {
         match meta_data.extension.as_str() {
             "xlsx" => {
                 if meta_data.header == XLSX_HEADER.to_vec() {
