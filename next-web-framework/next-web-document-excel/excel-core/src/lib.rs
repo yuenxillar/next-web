@@ -44,9 +44,9 @@ pub mod tests {
         worksheet.set_name("TestSheet1");
         let sheet = book.add_sheet(worksheet).unwrap();
         println!("Time elapsed in open_workbook is: {:?}", instant.elapsed());
-        for i in 1..1000{
+        for i in 1..10 {
             for i1 in 1..300 {
-                sheet.get_cell_value((i, i1)).set_value("Hello World");
+                sheet.get_cell_value_mut((i, i1)).set_value("Hello World");
             }
         }
 

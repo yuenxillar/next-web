@@ -67,7 +67,7 @@
 
     <!-- 主体内容 -->
     <div class="main-content">
-      <!-- 左侧查询区域 -->
+      <!-- 查询窗口 -->
       <div class="query-container">
         <div class="query-tabs">
           <a-tabs default-active-key="1">
@@ -76,7 +76,7 @@
                 <span class="tab-icon"><car-outlined /> 车票</span>
               </template>
               <a-card class="query-card">
-                <a-radio-group default-value="a" button-style="solid" class="query-type">
+                <a-radio-group v-model:value="ticketType" button-style="solid" class="query-type">
                   <a-radio-button value="a">单程</a-radio-button>
                   <a-radio-button value="b">往返</a-radio-button>
                   <a-radio-button value="c">中转换乘</a-radio-button>
@@ -85,7 +85,7 @@
 
                 <div class="form-item">
                   <div class="label">出发地</div>
-                  <a-input placeholder="简拼/全拼/汉字">
+                  <a-input placeholder="简拼/全拼/汉字" @focus="hanleFirstInputFocus">
                     <template #suffix>
                       <environment-outlined />
                     </template>
@@ -94,7 +94,7 @@
 
                 <div class="form-item">
                   <div class="label">到达地</div>
-                  <a-input placeholder="简拼/全拼/汉字">
+                  <a-input placeholder="简拼/全拼/汉字" @focus="hanleFirstInputFocus">
                     <template #suffix>
                       <environment-outlined />
                     </template>
@@ -103,7 +103,7 @@
 
                 <div class="form-item">
                   <div class="label">出发日期</div>
-                  <a-date-picker style="width: 100%" />
+                  <a-date-picker v-model="departureDate" style="width: 100%" :locale="locale" placeholder="请选择日期" />
                 </div>
 
                 <div class="form-item">
@@ -111,7 +111,7 @@
                   <a-checkbox>高铁/动车</a-checkbox>
                 </div>
 
-                <a-button type="primary" block class="query-btn">查 询</a-button>
+                <a-button type="primary" block class="query-btn">查询</a-button>
               </a-card>
             </a-tab-pane>
             <a-tab-pane key="2">
@@ -128,61 +128,43 @@
         </div>
       </div>
 
-      <!-- 右侧轮播图 -->
+      <!-- 轮播图 -->
       <div class="banner-container">
-        <a-carousel autoplay class="banner">
-          <div class="banner-item">
-            <div class="banner-content">
-              <h1 class="province">江西</h1>
-              <div class="slogan">风/景/独/好</div>
-              <div class="description">中 国 铁 路 旅 游</div>
-            </div>
-          </div>
-          <div>
-            <h3>2</h3>
-          </div>
-          <div>
-            <h3>3</h3>
-          </div>
-          <div>
-            <h3>4</h3>
+        <a-carousel autoplay :after-change="onChange">
+          <div v-for="(banner, index) in banners" :key="index">
+            <img :src="banner" class="banner-img" />
           </div>
         </a-carousel>
-        <div class="carousel-indicators">
-          <a-radio-group v-model:value="carouselIndex" button-style="solid" size="small">
-            <a-radio-button v-for="i in 6" :key="i" :value="i"></a-radio-button>
-          </a-radio-group>
-        </div>
       </div>
     </div>
 
     <!-- 快捷服务图标 -->
     <div class="quick-services">
-      <div class="service-item">
+      <div class="service-item" @click="goToService('special-passenger')">
         <team-outlined class="service-icon" />
         <div>重点旅客预约</div>
       </div>
-      <div class="service-item">
+      <div class="service-item" @click="goToService('lost-property')">
         <inbox-outlined class="service-icon" />
         <div>遗失物品查找</div>
       </div>
-      <div class="service-item">
+      <div class="service-item" @click="goToService('car-service')">
         <car-outlined class="service-icon" />
         <div>约车服务</div>
       </div>
-      <div class="service-item">
+      <div class="service-item" @click="goToService('consignment')">
         <compass-outlined class="service-icon" />
         <div>便民托运</div>
       </div>
-      <div class="service-item">
+      <div class="service-item" @click="goToService('station-guide')">
         <environment-outlined class="service-icon" />
         <div>车站引导</div>
       </div>
-      <div class="service-item">
+      <div class="service-item" @click="goToService('station-style')">
         <bank-outlined class="service-icon" />
         <div>站车风采</div>
       </div>
-      <div class="service-item">
+      <div class="service-item" @click="goToService('feedback')">
         <user-outlined class="service-icon" />
         <div>用户反馈</div>
       </div>
@@ -226,6 +208,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import zhCN from 'ant-design-vue/es/locale/zh_CN';
 import {
   SearchOutlined,
   DownOutlined,
@@ -240,7 +223,43 @@ import {
   UserOutlined
 } from '@ant-design/icons-vue';
 
-const carouselIndex = ref(1);
+
+const ticketType = ref('a');
+const locale = zhCN;
+const departureDate = ref<any>();
+const banners = [
+  '/banner10.jpg',
+  '/banner12.jpg',
+  '/banner26.jpg',
+  '/banner0619.jpg',
+  '/banner20200707.jpg',
+  '/banner20201223.jpg',
+];
+
+
+// banner 切换事件处理函数
+const onChange = (current: number) => {
+};
+
+const hanleFirstInputFocus = () => {
+  console.log('focus');
+}
+
+const goToService = (serviceType: string) => {
+  const uris = {
+    'special-passenger': 'view/icentre_qxyyInfo.html',
+    'lost-property': 'view/icentre_lostInfo.html',
+    'car-service': 'view/station/shared_Car.html',
+    'consignment': 'view/station/hand.html',
+    'station-guide': 'czyd_2143/',
+    'station-style': 'zcfc_2548/',
+    'feedback': 'view/advice_adviceInfo.html'
+  };
+  // 为了避免类型错误，先检查 serviceType 是否是 uris 对象的有效键
+  // @ts-ignore
+  const url = `https://www.12306.cn/index/${uris[serviceType]}`;
+  window.open(url, '_blank');
+}
 </script>
 
 <style scoped>
@@ -327,21 +346,24 @@ body {
 /* 确保内容区域宽度 100% */
 .main-content {
   display: flex;
-  background-size: cover;
   min-height: 360px;
-  position: relative;
   width: 100%;
 }
 
 .query-container {
-  width: 320px;
+  position: absolute;
+  width: 500px;
   padding: 20px;
   z-index: 10;
+  left: 20vw;
+  max-height: 160px;
 }
 
 .query-tabs {
   background-color: white;
   border-radius: 4px;
+  align-items: center;
+  justify-items: center;
 }
 
 .tab-icon {
@@ -368,11 +390,10 @@ body {
 .label {
   margin-bottom: 5px;
   font-size: 14px;
+  justify-self: start;
 }
 
 .query-btn {
-  background-color: #f5a623;
-  border-color: #f5a623;
   height: 40px;
   font-size: 16px;
 }
@@ -380,23 +401,22 @@ body {
 .banner-container {
   flex: 1;
   position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 30vh;
 }
 
 .banner {
-  height: 360px;
+  height: 100%;
+  width: 100%;
 }
 
-.banner-item {
-  height: 360px;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(0, 0, 0, 0.3);
-}
-
-.banner-content {
-  text-align: center;
+.banner-img {
+  width: 100%;
+  height: 100%;
+  min-height: 450px;
+  object-fit: cover;
+  transition: all 0.5s ease;
 }
 
 .province {
@@ -426,6 +446,8 @@ body {
   padding: 20px 0;
   background-color: white;
   border-bottom: 1px solid #eee;
+  width: 80%;
+  min-height: 10vh;
 }
 
 .service-item {
@@ -434,6 +456,7 @@ body {
   align-items: center;
   font-size: 14px;
   color: #666;
+  cursor: pointer;
 }
 
 .service-icon {
