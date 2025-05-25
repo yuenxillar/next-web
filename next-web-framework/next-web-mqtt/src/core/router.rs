@@ -60,17 +60,12 @@ impl TopicRouter {
                 })
             }
         } else if topic.contains("+") {
-            let left = if let Some(index) = topic.find('+') {
-                index
-            } else {
-                0
-            };
-
-            let mut right = left + 2;
-            if right > topic.len() {
-                right = 0;
+            let index: Vec<&str> = topic.split("+").collect();
+            if index.len() == 2 {
+                MacthType::Singlelayer(index[0].len(), index[1].len())
+            }else {
+                MacthType::Singlelayer(0, 0)
             }
-            MacthType::Singlelayer(left, right)
         } else {
             panic!("This topic doesn't seem to have the desired matching type.");
         };

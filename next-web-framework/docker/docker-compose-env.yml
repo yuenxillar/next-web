@@ -6,9 +6,9 @@ services:
     restart: always
     privileged: true
     environment:
-      POSTGRES_DB: next_web
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: 123456
+      - POSTGRES_DB: test_db
+      - POSTGRES_USER: root
+      - POSTGRES_PASSWORD: 123456
     networks:
       - next_web_network
     volumes:
@@ -24,13 +24,13 @@ services:
     ports:
       - "3306:3306"
     environment:
-      - TZ=Asia/Shanghai
-      - MYSQL_ROOT_HOST=%
-      - MYSQL_DATABASE=robot_master
-      - MYSQL_ROOT_USER=root
-      - MYSQL_ROOT_PASSWORD=123456
-      - MYSQL_CHARSET=utf8mb4
-      - MYSQL_COLLATION=utf8mb4_general_ci
+      - TZ: Asia/Shanghai
+      - MYSQL_ROOT_HOST: %
+      - MYSQL_DATABASE: test_db
+      - MYSQL_ROOT_USER: root
+      - MYSQL_ROOT_PASSWORD: 123456
+      - MYSQL_CHARSET: utf8mb4
+      - MYSQL_COLLATION: utf8mb4_general_ci
 
     networks:
       - next_web_network
@@ -47,7 +47,7 @@ services:
     privileged: true
     command: redis-server --requirepass 123
     environment:
-      - TZ=Asia/Shanghai
+      - TZ: Asia/Shanghai
     ports:
       - "6379:6379"
     networks:
@@ -67,10 +67,10 @@ services:
     networks:
       - next_web_network
     environment:
-      - TZ=Asia/Shanghai
-      - MINIO_ROOT_USER=minioadmin#@
-      - MINIO_ROOT_PASSWORD=minioadmin#@
-      - MINIO_PROMETHEUS_AUTH_TYPE=public
+      - TZ: Asia/Shanghai
+      - MINIO_ROOT_USER: minioadmin#@
+      - MINIO_ROOT_PASSWORD: minioadmin#@
+      - MINIO_PROMETHEUS_AUTH_TYPE: public
 
     command: server /data --console-address ":9000" -address ":9090"
     volumes:
@@ -84,10 +84,10 @@ services:
     command:
       - "--auth"
     environment:
-      - TZ=Asia/Shanghai
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=123456
-      - MONGO_INITDB_DATABASE=next_web
+      - TZ: Asia/Shanghai
+      - MONGO_INITDB_ROOT_USERNAME: admin
+      - MONGO_INITDB_ROOT_PASSWORD: 123456
+      - MONGO_INITDB_DATABASE: test_db
 
     ports:
       - "27017:27017"
@@ -131,8 +131,8 @@ services:
       - /etc/mosquitto/conf/mosquitto.conf
 
     environment:
-      - TZ=Asia/Shanghai
-      - LANG=en_US.UTF-8
+      - TZ: Asia/Shanghai
+      - LANG: en_US.UTF-8
 
     ports:
       - "1883:1883"
@@ -149,19 +149,19 @@ services:
     image: nacos/nacos-server:latest
     container_name: nacos-standalone-mysql
     environment:
-      - PREFER_HOST_MODE=hostname
-      - MODE=standalone
-      - SPRING_DATASOURCE_PLATFORM=mysql
-      - MYSQL_SERVICE_HOST=mysql
-      - MYSQL_SERVICE_DB_NAME=nacos
-      - MYSQL_SERVICE_PORT=3306
-      - MYSQL_SERVICE_USER=root
-      - MYSQL_SERVICE_PASSWORD=123456
-      - MYSQL_SERVICE_DB_PARAM=characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      - NACOS_AUTH_IDENTITY_KEY=2222
-      - NACOS_AUTH_IDENTITY_VALUE=2xxx
-      - NACOS_AUTH_TOKEN=SecretKey012345678901234567890123456789012345678901234567890123456789xxxxx
-      - NACOS_AUTH_ENABLE=true
+      - PREFER_HOST_MODE: hostname
+      - MODE: standalone
+      - SPRING_DATASOURCE_PLATFORM: mysql
+      - MYSQL_SERVICE_HOST: mysql
+      - MYSQL_SERVICE_DB_NAME: nacos
+      - MYSQL_SERVICE_PORT: 3306
+      - MYSQL_SERVICE_USER: root
+      - MYSQL_SERVICE_PASSWORD: 123456
+      - MYSQL_SERVICE_DB_PARAM: characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      - NACOS_AUTH_IDENTITY_KEY: 2222
+      - NACOS_AUTH_IDENTITY_VALUE: 2xxx
+      - NACOS_AUTH_TOKEN: SecretKey012345678901234567890123456789012345678901234567890123456789xxxxx
+      - NACOS_AUTH_ENABLE: true
     ports:
       - "8848:8848"
       - "9848:9848"

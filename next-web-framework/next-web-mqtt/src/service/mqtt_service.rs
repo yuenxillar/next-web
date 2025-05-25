@@ -136,10 +136,11 @@ impl MQTTService {
                                     }
                                 }
 
-                                MacthType::Singlelayer(left_inddex, right_index) => {
-                                    if topic[0..left_inddex].eq(&item.topic[0..left_inddex]) {
+                                MacthType::Singlelayer(left_index, right_index) => {
+                                    let len = topic.len();
+                                    if topic[0..left_index].eq(&item.topic[0..left_index]) {
                                         if right_index != 0 {
-                                            if !topic[right_index..].eq(&item.topic[right_index..])
+                                            if !topic[(len - right_index)..].eq(&item.topic[right_index..])
                                             {
                                                 continue;
                                             }

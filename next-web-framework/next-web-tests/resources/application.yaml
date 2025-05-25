@@ -8,24 +8,24 @@ next:
   data: 
     database:
       driver: mysql
-      host: localhost
+      host: 192.168.1.117
       port: 3306
       username: root
       password: 123456
       database: next_web
     redis:
-      host: localhost
+      host: 192.168.1.117
       port: 6379
       password: 123
       database: 0
     mongodb:
-      host: localhost
+      host: 192.168.1.117
       port: 27017
       username: admin
       password: 123456
       database: next_web
   mqtt:
-   host: localhost
+   host: 192.168.1.117
    port: 1883
    username: user1
    password: 123

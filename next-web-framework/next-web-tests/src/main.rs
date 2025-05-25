@@ -17,7 +17,8 @@ use next_web_dev::{
     router::{open_router::OpenRouter, private_router::PrivateRouter},
     Singleton,
 };
-// use next_web_mqtt::core::topic::base_topic::BaseTopic;
+use next_web_mqtt::core::topic::base_topic::BaseTopic;
+use next_web_mqtt::service::mqtt_service::MQTTService;
 use next_web_websocket::core::handler::WebSocketHandler;
 use next_web_websocket::core::session::WebSocketSession;
 
@@ -37,22 +38,29 @@ impl Application for TestApplication {
         &mut self,
         ctx: &mut ApplicationContext,
     ) -> (OpenRouter, PrivateRouter) {
+        let service = ctx.get_single_with_name::<MQTTService>("mqttService").clone();
 
+        tokio::spawn(async move {
+            loop {
+                service.publish("test/123/event", "hello world").await;
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+            }
+        });
         let app_router = Router::new().merge(excel_api());
         (OpenRouter(app_router), PrivateRouter::default())
     }
 }
 
 
-// #[Singleton( binds = [Self::into_base_topic])]
-// #[derive(Clone)]
-// pub struct TestOneBaseTopic;
+#[Singleton( binds = [Self::into_base_topic])]
+#[derive(Clone)]
+pub struct TestOneBaseTopic;
 
-// impl TestOneBaseTopic {
-//     fn into_base_topic(self) -> Box<dyn BaseTopic> {
-//         Box::new(self)
-//     }
-// }
+impl TestOneBaseTopic {
+    fn into_base_topic(self) -> Box<dyn BaseTopic> {
+        Box::new(self)
+    }
+}
 
 // #[Singleton( binds = [Self::into_base_topic])]
 // #[derive(Clone)]
@@ -64,20 +72,20 @@ impl Application for TestApplication {
 //     }
 // }
 
-// #[async_trait]
-// impl BaseTopic for TestOneBaseTopic {
-//     fn topic(&self) -> &'static str {
-//         "test/+/event"
-//     }
+#[async_trait]
+impl BaseTopic for TestOneBaseTopic {
+    fn topic(&self) -> &'static str {
+        "test/+/event"
+    }
 
-//     async fn consume(&self, topic: &str, message: &[u8]) {
-//         println!(
-//             "Received message0, Topic: {}, Data Content: {:?}",
-//             topic,
-//             String::from_utf8_lossy(message)
-//         );
-//     }
-// }
+    async fn consume(&self, topic: &str, message: &[u8]) {
+        println!(
+            "Received message0, Topic: {}, Data Content: {:?}",
+            topic,
+            String::from_utf8_lossy(message)
+        );
+    }
+}
 
 // #[async_trait]
 // impl BaseTopic for TestTwoBaseTopic {
@@ -153,6 +161,7 @@ impl WebSocketHandler for TestWebSocket {
     /// When the client sends a message, it will enter the following method
     async fn on_message(&self, session: &WebSocketSession, message: Message) -> Result<()> {
         if let Message::Text(msg) = message {
+            println!("Received message: {:?}", msg.to_string());
             if msg.contains("test") {
                 // let result: Vec<User> = self
                 //     .database_service
