@@ -15,7 +15,7 @@ type Result<V> = StdResult<V, rbatis::Error>;
 pub trait SelectWrapper {
     async fn select_list<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<Vec<T>>
     where
-        T: DeserializeOwned + TableName + Send + Sync + 'static,
+        T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned,
     {
         self.execute(wrapper).await
@@ -23,7 +23,7 @@ pub trait SelectWrapper {
 
     async fn select_one<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<T>
     where
-        T: DeserializeOwned + TableName + Send + Sync + 'static,
+        T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned,
     {
         self.execute(wrapper).await
@@ -31,7 +31,7 @@ pub trait SelectWrapper {
 
     async fn select_count<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<usize>
     where
-        T: DeserializeOwned + TableName + Send + Sync + 'static,
+        T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned,
     {
         self.execute(wrapper.select(vec!["COUNT(1) as count"]))
@@ -40,7 +40,7 @@ pub trait SelectWrapper {
 
     async fn execute<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<V>
     where
-        T: DeserializeOwned + TableName + Send + Sync + 'static,
+        T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned;
 }
 
@@ -48,10 +48,11 @@ pub trait SelectWrapper {
 impl SelectWrapper for RBatis {
     async fn execute<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<V>
     where
-        T: DeserializeOwned + TableName + Send + Sync + 'static,
+        T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned,
     {
-        self.query_decode(&wrapper.generate_sql(), vec![]).await
+        self.query_decode(&wrapper.generate_sql(), Vec::with_capacity(0))
+            .await
     }
 }
 

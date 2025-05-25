@@ -1,4 +1,4 @@
-pub mod excel;
-pub mod doc;
-pub mod csv;
-mod tests;
+
+
+#[cfg(feature = "excel")]
+pub use next_web_document_excel;

@@ -17,6 +17,9 @@ use uuid::Uuid;
 /// - `id`: 当前会话的唯一标识符（UUID）。
 /// - `msg_channel`: 异步发送 WebSocket 消息的通道发送端。
 /// - `remote_address`: 客户端的远程套接字地址。
+/// - `header`: 请求头
+/// - `path`: 请求路径
+///
 ///
 /// Represents a WebSocket session.
 ///
@@ -27,6 +30,8 @@ use uuid::Uuid;
 /// - `id`: Unique identifier for the session (UUID).
 /// - `msg_channel`: Channel sender used to send WebSocket messages asynchronously.
 /// - `remote_address`: The client's remote socket address.
+/// - `header`: request header
+/// - `path`: request path
 ///
 #[derive(Clone)]
 pub struct WebSocketSession {
@@ -44,6 +49,8 @@ impl WebSocketSession {
     /// # 参数
     /// - `msg_channel`: 用于向客户端发送消息的通道发送端。
     /// - `remote_address`: 客户端的远程地址。
+    /// - `header`: 请求头
+    /// - `path`: 请求路径
     ///
     /// # 返回值
     /// 返回一个新的 `WebSocketSession` 实例。
@@ -53,6 +60,8 @@ impl WebSocketSession {
     /// # Arguments
     /// - `msg_channel`: A sender channel used to send messages to the client.
     /// - `remote_address`: The client’s remote socket address.
+    /// - `header`: request header
+    /// - `path`: request path
     ///
     /// # Returns
     /// A new instance of `WebSocketSession`.

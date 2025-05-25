@@ -11,8 +11,6 @@ version = "0.1.0"
 rust-version = "1.86.0"
 description = "Just a simple web infrastructure framework"
 
-[lib]
-path = "src/lib.rs"
 
 [dependencies]
 # next-web libs
@@ -25,6 +23,8 @@ next-web-mq = { version = "0.1.0", path = "./next-web-mq", optional = true }
 next-web-common = { version = "0.1.0", path = "./next-web-common", optional = true }
 next-web-tests = { version = "0.1.0", path = "./next-web-tests" , optional = true}
 
+next-web-sms = { version = "0.1.0", path = "./next-web-sms", optional = true }
+
 # data
 next-web-data-redis = { version = "0.1.0", path = "./next-web-data-redis", optional = true }
 next-web-data-mongodb = { version = "0.1.0", path = "./next-web-data-mongodb", optional = true }
@@ -34,11 +34,10 @@ next-web-websocket = { version = "0.1.2", path = "./next-web-websocket", optiona
 
 # document
 next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }
-next-web-document-excel = { version = "0.1.0", path = "./next-web-document-excel", optional = true }
 
 # next-web-email = { version = "0.1.0", path = "./next-web-email", optional = true }
 # next-web-macro = { version = "0.1.0", path = "./next-web-macro", optional = true }
-# next-web-sms = { version = "0.1.0", path = "./next-web-sms", optional = true }
+
 # # next-web-ai = { version = "0.1.0", path = "./next-web-ai", optional = true }
 # next-web-security = { version = "0.1.0", path = "./next-web-security", optional = true }
 # next-web-id = { version = "0.1.0", path = "./next-web-id", optional = true }

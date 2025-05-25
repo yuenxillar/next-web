@@ -10,33 +10,36 @@ readme.workspace = true
 
 
 [dependencies]
-rudi = {  workspace = true }
-next-web-core = {  workspace = true}
+rudi = { workspace = true }
+next-web-core = { workspace = true }
 
-aes = { workspace = true}
-serde_json = { workspace = true}
-serde = { workspace = true}
-quick-xml = { workspace = true}
-reqwest = { workspace = true}
-tracing = {workspace = true}
-thiserror = { workspace = true}
-strum = { workspace = true}
-base64 =  {workspace = true}
-serde_repr = {workspace = true}
-chrono = { workspace = true}
-sha2 = { workspace = true}
+aes = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+quick-xml = { workspace = true }
+reqwest = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+strum = { workspace = true }
+base64 = { workspace = true }
+serde_repr = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
 hex = { workspace = true }
-tokio = { workspace = true}
+tokio = { workspace = true }
 
 cbc = { version = "^0.1.2", features = ["alloc"] }
-hmac = "0.12.1"
+hmac = { workspace = true }
 
 [features]
 default = ["official-account"]
-official-account = ["official-account-menu", "official-account-message", 
-"official-account-subscribe",
-"official-account-user-management", 
-"official-account-customer-service"]
+official-account = [
+    "official-account-menu",
+    "official-account-message",
+    "official-account-subscribe",
+    "official-account-user-management",
+    "official-account-customer-service",
+]
 official-account-menu = []
 official-account-message = []
 official-account-subscribe = []

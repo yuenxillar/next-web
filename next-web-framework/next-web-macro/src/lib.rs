@@ -1,14 +1,15 @@
 extern crate proc_macro;
 
-use macros::data::builder::impl_macro_builder;
-use macros::data::field_name::impl_macro_field_name;
-use macros::data::get_set::impl_macro_get_set;
-use macros::database::db_mapper::impl_macro_db_mapper;
+use crate::data::builder::impl_macro_builder;
+use crate::data::field_name::impl_macro_field_name;
+use crate::data::get_set::impl_macro_get_set;
+use crate::database::db_mapper::impl_macro_db_mapper;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 use syn::DeriveInput;
 
-mod macros;
+mod data;
+mod database;
 mod utils;
 
 

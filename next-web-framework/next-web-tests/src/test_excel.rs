@@ -7,8 +7,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use futures::stream::{self, Stream, StreamExt};
-use next_web_document_excel::core::write::excel_writer::ExcelWriter;
+use next_web_document::next_web_document_excel::core::write::excel_writer::ExcelWriter;
 use rust_xlsxwriter::*;
 use tokio_util::io::ReaderStream;
 

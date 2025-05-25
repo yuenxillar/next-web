@@ -4,3 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+next-web-core = { workspace = true }
+
+reqwest = { workspace = true }
+chrono = { workspace = true }
+hmac = { workspace = true}
+sha2 = { workspace = true}
+hex = { workspace = true }
+urlencoding = { workspace = true }
+
+
+[features]
+default = ["aliyun", "tencent"]
+aliyun = []
+tencent = []
