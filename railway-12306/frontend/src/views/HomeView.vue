@@ -111,7 +111,7 @@
                   <a-checkbox>高铁/动车</a-checkbox>
                 </div>
 
-                <a-button type="primary" block class="query-btn">查询</a-button>
+                <a-button type="primary" block class="query-btn" style="margin-bottom: 30px;">查询</a-button>
               </a-card>
             </a-tab-pane>
             <a-tab-pane key="2">
@@ -174,34 +174,131 @@
     <div class="service-cards">
       <a-row :gutter="16">
         <a-col :span="12">
-          <a-card class="service-card member-card">
-            <div class="card-content">
-              <div class="card-title">
-                <h2>会员服务</h2>
-                <p>铁路畅行 尊享体验</p>
-                <p>12306铁路会员积分服务</p>
-              </div>
-              <div class="card-image">
-                <img src="@/assets/member-train.png" alt="会员服务" />
-              </div>
+          <a-card class="service-card">
+            <div class="card-image">
+              <img src="@/assets/abanner01.jpg" alt="会员服务" />
             </div>
           </a-card>
         </a-col>
         <a-col :span="12">
-          <a-card class="service-card food-card">
-            <div class="card-content">
-              <div class="card-title">
-                <h2>餐饮·特产</h2>
-                <p>带有温度的旅途配餐</p>
-                <p>享受星级的体验和丰富的味道</p>
-              </div>
-              <div class="card-image">
-                <img src="@/assets/food.png" alt="餐饮特产" />
-              </div>
+          <a-card class="service-card">
+
+            <div class="card-image">
+              <img src="@/assets/abanner02.jpg" alt="餐饮特产" />
             </div>
           </a-card>
         </a-col>
       </a-row>
+      <a-row :gutter="16">
+        <a-col :span="12">
+          <a-card class="service-card">
+            <div class="card-image">
+              <img src="@/assets/abanner05.jpg" alt="出行指南" />
+            </div>
+          </a-card>
+        </a-col>
+        <a-col :span="12">
+          <a-card class="service-card">
+            <div class="card-image">
+              <img src="@/assets/abanner06.jpg" alt="信息查询" />
+            </div>
+          </a-card>
+        </a-col>
+      </a-row>
+    </div>
+    <div class="news">
+      <a-row :gutter="16" class="new-titles">
+        <div class="news-title" v-for="(label, index) in newsList" :key="index" @click="() => { newsIndex = index }"
+          :style="{ color: newsIndex === index ? '#fff' : '#666', background: newsIndex === index ? '#3b99fc' : '#efeff4'}"> {{ label }}</div>
+      </a-row>
+    </div>
+    <!-- 底部导航栏 -->
+    <div class="footer">
+      <div class="footer-con">
+        <div class="footer-links">
+          <a-row>
+            <h2 style="font-size: 15px;">友情连接</h2>
+          </a-row>
+          <a-row :gutter="8">
+            <a-col>
+              <a name="g_href" title="中国国家铁路集团有限公司" data-href="http://www.china-railway.com.cn/" data-redirect="N"
+                href="javascript:;" data-target="_blank">
+                <img src="@/assets/links/link05.png" alt="中国国家铁路集团有限公司">
+              </a>
+            </a-col>
+            <a-col>
+              <a name="g_href" title="中国铁路财产保险自保有限公司" data-href="http://www.china-ric.com/" data-redirect="N"
+                href="javascript:;" data-target="_blank">
+                <img src="@/assets/links/link02.png" alt="中国铁路财产保险自保有限公司">
+              </a>
+            </a-col>
+          </a-row>
+          <a-row :gutter="8">
+            <a-col>
+              <a name="g_href" title="中国铁路95306网" data-href="http://www.95306.cn/" data-redirect="N" href="javascript:;"
+                data-target="_blank">
+                <img src="@/assets/links/link03.png" alt="中国铁路95306网">
+              </a>
+            </a-col>
+            <a-col>
+              <a name="g_href" title="中铁快运股份有限公司" data-href="http://www.95572.com/" data-redirect="N"
+                href="javascript:;" data-target="_blank">
+                <img src="@/assets/links/link04.png" alt="中铁快运股份有限公司">
+              </a>
+            </a-col>
+          </a-row>
+        </div>
+        <div class="foot-code">
+          <a-row :gutter="40">
+            <a-col>
+              <h2 style="font-size: 15px;">中国铁路官方微信</h2>
+              <img src="@/assets/code/zgtlwx.png" alt="中国铁路官方微信">
+            </a-col>
+            <a-col>
+              <h2 style="font-size: 15px;">中国铁路官方微博</h2>
+              <img src="@/assets/code/zgtlwb.png" alt="中国铁路官方微博">
+            </a-col>
+            <a-col>
+              <h2 style="font-size: 15px;">12306 公众号</h2>
+              <img src="@/assets/code/public.png" alt="12306 公众号">
+            </a-col>
+            <a-col>
+              <h2 style="font-size: 15px;">铁路12306</h2>
+              <img src="@/assets/code/download.png" alt="铁路12306">
+            </a-col>
+          </a-row>
+        </div>
+
+        <div class="code-tips">
+          官方APP下载，目前铁路未授权其他网站或APP开展类似服务内容，敬请广大用户注意。
+        </div>
+      </div>
+      <br>
+      <br>
+      <div class="footer-txt">
+        <a-row class="footer-warpper">
+          <p class="footer-text">
+            <span class="mr">版权所有©2008-2025</span>
+            <span class="mr">中国铁道科学研究院集团有限公司</span>
+            <span class="mr">技术支持：铁旅科技有限公司</span>
+          </p>
+        </a-row>
+        <a-row class="footer-warpper">
+          <p class="footer-text">
+            <span><img src="@/assets/gongan.png" alt="公安" style="margin-right: 4px;width: 14px;" /></span>
+            <span class="mr">京公网安备 11010802038392号</span>
+            <span class="mr">|</span>
+            <span class="mr">京ICP备05020493号-4</span>
+            <span class="mr">|</span>
+            <span class="mr">ICP证：京B2-20202537</span>
+            <span class="mr">|</span>
+            <span class="mr">营业执照</span>
+          </p>
+        </a-row>
+        <div class="footer-slh">
+          <img src="@/assets/footer-slh.jpg" alt="适老化无障碍服务">
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -225,6 +322,13 @@ import {
 
 
 const ticketType = ref('a');
+const newsList = ref([
+  '最新发布',
+  '常见问题',
+  '信用信息',
+]);
+const newsIndex = ref(0); // 当前新闻标题索引
+
 const locale = zhCN;
 const departureDate = ref<any>();
 const banners = [
@@ -354,7 +458,8 @@ body {
   position: absolute;
   width: 500px;
   padding: 20px;
-  z-index: 10;
+  padding-top: 10px;
+  z-index: 100;
   left: 20vw;
   max-height: 160px;
 }
@@ -378,7 +483,7 @@ body {
 }
 
 .query-type {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   width: 100%;
   display: flex;
 }
@@ -463,55 +568,168 @@ body {
   font-size: 24px;
   color: #4a90e2;
   margin-bottom: 8px;
+
+}
+
+.service-item:hover {
+  opacity: 0.8;
 }
 
 .service-cards {
   padding: 20px;
-  background-color: #f5f5f5;
+  max-width: 76%;
+}
+
+.news {
+  padding: 20px;
+  min-width: 75%;
+}
+
+.new-titles {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.news-title {
+  background: #efeff4;
+  color: #666;
+  display: block;
+  min-width: 450px;
+  width: 32%;
+  height: 50px;
+  line-height: 40px;
+  font-size: 18px;
+  align-content: center;
+  cursor: pointer;
 }
 
 .service-card {
   margin-bottom: 20px;
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
-}
-
-.card-content {
-  display: flex;
-  justify-content: space-between;
-  padding: 20px;
-}
-
-.card-title {
-  flex: 1;
-}
-
-.card-title h2 {
-  font-size: 24px;
-  color: #4a90e2;
-  margin-bottom: 10px;
-}
-
-.card-title p {
-  color: #666;
-  margin-bottom: 5px;
+  cursor: pointer;
 }
 
 .card-image {
   flex: 1;
   text-align: right;
+  transition: 0.3s linear opacity;
+}
+
+.card-image:hover {
+  opacity: 0.8;
+}
+
+
+:deep(.ant-card-body) {
+  /* 样式规则 */
+  padding: 0px;
 }
 
 .card-image img {
-  max-width: 100%;
-  max-height: 120px;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  transition: 0.3s linear opacity;
 }
 
-.member-card {
-  background-color: #e8f4ff;
+.footer {
+  width: 100%;
+  height: 40%;
+  background: #f8f8f8;
+  ;
 }
 
-.food-card {
-  background-color: #f0f9eb;
+.footer-con {
+  width: 70%;
+  height: 50%;
+  display: flex;
+  justify-self: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin-top: 20px;
+}
+
+.footer-links {
+  width: 40%;
+  height: 100%;
+  justify-self: center;
+}
+
+.foot-code {
+  width: 40%;
+  height: 100%;
+  justify-self: center;
+  text-align: center;
+}
+
+.foot-code img {
+  display: block;
+  width: 80px;
+  height: 80px;
+  border: 1px solid #dedede;
+}
+
+.footer-links img {
+  display: block;
+  width: 220px;
+  height: 37px;
+  border: 1px solid #dedede;
+  margin-bottom: 10px;
+}
+
+.code-tips {
+  width: 190px;
+  height: 80px;
+  border: 1px solid #dedede;
+  background-color: #fff;
+  background-position: right bottom;
+  background-repeat: no-repeat;
+  line-height: 18px;
+  padding: 12px 10px;
+  font-size: 12px;
+  text-align: left;
+  margin-left: 20px;
+  align-self: center;
+  justify-self: center;
+  margin-top: 12px;
+}
+
+.footer-txt {
+  align-content: center;
+  align-items: center;
+  min-height: 100px;
+  width: 100%;
+  background-color: #666666;
+}
+
+.footer-warpper {
+  display: relative;
+  justify-content: center;
+  text-align: center;
+}
+
+.footer-text {
+  color: #c1c1c1;
+  text-align: center;
+  font-size: 14.5px;
+}
+
+.mr {
+  margin-right: 10px;
+}
+
+.footer-slh {
+  position: absolute;
+  left: 50%;
+  margin-left: 465px;
+}
+
+.footer-slh img {
+  display: block;
+  width: 150px;
+  height: 50px;
 }
 </style>
