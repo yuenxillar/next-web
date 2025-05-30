@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+next-web-security-core = { path = "./next-web-security-core", version = "*"}
+next-web-security-macro = { path = "./next-web-security-macro", version = "*"}

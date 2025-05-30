@@ -1,14 +1,15 @@
-use hashbrown::HashSet;
+use std::collections::HashSet;
+
 
 #[derive(Default, Clone)]
-pub struct AuthGroup {
+pub struct PermissionGroup {
     role_group: Option<Vec<String>>,
     permission_group: Option<Vec<String>>,
     combination: Option<CombinationGroup>,
     is_combination: bool,
 }
 
-impl AuthGroup {
+impl PermissionGroup {
     pub fn new(
         role_group: Option<Vec<String>>,
         permission_group: Option<Vec<String>>,
@@ -78,13 +79,13 @@ impl AuthGroup {
         self.is_combination = flag;
     }
 
-    pub fn match_value(
+    pub fn match_value<T: AsRef<str> + PartialEq + Eq + ToString>(
         &self,
-        var1: Vec<String>,
-        var2: Vec<String>,
+        var1: Vec<T>,
+        var2: Vec<T>,
         mode: Option<&CombinationMode>,
     ) -> bool {
-        let var3 = var2.len() == 1 && var2[0] == "*";
+        let var3 = var2.len() == 1 && var2[0].as_ref() == "*";
         if var3 {
             return true;
         }
@@ -94,8 +95,8 @@ impl AuthGroup {
                     if var1.len() != var2.len() {
                         return false;
                     }
-                    let var4: HashSet<String> = var1.into_iter().collect();
-                    let var5: HashSet<String> = var2.into_iter().collect();
+                    let var4: HashSet<String> = var1.into_iter().map(|s| s.to_string()).collect();
+                    let var5: HashSet<String> = var2.into_iter().map(|s| s.to_string()).collect();
                     return var4 == var5;
                 }
                 Some(CombinationMode::Or) => {
@@ -107,8 +108,8 @@ impl AuthGroup {
             if var1.len() != var2.len() {
                 return false;
             }
-            let var4: HashSet<String> = var1.into_iter().collect();
-            let var5: HashSet<String> = var2.into_iter().collect();
+            let var4: HashSet<String> = var1.into_iter().map(|s| s.to_string()).collect();
+            let var5: HashSet<String> = var2.into_iter().map(|s| s.to_string()).collect();
             return var4 == var5;
         }
         false
@@ -156,7 +157,7 @@ impl CombinationGroup {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CombinationMode {
     And,
     Or,

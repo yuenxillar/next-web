@@ -206,11 +206,29 @@
         </a-col>
       </a-row>
     </div>
-    <div class="news">
-      <a-row :gutter="16" class="new-titles">
-        <div class="news-title" v-for="(label, index) in newsList" :key="index" @click="() => { newsIndex = index }"
-          :style="{ color: newsIndex === index ? '#fff' : '#666', background: newsIndex === index ? '#3b99fc' : '#efeff4'}"> {{ label }}</div>
+    <div class="new-tab">
+      <a-row :gutter="16" class="tab-hd">
+        <div v-for="(label, index) in newsTitleList" :key="index" @click="() => { newsIndex = index }"
+          :style="{ color: newsIndex === index ? '#fff' : '#666', background: newsIndex === index ? '#3b99fc' : '#efeff4' }">
+          {{ label }}</div>
       </a-row>
+      <a-row class="tab-bd">
+         <div class="tab-item">
+           <div class="news-index">
+             <ul class="news-index-list">
+               <li v-for="item in newsDataList" >
+                 <a target="_self"  class="news-tit" style="max-width: 70%;overflow: hidden;text-overflow: ellipsis;white-space: nowrap"
+                   :href="item.url" :title="item.title">{{ item.title }}</a>
+                 <span class="news-time">{{ item.date }}</span>
+               </li>
+             </ul>
+             <div style="clear: both; width: 100%; line-height: 36px; text-align: right;">
+               <a name="g_href" data-type="4" data-href="zxdt/index_zxdt.html" data-redirect="Y" data-target="_blank"
+                 style="color: #999;">更多&gt;</a>
+             </div>
+           </div>
+         </div>
+       </a-row>
     </div>
     <!-- 底部导航栏 -->
     <div class="footer">
@@ -320,13 +338,65 @@ import {
   UserOutlined
 } from '@ant-design/icons-vue';
 
-
 const ticketType = ref('a');
-const newsList = ref([
+const newsTitleList = ref([
   '最新发布',
   '常见问题',
   '信用信息',
 ]);
+const newsDataList = ref([
+  {
+    "title": "公 告",
+    "date": "2024-12-11",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  },
+  {
+    "title": "关于优化铁路车票改签规则的公告",
+    "date": "2024-01-11",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  },
+  {
+    "title": "铁路旅客禁止、限制携带和托运物品目录",
+    "date": "2023-11-30",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  },
+  {
+    "title": "公 告",
+    "date": "2022-12-22",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  },
+  {
+    "title": "中国铁路上海局集团有限公司关于2025年5月30日-2025年6月30日增开部分旅客列车的公告",
+    "date": "2025-05-27",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  },
+  {
+    "title": "关于铁路客运推广使用全面数字化的电子发票的公告",
+    "date": "2024-11-07",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  },
+  {
+    "title": "外国护照身份核验使用说明",
+    "date": "2023-12-13",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  },
+  {
+    "title": "候补购票操作说明",
+    "date": "2024-04-19",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  },
+  {
+    "title": "关于调整互联网、电话订票起售时间的公告",
+    "date": "2025-03-29",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  },
+  {
+    "title": "中国铁路呼和浩特局集团有限公司关于2025年5月27停运部分旅客列车的公告",
+    "date": "2025-05-26",
+    "url": "http://www.12306.cn/mormhweb/zxdt/202412/t20241211_43192.html"
+  }
+])
+
 const newsIndex = ref(0); // 当前新闻标题索引
 
 const locale = zhCN;
@@ -550,7 +620,6 @@ body {
   justify-content: space-around;
   padding: 20px 0;
   background-color: white;
-  border-bottom: 1px solid #eee;
   width: 80%;
   min-height: 10vh;
 }
@@ -580,29 +649,108 @@ body {
   max-width: 76%;
 }
 
-.news {
-  padding: 20px;
+.new-tab {
+  padding: 0;
   min-width: 75%;
+  max-width: 75%;
 }
 
-.new-titles {
+.tab-hd {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  /* align-items: center; */
+  justify-self: center;
+  width: 100%;
 }
 
-.news-title {
+.tab-hd div {
   background: #efeff4;
   color: #666;
   display: block;
-  min-width: 450px;
+  /* min-width: 400px; */
   width: 32%;
   height: 50px;
   line-height: 40px;
   font-size: 18px;
   align-content: center;
   cursor: pointer;
+}
+
+.tab-bd {
+  border: 1px solid #dedede;
+  width:  100%;
+  height: 30vh;
+  min-height: 300px;
+  padding: 0;
+  margin: 0;
+}
+
+.tab-item {
+  padding: 20px;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.news-index {
+  overflow: hidden;
+}
+
+.news-index li {
+  list-style: none;
+  float: left;
+  width: 544px;
+  margin-right: 100px;
+  height: 36px;
+  line-height: 36px;
+}
+
+.news-index a {
+  color: #333333;
+  font-size: 16px;
+}
+
+.news-index a:hover {
+  color: #000;
+}
+
+.news-index-list {
+  display: block;
+  list-style-type: disc;
+  margin-block-start: 1em;
+  margin-block-end: 1em;
+  padding-inline-start: 40px;
+  unicode-bidi: isolate;
+}
+
+.news-index li:before {
+  content: "";
+  float: left;
+  width: 6px;
+  height: 6px;
+  background: #3b99fc;
+  margin: 15px 20px 0 0;
+}
+
+.news-index ul::before {
+  content: "";
+  display: table;
+}
+
+.news-tit {
+  float: left;
+  height: 36px;
+  line-height: 36px;
+  overflow: hidden;
+  -ms-text-overflow: ellipsis;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.news-time {
+  float: right;
+  color: #999;
+  font-size: 14px;
 }
 
 .service-card {

@@ -35,7 +35,6 @@ use crate::event::default_application_event_publisher::DefaultApplicationEventPu
 use crate::router::open_router::OpenRouter;
 use crate::router::private_router::PrivateRouter;
 use crate::util::date_time_util::LocalDateTimeUtil;
-use crate::util::file_util::FileUtil;
 
 use next_web_core::context::application_resources::ApplicationResources;
 
@@ -56,11 +55,11 @@ pub trait Application: Send + Sync {
     ) -> (OpenRouter, PrivateRouter);
 
     /// register the rpc server.
-    #[cfg(feature = "grpc_enabled")]
+    #[cfg(feature = "enable_grpc")]
     async fn register_rpc_server(&mut self, properties: &ApplicationProperties);
 
     /// register the grpc client.
-    #[cfg(feature = "grpc_enabled")]
+    #[cfg(feature = "enable_grpc")]
     async fn connect_rpc_client(&mut self, properties: &ApplicationProperties);
 
     /// show the banner of the application.
@@ -111,30 +110,6 @@ pub trait Application: Send + Sync {
             });
         }
         messages
-    }
-
-    #[cfg(feature = "user_security")]
-    fn user_permission_resource(
-        &self,
-    ) -> Option<crate::security::user_permission_resource::UserPermissionResource> {
-        use crate::security::user_permission_resource::UserPermissionResourceBuilder;
-
-        let path = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .join(APPLICATION_USER_PERMISSION_RESOURCE)
-            .display()
-            .to_string();
-        if let Ok(content) = FileUtil::read_file_to_string(&path) {
-            if content.is_empty() {
-                return None;
-            }
-            let user_permission_resource: Vec<UserPermissionResourceBuilder> =
-                serde_json::from_str(&content).unwrap();
-            if user_permission_resource.is_empty() {
-                return None;
-            }
-            return Some(user_permission_resource.into());
-        }
-        None
     }
 
     /// initialize the logger.
@@ -282,7 +257,7 @@ pub trait Application: Send + Sync {
             .fallback(fall_back);
 
         // add prometheus layer
-        #[cfg(feature = "prometheus_enabled")]
+        #[cfg(feature = "enable_prometheus")]
         {
             let (prometheus_layer, metric_handle) = axum_prometheus::PrometheusMetricLayer::pair();
             app = app
@@ -497,7 +472,7 @@ pub trait Application: Send + Sync {
             LocalDateTimeUtil::now()
         );
 
-        #[cfg(feature = "grpc_enabled")]
+        #[cfg(feature = "enable_grpc")]
         {
             application.register_rpc_server(&properties).await;
             println!(

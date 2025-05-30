@@ -3,29 +3,22 @@ use axum::{
     http::header,
     middleware::Next,
     response::Response,
-    // Extension,
-};
-use next_web_common::response::api_response::ApiResponse;
-// use tracing::info;
-
-use super::{authorization_service::AuthorizationService, login_type::LoginType};
-use crate::{
-    manager::user_authorization_manager::UserAuthorizationManager, util::token_util::TokenUtil,
 };
 
-async fn request_auth_middleware<T: AuthorizationService<Vec<String>> + Clone>(
+
+async fn request_auth_middleware<T: AuthorizationService> (
     State(user_auth_manager): State<UserAuthorizationManager<T>>,
     mut req: Request,
     next: Next,
 ) -> Result<Response, ApiResponse<String>> {
-    let login_type = LoginType::default();
+    let login_type = T::LoginType::default();
     // do something with `state` and `request`...
     let token = req
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|header| header.to_str().ok())
         .ok_or(ApiResponse::fail(
-            "Authorization header not found".into(),
+            "Authorization header not found.".into(),
         ))
         .map(|token| token.replace("Bearer ", ""))?;
 

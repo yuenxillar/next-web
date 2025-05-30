@@ -39,7 +39,6 @@ tracing-appender = { workspace = true }
 regex = { workspace = true }
 jsonwebtoken = { workspace = true }
 matchit = { workspace = true, optional = true }
-bcrypt = { workspace = true }
 parking_lot = { workspace = true }
 flume = { workspace = true }
 
@@ -61,5 +60,5 @@ tls_rustls = ["axum-server"]
 user_security = ["matchit"]
 job_scheduler = ["tokio-cron-scheduler"]
 
-grpc_enabled = []
-prometheus_enabled = ["axum-prometheus"]
+enable_grpc = []
+enable_prometheus = ["axum-prometheus"]
