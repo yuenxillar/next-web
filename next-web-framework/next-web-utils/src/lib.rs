@@ -1,12 +1,21 @@
 pub mod url;
 pub mod html;
-pub mod cache;
+
+
+
 pub mod digester;
 
 #[cfg(feature = "qr-code")]
 pub mod qr_code;
+
+#[cfg(feature = "cache")]
+pub mod cache;
+
 pub mod calendar;
+
+#[cfg(feature = "captcha")]
 pub mod captcha;
+
 pub mod common;
 pub mod cron;
 pub mod crypto;
