@@ -3,7 +3,7 @@ pub mod html;
 
 
 
-pub mod digester;
+
 
 #[cfg(feature = "qr-code")]
 pub mod qr_code;
@@ -21,7 +21,8 @@ pub mod cron;
 pub mod crypto;
 pub mod datetime;
 pub mod file;
-pub mod mock_data;
 pub mod script;
 pub mod socket;
 pub mod system;
+pub mod control;
+pub mod image;
