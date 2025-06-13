@@ -1,47 +1,36 @@
 use axum::{
     extract::{Request, State},
-    http::header,
+    http::{HeaderMap, Response, StatusCode},
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response}, Extension,
 };
 
+use crate::permission::{
+    manager::user_authorization_manager::UserAuthenticationManager,
+    models::permission_group::PermissionGroup,
+};
 
-async fn request_auth_middleware<T: AuthorizationService> (
-    State(user_auth_manager): State<UserAuthorizationManager<T>>,
-    mut req: Request,
+pub(crate) async fn request_auth_middleware<R = axum::response::Response>(
+    State(user_auth_manager): State<UserAuthenticationManager>,
+    Extension(var): Extension<Option<String>>,
+    req_header: HeaderMap,
+    req: Request,
     next: Next,
-) -> Result<Response, ApiResponse<String>> {
-    let login_type = T::LoginType::default();
-    // do something with `state` and `request`...
-    let token = req
-        .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|header| header.to_str().ok())
-        .ok_or(ApiResponse::fail(
-            "Authorization header not found.".into(),
-        ))
-        .map(|token| token.replace("Bearer ", ""))?;
+) -> Result<R, R> {
+    let auth_service = user_auth_manager.authentication_service();
 
-    // local (check if the token is valid)
-    let user_info = TokenUtil::decode(&token).map_err(|e| ApiResponse::fail(e.to_string()))?;
+    let login_type = auth_service.login_type(&req_header);
+    let user_id = auth_service.id(&req_header);
 
-    // service (check if the token is valid)
-    if !user_auth_manager.verify_token(&token, &login_type).await {
-        return Err(ApiResponse::fail("Invalid token".into()));
+    if user_auth_manager
+        .pre_authorize(&user_id, &login_type, &PermissionGroup::default())
+        .await
+    {
+        return Ok(next.run(req).await);
     }
 
-    if let Some(auth_group) = user_auth_manager.get_permission(req.method(), req.uri().path()) {
-        // check if the user is authorized to access the resource
-        if !user_auth_manager
-            .pre_authorize(user_info.user_id(), auth_group, &login_type)
-            .await
-        {
-            return Err(ApiResponse::fail("Unauthorized access".into()));
-        }
-    }
-    // set the user info in the request
-    req.extensions_mut().insert(user_info);
-
-    // check if the user is authorized to access the resource
-    Ok(next.run(req).await)
+    Err(Response::builder()
+        .status(StatusCode::UNAUTHORIZED)
+        .body("")
+        .unwrap())
 }

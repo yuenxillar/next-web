@@ -1,6 +1,7 @@
-use std::any::Any;
+use std::{any::Any, fmt::Debug};
 
-
+/// 缓存值类型枚举
+/// Cache value type enum
 #[derive(Clone)]
 pub enum CacheValue {
     String(String),
@@ -8,39 +9,66 @@ pub enum CacheValue {
     Boolean(bool),
     Float(String),
     Array(Vec<CacheValue>),
-    // Object(Box<dyn BoxAny>),
+    Object(Box<String>),
     Null,
 }
 
+/// 可克隆的任意类型trait
+/// Cloneable any type trait
+pub trait AnyClone: Any + Send + Sync + Debug {
+    fn clone_box(&self) -> Box<dyn AnyClone>;
+    fn as_any(&self) -> &dyn Any;
+}
+
+/// 缓存对象包装器
+/// Cache object wrapper
+pub struct CacheObject<T>(pub T)
+where
+    T: Any + Clone + Send + Sync + Debug;
+
 impl CacheValue {
+    /// 检查是否为数字类型
+    /// Check if the value is a number
     pub fn is_number(&self) -> bool {
         matches!(self, CacheValue::Number(_))
     }
 
+    /// 检查是否为浮点数类型
+    /// Check if the value is a float
     pub fn is_float(&self) -> bool {
         matches!(self, CacheValue::Float(_))
     }
 
+    /// 检查是否为字符串类型
+    /// Check if the value is a string
     pub fn is_string(&self) -> bool {
         matches!(self, CacheValue::String(_))
     }
 
+    /// 检查是否为布尔类型
+    /// Check if the value is a boolean
     pub fn is_boolean(&self) -> bool {
         matches!(self, CacheValue::Boolean(_))
     }
 
+    /// 检查是否为null
+    /// Check if the value is null
     pub fn is_null(&self) -> bool {
         matches!(self, CacheValue::Null)
     }
 
+    /// 检查是否为数组类型
+    /// Check if the value is an array
     pub fn is_array(&self) -> bool {
         matches!(self, CacheValue::Array(_))
     }
 
-    // pub fn is_object(&self) -> bool {
-    //     matches!(self, CacheValue::Object(_))
-    // }
+    pub fn is_object(&self) -> bool {
+        matches!(self, CacheValue::Object(_))
+    }
 
+    /// 获取字符串值
+    /// Get string value
     pub fn as_string(&self) -> Option<String> {
         if let CacheValue::String(s) = self {
             Some(s.to_owned())
@@ -49,6 +77,8 @@ impl CacheValue {
         }
     }
 
+    /// 获取数字值
+    /// Get number value
     pub fn as_number(&self) -> Option<i64> {
         if let CacheValue::Number(n) = self {
             Some(*n)
@@ -57,6 +87,8 @@ impl CacheValue {
         }
     }
 
+    /// 获取布尔值
+    /// Get boolean value
     pub fn as_boolean(&self) -> Option<bool> {
         if let CacheValue::Boolean(b) = self {
             Some(*b)
@@ -65,6 +97,8 @@ impl CacheValue {
         }
     }
 
+    /// 获取数组引用
+    /// Get array reference
     pub fn as_array(&self) -> Option<&Vec<CacheValue>> {
         if let CacheValue::Array(a) = self {
             Some(a)
@@ -73,18 +107,8 @@ impl CacheValue {
         }
     }
 
-    // pub fn as_object<T: 'static>(&self) -> Option<T> {
-    //     if let CacheValue::Object(obj) = self {
-    //         if let Ok(o) = obj.as_any().downcast::<T>() {
-    //             Some(*o)
-    //         } else {
-    //             None
-    //         }
-    //     } else {
-    //         None
-    //     }
-    // }
-
+    /// 转换为字符串表示
+    /// Convert to string representation
     pub fn to_string(&self) -> String {
         match self {
             CacheValue::String(s) => s.clone(),
@@ -104,6 +128,14 @@ impl CacheValue {
             }
             _ => "".to_string(),
         }
+    }
+
+    pub fn as_object<T: Any>(&self) -> Option<&T> {
+        if let CacheValue::Object(obj) = self {
+            let any_obj = obj.as_any();
+            return any_obj.downcast_ref::<T>();
+        }
+        None
     }
 }
 
@@ -154,3 +186,25 @@ impl Into<CacheValue> for Vec<CacheValue> {
         CacheValue::Array(self)
     }
 }
+
+/// 为所有实现了Clone+Send+Sync的类型实现AnyClone
+/// Implement AnyClone for all types that implement Clone+Send+Sync
+impl<T> AnyClone for T
+where
+    T: Any,
+    T: Clone + Send + Sync + Debug,
+{
+    fn clone_box(&self) -> Box<dyn AnyClone> {
+        Box::new(self.clone())
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+// impl<T: Any + Clone + Send + Sync + Debug> Into<CacheValue> for CacheObject<T> {
+//     fn into(self) -> CacheValue {
+//         CacheValue::Object(Box::new(self.0))
+//     }
+// }

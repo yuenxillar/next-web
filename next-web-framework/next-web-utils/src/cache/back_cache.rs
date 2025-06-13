@@ -135,16 +135,6 @@ impl BackCache {
         );
     }
 
-    // pub fn set_obj<K, V>(&self, key: K, value: V, ttl: Option<Duration>)
-    // where
-    //     K: Into<Cow<'static, str>>,
-    //     V: Any + Clone + Send + Sync,
-    // {
-    //     let expires_at = ttl.map(|d| Instant::now() + d);
-    //     let item = CacheItem::new(CacheValue::Object(Box::new(value)), expires_at);
-    //     self.data.insert(key.into(), item);
-    // }
-
     /// Gets a value by key, returns None if expired or not found
     /// 通过键获取值，如果过期或不存在则返回 None
     ///
@@ -243,8 +233,8 @@ impl BackCache {
             .collect())
     }
 
-      /// 删除键
-      pub fn remove<K: AsRef<str>>(&self, key: K) -> Option<CacheValue> {
+    /// 删除键
+    pub fn remove<K: AsRef<str>>(&self, key: K) -> Option<CacheValue> {
         self.data.remove(key.as_ref()).map(|(_, item)| item.value)
     }
 
@@ -292,6 +282,10 @@ impl Drop for BackCache {
 
 #[cfg(test)]
 mod tests {
+    use md2::digest::typenum::Or;
+
+    use crate::cache::cache_value::{AnyClone, CacheObject};
+
     use super::*;
     use std::thread;
     use std::time::Duration;
@@ -311,7 +305,13 @@ mod tests {
         assert!(!cache.exists("nonexistent"));
 
         // Test remove
-        assert_eq!(cache.remove("key1").map(|s| s.as_string()).unwrap_or_default(), Some("value1".into()));
+        assert_eq!(
+            cache
+                .remove("key1")
+                .map(|s| s.as_string())
+                .unwrap_or_default(),
+            Some("value1".into())
+        );
         assert!(!cache.exists("key1"));
 
         // Test set object
@@ -362,9 +362,22 @@ mod tests {
         assert!(cache.ttl("permanent").is_none());
 
         // Test expired
-        cache.set("expired", "value", Some(Duration::from_millis(1)));
-        thread::sleep(Duration::from_millis(2));
+        cache.set("expired", "value", Some(Duration::from_millis(1000)));
+        thread::sleep(Duration::from_millis(1200));
         assert!(cache.ttl("expired").is_none());
+
+        #[derive(Clone)]
+        struct TestA(String);
+
+        let object = TestA("hello".to_string());
+
+        // cache.set("ttl-123", CacheObject(String::new()), None);
+
+        if let Some(value) = cache.get("ttl-123") {
+            if let Some(item) = value.as_object::<String>() {
+                println!("{:?}", 123456);
+            }
+        }
     }
 
     #[test]
@@ -458,5 +471,38 @@ mod tests {
 
         cache.clear();
         assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn test_any() {
+        use std::any::{Any, TypeId};
+
+        trait AnyCloneA: Any {
+            fn clone_box(&self) -> Box<dyn AnyCloneA>;
+        }
+
+        impl<T> AnyCloneA for T
+        where
+            T: Clone + Any + 'static,
+        {
+            fn clone_box(&self) -> Box<dyn AnyCloneA> {
+                Box::new(self.clone())
+            }
+        }
+
+        impl Clone for  Box<dyn AnyCloneA> {
+            fn clone(&self) -> Self {
+                (**self).clone_box()
+            }
+        }
+
+        let original: Box<dyn AnyCloneA> = Box::new(String::from("Hello, world!"));
+
+        let var = original.clone_box();
+        if let Some(downcasted) = Any::downcast_ref::<String>(&*original) {
+            println!("Downcast successful: {}", downcasted);
+        } else {
+            println!("Downcast failed");
+        }
     }
 }

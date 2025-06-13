@@ -7,6 +7,8 @@ mod route;
 mod service_discovery;
 mod tests;
 mod utils;
+mod models;
+
 
 pub mod application;
 pub mod circuit_breaker;

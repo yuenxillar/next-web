@@ -1,24 +1,23 @@
+use std::sync::Arc;
+
+use crate::auth::models::login_type::LoginType;
 use crate::permission::{
     models::permission_group::{CombinationMode, PermissionGroup},
     service::authentication_service::AuthenticationService,
 };
 
 #[derive(Clone)]
-pub struct UserAuthenticationManager<T>
-where
-    T: AuthenticationService,
+pub struct UserAuthenticationManager
 {
     // options: UserAuthorizationOptions,
-    authentication_service: T,
+    authentication_service: Arc<dyn AuthenticationService>,
 }
 
-impl<T> UserAuthenticationManager<T>
-where
-    T: AuthenticationService,
+impl UserAuthenticationManager
 {
     pub fn new(
         // options: UserAuthorizationOptions,
-        authentication_service: T,
+        authentication_service: Arc<dyn AuthenticationService>,
     ) -> Self {
         Self {
             // options,
@@ -30,28 +29,17 @@ where
     //     &self.options
     // }
 
-    pub fn authentication_service(&self) -> &T {
+    pub fn authentication_service(&self) -> &Arc<dyn AuthenticationService> {
         &self.authentication_service
-    }
-
-    pub fn get_permission(
-        &self,
-        method: &axum::http::Method,
-        path: &str,
-    ) -> Option<&PermissionGroup> {
-        // self.user_permission_resource.get_permission(method, path)
-        None
     }
 }
 
-impl<T> UserAuthenticationManager<T>
-where
-    T: AuthenticationService,
+impl UserAuthenticationManager
 {
     pub async fn pre_authorize<'a>(
         &self,
-        user_id: &'a T::Id,
-        login_type: &'a T::LoginType,
+        user_id: &'a String,
+        login_type: &'a LoginType,
         auth_group: &'a PermissionGroup,
     ) -> bool {
         if auth_group.is_combination() {
@@ -62,7 +50,7 @@ where
 
         let roles = auth_group.roles();
         let permissions = auth_group.permissions();
-        let binding  = auth_group.mode();
+        let binding = auth_group.mode();
         let mode = binding.as_ref();
 
         if roles.is_none() && permissions.is_none() {
@@ -80,7 +68,7 @@ where
         // 2. Or mode: if user has any roles or permissions, return true
         let role_flag = auth_group.match_value(
             roles.unwrap_or_default(),
-            user_roles.iter().map(|s| s.to_string()).collect(),
+            user_roles,
             mode,
         );
         if let Some(var1) = mode {
@@ -102,7 +90,7 @@ where
 
         let permission_flag = auth_group.match_value(
             permissions.unwrap_or_default(),
-            user_permissions.iter().map(|s| s.to_string()).collect(),
+            user_permissions,
             mode,
         );
 

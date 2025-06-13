@@ -11,7 +11,8 @@ use next_web_dev::router::open_router::OpenRouter;
 use next_web_dev::router::private_router::PrivateRouter;
 use next_web_dev::Singleton;
 use next_web_websocket::core::handler::Result;
-use next_web_websocket::core::{handler::WebSocketHandler, session::WebSocketSession};
+use next_web_websocket::core::handler::WebSocketHandler;
+use next_web_websocket::models::session::WebSocketSession;
 use next_web_websocket::Message;
 
 /// Test

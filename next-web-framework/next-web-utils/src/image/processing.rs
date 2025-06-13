@@ -1,4 +1,4 @@
-use image::{imageops::FilterType, DynamicImage, GenericImageView, Rgba};
+use image::{imageops::FilterType, DynamicImage, GenericImageView, ImageOutputFormat, Rgba};
 
 use imageproc::drawing::draw_text;
 use rusttype::{Font, Scale};
@@ -14,6 +14,8 @@ pub enum ImageProcessingError {
     DimensionError(String),
     /// Error with font loading
     FontError(String),
+    /// Error with unsupported format
+    UnsupportedFormat(String),
 }
 
 /// Compress an image by reducing quality and/or changing format
@@ -34,33 +36,26 @@ pub fn compress_image(
         image::open(input_path).map_err(|e| ImageProcessingError::LoadError(e.to_string()))?;
 
     // Save with specified quality and format
-    match format.to_lowercase().as_str() {
-        "jpeg" | "jpg" => {
-            img.save_with_format(output_path, image::ImageFormat::Jpeg)
-                .map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
-            // For JPEG, we can set quality
-            let mut output = std::fs::File::create(output_path)
-                .map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
-            img.write_to(&mut output, image::ImageOutputFormat::Jpeg(quality))
-                .map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
-        }
+    let output_format = match format.to_lowercase().as_str() {
+        "jpeg" | "jpg" => ImageOutputFormat::Jpeg(quality),
         "png" => {
-            img.save_with_format(output_path, image::ImageFormat::Png)
-                .map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
+            // PNG压缩级别 (0-9)
+            let compression = (9 - (quality as f32 / 100.0 * 9.0) as u8).min(9);
+            ImageOutputFormat::Png
         }
         "webp" => {
-            let mut output = std::fs::File::create(output_path)
-                .map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
-            img.write_to(&mut output, image::ImageOutputFormat::WebP)
-                .map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
+            // WebP质量 (0-100)
+            ImageOutputFormat::WebP
         }
-        _ => {
-            return Err(ImageProcessingError::SaveError(format!(
-                "Unsupported format: {}",
-                format
-            )))
-        }
-    }
+        _ => return Err(ImageProcessingError::UnsupportedFormat(format.to_string())),
+    };
+    // 创建输出文件并保存
+    let mut output_file =
+        std::fs::File::create(output_path).map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
+
+    img.write_to(&mut output_file, output_format)
+        .map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
+
     Ok(())
 }
 
@@ -148,7 +143,7 @@ pub fn add_watermark(
     let color = Rgba([255, 255, 255, opacity]);
 
     // Draw text on image
-    let img= draw_text(&mut img, color, x, y, scale, &font, text);
+    let img = draw_text(&mut img, color, x, y, scale, &font, text);
 
     // Save watermarked image
     DynamicImage::ImageRgba8(img)
@@ -250,9 +245,8 @@ mod tests {
         path
     }
 
-
     fn get_file_path() -> String {
-       format!(
+        format!(
             "{}.png",
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -288,8 +282,8 @@ mod tests {
         let input_path = create_test_image(200, 200);
 
         // 测试JPEG压缩
-        let jpeg_path =get_file_path();
-        compress_image(&input_path,  &jpeg_path, 50, "jpeg").expect("JPEG compression failed");
+        let jpeg_path = get_file_path();
+        compress_image(&input_path, &jpeg_path, 50, "jpeg").expect("JPEG compression failed");
         assert!(
             fs::metadata(jpeg_path)
                 .expect("JPEG file not created")

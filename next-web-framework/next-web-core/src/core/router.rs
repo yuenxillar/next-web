@@ -6,6 +6,8 @@ use crate::ApplicationContext;
 
 
 pub trait ApplyRouter: DynClone + Send + Sync{
+
+    fn order(&self) -> u32 { 100 }
     
     fn router(&self, ctx: &mut ApplicationContext) -> Router;
 }

@@ -1,1 +1,1 @@
-// pub mod request_auth_middleware;
+pub mod request_auth_middleware;

@@ -20,7 +20,7 @@ use next_web_dev::{
 use next_web_mqtt::core::topic::base_topic::BaseTopic;
 use next_web_mqtt::service::mqtt_service::MQTTService;
 use next_web_websocket::core::handler::WebSocketHandler;
-use next_web_websocket::core::session::WebSocketSession;
+use next_web_websocket::models::session::WebSocketSession;
 
 mod test_excel;
 
