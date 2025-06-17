@@ -1,4 +1,4 @@
-use std::{any::Any, fmt::Debug};
+use std::any::Any;
 
 /// 缓存值类型枚举
 /// Cache value type enum
@@ -9,22 +9,44 @@ pub enum CacheValue {
     Boolean(bool),
     Float(String),
     Array(Vec<CacheValue>),
-    Object(Box<String>),
+    Object(Box<dyn AnyClone>),
     Null,
 }
 
 /// 可克隆的任意类型trait
 /// Cloneable any type trait
-pub trait AnyClone: Any + Send + Sync + Debug {
+pub trait AnyClone: Any + Send + Sync {
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
     fn clone_box(&self) -> Box<dyn AnyClone>;
-    fn as_any(&self) -> &dyn Any;
+}
+
+/// 为所有实现了Clone+Send+Sync的类型实现AnyClone
+/// Implement AnyClone for all types that implement Clone+Send+Sync
+impl<T> AnyClone for T
+where
+    T:  Any + Clone + Send + Sync,
+{
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn AnyClone> {
+        Box::new(self.clone())
+    }
+}
+
+// Implement Clone for Box<dyn AnyClone>
+impl Clone for Box<dyn AnyClone> {
+    fn clone(&self) -> Box<dyn AnyClone> {
+        (**self).clone_box()
+    }
 }
 
 /// 缓存对象包装器
 /// Cache object wrapper
 pub struct CacheObject<T>(pub T)
 where
-    T: Any + Clone + Send + Sync + Debug;
+    T: Any + Clone + Send + Sync;
 
 impl CacheValue {
     /// 检查是否为数字类型
@@ -130,12 +152,13 @@ impl CacheValue {
         }
     }
 
-    pub fn as_object<T: Any>(&self) -> Option<&T> {
+    pub fn as_object<T: Any>(&self) -> Option<T> {
         if let CacheValue::Object(obj) = self {
-            let any_obj = obj.as_any();
-            return any_obj.downcast_ref::<T>();
+            let any_obj = obj.clone();
+            any_obj.into_any().downcast().map(|obj| *obj).ok()
+        } else {
+            None
         }
-        None
     }
 }
 
@@ -187,24 +210,8 @@ impl Into<CacheValue> for Vec<CacheValue> {
     }
 }
 
-/// 为所有实现了Clone+Send+Sync的类型实现AnyClone
-/// Implement AnyClone for all types that implement Clone+Send+Sync
-impl<T> AnyClone for T
-where
-    T: Any,
-    T: Clone + Send + Sync + Debug,
-{
-    fn clone_box(&self) -> Box<dyn AnyClone> {
-        Box::new(self.clone())
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
+impl<T: 'static + Any + Clone + Send + Sync> Into<CacheValue> for CacheObject<T> {
+    fn into(self) -> CacheValue {
+        CacheValue::Object(Box::new(self.0))
     }
 }
-
-// impl<T: Any + Clone + Send + Sync + Debug> Into<CacheValue> for CacheObject<T> {
-//     fn into(self) -> CacheValue {
-//         CacheValue::Object(Box::new(self.0))
-//     }
-// }

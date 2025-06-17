@@ -1,6 +1,5 @@
 use dashmap::DashMap;
 use regex::Regex;
-use std::any::Any;
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -33,17 +32,11 @@ pub struct BackCache {
 struct CacheItem {
     /// The cached value
     /// 缓存的值
-    value: CacheValue,
+    pub value: CacheValue,
 
     /// Optional expiration time
     /// 可选的过期时间
-    expires_at: Option<Instant>,
-}
-
-impl CacheItem {
-    pub fn new(value: CacheValue, expires_at: Option<Instant>) -> Self {
-        Self { value, expires_at }
-    }
+    pub expires_at: Option<Instant>,
 }
 
 impl BackCache {
@@ -282,9 +275,8 @@ impl Drop for BackCache {
 
 #[cfg(test)]
 mod tests {
-    use md2::digest::typenum::Or;
 
-    use crate::cache::cache_value::{AnyClone, CacheObject};
+    use crate::cache::cache_value::CacheObject;
 
     use super::*;
     use std::thread;
@@ -313,26 +305,6 @@ mod tests {
             Some("value1".into())
         );
         assert!(!cache.exists("key1"));
-
-        // Test set object
-        #[derive(Clone)]
-        struct TestA {
-            name: String,
-        }
-
-        // cache.set_obj(
-        //     "hello",
-        //     TestA {
-        //         name: "test".to_string(),
-        //     },
-        //     Some(Duration::from_millis(5000)),
-        // );
-
-        // if let Some(var1) = cache.get("hello") {
-        //     if let Some(var1) = var1.as_object::<TestA>() {
-        //         println!("naem: {:?}", var1.name);
-        //     }
-        // }
     }
 
     #[test]
@@ -365,19 +337,6 @@ mod tests {
         cache.set("expired", "value", Some(Duration::from_millis(1000)));
         thread::sleep(Duration::from_millis(1200));
         assert!(cache.ttl("expired").is_none());
-
-        #[derive(Clone)]
-        struct TestA(String);
-
-        let object = TestA("hello".to_string());
-
-        // cache.set("ttl-123", CacheObject(String::new()), None);
-
-        if let Some(value) = cache.get("ttl-123") {
-            if let Some(item) = value.as_object::<String>() {
-                println!("{:?}", 123456);
-            }
-        }
     }
 
     #[test]
@@ -424,28 +383,6 @@ mod tests {
     }
 
     #[test]
-    fn test_concurrent_access() {
-        let cache = BackCache::new();
-        let cache = Arc::new(cache);
-
-        // let mut handles = vec![];
-
-        // for i in 0..10 {
-        //     let cache = cache.clone();
-        //     handles.push(thread::spawn(move || {
-        //         cache.set(format!("key{}", i), i, None);
-        //         assert_eq!(cache.get(format!("key{}", i)), Some(i.into()));
-        //     }));
-        // }
-
-        // for handle in handles {
-        //     handle.join().unwrap();
-        // }
-
-        // assert_eq!(cache.len(), 10);
-    }
-
-    #[test]
     fn test_cleanup_task() {
         let cache = BackCache::new();
 
@@ -475,34 +412,26 @@ mod tests {
 
     #[test]
     fn test_any() {
-        use std::any::{Any, TypeId};
+       
+        let cache = BackCache::new();
+        cache.set(
+            "key1",
+            CacheObject(String::from("Hello, world!")),
+            Some(Duration::from_secs(100)),
+        );
+        let value = cache.get("key1");
+        assert_eq!(value.map(|f| f.as_object::<String>()).unwrap().unwrap(), "Hello, world!".to_string());
 
-        trait AnyCloneA: Any {
-            fn clone_box(&self) -> Box<dyn AnyCloneA>;
-        }
 
-        impl<T> AnyCloneA for T
-        where
-            T: Clone + Any + 'static,
-        {
-            fn clone_box(&self) -> Box<dyn AnyCloneA> {
-                Box::new(self.clone())
+        #[derive(Clone, Debug)]
+        struct TestA(pub String);
+
+        let gogo = TestA("I am Gogo!!".to_string());
+        cache.set("test_gogo", CacheObject(gogo), None);
+        if let Some(value) = cache.get("test_gogo") {
+            if let Some(var) = value.as_object::<TestA>() {
+                assert_eq!(var.0, "I am Gogo!!".to_string());
             }
-        }
-
-        impl Clone for  Box<dyn AnyCloneA> {
-            fn clone(&self) -> Self {
-                (**self).clone_box()
-            }
-        }
-
-        let original: Box<dyn AnyCloneA> = Box::new(String::from("Hello, world!"));
-
-        let var = original.clone_box();
-        if let Some(downcasted) = Any::downcast_ref::<String>(&*original) {
-            println!("Downcast successful: {}", downcasted);
-        } else {
-            println!("Downcast failed");
         }
     }
 }
