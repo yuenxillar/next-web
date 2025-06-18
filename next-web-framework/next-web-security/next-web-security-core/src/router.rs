@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use next_web_core::core::router::ApplyRouter;
+use next_web_core::core::apply_router::ApplyRouter;
 use rudi_dev::Singleton;
 
 use crate::permission::{
     manager::user_authorization_manager::UserAuthenticationManager,
-    middleware::request_auth_middleware::request_auth_middleware,
     service::authentication_service::AuthenticationService,
 };
+use crate::permission::middleware::request_auth_middleware::request_auth_middleware;
 
 #[derive(Clone)]
 #[Singleton(binds = [Self::into_apply_router])]

@@ -8,8 +8,6 @@ pub trait ApplyRouter: DynClone + Send + Sync {
 
     fn open(&self) -> bool { false }
 
-pub trait ApplyRouter: DynClone + Send + Sync{
-
     fn order(&self) -> u32 { 100 }
     
     fn router(&self, ctx: &mut ApplicationContext) -> Router;
