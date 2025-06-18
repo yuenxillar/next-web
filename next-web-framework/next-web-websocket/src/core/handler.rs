@@ -3,7 +3,8 @@ use std::error::Error;
 use axum::extract::ws::{CloseFrame, Message};
 use next_web_core::async_trait;
 
-use super::session::WebSocketSession;
+use crate::models::session::WebSocketSession;
+
 
 ///
 /// 自定义 WebSocket 操作结果类型。

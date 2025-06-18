@@ -1,46 +1,55 @@
-use crate::{
-    core::http_security::HttpSecurity,
-    permission::{
-        models::permission_group::{CombinationMode, PermissionGroup},
-        service::authentication_service::AuthenticationService,
-    },
+use std::sync::Arc;
+
+use crate::auth::models::login_type::LoginType;
+use crate::permission::{
+    models::permission_group::{CombinationMode, PermissionGroup},
+    service::authentication_service::AuthenticationService,
 };
 
 #[derive(Clone)]
-pub struct UserAuthenticationManager<S>
-where
-    S: AuthenticationService,
+pub struct UserAuthenticationManager
 {
-    authentication_service: S,
-    pub(crate) http_security: HttpSecurity,
+    // options: UserAuthorizationOptions,
+    authentication_service: Arc<dyn AuthenticationService>,
 }
 
-impl<S> UserAuthenticationManager<S>
-where
-    S: AuthenticationService,
+impl UserAuthenticationManager
 {
-    pub fn new(authentication_service: S, http_security: HttpSecurity) -> Self {
+    pub fn new(
+        // options: UserAuthorizationOptions,
+        authentication_service: Arc<dyn AuthenticationService>,
+    ) -> Self {
         Self {
             authentication_service,
             http_security,
         }
     }
 
-    pub fn authentication_service(&self) -> &S {
+    pub fn authentication_service(&self) -> &Arc<dyn AuthenticationService> {
         &self.authentication_service
     }
 }
 
-impl<S> UserAuthenticationManager<S>
-where
-    S: AuthenticationService,
+impl UserAuthenticationManager
 {
     pub async fn pre_authorize(
         &self,
-        req_headers: &axum::http::HeaderMap,
-        permission_group: &PermissionGroup,
+        user_id: &'a String,
+        login_type: &'a LoginType,
+        auth_group: &'a PermissionGroup,
     ) -> bool {
-        if permission_group.valid() {
+        if auth_group.is_combination() {
+            if auth_group.combination_valid() {
+                return true;
+            }
+        }
+
+        let roles = auth_group.roles();
+        let permissions = auth_group.permissions();
+        let binding = auth_group.mode();
+        let mode = binding.as_ref();
+
+        if roles.is_none() && permissions.is_none() {
             return true;
         }
 
@@ -61,8 +70,18 @@ where
         // tips:
         // 1. And mode: if user has all roles and permissions, return true
         // 2. Or mode: if user has any roles or permissions, return true
-        let role_flag = permission_group.match_value(roles, user_roles.as_ref());
-        if *mode == CombinationMode::And {
+        let role_flag = auth_group.match_value(
+            roles.unwrap_or_default(),
+            user_roles,
+            mode,
+        );
+        if let Some(var1) = mode {
+            if var1 != &CombinationMode::Or {
+                if !role_flag {
+                    return false;
+                }
+            }
+        } else {
             if !role_flag {
                 return false;
             }
@@ -78,7 +97,11 @@ where
             .await
             .map(|s| s.iter().map(|s| s.to_string()).collect::<Vec<_>>());
 
-        let permission_flag = permission_group.match_value(permissions, user_permissions.as_ref());
+        let permission_flag = auth_group.match_value(
+            permissions.unwrap_or_default(),
+            user_permissions,
+            mode,
+        );
 
         if role_flag && permission_flag {
             return true;

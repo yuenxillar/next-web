@@ -1,32 +1,15 @@
-use std::fmt::Debug;
-
+use crate::auth::models::login_type::LoginType;
 use next_web_core::async_trait;
 
-
 #[async_trait]
-pub trait AuthenticationService<H = axum::http::HeaderMap>: Send + Sync {
+pub trait AuthenticationService<H = axum::http::HeaderMap, ID = String>: Send + Sync {
+    fn id(&self, req_header: &H) -> ID;
 
-    type Id: Default;
-
-    type LoginType: Eq + PartialEq + Clone + Debug + Default;
-
-    type AccessElement: AsRef<str> + ToString;
-
-    fn id(&self, req_headers: &H) -> Self::Id;
-
-    fn login_type(&self, req_headers: &H) -> Self::LoginType;
+    fn login_type(&self, req_header: &H) -> LoginType;
 
     /// Returns the roles of the user with the given `user_id` and `login_type`.
-    async fn user_role(
-        &self,
-        user_id: &Self::Id,
-        login_type: &Self::LoginType,
-    ) -> Option<Vec<Self::AccessElement>>;
+    async fn user_role(&self, user_id: &ID, login_type: &LoginType) -> Vec<String>;
 
     /// Returns the permission of the user with the given `user_id` and `login_type`.
-    async fn user_permission(
-        &self,
-        user_id: &Self::Id,
-        login_type: &Self::LoginType,
-    ) -> Option<Vec<Self::AccessElement>>;
+    async fn user_permission(&self, user_id: &ID, login_type: &LoginType) -> Vec<String>;
 }

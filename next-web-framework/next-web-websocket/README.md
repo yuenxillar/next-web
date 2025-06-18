@@ -13,8 +13,10 @@ use axum::extract::ws::CloseFrame;
 use next_web_core::async_trait;
 use next_web_dev::Singleton;
 use next_web_websocket::core::handler::Result;
-use next_web_websocket::core::{handler::WebSocketHandler, session::WebSocketSession};
+use next_web_websocket::core::handler::WebSocketHandler;
 use next_web_websocket::Message;
+
+use crate::models::session::WebSocketSession;
 
 /// Test
 #[Singleton(binds = [Self::into_websocket_handler])]
