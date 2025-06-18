@@ -38,7 +38,6 @@ tracing = { workspace = true }
 tracing-appender = { workspace = true }
 regex = { workspace = true }
 jsonwebtoken = { workspace = true }
-matchit = { workspace = true, optional = true }
 parking_lot = { workspace = true }
 flume = { workspace = true }
 
@@ -54,10 +53,9 @@ next-web-common = { version = "0.1.0", default-features = false, features = [
 ] }
 
 [features]
-default = ["user_security", "job_scheduler"]
+default = ["job_scheduler"]
 tls_rustls = ["axum-server"]
 
-user_security = ["matchit"]
 job_scheduler = ["tokio-cron-scheduler"]
 
 enable_grpc = []

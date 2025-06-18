@@ -8,11 +8,11 @@ use next_web_core::constants::application_constants::APPLICATION_BANNER_FILE;
 use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
-use next_web_core::core::router::ApplyRouter;
+use next_web_core::core::apply_router::ApplyRouter;
 use next_web_core::AutoRegister;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use std::io::BufRead;
-use std::path::PathBuf;
+// use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
@@ -32,37 +32,30 @@ use crate::autoconfigure::context::next_properties::NextProperties;
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
-use crate::router::open_router::OpenRouter;
-use crate::router::private_router::PrivateRouter;
-use crate::util::date_time_util::LocalDateTimeUtil;
+use crate::util::date_time_util::LocalDateTime;
 
 use next_web_core::context::application_resources::ApplicationResources;
 
 #[cfg(feature = "job_scheduler")]
 use crate::manager::job_scheduler_manager::{ApplicationJob, JobSchedulerManager};
 
-pub const APPLICATION_USER_PERMISSION_RESOURCE: &str = "user_permission_resource.json";
-
 #[async_trait]
 pub trait Application: Send + Sync {
-    /// initialize the middleware.
+    /// Initialize the middleware.
     async fn init_middleware(&mut self, properties: &ApplicationProperties);
 
-    // get the application router. (open api  and private api)
-    async fn application_router(
-        &mut self,
-        ctx: &mut ApplicationContext,
-    ) -> (OpenRouter, PrivateRouter);
+    // Get the application router. (open api  and private api)
+    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router;
 
-    /// register the rpc server.
+    /// Register the rpc server.
     #[cfg(feature = "enable_grpc")]
     async fn register_rpc_server(&mut self, properties: &ApplicationProperties);
 
-    /// register the grpc client.
+    /// Register the grpc client.
     #[cfg(feature = "enable_grpc")]
     async fn connect_rpc_client(&mut self, properties: &ApplicationProperties);
 
-    /// show the banner of the application.
+    /// Show the banner of the application.
     fn banner_show() {
         if let Some(content) = ApplicationResources::get(APPLICATION_BANNER_FILE) {
             TopBanner::show(std::str::from_utf8(&content.data()).unwrap_or(DEFAULT_TOP_BANNER));
@@ -71,12 +64,11 @@ pub trait Application: Send + Sync {
         }
     }
 
-    /// initialize the message source.
+    /// Initialize the message source.
     async fn init_message_source<T>(
         &mut self,
         application_properties: &NextProperties,
     ) -> HashMap<String, HashMap<String, String>> {
-        // message source
         let mut messages = HashMap::new();
         if let Some(message_source) = application_properties.messages() {
             let mut load_local_message = |name: &str| {
@@ -112,7 +104,7 @@ pub trait Application: Send + Sync {
         messages
     }
 
-    /// initialize the logger.
+    /// Initialize the logger.
     fn init_logger(&self, application_properties: &ApplicationProperties) {
         let application_name = application_properties
             .next()
@@ -129,7 +121,7 @@ pub trait Application: Send + Sync {
                         "{}{}.log",
                         application_name,
                         if logger.additional_date() {
-                            format!("-{}", LocalDateTimeUtil::date())
+                            format!("-{}", LocalDateTime::date())
                         } else {
                             String::new()
                         }
@@ -186,7 +178,7 @@ pub trait Application: Send + Sync {
         application_properties: &ApplicationProperties,
         application_args: &ApplicationArgs,
     ) {
-        // register application singleton
+        // Register application singleton
         let mut container = ApplicationDefaultRegisterContainer::new();
         container.register_all(ctx, application_properties).await;
 
@@ -194,14 +186,14 @@ pub trait Application: Send + Sync {
         ctx.insert_singleton_with_name(application_properties.clone(), "");
         ctx.insert_singleton_with_name(application_args.clone(), "");
 
-        // resove autoRegister
+        // Resove autoRegister
         let auto_register = ctx.resolve_by_type::<Arc<dyn AutoRegister>>();
         for item in auto_register.iter() {
             item.register(ctx, application_properties).await.unwrap();
         }
     }
 
-    /// initialize the application infrastructure
+    /// Initialize the application infrastructure
     async fn init_infrastructure(
         &self,
         ctx: &mut ApplicationContext,
@@ -240,7 +232,7 @@ pub trait Application: Send + Sync {
         ctx.insert_singleton_with_name(multicaster, "");
     }
 
-    /// bind tcp server.
+    /// Bind tcp server.
     async fn bind_tcp_server(
         &mut self,
         ctx: &mut ApplicationContext,
@@ -249,14 +241,22 @@ pub trait Application: Send + Sync {
     ) {
         let config = application_properties.next().server();
 
-        let (open_router, private_router) = self.application_router(ctx).await;
-        // run our app with hyper, listening globally on port
+        let context_path = config.context_path().unwrap_or("");
+        let server_port = config.port().unwrap_or(11011);
+        let server_addr = if config.local().unwrap_or(false) {
+            "127.0.0.1"
+        } else {
+            "0.0.0.0"
+        };
+
+        let mut application_router = self.application_router(ctx).await;
+
+        // Run our app with hyper, listening globally on port
         let mut app = Router::new()
-            .merge(Router::new().nest("/open", open_router.0))
             // handle not found route
             .fallback(fall_back);
 
-        // add prometheus layer
+        // Add prometheus layer
         #[cfg(feature = "enable_prometheus")]
         {
             let (prometheus_layer, metric_handle) = axum_prometheus::PrometheusMetricLayer::pair();
@@ -268,7 +268,6 @@ pub trait Application: Send + Sync {
                 .layer(prometheus_layer);
         }
 
-        let mut router = private_router.0;
         // set layer
         if let Some(http) = config.http() {
             let val = http
@@ -281,15 +280,16 @@ pub trait Application: Send + Sync {
                 .unwrap_or_default();
             let _ = http.response();
             if val.0 {
-                router = router.layer(TraceLayer::new_for_http());
+                application_router = application_router.route_layer(TraceLayer::new_for_http());
             }
             // 3MB
             if val.1 >= 3145728 {
-                router = router.route_layer(RequestBodyLimitLayer::new(val.1));
+                application_router =
+                    application_router.route_layer(RequestBodyLimitLayer::new(val.1));
             }
         }
 
-        router = router
+        application_router = application_router
             // global panic handler
             .layer(CatchPanicLayer::custom(handle_panic))
             // handler request  max timeout
@@ -302,42 +302,57 @@ pub trait Application: Send + Sync {
                     .allow_headers(tower_http::cors::Any)
                     .max_age(std::time::Duration::from_secs(60) * 10),
             );
-        // #[cfg(feature = "user_security")]
-        // router = router.layer(axum::middleware::from_fn_with_state(crate::security::request_auth_middleware));
-        if let Some(path) = config.context_path() {
-            app = app.nest(path, router);
+
+        if !context_path.is_empty() {
+            app = app.nest(context_path, application_router);
         } else {
-            app = app.merge(router);
+            app = app.merge(application_router);
         }
 
         // apply router
         let routers = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
-        for item in routers.into_iter() {
-            let router = item.router(ctx);
-            if !router.has_routes() { continue; }
-            if let Some(path) = config.context_path() {
-                if !path.is_empty() {
-                    app = app.nest(path, router);
-                    continue;
+
+        let (mut open_routers, mut common_routers): (Vec<_>, Vec<_>) =
+            routers.into_iter().partition(|item| item.open());
+
+        let var10 = Router::new();
+
+        open_routers.sort_by_key(|k| k.order());
+        let open_router = open_routers
+            .into_iter()
+            .map(|item| item.router(ctx))
+            .filter(|item1| item1.has_routes())
+            .fold(var10, |acc, router| {
+                if !context_path.is_empty() {
+                    acc.nest(context_path, router)
+                } else {
+                    acc.merge(router)
                 }
+            });
+
+        app = app.merge(open_router);
+
+        common_routers.sort_by_key(|k| k.order());
+        for item2 in common_routers
+            .into_iter()
+            .map(|item| item.router(ctx))
+            .filter(|item1| item1.has_routes())
+        {
+            if !context_path.is_empty() {
+                app = app.nest(context_path, item2);
+                continue;
             }
-            app = app.merge(router);
+            app = app.merge(item2);
         }
 
-        let server_port = config.port().unwrap_or(8080);
-        let server_addr = if config.local().unwrap_or(false) {
-            "127.0.0.1"
-        } else {
-            "0.0.0.0"
-        };
         println!(
-            "\napplication listening  on:  {}",
+            "\nApplication Listening  on:  {}",
             format!("{}:{}", server_addr, server_port)
         );
 
-        println!("application running    on:  {}", LocalDateTimeUtil::now());
-        println!("application startTime  on:  {:?}", time.elapsed());
-        println!("application currentPid on:  {:?}\n", std::process::id());
+        println!("Application Running    on:  {}", LocalDateTime::now());
+        println!("Application StartTime  on:  {:?}", time.elapsed());
+        println!("Application CurrentPid on:  {:?}\n", std::process::id());
 
         // configure certificate and private key used by https
         #[cfg(feature = "tls_rustls")]
@@ -369,57 +384,60 @@ pub trait Application: Send + Sync {
                     .unwrap();
 
             let mut shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
-            axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
-                .with_graceful_shutdown(async move {
-                    let ctrl_c = async {
-                        tokio::signal::ctrl_c()
-                            .await
-                            .expect("failed to install Ctrl+C handler");
-                    };
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            )
+            .with_graceful_shutdown(async move {
+                let ctrl_c = async {
+                    tokio::signal::ctrl_c()
+                        .await
+                        .expect("failed to install Ctrl+C handler");
+                };
 
-                    #[cfg(unix)]
-                    let terminate = async {
-                        signal::unix::signal(signal::unix::SignalKind::terminate())
-                            .expect("failed to install signal handler")
-                            .recv()
-                            .await;
-                    };
+                #[cfg(unix)]
+                let terminate = async {
+                    signal::unix::signal(signal::unix::SignalKind::terminate())
+                        .expect("failed to install signal handler")
+                        .recv()
+                        .await;
+                };
 
-                    #[cfg(not(unix))]
-                    let terminate = std::future::pending::<()>();
+                #[cfg(not(unix))]
+                let terminate = std::future::pending::<()>();
 
-                    tokio::select! {
-                        _ = ctrl_c =>  {
-                            info!("Received Ctrl+C. Shutting down...");
-                            for service in shutdowns.iter_mut() {
-                                service.shutdown().await;
-                            }
-                        },
-                        _ = terminate =>  {
-                            info!("Received terminate signal. Shutting down...");
-                            for service in shutdowns.iter_mut() {
-                                service.shutdown().await;
-                            }
-                        },
-                    }
-                })
-                .await
-                .unwrap();
+                tokio::select! {
+                    _ = ctrl_c =>  {
+                        info!("Received Ctrl+C. Shutting down...");
+                        for service in shutdowns.iter_mut() {
+                            service.shutdown().await;
+                        }
+                    },
+                    _ = terminate =>  {
+                        info!("Received terminate signal. Shutting down...");
+                        for service in shutdowns.iter_mut() {
+                            service.shutdown().await;
+                        }
+                    },
+                }
+            })
+            .await
+            .unwrap();
         }
     }
 
-    /// run the application.
+    /// Run the application.
     async fn run()
     where
         Self: Application + Default,
     {
-        // record application start time
+        // Record application start time
         let start_time = std::time::Instant::now();
 
-        // banner show
+        // Banner show
         Self::banner_show();
 
-        // get a base application instance
+        // Get a base application instance
         let mut next_application: NextApplication<Self> = NextApplication::new();
         let properties = next_application.application_properties().clone();
         let args = next_application.application_args().clone();
@@ -430,60 +448,60 @@ pub trait Application: Send + Sync {
 
         application.init_logger(&properties);
         println!(
-            "init logger success!\ncurrent time: {}\n",
-            LocalDateTimeUtil::now()
+            "Init logger success!\nCurrent Time: {}\n",
+            LocalDateTime::now()
         );
 
         let mut ctx = ApplicationContext::options()
             .allow_override(false)
             .auto_register();
         println!(
-            "init application context success!\ncurrent time: {}\n",
-            LocalDateTimeUtil::now()
+            "Init application context success!\nCurrent Time: {}\n",
+            LocalDateTime::now()
         );
 
-        // autowire properties
+        // Autowire properties
         application.autowire_properties(&mut ctx, &properties).await;
         println!(
-            "autowire properties success!\ncurrent time: {}\n",
-            LocalDateTimeUtil::now()
+            "Autowire properties success!\nCurrent Time: {}\n",
+            LocalDateTime::now()
         );
 
-        // register singleton
+        // Register singleton
         application
             .register_singleton(&mut ctx, &properties, &args)
             .await;
         println!(
-            "register singleton success!\ncurrent time: {}\n",
-            LocalDateTimeUtil::now()
+            "Register singleton success!\nCurrent Time: {}\n",
+            LocalDateTime::now()
         );
 
-        // init infrastructure
+        // Init infrastructure
         application.init_infrastructure(&mut ctx, &properties).await;
         println!(
-            "init infrastructure success!\ncurrent time: {}\n",
-            LocalDateTimeUtil::now()
+            "Init infrastructure success!\nCurrent Time: {}\n",
+            LocalDateTime::now()
         );
 
-        // init middleware
+        // Init middleware
         application.init_middleware(&properties).await;
         println!(
-            "init middleware success!\ncurrent time: {}\n",
-            LocalDateTimeUtil::now()
+            "Init middleware success!\nCurrent Time: {}\n",
+            LocalDateTime::now()
         );
 
         #[cfg(feature = "enable_grpc")]
         {
             application.register_rpc_server(&properties).await;
             println!(
-                "register grpc server success!\ncurrent time: {}\n",
-                LocalDateTimeUtil::now()
+                "Register grpc server success!\nCurrent Time: {}\n",
+                LocalDateTime::now()
             );
 
             application.connect_rpc_client(&properties).await;
             println!(
-                "connect grpc client success!\ncurrent time: {}\n",
-                LocalDateTimeUtil::now()
+                "Connect grpc client success!\nCurrent Time: {}\n",
+                LocalDateTime::now()
             );
         }
 
@@ -498,11 +516,11 @@ pub trait Application: Send + Sync {
 }
 
 fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response<Full<Bytes>> {
-    error!("application handle panic, case: {:?}", err);
+    error!("Application handle panic, case: {:?}", err);
     let err_str = format!(
         "internal server error, case: {:?},\ntimestamp: {}",
         err,
-        LocalDateTimeUtil::timestamp()
+        LocalDateTime::timestamp()
     );
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)

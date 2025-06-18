@@ -4,8 +4,11 @@ use dyn_clone::DynClone;
 use crate::ApplicationContext;
 
 
+pub trait ApplyRouter: DynClone + Send + Sync {
 
-pub trait ApplyRouter: DynClone + Send + Sync{
+    fn open(&self) -> bool { false }
+
+    fn order(&self) -> u32 { 9999 }
     
     fn router(&self, ctx: &mut ApplicationContext) -> Router;
 }

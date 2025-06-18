@@ -22,6 +22,8 @@ next-web-common = { version = "0.1.0" }
 next-web-mq = { version = "0.1.0" }
 next-web-mqtt = { version = "0.1.3" }
 
+
+next-web-security-core = { version = "*", path = "./next-web-framework/next-web-security/next-web-security-core" }
 # rudi-dev = { version = "0.8.6"}
 
 # next-web-mq = {  version = "0.1.0", path = "./next-web-framework/next-web-mq"}

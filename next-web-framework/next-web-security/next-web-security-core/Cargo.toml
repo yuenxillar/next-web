@@ -9,3 +9,5 @@ rudi-dev = { workspace = true }
 axum = { workspace = true, features = ["http1"]}
 
 bcrypt = { workspace = true }
+
+matchit = { workspace = true }

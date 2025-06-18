@@ -5,8 +5,8 @@ use rudi_core::{Color, Scope};
 use syn::ItemStruct;
 
 use crate::{
-    commons::{self, FieldResolveStmts, ResolvedFields},
     autowired_attr::AutowiredAttr,
+    commons::{self, FieldResolveStmts, ResolvedFields},
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
 
@@ -29,7 +29,7 @@ pub(crate) fn generate(
         async_,
         #[cfg(feature = "auto-register")]
         auto_register,
-        default
+        default,
     } = attr;
 
     #[cfg(feature = "auto-register")]
@@ -88,7 +88,7 @@ pub(crate) fn generate(
         }
     };
 
-    
+
     let constructor = match color {
         Color::Async => {
             if default {
@@ -98,7 +98,7 @@ pub(crate) fn generate(
                         #struct_ident::default()
                     }
                 }
-            }else {
+            } else {
                 quote! {
                     #[allow(unused_variables)]
                     |cx| ::std::boxed::Box::pin(async {
@@ -107,9 +107,7 @@ pub(crate) fn generate(
                         #instance
                     })
                 }
-                
             }
-            
         }
         Color::Sync => {
             if default {
@@ -119,8 +117,7 @@ pub(crate) fn generate(
                         #struct_ident::default()
                     }
                 }
-            }
-            else {
+            } else {
                 quote! {
                     #[allow(unused_variables)]
                     |cx| {
@@ -129,16 +126,13 @@ pub(crate) fn generate(
                         #instance
                     }
                 }
-
             }
-            
         }
     };
     // println!("constructor: {}", constructor.to_string());
 
     #[cfg(not(feature = "auto-register"))]
     let auto_register = quote! {};
-
 
     #[cfg(feature = "auto-register")]
     let auto_register = if auto_register {
@@ -152,7 +146,7 @@ pub(crate) fn generate(
     let struct_name = &item_struct.ident;
     let default_name = {
         let singleton_name = name.to_token_stream().to_string().replacen("\"", "", 2);
-    
+
         if singleton_name.is_empty() {
             let struct_name_str = struct_name.to_string();
             let mut chars = struct_name_str.chars();
@@ -163,11 +157,11 @@ pub(crate) fn generate(
             } else {
                 struct_name_str
             }
-        }else {
+        } else {
             singleton_name
         }
     };
-    
+
     let expand = quote! {
         #item_struct
 
@@ -176,7 +170,7 @@ pub(crate) fn generate(
 
             fn provider() -> #path::Provider<Self> {
                 #[allow(unused_variables)]
-                
+
                 <#path::Provider<_> as ::core::convert::From<_>>::from(
                     #path::#create_provider(#constructor)
                         .name(#default_name)

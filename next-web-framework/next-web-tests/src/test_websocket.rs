@@ -1,22 +1,14 @@
-//! Test websocket handler
-
-use std::error::Error;
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use axum::extract::ws::CloseFrame;
-use axum::Router;
-use next_web_core::{async_trait, ApplicationContext};
-use next_web_core::context::properties::ApplicationProperties;
-use next_web_dev::application::Application;
+use next_web_core::async_trait;
 use next_web_dev::Singleton;
+use next_web_websocket::{core::{handler::WebSocketHandler, session::WebSocketSession}, Message};
 use next_web_websocket::core::handler::Result;
-use next_web_websocket::core::{handler::WebSocketHandler, session::WebSocketSession};
-use next_web_websocket::Message;
 
-/// Test
 #[Singleton(binds = [Self::into_websocket_handler])]
 #[derive(Clone)]
-pub struct TestWebSocket;
+pub(crate) struct TestWebSocket;
 
 impl TestWebSocket {
     fn into_websocket_handler(self) -> Arc<dyn WebSocketHandler> {
@@ -27,23 +19,24 @@ impl TestWebSocket {
 #[async_trait]
 impl WebSocketHandler for TestWebSocket {
     fn paths(&self) -> Vec<&'static str> {
-        vec!["/test/websocket", "/test/websocket2"]
+        vec!["/test1/websocket", "/test1/websocket2"]
     }
 
     // When the socket connection enters, this method will be entered first
     async fn on_open(&self, session: &WebSocketSession) -> Result<()> {
         println!(
-            "Client remote address: {:?}, session id: {:?}",
+            "Client remote address: {:?}, Session id: {:?}, Client header: {:?}, Client paths: {:?}",
             session.remote_address(),
-            session.id()
-        );
+            session.id(),
+            session.header(),
+            session.path());
         Ok(())
     }
 
     /// When the client sends a message, it will enter the following method
     async fn on_message(&self, _session: &WebSocketSession, message: Message) -> Result<()> {
         if let Message::Text(msg) = message {
-            println!("User message: {:?}", msg);
+            println!("Received message: {:?}", msg.to_string());
         }
         Ok(())
     }
@@ -65,27 +58,3 @@ impl WebSocketHandler for TestWebSocket {
     }
 }
 
-/// 
-#[derive(Clone, Default)]
-pub struct TestWSApplication;
-
-
-#[async_trait]
-impl Application for TestWSApplication {
-    /// initialize the middleware.
-    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
-
-    // get the application router. (open api  and private api)
-    async fn application_router(
-        &mut self,
-        _ctx: &mut ApplicationContext,
-    ) -> Router {
-        Router::new()
-    }
-
-}
-
-#[tokio::main]
-async fn main() {
-    TestWSApplication::run().await;
-}

@@ -10,7 +10,7 @@ pub(crate) struct PropertiesAttr {
 }
 
 fn default_name() -> Expr {
-    parse_quote!("")
+    parse_quote!()
 }
 
 impl Default for PropertiesAttr {

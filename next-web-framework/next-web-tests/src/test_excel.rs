@@ -1,9 +1,9 @@
-use std::{io::Cursor, time::{self, Instant}};
+use std::{io::Cursor, time::{Instant}};
 
 use axum::{
-    body::{Body, Bytes},
+    body::Body,
     http::{header, StatusCode},
-    response::{IntoResponse, Response},
+    response::Response,
     routing::{get, post},
     Router,
 };
@@ -59,6 +59,7 @@ In particular the last point is what sets axum apart from other frameworks. axum
     let filename = format!("attachment;filename={}", "test_excel.xlsx");
 
     println!("{:?}", instant.elapsed());
+    // Slow Slow!!!!!!!
     return Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/octet-stream")

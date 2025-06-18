@@ -3,7 +3,7 @@ next:
   server:
     port: 8080
     context_path: /test
-  coco: ${test}
+  coco: "hello world111"
 
   data: 
     database:

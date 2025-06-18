@@ -1,14 +1,14 @@
 use from_attr::{AttrsValue, FlagOrValue, FromAttr};
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use proc_macro2::{Span, TokenStream};
+use quote::{format_ident, quote, ToTokens};
 use rudi_core::{Color, Scope};
 use syn::{
     parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
-    Attribute, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident, PatType,
-    Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath, TypeReference,
+    Attribute, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident, Lit,
+    PatType, Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath, TypeReference,
 };
 
-use crate::field_or_argument_attr::FieldOrArgumentAttr;
+use crate::{field_or_argument_attr::FieldOrArgumentAttr, value_attr::ValueAttr};
 
 pub(crate) fn generate_create_provider(scope: Scope, color: Color) -> TokenStream {
     match (scope, color) {
@@ -197,6 +197,20 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         Ok(Some(AttrsValue { value, .. })) => value,
         Ok(None) => FieldOrArgumentAttr::default(),
         Err(AttrsValue { value, .. }) => return Err(value),
+    };
+
+    // macro processing for properties
+    let ValueAttr { key } = match ValueAttr::remove_attributes(attrs) {
+        Ok(Some(AttrsValue { value: attr, .. })) => attr,
+        Ok(None) => ValueAttr::default(),
+        Err(AttrsValue { value, .. }) => return Err(value),
+    };
+
+    let var1 = key.clone().to_token_stream().to_string();
+    let is_value = if !var1.replace("\"", "").is_empty() {
+        true
+    } else {
+        false
     };
 
     let ident = match ref_ {
@@ -409,9 +423,27 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                 Color::Async => parse_quote! {
                     let #ident = cx.resolve_with_name_async(#name).await;
                 },
-                Color::Sync => parse_quote! {
-                    let #ident = cx.resolve_with_name(#name);
-                },
+                Color::Sync => {
+                    if is_value {
+                        // 如果为空就报错
+                        let  value_type = extract_vec_inner_type(field_or_argument_ty);
+                        if value_type.is_none() {
+                            return Err(syn::Error::new(
+                                Span::call_site(),
+                                "value only support `Option<T>` type with one generic argument",
+                            ));
+                        }
+
+                        parse_quote! {
+                            let #ident = cx.get_single::<::next_web_core::context::properties::ApplicationProperties>().one_value::<#value_type>(#key);
+                        }
+
+                    } else {
+                        parse_quote! {
+                            let #ident = cx.resolve_with_name(#name);
+                        }
+                    }
+                }
             };
 
             Ok(ResolveOne {
@@ -621,4 +653,22 @@ pub(crate) fn generate_field_resolve_stmts(
             })
         }
     }
+}
+
+fn extract_vec_inner_type(ty: &Type) -> Option<&Type> {
+    if let Type::Path(type_path) = ty {
+        let last_segment = type_path.path.segments.last()?;
+        
+        // 检查是否是 Option
+        if last_segment.ident == "Option" {
+            // 获取泛型参数
+            if let PathArguments::AngleBracketed(args) = &last_segment.arguments {
+                // 获取第一个泛型参数
+                if let Some(GenericArgument::Type(inner_ty)) = args.args.first() {
+                    return Some(inner_ty);
+                }
+            }
+        }
+    }
+    None
 }

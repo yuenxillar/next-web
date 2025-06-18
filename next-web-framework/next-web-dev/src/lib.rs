@@ -8,7 +8,6 @@ pub mod interceptor;
 pub mod manager;
 pub mod middleware;
 pub mod util;
-pub mod router;
 pub mod application;
 
 mod tests;

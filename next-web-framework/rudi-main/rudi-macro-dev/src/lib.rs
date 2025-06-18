@@ -1,4 +1,5 @@
 mod autowired_attr;
+mod value_attr;
 mod commons;
 mod field_or_argument_attr;
 mod impl_fn_or_enum_variant_attr;
