@@ -1,8 +1,9 @@
 use axum::{
+    Extension,
     extract::{Request, State},
-    http::{HeaderMap, Response, StatusCode},
+    http::{HeaderMap, StatusCode},
     middleware::Next,
-    response::{IntoResponse, Response}, Extension,
+    response::Response,
 };
 
 use crate::permission::{
@@ -10,13 +11,12 @@ use crate::permission::{
     models::permission_group::PermissionGroup,
 };
 
-pub(crate) async fn request_auth_middleware<R = axum::response::Response>(
+pub(crate) async fn request_auth_middleware(
     State(user_auth_manager): State<UserAuthenticationManager>,
-    Extension(var): Extension<Option<String>>,
     req_header: HeaderMap,
     req: Request,
     next: Next,
-) -> Result<R, R> {
+) -> Result<Response, Response> {
     let auth_service = user_auth_manager.authentication_service();
 
     let login_type = auth_service.login_type(&req_header);
@@ -31,6 +31,6 @@ pub(crate) async fn request_auth_middleware<R = axum::response::Response>(
 
     Err(Response::builder()
         .status(StatusCode::UNAUTHORIZED)
-        .body("")
+        .body("".into())
         .unwrap())
 }

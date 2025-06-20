@@ -7,7 +7,7 @@ pub enum CacheValue {
     String(String),
     Number(i64),
     Boolean(bool),
-    Float(String),
+    Float(f32),
     Array(Vec<CacheValue>),
     Object(Box<dyn AnyClone>),
     Null,
@@ -109,6 +109,16 @@ impl CacheValue {
         }
     }
 
+    /// 获取浮点数
+    /// Get float value
+    pub fn as_float(&self) -> Option<f32> {
+        if let CacheValue::Float(f) = self {
+            Some(*f)
+        } else {
+            None
+        }
+    }
+
     /// 获取布尔值
     /// Get boolean value
     pub fn as_boolean(&self) -> Option<bool> {
@@ -194,7 +204,7 @@ impl Into<CacheValue> for u32 {
 
 impl Into<CacheValue> for f32 {
     fn into(self) -> CacheValue {
-        CacheValue::Float(self.to_string())
+        CacheValue::Float(self)
     }
 }
 

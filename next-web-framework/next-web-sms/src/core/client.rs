@@ -1,22 +1,18 @@
 use reqwest::Client;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SmsClient {
     client: Client,
-    sign_name: String,
 }
 
-
-impl SmsClient  {
-    
-    pub fn client(&self) -> &Client {
-        &self.client
+impl SmsClient {
+    pub fn new() -> Self {
+        Self {
+            client: reqwest::Client::new(),
+        }
     }
 
-
-    fn test(&self) {
-        // self.client.post("url").send()
-        // "sms.tencentcloudapi.com"
-        // "dysmsapi.aliyuncs.com"
+    pub fn client(&self) -> &Client {
+        &self.client
     }
 }

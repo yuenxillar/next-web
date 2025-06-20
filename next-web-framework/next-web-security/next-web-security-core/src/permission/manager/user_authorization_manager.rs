@@ -7,101 +7,68 @@ use crate::permission::{
 };
 
 #[derive(Clone)]
-pub struct UserAuthenticationManager
-{
+pub struct UserAuthenticationManager {
     // options: UserAuthorizationOptions,
     authentication_service: Arc<dyn AuthenticationService>,
 }
 
-impl UserAuthenticationManager
-{
+impl UserAuthenticationManager {
     pub fn new(
         // options: UserAuthorizationOptions,
         authentication_service: Arc<dyn AuthenticationService>,
     ) -> Self {
         Self {
+            // options,
             authentication_service,
-            http_security,
         }
     }
+
+    // pub fn options(&self) -> &UserAuthorizationOptions {
+    //     &self.options
+    // }
 
     pub fn authentication_service(&self) -> &Arc<dyn AuthenticationService> {
         &self.authentication_service
     }
 }
 
-impl UserAuthenticationManager
-{
-    pub async fn pre_authorize(
+impl UserAuthenticationManager {
+    pub async fn pre_authorize<'a>(
         &self,
         user_id: &'a String,
         login_type: &'a LoginType,
         auth_group: &'a PermissionGroup,
     ) -> bool {
-        if auth_group.is_combination() {
-            if auth_group.combination_valid() {
-                return true;
-            }
-        }
-
-        let roles = auth_group.roles();
-        let permissions = auth_group.permissions();
-        let binding = auth_group.mode();
-        let mode = binding.as_ref();
+        let roles = auth_group.get_roles();
+        let permissions = auth_group.get_permissions();
+        let mode = auth_group.get_mode();
 
         if roles.is_none() && permissions.is_none() {
             return true;
         }
 
-        let roles = permission_group.get_roles();
-        let permissions = permission_group.get_permissions();
-        let mode = permission_group.get_mode();
-
-        let user_id = self.authentication_service.id(req_headers);
-        let login_type = self.authentication_service.login_type(req_headers);
-
         let user_roles = self
             .authentication_service
-            .user_role(&user_id, &login_type)
-            .await
-            .map(|s| s.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+            .user_role(user_id, login_type)
+            .await;
 
         // Mode  And or Or
         // tips:
         // 1. And mode: if user has all roles and permissions, return true
         // 2. Or mode: if user has any roles or permissions, return true
-        let role_flag = auth_group.match_value(
-            roles.unwrap_or_default(),
-            user_roles,
-            mode,
-        );
-        if let Some(var1) = mode {
-            if var1 != &CombinationMode::Or {
-                if !role_flag {
-                    return false;
-                }
-            }
-        } else {
-            if !role_flag {
-                return false;
-            }
-        } else {
-            if role_flag {
-                return true;
-            }
+        let role_flag = auth_group.match_value(roles, user_roles.as_ref());
+      
+        if !role_flag {
+            return false;
         }
 
         let user_permissions = self
             .authentication_service
-            .user_permission(&user_id, &login_type)
-            .await
-            .map(|s| s.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+            .user_permission(user_id, login_type)
+            .await;
 
-        let permission_flag = auth_group.match_value(
-            permissions.unwrap_or_default(),
-            user_permissions,
-            mode,
-        );
+        let permission_flag =
+            auth_group.match_value(permissions, user_permissions.as_ref());
 
         if role_flag && permission_flag {
             return true;
