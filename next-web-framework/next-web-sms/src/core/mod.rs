@@ -1,4 +1,2 @@
-#[cfg(feature = "template")]
-pub mod template_service;
+pub mod signer;
 pub mod service;
-pub mod client;

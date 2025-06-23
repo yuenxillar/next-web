@@ -4,18 +4,18 @@ use chrono::DateTime;
 use next_web_core::{async_trait, core::service::Service, error::BoxError};
 use once_cell::sync::Lazy;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
 
 use crate::{
-    aliyun::respnose::sms_respnose::AliyunCloudSmsResponse,
-    core::service::SmsSendService,
-    signature::v3::{build_sored_encoded_query_string, hex_sha256, SignerV3},
+    aliyun::{respnose::sms_respnose::AliyunCloudSmsResponse, signer::AliyunSigner},
+    core::{service::sms_service::SmsSendService, signer::SignerV3},
+    signature::v3::{build_sored_encoded_query_string, hex_sha256},
 };
 
 #[cfg(feature = "template")]
 use crate::aliyun::models::create_sms_template::*;
 #[cfg(feature = "template")]
-use crate::core::template_service::{TemplateResult, TemplateService};
+use crate::core::service::template_service::{TemplateResult, TemplateService};
 
 #[derive(Clone)]
 pub struct AliyunSmsService {
@@ -71,19 +71,18 @@ impl SmsSendService for AliyunSmsService {
         common_req_headers.insert("x-acs-content-sha256", hex_sha256(req_body));
 
         // build SignerV3
-        let signer = SignerV3::new(
-            ACCESS_KEY_ID.as_str(),
-            ACCESS_KEY_SECRET.as_str(),
-            "service",
-            "region",
-            ALGORITHM,
-        );
+        let signer = AliyunSigner {
+            map: ""
+        };
         let authorization = signer.sign(
             METHOD,
             PATH,
-            &query_params,
+            Some(&query_params),
             &common_req_headers,
-            req_body.as_bytes(),
+            req_body,
+            ACCESS_KEY_ID.as_str(),
+            ACCESS_KEY_SECRET.as_str(),
+            ALGORITHM,
         )?;
         common_req_headers.insert("Authorization", authorization);
 
@@ -91,8 +90,8 @@ impl SmsSendService for AliyunSmsService {
         let mut headers = HeaderMap::new();
         common_req_headers.into_iter().for_each(|(key, value)| {
             headers.insert(
-                HeaderName::from_str(&key).unwrap_or(HeaderName::from_static("")),
-                value.parse().unwrap_or(HeaderValue::from_static("")),
+                HeaderName::from_str(&key).unwrap(),
+                value.parse().unwrap(),
             );
         });
 
@@ -152,19 +151,18 @@ impl SmsSendService for AliyunSmsService {
         common_req_headers.insert("x-acs-content-sha256", hex_sha256(req_body));
 
         // build SignerV3
-        let signer = SignerV3::new(
-            ACCESS_KEY_ID.as_str(),
-            ACCESS_KEY_SECRET.as_str(),
-            "service",
-            "region",
-            ALGORITHM,
-        );
+        let signer = AliyunSigner {
+            map: ""
+        };
         let authorization = signer.sign(
             METHOD,
             PATH,
-            &query_params,
+            Some(&query_params),
             &common_req_headers,
-            req_body.as_bytes(),
+            req_body,
+            ACCESS_KEY_ID.as_str(),
+            ACCESS_KEY_SECRET.as_str(),
+            ALGORITHM,
         )?;
         common_req_headers.insert("Authorization", authorization);
 
@@ -300,21 +298,21 @@ mod test {
         let sms_service = AliyunSmsService {
             sms_client: reqwest::Client::new(),
         };
-        let phone1: String = "13542313xxxx".into();
+        let phone1: String = "164135312313".into();
         let phone2: String = "13542366613xxxx".into();
 
-        let sign1: String = "sadwadawdaw".into();
+        let sign1: String = "阿里云短信测试".into();
         let sign2: String = "zasdwadawd".into();
 
         let param1: String = "sadwadawdaw".into();
         let param2: String = "zasdwadawd".into();
 
         let result = sms_service
-            .send_batch_sms(
-                vec![&phone1, &phone2],
-                vec![&sign1, &sign2],
-                "kasdllwwl-w1s3a35wd1",
-                vec![&param1, &param2],
+            .send_sms(
+                &phone1,
+                &sign1,
+                "SMS_154950909",
+                "{\"code\":\"1234\"}",
                 None,
             )
             .await
@@ -342,7 +340,7 @@ mod test {
         let resp: TemplateResponse<CreateSmsTemplateRespnose> =
             sms_service.create_template("req_params", "" , 11, None).await?;
 
-        println!("Template name is: {}", resp.params.template_name);
+        // println!("Template name is: {}", resp.params.template_name);
 
         Ok(())
     }

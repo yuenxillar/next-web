@@ -6,10 +6,12 @@ use std::{
 use next_web_core::{async_trait, core::service::Service, error::BoxError};
 use reqwest::header::HeaderMap;
 
-use crate::core::{client::SmsClient, service::SmsSendService};
+use crate::core::{service::sms_service::SmsSendService};
 
 #[derive(Clone)]
-pub struct TencentCloudSmsService {}
+pub struct TencentCloudSmsService {
+    sms_client: reqwest::Client
+}
 
 impl Service for TencentCloudSmsService {}
 
@@ -17,7 +19,7 @@ const ENDPOINT: &'static str = "sms.tencentcloudapi.com";
 const METHOD: &'static str = "POST";
 const VERSION: &'static str = "2021-01-11";
 const LANGUAGE: &'static str = "zh-CN";
-const ACTION: &'static str = "SendSms";
+const CONTENT_TYPE: &'static str = "application/json";
 const REGION: &'static str = "ap-guangzhou";
 
 #[async_trait]
@@ -27,7 +29,6 @@ impl SmsSendService for TencentCloudSmsService {
     /// read this doc: https://cloud.tencent.com/document/api/382
     async fn send_sms<'a>(
         &self,
-        sms_client: &SmsClient,
         phone_numbers: &'a str,
         sign_name: &'a str,
         template_code: &'a str,
@@ -51,8 +52,7 @@ impl SmsSendService for TencentCloudSmsService {
         let mut common_req_headers = self.common_req_headers();
         common_req_headers.insert("Authorization", "".into());
 
-        let resp = sms_client
-            .client()
+        let resp = self.sms_client
             .post(self.url())
             .body(body)
             .headers(HeaderMap::new())
@@ -64,7 +64,6 @@ impl SmsSendService for TencentCloudSmsService {
 
     async fn send_batch_sms<'a>(
         &self,
-        sms_client: &SmsClient,
         phone_numbers: Vec<&'a str>,
         sign_names: Vec<&'a str>,
         template_code: &'a str,
@@ -81,7 +80,6 @@ impl SmsSendService for TencentCloudSmsService {
     }
 
     ///
-    /// HTTP 请求头：X-TC-Action。操作的接口名称。取值参考接口文档输入参数章节关于公共参数 Action 的说明。例如云服务器的查询实例列表接口，取值为 DescribeInstances.
     ///
     /// HTTP 请求头：X-TC-Timestamp。当前 UNIX 时间戳，可记录发起 API 请求的时间。例如 1529223702。注意：如果与服务器时间相差超过5分钟，会引起签名过期错误.
     ///
@@ -91,10 +89,9 @@ impl SmsSendService for TencentCloudSmsService {
     fn common_req_headers(&self) -> BTreeMap<&str, String> {
         let mut params = BTreeMap::new();
 
-        params.insert("X-TC-Action", ACTION.into());
         let unix_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis()
             .to_string();
         params.insert("X-TC-Timestamp", unix_timestamp);
@@ -103,7 +100,7 @@ impl SmsSendService for TencentCloudSmsService {
         params.insert("X-TC-Region", REGION.into());
 
         params.insert("Host", ENDPOINT.into());
-        params.insert("Content-Type", "application/json".into());
+        params.insert("Content-Type", CONTENT_TYPE.into());
         params
     }
 }

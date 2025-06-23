@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use next_web_core::{async_trait, core::service::Service, error::BoxError};
 use reqwest::Client;
 
-use crate::core::client::SmsClient;
 
 #[derive(Clone)]
 pub struct SmsService<T: SmsSendService> {
