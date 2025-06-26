@@ -2,11 +2,10 @@ use std::collections::BTreeMap;
 
 use crate::core::signer::SignerV3;
 
-pub struct AliyunSigner<'a> {
-    pub(crate) map: &'a str,
-}
+#[derive(Debug)]
+pub struct AliyunSigner;
 
-impl<'a> SignerV3 for AliyunSigner<'a> {
+impl SignerV3 for AliyunSigner {
     fn sign(
         &self,
         method: &str,
@@ -22,14 +21,16 @@ impl<'a> SignerV3 for AliyunSigner<'a> {
         let body_sha256 = self.hex_sha256(body);
         let canonical_request =
             self.canonical_request(method, uri, query_params, headers, &body_sha256)?;
-        let string_to_sign = self.string_to_sign(&canonical_request, algorithm)?;
+
+        let string_to_sign = self.string_to_sign(&canonical_request, algorithm, headers)?;
+
         let signed_headers = headers
             .iter()
-            .map(|(k, _)| k.to_string())
+            .map(|(k, _)| k.to_lowercase())
             .collect::<Vec<_>>()
             .join(";");
 
-        let signature = self.signature(&string_to_sign, secret_key)?;
+        let signature = self.signature(&string_to_sign, secret_key, headers)?;
         Ok(format!(
             "{} Credential={},SignedHeaders={},Signature={}",
             algorithm, secret_key_id, signed_headers, signature
@@ -74,13 +75,23 @@ impl<'a> SignerV3 for AliyunSigner<'a> {
         ))
     }
 
-    fn string_to_sign(&self, canonical_request: &str, algorithm: &str) -> Result<String, String> {
+    fn string_to_sign(
+        &self,
+        canonical_request: &str,
+        algorithm: &str,
+        _headers: &BTreeMap<&str, String>,
+    ) -> Result<String, String> {
         let hashed_canonical_request = self.hex_sha256(canonical_request);
         Ok(format!("{}\n{}", algorithm, hashed_canonical_request))
     }
 
-    fn signature(&self, string_to_sign: &str, secret_key: &str) -> Result<String, String> {
-        let signature = self.hmac_sha256(string_to_sign.as_bytes(), secret_key.as_bytes())?;
+    fn signature(
+        &self,
+        string_to_sign: &str,
+        secret_key: &str,
+        _headers: &BTreeMap<&str, String>,
+    ) -> Result<String, String> {
+        let signature = self.hmac_sha256(secret_key.as_bytes(), string_to_sign.as_bytes())?;
         let data_sign = hex::encode(&signature);
         Ok(data_sign)
     }

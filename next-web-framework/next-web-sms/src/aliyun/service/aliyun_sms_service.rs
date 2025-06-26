@@ -3,40 +3,66 @@ use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::SystemTime};
 use chrono::DateTime;
 use next_web_core::{async_trait, core::service::Service, error::BoxError};
 use once_cell::sync::Lazy;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest::{
+    header::{HeaderMap, HeaderName},
+    Method,
+};
 use serde::de::DeserializeOwned;
 
 use crate::{
     aliyun::{respnose::sms_respnose::AliyunCloudSmsResponse, signer::AliyunSigner},
     core::{service::sms_service::SmsSendService, signer::SignerV3},
-    signature::v3::{build_sored_encoded_query_string, hex_sha256},
 };
 
 #[cfg(feature = "template")]
-use crate::aliyun::models::create_sms_template::*;
-#[cfg(feature = "template")]
 use crate::core::service::template_service::{TemplateResult, TemplateService};
+
+const PATH: &'static str = "/";
+const ENDPOINT: &'static str = "dysmsapi.aliyuncs.com";
+const VERSION: &'static str = "2017-05-25";
+const ALGORITHM: &'static str = "ACS3-HMAC-SHA256";
+const EMPTY_BODY_HEX_HASH_256: &'static str =
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+static ALIBABA_CLOUD_ACCESS_KEY_ID: Lazy<Arc<String>> =
+    Lazy::new(|| Arc::new(std::env::var("ALIBABA_CLOUD_ACCESS_KEY_ID").unwrap()));
+
+static ALIBABA_CLOUD_ACCESS_KEY_SECRET: Lazy<Arc<String>> =
+    Lazy::new(|| Arc::new(std::env::var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").unwrap()));
 
 #[derive(Clone)]
 pub struct AliyunSmsService {
     sms_client: reqwest::Client,
 }
 
+impl AliyunSmsService {
+    async fn call_api<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        path: &str,
+        query_params: &BTreeMap<&str, String>,
+        action: &str,
+        req_body: &str,
+        mut common_req_headers: BTreeMap<&str, String>,
+    ) -> Result<T, BoxError> {
+        common_req_headers.insert("x-acs-action", action.into());
+        common_req_headers.insert("x-acs-content-sha256", EMPTY_BODY_HEX_HASH_256.into());
+
+        // build SignerV3
+        let authorization =
+            auth_header(method, path, &query_params, &common_req_headers, req_body)?;
+        common_req_headers.insert("Authorization", authorization);
+
+        let headers = to_header_map(common_req_headers);
+        let canonical_query_string = build_sored_encoded_query_string(&query_params);
+        let url = format!("{}{}?{}", self.url(), path, canonical_query_string);
+
+        let resp = self.sms_client.post(url).headers(headers).send().await?;
+        Ok(resp.json::<T>().await?)
+    }
+}
+
 impl Service for AliyunSmsService {}
-
-const PATH: &'static str = "/";
-const METHOD: &'static str = "POST";
-const ENDPOINT: &'static str = "dysmsapi.aliyuncs.com";
-const SMS_ACTION: &'static str = "SendSms";
-const SMS_BATCH_ACTION: &'static str = "SendBatchSms";
-const VERSION: &'static str = "2017-05-25";
-const ALGORITHM: &'static str = "ACS3-HMAC-SHA256";
-
-static ACCESS_KEY_ID: Lazy<Arc<String>> =
-    Lazy::new(|| Arc::new(std::env::var("ALIBABA_CLOUD_ACCESS_KEY_ID").unwrap()));
-
-static ACCESS_KEY_SECRET: Lazy<Arc<String>> =
-    Lazy::new(|| Arc::new(std::env::var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").unwrap()));
 
 #[async_trait]
 impl SmsSendService for AliyunSmsService {
@@ -55,6 +81,8 @@ impl SmsSendService for AliyunSmsService {
             return Err("phone_numbers or sign_names is invalid.".into());
         }
 
+        let action = "SendSms";
+
         let mut query_params: BTreeMap<&'a str, String> = BTreeMap::new();
 
         query_params.insert("PhoneNumbers", phone_numbers.into());
@@ -65,44 +93,33 @@ impl SmsSendService for AliyunSmsService {
         expand_params.map(|var| query_params.extend(var));
 
         let req_body = "";
-        let mut common_req_headers = self.common_req_headers();
-        // fill
-        common_req_headers.insert("x-acs-action", SMS_ACTION.into());
-        common_req_headers.insert("x-acs-content-sha256", hex_sha256(req_body));
+        let common_req_headers = self.common_req_headers();
 
-        // build SignerV3
-        let signer = AliyunSigner {
-            map: ""
-        };
-        let authorization = signer.sign(
-            METHOD,
+        self.call_api::<Self::Response>(
+            Method::POST.as_str(),
             PATH,
-            Some(&query_params),
-            &common_req_headers,
+            &query_params,
+            action,
             req_body,
-            ACCESS_KEY_ID.as_str(),
-            ACCESS_KEY_SECRET.as_str(),
-            ALGORITHM,
-        )?;
-        common_req_headers.insert("Authorization", authorization);
-
-        // build headers
-        let mut headers = HeaderMap::new();
-        common_req_headers.into_iter().for_each(|(key, value)| {
-            headers.insert(
-                HeaderName::from_str(&key).unwrap(),
-                value.parse().unwrap(),
-            );
-        });
-
-        let canonical_query_string = build_sored_encoded_query_string(&query_params);
-        let url = format!("{}{}?{}", self.url(), PATH, canonical_query_string);
-
-        let resp = self.sms_client.post(url).headers(headers).send().await?;
-
-        Ok(resp.json::<Self::Response>().await?)
+            common_req_headers,
+        )
+        .await
     }
 
+    /// Send SMS messages to multiple phone numbers in batch.
+    ///
+    /// # Arguments
+    ///
+    /// * `phone_numbers` - List of phone numbers.
+    /// * `sign_names` - Corresponding list of signature names.
+    /// * `template_code` - The same template code used for all messages.
+    /// * `template_params` - Parameters for each message in JSON array format.
+    /// * `expand_params` - Optional additional request parameters.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(AliyunCloudSmsResponse)` if successful.
+    /// * `Err(BoxError)` if input validation or API call fails.
     async fn send_batch_sms<'a>(
         &self,
         phone_numbers: Vec<&'a str>,
@@ -132,6 +149,8 @@ impl SmsSendService for AliyunSmsService {
             return Err("template_params and phone_numbers len not equal.".into());
         }
 
+        let action = "SendBatchSms";
+
         let phone_numbers = serde_json::to_string(&phone_numbers)?;
         let sign_names = serde_json::to_string(&sign_names)?;
         let template_params = serde_json::to_string(&template_params)?;
@@ -145,44 +164,20 @@ impl SmsSendService for AliyunSmsService {
         expand_params.map(|var| query_params.extend(var));
 
         let req_body = "";
-        let mut common_req_headers = self.common_req_headers();
-        // fill
-        common_req_headers.insert("x-acs-action", SMS_BATCH_ACTION.into());
-        common_req_headers.insert("x-acs-content-sha256", hex_sha256(req_body));
+        let common_req_headers = self.common_req_headers();
 
-        // build SignerV3
-        let signer = AliyunSigner {
-            map: ""
-        };
-        let authorization = signer.sign(
-            METHOD,
+        self.call_api::<Self::Response>(
+            Method::POST.as_str(),
             PATH,
-            Some(&query_params),
-            &common_req_headers,
+            &query_params,
+            action,
             req_body,
-            ACCESS_KEY_ID.as_str(),
-            ACCESS_KEY_SECRET.as_str(),
-            ALGORITHM,
-        )?;
-        common_req_headers.insert("Authorization", authorization);
-
-        // build headers
-        let mut headers = HeaderMap::new();
-        common_req_headers.into_iter().for_each(|(key, value)| {
-            headers.insert(
-                HeaderName::from_str(&key).unwrap_or(HeaderName::from_static("")),
-                value.parse().unwrap_or(HeaderValue::from_static("")),
-            );
-        });
-
-        let canonical_query_string = build_sored_encoded_query_string(&query_params);
-        let url = format!("{}{}?{}", self.url(), PATH, canonical_query_string);
-
-        let resp = self.sms_client.post(url).headers(headers).send().await?;
-
-        Ok(resp.json::<Self::Response>().await?)
+            common_req_headers,
+        )
+        .await
     }
 
+    /// Validate phone number and signature name are non-empty.
     fn check_validity<'a>(&self, phone_number: &'a str, sign_name: &'a str) -> bool {
         // 检查手机号码是否合法
         if phone_number.trim_end().is_empty() {
@@ -196,7 +191,6 @@ impl SmsSendService for AliyunSmsService {
 
         true
     }
-
     fn url(&self) -> &str {
         "https://dysmsapi.aliyuncs.com"
     }
@@ -234,6 +228,28 @@ impl TemplateService for AliyunSmsService {
     where
         R: DeserializeOwned,
     {
+        if template_name.is_empty() || template_content.is_empty() {
+            return Err("template_name, template_content cannot be empty!".into());
+        }
+
+        if template_type == 0 {
+            if !expand_params
+                .as_ref()
+                .map(|map| map.contains_key("RelatedSignName"))
+                .unwrap_or(false)
+            {
+                return Err("RelatedSignName is required, Please input to expand_params!".into());
+            }
+        } else if template_type == 3 {
+            if !expand_params
+                .as_ref()
+                .map(|map| map.contains_key("IntlType"))
+                .unwrap_or(false)
+            {
+                return Err("IntlType is required, Please input to expand_params!".into());
+            }
+        }
+
         let action: &str = "CreateSmsTemplate";
 
         let mut query_params = BTreeMap::new();
@@ -243,33 +259,102 @@ impl TemplateService for AliyunSmsService {
 
         expand_params.map(|var| query_params.extend(var));
 
-        let resp = self.sms_client.post(self.url()).send().await?;
+        let req_body = "";
+        let common_req_headers = self.common_req_headers();
 
-        Ok(resp.json::<R>().await?)
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            &query_params,
+            action,
+            req_body,
+            common_req_headers,
+        )
+        .await
     }
 
     async fn delete_template<R>(&self, template_code: &str) -> TemplateResult<R>
     where
         R: DeserializeOwned,
     {
+        if template_code.is_empty() {
+            return Err("template_code is empty!".into());
+        }
+
         let action: &str = "DeleteSmsTemplate";
 
-        let url = format!("{}{}?TemplateCode={}", self.url(), PATH, urlencoding::encode(template_code));
-        let resp = self.sms_client.post(url).send().await?;
+        let mut query_params = BTreeMap::new();
+        query_params.insert("TemplateCode", urlencoding::encode(template_code).into());
 
-        Ok(resp.json::<R>().await?)
+        let req_body = "";
+        let common_req_headers = self.common_req_headers();
+
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            &query_params,
+            action,
+            req_body,
+            common_req_headers,
+        )
+        .await
     }
 
-    async fn update_template<'a, R>(
+    async fn update_template<R>(
         &self,
-        template_name: &'a str,
-        template_content: &'a str,
+        template_code: &str,
+        template_name: &str,
+        template_content: &str,
         template_type: i32,
-        expand_params: Option<BTreeMap<&'a str, String>>,
-    ) -> TemplateResult<R> {
-        let action: &str = "UpdateSmsTemplate";
+        expand_params: Option<BTreeMap<&str, String>>,
+    ) -> TemplateResult<R>
+    where
+        R: DeserializeOwned,
+    {
+        if template_code.is_empty() || template_name.is_empty() || template_content.is_empty() {
+            return Err("template_code, template_name, template_content cannot be empty!".into());
+        }
 
-        Err("".into())
+        if template_type == 0 {
+            if !expand_params
+                .as_ref()
+                .map(|map| map.contains_key("RelatedSignName"))
+                .unwrap_or(false)
+            {
+                return Err("RelatedSignName is required, Please input to expand_params!".into());
+            }
+        } else if template_type == 3 {
+            if !expand_params
+                .as_ref()
+                .map(|map| map.contains_key("IntlType"))
+                .unwrap_or(false)
+            {
+                return Err("IntlType is required, Please input to expand_params!".into());
+            }
+        }
+
+        let action = "UpdateSmsTemplate";
+
+        let mut query_params = BTreeMap::new();
+        query_params.insert("TemplateName", template_name.into());
+        query_params.insert("TemplateCode", template_code.into());
+        query_params.insert("TemplateContent", template_content.into());
+        query_params.insert("TemplateType", template_type.to_string());
+
+        expand_params.map(|var| query_params.extend(var));
+
+        let req_body = "";
+        let common_req_headers = self.common_req_headers();
+
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            &query_params,
+            action,
+            req_body,
+            common_req_headers,
+        )
+        .await
     }
 
     async fn query_template<R>(
@@ -281,10 +366,71 @@ impl TemplateService for AliyunSmsService {
     where
         R: DeserializeOwned,
     {
+        if index < 1 {
+            return Err("PageIndex must be greater than 0".into());
+        }
+
+        if size <= 0 || size > 50 {
+            return Err("PageSize must be greater than 0 and less than 50".into());
+        }
+
         let action: &str = "QuerySmsTemplateList";
 
-        Err("".into())
+        let mut query_params = BTreeMap::new();
+        query_params.insert("PageIndex", index.to_string());
+        query_params.insert("PageSize", size.to_string());
+
+        let req_body = "";
+        let common_req_headers = self.common_req_headers();
+
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            &query_params,
+            action,
+            req_body,
+            common_req_headers,
+        )
+        .await
     }
+}
+
+fn to_header_map(headers: BTreeMap<&str, String>) -> HeaderMap {
+    let mut header_map = HeaderMap::new();
+    headers.into_iter().for_each(|(key, value)| {
+        header_map.insert(HeaderName::from_str(&key).unwrap(), value.parse().unwrap());
+    });
+
+    header_map
+}
+
+fn auth_header(
+    method: &str,
+    path: &str,
+    query_params: &BTreeMap<&str, String>,
+    headers: &BTreeMap<&str, String>,
+    body: &str,
+) -> Result<String, String> {
+    let signer = AliyunSigner {};
+    signer.sign(
+        method,
+        path,
+        Some(query_params),
+        headers,
+        body,
+        ALIBABA_CLOUD_ACCESS_KEY_SECRET.as_str(),
+        ALIBABA_CLOUD_ACCESS_KEY_ID.as_str(),
+        ALGORITHM,
+    )
+}
+
+
+fn build_sored_encoded_query_string(params: &BTreeMap<&str, String>) -> String {
+    params
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
+        .collect::<Vec<_>>()
+        .join("&")
 }
 
 #[cfg(test)]
@@ -295,53 +441,48 @@ mod test {
 
     #[tokio::test]
     async fn test_send_sms() {
+        // println!("key+Id: {:?}", std::env::var("ALIBABA_CLOUD_ACCESS_KEY_ID"));
+        // println!("key+: {:?}", std::env::var("ALIBABA_CLOUD_ACCESS_KEY_SECRET"));
         let sms_service = AliyunSmsService {
             sms_client: reqwest::Client::new(),
         };
-        let phone1: String = "164135312313".into();
-        let phone2: String = "13542366613xxxx".into();
+        let phone1: String = "1642312xxxx".into();
+        let _phone2: String = "13542366613xxxx".into();
 
         let sign1: String = "阿里云短信测试".into();
-        let sign2: String = "zasdwadawd".into();
-
-        let param1: String = "sadwadawdaw".into();
-        let param2: String = "zasdwadawd".into();
+        let _sign2: String = "zasdwadawd".into();
 
         let result = sms_service
-            .send_sms(
-                &phone1,
-                &sign1,
-                "SMS_154950909",
-                "{\"code\":\"1234\"}",
-                None,
-            )
+            .send_sms(&phone1, &sign1, "SMS_xxxxxxx", "{\"code\":\"1234\"}", None)
             .await
             .unwrap();
-        println!("{:?}", uuid::Uuid::new_v4().to_string());
+        println!("{:?}", result);
     }
 
     #[tokio::test]
     async fn test_sms_template() -> Result<(), BoxError> {
+        use crate::aliyun::models::sms_template_respnose::create_respnose::CreateSmsTemplateRespnose;
+
         let sms_service = AliyunSmsService {
             sms_client: reqwest::Client::new(),
         };
 
-        let req_params = CreateSmsTemplateRequest {
-            template_name: Default::default(),
-            template_content: Default::default(),
-            remark: Default::default(),
-            template_type: Default::default(),
-            related_sign_name: Default::default(),
-            template_rule: Default::default(),
-            more_data: Default::default(),
-            apply_scene_content: Default::default(),
-            intl_type: Default::default(),
-        };
-        let resp: TemplateResponse<CreateSmsTemplateRespnose> =
-            sms_service.create_template("req_params", "" , 11, None).await?;
+        let _resp: TemplateResponse<CreateSmsTemplateRespnose> = sms_service
+            .create_template("req_params", "", 11, None)
+            .await?;
 
         // println!("Template name is: {}", resp.params.template_name);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_from() {
+        use reqwest::header::HeaderValue;
+
+        let val1 = HeaderValue::try_from(123).unwrap();
+        let val2 = HeaderValue::try_from("123").unwrap();
+        println!("val1: {:?}, val2: {:?}", val1, val2);
+        assert_eq!(val1, val2)
     }
 }

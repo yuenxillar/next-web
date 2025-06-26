@@ -6,17 +6,17 @@ use serde::Deserialize;
 #[serde(rename_all = "PascalCase")]
 pub struct AliyunCloudSmsResponse {
     #[serde(deserialize_with = "deserialize_str")]
-    pub code: ErrorCode,
+    pub code: RespCode,
     /// 状态码的描述。
     pub message: String,
     /// 发送回执 ID。
     /// 可根据发送回执 ID 在接口 QuerySendDetails 中查询具体的发送状态。
-    pub buz_id: String,
+    pub buz_id: Option<String>,
     /// 请求 ID。
     pub request_id: String,
 }
 
-fn deserialize_str<'de, D>(deserializer: D) -> Result<ErrorCode, D::Error>
+fn deserialize_str<'de, D>(deserializer: D) -> Result<RespCode, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -29,7 +29,10 @@ where
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub enum ErrorCode {
+pub enum RespCode {
+    /// 发送成功
+    Ok,
+
     /// 签名和模板类型不一致
     ///
     /// 原因：模板和签名类型不一致。错误示例：用验证码签名发送了通知短信或推广短信。
@@ -663,106 +666,107 @@ pub enum ErrorCode {
     Unknown(String),
 }
 
-impl fmt::Display for ErrorCode {
+impl fmt::Display for RespCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl Into<ErrorCode> for String {
-    fn into(self) -> ErrorCode {
+impl Into<RespCode> for String {
+    fn into(self) -> RespCode {
         let s = self.as_str();
         s.into()
     }
 }
 
-impl Into<ErrorCode> for &str {
-    fn into(self) -> ErrorCode {
+impl Into<RespCode> for &str {
+    fn into(self) -> RespCode {
         match self {
-            "isv.SMS_SIGNATURE_SCENE_ILLEGAL" => ErrorCode::SMSSignatureSceneIllegal,
-            "isv.EXTEND_CODE_ERROR" => ErrorCode::ExtendCodeError,
-            "isv.DOMESTIC_NUMBER_NOT_SUPPORTED" => ErrorCode::DomesticNumberNotSupported,
-            "isv.DENY_IP_RANGE" => ErrorCode::DenyIpRange,
-            "isv.DAY_LIMIT_CONTROL" => ErrorCode::DayLimitControl,
-            "isv.MONTH_LIMIT_CONTROL" => ErrorCode::MonthLimitControl,
-            "isv.SMS_CONTENT_ILLEGAL" => ErrorCode::SMSContentIllegal,
-            "isv.SMS_SIGN_ILLEGAL" => ErrorCode::SMSSignIllegal,
-            "isp.RAM_PERMISSION_DENY" => ErrorCode::RAMPermissionDeny,
-            "isv.OUT_OF_SERVICE" => ErrorCode::OutOfService,
-            "isv.PRODUCT_UN_SUBSCRIPT" | "isv.PRODUCT_UNSUBSCRIBE" => ErrorCode::ProductUnSubscribe,
-            "isv.ACCOUNT_NOT_EXISTS" => ErrorCode::AccountNotExists,
-            "isv.ACCOUNT_ABNORMAL" => ErrorCode::AccountAbnormal,
-            "isv.SMS_TEMPLATE_ILLEGAL" => ErrorCode::SMSTemplateIllegal,
-            "isv.SMS_SIGNATURE_ILLEGAL" => ErrorCode::SMSSignatureIllegal,
-            "isv.INVALID_PARAMETERS" => ErrorCode::InvalidParameters,
-            "isp.SYSTEM_ERROR" => ErrorCode::SystemError,
-            "isv.MOBILE_NUMBER_ILLEGAL" => ErrorCode::MobileNumberIllegal,
-            "isv.MOBILE_COUNT_OVER_LIMIT" => ErrorCode::MobileCountOverLimit,
-            "isv.TEMPLATE_MISSING_PARAMETERS" => ErrorCode::TemplateMissingParameters,
-            "isv.BUSINESS_LIMIT_CONTROL" => ErrorCode::BusinessLimitControl,
-            "isv.INVALID_JSON_PARAM" => ErrorCode::InvalidJsonParam,
-            "isv.BLACK_KEY_CONTROL_LIMIT" => ErrorCode::BlackKeyControlLimit,
-            "isv.PARAM_LENGTH_LIMIT" => ErrorCode::ParamLengthLimit,
-            "isv.PARAM_NOT_SUPPORT_URL" => ErrorCode::ParamNotSupportUrl,
-            "isv.AMOUNT_NOT_ENOUGH" => ErrorCode::AmountNotEnough,
-            "isv.TEMPLATE_PARAMS_ILLEGAL" => ErrorCode::TemplateParamsIllegal,
-            "SignatureDoesNotMatch" => ErrorCode::SignatureDoesNotMatch,
-            "InvalidTimeStamp.Expired" => ErrorCode::InvalidTimeStampExpired,
-            "SignatureNonceUsed" => ErrorCode::SignatureNonceUsed,
-            "InvalidVersion" => ErrorCode::InvalidVersion,
-            "InvalidAction.NotFound" => ErrorCode::InvalidActionNotFound,
-            "isv.SIGN_COUNT_OVER_LIMIT" => ErrorCode::SignCountOverLimit,
-            "isv.TEMPLATE_COUNT_OVER_LIMIT" => ErrorCode::TemplateCountOverLimit,
-            "isv.SIGN_NAME_ILLEGAL" => ErrorCode::SignNameIllegal,
-            "isv.SIGN_FILE_LIMIT" => ErrorCode::SignFileLimit,
-            "isv.SIGN_OVER_LIMIT" => ErrorCode::SignOverLimit,
-            "isv.TEMPLATE_OVER_LIMIT" => ErrorCode::TemplateOverLimit,
-            "SIGNATURE_BLACKLIST" => ErrorCode::SignatureBlacklist,
-            "isv.SHORTURL_OVER_LIMIT" => ErrorCode::ShorturlOverLimit,
-            "isv.NO_AVAILABLE_SHORT_URL" => ErrorCode::NoAvailableShortUrl,
-            "isv.SHORTURL_NAME_ILLEGAL" => ErrorCode::ShorturlNameIllegal,
-            "isv.SOURCEURL_OVER_LIMIT" => ErrorCode::SourceurlOverLimit,
-            "isv.SHORTURL_TIME_ILLEGAL" => ErrorCode::ShorturlTimeIllegal,
-            "isv.PHONENUMBERS_OVER_LIMIT" => ErrorCode::PhonenumbersOverLimit,
-            "isv.SHORTURL_STILL_AVAILABLE" => ErrorCode::ShorturlStillAvailable,
-            "isv.ERROR_EMPTY_FILE" => ErrorCode::ErrorEmptyFile,
-            "isp.GATEWAY_ERROR" => ErrorCode::GatewayError,
-            "isv.ERROR_SIGN_NOT_DELETE" => ErrorCode::ErrorSignNotDelete,
-            "isv.ERROR_SIGN_NOT_MODIFY" => ErrorCode::ErrorSignNotModify,
-            "isv.ERROR_TEMPLATE_NOT_DELETE" => ErrorCode::ErrorTemplateNotDelete,
-            "isv.ERROR_TEMPLATE_NOT_MODIFY" => ErrorCode::ErrorTemplateNotModify,
-            "isv.SMS_OVER_LIMIT" => ErrorCode::SMSSOverLimit,
-            "isv.CUSTOMER_REFUSED" => ErrorCode::CustomerRefused,
-            "isv.SMS_TEST_SIGN_TEMPLATE_LIMIT" => ErrorCode::SMSTestSignTemplateLimit,
-            "isv.SHORTURL_DOMAIN_EMPTY" => ErrorCode::ShorturlDomainEmpty,
-            "template_parameter_count_illegal" => ErrorCode::TemplateParameterCountIllegal,
-            "isv.SMS_TEST_TEMPLATE_PARAMS_ILLEGAL" => ErrorCode::SMSTestTemplateParamsIllegal,
-            "isv.SMS_TEST_NUMBER_LIMIT" => ErrorCode::SMSTestNumberLimit,
-            "isv.SMS_SIGN_EMOJI_ILLEGAL" => ErrorCode::SMSSignEmojiIllegal,
-            "isv.SECURITY_FROZEN_ACCOUNT" => ErrorCode::SecurityFrozenAccount,
-            "IS_CLOSE" => ErrorCode::IsClose,
-            "PARAMS_ILLEGAL" => ErrorCode::ParamsIllegal,
-            "MOBILE_NOT_ON_SERVICE" => ErrorCode::MobileNotOnService,
-            "MOBILE_SEND_LIMIT" => ErrorCode::MobileSendLimit,
-            "MOBILE_ACCOUNT_ABNORMAL" => ErrorCode::MobileAccountAbnormal,
-            "MOBILE_IN_BLACK" => ErrorCode::MobileInBlack,
-            "MOBLLE_TERMINAL_ERROR" => ErrorCode::MoblleTerminalError,
-            "CONTENT_KEYWORD" => ErrorCode::ContentKeyword,
-            "INVALID_NUMBER" => ErrorCode::InvalidNumber,
-            "CONTENT_ERROR" => ErrorCode::ContentError,
-            "REQUEST_SUCCESS" => ErrorCode::RequestSuccess,
-            "SP_NOT_BY_INTER_SMS" => ErrorCode::SPNotByInterSMS,
-            "SP_UNKNOWN_ERROR" => ErrorCode::SPUnknownError,
-            "USER_REJECT" => ErrorCode::UserReject,
-            "NO_ROUTE" => ErrorCode::NORoute,
-            "isv.UNSUPPORTED_CONTENT" => ErrorCode::UnsupportedContent,
-            "isv.SMS_CONTENT_MISMATCH_TEMPLATE_TYPE" => ErrorCode::SMSContentMismatchTemplateType,
-            "isv.ONE_CODE_MULTIPLE_SIGN" => ErrorCode::OneCodeMultipleSign,
-            "isv.CODE_EXCEED_LIMIT" => ErrorCode::CodeExceedLimit,
-            "isv.CODE_ERROR" => ErrorCode::CodeError,
-            "PORT_NOT_REGISTERED" => ErrorCode::PortNotRegistered,
-            "isv.SIGN_SOURCE_ILLEGAL" => ErrorCode::SignSourceIllegal,
-            _ => ErrorCode::Unknown(self.to_string()),
+            "OK" => RespCode::Ok,
+            "isv.SMS_SIGNATURE_SCENE_ILLEGAL" => RespCode::SMSSignatureSceneIllegal,
+            "isv.EXTEND_CODE_ERROR" => RespCode::ExtendCodeError,
+            "isv.DOMESTIC_NUMBER_NOT_SUPPORTED" => RespCode::DomesticNumberNotSupported,
+            "isv.DENY_IP_RANGE" => RespCode::DenyIpRange,
+            "isv.DAY_LIMIT_CONTROL" => RespCode::DayLimitControl,
+            "isv.MONTH_LIMIT_CONTROL" => RespCode::MonthLimitControl,
+            "isv.SMS_CONTENT_ILLEGAL" => RespCode::SMSContentIllegal,
+            "isv.SMS_SIGN_ILLEGAL" => RespCode::SMSSignIllegal,
+            "isp.RAM_PERMISSION_DENY" => RespCode::RAMPermissionDeny,
+            "isv.OUT_OF_SERVICE" => RespCode::OutOfService,
+            "isv.PRODUCT_UN_SUBSCRIPT" | "isv.PRODUCT_UNSUBSCRIBE" => RespCode::ProductUnSubscribe,
+            "isv.ACCOUNT_NOT_EXISTS" => RespCode::AccountNotExists,
+            "isv.ACCOUNT_ABNORMAL" => RespCode::AccountAbnormal,
+            "isv.SMS_TEMPLATE_ILLEGAL" => RespCode::SMSTemplateIllegal,
+            "isv.SMS_SIGNATURE_ILLEGAL" => RespCode::SMSSignatureIllegal,
+            "isv.INVALID_PARAMETERS" => RespCode::InvalidParameters,
+            "isp.SYSTEM_ERROR" => RespCode::SystemError,
+            "isv.MOBILE_NUMBER_ILLEGAL" => RespCode::MobileNumberIllegal,
+            "isv.MOBILE_COUNT_OVER_LIMIT" => RespCode::MobileCountOverLimit,
+            "isv.TEMPLATE_MISSING_PARAMETERS" => RespCode::TemplateMissingParameters,
+            "isv.BUSINESS_LIMIT_CONTROL" => RespCode::BusinessLimitControl,
+            "isv.INVALID_JSON_PARAM" => RespCode::InvalidJsonParam,
+            "isv.BLACK_KEY_CONTROL_LIMIT" => RespCode::BlackKeyControlLimit,
+            "isv.PARAM_LENGTH_LIMIT" => RespCode::ParamLengthLimit,
+            "isv.PARAM_NOT_SUPPORT_URL" => RespCode::ParamNotSupportUrl,
+            "isv.AMOUNT_NOT_ENOUGH" => RespCode::AmountNotEnough,
+            "isv.TEMPLATE_PARAMS_ILLEGAL" => RespCode::TemplateParamsIllegal,
+            "SignatureDoesNotMatch" => RespCode::SignatureDoesNotMatch,
+            "InvalidTimeStamp.Expired" => RespCode::InvalidTimeStampExpired,
+            "SignatureNonceUsed" => RespCode::SignatureNonceUsed,
+            "InvalidVersion" => RespCode::InvalidVersion,
+            "InvalidAction.NotFound" => RespCode::InvalidActionNotFound,
+            "isv.SIGN_COUNT_OVER_LIMIT" => RespCode::SignCountOverLimit,
+            "isv.TEMPLATE_COUNT_OVER_LIMIT" => RespCode::TemplateCountOverLimit,
+            "isv.SIGN_NAME_ILLEGAL" => RespCode::SignNameIllegal,
+            "isv.SIGN_FILE_LIMIT" => RespCode::SignFileLimit,
+            "isv.SIGN_OVER_LIMIT" => RespCode::SignOverLimit,
+            "isv.TEMPLATE_OVER_LIMIT" => RespCode::TemplateOverLimit,
+            "SIGNATURE_BLACKLIST" => RespCode::SignatureBlacklist,
+            "isv.SHORTURL_OVER_LIMIT" => RespCode::ShorturlOverLimit,
+            "isv.NO_AVAILABLE_SHORT_URL" => RespCode::NoAvailableShortUrl,
+            "isv.SHORTURL_NAME_ILLEGAL" => RespCode::ShorturlNameIllegal,
+            "isv.SOURCEURL_OVER_LIMIT" => RespCode::SourceurlOverLimit,
+            "isv.SHORTURL_TIME_ILLEGAL" => RespCode::ShorturlTimeIllegal,
+            "isv.PHONENUMBERS_OVER_LIMIT" => RespCode::PhonenumbersOverLimit,
+            "isv.SHORTURL_STILL_AVAILABLE" => RespCode::ShorturlStillAvailable,
+            "isv.ERROR_EMPTY_FILE" => RespCode::ErrorEmptyFile,
+            "isp.GATEWAY_ERROR" => RespCode::GatewayError,
+            "isv.ERROR_SIGN_NOT_DELETE" => RespCode::ErrorSignNotDelete,
+            "isv.ERROR_SIGN_NOT_MODIFY" => RespCode::ErrorSignNotModify,
+            "isv.ERROR_TEMPLATE_NOT_DELETE" => RespCode::ErrorTemplateNotDelete,
+            "isv.ERROR_TEMPLATE_NOT_MODIFY" => RespCode::ErrorTemplateNotModify,
+            "isv.SMS_OVER_LIMIT" => RespCode::SMSSOverLimit,
+            "isv.CUSTOMER_REFUSED" => RespCode::CustomerRefused,
+            "isv.SMS_TEST_SIGN_TEMPLATE_LIMIT" => RespCode::SMSTestSignTemplateLimit,
+            "isv.SHORTURL_DOMAIN_EMPTY" => RespCode::ShorturlDomainEmpty,
+            "template_parameter_count_illegal" => RespCode::TemplateParameterCountIllegal,
+            "isv.SMS_TEST_TEMPLATE_PARAMS_ILLEGAL" => RespCode::SMSTestTemplateParamsIllegal,
+            "isv.SMS_TEST_NUMBER_LIMIT" => RespCode::SMSTestNumberLimit,
+            "isv.SMS_SIGN_EMOJI_ILLEGAL" => RespCode::SMSSignEmojiIllegal,
+            "isv.SECURITY_FROZEN_ACCOUNT" => RespCode::SecurityFrozenAccount,
+            "IS_CLOSE" => RespCode::IsClose,
+            "PARAMS_ILLEGAL" => RespCode::ParamsIllegal,
+            "MOBILE_NOT_ON_SERVICE" => RespCode::MobileNotOnService,
+            "MOBILE_SEND_LIMIT" => RespCode::MobileSendLimit,
+            "MOBILE_ACCOUNT_ABNORMAL" => RespCode::MobileAccountAbnormal,
+            "MOBILE_IN_BLACK" => RespCode::MobileInBlack,
+            "MOBLLE_TERMINAL_ERROR" => RespCode::MoblleTerminalError,
+            "CONTENT_KEYWORD" => RespCode::ContentKeyword,
+            "INVALID_NUMBER" => RespCode::InvalidNumber,
+            "CONTENT_ERROR" => RespCode::ContentError,
+            "REQUEST_SUCCESS" => RespCode::RequestSuccess,
+            "SP_NOT_BY_INTER_SMS" => RespCode::SPNotByInterSMS,
+            "SP_UNKNOWN_ERROR" => RespCode::SPUnknownError,
+            "USER_REJECT" => RespCode::UserReject,
+            "NO_ROUTE" => RespCode::NORoute,
+            "isv.UNSUPPORTED_CONTENT" => RespCode::UnsupportedContent,
+            "isv.SMS_CONTENT_MISMATCH_TEMPLATE_TYPE" => RespCode::SMSContentMismatchTemplateType,
+            "isv.ONE_CODE_MULTIPLE_SIGN" => RespCode::OneCodeMultipleSign,
+            "isv.CODE_EXCEED_LIMIT" => RespCode::CodeExceedLimit,
+            "isv.CODE_ERROR" => RespCode::CodeError,
+            "PORT_NOT_REGISTERED" => RespCode::PortNotRegistered,
+            "isv.SIGN_SOURCE_ILLEGAL" => RespCode::SignSourceIllegal,
+            _ => RespCode::Unknown(self.to_string()),
         }
     }
 }

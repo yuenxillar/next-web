@@ -25,9 +25,19 @@ pub trait SignerV3<E = String> {
         body_sha256: &str,
     ) -> Result<String, E>;
 
-    fn string_to_sign(&self, canonical_request: &str, algorithm: &str) -> Result<String, E>;
+    fn string_to_sign(
+        &self,
+        canonical_request: &str,
+        algorithm: &str,
+        headers: &BTreeMap<&str, String>,
+    ) -> Result<String, E>;
 
-    fn signature(&self, string_to_sign: &str, secret_key: &str) -> Result<String, E>;
+    fn signature(
+        &self,
+        string_to_sign: &str,
+        secret_key: &str,
+        headers: &BTreeMap<&str, String>,
+    ) -> Result<String, E>;
 
     fn hmac_sha256(&self, key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
         let mut mac = Hmac::<Sha256>::new_from_slice(key)

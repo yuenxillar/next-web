@@ -1,1 +1,1 @@
-pub mod create_sms_template;
+pub mod sms_template_respnose;

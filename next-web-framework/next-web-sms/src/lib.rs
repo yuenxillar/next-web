@@ -1,5 +1,4 @@
 pub mod core;
-pub mod signature;
 
 #[cfg(feature = "aliyun")]
 pub mod aliyun;

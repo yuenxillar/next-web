@@ -4,11 +4,23 @@ use next_web_core::{async_trait, error::BoxError};
 
 use serde::de::DeserializeOwned;
 
-pub type TemplateResult<T: DeserializeOwned> = std::result::Result<T, BoxError>;
+pub type TemplateResult<T> = std::result::Result<T, BoxError>;
 
 #[async_trait]
 pub trait TemplateService: Send + Sync {
-    /// CreateSmsTemplate- 申请短信模板
+    /// Create a new SMS template
+    ///
+    /// # Arguments
+    ///
+    /// * `template_name` - Name of the template.
+    /// * `template_content` - Content of the template.
+    /// * `template_type` - Type of the template (e.g., verification code).
+    /// * `expand_params` - Additional parameters like related sign name or international type.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(R)` with response data if successful.
+    /// * `Err(BoxError)` if validation or API call fails.
     async fn create_template<'a, R>(
         &self,
         template_name: &'a str,
@@ -18,23 +30,64 @@ pub trait TemplateService: Send + Sync {
     ) -> TemplateResult<R>
     where
         R: DeserializeOwned;
-    
+
+    /// Delete an existing SMS template by its code.
+    ///
+    /// # Arguments
+    ///
+    /// * `template_code` - Unique identifier of the template.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(R)` with response data if successful.
+    /// * `Err(BoxError)` if template code is empty or API call fails.
     async fn delete_template<R>(&self, template_code: &str) -> TemplateResult<R>
     where
         R: DeserializeOwned;
-    
-    async fn update_template<'a, R>(
+
+    /// Update an existing SMS template.
+    ///
+    /// # Arguments
+    ///
+    /// * `template_code` - Unique identifier of the template.
+    /// * `template_name` - New name for the template.
+    /// * `template_content` - New content for the template.
+    /// * `template_type` - Type of the template.
+    /// * `expand_params` - Optional additional parameters.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(R)` with response data if successful.
+    /// * `Err(BoxError)` if validation or API call fails.
+    async fn update_template<R>(
         &self,
-        template_name: &'a str,
-        template_content: &'a str,
+        template_code: &str,
+        template_name: &str,
+        template_content: &str,
         template_type: i32,
-        expand_params: Option<BTreeMap<&'a str, String>>,
+        expand_params: Option<BTreeMap<&str, String>>,
     ) -> TemplateResult<R>
     where
         R: DeserializeOwned;
 
-    
-    async fn query_template<R>(&self, template_type: i32, index: u16, size: u16) -> TemplateResult<R>
+    /// Query a list of SMS templates.
+    ///
+    /// # Arguments
+    ///
+    /// * `_template_type` - Filter by template type.
+    /// * `index` - Page index (starting from 1).
+    /// * `size` - Number of items per page (max 50).
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(R)` with response data if successful.
+    /// * `Err(BoxError)` if page index or size is invalid or API call fails.
+    async fn query_template<R>(
+        &self,
+        template_type: i32,
+        index: u16,
+        size: u16,
+    ) -> TemplateResult<R>
     where
         R: DeserializeOwned;
 }
