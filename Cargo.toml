@@ -38,6 +38,8 @@ tower-http = { version = "0.6.2" }
 axum-prometheus = { version = "0.7.0" }
 axum-core = { version = "0.5.2" }
 
+mimalloc = { version = "0.1.47" }
+
 # serialization and deserialization
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = { version = "0.9.34" }

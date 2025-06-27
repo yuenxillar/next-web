@@ -17,3 +17,5 @@ pub use rudi_dev::{Singleton, Transient, SingleOwner, Properties};
 #[cfg(feature = "job_scheduler")]
 pub use tokio_cron_scheduler::Job;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
