@@ -1,16 +1,10 @@
 use std::collections::BTreeMap;
 
 use next_web_core::{async_trait, core::service::Service, error::BoxError};
-use reqwest::Client;
-
-#[derive(Clone)]
-pub struct SmsService<T: SmsSendService> {
-    client: Client,
-    send_service: T,
-}
+use serde_json::Value;
 
 #[async_trait]
-pub trait SmsSendService: Service {
+pub trait SmsService: Service {
     type Response: serde::de::DeserializeOwned;
 
     /// Send a single SMS message to one phone number.
@@ -18,9 +12,9 @@ pub trait SmsSendService: Service {
     /// # Arguments
     ///
     /// * `phone_numbers` - A string representing the target phone numbers (e.g., "13800138000").
-    /// * `sign_name` - The SMS signature name registered in Alibaba Cloud.
-    /// * `template_code` - The template ID defined on Alibaba Cloud.
-    /// * `template_param` - Template parameters in JSON format.
+    /// * `sign_name` - The SMS signature name.
+    /// * `template_code` - The template ID.
+    /// * `template_param` - Template parameters.
     /// * `expand_params` - Optional additional request parameters.
     ///
     /// # Returns
@@ -34,7 +28,7 @@ pub trait SmsSendService: Service {
         sign_name: &'a str,
         template_code: &'a str,
         template_param: &'a str,
-        expand_params: Option<BTreeMap<&'a str, String>>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
     ) -> Result<Self::Response, BoxError>;
 
     /// Send SMS messages to multiple phone numbers in batch.
@@ -57,7 +51,7 @@ pub trait SmsSendService: Service {
         sign_names: Vec<&'a str>,
         template_code: &'a str,
         template_param: Vec<&'a str>,
-        expand_params: Option<BTreeMap<&'a str, String>>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
     ) -> Result<Self::Response, BoxError>;
 
     /// Validate phone number and signature name are non-empty.

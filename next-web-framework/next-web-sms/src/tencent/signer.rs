@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::format};
+use std::collections::BTreeMap;
 
 use reqwest::Method;
 
@@ -10,6 +10,13 @@ const EMPTY_BODY_HEX_HASH_256: &'static str =
 #[derive(Debug)]
 pub struct TencentCloudSigner<'a> {
     pub(crate) service: &'a str,
+}
+
+impl <'a> TencentCloudSigner<'a> {
+    
+    pub fn new(service: &'a str) -> Self {
+        Self { service }
+    }
 }
 
 impl<'a> SignerV3 for TencentCloudSigner<'a> {
@@ -46,7 +53,7 @@ impl<'a> SignerV3 for TencentCloudSigner<'a> {
 
         let credential_scope = format!(
             "{}/{}/tc3_request",
-            chrono::Utc::now().to_string(),
+            chrono::Utc::now().format("%Y-%m-%d"),
             self.service
         );
         Ok(format!(
@@ -90,7 +97,7 @@ impl<'a> SignerV3 for TencentCloudSigner<'a> {
             .join("\n");
 
         Ok(format!(
-            "{}\n{}\n{}\n{}\n{}\n{}",
+            "{}\n{}\n{}\n{}\n\n{}\n{}",
             method, path, canonical_query, canonical_headers, signed_headers, body_sha256
         ))
     }
@@ -109,7 +116,7 @@ impl<'a> SignerV3 for TencentCloudSigner<'a> {
                 format!("timestamp parse error!{}", e.to_string())
             })?;
 
-        let datetime = chrono::Utc::now().to_string();
+        let datetime = chrono::Utc::now().format("%Y-%m-%d");
 
         let credential_scope = format!("{}/{}/tc3_request", datetime, self.service);
         Ok(format!(
@@ -124,7 +131,7 @@ impl<'a> SignerV3 for TencentCloudSigner<'a> {
         secret_key: &str,
         _headers: &BTreeMap<&str, String>,
     ) -> Result<String, String> {
-        let date = chrono::Utc::now().to_string();
+        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
         // SecretDate = HMAC_SHA256("TC3" + SecretKey, Date)
         let secret_date =

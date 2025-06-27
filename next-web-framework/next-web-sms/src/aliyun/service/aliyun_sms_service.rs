@@ -8,10 +8,11 @@ use reqwest::{
     Method,
 };
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 
 use crate::{
     aliyun::{respnose::sms_respnose::AliyunCloudSmsResponse, signer::AliyunSigner},
-    core::{service::sms_service::SmsSendService, signer::SignerV3},
+    core::{service::sms_service::SmsService, signer::SignerV3},
 };
 
 #[cfg(feature = "template")]
@@ -36,11 +37,17 @@ pub struct AliyunSmsService {
 }
 
 impl AliyunSmsService {
+    pub fn new() -> Self {
+        Self {
+            sms_client: reqwest::Client::new(),
+        }
+    }
+
     async fn call_api<T: DeserializeOwned>(
         &self,
         method: &str,
         path: &str,
-        query_params: &BTreeMap<&str, String>,
+        query_params: &BTreeMap<&str, Value>,
         action: &str,
         req_body: &str,
         mut common_req_headers: BTreeMap<&str, String>,
@@ -48,12 +55,24 @@ impl AliyunSmsService {
         common_req_headers.insert("x-acs-action", action.into());
         common_req_headers.insert("x-acs-content-sha256", EMPTY_BODY_HEX_HASH_256.into());
 
+        let query_params: BTreeMap<&str, String>  = query_params.iter().map(|(k, v)| (*k, v.to_string())).collect();
         // build SignerV3
-        let authorization =
-            auth_header(method, path, &query_params, &common_req_headers, req_body)?;
+        let signer = AliyunSigner {};
+         let authorization = signer.sign(
+            method,
+            path,
+            Some(&query_params),
+            &common_req_headers,
+            req_body,
+            ALIBABA_CLOUD_ACCESS_KEY_SECRET.as_str(),
+            ALIBABA_CLOUD_ACCESS_KEY_ID.as_str(),
+            ALGORITHM,
+        )?;
         common_req_headers.insert("Authorization", authorization);
 
         let headers = to_header_map(common_req_headers);
+
+
         let canonical_query_string = build_sored_encoded_query_string(&query_params);
         let url = format!("{}{}?{}", self.url(), path, canonical_query_string);
 
@@ -65,7 +84,7 @@ impl AliyunSmsService {
 impl Service for AliyunSmsService {}
 
 #[async_trait]
-impl SmsSendService for AliyunSmsService {
+impl SmsService for AliyunSmsService {
     type Response = AliyunCloudSmsResponse;
 
     /// read this doc: https://next.api.aliyun.com/document/Dysmsapi/2017-05-25/SendSms
@@ -75,7 +94,7 @@ impl SmsSendService for AliyunSmsService {
         sign_name: &'a str,
         template_code: &'a str,
         template_param: &'a str,
-        expand_params: Option<BTreeMap<&'a str, String>>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
     ) -> Result<Self::Response, BoxError> {
         if !self.check_validity(phone_numbers, sign_name) {
             return Err("phone_numbers or sign_names is invalid.".into());
@@ -83,7 +102,7 @@ impl SmsSendService for AliyunSmsService {
 
         let action = "SendSms";
 
-        let mut query_params: BTreeMap<&'a str, String> = BTreeMap::new();
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
 
         query_params.insert("PhoneNumbers", phone_numbers.into());
         query_params.insert("SignName", sign_name.into());
@@ -126,7 +145,7 @@ impl SmsSendService for AliyunSmsService {
         sign_names: Vec<&'a str>,
         template_code: &'a str,
         template_params: Vec<&'a str>,
-        expand_params: Option<BTreeMap<&'a str, String>>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
     ) -> Result<Self::Response, BoxError> {
         if phone_numbers.len() == 0 || sign_names.len() == 0 {
             return Err("phone_numbers or sign_names is empty.".into());
@@ -151,16 +170,12 @@ impl SmsSendService for AliyunSmsService {
 
         let action = "SendBatchSms";
 
-        let phone_numbers = serde_json::to_string(&phone_numbers)?;
-        let sign_names = serde_json::to_string(&sign_names)?;
-        let template_params = serde_json::to_string(&template_params)?;
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
 
-        let mut query_params: BTreeMap<&'a str, String> = BTreeMap::new();
-
-        query_params.insert("PhoneNumberJson", phone_numbers);
-        query_params.insert("SignNameJson", sign_names);
+        query_params.insert("PhoneNumberJson", phone_numbers.into());
+        query_params.insert("SignNameJson", sign_names.into());
         query_params.insert("TemplateCode", template_code.into());
-        query_params.insert("TemplateParamJson", template_params);
+        query_params.insert("TemplateParamJson", template_params.into());
         expand_params.map(|var| query_params.extend(var));
 
         let req_body = "";
@@ -223,7 +238,7 @@ impl TemplateService for AliyunSmsService {
         template_name: &'a str,
         template_content: &'a str,
         template_type: i32,
-        expand_params: Option<BTreeMap<&'a str, String>>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
     ) -> TemplateResult<R>
     where
         R: DeserializeOwned,
@@ -252,10 +267,10 @@ impl TemplateService for AliyunSmsService {
 
         let action: &str = "CreateSmsTemplate";
 
-        let mut query_params = BTreeMap::new();
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
         query_params.insert("TemplateName", template_name.into());
         query_params.insert("TemplateContent", template_content.into());
-        query_params.insert("TemplateType", template_type.to_string());
+        query_params.insert("TemplateType", template_type.into());
 
         expand_params.map(|var| query_params.extend(var));
 
@@ -283,7 +298,7 @@ impl TemplateService for AliyunSmsService {
 
         let action: &str = "DeleteSmsTemplate";
 
-        let mut query_params = BTreeMap::new();
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
         query_params.insert("TemplateCode", urlencoding::encode(template_code).into());
 
         let req_body = "";
@@ -300,13 +315,13 @@ impl TemplateService for AliyunSmsService {
         .await
     }
 
-    async fn update_template<R>(
+    async fn update_template<'a, R>(
         &self,
-        template_code: &str,
-        template_name: &str,
-        template_content: &str,
+        template_code: &'a str,
+        template_name: &'a str,
+        template_content: &'a str,
         template_type: i32,
-        expand_params: Option<BTreeMap<&str, String>>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
     ) -> TemplateResult<R>
     where
         R: DeserializeOwned,
@@ -335,11 +350,11 @@ impl TemplateService for AliyunSmsService {
 
         let action = "UpdateSmsTemplate";
 
-        let mut query_params = BTreeMap::new();
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
         query_params.insert("TemplateName", template_name.into());
         query_params.insert("TemplateCode", template_code.into());
         query_params.insert("TemplateContent", template_content.into());
-        query_params.insert("TemplateType", template_type.to_string());
+        query_params.insert("TemplateType", template_type.into());
 
         expand_params.map(|var| query_params.extend(var));
 
@@ -376,9 +391,9 @@ impl TemplateService for AliyunSmsService {
 
         let action: &str = "QuerySmsTemplateList";
 
-        let mut query_params = BTreeMap::new();
-        query_params.insert("PageIndex", index.to_string());
-        query_params.insert("PageSize", size.to_string());
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
+        query_params.insert("PageIndex", index.into());
+        query_params.insert("PageSize", size.into());
 
         let req_body = "";
         let common_req_headers = self.common_req_headers();
@@ -404,31 +419,10 @@ fn to_header_map(headers: BTreeMap<&str, String>) -> HeaderMap {
     header_map
 }
 
-fn auth_header(
-    method: &str,
-    path: &str,
-    query_params: &BTreeMap<&str, String>,
-    headers: &BTreeMap<&str, String>,
-    body: &str,
-) -> Result<String, String> {
-    let signer = AliyunSigner {};
-    signer.sign(
-        method,
-        path,
-        Some(query_params),
-        headers,
-        body,
-        ALIBABA_CLOUD_ACCESS_KEY_SECRET.as_str(),
-        ALIBABA_CLOUD_ACCESS_KEY_ID.as_str(),
-        ALGORITHM,
-    )
-}
-
-
 fn build_sored_encoded_query_string(params: &BTreeMap<&str, String>) -> String {
     params
         .iter()
-        .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
+        .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v.as_str())))
         .collect::<Vec<_>>()
         .join("&")
 }
@@ -441,16 +435,13 @@ mod test {
 
     #[tokio::test]
     async fn test_send_sms() {
-        // println!("key+Id: {:?}", std::env::var("ALIBABA_CLOUD_ACCESS_KEY_ID"));
-        // println!("key+: {:?}", std::env::var("ALIBABA_CLOUD_ACCESS_KEY_SECRET"));
+        // println!("key_id: {:?}", std::env::var("ALIBABA_CLOUD_ACCESS_KEY_ID"));
+        // println!("key: {:?}", std::env::var("ALIBABA_CLOUD_ACCESS_KEY_SECRET"));
         let sms_service = AliyunSmsService {
             sms_client: reqwest::Client::new(),
         };
         let phone1: String = "1642312xxxx".into();
-        let _phone2: String = "13542366613xxxx".into();
-
         let sign1: String = "阿里云短信测试".into();
-        let _sign2: String = "zasdwadawd".into();
 
         let result = sms_service
             .send_sms(&phone1, &sign1, "SMS_xxxxxxx", "{\"code\":\"1234\"}", None)

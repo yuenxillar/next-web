@@ -1,9 +1,14 @@
-
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
+pub struct TencentCloudSmsResponse {
+    #[serde(rename = "Response")]
+    pub response: SmsResponse,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub enum TencentCloudSmsResponse {
+pub enum SmsResponse {
     Ok {
         #[serde(rename = "SendStatusSet")]
         send_status_set: Vec<SendStatusSet>,
@@ -15,8 +20,7 @@ pub enum TencentCloudSmsResponse {
         error: ErrorRespnose,
         #[serde(rename = "RequestId")]
         request_id: String,
-
-    }
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,7 +32,7 @@ pub struct ErrorRespnose {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct  SendStatusSet {
+pub struct SendStatusSet {
     /// 发送流水号
     pub serial_no: String,
     /// 手机号码，E.164标准，+[国家或地区码][手机号] ，示例如：+8618501234444， 其中前面有一个+号 ，86为国家码，18501234444为手机号
@@ -42,5 +46,5 @@ pub struct  SendStatusSet {
     /// 短信请求错误码描述
     pub message: String,
     /// 国家码或地区码，例如 CN、US 等，对于未识别出国家码或者地区码，默认返回 DEF，具体支持列表请参考
-    pub iso_code: String
+    pub iso_code: String,
 }

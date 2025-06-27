@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use next_web_core::{async_trait, error::BoxError};
 
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 
 pub type TemplateResult<T> = std::result::Result<T, BoxError>;
 
@@ -26,7 +27,7 @@ pub trait TemplateService: Send + Sync {
         template_name: &'a str,
         template_content: &'a str,
         template_type: i32,
-        expand_params: Option<BTreeMap<&'a str, String>>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
     ) -> TemplateResult<R>
     where
         R: DeserializeOwned;
@@ -59,13 +60,13 @@ pub trait TemplateService: Send + Sync {
     ///
     /// * `Ok(R)` with response data if successful.
     /// * `Err(BoxError)` if validation or API call fails.
-    async fn update_template<R>(
+    async fn update_template<'a, R>(
         &self,
-        template_code: &str,
-        template_name: &str,
-        template_content: &str,
+        template_code: &'a str,
+        template_name: &'a str,
+        template_content: &'a str,
         template_type: i32,
-        expand_params: Option<BTreeMap<&str, String>>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
     ) -> TemplateResult<R>
     where
         R: DeserializeOwned;
@@ -74,9 +75,9 @@ pub trait TemplateService: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `_template_type` - Filter by template type.
+    /// * `template_type` - Filter by template type.
     /// * `index` - Page index (starting from 1).
-    /// * `size` - Number of items per page (max 50).
+    /// * `size` - Number of items per page.
     ///
     /// # Returns
     ///
