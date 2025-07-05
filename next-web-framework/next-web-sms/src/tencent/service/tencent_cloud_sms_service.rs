@@ -10,15 +10,17 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::{
-    core::{
-        service::{
-            sms_service::SmsService,
-            template_service::{TemplateResult, TemplateService},
-        },
-        signer::SignerV3,
-    },
+    core::signer::SignerV3,
     tencent::{respnose::sms_respnose::TencentCloudSmsResponse, signer::TencentCloudSigner},
 };
+
+use crate::core::service::sms_service::SmsService;
+
+#[cfg(feature = "template")]
+use crate::core::service::template_service::TemplateService;
+
+#[cfg(feature = "sign")]
+use crate::core::service::sign_service::SignService;
 
 const SMS_ENDPOINT: &'static str = "sms.tencentcloudapi.com";
 const SMS_VERSION: &'static str = "2021-01-11";
@@ -243,6 +245,7 @@ impl SmsService for TencentCloudSmsService {
     }
 }
 
+#[cfg(feature = "template")]
 #[async_trait]
 impl TemplateService for TencentCloudSmsService {
     async fn create_template<'a, R>(
@@ -251,7 +254,7 @@ impl TemplateService for TencentCloudSmsService {
         template_content: &'a str,
         template_type: i32,
         expand_params: Option<BTreeMap<&'a str, Value>>,
-    ) -> TemplateResult<R>
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned,
     {
@@ -281,7 +284,7 @@ impl TemplateService for TencentCloudSmsService {
                 Default::default()
             })
             .unwrap_or("expand_params missing [International] and [Remark] parameter.");
-        
+
         if !error_str.is_empty() {
             return Err(error_str.into());
         }
@@ -310,7 +313,7 @@ impl TemplateService for TencentCloudSmsService {
         .await
     }
 
-    async fn delete_template<R>(&self, template_code: &str) -> TemplateResult<R>
+    async fn delete_template<R>(&self, template_code: &str) -> Result<R, BoxError>
     where
         R: DeserializeOwned,
     {
@@ -349,7 +352,7 @@ impl TemplateService for TencentCloudSmsService {
         template_content: &'a str,
         template_type: i32,
         expand_params: Option<BTreeMap<&'a str, Value>>,
-    ) -> TemplateResult<R>
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned,
     {
@@ -379,7 +382,7 @@ impl TemplateService for TencentCloudSmsService {
                 Default::default()
             })
             .unwrap_or("expand_params missing [International] and [Remark] parameter.");
-        
+
         if !error_str.is_empty() {
             return Err(error_str.into());
         }
@@ -418,7 +421,7 @@ impl TemplateService for TencentCloudSmsService {
         international: i32,
         index: u16,
         size: u16,
-    ) -> TemplateResult<R>
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned,
     {
@@ -438,6 +441,260 @@ impl TemplateService for TencentCloudSmsService {
         params.insert("Limit", size.into());
         params.insert("Offset", index.into());
 
+        let common_req_headers = self.common_req_headers();
+
+        let body = serde_json::to_string(&params)?;
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            None,
+            common_req_headers,
+            &body,
+            TENCENTCLOUD_SECRET_KEY.as_str(),
+            TENCENTCLOUD_SECRET_ID.as_str(),
+            ALGORITHM,
+            action,
+        )
+        .await
+    }
+}
+
+#[cfg(feature = "sign")]
+#[async_trait]
+impl SignService for TencentCloudSmsService {
+    async fn create_sign<'a, R>(
+        &self,
+        sign_name: &'a str,
+        sign_type: i32,
+        sign_purpose: i32,
+        qualification_id: u64,
+        remark: Option<&'a str>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
+    ) -> Result<R, BoxError>
+    where
+        R: DeserializeOwned,
+    {
+        if !expand_params
+            .as_ref()
+            .map(|var| var.get("DocumentType").is_some())
+            .unwrap_or_default()
+        {
+            return Err("expand_params missing [DocumentType] parameter.".into());
+        }
+
+        let mut international: bool = false;
+        if !expand_params
+            .as_ref()
+            .map(|var| {
+                var.get("International")
+                    .map(|v| match v.as_i64().unwrap_or(-1) {
+                        0 => true,
+                        1 => {
+                            international = true;
+                            true
+                        }
+                        _ => false,
+                    })
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
+        {
+            return Err("expand_params missing [International: i64] parameter.".into());
+        }
+
+        if !expand_params
+            .as_ref()
+            .map(|var| var.get("ProofImage").is_some())
+            .unwrap_or_default()
+        {
+            return Err("expand_params missing [ProofImage] parameter.".into());
+        }
+
+        if sign_purpose == 1 {
+            if !expand_params
+                .as_ref()
+                .map(|var| var.get("CommissionImage").is_some())
+                .unwrap_or_default()
+            {
+                return Err("expand_params missing [CommissionImage: String] parameter.".into());
+            }
+        }
+
+        let action = "AddSmsSign";
+        let mut params: BTreeMap<&str, Value> = BTreeMap::new();
+        params.insert("SignName", sign_name.into());
+        params.insert("SignType", sign_type.into());
+        params.insert("SignPurpose", sign_purpose.into());
+        if international { params.insert("QualificationId", qualification_id.into()); }
+
+        remark.map(|s| params.insert("Remark", s.into()));
+        expand_params.map(|var| params.extend(var));
+
+        let common_req_headers = self.common_req_headers();
+
+        let body = serde_json::to_string(&params)?;
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            None,
+            common_req_headers,
+            &body,
+            TENCENTCLOUD_SECRET_KEY.as_str(),
+            TENCENTCLOUD_SECRET_ID.as_str(),
+            ALGORITHM,
+            action,
+        )
+        .await
+    }
+
+    async fn delete_sign<R>(&self, sign_id: &str) -> Result<R, BoxError>
+    where
+        R: DeserializeOwned,
+    {
+        if sign_id.is_empty() {
+            return Err("sign_id is empty!".into());
+        }
+        let action = "DeleteSmsSign";
+        let mut params: BTreeMap<&str, Value> = BTreeMap::new();
+        params.insert(
+            "SignId",
+            Value::Number(sign_id.parse::<u64>().unwrap_or_default().into()),
+        );
+
+        let common_req_headers = self.common_req_headers();
+
+        let body = serde_json::to_string(&params)?;
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            None,
+            common_req_headers,
+            &body,
+            TENCENTCLOUD_SECRET_KEY.as_str(),
+            TENCENTCLOUD_SECRET_ID.as_str(),
+            ALGORITHM,
+            action,
+        )
+        .await
+    }
+
+    async fn update_sign<'a, R>(
+        &self,
+        sign_name: &'a str,
+        sign_type: i32,
+        sign_purpose: i32,
+        qualification_id: u64,
+        remark: Option<&'a str>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
+    ) -> Result<R, BoxError>
+    where
+        R: DeserializeOwned,
+    {
+        if !expand_params
+            .as_ref()
+            .map(|var| var.get("DocumentType").is_some())
+            .unwrap_or_default()
+        {
+            return Err("expand_params missing [DocumentType: u64] parameter.".into());
+        }
+
+        let mut international: bool = false;
+        if !expand_params
+            .as_ref()
+            .map(|var| {
+                var.get("International")
+                    .map(|v| match v.as_i64().unwrap_or(-1) {
+                        0 => true,
+                        1 => {
+                            international = true;
+                            true
+                        }
+                        _ => false,
+                    })
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
+        {
+            return Err("expand_params missing [International: i64] parameter.".into());
+        }
+
+        if !expand_params
+            .as_ref()
+            .map(|var| var.get("ProofImage").is_some())
+            .unwrap_or_default()
+        {
+            return Err("expand_params missing [ProofImage: String] parameter.".into());
+        }
+
+        if sign_purpose == 1 {
+            if !expand_params
+                .as_ref()
+                .map(|var| var.get("CommissionImage").is_some())
+                .unwrap_or_default()
+            {
+                return Err("expand_params missing [CommissionImage: String] parameter.".into());
+            }
+        }
+
+        let action = "ModifySmsSign";
+        let mut params: BTreeMap<&str, Value> = BTreeMap::new();
+        params.insert("SignName", sign_name.into());
+        params.insert("SignType", sign_type.into());
+        params.insert("SignPurpose", sign_purpose.into());
+        if international { params.insert("QualificationId", qualification_id.into()); }
+
+        remark.map(|s| params.insert("Remark", s.into()));
+        expand_params.map(|var| params.extend(var));
+
+        let common_req_headers = self.common_req_headers();
+
+        let body = serde_json::to_string(&params)?;
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            None,
+            common_req_headers,
+            &body,
+            TENCENTCLOUD_SECRET_KEY.as_str(),
+            TENCENTCLOUD_SECRET_ID.as_str(),
+            ALGORITHM,
+            action,
+        )
+        .await
+    }
+
+    async fn query_sign<R>(
+        &self,
+        sign_id: &str,
+        expand_params: Option<BTreeMap<&str, Value>>,
+    ) -> Result<R, BoxError>
+    where
+        R: DeserializeOwned,
+    {
+        if sign_id.is_empty() {
+            return Err("sign_id is empty!".into());
+        }
+
+        if !expand_params
+            .as_ref()
+            .map(|var| var.get("International").is_some())
+            .unwrap_or_default()
+        {
+            return Err("expand_params missing [International] parameter.".into());
+        }
+
+        let sign_id_set: Vec<Value> = if sign_id.contains(",") {
+            sign_id.split(",").map(|v| v.into()).collect()
+        } else {
+            vec![sign_id.into()]
+        };
+
+        let mut params: BTreeMap<&str, Value> = BTreeMap::new();
+        params.insert("SignIdSet", Value::Array(sign_id_set));
+
+        expand_params.map(|var| params.extend(var));
+
+        let action = "DescribeSmsSignList";
         let common_req_headers = self.common_req_headers();
 
         let body = serde_json::to_string(&params)?;

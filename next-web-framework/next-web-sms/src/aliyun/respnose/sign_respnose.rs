@@ -1,6 +1,6 @@
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct AliyunCloudTemplateResponse<T> {
+pub struct AliyunCloudSignResponse<T> {
     /// 请求 ID
     pub request_id: String,
     /// 状态码

@@ -2,6 +2,9 @@
 name = "next-web-sms"
 version = "0.1.0"
 edition = "2021"
+keywords = ["next-web", "sms", "api"]
+description = "Next Web SMS"
+
 
 [dependencies]
 next-web-core = { workspace = true }
@@ -14,6 +17,7 @@ hex = { workspace = true }
 urlencoding = { workspace = true }
 uuid = { workspace = true }
 once_cell = { workspace = true }
+regex = { workspace = true }
 
 serde_json = { workspace = true }
 serde = { workspace = true }
@@ -24,7 +28,9 @@ tracing = { workspace = true}
 tokio = { workspace = true, features = ["macros"] }
 
 [features]
-default = ["aliyun", "tencent", "template"]
+default = ["aliyun", "tencent", "template", "sign"]
 aliyun = []
 tencent = []
 template = []
+sign = []
+full = ["aliyun", "tencent", "template", "sign"]

@@ -62,4 +62,5 @@ pub trait SmsService: Service {
 
     /// Build common HTTP headers required for API requests.
     fn common_req_headers(&self) -> BTreeMap<&str, String>;
+
 }
