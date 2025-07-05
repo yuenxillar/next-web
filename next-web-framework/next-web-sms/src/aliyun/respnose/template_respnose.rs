@@ -7,8 +7,7 @@ pub struct AliyunCloudTemplateResponse<T> {
     pub code: String,
     /// 状态码的描述。
     pub message: String,
-    /// expand_params
-    /// 拓展参数
+    /// 拓展
     #[serde(flatten)]
     pub params: Option<T>,
 }

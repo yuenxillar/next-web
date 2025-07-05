@@ -525,7 +525,9 @@ impl SignService for TencentCloudSmsService {
         params.insert("SignName", sign_name.into());
         params.insert("SignType", sign_type.into());
         params.insert("SignPurpose", sign_purpose.into());
-        if international { params.insert("QualificationId", qualification_id.into()); }
+        if international {
+            params.insert("QualificationId", qualification_id.into());
+        }
 
         remark.map(|s| params.insert("Remark", s.into()));
         expand_params.map(|var| params.extend(var));
@@ -558,7 +560,7 @@ impl SignService for TencentCloudSmsService {
         let mut params: BTreeMap<&str, Value> = BTreeMap::new();
         params.insert(
             "SignId",
-            Value::Number(sign_id.parse::<u64>().unwrap_or_default().into()),
+            Value::Number(sign_id.parse::<u64>()?.into()),
         );
 
         let common_req_headers = self.common_req_headers();
@@ -641,7 +643,9 @@ impl SignService for TencentCloudSmsService {
         params.insert("SignName", sign_name.into());
         params.insert("SignType", sign_type.into());
         params.insert("SignPurpose", sign_purpose.into());
-        if international { params.insert("QualificationId", qualification_id.into()); }
+        if international {
+            params.insert("QualificationId", qualification_id.into());
+        }
 
         remark.map(|s| params.insert("Remark", s.into()));
         expand_params.map(|var| params.extend(var));
@@ -684,9 +688,15 @@ impl SignService for TencentCloudSmsService {
         }
 
         let sign_id_set: Vec<Value> = if sign_id.contains(",") {
-            sign_id.split(",").map(|v| v.into()).collect()
+            sign_id
+                .split(",")
+                .filter_map(|v| v.parse::<u64>().ok())
+                .map(|v| Value::Number(v.into()))
+                .collect()
         } else {
-            vec![sign_id.into()]
+            if let Ok(num) = sign_id.parse::<u64>() {
+                vec![Value::Number(num.into())]
+            }else { vec![] }
         };
 
         let mut params: BTreeMap<&str, Value> = BTreeMap::new();
@@ -735,9 +745,14 @@ mod tencent_sms_test {
     use serde_json::Value;
 
     use crate::{
-        core::service::{sms_service::SmsService, template_service::TemplateService},
+        core::service::{
+            sign_service::SignService, sms_service::SmsService, template_service::TemplateService,
+        },
         tencent::{
-            respnose::template_respnose::TencentCloudTemplateResponse,
+            respnose::{
+                sign_respnose::TencentCloudSignResponse,
+                template_respnose::TencentCloudTemplateResponse,
+            },
             service::tencent_cloud_sms_service::TencentCloudSmsService,
         },
     };
@@ -760,6 +775,28 @@ mod tencent_sms_test {
             .unwrap();
         println!("resp: {:?}", resp);
         println!("time elapsed: {:?}", start.elapsed());
+
+        let mut expand_params: BTreeMap<&str, Value> = BTreeMap::new();
+        expand_params.insert("International", 0.into());
+        expand_params.insert("Remark", "test".into());
+
+        let resp1: TencentCloudTemplateResponse = sms_service
+            .create_template("template_name", "template_content", 1, Some(expand_params))
+            .await
+            .unwrap();
+        println!("resp1: {:?}", resp1.response);
+    }
+
+    #[tokio::test]
+    async fn test_query_sign() {
+        let sms_service = TencentCloudSmsService::new();
+        let mut expand_params = BTreeMap::new();
+        expand_params.insert("International", 0.into());
+        let resp: TencentCloudSignResponse = sms_service
+            .query_sign("1234567890", Some(expand_params))
+            .await
+            .unwrap();
+        println!("resp: {:?}", resp);
 
         let mut expand_params: BTreeMap<&str, Value> = BTreeMap::new();
         expand_params.insert("International", 0.into());

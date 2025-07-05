@@ -1,12 +1,12 @@
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct TencentCloudSmsResponse {
     #[serde(rename = "Response")]
     pub response: SmsResponse,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum SmsResponse {
     Ok {
@@ -23,14 +23,14 @@ pub enum SmsResponse {
     },
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ErrorRespnose {
     pub code: String,
     pub message: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct SendStatusSet {
     /// 发送流水号

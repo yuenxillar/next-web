@@ -418,6 +418,7 @@ impl SignService for AliyunCloudSmsService {
         if sign_name.is_empty() {
             return Err("sign_name cannot be empty!".into());
         }
+        
         if sign_type != 0 && sign_type != 1 {
             return Err("sign_type must be 0 or 1!".into());
         }
@@ -670,11 +671,11 @@ mod test {
             sms_client: reqwest::Client::new(),
         };
 
-        let _resp: AliyunCloudTemplateResponse<CreateSmsTemplateRespnose> = sms_service
-            .create_template("req_params", "", 11, None)
+        let resp: AliyunCloudTemplateResponse<CreateSmsTemplateRespnose> = sms_service
+            .create_template("req_params", "req", 11, None)
             .await?;
 
-        // println!("Template name is: {}", resp.params.template_name);
+        println!("Template name is: {:?}", resp);
 
         Ok(())
     }
