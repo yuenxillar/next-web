@@ -1,6 +1,6 @@
 [package]
 name = "next-web-core"
-version = "0.1.1"
+version = "0.1.3"
 edition.workspace = true
 description = "Core library for the Next Web framework, providing essential web server and middleware abstractions."
 license.workspace = true

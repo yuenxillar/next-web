@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod core;
 pub mod properties;
 pub mod models;
