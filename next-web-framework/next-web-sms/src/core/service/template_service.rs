@@ -5,8 +5,6 @@ use next_web_core::{async_trait, error::BoxError};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-pub type TemplateResult<T> = std::result::Result<T, BoxError>;
-
 #[async_trait]
 pub trait TemplateService: Send + Sync {
     /// Create a new SMS template
@@ -28,7 +26,7 @@ pub trait TemplateService: Send + Sync {
         template_content: &'a str,
         template_type: i32,
         expand_params: Option<BTreeMap<&'a str, Value>>,
-    ) -> TemplateResult<R>
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned;
 
@@ -42,7 +40,7 @@ pub trait TemplateService: Send + Sync {
     ///
     /// * `Ok(R)` with response data if successful.
     /// * `Err(BoxError)` if template code is empty or API call fails.
-    async fn delete_template<R>(&self, template_code: &str) -> TemplateResult<R>
+    async fn delete_template<R>(&self, template_code: &str) -> Result<R, BoxError>
     where
         R: DeserializeOwned;
 
@@ -67,7 +65,7 @@ pub trait TemplateService: Send + Sync {
         template_content: &'a str,
         template_type: i32,
         expand_params: Option<BTreeMap<&'a str, Value>>,
-    ) -> TemplateResult<R>
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned;
 
@@ -88,7 +86,7 @@ pub trait TemplateService: Send + Sync {
         template_type: i32,
         index: u16,
         size: u16,
-    ) -> TemplateResult<R>
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned;
 }

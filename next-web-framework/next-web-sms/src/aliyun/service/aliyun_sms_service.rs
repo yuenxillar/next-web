@@ -15,8 +15,10 @@ use crate::{
     core::{service::sms_service::SmsService, signer::SignerV3},
 };
 
+#[cfg(feature = "sign")]
+use crate::core::service::sign_service::SignService;
 #[cfg(feature = "template")]
-use crate::core::service::template_service::{TemplateResult, TemplateService};
+use crate::core::service::template_service::TemplateService;
 
 const PATH: &'static str = "/";
 const ENDPOINT: &'static str = "dysmsapi.aliyuncs.com";
@@ -32,11 +34,11 @@ static ALIBABA_CLOUD_ACCESS_KEY_SECRET: Lazy<Arc<String>> =
     Lazy::new(|| Arc::new(std::env::var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").unwrap()));
 
 #[derive(Clone)]
-pub struct AliyunSmsService {
+pub struct AliyunCloudSmsService {
     sms_client: reqwest::Client,
 }
 
-impl AliyunSmsService {
+impl AliyunCloudSmsService {
     pub fn new() -> Self {
         Self {
             sms_client: reqwest::Client::new(),
@@ -55,10 +57,13 @@ impl AliyunSmsService {
         common_req_headers.insert("x-acs-action", action.into());
         common_req_headers.insert("x-acs-content-sha256", EMPTY_BODY_HEX_HASH_256.into());
 
-        let query_params: BTreeMap<&str, String>  = query_params.iter().map(|(k, v)| (*k, v.to_string())).collect();
+        let query_params: BTreeMap<&str, String> = query_params
+            .iter()
+            .map(|(k, v)| (*k, v.to_string()))
+            .collect();
         // build SignerV3
         let signer = AliyunSigner {};
-         let authorization = signer.sign(
+        let authorization = signer.sign(
             method,
             path,
             Some(&query_params),
@@ -72,7 +77,6 @@ impl AliyunSmsService {
 
         let headers = to_header_map(common_req_headers);
 
-
         let canonical_query_string = build_sored_encoded_query_string(&query_params);
         let url = format!("{}{}?{}", self.url(), path, canonical_query_string);
 
@@ -81,10 +85,10 @@ impl AliyunSmsService {
     }
 }
 
-impl Service for AliyunSmsService {}
+impl Service for AliyunCloudSmsService {}
 
 #[async_trait]
-impl SmsService for AliyunSmsService {
+impl SmsService for AliyunCloudSmsService {
     type Response = AliyunCloudSmsResponse;
 
     /// read this doc: https://next.api.aliyun.com/document/Dysmsapi/2017-05-25/SendSms
@@ -125,20 +129,6 @@ impl SmsService for AliyunSmsService {
         .await
     }
 
-    /// Send SMS messages to multiple phone numbers in batch.
-    ///
-    /// # Arguments
-    ///
-    /// * `phone_numbers` - List of phone numbers.
-    /// * `sign_names` - Corresponding list of signature names.
-    /// * `template_code` - The same template code used for all messages.
-    /// * `template_params` - Parameters for each message in JSON array format.
-    /// * `expand_params` - Optional additional request parameters.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(AliyunCloudSmsResponse)` if successful.
-    /// * `Err(BoxError)` if input validation or API call fails.
     async fn send_batch_sms<'a>(
         &self,
         phone_numbers: Vec<&'a str>,
@@ -192,7 +182,6 @@ impl SmsService for AliyunSmsService {
         .await
     }
 
-    /// Validate phone number and signature name are non-empty.
     fn check_validity<'a>(&self, phone_number: &'a str, sign_name: &'a str) -> bool {
         // 检查手机号码是否合法
         if phone_number.trim_end().is_empty() {
@@ -206,6 +195,7 @@ impl SmsService for AliyunSmsService {
 
         true
     }
+
     fn url(&self) -> &str {
         "https://dysmsapi.aliyuncs.com"
     }
@@ -230,16 +220,16 @@ impl SmsService for AliyunSmsService {
     }
 }
 
-// #[cfg(feature = "template")]
+#[cfg(feature = "template")]
 #[async_trait]
-impl TemplateService for AliyunSmsService {
+impl TemplateService for AliyunCloudSmsService {
     async fn create_template<'a, R>(
         &self,
         template_name: &'a str,
         template_content: &'a str,
         template_type: i32,
         expand_params: Option<BTreeMap<&'a str, Value>>,
-    ) -> TemplateResult<R>
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned,
     {
@@ -288,7 +278,7 @@ impl TemplateService for AliyunSmsService {
         .await
     }
 
-    async fn delete_template<R>(&self, template_code: &str) -> TemplateResult<R>
+    async fn delete_template<R>(&self, template_code: &str) -> Result<R, BoxError>
     where
         R: DeserializeOwned,
     {
@@ -322,7 +312,7 @@ impl TemplateService for AliyunSmsService {
         template_content: &'a str,
         template_type: i32,
         expand_params: Option<BTreeMap<&'a str, Value>>,
-    ) -> TemplateResult<R>
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned,
     {
@@ -377,7 +367,7 @@ impl TemplateService for AliyunSmsService {
         _template_type: i32,
         index: u16,
         size: u16,
-    ) -> TemplateResult<R>
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned,
     {
@@ -394,6 +384,228 @@ impl TemplateService for AliyunSmsService {
         let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
         query_params.insert("PageIndex", index.into());
         query_params.insert("PageSize", size.into());
+
+        let req_body = "";
+        let common_req_headers = self.common_req_headers();
+
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            &query_params,
+            action,
+            req_body,
+            common_req_headers,
+        )
+        .await
+    }
+}
+
+#[cfg(feature = "sign")]
+#[async_trait]
+impl SignService for AliyunCloudSmsService {
+    async fn create_sign<'a, R>(
+        &self,
+        sign_name: &'a str,
+        sign_type: i32,
+        sign_purpose: i32,
+        qualification_id: u64,
+        remark: Option<&'a str>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
+    ) -> Result<R, BoxError>
+    where
+        R: DeserializeOwned,
+    {
+        if sign_name.is_empty() {
+            return Err("sign_name cannot be empty!".into());
+        }
+        if sign_type != 0 && sign_type != 1 {
+            return Err("sign_type must be 0 or 1!".into());
+        }
+
+        if qualification_id == 0 {
+            return Err("qualification_id is invalid!".into());
+        }
+
+        if sign_purpose != 0 && sign_purpose != 1 {
+            return Err("sign_purpose must be (0 = false) or (1 = true)!".into());
+        }
+
+        if !expand_params
+            .as_ref()
+            .map(|map| map.contains_key("SignSource"))
+            .unwrap_or(false)
+        {
+            return Err(
+                "SignSource (type: int) is required, Please input to expand_params!".into(),
+            );
+        }
+
+        if sign_purpose == 1 {
+            if !expand_params
+                .as_ref()
+                .map(|map| map.contains_key("AuthorizationLetterId"))
+                .unwrap_or(false)
+            {
+                return Err(
+                    "AuthorizationLetterId (type: int) is required, Please input to expand_params!"
+                        .into(),
+                );
+            }
+        }
+
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
+
+        query_params.insert("SignName", sign_name.into());
+        query_params.insert("SignType", sign_type.into());
+        query_params.insert(
+            "ThirdParty",
+            if sign_purpose == 0 {
+                Value::Bool(false)
+            } else {
+                Value::Bool(true)
+            },
+        );
+        query_params.insert("QualificationId", qualification_id.into());
+        remark.map(|var| query_params.insert("Remark", var.into()));
+        expand_params.map(|var| query_params.extend(var));
+
+        let action = "CreateSmsSign";
+
+        let req_body = "";
+        let common_req_headers = self.common_req_headers();
+
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            &query_params,
+            action,
+            req_body,
+            common_req_headers,
+        )
+        .await
+    }
+
+    async fn query_sign<R>(&self, sign_id: &str, _expand_params: Option<BTreeMap<&str, Value>>) -> Result<R, BoxError>
+    where
+        R: DeserializeOwned,
+    {
+        if sign_id.is_empty() {
+            return Err("sign_id cannot be empty!".into());
+        }
+
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
+        query_params.insert("SignName", sign_id.into());
+
+        let action = "GetSmsSign";
+
+        let req_body = "";
+        let common_req_headers = self.common_req_headers();
+
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            &query_params,
+            action,
+            req_body,
+            common_req_headers,
+        )
+        .await
+    }
+
+    async fn update_sign<'a, R>(
+        &self,
+        sign_name: &'a str,
+        sign_type: i32,
+        sign_purpose: i32,
+        qualification_id: u64,
+        remark: Option<&'a str>,
+        expand_params: Option<BTreeMap<&'a str, Value>>,
+    ) -> Result<R, BoxError>
+    where
+        R: DeserializeOwned,
+    {
+        if sign_name.is_empty() {
+            return Err("sign_name cannot be empty!".into());
+        }
+        if sign_type != 0 && sign_type != 1 {
+            return Err("sign_type must be 0 or 1!".into());
+        }
+
+        if qualification_id == 0 {
+            return Err("qualification_id is invalid!".into());
+        }
+
+        if sign_purpose != 0 && sign_purpose != 1 {
+            return Err("sign_purpose must be (0 = false) or (1 = true)!".into());
+        }
+
+        if !expand_params
+            .as_ref()
+            .map(|map| map.contains_key("SignSource"))
+            .unwrap_or(false)
+        {
+            return Err(
+                "SignSource (type: int) is required, Please input to expand_params!".into(),
+            );
+        }
+
+        if sign_purpose == 1 {
+            if !expand_params
+                .as_ref()
+                .map(|map| map.contains_key("AuthorizationLetterId"))
+                .unwrap_or(false)
+            {
+                return Err(
+                    "AuthorizationLetterId (type: int) is required, Please input to expand_params!"
+                        .into(),
+                );
+            }
+        }
+
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
+
+        query_params.insert("SignName", sign_name.into());
+        query_params.insert("SignType", sign_type.into());
+        query_params.insert(
+            "ThirdParty",
+            if sign_purpose == 0 {
+                Value::Bool(false)
+            } else {
+                Value::Bool(true)
+            },
+        );
+        query_params.insert("QualificationId", qualification_id.into());
+        remark.map(|var| query_params.insert("Remark", var.into()));
+        expand_params.map(|var| query_params.extend(var));
+
+        let action = "UpdateSmsSign";
+
+        let req_body = "";
+        let common_req_headers = self.common_req_headers();
+
+        self.call_api::<R>(
+            Method::POST.as_str(),
+            PATH,
+            &query_params,
+            action,
+            req_body,
+            common_req_headers,
+        )
+        .await
+    }
+
+    async fn delete_sign<R>(&self, sign_id: &str) -> Result<R, BoxError>
+    where
+        R: DeserializeOwned,
+    {
+        if sign_id.is_empty() {
+            return Err("sign_id cannot be empty!".into());
+        }
+
+        let mut query_params: BTreeMap<&str, Value> = BTreeMap::new();
+        query_params.insert("SignName", sign_id.into());
+
+        let action = "DeleteSmsSign";
 
         let req_body = "";
         let common_req_headers = self.common_req_headers();
@@ -429,7 +641,7 @@ fn build_sored_encoded_query_string(params: &BTreeMap<&str, String>) -> String {
 
 #[cfg(test)]
 mod test {
-    use crate::aliyun::respnose::template_respnose::TemplateResponse;
+    use crate::aliyun::respnose::template_respnose::AliyunCloudTemplateResponse;
 
     use super::*;
 
@@ -437,7 +649,7 @@ mod test {
     async fn test_send_sms() {
         // println!("key_id: {:?}", std::env::var("ALIBABA_CLOUD_ACCESS_KEY_ID"));
         // println!("key: {:?}", std::env::var("ALIBABA_CLOUD_ACCESS_KEY_SECRET"));
-        let sms_service = AliyunSmsService {
+        let sms_service = AliyunCloudSmsService {
             sms_client: reqwest::Client::new(),
         };
         let phone1: String = "1642312xxxx".into();
@@ -454,11 +666,11 @@ mod test {
     async fn test_sms_template() -> Result<(), BoxError> {
         use crate::aliyun::models::sms_template_respnose::create_respnose::CreateSmsTemplateRespnose;
 
-        let sms_service = AliyunSmsService {
+        let sms_service = AliyunCloudSmsService {
             sms_client: reqwest::Client::new(),
         };
 
-        let _resp: TemplateResponse<CreateSmsTemplateRespnose> = sms_service
+        let _resp: AliyunCloudTemplateResponse<CreateSmsTemplateRespnose> = sms_service
             .create_template("req_params", "", 11, None)
             .await?;
 
@@ -474,6 +686,10 @@ mod test {
         let val1 = HeaderValue::try_from(123).unwrap();
         let val2 = HeaderValue::try_from("123").unwrap();
         println!("val1: {:?}, val2: {:?}", val1, val2);
-        assert_eq!(val1, val2)
+        assert_eq!(val1, val2);
+
+        let var1: u8 = 123;
+        let num: Value = var1.into();
+        println!("num: {:?}", num)
     }
 }

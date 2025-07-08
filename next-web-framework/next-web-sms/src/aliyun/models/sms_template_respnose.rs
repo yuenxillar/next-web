@@ -1,12 +1,3 @@
-pub mod delete_respnose {
-    #[derive(serde::Deserialize, Debug, Clone)]
-    #[serde(rename_all = "PascalCase")]
-    pub struct DeleteSmsTemplateRespnose {
-        /// 已删除的模板 Code
-        pub template_code: String,
-    }
-}
-
 pub mod create_respnose {
     #[derive(serde::Deserialize, Debug, Clone)]
     #[serde(rename_all = "PascalCase")]
@@ -20,6 +11,15 @@ pub mod create_respnose {
         /// 工单号。
         /// 审核人员查询审核时会用到此参数。您需要审核加急时需要提供此工单号。
         pub order_id: String,
+    }
+}
+
+pub mod delete_respnose {
+    #[derive(serde::Deserialize, Debug, Clone)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct DeleteSmsTemplateRespnose {
+        /// 已删除的模板 Code
+        pub template_code: String,
     }
 }
 
