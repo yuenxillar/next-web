@@ -71,10 +71,4 @@ impl WebSocketHandler for TestWebSocket {
     }
 }
 
-
-#[tokio::main]
-async fn main() {
-    // TestApplication::run().await;
-}
-
 ```

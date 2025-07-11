@@ -126,7 +126,7 @@ impl WebSocketSession {
     /// A boolean indicating whether the session is active/open.
     ///
     pub async fn is_open(&self) -> bool {
-        self.msg_channel.is_disconnected()
+        !self.msg_channel.is_disconnected()
     }
 
     ///
@@ -144,7 +144,7 @@ impl WebSocketSession {
             .msg_channel
             .send_async(Message::Close(Some(CloseFrame {
                 code: axum::extract::ws::close_code::NORMAL,
-                reason: "0".into(),
+                reason: "The server actively closes the connection.".into(),
             })))
             .await;
     }

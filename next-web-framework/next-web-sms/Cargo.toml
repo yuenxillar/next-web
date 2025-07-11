@@ -1,8 +1,10 @@
 [package]
 name = "next-web-sms"
 version = "0.1.0"
-edition = "2021"
-keywords = ["next-web", "sms", "api"]
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["next-web", "sms", "api", "aliyun", "tencent"]
 description = "Next Web SMS"
 
 

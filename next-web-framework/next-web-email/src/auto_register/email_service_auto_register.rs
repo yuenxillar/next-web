@@ -1,15 +1,17 @@
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext, AutoRegister};
-use rudi::SingleOwner;
+use std::sync::Arc;
 
+use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext, AutoRegister};
+use rudi_dev::Singleton;
 use crate::{properties::email_properties::EmailProperties, service::email_service::EmailService};
 
-#[SingleOwner(binds = [Self::into_auto_register])]
+#[Singleton(binds = [Self::into_auto_register])]
+#[derive(Clone)]
 pub struct EmailServiceAutoRegister(pub EmailProperties);
 
 
 impl EmailServiceAutoRegister {
-    fn into_auto_register(self) -> Box<dyn AutoRegister> {
-        Box::new(self)
+    fn into_auto_register(self) -> Arc<dyn AutoRegister> {
+        Arc::new(self)
     }
 }
 

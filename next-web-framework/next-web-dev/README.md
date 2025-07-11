@@ -21,8 +21,8 @@ pub struct TestApplication;
 impl Application for TestApplication {
     async fn init_middleware(&mut self, properties: &ApplicationProperties) {}
 
-    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> (OpenRouter, PrivateRouter) {
-        (OpenRouter::default(), PrivateRouter(axum::Router::new().route("/test", get(test_fn))))
+    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
+        axum::Router::new().route("/test", get(test_fn))
     }
 }
 

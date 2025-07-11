@@ -29,7 +29,7 @@ syn = { workspace = true, features = [
     "full",
 ] }
 
-next-web-core = { version = "0.1.1"}
+next-web-core = { version = "0.1.3"}
 
 [dev-dependencies]
 # cannot contain `workspace = true` to avoid circular dependencies.
