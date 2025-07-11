@@ -6,8 +6,6 @@ use next_web_core::{context::properties::ApplicationProperties, ApplicationConte
 
 use next_web_dev::application::Application;
 
-mod test_auth;
-mod test_excel;
 mod test_mqtt;
 mod test_redis;
 mod test_websocket;

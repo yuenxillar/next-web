@@ -4,5 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-next-web-security-core = { path = "./next-web-security-core", version = "*"}
-next-web-security-macro = { path = "./next-web-security-macro", version = "*"}
+next-web-core = { workspace = true }
+rudi-dev = { workspace = true }
+axum = { workspace = true, features = ["http1"]}
+
+bcrypt = { workspace = true }
+
+matchit = { workspace = true }

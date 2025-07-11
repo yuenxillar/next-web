@@ -1,2 +1,6 @@
-pub use next_web_security_core::*;
-pub use next_web_security_macro::*;
+pub mod core;
+pub mod auth;
+pub mod permission;
+pub mod shared;
+
+use matchit::Router;

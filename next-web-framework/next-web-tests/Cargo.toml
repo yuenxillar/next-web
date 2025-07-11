@@ -25,6 +25,7 @@ next-web-data-redis = { path = "../next-web-data-redis", version = "0.1.0", feat
 next-web-document = { path = "../next-web-document", version = "0.1.0", features = [
     "excel",
 ] }
+next-web-security= { path = "../next-web-security", version = "*" }
 
 rust_xlsxwriter = { workspace = true }
 axum = { workspace = true, features = ["multipart"] }

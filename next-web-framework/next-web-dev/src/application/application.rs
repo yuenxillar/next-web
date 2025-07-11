@@ -256,11 +256,37 @@ pub trait Application: Send + Sync {
             // handle not found route
             .fallback(fall_back);
 
+        // apply router
+        let routers = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
+
+        let (mut open_routers, mut common_routers): (Vec<_>, Vec<_>) =
+            routers.into_iter().partition(|item| item.open());
+
+        let var10 = Router::new();
+
+        open_routers.sort_by_key(|k| k.order());
+        let open_router = open_routers
+            .into_iter()
+            .map(|item| item.router(ctx))
+            .filter(|item1| item1.has_routes())
+            .fold(var10, |acc, router| acc.merge(router));
+
+        application_router = application_router.merge(open_router);
+
+        common_routers.sort_by_key(|k| k.order());
+        for item2 in common_routers
+            .into_iter()
+            .map(|item| item.router(ctx))
+            .filter(|item1| item1.has_routes())
+        {
+            application_router = application_router.merge(item2);
+        }
+
         // Add prometheus layer
         #[cfg(feature = "enable_prometheus")]
         {
             let (prometheus_layer, metric_handle) = axum_prometheus::PrometheusMetricLayer::pair();
-            app = app
+            application_router = application_router
                 .route(
                     "/metrics",
                     axum::routing::get(|| async move { metric_handle.render() }),
@@ -305,44 +331,9 @@ pub trait Application: Send + Sync {
 
         if !context_path.is_empty() {
             app = app.nest(context_path, application_router);
+            println!("nest context path: {}", context_path);
         } else {
             app = app.merge(application_router);
-        }
-
-        // apply router
-        let routers = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
-
-        let (mut open_routers, mut common_routers): (Vec<_>, Vec<_>) =
-            routers.into_iter().partition(|item| item.open());
-
-        let var10 = Router::new();
-
-        open_routers.sort_by_key(|k| k.order());
-        let open_router = open_routers
-            .into_iter()
-            .map(|item| item.router(ctx))
-            .filter(|item1| item1.has_routes())
-            .fold(var10, |acc, router| {
-                if !context_path.is_empty() {
-                    acc.nest(context_path, router)
-                } else {
-                    acc.merge(router)
-                }
-            });
-
-        app = app.merge(open_router);
-
-        common_routers.sort_by_key(|k| k.order());
-        for item2 in common_routers
-            .into_iter()
-            .map(|item| item.router(ctx))
-            .filter(|item1| item1.has_routes())
-        {
-            if !context_path.is_empty() {
-                app = app.nest(context_path, item2);
-                continue;
-            }
-            app = app.merge(item2);
         }
 
         println!(

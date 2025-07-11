@@ -1,12 +1,16 @@
 use axum::{http::StatusCode, response::IntoResponse};
+use next_web_core::DynClone;
 
 use super::http_security::HttpSecurity;
 
-pub trait WebSecurityConfigure: Send + Sync
+pub trait WebSecurityConfigure: DynClone + Send + Sync
 {
     fn configure(&self) -> HttpSecurity;
 }
 
+next_web_core::clone_trait_object!(WebSecurityConfigure);
+
+#[derive(Clone)]
 struct Test;
 
 impl WebSecurityConfigure for Test {
@@ -26,6 +30,7 @@ impl WebSecurityConfigure for Test {
             .any_match("/test/**", |group| group.roles(vec!["test"]))
             .not_match("/**/*.js")
             .not_match("/**/*.css")
+            .not_matches(["/pass_route", "/login"])
             .map_error(|error| {
                 let error_msg = error.to_string();
                 println!("error: {:?}", &error_msg);
