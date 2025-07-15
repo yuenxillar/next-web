@@ -4,30 +4,26 @@ use hashbrown::HashMap;
 use next_web_core::{
     async_trait,
     context::properties::ApplicationProperties,
-    core::service::{self, Service},
+    core::service::Service,
     ApplicationContext, AutoRegister,
 };
 use rudi_dev::Singleton;
-use serde::ser;
 
 use crate::{
     core::{
-        interceptor::message_interceptor::MessageInterceptor, router::TopicRouter,
+        interceptor::message_interceptor::MessageInterceptor, route::TopicRoute,
         topic::base_topic::BaseTopic,
     },
     properties::mqtt_properties::MQTTClientProperties,
     service::mqtt_service::MQTTService,
 };
 
-/// 定义一个单例拥有者，并绑定到 `into_auto_register` 方法
-/// Define a singleton owner and bind it to the `into_auto_register` method
+
 #[Singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
 pub struct MqttServiceAutoRegister(pub MQTTClientProperties);
 
 impl MqttServiceAutoRegister {
-    /// 将当前结构体转换为 `AutoRegister` 的动态分发类型
-    /// Convert the current structure into a dynamically dispatched `AutoRegister` type
     fn into_auto_register(self) -> Arc<dyn AutoRegister> {
         Arc::new(self)
     }
@@ -35,37 +31,33 @@ impl MqttServiceAutoRegister {
 
 #[async_trait]
 impl AutoRegister for MqttServiceAutoRegister {
-    /// 返回单例名称，用于标识服务
-    /// Return the singleton name used to identify the service
     fn singleton_name(&self) -> &'static str {
         ""
     }
 
-    /// 异步注册方法，用于在应用上下文中注册 MQTT 服务
-    /// Asynchronous registration method used to register the MQTT service in the application context
     async fn register(
         &self,
         ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // 克隆 MQTT 配置属性
-        // Clone the MQTT configuration properties
         let mqtt_properties = self.0.clone();
 
         // 从上下文中解析所有实现了 `BaseTopic` 的组件
         // Resolve all components implementing `BaseTopic` from the context
-
         let base_topics = ctx.resolve_by_type::<Box<dyn BaseTopic>>();
-        let mut router_map = HashMap::new();
-        let mut router = Vec::new();
+        let mut route_map = HashMap::new();
+        let mut route = Vec::new();
+
+        // 根据主题选择不同的路由方式
+        // Select different routing methods based on the topic
         base_topics.into_iter().for_each(|item| {
             let topic = item.topic();
             if topic.contains("#") || topic.contains("+") {
-                router.push(TopicRouter::new(topic, item));
+                route.push(TopicRoute::new(topic, item));
             } else {
-                // 遍历所有 `BaseTopic` 并将其主题名插入哈希表
-                // Iterate over all `BaseTopic` and insert their topic names into the hash map
-                router_map.insert(topic.into(), item);
+                // 遍历所有 `BaseTopic` 并将其主题名插入哈希表，此处为静态主题例如 /test
+                // Iterate over all `BaseTopic` and insert their topic names into the hash map, which is static topic such as /test
+                route_map.insert(topic.into(), item);
             }
         });
 
@@ -85,7 +77,7 @@ impl AutoRegister for MqttServiceAutoRegister {
 
         // 创建 MQTT 服务实例，传入配置、主题映射和消息拦截器
         // Create an MQTT service instance, passing in the configuration, topic mapping, and message interceptor
-        let mqtt_service = MQTTService::new(mqtt_properties, router_map, router, interceptor);
+        let mqtt_service = MQTTService::new(mqtt_properties, route_map, route, interceptor);
 
         // 将 MQTT 服务插入上下文，并命名为单例名称
         // Insert the MQTT service into the context and name it with the singleton name

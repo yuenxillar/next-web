@@ -349,10 +349,10 @@ pub trait Application: Send + Sync {
         #[cfg(feature = "tls_rustls")]
         {
             let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
-                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR"))
                     .join("self_signed_certs")
                     .join("cert.pem"),
-                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR"))
                     .join("self_signed_certs")
                     .join("key.pem"),
             )
