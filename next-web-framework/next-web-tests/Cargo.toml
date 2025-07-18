@@ -20,7 +20,7 @@ next-web-mqtt = { path = "../next-web-mqtt", version = "0.1.2" }
 next-web-dev = { path = "../next-web-dev", version = "0.1.4" }
 next-web-core = { workspace = true }
 # next-web-data-database = { path = "../next-web-data-database", version = "0.1.0" }
-next-web-data-redis = { path = "../next-web-data-redis", version = "0.1.0", features = ["expired-key-listener"]}
+next-web-data-redis = { path = "../next-web-data/next-web-data-redis", version = "0.1.0", features = ["expired-key-listener"]}
 # next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "0.1.0" }
 next-web-document = { path = "../next-web-document", version = "0.1.0", features = [
     "excel",

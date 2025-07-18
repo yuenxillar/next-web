@@ -32,7 +32,7 @@ use crate::autoconfigure::context::next_properties::NextProperties;
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
-use crate::util::date_time_util::LocalDateTime;
+use crate::util::local_date_time::LocalDateTime;
 
 use next_web_core::context::application_resources::ApplicationResources;
 

@@ -1,6 +1,4 @@
-use std::borrow::Cow;
-
-use super::{application_event::ApplicationEvent, application_listener::ApplicationListener, key::Key};
+use super::{application_listener::ApplicationListener, key::Key};
 
 /// 应用事件多播器
 /// Application event multicaster

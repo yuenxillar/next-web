@@ -27,15 +27,11 @@ next-web-mqtt = { version = "0.1.0", path = "./next-web-mqtt", optional = true }
 next-web-mq = { version = "0.1.0", path = "./next-web-mq", optional = true }
 next-web-common = { version = "0.1.0", path = "./next-web-common", optional = true }
 next-web-tests = { version = "0.1.0", path = "./next-web-tests" , optional = true}
-
 next-web-sms = { version = "0.1.0", path = "./next-web-sms", optional = true }
-
-# data
-next-web-data-redis = { version = "0.1.0", path = "./next-web-data-redis", optional = true }
-next-web-data-mongodb = { version = "0.1.0", path = "./next-web-data-mongodb", optional = true }
-next-web-data-minio = { version = "0.1.0", path = "./next-web-data-minio", optional = true }
-next-web-data-database = { version = "0.1.0", path = "./next-web-data-database", optional = true }
+next-web-data = {  version = "*", path = "./next-web-data", optional = true}
 next-web-websocket = { version = "0.1.2", path = "./next-web-websocket", optional = true}
+
+
 
 # document
 next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }
