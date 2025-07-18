@@ -23,6 +23,10 @@ next:
         topics:
             - test/#
             - testtopic/#
+            # with qos 
+            # 默认匹配最后两个字符 希望是以下字符-> :0 :1 :2 
+            # 如果都没有匹配, QOS 消息质量默认为 1
+            - test/666:0
         # from secs
         connect_timeout: 10
         clean_session: true
@@ -36,8 +40,7 @@ use next_web_core::async_trait;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{
     application::Application,
-    router::{open_router::OpenRouter, private_router::PrivateRouter},
-     Singleton,
+    Singleton,
 };
 use next_web_mqtt::{core::topic::base_topic::BaseTopic, service::mqtt_service::MQTTService};
 
@@ -54,10 +57,10 @@ impl Application for TestApplication {
     async fn application_router(
         &mut self,
         ctx: &mut ApplicationContext,
-    ) -> (OpenRouter, PrivateRouter) {
+    ) -> axum::Router {
         let mqtt = ctx.get_single_with_name::<MQTTService>("mqttService");
-        mqtt.publish("test/two", "hello world!").await;
-        (OpenRouter::default(), PrivateRouter::default())
+        mqtt.publish("test/two", "hello world!").await.unwrap();
+        axum::Router::new()
     }
 }
 
