@@ -1,4 +1,5 @@
 use crate::rabbitmq::core::bind_exchange::BindExchange;
+use crate::rabbitmq::core::listener::rabbit_listener::RabbitListener;
 use amqprs::callbacks::DefaultChannelCallback;
 use amqprs::callbacks::DefaultConnectionCallback;
 use amqprs::channel::BasicConsumeArguments;
@@ -12,6 +13,7 @@ use amqprs::connection::OpenConnectionArguments;
 use amqprs::BasicProperties;
 use next_web_core::core::service::Service;
 
+use next_web_core::core::singleton::Singleton;
 use tracing::{error, info};
 
 use crate::rabbitmq::properties::rabbitmq_properties::RabbitMQClientProperties;
@@ -23,11 +25,8 @@ pub struct RabbitmqService {
     channel: Channel,
 }
 
-impl Service for RabbitmqService {
-    fn service_name(&self) -> String {
-        "rabbitmqService".into()
-    }
-}
+impl Singleton for RabbitmqService {}
+impl Service for RabbitmqService {}
 
 impl RabbitmqService {
     pub async fn new(properties: RabbitMQClientProperties, binds: Vec<BindExchange>) -> Self {
@@ -35,6 +34,20 @@ impl RabbitmqService {
         Self {
             properties,
             channel,
+        }
+    }
+
+    pub(crate) async fn spawn_consumer(&self, consumer: Vec<Box<dyn RabbitListener>>) {
+        for mut item in consumer {
+            let basic_consume_arguments =
+                BasicConsumeArguments::new(&item.queue(), &item.consumer_tag());
+            if let Ok((_ctag, mut rx)) = self.add_consumer(basic_consume_arguments).await {
+                tokio::spawn(async move {
+                    while let Some(msg) = rx.recv().await {
+                        item.on_message(msg).await;
+                    }
+                });
+            }
         }
     }
 

@@ -8,7 +8,7 @@ use lettre::{
     transport::smtp::authentication::Credentials,
     AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
 };
-use next_web_core::core::service::Service;
+use next_web_core::core::{service::Service, singleton::Singleton};
 
 use crate::{core::email_content::EmailContent, properties::email_properties::EmailProperties};
 
@@ -19,6 +19,7 @@ pub struct EmailService {
     transport: AsyncSmtpTransport<Tokio1Executor>,
 }
 
+impl Singleton for EmailService {}
 impl Service for EmailService {}
 
 impl EmailService {

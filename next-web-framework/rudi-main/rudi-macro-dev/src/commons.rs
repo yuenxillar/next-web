@@ -158,12 +158,105 @@ fn extract_path_type<'a>(ty: &'a Type, ty_name: &str) -> syn::Result<&'a Type> {
     }
 }
 
+fn extract_path_type_with_owned_type(ty: &Type, ty_name: &str) -> syn::Result<Type> {
+    let Type::Path(TypePath {
+        qself: None,
+        path: Path {
+            leading_colon: None,
+            segments,
+        },
+    }) = ty
+    else {
+        return Err(syn::Error::new(
+            ty.span(),
+            format!("only support `{}<T>` type", ty_name),
+        ));
+    };
+
+    let Some(segment) = segments.last() else {
+        return Err(syn::Error::new(
+            ty.span(),
+            "not support path type with empty segments",
+        ));
+    };
+
+    let PathSegment {
+        ident,
+        arguments: PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }),
+    } = segment
+    else {
+        return Err(syn::Error::new(
+            segment.span(),
+            "only support angle bracketed generic argument",
+        ));
+    };
+
+    if ident != ty_name {
+        return Err(syn::Error::new(
+            ident.span(),
+            format!("only support `{}<T>` type", ty_name),
+        ));
+    }
+
+    let Some(arg) = args.first() else {
+        return Err(syn::Error::new(
+            segment.span(),
+            format!(
+                "not support `{}<T>` type with empty generic arguments ",
+                ty_name
+            ),
+        ));
+    };
+
+    if args.len() > 1 {
+        if ty_name == "HashMap" {
+            let last_args = args.last().unwrap();
+            if let GenericArgument::Type(last_ty) = last_args {
+                let Type::Path(TypePath {
+                    qself: None,
+                    path:
+                        Path {
+                            leading_colon: None,
+                            segments,
+                        },
+                }) = last_ty
+                else {
+                    return Err(syn::Error::new(
+                        last_ty.span(),
+                        format!("only support `{}<T>` type", ty_name),
+                    ));
+                };
+
+                let val = segments.last().unwrap();
+                let mut pun = Punctuated::new();
+                pun.push(val.to_owned());
+                return syn::Result::Ok(Type::Path(TypePath {
+                    qself: None,
+                    path: Path {
+                        leading_colon: None,
+                        segments: pun,
+                    },
+                }));
+            }
+        }
+    }
+
+    return Err(syn::Error::new(
+        arg.span(),
+        "only support generic argument type",
+    ));
+}
+
 fn extract_option_type(ty: &Type) -> syn::Result<&Type> {
     extract_path_type(ty, "Option")
 }
 
 fn extract_vec_type(ty: &Type) -> syn::Result<&Type> {
     extract_path_type(ty, "Vec")
+}
+
+fn extract_hashmap_type(ty: &Type) -> syn::Result<Type> {
+    extract_path_type_with_owned_type(ty, "HashMap")
 }
 
 enum ResolveOneValue {
@@ -192,6 +285,7 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         option,
         default,
         vec,
+        map,
         ref_,
     } = match FieldOrArgumentAttr::remove_attributes(attrs) {
         Ok(Some(AttrsValue { value, .. })) => value,
@@ -386,6 +480,61 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         };
     }
 
+    // if map
+    if map {
+        let ty = match ref_ {
+            FlagOrValue::None => None,
+            FlagOrValue::Flag { .. } => {
+                let ty = extract_hashmap_type(field_or_argument_ty)?;
+                Some(quote!(#ty))
+            }
+            FlagOrValue::Value { value: ty, .. } => Some(quote!(#ty)),
+        };
+
+        return match ty {
+            Some(ty) => {
+                let create_single = match color {
+                    Color::Async => parse_quote! {
+                        cx.try_just_create_singles_by_type_async::<#ty>().await;
+                    },
+                    Color::Sync => parse_quote! {
+                        cx.try_just_create_singles_by_type::<#ty>();
+                    },
+                };
+
+                let get_single = parse_quote! {
+                    let #ident = cx.get_singles_by_type();
+                };
+
+                Ok(ResolveOne {
+                    stmt: ResolveOneValue::Ref {
+                        create_single,
+                        get_single,
+                    },
+                    variable: ident,
+                })
+            }
+            None => {
+                let ty = extract_hashmap_type(field_or_argument_ty)
+                    .unwrap()
+                    .into_token_stream();
+                let resolve = match color {
+                    Color::Async => parse_quote! {
+                        let #ident: HashMap<String, #ty>  = HashMap::from_iter(cx.resolve_by_type_async::<#ty>().await.into_iter().map(|v| (v.singleton_name(), v)));
+                    },
+                    Color::Sync => parse_quote! {
+                        let #ident: HashMap<String, #ty>  = HashMap::from_iter(cx.resolve_by_type::<#ty>().into_iter().map(|v| (v.singleton_name(), v)));
+                    },
+                };
+
+                Ok(ResolveOne {
+                    stmt: ResolveOneValue::Owned { resolve },
+                    variable: ident,
+                })
+            }
+        };
+    }
+
     let ty = match ref_ {
         FlagOrValue::None => None,
         FlagOrValue::Flag { .. } => {
@@ -425,8 +574,8 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                 },
                 Color::Sync => {
                     if is_value {
-                        // 如果为空就报错
-                        let  value_type = extract_vec_inner_type(field_or_argument_ty);
+                        // 如果为空就 panic
+                        let value_type = extract_vec_inner_type(field_or_argument_ty);
                         if value_type.is_none() {
                             return Err(syn::Error::new(
                                 Span::call_site(),
@@ -437,7 +586,6 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                         parse_quote! {
                             let #ident = cx.get_single::<::next_web_core::context::properties::ApplicationProperties>().one_value::<#value_type>(#key);
                         }
-
                     } else {
                         parse_quote! {
                             let #ident = cx.resolve_with_name(#name);
@@ -658,7 +806,7 @@ pub(crate) fn generate_field_resolve_stmts(
 fn extract_vec_inner_type(ty: &Type) -> Option<&Type> {
     if let Type::Path(type_path) = ty {
         let last_segment = type_path.path.segments.last()?;
-        
+
         // 检查是否是 Option
         if last_segment.ident == "Option" {
             // 获取泛型参数

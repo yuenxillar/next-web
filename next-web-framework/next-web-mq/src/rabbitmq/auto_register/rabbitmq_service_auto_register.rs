@@ -1,6 +1,6 @@
-use amqprs::channel::BasicConsumeArguments;
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, ApplicationContext, AutoRegister,
+    async_trait, context::properties::ApplicationProperties, core::singleton::Singleton,
+    ApplicationContext, AutoRegister,
 };
 use rudi_dev::SingleOwner;
 
@@ -21,8 +21,8 @@ impl RabbitmqServiceAutoRegister {
 
 #[async_trait]
 impl AutoRegister for RabbitmqServiceAutoRegister {
-    fn singleton_name(&self) -> &'static str {
-        "rabbitmqService"
+    fn registered_name(&self) -> &'static str {
+        ""
     }
 
     async fn register(
@@ -36,20 +36,9 @@ impl AutoRegister for RabbitmqServiceAutoRegister {
 
         let rabbitmq_service = RabbitmqService::new(properties, bind_exchange).await;
 
-        let consumers = ctx.resolve_by_type::<Box<dyn RabbitListener>>();
+        let consumer: Vec<Box<dyn RabbitListener>> = ctx.resolve_by_type::<Box<dyn RabbitListener>>();
 
-        for mut consumer in consumers {
-            let basic_consume_arguments =
-                BasicConsumeArguments::new(&consumer.queue(), &consumer.consumer_tag());
-            if let Ok((_ctag, mut rx)) = rabbitmq_service.add_consumer(basic_consume_arguments).await
-            {
-                tokio::spawn(async move {
-                    while let Some(msg) = rx.recv().await {
-                        consumer.on_message(msg).await;
-                    }
-                });
-            }
-        }
+        rabbitmq_service.spawn_consumer(consumer).await;
         ctx.insert_singleton_with_name(rabbitmq_service, self.singleton_name());
         Ok(())
     }

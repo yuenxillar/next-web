@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use flume::Sender;
 use hashbrown::HashSet;
+use next_web_core::core::singleton::Singleton;
 use tokio::sync::Mutex;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::info;
@@ -12,6 +13,10 @@ pub struct JobSchedulerManager {
     jobs: Arc<Mutex<Vec<Job>>>,
     tx: Option<Sender<SchedulerEvent>>,
 }
+
+
+impl Singleton for JobSchedulerManager {}
+
 
 impl JobSchedulerManager {
     pub fn new() -> Self {

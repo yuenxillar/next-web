@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use axum::{
     body::Bytes,
     extract::{FromRequest, Request},
     http::{header, HeaderMap, StatusCode},
 };
+use next_web_core::core::data_decoder::DataDecoder;
 use serde::de::DeserializeOwned;
 
 pub struct Data<T>(pub T);
@@ -15,19 +18,20 @@ where
     type Rejection = (StatusCode, &'static str);
 
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-        if json_content_type(req.headers()) {
+        if is_json(req.headers()) {
+            let decoder = req.extensions().get::<Arc<dyn DataDecoder>>().cloned();
             let bytes = Bytes::from_request(req, state).await;
             if bytes.is_err() {
                 return Err((StatusCode::BAD_REQUEST, "Bad Request"));
             }
-            Self::from_bytes(&bytes.unwrap())
+            Self::from_bytes(&bytes.unwrap(), decoder)
         } else {
             Err((StatusCode::BAD_REQUEST, "Bad Request"))
         }
     }
 }
 
-fn json_content_type(headers: &HeaderMap) -> bool {
+fn is_json(headers: &HeaderMap) -> bool {
     let content_type = if let Some(content_type) = headers.get(header::CONTENT_TYPE) {
         content_type
     } else {
@@ -56,13 +60,28 @@ impl<T> Data<T>
 where
     T: DeserializeOwned,
 {
-    /// Construct a `Json<T>` from a byte slice. Most users should prefer to use the `FromRequest` impl
-    /// but special cases may require first extracting a `Request` into `Bytes` then optionally
-    /// constructing a `Json<T>`.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, (StatusCode, &'static str)> {
-        // Decode
+    pub fn from_bytes(
+        bytes: &[u8],
+        decoder: Option<Arc<dyn DataDecoder>>,
+    ) -> Result<Self, (StatusCode, &'static str)> {
+        if bytes.is_empty() {
+            return Err((StatusCode::BAD_REQUEST, "Body is empty"));
+        }
 
-        let deserializer = &mut serde_json::Deserializer::from_slice(bytes);
+        // Decode
+        let mut raw_data = String::default();
+
+        if let Some(decoder) = decoder {
+            raw_data = decoder
+                .decode(bytes)
+                .or_else(|err| Err((StatusCode::BAD_REQUEST, err)))?
+        }
+
+        let deserializer = &mut serde_json::Deserializer::from_slice(if raw_data.is_empty() {
+            bytes
+        } else {
+            raw_data.as_bytes()
+        });
 
         let value = match serde_path_to_error::deserialize(deserializer) {
             Ok(value) => value,

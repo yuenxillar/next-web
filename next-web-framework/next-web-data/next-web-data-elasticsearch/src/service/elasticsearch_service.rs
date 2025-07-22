@@ -3,7 +3,7 @@ use std::
 ;
 
 use elasticsearch::{Elasticsearch, auth::Credentials, http::transport::Transport};
-use next_web_core::core::service::Service;
+use next_web_core::core::{service::Service, singleton::Singleton};
 
 use crate::properties::elasticsearch_properties::ElasticsearchClientProperties;
 
@@ -21,14 +21,8 @@ pub struct ElasticsearchService {
     ///  Elasticsearch client instance
     client: Elasticsearch,
 }
-
-impl Service for ElasticsearchService {
-    /// 获取服务名称
-    ///  Get service name
-    fn service_name(&self) -> String {
-        "elasticsearchService".into()
-    }
-}
+impl Singleton  for ElasticsearchService {}
+impl Service    for ElasticsearchService {}
 
 impl ElasticsearchService {
     /// 创建新的Elasticsearch服务实例

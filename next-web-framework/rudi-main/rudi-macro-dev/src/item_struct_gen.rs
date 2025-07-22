@@ -45,10 +45,15 @@ pub(crate) fn generate(
         _ => Color::Sync,
     };
 
+    // 获取单例的条件表达式 如果函数返回为 true 则创建单例
     let condition = condition
         .map(|ClosureOrPath(expr)| quote!(Some(#expr)))
         .unwrap_or_else(|| quote!(None));
 
+    // 生成字段解析语句
+    // ref_mut_cx_stmts: 用于获取可变引用的上下文
+    // ref_cx_stmts: 用于获取不可变引用的上下文
+    // fields: 字段解析结果
     let FieldResolveStmts {
         ref_mut_cx_stmts,
         ref_cx_stmts,
@@ -87,7 +92,6 @@ pub(crate) fn generate(
             }
         }
     };
-
 
     let constructor = match color {
         Color::Async => {
@@ -150,7 +154,6 @@ pub(crate) fn generate(
         if singleton_name.is_empty() {
             let struct_name_str = struct_name.to_string();
             let mut chars = struct_name_str.chars();
-            // 将首字母小写
             if let Some(first_char) = chars.next() {
                 let first_char_lower = first_char.to_lowercase().to_string();
                 first_char_lower + chars.as_str()
@@ -164,6 +167,8 @@ pub(crate) fn generate(
 
     let expand = quote! {
         #item_struct
+
+        impl ::next_web_core::core::singleton::Singleton for #struct_name {}
 
         impl #impl_generics #path::DefaultProvider for #struct_ident #ty_generics #where_clause {
             type Type = Self;

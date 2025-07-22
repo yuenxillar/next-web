@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use next_web_core::core::service::Service;
+use next_web_core::core::{service::Service, singleton::Singleton};
 use rbatis::RBatis;
 
 use crate::properties::database_properties::DatabaseClientProperties;
@@ -11,11 +11,8 @@ pub struct DatabaseService {
     rbs: RBatis,
 }
 
-impl Service for DatabaseService {
-    fn service_name(&self) -> String {
-        "databaseService".into()
-    }
-}
+impl Singleton for DatabaseService {}
+impl Service for DatabaseService {}
 
 impl DatabaseService {
     pub fn new(properties: DatabaseClientProperties) -> Self {

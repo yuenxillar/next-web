@@ -310,7 +310,7 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                 Ok(())
             }
 
-            fn singleton_name(&self) -> &'static str {
+            fn registered_name(&self) -> &'static str {
                 #singleton_name
             }
         }

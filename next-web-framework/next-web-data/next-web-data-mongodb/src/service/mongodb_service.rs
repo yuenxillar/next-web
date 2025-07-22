@@ -4,7 +4,7 @@ use mongodb::{
     Client,
     options::{ClientOptions, Compressor, Credential, ServerAddress},
 };
-use next_web_core::core::service::Service;
+use next_web_core::core::{service::Service, singleton::Singleton};
 
 use crate::properties::mongodb_properties::MongodbClientProperties;
 
@@ -15,11 +15,8 @@ pub struct MongodbService {
     database: mongodb::Database,
 }
 
-impl Service for MongodbService {
-    fn service_name(&self) -> String {
-        "mongodbService".into()
-    }
-}
+impl Singleton  for MongodbService {}
+impl Service    for MongodbService {}
 
 impl MongodbService {
     pub fn new(properties: MongodbClientProperties) -> Self {

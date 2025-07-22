@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use minio_rsc::{provider::StaticProvider, Minio};
-use next_web_core::core::service::Service;
+use next_web_core::core::{service::Service, singleton::Singleton};
 
 use crate::properties::minio_properties::MinioClientProperties;
 
@@ -11,11 +11,8 @@ pub struct MinioService {
     client: Minio,
 }
 
-impl Service for MinioService {
-    fn service_name(&self) -> String {
-        "minioService".into()
-    }
-}
+impl Singleton  for MinioService {}
+impl Service    for MinioService {}
 
 impl MinioService {
     pub fn new(properties: MinioClientProperties) -> Self {

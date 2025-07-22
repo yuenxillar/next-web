@@ -9,6 +9,8 @@ use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::core::apply_router::ApplyRouter;
+use next_web_core::core::data_decoder::DataDecoder;
+use next_web_core::state::app_state::AppState;
 use next_web_core::AutoRegister;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use std::io::BufRead;
@@ -251,11 +253,19 @@ pub trait Application: Send + Sync {
 
         let mut application_router = self.application_router(ctx).await;
 
+         // Add app state
+        let decoder_list = ctx.resolve_by_type::<Arc<dyn DataDecoder>>();
+
+        let data_decoder = decoder_list.last();
         // Run our app with hyper, listening globally on port
         let mut app = Router::new()
             // handle not found route
-            .fallback(fall_back);
+            .fallback(fall_back)
+            .with_state(AppState::new(
+            data_decoder.map(|item| item.clone())
+        ));
 
+   
         // apply router
         let routers = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
 

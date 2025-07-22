@@ -10,7 +10,7 @@ use crate::{
 };
 
 use hashbrown::HashMap;
-use next_web_core::core::service::Service;
+use next_web_core::core::{service::Service, singleton::Singleton};
 use rumqttc::{
     AsyncClient, ConnectReturnCode, Event, MqttOptions, NetworkOptions, Packet, QoS,
     SubscribeFilter,
@@ -45,13 +45,8 @@ pub struct MQTTService {
     client: AsyncClient,
 }
 
-impl Service for MQTTService {
-    /// Returns the service name
-    /// 返回服务名称
-    fn service_name(&self) -> String {
-        "mqttService".into()
-    }
-}
+impl Singleton  for MQTTService {}
+impl Service    for MQTTService {}
 
 impl MQTTService {
     /// Creates a new MQTTService instance

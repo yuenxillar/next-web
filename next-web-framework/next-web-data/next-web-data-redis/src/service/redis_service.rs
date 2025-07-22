@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::StreamExt;
-use next_web_core::core::service::Service;
+use next_web_core::core::{service::Service, singleton::Singleton};
 use redis::{Client, Value, aio::MultiplexedConnection};
 
 #[cfg(feature = "expired-key-listener")]
@@ -32,20 +32,16 @@ pub struct RedisService {
     index: Arc<AtomicUsize>,
 }
 
-impl Service for RedisService {
-    /// 获取服务名称
-    ///  Get service name
-    fn service_name(&self) -> String {
-        "redisService".into()
-    }
-}
+impl Singleton  for RedisService {}
+impl Service    for RedisService {}
+
 
 impl RedisService {
     /// 创建新的Redis服务实例
     ///  Create new Redis service instance
     pub fn new(properties: RedisClientProperties) -> Self {
         let client = Self::build_client(&properties);
-
+        
         let connections = Vec::with_capacity(7);
         let index = Arc::new(AtomicUsize::new(0));
         Self {

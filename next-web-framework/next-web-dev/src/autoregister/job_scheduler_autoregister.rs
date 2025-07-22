@@ -1,6 +1,7 @@
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
 use next_web_core::async_trait;
 use next_web_core::context::properties::ApplicationProperties;
+use next_web_core::core::singleton::Singleton;
 use next_web_core::{ApplicationContext, AutoRegister};
 
 #[derive(Default)]
@@ -8,8 +9,8 @@ pub struct JobSchedulerAutoRegister;
 
 #[async_trait]
 impl AutoRegister for JobSchedulerAutoRegister {
-    fn singleton_name(&self) -> &'static str {
-        "jobSchedulerManager"
+    fn registered_name(&self) -> &'static str {
+        ""
     }
 
     async fn register(
@@ -18,7 +19,9 @@ impl AutoRegister for JobSchedulerAutoRegister {
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let job_scheduler_manager = JobSchedulerManager::new();
-        ctx.insert_singleton_with_name(job_scheduler_manager, self.singleton_name());
+
+        let singleton_name = job_scheduler_manager.singleton_name();
+        ctx.insert_singleton_with_name(job_scheduler_manager, singleton_name);
 
         Ok(())
     }

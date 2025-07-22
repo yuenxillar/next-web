@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use next_web_core::{
-    ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
-    core::service::Service,
+    async_trait, context::properties::ApplicationProperties, core::singleton::Singleton, ApplicationContext, AutoRegister
 };
 use rudi_dev::Singleton;
 use tracing::debug;
@@ -27,7 +26,7 @@ impl MinioServiceAutoRegister {
 #[async_trait]
 impl AutoRegister for MinioServiceAutoRegister {
     /// Return the singleton name to identify the service
-    fn singleton_name(&self) -> &'static str {
+    fn registered_name(&self) -> &'static str {
         ""
     }
 
@@ -48,8 +47,8 @@ impl AutoRegister for MinioServiceAutoRegister {
         }
 
         // Insert the  service into the context and name it with the singleton name
-        let service_name = mongodb_service.service_name();
-        ctx.insert_singleton_with_name(mongodb_service, service_name);
+        let singleton_name = mongodb_service.singleton_name();
+        ctx.insert_singleton_with_name(mongodb_service, singleton_name);
 
         Ok(())
     }

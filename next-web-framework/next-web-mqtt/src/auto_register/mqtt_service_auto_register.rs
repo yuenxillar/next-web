@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use hashbrown::HashMap;
 use next_web_core::{
-    async_trait,
-    context::properties::ApplicationProperties,
-    core::service::Service,
-    ApplicationContext, AutoRegister,
+    async_trait, context::properties::ApplicationProperties, core::singleton::Singleton, ApplicationContext, AutoRegister
 };
 use rudi_dev::Singleton;
 
@@ -31,7 +28,7 @@ impl MqttServiceAutoRegister {
 
 #[async_trait]
 impl AutoRegister for MqttServiceAutoRegister {
-    fn singleton_name(&self) -> &'static str {
+    fn registered_name(&self) -> &'static str {
         ""
     }
 
@@ -81,8 +78,8 @@ impl AutoRegister for MqttServiceAutoRegister {
 
         // 将 MQTT 服务插入上下文，并命名为单例名称
         // Insert the MQTT service into the context and name it with the singleton name
-        let service_name = mqtt_service.service_name();
-        ctx.insert_singleton_with_name(mqtt_service, service_name);
+        let singleton_name = mqtt_service.singleton_name();
+        ctx.insert_singleton_with_name(mqtt_service, singleton_name);
 
         Ok(())
     }

@@ -57,7 +57,7 @@ where
     /// - `service`: 要添加的服务实例。
     ///
     pub fn add_service(&mut self, service: T) -> Result<(), ServiceManagerError> {
-        let name = service.service_name();
+        let name = service.singleton_name();
         if self.services.contains_key(&name) {
             return Err(ServiceManagerError::ServiceAlreadyExists(name));
         }

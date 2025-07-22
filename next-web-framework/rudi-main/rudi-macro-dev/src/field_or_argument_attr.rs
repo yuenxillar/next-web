@@ -6,6 +6,7 @@ use syn::{parse_quote, Expr, Type};
 //     option,
 //     default = 42,
 //     vec,
+//     map,
 //     ref = T
 // )]
 
@@ -21,8 +22,11 @@ pub(crate) struct FieldOrArgumentAttr {
     #[attribute(conflicts = [option, vec])]
     pub(crate) default: FlagOrValue<Expr>,
 
-    #[attribute(conflicts = [name, option, default])]
+    #[attribute(conflicts = [name, option, default, map])]
     pub(crate) vec: bool,
+
+    #[attribute(conflicts = [name, option, default, vec])]
+    pub(crate) map: bool,
 
     #[attribute(rename = "ref")]
     pub(crate) ref_: FlagOrValue<Type>,
@@ -39,6 +43,7 @@ impl Default for FieldOrArgumentAttr {
             option: Default::default(),
             default: Default::default(),
             vec: Default::default(),
+            map: Default::default(),
             ref_: Default::default(),
         }
     }

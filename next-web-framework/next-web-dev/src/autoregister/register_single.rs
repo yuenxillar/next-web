@@ -9,7 +9,7 @@ use next_web_core::{
 use super::job_scheduler_autoregister::JobSchedulerAutoRegister;
 
 pub struct ApplicationDefaultRegisterContainer {
-    registers: Vec<Box<dyn AutoRegister + Send + Sync>>,
+    registers: Vec<Box<dyn AutoRegister>>,
 }
 
 impl ApplicationDefaultRegisterContainer {

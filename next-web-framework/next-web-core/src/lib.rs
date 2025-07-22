@@ -5,6 +5,7 @@ pub mod autoconfigure;
 pub mod autoregister;
 pub mod core;
 pub mod error;
+pub mod state;
 
 pub use self::context::application_context::*;
 pub use self::autoregister::auto_register::*;

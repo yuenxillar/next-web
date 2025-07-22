@@ -1,8 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use next_web_core::{
-    ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
-    core::service::Service,
+    async_trait, context::properties::ApplicationProperties, core::{service::Service, singleton::Singleton}, ApplicationContext, AutoRegister
 };
 use redis::{Cmd, ConnectionLike};
 use rudi_dev::Singleton;
@@ -29,7 +28,7 @@ impl RedisServiceAutoRegister {
 #[async_trait]
 impl AutoRegister for RedisServiceAutoRegister {
     /// Return the singleton name to identify the service
-    fn singleton_name(&self) -> &'static str {
+    fn registered_name(&self) -> &'static str {
         ""
     }
 
@@ -56,7 +55,8 @@ impl AutoRegister for RedisServiceAutoRegister {
             ctx.insert_singleton_with_name(redis_lock_service, service_name);
         }
 
-        let service_name = redis_service.service_name();
+      
+        let singleton_name = redis_service.singleton_name();
         for _ in 0..7 {
             let connect = redis_service
                 .get_multiplexed_tokio_connection_with_response_timeouts(
@@ -68,14 +68,14 @@ impl AutoRegister for RedisServiceAutoRegister {
             redis_service.connections.push(connect);
         }
 
-        ctx.insert_singleton_with_name(redis_service, service_name.to_owned());
+        ctx.insert_singleton_with_name(redis_service, singleton_name.to_owned());
 
         // Listen for expired keys
         #[cfg(feature = "expired-key-listener")]
         {
             let services = ctx.resolve_by_type::<Box<dyn RedisExpiredKeysEvent>>();
             if let Some(service) = services.first() {
-                let rs = ctx.get_single_with_name::<RedisService>(service_name);
+                let rs = ctx.get_single_with_name::<RedisService>(singleton_name);
                 rs.expired_key_listener(service.to_owned()).await?;
             }
         }

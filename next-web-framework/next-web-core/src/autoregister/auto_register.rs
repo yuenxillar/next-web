@@ -22,12 +22,11 @@ use crate::context::{application_context::ApplicationContext, properties::Applic
 ///
 #[async_trait]
 pub trait AutoRegister: Sync + Send {
+    /// Get the name of the registration instance.
     ///
-    /// Get the name of the module as a singleton.
+    /// This method is used to obtain the name of the registration instance.
     ///
-    /// This method is used to get the name of the module as a singleton.
-    ///
-    fn singleton_name(&self) -> &'static str;
+    fn registered_name(&self) -> &'static str;
 
     ///
     /// Register the singleton to the application context.
@@ -45,7 +44,6 @@ pub trait AutoRegister: Sync + Send {
 pub use inventory::submit;
 
 use crate::{DynProvider, Module};
-
 
 #[doc(hidden)]
 pub struct ProviderRegister {
@@ -166,7 +164,6 @@ macro_rules! register_provider {
     };
 }
 
-
 /// Generate a function to enable auto-registration.
 ///
 /// In Rust, it is possible to use [`inventory`] to accomplish something like
@@ -231,4 +228,3 @@ macro_rules! enable {
         }
     };
 }
-

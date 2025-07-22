@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::{
     ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
-    core::service::Service,
+    core::singleton::Singleton,
 };
 use rudi_dev::Singleton;
 
@@ -26,7 +26,7 @@ impl ElasticsearchServiceAutoRegister {
 #[async_trait]
 impl AutoRegister for ElasticsearchServiceAutoRegister {
     /// Return the singleton name to identify the service
-    fn singleton_name(&self) -> &'static str {
+    fn registered_name(&self) -> &'static str {
         ""
     }
 
@@ -41,8 +41,8 @@ impl AutoRegister for ElasticsearchServiceAutoRegister {
 
         let elasticsearch_service = ElasticsearchService::new(client_properties);
 
-        let service_name = elasticsearch_service.service_name();
-        ctx.insert_singleton_with_name(elasticsearch_service, service_name.to_owned());
+        let singleton_name = elasticsearch_service.singleton_name();
+        ctx.insert_singleton_with_name(elasticsearch_service, singleton_name);
 
         Ok(())
     }

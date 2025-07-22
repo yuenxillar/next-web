@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, core::service::Service, ApplicationContext, AutoRegister
+    async_trait, context::properties::ApplicationProperties, core::singleton::Singleton, ApplicationContext, AutoRegister
 };
 use rudi_dev::Singleton;
 
@@ -26,7 +26,7 @@ impl DatabaseServiceAutoRegister {
 #[async_trait]
 impl AutoRegister for DatabaseServiceAutoRegister {
     /// Return the singleton name to identify the service
-    fn singleton_name(&self) -> &'static str {
+    fn registered_name(&self) -> &'static str {
         ""
     }
 
@@ -57,8 +57,8 @@ impl AutoRegister for DatabaseServiceAutoRegister {
         database_service.exec("SELECT 1", vec![]).await?;
 
         // Insert the  service into the context and name it with the singleton name
-        let service_name = database_service.service_name();
-        ctx.insert_singleton_with_name(database_service, service_name);
+        let singleton_name = database_service.singleton_name();
+        ctx.insert_singleton_with_name(database_service, singleton_name);
 
         Ok(())
     }
