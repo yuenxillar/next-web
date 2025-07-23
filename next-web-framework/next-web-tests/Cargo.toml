@@ -15,12 +15,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 next-web-ip = { path = "../next-web-ip", version = "0.1.0" }
 next-web-macro = { path = "../next-web-macro", version = "0.1.0" }
-next-web-websocket = { path = "../next-web-websocket", version = "0.1.2" }
-next-web-mqtt = { path = "../next-web-mqtt", version = "0.1.2" }
+# next-web-websocket = { path = "../next-web-websocket", version = "0.1.2" }
+# next-web-mqtt = { path = "../next-web-mqtt", version = "0.1.2" }
+# next-web-data-redis = { path = "../next-web-data/next-web-data-redis", version = "0.1.0", features = ["expired-key-listener"]}
+
 next-web-dev = { path = "../next-web-dev", version = "0.1.4" }
 next-web-core = { workspace = true }
 # next-web-data-database = { path = "../next-web-data-database", version = "0.1.0" }
-next-web-data-redis = { path = "../next-web-data/next-web-data-redis", version = "0.1.0", features = ["expired-key-listener"]}
 # next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "0.1.0" }
 next-web-document = { path = "../next-web-document", version = "0.1.0", features = [
     "excel",
@@ -31,6 +32,3 @@ rust_xlsxwriter = { workspace = true }
 axum = { workspace = true, features = ["multipart"] }
 tokio-util = { workspace = true }
 futures = { workspace = true }
-
-[lints]
-workspace = true

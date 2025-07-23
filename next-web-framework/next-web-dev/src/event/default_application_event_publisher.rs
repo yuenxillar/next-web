@@ -1,6 +1,5 @@
 use flume::Sender;
-use std::borrow::Cow;
-
+use next_web_core::error::BoxError;
 
 use super::{
     application_event::ApplicationEvent, application_event_publisher::ApplicationEventPublisher,
@@ -8,7 +7,7 @@ use super::{
 
 #[derive(Clone)]
 pub struct DefaultApplicationEventPublisher {
-    channel: Option<Sender<(Cow<'static, str>, Box<dyn ApplicationEvent>)>>,
+    channel: Option<Sender<(String, Box<dyn ApplicationEvent>)>>,
 }
 
 impl DefaultApplicationEventPublisher {
@@ -16,7 +15,10 @@ impl DefaultApplicationEventPublisher {
         Self { channel: None }
     }
 
-    pub fn set_channel(&mut self, channel: Option<Sender<(Cow<'static, str>, Box<dyn ApplicationEvent>)>>) {
+    pub(crate) fn set_channel(
+        &mut self,
+        channel: Option<Sender<(String, Box<dyn ApplicationEvent>)>>,
+    ) {
         self.channel = channel;
     }
 }
@@ -26,10 +28,11 @@ impl ApplicationEventPublisher for DefaultApplicationEventPublisher {
     /// Publish event
     fn publish_event(
         &self,
-        event: Box<dyn ApplicationEvent>
-    ) -> Result<(), Box<dyn std::error::Error>> {
+        id: impl Into<String>,
+        event: Box<dyn ApplicationEvent>,
+    ) -> Result<(), BoxError> {
         if let Some(sender) = &self.channel {
-            sender.send((self.id(), event))?
+            sender.send((id.into(), event))?
         };
         Ok(())
     }

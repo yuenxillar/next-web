@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use axum::{http::HeaderMap, routing::{get, post}};
+use axum::{
+    http::HeaderMap,
+    routing::{get, post},
+};
 #[allow(missing_docs)]
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{application::Application, Singleton};
@@ -20,10 +23,12 @@ impl Application for TestApplication {
 
     // get the application router. (open api  and private api)
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
-        axum::Router::new().nest("/login", axum::Router::new().route("/test", get(async || { "OK"}))
-    .route("/test2", post(async || {
-        "Ok666"
-    })))
+        axum::Router::new().nest(
+            "/login",
+            axum::Router::new()
+                .route("/test", get(async || "OK"))
+                .route("/test2", post(async || "Ok666")),
+        )
     }
 }
 
@@ -70,8 +75,7 @@ impl TestWebSecurityConfigure {
 
 impl WebSecurityConfigure for TestWebSecurityConfigure {
     fn configure(&self) -> next_web_security::core::http_security::HttpSecurity {
-        HttpSecurity::new()
-            .any_match("/test3/{*index}", |group| group.roles(vec!["user"]))
+        HttpSecurity::new().any_match("/test3/{*index}", |group| group.roles(vec!["user"]))
     }
 }
 

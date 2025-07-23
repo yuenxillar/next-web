@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use axum::body::Bytes;
+use axum::handler::Handler;
 use axum::http::{Response, StatusCode};
 use axum::Router;
 use hashbrown::HashMap;
@@ -244,28 +245,21 @@ pub trait Application: Send + Sync {
         let config = application_properties.next().server();
 
         let context_path = config.context_path().unwrap_or("");
-        let server_port = config.port().unwrap_or(11011);
+        let server_port = config.port().unwrap_or(10011);
         let server_addr = if config.local().unwrap_or(false) {
             "127.0.0.1"
         } else {
             "0.0.0.0"
         };
 
+        
         let mut application_router = self.application_router(ctx).await;
-
-         // Add app state
-        let decoder_list = ctx.resolve_by_type::<Arc<dyn DataDecoder>>();
-
-        let data_decoder = decoder_list.last();
+     
         // Run our app with hyper, listening globally on port
         let mut app = Router::new()
             // handle not found route
-            .fallback(fall_back)
-            .with_state(AppState::new(
-            data_decoder.map(|item| item.clone())
-        ));
+            .fallback(fall_back);
 
-   
         // apply router
         let routers = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
 
@@ -345,6 +339,10 @@ pub trait Application: Send + Sync {
         } else {
             app = app.merge(application_router);
         }
+
+        let decoder_list = ctx.resolve_by_type::<Arc<dyn DataDecoder>>();
+        let data_decoder = decoder_list.last();
+        if let Some(decoder) = data_decoder { app = app.route_layer(axum::Extension(decoder.to_owned())); }
 
         println!(
             "\nApplication Listening  on:  {}",
