@@ -3,7 +3,6 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use axum::extract::ws::CloseFrame;
 use axum::Router;
 use next_web_core::{async_trait, ApplicationContext};
 use next_web_core::context::properties::ApplicationProperties;
@@ -13,6 +12,7 @@ use next_web_websocket::core::handler::Result;
 use next_web_websocket::core::handler::WebSocketHandler;
 use next_web_websocket::models::session::WebSocketSession;
 use next_web_websocket::Message;
+use axum::extract::ws::CloseFrame;
 
 /// Test
 #[Singleton(binds = [Self::into_websocket_handler])]

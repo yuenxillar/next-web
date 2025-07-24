@@ -20,8 +20,7 @@ axum = { workspace = true }
 inventory = { workspace = true }
 clap = { workspace = true }
 async-trait = { workspace = true }
-tracing = { workspace = true, optional = true }
-
+tracing = { workspace = true }
 
 tower-layer = "0.3.3"
 tower-service = "0.3.3"

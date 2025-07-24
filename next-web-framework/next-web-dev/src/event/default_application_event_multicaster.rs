@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 /// 默认的事件多播器实现
-/// 
+///
 /// Default implementation of event multicaster
 #[derive(Clone)]
 pub struct DefaultApplicationEventMulticaster {
@@ -51,8 +51,7 @@ impl DefaultApplicationEventMulticaster {
         let listeners = self.listeners.clone();
         tokio::spawn(async move {
             while let Ok(event) = channel.recv() {
-                if let Some(listeners) = listeners.lock().get(&Key::new(event.0, event.1.tid()))
-                {
+                if let Some(listeners) = listeners.lock().get(&Key::new(event.0, event.1.tid())) {
                     let _ = listeners.send(event.1);
                 }
             }
@@ -67,20 +66,26 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
 
         let (sender, receiver) = flume::unbounded();
         let key = Key::new(listener.id(), listener.tid());
-        self.listeners.lock().insert(key, sender);
-
-        tokio::spawn(async move {
-            while let Ok(event) = receiver.recv() {
-                listener.on_application_event(&event).await;
-                info!("Received event: {:?}", event.source());
-            }
-        });
-        debug!("Added listener for event type: {:?}, id: {}", tid, id);
+        let mut listeners = self.listeners.lock();
+        if listeners.contains_key(&key) {
+            panic!(
+                "Listener already exists for event type: {:?}, key: {}",
+                tid, key
+            );
+        }
+        if let None = listeners.insert(key, sender) {
+            tokio::spawn(async move {
+                while let Ok(event) = receiver.recv() {
+                    listener.on_application_event(&event).await;
+                    info!("Received event: {:?}", event.source());
+                }
+            });
+            debug!("Added listener for event type: {:?}, id: {}", tid, id);
+        }
     }
 
     fn remove_application_listener(&mut self, key: &Key) {
         // 使用监听器的唯一ID进行匹配删除
-        // 
         // Use listener's unique ID to match and remove
         if let Some(_) = self.listeners.lock().remove(key) {
             debug!("Removed listener for event type: {}", key);
