@@ -3,17 +3,17 @@ name = "next-web-common"
 version = "0.1.0"
 edition = "2021"
 description = "A common utility library for the Next Web framework"
-license = "MIT"
+license.workspace = true
 
 
 [dependencies]
-serde = { version = "1", features = ["derive"]}
-serde_json = { version = "1"}
+serde.workspace = true
+serde_json.workspace = true
 
-axum-core = "0.5.0"
-log = "0.4"
+axum-core.workspace = true
+tracing.workspace = true
 
 
 [features]
-default = ["thread-pool"]
+default = []
 thread-pool = []
