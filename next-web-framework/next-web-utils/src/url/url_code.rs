@@ -363,104 +363,6 @@ impl UrlCode {
         url
     }
     
-    /// 连接基础URL和相对URL，返回完整URL
-    pub fn join_url(base: &str, relative: &str) -> Result<String, String> {
-        // 如果相对URL是绝对URL（含有协议部分），则直接返回
-        if relative.contains("://") {
-            return Ok(relative.to_string());
-        }
-        
-        let base_components = Self::parse_url(base)?;
-        
-        // 如果相对URL以/开头，则是相对于基础URL的主机根目录
-        if relative.starts_with('/') {
-            let mut result_components = base_components.clone();
-            result_components.path = relative.to_string();
-            result_components.query = Vec::new();
-            result_components.fragment = String::new();
-            
-            // 如果相对URL包含查询参数或片段，需要单独处理
-            if let Some(query_pos) = relative.find('?') {
-                if let Some(fragment_pos) = relative.find('#') {
-                    if query_pos < fragment_pos {
-                        result_components.path = relative[..query_pos].to_string();
-                        let query_str = &relative[query_pos+1..fragment_pos];
-                        result_components.query = Self::parse_query_string(query_str)?;
-                        result_components.fragment = relative[fragment_pos+1..].to_string();
-                    } else {
-                        result_components.path = relative[..fragment_pos].to_string();
-                        result_components.fragment = relative[fragment_pos+1..].to_string();
-                    }
-                } else {
-                    result_components.path = relative[..query_pos].to_string();
-                    let query_str = &relative[query_pos+1..];
-                    result_components.query = Self::parse_query_string(query_str)?;
-                }
-            } else if let Some(fragment_pos) = relative.find('#') {
-                result_components.path = relative[..fragment_pos].to_string();
-                result_components.fragment = relative[fragment_pos+1..].to_string();
-            }
-            
-            return Ok(Self::build_url(&result_components));
-        }
-        
-        // 处理相对路径
-        // 确保基础URL的路径以/结尾
-        let mut base_path = base_components.path.clone();
-        if !base_path.ends_with('/') && !base_path.is_empty() {
-            // 移除最后一个路径段
-            if let Some(pos) = base_path.rfind('/') {
-                base_path = base_path[..=pos].to_string();
-            } else {
-                base_path = "/".to_string();
-            }
-        }
-        
-        let mut result_components = base_components.clone();
-        
-        // 构建新路径
-        let mut rel_path = relative;
-        let mut query = String::new();
-        let mut fragment = String::new();
-        
-        // 处理相对URL中的查询参数和片段
-        if let Some(query_pos) = relative.find('?') {
-            rel_path = &relative[..query_pos];
-            
-            if let Some(fragment_pos) = relative[query_pos..].find('#') {
-                let abs_fragment_pos = query_pos + fragment_pos;
-                query = relative[query_pos+1..abs_fragment_pos].to_string();
-                fragment = relative[abs_fragment_pos+1..].to_string();
-            } else {
-                query = relative[query_pos+1..].to_string();
-            }
-        } else if let Some(fragment_pos) = relative.find('#') {
-            rel_path = &relative[..fragment_pos];
-            fragment = relative[fragment_pos+1..].to_string();
-        }
-        
-        // 处理 ../ 和 ./
-        let mut path_segments: Vec<&str> = base_path.split('/').filter(|s| !s.is_empty()).collect();
-        for segment in rel_path.split('/') {
-            match segment {
-                "" | "." => continue,
-                ".." => { path_segments.pop(); },
-                _ => path_segments.push(segment),
-            }
-        }
-        
-        // 构建最终路径
-        result_components.path = "/".to_string() + &path_segments.join("/");
-        if !query.is_empty() {
-            result_components.query = Self::parse_query_string(&query)?;
-        } else {
-            result_components.query = Vec::new();
-        }
-        result_components.fragment = fragment;
-        
-        Ok(Self::build_url(&result_components))
-    }
-    
     /// 提取URL的域名部分
     pub fn get_domain(url: &str) -> Result<String, String> {
         let components = Self::parse_url(url)?;
@@ -476,37 +378,6 @@ impl UrlCode {
     pub fn get_path(url: &str) -> Result<String, String> {
         let components = Self::parse_url(url)?;
         Ok(components.path)
-    }
-    
-    /// 规范化URL（去除冗余部分，如 /./ 和 /../）
-    pub fn normalize_url(url: &str) -> Result<String, String> {
-        let mut components = Self::parse_url(url)?;
-        
-        // 处理路径中的 /./ 和 /../
-        let path = components.path.replace("/./", "/");
-        let mut normalized_path = String::new();
-        let mut segments: Vec<&str> = path.split('/').collect();
-        
-        let mut i = 0;
-        while i < segments.len() {
-            if segments[i] == ".." && i > 0 && segments[i-1] != ".." && segments[i-1] != "" {
-                segments.remove(i);
-                segments.remove(i-1);
-                i = i.saturating_sub(1);
-            } else {
-                i += 1;
-            }
-        }
-        
-        normalized_path = segments.join("/");
-        // 确保路径以/开头
-        if !normalized_path.starts_with('/') && !normalized_path.is_empty() {
-            normalized_path = format!("/{}", normalized_path);
-        }
-        
-        components.path = normalized_path;
-        
-        Ok(Self::build_url(&components))
     }
 }
 
@@ -634,42 +505,5 @@ mod tests {
         components.port = Some(443); // HTTPS的默认端口
         let url = UrlCode::build_url(&components);
         assert_eq!(url, "https://user:pass@example.com/path/to/resource?name=value&foo=bar#section");
-    }
-    
-    #[test]
-    fn test_join_url() {
-        let base = "https://example.com/path/to/";
-        let relative = "resource?name=value";
-        let joined = UrlCode::join_url(base, relative).unwrap();
-        assert_eq!(joined, "https://example.com/path/to/resource?name=value");
-        
-        // 测试绝对URL
-        let base = "https://example.com/path/to/";
-        let relative = "https://other.com/resource";
-        let joined = UrlCode::join_url(base, relative).unwrap();
-        assert_eq!(joined, "https://other.com/resource");
-        
-        // 测试相对根URL
-        let base = "https://example.com/path/to/resource";
-        let relative = "/other/path";
-        let joined = UrlCode::join_url(base, relative).unwrap();
-        assert_eq!(joined, "https://example.com/other/path");
-        
-        // 测试 ../ 和 ./
-        let base = "https://example.com/path/to/resource";
-        let relative = "../other/./path";
-        let joined = UrlCode::join_url(base, relative).unwrap();
-        assert_eq!(joined, "https://example.com/path/other/path");
-    }
-    
-    #[test]
-    fn test_normalize_url() {
-        let url = "https://example.com/path/./to/../resource";
-        let normalized = UrlCode::normalize_url(url).unwrap();
-        assert_eq!(normalized, "https://example.com/path/resource");
-        
-        let url = "https://example.com/path///to/resource";
-        let normalized = UrlCode::normalize_url(url).unwrap();
-        assert_eq!(normalized, "https://example.com/path///to/resource");
     }
 }
