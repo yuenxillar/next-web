@@ -1,6 +1,7 @@
 use std::{any::TypeId, borrow::Cow, fmt::{self, Display}};
 
 /// 事件键
+/// 
 /// Event key
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Key {

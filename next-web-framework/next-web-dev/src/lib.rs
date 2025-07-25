@@ -1,3 +1,4 @@
+pub mod response;
 pub mod autoconfigure;
 pub mod autoregister;
 pub mod banner;

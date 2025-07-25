@@ -6,7 +6,11 @@ use axum::routing::post;
 use axum::Router;
 use next_web_core::async_trait;
 use next_web_core::core::data_decoder::DataDecoder;
+use next_web_core::core::job::application_job::ApplicationJob;
+use next_web_core::core::job::context::job_execution_context::JobExecutionContext;
+use next_web_core::core::job::schedule_type::ScheduleType;
 use next_web_core::core::service::Service;
+use next_web_core::error::BoxError;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 
 use next_web_dev::application::Application;
@@ -33,10 +37,43 @@ impl Application for TestApplication {
 
     // get the application router. (open api  and private api)
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
-
         let m = ctx.resolve_with_name::<TestModule>("testModule");
-        m.publisher.publish_event("", Box::new(TestEvent(100))).unwrap();
+        // std::thread::spawn(move || loop {
+        //     m.publisher
+        //         .publish_event("", Box::new(TestEvent(100)))
+        //         .unwrap();
+        //     std::thread::sleep(std::time::Duration::from_millis(500));
+        // });
         Router::new().route("/test/789", post(test_789))
+    }
+}
+
+
+#[Singleton(binds=[Self::into_job])]
+#[derive(Clone)]
+pub struct TestJob;
+
+impl TestJob {
+    
+    fn into_job(self) -> Arc<dyn ApplicationJob> {
+        Arc::new(self)
+    }
+}
+
+#[async_trait]
+impl ApplicationJob for TestJob {
+    fn schedule(&self) -> ScheduleType {
+        ScheduleType::Repeated(1500)
+    }
+
+    async fn execute(
+        &self,
+        _context: JobExecutionContext,
+    ) -> Result<(), BoxError>
+    {
+        
+        println!("我正在执行任务!");
+        Ok(())
     }
 }
 
@@ -55,41 +92,44 @@ async fn test_789(Data(data): Data<TestData>) -> String {
 pub struct TestDecoder;
 
 impl TestDecoder {
-    
-    fn into_decoder(self) -> Arc<dyn DataDecoder> { Arc::new(self)}
+    fn into_decoder(self) -> Arc<dyn DataDecoder> {
+        Arc::new(self)
+    }
 }
 
 impl DataDecoder for TestDecoder {
     fn decode(&self, data: &[u8]) -> Result<String, &'static str> {
-        let d = data.iter().filter(|&&s | s != b'\\').copied()
-        .collect::<Vec<_>>();
+        let d = data
+            .iter()
+            .filter(|&&s| s != b'\\')
+            .copied()
+            .collect::<Vec<_>>();
         Ok(String::from_utf8_lossy(&d).to_string())
     }
 }
 
-
 #[Singleton]
 #[derive(Clone)]
 pub struct TestModule {
-    pub publisher: DefaultApplicationEventPublisher
+    pub publisher: DefaultApplicationEventPublisher,
 }
 
 impl Service for TestModule {}
-
 
 #[Singleton]
 #[derive(Clone)]
 pub struct TestEvent(i32);
 
-impl ApplicationEvent for  TestEvent {}
+impl ApplicationEvent for TestEvent {}
 
 #[Singleton(binds=[Self::into_listener])]
 #[derive(Clone)]
 pub struct TestListener;
 
 impl TestListener {
-    
-    fn into_listener(self) -> Box<dyn ApplicationListener> { Box::new(self)}
+    fn into_listener(self) -> Box<dyn ApplicationListener> {
+        Box::new(self)
+    }
 }
 #[async_trait]
 impl ApplicationListener for TestListener {
@@ -103,8 +143,6 @@ impl ApplicationListener for TestListener {
         println!("i32: {}", e.0)
     }
 }
-
-
 
 #[tokio::main]
 async fn main() {

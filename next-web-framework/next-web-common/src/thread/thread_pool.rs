@@ -3,7 +3,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Instant;
 use std::{collections::VecDeque, thread, time::Duration};
 
-use log::{debug, error};
+use tracing::{debug, error};
 
 use super::worker::Worker;
 use crate::config::thread_pool_config::ThreadPoolConfig;

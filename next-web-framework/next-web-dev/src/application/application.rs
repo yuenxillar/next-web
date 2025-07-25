@@ -40,7 +40,9 @@ use crate::util::local_date_time::LocalDateTime;
 use next_web_core::context::application_resources::ApplicationResources;
 
 #[cfg(feature = "job_scheduler")]
-use crate::manager::job_scheduler_manager::{ApplicationJob, JobSchedulerManager};
+use crate::manager::job_scheduler_manager::JobSchedulerManager;
+#[cfg(feature = "job_scheduler")]
+use next_web_core::core::job::application_job::ApplicationJob;
 
 #[async_trait]
 pub trait Application: Send + Sync {
@@ -204,16 +206,17 @@ pub trait Application: Send + Sync {
     ) {
         // Register job
         let producers = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
-        if let Some(schedluer_manager) =
-            ctx.get_single_option_with_name::<JobSchedulerManager>("jobSchedulerManager")
+        
+        if let Some(job_schedluer_manager) =
+            ctx.get_single_option::<JobSchedulerManager>()
         {
-            let mut schedluer_manager = schedluer_manager.clone();
+            let mut schedluer_manager = job_schedluer_manager.clone();
             for producer in producers {
-                schedluer_manager.add_job(producer.gen_job()).await;
+                schedluer_manager.add_job(producer).await;
             }
             schedluer_manager.start();
         } else {
-            warn!("Job scheduler manager not found");
+            warn!("Job scheduler manager not found.");
         }
 
         // Register application event
