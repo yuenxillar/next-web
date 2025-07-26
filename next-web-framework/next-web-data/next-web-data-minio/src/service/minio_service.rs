@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use minio_rsc::{provider::StaticProvider, Minio};
-use next_web_core::core::{service::Service, singleton::Singleton};
+use next_web_core::interface::{service::Service, singleton::Singleton};
 
 use crate::properties::minio_properties::MinioClientProperties;
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::extract::FromRef;
 
-use crate::core::data_decoder::DataDecoder;
+use crate::interface::data_decoder::DataDecoder;
 
 
 #[derive(Clone)]

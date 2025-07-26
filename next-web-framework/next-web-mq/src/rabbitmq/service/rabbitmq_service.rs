@@ -11,9 +11,9 @@ use amqprs::channel::QueueDeclareArguments;
 use amqprs::connection::Connection;
 use amqprs::connection::OpenConnectionArguments;
 use amqprs::BasicProperties;
-use next_web_core::core::service::Service;
+use next_web_core::interface::service::Service;
 
-use next_web_core::core::singleton::Singleton;
+use next_web_core::interface::singleton::Singleton;
 use tracing::{error, info};
 
 use crate::rabbitmq::properties::rabbitmq_properties::RabbitMQClientProperties;

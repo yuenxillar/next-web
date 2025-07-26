@@ -290,12 +290,12 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         #item_struct
 
         #[next_web_core::async_trait]
-        impl next_web_core::AutoRegister for #struct_name {
+        impl ::next_web_core::AutoRegister for #struct_name {
             async fn register(
                 &self,
-                ctx: &mut next_web_core::context::application_context::ApplicationContext,
-                properties: &next_web_core::context::properties::ApplicationProperties,
-            ) -> Result<(), Box<dyn std::error::Error>> {
+                ctx: &mut ::next_web_core::context::application_context::ApplicationContext,
+                properties: &::next_web_core::context::properties::ApplicationProperties,
+            ) -> std::result::Result<(), std::boxed::Box<dyn std::error::Error>> {
                 let mut noting = 0;
 
                 let instance = Self {
@@ -315,10 +315,10 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
             }
         }
 
-        impl next_web_core::context::properties::Properties for #struct_name {}
+        impl ::next_web_core::context::properties::Properties for #struct_name {}
 
         impl #struct_name {
-            fn into_properties(self) -> Box<dyn next_web_core::context::properties::Properties> {
+            fn into_properties(self) -> std::boxed::Box<dyn ::next_web_core::context::properties::Properties> {
                 std::boxed::Box::new(self)
             }
         }

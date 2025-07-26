@@ -1,5 +1,5 @@
 use crate::{
-    core::job::{context::job_execution_context::JobExecutionContext, schedule_type::ScheduleType},
+    interface::job::{context::job_execution_context::JobExecutionContext, schedule_type::ScheduleType},
     error::BoxError,
 };
 use async_trait::async_trait;

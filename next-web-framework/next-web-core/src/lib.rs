@@ -3,7 +3,7 @@ pub mod constants;
 pub mod context;
 pub mod autoconfigure;
 pub mod autoregister;
-pub mod core;
+pub mod interface;
 pub mod error;
 pub mod state;
 

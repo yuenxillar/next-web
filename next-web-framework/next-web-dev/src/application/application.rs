@@ -9,8 +9,8 @@ use next_web_core::constants::application_constants::APPLICATION_BANNER_FILE;
 use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
-use next_web_core::core::apply_router::ApplyRouter;
-use next_web_core::core::data_decoder::DataDecoder;
+use next_web_core::interface::apply_router::ApplyRouter;
+use next_web_core::interface::data_decoder::DataDecoder;
 use next_web_core::state::app_state::AppState;
 use next_web_core::AutoRegister;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
@@ -42,7 +42,7 @@ use next_web_core::context::application_resources::ApplicationResources;
 #[cfg(feature = "job_scheduler")]
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
 #[cfg(feature = "job_scheduler")]
-use next_web_core::core::job::application_job::ApplicationJob;
+use next_web_core::interface::job::application_job::ApplicationJob;
 
 #[async_trait]
 pub trait Application: Send + Sync {

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use next_web_core::{async_trait, core::service::Service, error::BoxError};
+use next_web_core::{async_trait, interface::service::Service, error::BoxError};
 use serde_json::Value;
 
 #[async_trait]

@@ -7,7 +7,7 @@ use axum::{
     routing::any,
     Router,
 };
-use next_web_core::{core::apply_router::ApplyRouter, ApplicationContext};
+use next_web_core::{interface::apply_router::ApplyRouter, ApplicationContext};
 use rudi_dev::Singleton;
 
 use super::{

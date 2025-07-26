@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use hashbrown::HashMap;
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, core::singleton::Singleton, ApplicationContext, AutoRegister
+    async_trait, context::properties::ApplicationProperties, interface::singleton::Singleton,
+    ApplicationContext, AutoRegister,
 };
 use rudi_dev::Singleton;
 
@@ -14,7 +15,6 @@ use crate::{
     properties::mqtt_properties::MQTTClientProperties,
     service::mqtt_service::MQTTService,
 };
-
 
 #[Singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
@@ -62,6 +62,7 @@ impl AutoRegister for MqttServiceAutoRegister {
         // Attempt to resolve a message interceptor from the context
         let var = ctx.resolve_option::<Box<dyn MessageInterceptor>>();
 
+        
         let interceptor = if let Some(var1) = var {
             // 如果解析成功，直接使用解析到的拦截器
             // If resolution succeeds, use the resolved interceptor directly

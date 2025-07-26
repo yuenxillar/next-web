@@ -4,7 +4,7 @@ use quote::{format_ident, quote, ToTokens};
 use rudi_core::{Color, Scope};
 use syn::{
     parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
-    Attribute, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident, Lit,
+    Attribute, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident,
     PatType, Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath, TypeReference,
 };
 

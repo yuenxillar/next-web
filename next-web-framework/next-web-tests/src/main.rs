@@ -2,23 +2,25 @@
 use std::any::{Any, TypeId};
 use std::sync::Arc;
 
-use axum::routing::post;
+use axum::response::IntoResponse;
+use axum::routing::{get, post};
 use axum::Router;
 use next_web_core::async_trait;
-use next_web_core::core::data_decoder::DataDecoder;
-use next_web_core::core::job::application_job::ApplicationJob;
-use next_web_core::core::job::context::job_execution_context::JobExecutionContext;
-use next_web_core::core::job::schedule_type::ScheduleType;
-use next_web_core::core::service::Service;
 use next_web_core::error::BoxError;
+use next_web_core::interface::data_decoder::DataDecoder;
+use next_web_core::interface::job::application_job::ApplicationJob;
+use next_web_core::interface::job::context::job_execution_context::JobExecutionContext;
+use next_web_core::interface::job::schedule_type::ScheduleType;
+use next_web_core::interface::service::Service;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 
 use next_web_dev::application::Application;
 use next_web_dev::event::application_event::ApplicationEvent;
-use next_web_dev::event::application_event_publisher::ApplicationEventPublisher;
 use next_web_dev::event::application_listener::ApplicationListener;
 use next_web_dev::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use next_web_dev::interceptor::request_data_interceptor::Data;
+use next_web_dev::stream::local_file_stream::LocalFileStream;
+use next_web_dev::stream::response_stream::ResponseStream;
 use next_web_dev::Singleton;
 use serde::{Deserialize, Serialize};
 
@@ -44,17 +46,21 @@ impl Application for TestApplication {
         //         .unwrap();
         //     std::thread::sleep(std::time::Duration::from_millis(500));
         // });
-        Router::new().route("/test/789", post(test_789))
+        Router::new()
+            .route("/test/789", post(test_789))
+            .route("/download", get(download))
     }
 }
 
+async fn download() -> impl IntoResponse {
+    return ResponseStream::new(LocalFileStream("".into()));
+}
 
 #[Singleton(binds=[Self::into_job])]
 #[derive(Clone)]
 pub struct TestJob;
 
 impl TestJob {
-    
     fn into_job(self) -> Arc<dyn ApplicationJob> {
         Arc::new(self)
     }
@@ -66,12 +72,7 @@ impl ApplicationJob for TestJob {
         ScheduleType::Repeated(1500)
     }
 
-    async fn execute(
-        &self,
-        _context: JobExecutionContext,
-    ) -> Result<(), BoxError>
-    {
-        
+    async fn execute(&self, _context: JobExecutionContext) -> Result<(), BoxError> {
         println!("我正在执行任务!");
         Ok(())
     }

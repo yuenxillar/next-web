@@ -8,7 +8,7 @@ use lettre::{
     transport::smtp::authentication::Credentials,
     AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
 };
-use next_web_core::core::{service::Service, singleton::Singleton};
+use next_web_core::interface::{service::Service, singleton::Singleton};
 
 use crate::{core::email_content::EmailContent, properties::email_properties::EmailProperties};
 

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use next_web_core::core::{service::Service, singleton::Singleton};
+use next_web_core::interface::{service::Service, singleton::Singleton};
 use rbatis::RBatis;
 
 use crate::properties::database_properties::DatabaseClientProperties;

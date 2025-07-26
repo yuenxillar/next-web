@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{properties::email_properties::EmailProperties, service::email_service::EmailService};
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, core::singleton::Singleton,
+    async_trait, context::properties::ApplicationProperties, interface::singleton::Singleton,
     ApplicationContext, AutoRegister,
 };
 use rudi_dev::Singleton;

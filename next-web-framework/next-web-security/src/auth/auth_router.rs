@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::core::apply_router::ApplyRouter;
+use next_web_core::interface::apply_router::ApplyRouter;
 use rudi_dev::Singleton;
 
 use crate::core::web_security_configure::WebSecurityConfigure;

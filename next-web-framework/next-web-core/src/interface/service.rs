@@ -1,4 +1,4 @@
-use crate::core::singleton::Singleton;
+use crate::interface::singleton::Singleton;
 
 pub trait Service: Singleton {}
 

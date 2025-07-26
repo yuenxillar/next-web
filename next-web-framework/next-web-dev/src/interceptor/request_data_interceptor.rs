@@ -5,7 +5,7 @@ use axum::{
     extract::{FromRequest, Request},
     http::{header, HeaderMap, StatusCode},
 };
-use next_web_core::core::data_decoder::DataDecoder;
+use next_web_core::interface::data_decoder::DataDecoder;
 use serde::de::DeserializeOwned;
 
 pub struct Data<T>(pub T);

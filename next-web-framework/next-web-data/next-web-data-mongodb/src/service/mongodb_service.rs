@@ -4,7 +4,7 @@ use mongodb::{
     Client,
     options::{ClientOptions, Compressor, Credential, ServerAddress},
 };
-use next_web_core::core::{service::Service, singleton::Singleton};
+use next_web_core::interface::{service::Service, singleton::Singleton};
 
 use crate::properties::mongodb_properties::MongodbClientProperties;
 

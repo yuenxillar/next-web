@@ -1,7 +1,7 @@
 use std::{any::Any, collections::HashMap, fmt::Debug, sync::Arc};
 
 use next_web_core::{
-    core::{service::Service},
+    interface::{service::Service},
     ApplicationContext,
 };
 use next_web_dev::Singleton;

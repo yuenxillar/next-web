@@ -1,4 +1,4 @@
-pub mod response;
+pub mod stream;
 pub mod autoconfigure;
 pub mod autoregister;
 pub mod banner;

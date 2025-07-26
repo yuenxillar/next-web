@@ -3,7 +3,7 @@ use std::
 ;
 
 use elasticsearch::{Elasticsearch, auth::Credentials, http::transport::Transport};
-use next_web_core::core::{service::Service, singleton::Singleton};
+use next_web_core::interface::{service::Service, singleton::Singleton};
 
 use crate::properties::elasticsearch_properties::ElasticsearchClientProperties;
 

@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::SystemTime};
 
 use chrono::DateTime;
-use next_web_core::{async_trait, core::{service::Service, singleton::Singleton}, error::BoxError};
+use next_web_core::{async_trait, interface::{service::Service, singleton::Singleton}, error::BoxError};
 use once_cell::sync::Lazy;
 use reqwest::{
     header::{HeaderMap, HeaderName},
