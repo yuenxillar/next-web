@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use axum::{
     body::{Body, Bytes},
     http::{header, StatusCode},
-    response::Response,
+    response::{IntoResponse, Response},
     BoxError,
 };
 use futures::{stream, StreamExt};
@@ -18,6 +18,14 @@ pub struct BytesStream {
 
 impl IntoRespnoseStream for BytesStream {
     fn into_response_stream(self, target_rate: usize) -> Response {
+        if self.body.is_empty() {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response();
+        }
+
+        if self.body.len() < DEFAULT_CHUNK_SIZE * 2 {
+            return (StatusCode::OK, self.body).into_response();
+        }
+
         let chunks: Vec<Bytes> = self
             .body
             .chunks(DEFAULT_CHUNK_SIZE)

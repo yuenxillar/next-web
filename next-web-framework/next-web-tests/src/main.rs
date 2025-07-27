@@ -149,3 +149,23 @@ impl ApplicationListener for TestListener {
 async fn main() {
     TestApplication::run().await;
 }
+
+#[cfg(test)]
+mod tests {
+
+    #[tokio::test]
+    async fn test666() {
+
+        test_666().await;
+    }
+
+    #[next_web_macro::retry(max_attempts = 1, delay = 0, backoff = backoff_test, retry_for = String::from("I back!1") )]
+    async fn test_666() -> Result<(), String> {
+
+        Err(String::from("I back!"))
+    }
+
+    fn backoff_test(error: &String) {
+        println!("backoff: {}", error);
+    }
+}

@@ -1,5 +1,7 @@
+
 extern crate proc_macro;
 
+use crate::common::retry::impl_macro_retry;
 use crate::data::builder::impl_macro_builder;
 use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
@@ -8,10 +10,10 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 use syn::DeriveInput;
 
+mod common;
 mod data;
 mod database;
 mod utils;
-
 
 #[proc_macro_derive(GetSet, attributes(skip))]
 pub fn get_set(input: TokenStream) -> TokenStream {
@@ -41,5 +43,12 @@ pub fn builder(input: TokenStream) -> TokenStream {
 pub fn all_constructor(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let stream = impl_macro_db_mapper(&input);
+    stream.into()
+}
+
+
+#[proc_macro_attribute]
+pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let stream = impl_macro_retry(attr, item);
     stream.into()
 }

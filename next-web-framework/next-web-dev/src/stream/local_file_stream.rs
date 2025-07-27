@@ -21,6 +21,18 @@ impl IntoRespnoseStream for LocalFileStream {
         if !file_path.exists() {
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response();
         }
+
+        if let Ok(metadata) = std::fs::metadata(file_path) {
+            if (metadata.len() as usize) < DEFAULT_CHUNK_SIZE * 2 {
+                return match std::fs::read(file_path) {
+                    Ok(data) => (StatusCode::OK, data.into_response()).into_response(),
+                    Err(_) => {
+                        (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
+                    }
+                };
+            }
+        }
+
         let std_file = std::fs::File::open(file_path);
 
         if let Err(error) = std_file {
