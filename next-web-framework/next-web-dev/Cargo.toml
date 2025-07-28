@@ -59,9 +59,11 @@ mime = "0.3.17"
 
 [features]
 default = ["job_scheduler"]
-tls_rustls = ["axum-server"]
 
+tls_rustls = ["axum-server"]
 job_scheduler = ["tokio-cron-scheduler"]
 
-enable_grpc = []
-enable_prometheus = ["axum-prometheus"]
+enable-grpc = []
+enable-prometheus = ["axum-prometheus"]
+
+trace-log = []

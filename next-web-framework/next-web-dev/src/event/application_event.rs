@@ -23,7 +23,7 @@ pub trait ApplicationEvent: Any + Send + Sync + 'static {
 
     /// 获取事件类型ID
     /// Get event type ID
-    fn tid(&self) -> TypeId {
+    fn event_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
 }

@@ -16,6 +16,14 @@ pub struct BytesStream {
     file_name: Option<String>,
 }
 
+
+impl BytesStream {
+    
+    pub fn new(body: Bytes, file_name: Option<String>) -> Self {
+        Self { body, file_name }
+    }
+}
+
 impl IntoRespnoseStream for BytesStream {
     fn into_response_stream(self, target_rate: usize) -> Response {
         if self.body.is_empty() {

@@ -175,7 +175,7 @@ pub fn into_application_properties() -> ApplicationProperties {
 
     // into application properties
     let mut application_properties: ApplicationProperties =
-        serde_yaml::from_str(config_data.as_str()).unwrap();
+        serde_yaml::from_str(config_data.as_str()).unwrap_or_default();
     application_properties.set_mapping(mapping);
 
     // return

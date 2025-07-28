@@ -22,7 +22,7 @@ impl Application for TestApplication {
     async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)
-    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new().nest(
             "/login",
             axum::Router::new()
@@ -44,21 +44,25 @@ impl TestAuthenticationService {
 
 #[async_trait]
 impl AuthenticationService for TestAuthenticationService {
-    fn user_id(&self, req_header: &HeaderMap) -> String {
+    fn user_id(&self, _req_header: &HeaderMap) -> String {
         String::from("test_user_id")
     }
 
-    fn login_type(&self, req_header: &HeaderMap) -> LoginType {
+    fn login_type(&self, _req_header: &HeaderMap) -> LoginType {
         LoginType::Username
     }
 
     /// Returns the roles of the user with the given `user_id` and `login_type`.
-    async fn user_role(&self, user_id: &str, login_type: &LoginType) -> Option<Vec<String>> {
+    async fn user_role(&self, _user_id: &str, _login_type: &LoginType) -> Option<Vec<String>> {
         Some(vec!["user".into()])
     }
 
     /// Returns the permission of the user with the given `user_id` and `login_type`.
-    async fn user_permission(&self, user_id: &str, login_type: &LoginType) -> Option<Vec<String>> {
+    async fn user_permission(
+        &self,
+        _user_id: &str,
+        _login_type: &LoginType,
+    ) -> Option<Vec<String>> {
         Some(vec!["*".into()])
     }
 }

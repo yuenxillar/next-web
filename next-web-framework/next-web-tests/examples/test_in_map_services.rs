@@ -1,10 +1,11 @@
-use std::{any::Any, collections::HashMap, fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
+use axum::response::IntoResponse;
 use next_web_core::{
-    interface::{service::Service},
-    ApplicationContext,
+    async_trait, context::properties::ApplicationProperties, interface::service::Service,
+    state::application_state::AcSingleton, ApplicationContext,
 };
-use next_web_dev::Singleton;
+use next_web_dev::{application::Application, Singleton};
 
 #[Singleton(binds = [Self::into_test_coll])]
 #[derive(Clone, Debug)]
@@ -40,21 +41,37 @@ impl TestColl for TestService {}
 
 #[Singleton]
 #[derive(Clone)]
-pub struct TestContext {
+pub struct TestMapService {
     #[autowired(map)]
     pub services_map: HashMap<String, Arc<dyn TestColl>>,
 }
 
-fn main() {
-    let mut ctx = ApplicationContext::auto_register();
+#[derive(Clone, Default)]
+struct TestApplication;
 
-    let colls: Vec<Arc<dyn TestColl>> = ctx.resolve_by_type::<Arc<dyn TestColl>>();
+#[async_trait]
+impl Application for TestApplication {
+    /// initialize the middleware.
+    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
 
-    // colls.into_iter().filter(|i| find_group_singleton(singleton));
+    // get the application router. (open api  and private api)
+    async fn application_router(
+        &mut self,
+        _ctx: &mut ApplicationContext,
+    ) -> axum::Router {
+        axum::Router::new().route("/getMapService", axum::routing::get(get_service))
+    }
+}
+async fn get_service(map_service: AcSingleton<TestMapService>) -> impl IntoResponse {
+    map_service
+        .services_map
+        .keys()
+        .map(|s| s.to_owned())
+        .collect::<Vec<String>>()
+        .join(":")
+}
 
-    let cal = TestService;
-    let box_cal: Box<dyn TestColl> = Box::new(cal);
-    let ref_cal: &dyn Any = &box_cal;
-    println!("{:#?}", ref_cal.downcast_ref::<Box<dyn Service>>()
-            .map(|s| s.group()))
+#[tokio::main]
+async fn main() {
+    TestApplication::run().await;
 }

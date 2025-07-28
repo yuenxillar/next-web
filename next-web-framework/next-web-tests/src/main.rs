@@ -1,5 +1,4 @@
 #![allow(missing_docs)]
-use std::any::{Any, TypeId};
 use std::sync::Arc;
 
 use axum::response::IntoResponse;
@@ -15,8 +14,6 @@ use next_web_core::interface::service::Service;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 
 use next_web_dev::application::Application;
-use next_web_dev::event::application_event::ApplicationEvent;
-use next_web_dev::event::application_listener::ApplicationListener;
 use next_web_dev::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use next_web_dev::interceptor::request_data_interceptor::Data;
 use next_web_dev::stream::local_file_stream::LocalFileStream;
@@ -39,13 +36,7 @@ impl Application for TestApplication {
 
     // get the application router. (open api  and private api)
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
-        let m = ctx.resolve_with_name::<TestModule>("testModule");
-        // std::thread::spawn(move || loop {
-        //     m.publisher
-        //         .publish_event("", Box::new(TestEvent(100)))
-        //         .unwrap();
-        //     std::thread::sleep(std::time::Duration::from_millis(500));
-        // });
+        ctx.get_single_with_name::<String>("test");
         Router::new()
             .route("/test/789", post(test_789))
             .route("/download", get(download))
@@ -117,55 +108,8 @@ pub struct TestModule {
 
 impl Service for TestModule {}
 
-#[Singleton]
-#[derive(Clone)]
-pub struct TestEvent(i32);
-
-impl ApplicationEvent for TestEvent {}
-
-#[Singleton(binds=[Self::into_listener])]
-#[derive(Clone)]
-pub struct TestListener;
-
-impl TestListener {
-    fn into_listener(self) -> Box<dyn ApplicationListener> {
-        Box::new(self)
-    }
-}
-#[async_trait]
-impl ApplicationListener for TestListener {
-    fn tid(&self) -> TypeId {
-        TypeId::of::<TestEvent>()
-    }
-
-    async fn on_application_event(&mut self, event: &Box<dyn ApplicationEvent>) {
-        let any: &dyn Any = event.as_ref();
-        let e = any.downcast_ref::<TestEvent>().unwrap();
-        println!("i32: {}", e.0)
-    }
-}
 
 #[tokio::main]
 async fn main() {
     TestApplication::run().await;
-}
-
-#[cfg(test)]
-mod tests {
-
-    #[tokio::test]
-    async fn test666() {
-
-        test_666().await;
-    }
-
-    #[next_web_macro::retry(max_attempts = 1, delay = 0, backoff = backoff_test, retry_for = String::from("I back!1") )]
-    async fn test_666() -> Result<(), String> {
-
-        Err(String::from("I back!"))
-    }
-
-    fn backoff_test(error: &String) {
-        println!("backoff: {}", error);
-    }
 }

@@ -16,6 +16,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         delay,
         backoff,
         retry_for,
+        multiplier,
     } = match RetryAttr::from_tokens(attr.into()) {
         Ok(attr) => attr,
         Err(err) => return err.to_compile_error().into(),
@@ -26,11 +27,20 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         None => quote! {},
     };
 
-    let retry_for = match retry_for {
-        Some(retry_for) => quote! { if error != #retry_for { return Err(error); }},
+    let retry_for = if retry_for.len() > 0 {
+        quote! { 
+            if !match error {
+                #(#retry_for)|* => true,
+                _ => false,
+            } { #backoff return Err(error); }
+         }
+    }else { quote! {} };
+
+    let multiplier = match multiplier {
+        Some(multiplier) => quote! { delay = delay * #multiplier; },
         None => quote! {},
     };
-
+    
     // 判断参数是否合法 todo
 
     // 解析函数
@@ -76,7 +86,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         quote! {
             async fn #fn_name(#fn_inputs) #fn_output {
                 let max_attempts: u8 = #max_attempts;
-                let delay: u64 = #delay;
+                let mut delay: u64 = #delay;
 
                 let mut retry_count: u8 = 0;
                 loop {
@@ -97,6 +107,8 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
                             retry_count += 1;
 
                             ::tokio::time::sleep(::std::time::Duration::from_millis(delay)).await;
+
+                            #multiplier
                         }
                     }
                 }
@@ -108,7 +120,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
             fn #fn_name(#fn_inputs) #fn_output {
 
                 let max_attempts: u8 = #max_attempts;
-                let delay: u64 = #delay;
+                let mut delay: u64 = #delay;
 
                 let mut retry_count: u8 = 0;
 
@@ -130,6 +142,8 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
                             retry_count += 1;
 
                             ::std::thread::sleep(::std::time::Duration::from_millis(delay));
+
+                            #multiplier
                         }
                     }
                 }
@@ -137,6 +151,6 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         }
     };
 
-    // println!("retry_logic:  {}", retry_logic.to_string());
+    // println!("retry_logic: {}", retry_logic.to_string());
     retry_logic.into()
 }

@@ -26,6 +26,8 @@ tracing = { workspace = true }
 
 inventory = { workspace = true }
 
+tokio =  { workspace = true, features = ["sync"]}
+
 tower-layer = "0.3.3"
 tower-service = "0.3.3"
 

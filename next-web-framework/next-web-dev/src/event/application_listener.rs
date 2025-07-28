@@ -11,12 +11,12 @@ pub trait ApplicationListener: DynClone + Send + Sync {
     /// 获取事件类型
     ///
     /// Get event type
-    fn tid(&self) -> TypeId;
+    fn event_id(&self) -> TypeId;
 
     /// 获取事件ID
     /// Get event ID
     fn id(&self) -> String {
-        "".into()
+        String::new()
     }
 
     /// 处理应用事件

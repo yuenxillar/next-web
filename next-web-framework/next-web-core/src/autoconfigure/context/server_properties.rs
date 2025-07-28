@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::constants::application_constants::APPLICATION_DEFAULT_PORT;
+
 use super::http_properties::HttpProperties;
 
 /// Application server register
@@ -45,5 +47,4 @@ impl ServerProperties {
 
 }
 
-
-fn default_port() -> Option<u16> { Some(8080)}
+fn default_port() -> Option<u16> { Some(APPLICATION_DEFAULT_PORT)}

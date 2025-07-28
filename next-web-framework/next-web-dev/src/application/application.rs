@@ -1,17 +1,18 @@
 use async_trait::async_trait;
 use axum::body::Bytes;
-use axum::handler::Handler;
 use axum::http::{Response, StatusCode};
 use axum::Router;
 use hashbrown::HashMap;
 use http_body_util::Full;
-use next_web_core::constants::application_constants::APPLICATION_BANNER_FILE;
+use next_web_core::constants::application_constants::{
+    APPLICATION_BANNER_FILE, APPLICATION_DEFAULT_PORT,
+};
 use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::interface::apply_router::ApplyRouter;
 use next_web_core::interface::data_decoder::DataDecoder;
-use next_web_core::state::app_state::AppState;
+use next_web_core::state::application_state::ApplicationState;
 use next_web_core::AutoRegister;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use std::io::BufRead;
@@ -53,11 +54,11 @@ pub trait Application: Send + Sync {
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router;
 
     /// Register the rpc server.
-    #[cfg(feature = "enable_grpc")]
+    #[cfg(feature = "enable-grpc")]
     async fn register_rpc_server(&mut self, properties: &ApplicationProperties);
 
     /// Register the grpc client.
-    #[cfg(feature = "enable_grpc")]
+    #[cfg(feature = "enable-grpc")]
     async fn connect_rpc_client(&mut self, properties: &ApplicationProperties);
 
     /// Show the banner of the application.
@@ -206,10 +207,8 @@ pub trait Application: Send + Sync {
     ) {
         // Register job
         let producers = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
-        
-        if let Some(job_schedluer_manager) =
-            ctx.get_single_option::<JobSchedulerManager>()
-        {
+
+        if let Some(job_schedluer_manager) = ctx.get_single_option::<JobSchedulerManager>() {
             let mut schedluer_manager = job_schedluer_manager.clone();
             for producer in producers {
                 schedluer_manager.add_job(producer).await;
@@ -241,25 +240,24 @@ pub trait Application: Send + Sync {
     /// Bind tcp server.
     async fn bind_tcp_server(
         &mut self,
-        ctx: &mut ApplicationContext,
+        mut ctx: ApplicationContext,
         application_properties: &ApplicationProperties,
         time: std::time::Instant,
     ) {
         let config = application_properties.next().server();
 
         let context_path = config.context_path().unwrap_or("");
-        let server_port = config.port().unwrap_or(10011);
-        let server_addr = if config.local().unwrap_or(false) {
+        let server_port = config.port().unwrap_or(APPLICATION_DEFAULT_PORT);
+        let server_addr = if config.local().unwrap_or(true) {
             "127.0.0.1"
         } else {
             "0.0.0.0"
         };
 
-        
-        let mut application_router = self.application_router(ctx).await;
-     
         // Run our app with hyper, listening globally on port
-        let mut app = Router::new()
+        let mut app = self
+            .application_router(&mut ctx)
+            .await
             // handle not found route
             .fallback(fall_back);
 
@@ -274,23 +272,17 @@ pub trait Application: Send + Sync {
         open_routers.sort_by_key(|k| k.order());
         let open_router = open_routers
             .into_iter()
-            .map(|item| item.router(ctx))
+            .map(|item| item.router(&mut ctx))
             .filter(|item1| item1.has_routes())
             .fold(var10, |acc, router| acc.merge(router));
 
-        application_router = application_router.merge(open_router);
-
         common_routers.sort_by_key(|k| k.order());
-        for item2 in common_routers
-            .into_iter()
-            .map(|item| item.router(ctx))
-            .filter(|item1| item1.has_routes())
-        {
-            application_router = application_router.merge(item2);
-        }
+
+        #[cfg(not(feature = "tls_rustls"))]
+        let mut shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
 
         // Add prometheus layer
-        #[cfg(feature = "enable_prometheus")]
+        #[cfg(feature = "enable-prometheus")]
         {
             let (prometheus_layer, metric_handle) = axum_prometheus::PrometheusMetricLayer::pair();
             application_router = application_router
@@ -313,16 +305,15 @@ pub trait Application: Send + Sync {
                 .unwrap_or_default();
             let _ = http.response();
             if val.0 {
-                application_router = application_router.route_layer(TraceLayer::new_for_http());
+                app = app.route_layer(TraceLayer::new_for_http());
             }
             // 3MB
             if val.1 >= 3145728 {
-                application_router =
-                    application_router.route_layer(RequestBodyLimitLayer::new(val.1));
+                app = app.route_layer(RequestBodyLimitLayer::new(val.1));
             }
         }
 
-        application_router = application_router
+        app = app
             // global panic handler
             .layer(CatchPanicLayer::custom(handle_panic))
             // handler request  max timeout
@@ -336,16 +327,36 @@ pub trait Application: Send + Sync {
                     .max_age(std::time::Duration::from_secs(60) * 10),
             );
 
-        if !context_path.is_empty() {
-            app = app.nest(context_path, application_router);
-            println!("nest context path: {}", context_path);
-        } else {
-            app = app.merge(application_router);
+        app = app.merge(open_router);
+        for item2 in common_routers
+            .into_iter()
+            .map(|item| item.router(&mut ctx))
+            .filter(|item1| item1.has_routes())
+        {
+            app = app.merge(item2);
         }
 
         let decoder_list = ctx.resolve_by_type::<Arc<dyn DataDecoder>>();
         let data_decoder = decoder_list.last();
-        if let Some(decoder) = data_decoder { app = app.route_layer(axum::Extension(decoder.to_owned())); }
+
+        
+
+        app = app.route_layer(axum::Extension(ApplicationState::new(ctx)));
+
+        if let Some(decoder) = data_decoder {
+            app = app.route_layer(axum::Extension(decoder.to_owned()));
+        }
+
+        let app = if !context_path.is_empty() {
+            let router = Router::new();
+            
+            #[cfg(feature = "trace-log")]
+            info!("nest context path: {}", context_path);
+
+            router.nest(context_path, app)
+        } else {
+            app
+        };
 
         println!(
             "\nApplication Listening  on:  {}",
@@ -384,8 +395,7 @@ pub trait Application: Send + Sync {
                 tokio::net::TcpListener::bind(format!("{}:{}", server_addr, server_port))
                     .await
                     .unwrap();
-
-            let mut shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
+            
             axum::serve(
                 listener,
                 app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
@@ -492,7 +502,7 @@ pub trait Application: Send + Sync {
             LocalDateTime::now()
         );
 
-        #[cfg(feature = "enable_grpc")]
+        #[cfg(feature = "enable-grpc")]
         {
             application.register_rpc_server(&properties).await;
             println!(
@@ -512,7 +522,7 @@ pub trait Application: Send + Sync {
         // application.init_cache().await;
 
         application
-            .bind_tcp_server(&mut ctx, &properties, start_time)
+            .bind_tcp_server(ctx, &properties, start_time)
             .await;
     }
 }

@@ -1,7 +1,5 @@
-use std::path::Path;
-
 use from_attr::FromAttr;
-use syn::{parse_quote, Expr, ExprPath, Lit};
+use syn::{parse_quote, Expr, ExprPath};
 
 #[derive(FromAttr)]
 #[attribute(idents = [value])]
@@ -15,7 +13,9 @@ pub(crate) struct RetryAttr {
 
     pub(crate) backoff: Option<ExprPath>,
 
-    pub(crate) retry_for: Option<Expr>
+    pub(crate) retry_for: Vec<Expr>,
+
+    pub(crate) multiplier: Option<Expr>,
 }
 
 fn default_max_attempts() -> Expr {
@@ -33,7 +33,8 @@ impl Default for RetryAttr {
             max_attempts: default_max_attempts(),
             delay: default_delay(),
             backoff: None,
-            retry_for: None
+            retry_for: Vec::new(),
+            multiplier: None,
         }
     }
 }

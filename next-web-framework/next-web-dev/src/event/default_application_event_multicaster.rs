@@ -9,7 +9,8 @@ use flume::{Receiver, Sender};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use std::sync::Arc;
-use tracing::{debug, info};
+#[cfg(feature = "trace-log")]
+use tracing::debug;
 
 /// 默认的事件多播器实现
 ///
@@ -51,7 +52,7 @@ impl DefaultApplicationEventMulticaster {
         let listeners = self.listeners.clone();
         tokio::spawn(async move {
             while let Ok(event) = channel.recv() {
-                if let Some(listeners) = listeners.lock().get(&Key::new(event.0, event.1.tid())) {
+                if let Some(listeners) = listeners.lock().get(&Key::new(event.0, event.1.event_id())) {
                     let _ = listeners.send(event.1);
                 }
             }
@@ -61,11 +62,11 @@ impl DefaultApplicationEventMulticaster {
 
 impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
     fn add_application_listener(&mut self, mut listener: Box<dyn ApplicationListener>) {
-        let id = listener.id();
-        let tid = listener.tid();
+        
+        let tid = listener.event_id();
 
         let (sender, receiver) = flume::unbounded();
-        let key = Key::new(listener.id(), listener.tid());
+        let key = Key::new(listener.id(), listener.event_id());
         let mut listeners = self.listeners.lock();
         if listeners.contains_key(&key) {
             panic!(
@@ -77,10 +78,15 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
             tokio::spawn(async move {
                 while let Ok(event) = receiver.recv() {
                     listener.on_application_event(&event).await;
-                    info!("Received event: {:?}", event.source());
+                    #[cfg(feature = "trace-log")]
+                    debug!("Received event: {:?}", event.source());
                 }
             });
-            debug!("Added listener for event type: {:?}, id: {}", tid, id);
+            #[cfg(feature = "trace-log")]
+            {
+                let id = listener.id();
+                debug!("Added listener for event type: {:?}, id: {}", tid, id);
+            }
         }
     }
 
@@ -88,6 +94,7 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
         // 使用监听器的唯一ID进行匹配删除
         // Use listener's unique ID to match and remove
         if let Some(_) = self.listeners.lock().remove(key) {
+            #[cfg(feature = "trace-log")]
             debug!("Removed listener for event type: {}", key);
         };
     }

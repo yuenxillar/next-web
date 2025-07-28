@@ -28,7 +28,7 @@ impl TestWebSocket {
 #[async_trait]
 impl WebSocketHandler for TestWebSocket {
     fn paths(&self) -> Vec<&'static str> {
-        vec!["/test/websocket", "/test/websocket2"]
+        vec!["/test/websocket"]
     }
 
     // When the socket connection enters, this method will be entered first
