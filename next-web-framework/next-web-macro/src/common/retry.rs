@@ -2,7 +2,7 @@ use from_attr::FromAttr;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, ItemFn, ReturnType, Type};
+use syn::{parse_macro_input, spanned::Spanned, Expr, ItemFn, ReturnType, Type};
 
 use crate::{
     common::retry_attr::RetryAttr,
@@ -22,26 +22,23 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         Err(err) => return err.to_compile_error().into(),
     };
 
-    let backoff = match backoff {
-        Some(backoff) => quote! { #backoff(& error);},
-        None => quote! {},
-    };
-
-    let retry_for = if retry_for.len() > 0 {
-        quote! { 
-            if !match error {
-                #(#retry_for)|* => true,
-                _ => false,
-            } { #backoff return Err(error); }
-         }
-    }else { quote! {} };
-
-    let multiplier = match multiplier {
-        Some(multiplier) => quote! { delay = delay * #multiplier; },
-        None => quote! {},
-    };
-    
-    // 判断参数是否合法 todo
+    // 判断参数是否合法
+    if let Some(multilier) = &multiplier {
+        if let Expr::Lit(expr_lit) = multilier {
+            if let syn::Lit::Int(lit_int) = &expr_lit.lit {
+                if let Ok(num) = lit_int.token().to_string().parse::<u8>() {
+                    if num < 1 {
+                        return Err(syn::Error::new(
+                            expr_lit.span(),
+                            "max_attempts must be greater than or equal to 1",
+                        ))
+                        .unwrap_or_else(|e| e.to_compile_error())
+                        .into();
+                    }
+                }
+            }
+        }
+    }
 
     // 解析函数
     let input_fn = parse_macro_input!(item as ItemFn);
@@ -62,6 +59,27 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
             return quote! { let #name = #name.clone();};
         })
         .collect::<Vec<_>>();
+
+    let backoff = match backoff {
+        Some(backoff) => quote! { #backoff(& error);},
+        None => quote! {},
+    };
+
+    let retry_for = if retry_for.len() > 0 {
+        quote! {
+           if !match error {
+               #(#retry_for)|* => true,
+               _ => false,
+           } { #backoff return Err(error); }
+        }
+    } else {
+        quote! {}
+    };
+
+    let multiplier = match multiplier {
+        Some(multiplier) => quote! { delay = delay * #multiplier; },
+        None => quote! {},
+    };
 
     // 检查函数返回值是否为Result
     if !match fn_output {

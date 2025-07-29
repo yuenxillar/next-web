@@ -13,6 +13,7 @@ use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::interface::apply_router::ApplyRouter;
 use next_web_core::interface::data_decoder::DataDecoder;
 use next_web_core::state::application_state::ApplicationState;
+use next_web_core::client::rest_client::RestClient;
 use next_web_core::AutoRegister;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use std::io::BufRead;
@@ -233,8 +234,10 @@ pub trait Application: Send + Sync {
 
         multicaster.run();
 
+        let rest_client = RestClient::new();
         ctx.insert_singleton_with_name(default_event_publisher, "");
         ctx.insert_singleton_with_name(multicaster, "");
+        ctx.insert_singleton_with_name(rest_client, "");
     }
 
     /// Bind tcp server.

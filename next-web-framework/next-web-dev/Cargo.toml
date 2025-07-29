@@ -52,7 +52,8 @@ next-web-core = { workspace = true }
 next-web-common = { version = "0.1.0", default-features = false, features = [
     "query-wrapper",
 ] }
-reqwest = { workspace = true }
+reqwest = { workspace = true, features = ["stream"]}
+async-stream = { workspace = true }
 
 serde_path_to_error = "0.1.17"
 mime = "0.3.17"

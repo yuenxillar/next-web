@@ -41,9 +41,11 @@ impl TestColl for TestService {}
 
 #[Singleton]
 #[derive(Clone)]
-pub struct TestMapService {
+pub struct TestVecAndMapService {
     #[autowired(map)]
     pub services_map: HashMap<String, Arc<dyn TestColl>>,
+    #[autowired(vec)]
+    pub services_vec: Vec<Arc<dyn TestColl>>,
 }
 
 #[derive(Clone, Default)]
@@ -59,16 +61,21 @@ impl Application for TestApplication {
         &mut self,
         _ctx: &mut ApplicationContext,
     ) -> axum::Router {
-        axum::Router::new().route("/getMapService", axum::routing::get(get_service))
+        axum::Router::new().route("/getVecAndMapService", axum::routing::get(get_service))
     }
 }
-async fn get_service(map_service: AcSingleton<TestMapService>) -> impl IntoResponse {
-    map_service
+
+async fn get_service(map_service: AcSingleton<TestVecAndMapService>) -> impl IntoResponse {
+    let str1 = map_service.services_vec.iter().map(|s| s.singleton_name()).collect::<Vec<String>>().join(":");
+
+    let str2 = map_service
         .services_map
         .keys()
         .map(|s| s.to_owned())
         .collect::<Vec<String>>()
-        .join(":")
+        .join(":");
+
+    format!("vec: {}, map: {}", str1, str2)
 }
 
 #[tokio::main]

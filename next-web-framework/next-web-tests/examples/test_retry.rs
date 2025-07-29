@@ -14,9 +14,9 @@ fn test_retry() -> Result<(), TestMatch> {
         .unwrap()
         .as_secs();
     println!("{}", LocalDateTime::now());
-    match timestamp_sec % 2{ 
+    match timestamp_sec % 2 {
         0 => Err(TestMatch::Job(123)),
-        _ => Err(TestMatch::App)
+        _ => Err(TestMatch::App),
     }
 }
 

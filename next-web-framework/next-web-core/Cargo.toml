@@ -11,7 +11,6 @@ path = "src/lib.rs"
 [dependencies]
 axum = { workspace = true }
 
-
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 
@@ -27,6 +26,8 @@ tracing = { workspace = true }
 inventory = { workspace = true }
 
 tokio =  { workspace = true, features = ["sync"]}
+
+reqwest = { workspace = true }
 
 tower-layer = "0.3.3"
 tower-service = "0.3.3"

@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use axum::{body::Bytes, response::IntoResponse};
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{
     application::Application,
     stream::{
         bytes_stream::BytesStream, local_file_stream::LocalFileStream,
-        response_stream::ResponseStream,
+        network_file_stream::NetworkFileStream, response_stream::ResponseStream,
     },
 };
 
@@ -27,21 +29,28 @@ impl Application for TestApplication {
 
 async fn download_file() -> impl IntoResponse {
     ResponseStream::new(LocalFileStream(
-        "Please enter your large file address here. /  请在此处输入您的大文件地址".into(),
+        "Please enter your large file address here. /  请在此处输入您的文件地址".into(),
     ))
 }
 
 async fn download_bytes() -> impl IntoResponse {
-    // 100MB
-    let bytes = Bytes::from(vec![0x01; 1024 * 1024 * 100]);
+    let fs = tokio::fs::read(r"D:\firefoxDownload\inst.exe").await.unwrap();
+    let bytes = Bytes::from(fs);
+
+    // 15MB
+    // let bytes = Bytes::from(vec![0x01; 1024 * 1024 * 15]);
     // 10KB/s
     ResponseStream::new(BytesStream::new(bytes, Some("test.txt".into()))).target_rate(1024 * 10)
 }
 
-
 async fn download_network_file() -> impl IntoResponse {
-    let bytes = Bytes::from(vec![0x01; 1024 * 1024 * 100]);
-    ResponseStream::new(BytesStream::new(bytes, Some("test.txt".into()))).target_rate(1024 * 10)
+    // 3KB/s
+    ResponseStream::new(NetworkFileStream::new(
+        "http://127.0.0.1:11000/bytes",
+        "GET",
+        Some(HashMap::from_iter(vec![("Test-Header".into(), "test".into())])),
+    ))
+    .target_rate(1024 * 7)
 }
 
 #[tokio::main]
