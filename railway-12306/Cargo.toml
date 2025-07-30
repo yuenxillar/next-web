@@ -1,7 +1,0 @@
-[package]
-name = "railway-12306"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-rudi = {version = "0.8.3"}
