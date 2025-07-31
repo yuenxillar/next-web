@@ -4,6 +4,7 @@ use axum::http::{Response, StatusCode};
 use axum::Router;
 use hashbrown::HashMap;
 use http_body_util::Full;
+use next_web_core::client::rest_client::RestClient;
 use next_web_core::constants::application_constants::{
     APPLICATION_BANNER_FILE, APPLICATION_DEFAULT_PORT,
 };
@@ -13,7 +14,6 @@ use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::interface::apply_router::ApplyRouter;
 use next_web_core::interface::data_decoder::DataDecoder;
 use next_web_core::state::application_state::ApplicationState;
-use next_web_core::client::rest_client::RestClient;
 use next_web_core::AutoRegister;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use std::io::BufRead;
@@ -342,8 +342,6 @@ pub trait Application: Send + Sync {
         let decoder_list = ctx.resolve_by_type::<Arc<dyn DataDecoder>>();
         let data_decoder = decoder_list.last();
 
-        
-
         app = app.route_layer(axum::Extension(ApplicationState::new(ctx)));
 
         if let Some(decoder) = data_decoder {
@@ -352,7 +350,7 @@ pub trait Application: Send + Sync {
 
         let app = if !context_path.is_empty() {
             let router = Router::new();
-            
+
             #[cfg(feature = "trace-log")]
             info!("nest context path: {}", context_path);
 
@@ -398,7 +396,7 @@ pub trait Application: Send + Sync {
                 tokio::net::TcpListener::bind(format!("{}:{}", server_addr, server_port))
                     .await
                     .unwrap();
-            
+
             axum::serve(
                 listener,
                 app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
@@ -468,7 +466,13 @@ pub trait Application: Send + Sync {
         );
 
         let mut ctx = ApplicationContext::options()
-            .allow_override(false)
+            .allow_override(
+                properties
+                    .next()
+                    .appliation()
+                    .map(|s| s.context().allow_override())
+                    .unwrap_or(false),
+            )
             .auto_register();
         println!(
             "Init application context success!\nCurrent Time: {}\n",

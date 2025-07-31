@@ -132,33 +132,33 @@ impl JobSchedulerManager {
         let jjb = match schedule {
             ScheduleType::Cron(cron) => Job::new_cron_job_async(cron, move |_uid, _lock| {
                 Box::pin({
-                    let val1 = job.clone();
-                    let val2 = context.clone();
+                    let var1 = job.clone();
+                    let var2 = context.clone();
                     async move {
-                        val1.execute(val2).await.unwrap();
+                        var1.execute(var2).await.unwrap();
                     }
                 })
             }),
             ScheduleType::Repeated(interval) => Job::new_repeated_async(
-                std::time::Duration::from_millis(interval),
+                std::time::Duration::from_secs(interval),
                 move |_uid, _lock| {
                     Box::pin({
-                        let val1 = job.clone();
-                        let val2 = context.clone();
+                        let var1 = job.clone();
+                        let var2 = context.clone();
                         async move {
-                            val1.execute(val2).await.unwrap();
+                            var1.execute(var2).await.unwrap();
                         }
                     })
                 },
             ),
             ScheduleType::OneShot(interval) => Job::new_one_shot_async(
-                std::time::Duration::from_millis(interval),
+                std::time::Duration::from_secs(interval),
                 move |_uid, _lock| {
                     Box::pin({
-                        let val1 = job.clone();
-                        let val2 = context.clone();
+                        let var1 = job.clone();
+                        let var2 = context.clone();
                         async move {
-                            val1.execute(val2).await.unwrap();
+                            var1.execute(var2).await.unwrap();
                         }
                     })
                 },
@@ -166,10 +166,10 @@ impl JobSchedulerManager {
             ScheduleType::OneShotAtInstant(instant) => {
                 Job::new_one_shot_at_instant_async(instant, move |_uid, _lock| {
                     Box::pin({
-                        let val1 = job.clone();
-                        let val2 = context.clone();
+                        let var1 = job.clone();
+                        let var2 = context.clone();
                         async move {
-                            val1.execute(val2).await.unwrap();
+                            var1.execute(var2).await.unwrap();
                         }
                     })
                 })

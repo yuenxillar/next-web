@@ -34,11 +34,8 @@ async fn download_file() -> impl IntoResponse {
 }
 
 async fn download_bytes() -> impl IntoResponse {
-    let fs = tokio::fs::read(r"D:\firefoxDownload\inst.exe").await.unwrap();
-    let bytes = Bytes::from(fs);
-
-    // 15MB
-    // let bytes = Bytes::from(vec![0x01; 1024 * 1024 * 15]);
+    // 10MB
+    let bytes = Bytes::from(vec![0x01; 1024 * 1024 * 10]);
     // 10KB/s
     ResponseStream::new(BytesStream::new(bytes, Some("test.txt".into()))).target_rate(1024 * 10)
 }

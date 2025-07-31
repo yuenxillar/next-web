@@ -63,6 +63,7 @@ printpdf = { version = "0.8.2" }
 # pay
 wechat-pay-rust-sdk = { version = "0.2.18" }
 
+validator = { version = "0.20.0" }
 reqwest = { version = "0.12.15", features = ["json"] }
 aes = { version = "^0.8.4" }
 once_cell = { version = "1.20.2" }

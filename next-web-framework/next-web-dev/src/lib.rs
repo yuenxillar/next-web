@@ -4,6 +4,7 @@ pub mod autoregister;
 pub mod banner;
 pub mod converter;
 pub mod error;
+pub mod extract;
 pub mod event;
 pub mod interceptor;
 pub mod manager;

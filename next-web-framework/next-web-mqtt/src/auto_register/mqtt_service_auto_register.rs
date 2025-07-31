@@ -18,16 +18,16 @@ use crate::{
 
 #[Singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
-pub struct MqttServiceAutoRegister(pub MQTTClientProperties);
+pub struct MQTTServiceAutoRegister(pub MQTTClientProperties);
 
-impl MqttServiceAutoRegister {
+impl MQTTServiceAutoRegister {
     fn into_auto_register(self) -> Arc<dyn AutoRegister> {
         Arc::new(self)
     }
 }
 
 #[async_trait]
-impl AutoRegister for MqttServiceAutoRegister {
+impl AutoRegister for MQTTServiceAutoRegister {
     fn registered_name(&self) -> &'static str {
         ""
     }
@@ -38,6 +38,10 @@ impl AutoRegister for MqttServiceAutoRegister {
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mqtt_properties = self.0.clone();
+
+        if mqtt_properties == MQTTClientProperties::default() {
+            return Ok(());
+        }
 
         // 从上下文中解析所有实现了 `BaseTopic` 的组件
         // Resolve all components implementing `BaseTopic` from the context

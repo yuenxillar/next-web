@@ -41,6 +41,8 @@ regex = { workspace = true }
 jsonwebtoken = { workspace = true }
 parking_lot = { workspace = true }
 flume = { workspace = true }
+validator = { workspace = true}
+thiserror = { workspace = true }
 
 rudi-dev = { workspace = true }
 

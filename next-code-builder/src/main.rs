@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_meta = DatabaseMeta {
         url: String::from("postgres://admin:123456@localhost:5432/next_web"),
         database_name: String::from("next_web"),
-        table_name: String::from("media_process"),
+        table_name: String::from("user"),
         database_type: DatabaseType::default(),
     };
 
