@@ -1,11 +1,15 @@
-use std::{ops::{Deref, DerefMut}, sync::Arc};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
-use axum::{extract::{FromRef, FromRequestParts}, http::{request::Parts, StatusCode}};
+use axum::{
+    extract::{FromRef, FromRequestParts},
+    http::{request::Parts, StatusCode},
+};
 use tokio::sync::RwLock;
 
-use crate::{
-    interface::singleton::Singleton, ApplicationContext,
-};
+use crate::{interface::singleton::Singleton, ApplicationContext};
 
 #[derive(Clone)]
 pub struct ApplicationState {
@@ -13,16 +17,11 @@ pub struct ApplicationState {
 }
 
 impl ApplicationState {
-    pub fn new(
-        application_context: ApplicationContext,
-    ) -> Self {
+    pub fn new(application_context: ApplicationContext) -> Self {
         let context: Arc<RwLock<ApplicationContext>> = Arc::new(RwLock::new(application_context));
-        Self {
-            context,
-        }
+        Self { context }
     }
 }
-
 
 #[derive(Clone)]
 pub struct AcSingleton<T>(pub T)
@@ -58,11 +57,20 @@ where
 
     async fn from_request_parts(req: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let state = req.extensions.get::<ApplicationState>();
-        let singleton_name = get_singleton_name::<T>();
-        
+
         let instance = if let Some(state) = state {
-            state.context.write().await.resolve_with_name::<T>(singleton_name)
-        }else {
+            let singleton_name = get_singleton_name::<T>();
+            let reader = state.context.read().await;
+            if reader.contains_single_with_name::<T>(singleton_name.to_owned()) {
+                reader.get_single_with_name::<T>(singleton_name).clone()
+            } else {
+                state
+                    .context
+                    .write()
+                    .await
+                    .resolve_with_name::<T>(singleton_name)
+            }
+        } else {
             return Err((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"));
         };
 

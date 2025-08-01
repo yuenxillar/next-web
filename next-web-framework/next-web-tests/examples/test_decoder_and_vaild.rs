@@ -35,9 +35,9 @@ impl Application for TestApplication {
 struct TestValidator {
     #[validate(length(min = 5, message = "Can not be empty"))]
     pub name: String,
-    #[validate(range(min = 1, max = 120, message = "Can not be empty"))]
+    #[validate(range(min = 1, max = 120, message = "minimum  is 1, maximum  is 120"))]
     pub age: u8,
-    #[validate(range(min = 20, max = 200,message = "Can not be empty"))]
+    #[validate(range(min = 20, max = 200,message = "minimum  is 20, maximum  is 200"))]
     pub weight: u16,
 }
 

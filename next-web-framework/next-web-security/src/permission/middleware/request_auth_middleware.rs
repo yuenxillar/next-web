@@ -17,8 +17,8 @@ pub(crate) async fn request_auth_middleware(
     next: Next,
 ) -> Result<Response, Response> {
     
-
     println!("request_auth_middleware: req_header: {:?}, req: {:?}", req_header, req);
+   
     let auth_service = user_auth_manager.authentication_service();
     let route_resources = user_auth_manager.route_resources();
     let http_security = user_auth_manager.http_security();
