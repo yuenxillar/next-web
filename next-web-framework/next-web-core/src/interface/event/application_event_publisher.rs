@@ -1,4 +1,4 @@
-use next_web_core::error::BoxError;
+use crate::error::BoxError;
 
 use super::application_event::ApplicationEvent;
 

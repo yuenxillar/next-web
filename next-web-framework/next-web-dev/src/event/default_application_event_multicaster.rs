@@ -1,12 +1,7 @@
-use super::key::Key;
-use super::{
-    application_event::ApplicationEvent,
-    application_event_multicaster::ApplicationEventMulticaster,
-    application_listener::ApplicationListener,
-};
 
 use flume::{Receiver, Sender};
 use hashbrown::HashMap;
+use next_web_core::{common::key::Key, interface::event::{application_event::ApplicationEvent, application_event_multicaster::ApplicationEventMulticaster, application_listener::ApplicationListener}};
 use parking_lot::Mutex;
 use std::sync::Arc;
 #[cfg(feature = "trace-log")]

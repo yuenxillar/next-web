@@ -1,9 +1,5 @@
 use flume::Sender;
-use next_web_core::error::BoxError;
-
-use super::{
-    application_event::ApplicationEvent, application_event_publisher::ApplicationEventPublisher,
-};
+use next_web_core::{error::BoxError, interface::event::{application_event::ApplicationEvent, application_event_publisher::ApplicationEventPublisher}};
 
 #[derive(Clone)]
 pub struct DefaultApplicationEventPublisher {

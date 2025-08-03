@@ -1,3 +1,4 @@
+pub mod macros;
 pub mod stream;
 pub mod autoconfigure;
 pub mod autoregister;
@@ -11,6 +12,7 @@ pub mod manager;
 pub mod middleware;
 pub mod util;
 pub mod application;
+pub mod state_machine;
 
 mod tests;
 

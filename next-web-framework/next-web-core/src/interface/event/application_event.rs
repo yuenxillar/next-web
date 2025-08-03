@@ -1,14 +1,17 @@
 use std::any::{Any, TypeId};
 
-use crate::util::local_date_time::LocalDateTime;
-
-/// 应用事件    
+/// 应用事件  
+///   
 /// Application event
 pub trait ApplicationEvent: Any + Send + Sync + 'static {
     /// 获取事件时间戳
+    /// 
     /// Get event timestamp
-    fn timestamp(&self) -> i64 {
-        LocalDateTime::timestamp()
+    fn timestamp(&self) -> u64 {
+        std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
     }
 
     /// 获取事件源
@@ -22,6 +25,7 @@ pub trait ApplicationEvent: Any + Send + Sync + 'static {
     }
 
     /// 获取事件类型ID
+    /// 
     /// Get event type ID
     fn event_id(&self) -> TypeId {
         TypeId::of::<Self>()

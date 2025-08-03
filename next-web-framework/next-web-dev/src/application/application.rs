@@ -26,12 +26,9 @@ use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info, warn};
 
-use crate::application::application_shutdown::ApplicationShutdown;
 use crate::application::next_application::NextApplication;
 
 use crate::autoregister::register_single::ApplicationDefaultRegisterContainer;
-use crate::event::application_event_multicaster::ApplicationEventMulticaster;
-use crate::event::application_listener::ApplicationListener;
 
 use crate::autoconfigure::context::next_properties::NextProperties;
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
@@ -40,6 +37,10 @@ use crate::event::default_application_event_publisher::DefaultApplicationEventPu
 use crate::util::local_date_time::LocalDateTime;
 
 use next_web_core::context::application_resources::ApplicationResources;
+use next_web_core::interface::application::application_shutdown::ApplicationShutdown;
+
+use next_web_core::interface::event::application_event_multicaster::ApplicationEventMulticaster;
+use next_web_core::interface::event::application_listener::ApplicationListener;
 
 #[cfg(feature = "job_scheduler")]
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
@@ -53,6 +54,8 @@ pub trait Application: Send + Sync {
 
     // Get the application router. (open api  and private api)
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router;
+
+    async fn before_start(&self, ctx: &mut ApplicationContext) {}
 
     /// Register the rpc server.
     #[cfg(feature = "enable-grpc")]
@@ -526,7 +529,7 @@ pub trait Application: Send + Sync {
 
         println!("========================================================================");
 
-        // application.init_cache().await;
+        application.before_start(&mut ctx).await;
 
         application
             .bind_tcp_server(ctx, &properties, start_time)

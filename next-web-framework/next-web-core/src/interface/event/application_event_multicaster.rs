@@ -1,4 +1,6 @@
-use super::{application_listener::ApplicationListener, key::Key};
+use crate::common::key::Key;
+
+use super::application_listener::ApplicationListener;
 
 /// 应用事件多播器
 /// 

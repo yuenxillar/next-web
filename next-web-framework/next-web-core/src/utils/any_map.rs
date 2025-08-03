@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt::{self, Debug};
 use std::sync::RwLock;
 
 use hashbrown::HashMap;
@@ -6,12 +7,12 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 /// Support AnyMap caching for different data types
-/// 
+///
 /// 支持不同数据类型的 AnyMap 缓存
 #[derive(Clone)]
 pub struct AnyMap {
     /// The underlying concurrent hash map storing cache items
-    /// 
+    ///
     /// 存储缓存项的底层并发哈希表
     data: Arc<RwLock<HashMap<Cow<'static, str>, AnyValue>>>,
 }
@@ -57,7 +58,10 @@ impl AnyMap {
         K: Into<Cow<'static, str>>,
         V: Into<AnyValue>,
     {
-        self.data.write().unwrap().insert(key.into(), value.into());
+        self.data
+            .write()
+            .map(|mut s| s.insert(key.into(), value.into()))
+            .ok();
     }
 
     /// Gets a value by key, returns None if expired or not found
@@ -150,10 +154,31 @@ where
     }
 }
 
+impl fmt::Debug for dyn AnyClone
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 // Implement Clone for Box<dyn AnyClone>
 impl Clone for Box<dyn AnyClone> {
     fn clone(&self) -> Box<dyn AnyClone> {
         (**self).clone_box()
+    }
+}
+
+impl fmt::Debug for AnyValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AnyValue::String(s) => write!(f, "String({:?})", s),
+            AnyValue::Number(n) => write!(f, "Number({})", n),
+            AnyValue::Boolean(b) => write!(f, "Boolean({})", b),
+            AnyValue::Float(num) => write!(f, "Float({})", num),
+            AnyValue::Array(arr) => write!(f, "Array({:?})", arr),
+            AnyValue::Object(obj) => write!(f, "Object({:?})", obj),
+            AnyValue::Null => write!(f, "Null"),
+        }
     }
 }
 

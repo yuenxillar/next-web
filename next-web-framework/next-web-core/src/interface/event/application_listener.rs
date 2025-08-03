@@ -1,27 +1,30 @@
 use super::application_event::ApplicationEvent;
 use async_trait::async_trait;
-use next_web_core::DynClone;
+use dyn_clone::DynClone;
 use std::any::TypeId;
 
 /// 应用事件监听器
+/// 
 /// Application event listener
 #[async_trait]
 pub trait ApplicationListener: DynClone + Send + Sync {
     
+    /// 获取事件ID
+    /// 
+    /// Get event ID
+    fn id(&self) -> String;
+
+    
     /// 获取事件类型
     ///
-    /// Get event type
+    /// Get event typeid
     fn event_id(&self) -> TypeId;
 
-    /// 获取事件ID
-    /// Get event ID
-    fn id(&self) -> String {
-        String::new()
-    }
 
     /// 处理应用事件
+    /// 
     /// Handle application event
     async fn on_application_event(&mut self, event: &Box<dyn ApplicationEvent>);
 }
 
-next_web_core::clone_trait_object!(ApplicationListener);
+dyn_clone::clone_trait_object!(ApplicationListener);

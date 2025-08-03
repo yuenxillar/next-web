@@ -1,3 +1,4 @@
+pub mod common;
 pub mod client;
 pub mod utils;
 pub mod constants;
@@ -7,6 +8,7 @@ pub mod autoregister;
 pub mod interface;
 pub mod error;
 pub mod state;
+pub mod config;
 
 pub use self::context::application_context::*;
 pub use self::autoregister::auto_register::*;

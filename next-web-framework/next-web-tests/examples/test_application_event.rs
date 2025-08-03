@@ -1,16 +1,19 @@
 use std::any::{Any, TypeId};
 
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
+use next_web_core::interface::event::application_event_publisher::ApplicationEventPublisher;
+use next_web_core::{
+    async_trait,
+    context::properties::ApplicationProperties,
+    interface::event::{
+        application_event::ApplicationEvent, application_listener::ApplicationListener,
+    },
+    ApplicationContext,
+};
+
 use next_web_dev::{
     application::Application,
-    event::{
-        application_event::ApplicationEvent,
-        application_event_publisher::ApplicationEventPublisher,
-        application_listener::ApplicationListener,
-        default_application_event_publisher::DefaultApplicationEventPublisher,
-    },
-    util::local_date_time::LocalDateTime,
-    Singleton,
+    event::default_application_event_publisher::DefaultApplicationEventPublisher,
+    util::local_date_time::LocalDateTime, Singleton,
 };
 
 /// Test application
@@ -57,6 +60,10 @@ impl ApplicationEvent for TestEvent {}
 
 #[async_trait]
 impl ApplicationListener for TestListener {
+    fn id(&self) -> String {
+        String::default()
+    }
+
     fn event_id(&self) -> TypeId {
         TypeId::of::<TestEvent>()
     }
