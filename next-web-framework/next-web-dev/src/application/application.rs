@@ -11,6 +11,7 @@ use next_web_core::constants::application_constants::{
 use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
+use next_web_core::interface::application::application_ready_event::ApplicationReadyEvent;
 use next_web_core::interface::apply_router::ApplyRouter;
 use next_web_core::interface::data_decoder::DataDecoder;
 use next_web_core::state::application_state::ApplicationState;
@@ -250,6 +251,10 @@ pub trait Application: Send + Sync {
         application_properties: &ApplicationProperties,
         time: std::time::Instant,
     ) {
+
+        let var1 = ctx.resolve_by_type::<Box<dyn ApplicationReadyEvent>>();
+        for item in var1 { item.ready(&mut ctx).await; }
+        
         let config = application_properties.next().server();
 
         let context_path = config.context_path().unwrap_or("");

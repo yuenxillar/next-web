@@ -29,7 +29,6 @@ impl<S, E> Into<StateMachineKey<S, E>> for (String, Transition<S, E>) {
 
 #[derive(Clone)]
 pub struct StateContext<S, E> {
-    // pub(crate) action: Action<S, E>,
     pub(crate) message: EventMessage<E>,
     pub(crate) transition: Transition<S, E>,
     pub(crate) state_machine: Arc<StateMachine<S, E>>,

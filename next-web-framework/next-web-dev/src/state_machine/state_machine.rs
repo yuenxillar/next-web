@@ -3,6 +3,7 @@ use std::{collections::HashSet, fmt::Debug, hash::Hash, sync::Arc};
 use async_trait::async_trait;
 use next_web_core::{utils::any_map::AnyValue, DynClone};
 use tokio::sync::broadcast::Sender;
+use tracing::error;
 
 use super::{
     config::{
@@ -19,6 +20,7 @@ use super::{
 #[derive(Clone)]
 pub struct StateMachine<S, E> {
     pub(crate) id: String,
+    // todo
     pub(crate) configure: StateMachineConfigure<S, E>,
     pub(crate) state_configure: StateMachineStateConfigure<S, E>,
     pub(crate) transition_configure: StateMachineTransitionConfigure<S, E>,
@@ -51,8 +53,6 @@ where
     }
 
     pub fn start(mut self) -> Arc<Self>{
-        // if self.state_configure.in
-
         // create manager
         let mut manager = StateMachineManager::<S, E>::new(self.id.clone());
 
@@ -65,10 +65,10 @@ where
         self.status = true;
         self.sender = Some(sender);
 
-        let ac_self = Arc::new(self);
-        manager.start_up(ac_self.clone(), receiver);
+        let state_machine = Arc::new(self);
+        manager.start_up(state_machine.clone(), receiver);
 
-        ac_self
+        state_machine
     }
 
     pub async fn send_event(&self, message: EventMessage<E>) {
@@ -76,11 +76,9 @@ where
             return;
         }
         if let Some(sender) = self.sender.as_ref() {
-            match sender.send(message) {
-                Ok(_) => {
-                    println!("Send ok!")
-                }
-                Err(_) => sender.closed().await,
+            if let Err(e) = sender.send(message) {
+                error!("StateMachine [{}] send event error: {}", self.id(), e);
+                sender.closed().await
             }
         }
     }
@@ -213,17 +211,4 @@ impl<E> EventMessage<E> {
         self.event = event;
         self
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub enum TestState {
-    #[default]
-    Ready,
-    Run,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum TestEvent {
-    Open,
-    Close,
 }

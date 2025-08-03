@@ -17,7 +17,7 @@ pub struct StateMachineManager<S, E> {
     pub(crate) id: String,
     pub(crate) action: Action<S, E>,
     pub(crate) key: HashSet<Transition<S, E>>,
-    pub(crate) previous_state: Option<State<S, E>>,
+    // pub(crate) previous_state: Option<State<S, E>>,
 }
 
 impl<S, E> StateMachineManager<S, E>
@@ -32,7 +32,7 @@ where
             id,
             action: Arc::new(RwLock::new(HashMap::new())),
             key: HashSet::new(),
-            previous_state: None,
+            // previous_state: None,
         }
     }
 
@@ -70,6 +70,7 @@ where
             loop {
                 match receiver.recv().await {
                     Ok(event_message) => {
+                        if !state_machine.status { continue; }
                         let event = event_message.event();
                         if let Some(transition) = keys
                             .iter()
