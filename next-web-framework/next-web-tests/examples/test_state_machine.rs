@@ -7,13 +7,9 @@ use next_web_core::{
 use next_web_dev::{
     application::Application,
     state_machine::{
-        config::{
-            state_machine_configure::StateMachineConfigure,
-            state_machine_state_configure::StateMachineStateConfigure,
-            state_machine_transition_configure::StateMachineTransitionConfigure,
-        },
-        state_machine_context::StateContext,
-        EventMessage, StateMachine, StateMachineAction, StateMachineListener, Transition,
+        config::state_machine_transition_configure::StateMachineTransitionConfigure,
+        state_machine_context::StateContext, state_machine_generator::StateMachineGenerator,
+        EventMessage, StateMachineAction, StateMachineListener, Transition,
     },
 };
 
@@ -120,34 +116,31 @@ impl Application for TestApplication {
 
     async fn before_start(&self, _ctx: &mut ApplicationContext) {
         tokio::spawn(async move {
-            let configure = StateMachineConfigure::<TestState, TestEvent>::default();
-        let state_configure = StateMachineStateConfigure::default();
-        let transition_configure = StateMachineTransitionConfigure::default()
-            .with(
-                TestState::Ready,
-                TestState::Run,
+            let transition_configure = StateMachineTransitionConfigure::default()
+                .with(
+                    TestState::Ready,
+                    TestState::Run,
+                    TestEvent::Open,
+                    Box::new(TestAction),
+                )
+                .with(
+                    TestState::Run,
+                    TestState::Ready,
+                    TestEvent::Close,
+                    Box::new(TestAction1(String::from("dev"))),
+                );
+            tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+
+            let state_machie =
+                StateMachineGenerator::generate("testStateMachine", transition_configure)
+                    .add_state_listener(TestEventListener::default());
+
+            let var = state_machie.start();
+            var.send_event(EventMessage::new(
                 TestEvent::Open,
-                Box::new(TestAction),
-            )
-            .with(
-                TestState::Run,
-                TestState::Ready,
-                TestEvent::Close,
-                Box::new(TestAction1(String::from("dev"))),
-            );
-        tokio::time::sleep(std::time::Duration::from_secs(4)).await;
-
-        let state_machie =
-            StateMachine::from_configure(configure, state_configure, transition_configure)
-                .set_id("testStateMachine")
-                .add_state_listener(TestEventListener::default());
-
-        let var = state_machie.start();
-        var.send_event(EventMessage::new(
-            TestEvent::Open,
-            Some(AnyValue::Boolean(true)),
-        ))
-        .await;
+                Some(AnyValue::Boolean(true)),
+            ))
+            .await;
         });
     }
 }

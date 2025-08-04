@@ -2,7 +2,7 @@
 
 use axum::Router;
 use next_web_core::async_trait;
-use next_web_core::utils::any_matcher::RouteMatcher;
+use next_web_core::utils::any_matcher::AnyMatcher;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 
 use next_web_dev::application::Application;
@@ -25,22 +25,45 @@ impl Application for TestApplication {
 
 #[tokio::main]
 async fn main() {
-    // TestApplication::run().await;
-    let mut route = RouteMatcher::new();
-    
+    let mut route = AnyMatcher::new();
+
     route.insert("/test", 0).ok();
     route.insert("/test/*.js", 1).ok();
     route.insert("/test/**", 2).ok();
 
-     route.insert("/789", 0).ok();
+    route.insert("/789", 0).ok();
     route.insert("/789/*.css", 1).ok();
     route.insert("/789/**", 2).ok();
 
-     route.insert("/test/698", 0).ok();
-    route.insert("/test/6856/*.js", 1).ok();
-    route.insert("/test/3333", 2).ok();
+    route.insert("/test/698", 99).ok();
+    route.insert("/test/6856/*.js", 100).ok();
+    route.insert("/test/3333", 200).ok();
 
-    println!("route: {}", route.at("/test/test.js").unwrap());
-    // println!("route: {}", route.at("/test").unwrap());
-    // println!("route: {}", route.at("/test/test666").unwrap());
+    let start = std::time::Instant::now();
+    
+    for _i in 0..1000000 {
+        route.at("/test/test.666").unwrap();
+        route.at("/test/6856/test.js").unwrap();
+    }
+    println!("{:?}",start.elapsed());
+
+    let mut route = matchit::Router::new();
+    route.insert("/test", 0).ok();
+    route.insert("/test/*.js", 1).ok();
+    route.insert("/test/test.666", 2).ok();
+
+    route.insert("/789", 0).ok();
+    route.insert("/789/*.css", 1).ok();
+    route.insert("/789/**", 2).ok();
+
+    route.insert("/test/698", 99).ok();
+    route.insert("/test/6856/{*.js}", 100).ok();
+    route.insert("/test/3333", 200).ok();
+
+    let start = std::time::Instant::now();
+    for _i in 0..1000000 {
+        route.at("/test/test.666").unwrap();
+        route.at("/test/6856/test.js").unwrap();
+    }
+    println!("{:?}",start.elapsed());
 }

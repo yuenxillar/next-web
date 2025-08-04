@@ -1,5 +1,5 @@
 use std::any::Any;
-use std::fmt::{self, Debug};
+use std::fmt::{self};
 use std::sync::RwLock;
 
 use hashbrown::HashMap;

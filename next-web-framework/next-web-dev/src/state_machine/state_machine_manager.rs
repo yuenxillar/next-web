@@ -3,7 +3,7 @@ use std::{fmt::Debug, hash::Hash, sync::Arc};
 use crate::state_machine::state_machine_context::StateContext;
 
 use super::{
-    state_machine_context::StateMachineKey, EventMessage, State, StateMachine, StateMachineAction,
+    state_machine_context::StateMachineKey, EventMessage, StateMachine, StateMachineAction,
     Transition,
 };
 use hashbrown::{HashMap, HashSet};

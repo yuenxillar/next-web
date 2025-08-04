@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use next_web_core::utils::any_matcher::AnyMatcher;
+
 use crate::auth::models::login_type::LoginType;
 use crate::core::http_security::HttpSecurity;
 use crate::permission::{
@@ -11,7 +13,7 @@ use crate::permission::{
 pub struct UserAuthenticationManager {
     // options: UserAuthorizationOptions,
     http_security: Arc<HttpSecurity>,
-    route_resources: Arc<matchit::Router<PermissionGroup>>,
+    router: Arc<AnyMatcher<PermissionGroup>>,
     authentication_service: Arc<dyn AuthenticationService>,
 }
 
@@ -21,12 +23,12 @@ impl UserAuthenticationManager {
         authentication_service: Arc<dyn AuthenticationService>,
         http_security: HttpSecurity,
     ) -> Self {
-        let route_resources = Self::build_route_resources(&http_security);
+        let router = Self::build_router(&http_security);
         Self {
             // options,
             authentication_service,
             http_security: Arc::new(http_security),
-            route_resources: Arc::new(route_resources),
+            router: Arc::new(router),
         }
     }
 
@@ -38,16 +40,16 @@ impl UserAuthenticationManager {
         &self.authentication_service
     }
 
-    pub fn route_resources(&self) -> &Arc<matchit::Router<PermissionGroup>> {
-        &self.route_resources
+    pub fn router(&self) -> &Arc<AnyMatcher<PermissionGroup>> {
+        &self.router
     }
 
     pub fn http_security(&self) -> &Arc<HttpSecurity> {
         &self.http_security
     }
 
-    fn build_route_resources(http_security: &HttpSecurity) -> matchit::Router<PermissionGroup> {
-        let mut route_resources = matchit::Router::new();
+    fn build_router(http_security: &HttpSecurity) -> AnyMatcher<PermissionGroup> {
+        let mut route_resources = AnyMatcher::new();
         http_security
             .any_match
             .clone()
@@ -73,7 +75,7 @@ impl UserAuthenticationManager {
     ) -> bool {
         let roles = auth_group.get_roles();
         let permissions = auth_group.get_permissions();
-        let mode = auth_group.get_mode();
+        // let mode = auth_group.get_mode();
 
         if roles.is_none() && permissions.is_none() {
             return true;

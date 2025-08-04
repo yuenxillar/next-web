@@ -20,7 +20,7 @@ pub(crate) async fn request_auth_middleware(
     println!("request_auth_middleware: req_header: {:?}, req: {:?}", req_header, req);
    
     let auth_service = user_auth_manager.authentication_service();
-    let route_resources = user_auth_manager.route_resources();
+    let router = user_auth_manager.router();
     let http_security = user_auth_manager.http_security();
 
     if http_security.match_type != MatchType::NotMatch {
@@ -29,7 +29,7 @@ pub(crate) async fn request_auth_middleware(
         let path = req.uri().path();
 
         println!("path: {:?}", path);
-        let permission_group = route_resources.at(path).ok();
+        let permission_group = router.at(path).ok();
 
         let resp = Response::builder()
             .status(StatusCode::UNAUTHORIZED)
@@ -37,7 +37,7 @@ pub(crate) async fn request_auth_middleware(
             .unwrap();
         if let Some(group) = permission_group {
             if !user_auth_manager
-                .pre_authorize(&user_id, &login_type, group.value)
+                .pre_authorize(&user_id, &login_type, group)
                 .await
             {
                 println!("Unauthorized");
