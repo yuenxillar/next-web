@@ -31,6 +31,7 @@ next-web-sms = { version = "0.1.0", path = "./next-web-sms", optional = true }
 next-web-data = {  version = "*", path = "./next-web-data", optional = true}
 next-web-websocket = { version = "0.1.2", path = "./next-web-websocket", optional = true}
 next-web-crud = { version = "0.1.0", path = "./next-web-crud", optional = true}
+next-web-open-api = { version = "*", path = "./next-web-open-api", optional = true}
 
 # document
 next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }

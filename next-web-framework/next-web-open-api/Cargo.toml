@@ -1,0 +1,19 @@
+[package]
+name = "next-web-open-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+
+[features]
+default = ["open-weather"]
+open-weather = []
+
