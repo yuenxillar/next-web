@@ -19,8 +19,7 @@ next-web-core = { version = "0.1.3", path = "./next-web-core" }
 
 
 next-web-security = { version = "0.1.0", path = "./next-web-security", optional = true }
-# next-web-ai = { version = "0.1.0", path = "./next-web-ai", optional = true }
-
+next-web-ai = { version = "*", path = "./next-web-ai", optional = true }
 next-web-email = { version = "*", path = "./next-web-email"}
 next-web-utils = { version = "0.1.0", path = "./next-web-utils", optional = true }
 next-web-mqtt = { version = "0.1.0", path = "./next-web-mqtt", optional = true }
@@ -44,8 +43,6 @@ next-web-document = { version = "0.1.0", path = "./next-web-document", optional 
 # next-web-gateway = { version = "0.1.0", path = "./next-web-gateway", optional = true }
 
 # next-web-wechat = { version = "0.1.0", path = "./next-web-wechat", optional = true }
-
-
 
 rudi-macro-dev = { path = "./rudi-main/rudi-macro-dev", version = "0.1.1"}
 

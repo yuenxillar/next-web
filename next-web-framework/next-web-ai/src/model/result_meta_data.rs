@@ -1,0 +1,4 @@
+
+pub trait ResultMetadata: Send {
+    
+}

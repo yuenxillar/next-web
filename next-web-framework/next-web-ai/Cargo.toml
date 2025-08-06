@@ -5,10 +5,14 @@ edition = "2021"
 
 [dependencies]
 serde = { workspace = true }
+next-web-core = { workspace = true }
+bytes = { workspace = true }
+futures-core = { workspace = true}
+
 
 [dev-dependencies]
-tokio = { version = "1.41.0", features = ["full"] }
-reqwest = { version = "0.12", features = ["json"] }
+tokio.workspace = true
+reqwest.workspace = true
 
 
 [features]

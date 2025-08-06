@@ -26,6 +26,7 @@ impl WeatherService for OpenMeteoWeatherService {
         // query_params.api_key = Some(self.api_key.clone());
         let resp = self.client.get(url).send().await?;
 
+        println!("url: {}", resp.url());
         Ok(resp.json().await?)
     }
 }
@@ -34,7 +35,7 @@ fn build_url(base_url: &str, params: WeatherQueryParams) -> Result<String, &'sta
     let WeatherQueryParams {
         latitude,
         longitude,
-        hourly,
+        options,
     } = params;
 
     if latitude < -90.0 || latitude > 90.0 {
@@ -45,14 +46,19 @@ fn build_url(base_url: &str, params: WeatherQueryParams) -> Result<String, &'sta
         return Err("Longitude must be between -180 and 180");
     }
 
-    let hourly_str = hourly.join(",");
+    let mut query = String::new();
+    for weather_type in options {
+        let str = weather_type.to_string();
+        query.push('&');
+        query.push_str(&str);
+    }
 
     Ok(format!(
-        "{}?latitude={}&longitude={}&hourly={}",
+        "{}?latitude={}&longitude={}{}",
         base_url,
         latitude,
         longitude,
-        url_encode(&hourly_str)
+        &query
     ))
 }
 
@@ -88,9 +94,11 @@ fn hex_digit(value: u8) -> char {
 mod weather_service_tests {
     use crate::open_weather::{
         interface::weather_service::WeatherService,
-        region::international::{
-            open_meteo::request_params::weather_query_params::WeatherQueryParams,
-            open_meteo::weather_service::OpenMeteoWeatherService,
+        region::international::open_meteo::{
+            request_params::weather_query_params::{
+                CurrentVariables, WeatherQueryParams, WeatherType,
+            },
+            weather_service::OpenMeteoWeatherService,
         },
     };
 
@@ -98,7 +106,16 @@ mod weather_service_tests {
     async fn send_weather_inquiry() {
         let api_key = "your_api_key";
         let weather_service = OpenMeteoWeatherService::new(api_key);
-        let query_params = WeatherQueryParams::new(20.000, 120.111);
+
+        let options = vec![WeatherType::CurrentWeather(vec![
+            CurrentVariables::Temperature2m,
+            CurrentVariables::RelativeHumidity2m,
+            CurrentVariables::ApparentTemperature,
+            CurrentVariables::WeatherCode,
+            CurrentVariables::CloudCover,
+            CurrentVariables::PressureMsl,
+        ])];
+        let query_params = WeatherQueryParams::new(20.000, 120.111, options);
 
         let resp = weather_service.weather_inquiry(query_params).await.unwrap();
         println!("resp: {:?}", resp)
