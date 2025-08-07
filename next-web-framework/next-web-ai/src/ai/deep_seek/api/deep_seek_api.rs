@@ -14,10 +14,12 @@ pub struct DeepSeekApi {
 
 impl DeepSeekApi {
     pub fn new(api_key: impl Into<Box<str>>, chat_model: ChatModel) -> Self {
-        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest::Client::builder()
+            .build()
+            .unwrap();
         let api_key = api_key.into();
         Self {
-            base_url: "https://api.deepseek.com".into(),
+            base_url: "https://api.deepseek.com/chat/completions".into(),
             api_key,
             chat_model,
             client,
@@ -25,14 +27,20 @@ impl DeepSeekApi {
     }
 
     pub async fn send(&self, req: &ChatCompletionRequest) -> Result<ChatCompletion, BoxError> {
-        let resp = self
+        let body = serde_json::to_string(req)?;
+        println!("body: {:?}", body);
+                let resp = self
             .client
             .post(self.base_url.as_ref())
+            .header("Content-Type", "application/json")
             .bearer_auth(self.api_key.as_ref())
-            .body(serde_json::to_string(req).unwrap())
+            .body(body)
             .send()
             .await?;
-        resp.json().await.map_err(Into::into)
+        let text = resp.text().await?;
+        println!("resp: {:?}", text);
+        // resp.json().await.map_err(Into::into)
+        serde_json::from_str(&text).map_err(Into::into)
     }
 }
 
@@ -56,7 +64,42 @@ pub struct ChatCompletionMessage {
     pub(crate) content: Box<str>,
 }
 
+
+///
+/// {
+///  "id": "9710a6c0-1b51-427b-b95d-b6734ec46270",
+///  "object": "chat.completion",
+///  "created": 1754571706,
+///  "model": "deepseek-chat",
+///  "choices": [
+///    {
+///      "index": 0,
+///      "message": {
+///        "role": "assistant",
+///        "content": "Hello! 😊 How can I assist you today?"
+///      },
+///      "logprobs": null,
+///      "finish_reason": "stop"
+///    }
+///  ],
+///  "usage": {
+///    "prompt_tokens": 11,
+///    "completion_tokens": 11,
+///    "total_tokens": 22,
+///    "prompt_tokens_details": {
+///      "cached_tokens": 0
+///    },
+///    "prompt_cache_hit_tokens": 0,
+///    "prompt_cache_miss_tokens": 11
+///  },
+///  "system_fingerprint": "fp_8802369eaa_prod0623_fp8_kvcache"
+/// }
+/// 
+/// 
+/// 
 #[derive(serde::Deserialize)]
 pub struct ChatCompletion {
+    pub id: Box<str>,
+    pub model: Box<str>,
     pub data: String,
 }

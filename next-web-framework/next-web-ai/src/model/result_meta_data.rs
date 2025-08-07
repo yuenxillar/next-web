@@ -1,4 +1,4 @@
 
-pub trait ResultMetadata: Send {
+pub trait ResultMetadata: Send + Sync {
     
 }
