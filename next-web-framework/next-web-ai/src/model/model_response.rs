@@ -5,7 +5,7 @@ where
     T: ModelResult<R>,
     R: Send,
 {
-    fn result(&self) -> T;
+    fn result(&self) -> Option<T>;
 
     fn results(&self) -> impl IntoIterator<Item = T>;
 

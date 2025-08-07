@@ -45,13 +45,7 @@ pub trait CallResponseSpec: Send + Sync {
 
 #[async_trait]
 pub trait StreamResponseSpec: Send + Sync {
-    async fn chat_response<S>(&self) -> S
-    where
-        S: futures_core::Stream<Item = ChatResponse>,
-        S: Send + 'static;
+    async fn chat_response<S>(&self) ->  impl futures_core::Stream<Item = ChatResponse> + Send + 'static;
 
-    async fn content<S>(&self) -> S
-    where
-        S: futures_core::Stream<Item = Bytes>,
-        S: Send + 'static;
+    async fn content<S>(&self) -> impl futures_core::Stream<Item = ChatResponse> + Send + 'static;
 }

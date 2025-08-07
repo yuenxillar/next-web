@@ -108,7 +108,6 @@ impl DefaultCallResponseSpec {
     where
         C: StructuredOutputConverter<T>,
     {
-     
         let resp_content = Bytes::from_static(b"bytes");
         let entity = output_converter.convert(resp_content);
         ResponseEntity {
@@ -148,17 +147,13 @@ pub struct DefaultStreamResponseSpec {
 
 #[async_trait]
 impl StreamResponseSpec for DefaultStreamResponseSpec {
-    async fn chat_response<S>(&self) -> S
-    where
-        S: futures_core::Stream<Item = ChatResponse>,
-        S: Send + 'static,
-    {
+    async fn chat_response<S>(
+        &self,
+    ) -> impl futures_core::Stream<Item = ChatResponse> + Send + 'static {
+        futures_util::stream::empty()
     }
 
-    async fn content<S>(&self) -> S
-    where
-        S: futures_core::Stream<Item = Bytes>,
-        S: Send + 'static,
-    {
+    async fn content<S>(&self) -> impl futures_core::Stream<Item = ChatResponse> + Send + 'static {
+        futures_util::stream::empty()
     }
 }

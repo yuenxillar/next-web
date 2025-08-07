@@ -1,6 +1,6 @@
 
 
-#[derive(Clone)]
+#[derive(Clone, serde::Deserialize)]
 pub struct ResponseEntity<R, E> {
     pub(crate) response: R,
     pub(crate) entity: Option<E>,

@@ -9,6 +9,6 @@ pub trait Converter<S, T> {
 
 pub trait StructuredOutputConverter<T>: Converter<Bytes, T> {
     
-    fn get_format(&self) -> String;
+    fn get_format(&self) -> &str;
 
 }

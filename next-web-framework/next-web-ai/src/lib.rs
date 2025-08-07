@@ -1,7 +1,8 @@
+pub mod ai;
+pub mod api;
 pub mod convert;
 pub mod model;
 pub mod chat;
-pub mod deep_seek;
 
 
 /// 
