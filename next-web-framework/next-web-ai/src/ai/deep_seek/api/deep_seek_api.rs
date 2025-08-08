@@ -1,3 +1,5 @@
+use futures_core::stream::BoxStream;
+use futures_util::{StreamExt, TryStreamExt};
 use next_web_core::error::BoxError;
 
 use crate::ai::deep_seek::chat_model::ChatModel;
@@ -14,9 +16,7 @@ pub struct DeepSeekApi {
 
 impl DeepSeekApi {
     pub fn new(api_key: impl Into<Box<str>>, chat_model: ChatModel) -> Self {
-        let client = reqwest::Client::builder()
-            .build()
-            .unwrap();
+        let client = reqwest::Client::builder().build().unwrap();
         let api_key = api_key.into();
         Self {
             base_url: "https://api.deepseek.com/chat/completions".into(),
@@ -26,23 +26,37 @@ impl DeepSeekApi {
         }
     }
 
-    pub async fn send(&self, req: &ChatCompletionRequest) -> Result<ChatCompletion, BoxError> {
-        let body = serde_json::to_string(req)?;
-        println!("body: {:?}", body);
-                let resp = self
+    pub async fn send(&self, req: &ChatCompletionRequest) -> Result<ChatApiRespnose, BoxError> {
+        let resp = self
             .client
             .post(self.base_url.as_ref())
             .header("Content-Type", "application/json")
             .bearer_auth(self.api_key.as_ref())
-            .body(body)
+            .body(serde_json::to_string(req)?)
             .send()
             .await?;
-        let text = resp.text().await?;
-        println!("resp: {:?}", text);
-        // resp.json().await.map_err(Into::into)
-        serde_json::from_str(&text).map_err(Into::into)
+        if !req.stream {
+            return Ok(ChatApiRespnose::Entity(resp.json().await?));
+        }
+        
+        return Ok(
+            resp.bytes_stream().and_then(|data| {
+                
+
+                async {
+
+                    Ok()
+                }
+            })
+        );
     }
 }
+
+pub(crate) enum  ChatApiRespnose {
+    Entity(ChatCompletion),
+    Stream(BoxStream<'static, Result<ChatCompletion, BoxError>>),
+}
+
 
 impl Default for DeepSeekApi {
     fn default() -> Self {
@@ -58,12 +72,11 @@ pub struct ChatCompletionRequest {
     pub(crate) stream: bool,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ChatCompletionMessage {
     pub(crate) role: Box<str>,
     pub(crate) content: Box<str>,
 }
-
 
 ///
 /// {
@@ -94,12 +107,38 @@ pub struct ChatCompletionMessage {
 ///  },
 ///  "system_fingerprint": "fp_8802369eaa_prod0623_fp8_kvcache"
 /// }
-/// 
-/// 
-/// 
-#[derive(serde::Deserialize)]
+///
+///
+///
+#[derive(Debug, serde::Deserialize)]
 pub struct ChatCompletion {
     pub id: Box<str>,
     pub model: Box<str>,
-    pub data: String,
+    pub object: Box<str>,
+    pub choices: Vec<Choice>,
+    pub usage: Usage,
+    pub system_fingerprint: Box<str>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Usage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
+    pub prompt_tokens_details: PromptTokensDetails,
+    pub prompt_cache_hit_tokens: u32,
+    pub prompt_cache_miss_tokens: u32,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PromptTokensDetails {
+    pub cached_tokens: u32,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Choice {
+    pub index: u32,
+    pub message: ChatCompletionMessage,
+    pub logprobs: Option<String>,
+    pub finish_reason: Box<str>,
 }

@@ -8,11 +8,14 @@ use crate::{
     chat::{
         messages::{assistant_message::AssistantMessage, message_type::MessageType},
         meta_data::{chat_response_meta_data::ChatResponseMetadata, empty_usage::EmptyUsage},
-        model::{chat_model::ChatModel, chat_response::ChatResponse, generation::Generation},
+        model::{
+            chat_model::ChatModel, chat_response::ChatResponse, generation::Generation,
+            streaming_chat_model::StreamingChatModel,
+        },
         observation::chat_model_observation_convention::ChatModelObservationConvention,
         prompt::prompt::Prompt,
     },
-    model::{model::Model, model_request::ModelRequest},
+    model::{model::Model, model_request::ModelRequest, streaming_model::StreamingModel},
 };
 
 #[derive(Clone)]
@@ -63,7 +66,7 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
         let chat_completion = self.api.send(&req).await?;
 
         let assistant_message = AssistantMessage {
-            text_content: chat_completion.data.clone(),
+            text_content: "".to_string(),
             metadata: None,
             message_type: MessageType::Assistant,
         };
@@ -75,4 +78,21 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
     }
 }
 
+#[async_trait]
+impl StreamingModel<Prompt, ChatResponse> for DeepSeekChatModel {
+    async fn stream<S>(&self, request: Prompt) -> Result<S, BoxError>
+    where
+        S: futures_core::Stream<Item = ChatResponse> + Send + 'static,
+    {
+        let req: ChatCompletionRequest = self.crate_request(request, true);
+        // execute
+        let chat_completion = self.api.send(&req).await?;
+        
+
+
+        Ok(futures_util::stream::empty())
+    }
+}
+
 impl ChatModel for DeepSeekChatModel {}
+impl StreamingChatModel for DeepSeekChatModel {}
