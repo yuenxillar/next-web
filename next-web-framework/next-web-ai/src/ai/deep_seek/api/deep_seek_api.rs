@@ -29,7 +29,7 @@ impl DeepSeekApi {
         }
     }
 
-    pub(crate) async fn send(
+    pub async fn send(
         &self,
         req: &ChatCompletionRequest,
     ) -> Result<ChatApiRespnose, BoxError> {
@@ -70,7 +70,7 @@ impl DeepSeekApi {
     }
 }
 
-pub(crate) enum ChatApiRespnose {
+pub enum ChatApiRespnose {
     Entity(ChatCompletion),
     Stream(BoxStream<'static, Result<Vec<ChatCompletion>, BoxError>>),
 }
@@ -89,12 +89,32 @@ pub struct ChatCompletionRequest {
     pub(crate) stream: bool,
 }
 
+impl ChatCompletionRequest {
+    pub fn new(messages: Vec<ChatCompletionMessage>, model: impl Into<Box<str>>, stream: bool) -> Self {
+        Self {
+            messages,
+            model: model.into(),
+            stream,
+        }
+    }
+}
+
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ChatCompletionMessage {
     pub(crate) role: Box<str>,
     pub(crate) content: Box<str>,
 }
 
+impl ChatCompletionMessage {
+    
+    pub fn new(role: impl Into<Box<str>>, content: impl Into<Box<str>>) -> Self {
+        Self {
+            role: role.into(),
+            content: content.into(),
+        }
+    }
+}
 ///
 /// {
 ///  "id": "9710a6c0-1b51-427b-b95d-b6734ec46270",

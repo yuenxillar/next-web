@@ -36,4 +36,5 @@ matchit = { workspace = true}
 
 [dev-dependencies]
 next-web-mqtt = { path = "../next-web-mqtt", version = "*" }
+next-web-ai = { path = "../next-web-ai", version = "*", features = ["deep-seek"]}
 validator = { version = "0.20.0", features = ["derive"] }
