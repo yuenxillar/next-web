@@ -8,8 +8,8 @@ use crate::{
 
 #[derive(Clone)]
 pub struct ChatResponse {
-    chat_response_meta_data: ChatResponseMetadata,
-    generations: Vec<Generation>,
+    pub(crate) chat_response_meta_data: ChatResponseMetadata,
+    pub(crate) generations: Vec<Generation>,
 }
 
 impl ChatResponse {

@@ -1,4 +1,1 @@
-
-
-pub trait ModelOptions: Send + Sync {
-}
+pub trait ModelOptions: Send + Sync {}

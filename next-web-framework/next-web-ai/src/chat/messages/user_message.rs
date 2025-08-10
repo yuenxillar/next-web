@@ -4,18 +4,19 @@ use bytes::Bytes;
 
 use crate::chat::messages::{message::Message, message_type::MessageType};
 
-
 #[derive(Clone)]
 pub struct UserMessage {
     message_type: MessageType,
     text_content: Bytes,
     metadata: HashMap<String, String>,
-
 }
 
 impl UserMessage {
-    
-    pub fn new(message_type: MessageType, text_content: impl Into<Bytes>, mut metadata: HashMap<String, String>) -> Self {
+    pub fn new(
+        message_type: MessageType,
+        text_content: impl Into<Bytes>,
+        mut metadata: HashMap<String, String>,
+    ) -> Self {
         let text_content = text_content.into();
         if message_type == MessageType::User || message_type == MessageType::System {
             assert!(text_content.len() > 0);
@@ -30,7 +31,6 @@ impl UserMessage {
         }
     }
 
-
     pub fn text(&self) -> &Bytes {
         &self.text_content
     }
@@ -44,7 +44,4 @@ impl UserMessage {
     }
 }
 
-
-impl Message for UserMessage {
-    
-}
+impl Message for UserMessage {}

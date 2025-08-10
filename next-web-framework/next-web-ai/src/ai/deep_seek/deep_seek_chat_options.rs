@@ -1,5 +1,3 @@
-
-
 #[derive(Clone)]
 pub struct DeepSeekChatOptions {
     model: Box<str>,

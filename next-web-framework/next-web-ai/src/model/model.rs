@@ -17,9 +17,6 @@ use crate::model::{
 // }
 
 #[async_trait]
-pub trait Model<TReq, TRes>
-{
+pub trait Model<TReq, TRes> {
     async fn call(&self, request: TReq) -> Result<TRes, BoxError>;
 }
-
-

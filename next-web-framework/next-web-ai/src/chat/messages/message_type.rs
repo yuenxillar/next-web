@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum MessageType {
     #[default]
@@ -10,9 +9,7 @@ pub enum MessageType {
     Tool,
 }
 
-
 impl FromStr for MessageType {
-
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {

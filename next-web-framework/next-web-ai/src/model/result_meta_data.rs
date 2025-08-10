@@ -1,4 +1,1 @@
-
-pub trait ResultMetadata: Send + Sync {
-    
-}
+pub trait ResultMetadata: Send + Sync {}

@@ -1,6 +1,6 @@
-pub mod observation;
+pub mod client;
+pub mod messages;
 pub mod meta_data;
 pub mod model;
-pub mod messages;
+pub mod observation;
 pub mod prompt;
-pub mod client;

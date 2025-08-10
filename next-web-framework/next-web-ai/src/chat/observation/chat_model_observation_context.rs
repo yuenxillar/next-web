@@ -8,14 +8,14 @@ use crate::chat::{
 
 #[derive(Clone)]
 pub struct ChatModelObservationContext {
-    request_options: Box<dyn ChatOptions>,
+    // request_options: Box<dyn ChatOptions>,
     model_observation_context: ModelObservationContext<Prompt, ChatResponse>,
 }
 
 impl ChatModelObservationContext {
-    pub fn request_options(&self) -> &Box<dyn ChatOptions> {
-        &self.request_options
-    }
+    // pub fn request_options(&self) -> &Box<dyn ChatOptions> {
+    //     &self.request_options
+    // }
 }
 
 impl Deref for ChatModelObservationContext {

@@ -27,8 +27,7 @@ impl Prompt {
     }
 
     pub fn from_contents(contents: impl Into<Bytes>, chat_options: Box<dyn ChatOptions>) -> Self {
-        let message =
-            UserMessage::new(Default::default(), contents.into(), Default::default());
+        let message = UserMessage::new(Default::default(), contents.into(), Default::default());
         let messages: Vec<Box<dyn Message>> = vec![Box::new(message)];
         Self {
             messages,

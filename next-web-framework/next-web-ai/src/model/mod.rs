@@ -1,9 +1,9 @@
-pub mod model_description;
 pub mod model;
-pub mod streaming_model;
+pub mod model_description;
 pub mod model_options;
 pub mod model_request;
+pub mod model_response;
+pub mod model_result;
 pub mod response_meta_data;
 pub mod result_meta_data;
-pub mod model_result;
-pub mod model_response;
+pub mod streaming_model;

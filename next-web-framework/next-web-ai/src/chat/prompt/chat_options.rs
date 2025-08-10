@@ -2,7 +2,7 @@ use next_web_core::DynClone;
 
 use crate::model::model_options::ModelOptions;
 
-pub trait ChatOptions 
+pub trait ChatOptions
 where
     Self: DynClone + ModelOptions,
 {

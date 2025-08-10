@@ -13,7 +13,6 @@ where
     Self: Model<Prompt, ChatResponse>,
     Self: DynClone + Send + Sync + 'static,
 {
-    
 }
 
 // pub trait ChatModel<T, R, R1>:

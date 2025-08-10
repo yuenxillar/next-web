@@ -7,9 +7,9 @@ where
     Self: DynClone,
     Self: Send + Sync,
 {
-    fn get_name(&self) -> &str;
+    fn name(&self) -> &str;
 
-    fn get_contextual_name(&self, context: &ChatModelObservationContext) -> Option<String>;
+    fn contextual_name(&self, context: &ChatModelObservationContext) -> Option<String>;
 }
 
 next_web_core::clone_trait_object!(ChatModelObservationConvention);

@@ -1,8 +1,11 @@
 use futures_core::stream::BoxStream;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::StreamExt;
 use next_web_core::error::BoxError;
 
 use crate::ai::deep_seek::chat_model::ChatModel;
+
+const ERROR: [u8; 8] = [123, 34, 101, 114, 114, 111, 114, 34];
+const DATA: [u8; 6] = [100, 97, 116, 97, 58, 32];
 
 #[derive(Clone)]
 pub struct DeepSeekApi {
@@ -26,7 +29,10 @@ impl DeepSeekApi {
         }
     }
 
-    pub async fn send(&self, req: &ChatCompletionRequest) -> Result<ChatApiRespnose, BoxError> {
+    pub(crate) async fn send(
+        &self,
+        req: &ChatCompletionRequest,
+    ) -> Result<ChatApiRespnose, BoxError> {
         let resp = self
             .client
             .post(self.base_url.as_ref())
@@ -38,25 +44,36 @@ impl DeepSeekApi {
         if !req.stream {
             return Ok(ChatApiRespnose::Entity(resp.json().await?));
         }
-        
-        return Ok(
-            resp.bytes_stream().and_then(|data| {
-                
 
-                async {
-
-                    Ok()
+        // SSE stream
+        let stream = resp.bytes_stream().then(|data| async move {
+            data.map(|data| {
+                // Check for error message
+                if data.starts_with(&ERROR) {
+                    return Err(String::from_utf8(data.to_vec())
+                        .unwrap_or("Unknown error".into())
+                        .into());
                 }
+
+                data.split(|&s| s == b'\n')
+                    .filter(|line| line.starts_with(&DATA))
+                    .map(|line| {
+                        serde_json::from_slice::<ChatCompletion>(&line[6..]).map_err(Into::into)
+                    })
+                    .collect::<Result<Vec<ChatCompletion>, BoxError>>()
+                    .map_err(Into::into)
             })
-        );
+            .unwrap_or_else(|err| Err(err.into()))
+        });
+
+        Ok(ChatApiRespnose::Stream(Box::pin(stream)))
     }
 }
 
-pub(crate) enum  ChatApiRespnose {
+pub(crate) enum ChatApiRespnose {
     Entity(ChatCompletion),
-    Stream(BoxStream<'static, Result<ChatCompletion, BoxError>>),
+    Stream(BoxStream<'static, Result<Vec<ChatCompletion>, BoxError>>),
 }
-
 
 impl Default for DeepSeekApi {
     fn default() -> Self {
@@ -113,10 +130,11 @@ pub struct ChatCompletionMessage {
 #[derive(Debug, serde::Deserialize)]
 pub struct ChatCompletion {
     pub id: Box<str>,
-    pub model: Box<str>,
     pub object: Box<str>,
+    pub created: u64,
+    pub model: Box<str>,
     pub choices: Vec<Choice>,
-    pub usage: Usage,
+    pub usage: Option<Usage>,
     pub system_fingerprint: Box<str>,
 }
 
@@ -138,7 +156,13 @@ pub struct PromptTokensDetails {
 #[derive(Debug, serde::Deserialize)]
 pub struct Choice {
     pub index: u32,
-    pub message: ChatCompletionMessage,
-    pub logprobs: Option<String>,
-    pub finish_reason: Box<str>,
+    pub delta: Option<DeltaContent>,
+    pub message: Option<ChatCompletionMessage>,
+    pub logprobs: Option<Box<str>>,
+    pub finish_reason: Option<Box<str>>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct DeltaContent {
+    pub content: Box<str>,
 }
