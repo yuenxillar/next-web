@@ -259,6 +259,7 @@ impl std::str::FromStr for Locale {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim().replace("_", "-");
         match s.to_lowercase().as_str() {
             "zh-cn" => Ok(Locale::ZhCn),
             "zh-tw" => Ok(Locale::ZhTw),

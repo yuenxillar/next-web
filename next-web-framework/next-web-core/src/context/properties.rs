@@ -6,11 +6,11 @@ use regex::Regex;
 use std::fmt::Debug;
 use std::io::Read;
 
+use crate::constants::application_constants::APPLICATION_CONFIG;
 use crate::context::application_args::ApplicationArgs;
-// use crate::context::application_resources::ApplicationResources;
-// use crate::constants::application_constants::APPLICATION_CONFIG_FILE;
+use crate::context::application_resources::ResourceLoader;
 
-
+use super::application_resources::ApplicationResources;
 use super::next_properties::NextProperties;
 use crate::AutoRegister;
 
@@ -75,8 +75,8 @@ impl ApplicationProperties {
 }
 
 impl ApplicationProperties {
-    pub fn new() -> Self {
-        into_application_properties()
+    pub fn from_resources(application_resources: &ApplicationResources) -> Self {
+        into_application_properties(application_resources)
     }
 }
 
@@ -89,14 +89,16 @@ impl Default for ApplicationProperties {
     }
 }
 
-pub fn into_application_properties() -> ApplicationProperties {
+fn into_application_properties(
+    application_resources: &ApplicationResources,
+) -> ApplicationProperties {
     use serde_yaml::Value;
 
     let args = ApplicationArgs::parse();
 
     let config_path: Option<String> = args.config_location;
 
-    let mut config_data = String::new();
+    let mut config = String::new();
 
     if config_path.as_ref().map(|s| !s.is_empty()).unwrap_or(false) {
         let path = config_path.unwrap();
@@ -112,24 +114,23 @@ pub fn into_application_properties() -> ApplicationProperties {
                 );
             }
 
-            config_data = _buffer;
+            config = _buffer;
         } else {
             panic!(
                 "Please check if the configuration file of the application exists: {:?}",
                 &path
             );
         }
+    } else {
+        if let Some(data) = application_resources.load(APPLICATION_CONFIG) {
+            config = String::from_utf8(data.to_vec()).unwrap();
+        }
     }
-    //  else {
-    //     if let Some(var) = ApplicationResources::get(APPLICATION_CONFIG_FILE) {
-    //         config_data = String::from_utf8(vec![]).unwrap();
-    //     }
-    // }
 
     // replace var
     let mut pre_replace = Vec::new();
     if let Ok(re) = Regex::new(r"\$\{(.*?)\}") {
-        re.captures_iter(&config_data.as_ref()).for_each(|item| {
+        re.captures_iter(&config.as_ref()).for_each(|item| {
             item.get(1)
                 .map(|s| s.as_str())
                 .map(|s1| pre_replace.push(s1.to_string()));
@@ -139,7 +140,7 @@ pub fn into_application_properties() -> ApplicationProperties {
     // TODO
 
     // mapping value
-    let values = serde_yaml::from_str::<Value>(&config_data).unwrap();
+    let values = serde_yaml::from_str::<Value>(&config).unwrap();
     let mut mapping: HashMap<String, Value> = HashMap::new();
 
     // prepare a recursive function to fill in
@@ -175,7 +176,7 @@ pub fn into_application_properties() -> ApplicationProperties {
 
     // into application properties
     let mut application_properties: ApplicationProperties =
-        serde_yaml::from_str(config_data.as_str()).unwrap_or_default();
+        serde_yaml::from_str(config.as_str()).unwrap_or_default();
     application_properties.set_mapping(mapping);
 
     // return

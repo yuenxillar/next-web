@@ -2,7 +2,8 @@ use std::ops::Deref;
 
 use hashbrown::HashMap;
 use next_web_core::context::{
-    application_args::ApplicationArgs, properties::ApplicationProperties,
+    application_args::ApplicationArgs, application_resources::ApplicationResources,
+    properties::ApplicationProperties,
 };
 
 use super::application::Application;
@@ -12,14 +13,16 @@ use next_web_core::autoconfigure::context::server_properties::ServerProperties;
 pub struct NextApplication<A: Application> {
     application_properties: ApplicationProperties,
     application_args: ApplicationArgs,
+    application_resources: ApplicationResources,
     application: A,
 }
 
 impl<A: Application + Default> NextApplication<A> {
     pub fn new() -> Self {
         Self {
-            application_properties: ApplicationProperties::new(),
+            application_properties: ApplicationProperties::default(),
             application_args: ApplicationArgs::default(),
+            application_resources: ApplicationResources::default(),
             application: A::default(),
         }
     }
@@ -32,6 +35,11 @@ impl<A: Application + Default> NextApplication<A> {
     /// Get the application args
     pub fn application_args(&self) -> &ApplicationArgs {
         &self.application_args
+    }
+
+    /// Get the application resources.
+    pub fn application_resources(&self) -> &ApplicationResources {
+        &self.application_resources
     }
 
     /// Get the application name.

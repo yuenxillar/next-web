@@ -10,6 +10,7 @@ path = "src/lib.rs"
 
 [dependencies]
 axum = { workspace = true, features = ["form", "json"]}
+tokio =  { workspace = true, features = ["sync"]}
 
 serde = { workspace = true }
 serde_yaml = { workspace = true }
@@ -22,12 +23,12 @@ clap = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
+rust-embed = { workspace = true }
+sha2 = { workspace = true }
+reqwest = { workspace = true }
 
 inventory = { workspace = true }
 
-tokio =  { workspace = true, features = ["sync"]}
-
-reqwest = { workspace = true }
 
 tower-layer = "0.3.3"
 tower-service = "0.3.3"

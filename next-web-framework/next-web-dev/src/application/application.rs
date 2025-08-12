@@ -4,9 +4,12 @@ use axum::http::{Response, StatusCode};
 use axum::Router;
 use http_body_util::Full;
 use next_web_core::client::rest_client::RestClient;
-use next_web_core::constants::application_constants::APPLICATION_DEFAULT_PORT;
+use next_web_core::constants::application_constants::{
+    APPLICATION_BANNER, APPLICATION_DEFAULT_PORT,
+};
 use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
+use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::interface::application::application_ready_event::ApplicationReadyEvent;
 use next_web_core::interface::apply_router::ApplyRouter;
@@ -48,6 +51,8 @@ pub trait Application: Send + Sync {
     // Get the application router. (open api  and private api)
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router;
 
+    /// Before starting the application
+    #[allow(unused_variables)]
     async fn before_start(&self, ctx: &mut ApplicationContext) {}
 
     /// Register the rpc server.
@@ -59,14 +64,15 @@ pub trait Application: Send + Sync {
     async fn connect_rpc_client(&mut self, properties: &ApplicationProperties);
 
     /// Show the banner of the application.
-    fn banner_show() {
-        // if let Some(content) = ApplicationResources::get(APPLICATION_BANNER_FILE) {
-        //     TopBanner::show(std::str::from_utf8(content.as_ref()).unwrap_or(DEFAULT_TOP_BANNER));
-        // } else {
-        // }
-
-        TopBanner::show(DEFAULT_TOP_BANNER);
-
+    fn banner_show(application_resources: &ApplicationResources) {
+        if let None = application_resources
+            .load(APPLICATION_BANNER)
+            .map(|content| {
+                TopBanner::show(std::str::from_utf8(content.as_ref()).unwrap_or(DEFAULT_TOP_BANNER))
+            })
+        {
+            TopBanner::show(DEFAULT_TOP_BANNER);
+        }
     }
 
     /// Initialize the logger.
@@ -142,14 +148,17 @@ pub trait Application: Send + Sync {
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
         application_args: &ApplicationArgs,
+        application_resources: &ApplicationResources,
     ) {
         // Register application singleton
         let mut container = ApplicationDefaultRegisterContainer::new();
         container.register_all(ctx, application_properties).await;
 
-        // register singletion with properties and args
-        ctx.insert_singleton_with_name(application_properties.clone(), "");
-        ctx.insert_singleton_with_name(application_args.clone(), "");
+        // Register singletion
+        // properties args resources
+        ctx.insert_singleton_with_name(application_properties.to_owned(), "");
+        ctx.insert_singleton_with_name(application_args.to_owned(), "");
+        ctx.insert_singleton_with_name(application_resources.to_owned(), "");
 
         // Resove autoRegister
         let auto_register = ctx.resolve_by_type::<Arc<dyn AutoRegister>>();
@@ -205,10 +214,11 @@ pub trait Application: Send + Sync {
         application_properties: &ApplicationProperties,
         time: std::time::Instant,
     ) {
-
         let var1 = ctx.resolve_by_type::<Box<dyn ApplicationReadyEvent>>();
-        for item in var1 { item.ready(&mut ctx).await; }
-        
+        for item in var1 {
+            item.ready(&mut ctx).await;
+        }
+
         let config = application_properties.next().server();
 
         let context_path = config.context_path().unwrap_or("");
@@ -304,7 +314,7 @@ pub trait Application: Send + Sync {
         let decoder_list = ctx.resolve_by_type::<Arc<dyn DataDecoder>>();
         let data_decoder = decoder_list.last();
 
-        app = app.route_layer(axum::Extension(ApplicationState::new(ctx)));
+        app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
         if let Some(decoder) = data_decoder {
             app = app.route_layer(axum::Extension(decoder.to_owned()));
@@ -409,14 +419,15 @@ pub trait Application: Send + Sync {
         // Record application start time
         let start_time = std::time::Instant::now();
 
-        // Banner show
-        Self::banner_show();
-
         // Get a base application instance
         let mut next_application: NextApplication<Self> = NextApplication::new();
         let properties = next_application.application_properties().clone();
         let args = next_application.application_args().clone();
+        let resources = next_application.application_resources().clone();
 
+        // Banner show
+        Self::banner_show(&resources);
+        
         let application = next_application.application();
 
         println!("========================================================================\n");
@@ -450,7 +461,7 @@ pub trait Application: Send + Sync {
 
         // Register singleton
         application
-            .register_singleton(&mut ctx, &properties, &args)
+            .register_singleton(&mut ctx, &properties, &args, &resources)
             .await;
         println!(
             "Register singleton success!\nCurrent Time: {}\n",

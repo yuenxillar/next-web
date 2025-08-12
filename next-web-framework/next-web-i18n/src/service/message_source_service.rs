@@ -35,7 +35,6 @@ impl MessageSourceService {
         args: &[&str],
         locale: Locale,
     ) -> Option<String> {
-        // TODO ARGS
         self.source
             .get(&locale)
             .map(|s| {
@@ -60,7 +59,12 @@ impl MessageSourceService {
     pub fn add_message_source(&mut self, locale: Locale, str: impl AsRef<str>) {
         let source = str.as_ref();
         if let Ok(messages) = Self::analysis(source) {
-            self.source.insert(locale, messages);
+            if self.source.contains_key(&locale) {
+                // merge messages
+                self.source.get_mut(&locale).map(|map| map.extend(messages));
+            }else {
+                self.source.insert(locale, messages);
+            }
         }
     }
 

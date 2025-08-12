@@ -7,5 +7,5 @@ edition = "2024"
 sys-locale = { workspace = true }
 next-web-core = { workspace = true }
 serde = { workspace = true }
-
+tracing = { workspace = true }
 rudi-dev = { workspace = true }

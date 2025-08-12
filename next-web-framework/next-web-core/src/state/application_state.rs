@@ -17,7 +17,8 @@ pub struct ApplicationState {
 }
 
 impl ApplicationState {
-    pub fn new(application_context: ApplicationContext) -> Self {
+
+    pub fn from_context(application_context: ApplicationContext) -> Self {
         let context: Arc<RwLock<ApplicationContext>> = Arc::new(RwLock::new(application_context));
         Self { context }
     }
@@ -32,9 +33,7 @@ impl ApplicationState {
 }
 
 #[derive(Clone)]
-pub struct AcSingleton<T>(pub T)
-where
-    T: Clone;
+pub struct AcSingleton<T>(pub T);
 
 impl<T> Deref for AcSingleton<T>
 where
@@ -47,9 +46,10 @@ where
     }
 }
 
+
 impl<T> DerefMut for AcSingleton<T>
 where
-    T: Singleton + Clone,
+    T: Singleton + Clone, 
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
