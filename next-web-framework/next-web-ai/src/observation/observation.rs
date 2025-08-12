@@ -1,8 +1,11 @@
 use std::collections::VecDeque;
 
-use next_web_core::DynClone;
+use next_web_core::{convert::into_box::IntoBox, error::BoxError, DynClone};
 
-use crate::chat::observation::observation_convention::ObservationConvention;
+use crate::{
+    chat::observation::observation_convention::ObservationConvention,
+    observation::{noop_observation::NoopObservation, simple_event::SimpleEvent}, util::{key_value::KeyValue, key_values::KeyValues},
+};
 
 use super::{
     observation_documentation::BoxObservationConvention, observation_registry::ObservationRegistry,
@@ -10,39 +13,27 @@ use super::{
 };
 
 pub trait Observation: Send + Sync {
-    fn start(&self);
+    fn start(&mut self);
+
+    fn stop(&mut self);
 
     fn context(&mut self) -> &mut dyn Context;
 
-    fn stop(&self);
+    fn contextual_name(&mut self, contextual_name: &str);
 
-    fn contextual_name(&self, contextual_name: &str);
-}
+    fn parent_observation(&mut self, parent_observation: Box<dyn Observation>);
 
-pub struct NoopObservation {}
+    fn low_cardinality_key_value(&mut self, key_value: Box<dyn KeyValue>);
 
-impl Observation for NoopObservation {
-    fn start(&self) {
-        todo!()
-    }
+    fn high_cardinality_key_value(&mut self, key_value: Box<dyn KeyValue>);
 
-    fn context(&mut self) -> &mut dyn Context {
-        todo!()
-    }
+    fn observation_convention(&mut self, observation_convention: BoxObservationConvention);
 
-    fn stop(&self) {
-        todo!()
-    }
+    fn error(&mut self, error: BoxError);
 
-    fn contextual_name(&self, contextual_name: &str) {
-        todo!()
-    }
-}
+    fn event(&mut self, event: Box<dyn Event>);
 
-impl Default for NoopObservation {
-    fn default() -> Self {
-        Self {}
-    }
+    fn open_scope(&self) -> Box<dyn Scope>;
 }
 
 pub struct ObservationImpl;
@@ -55,8 +46,9 @@ impl ObservationImpl {
         registry: Option<Box<dyn ObservationRegistry>>,
     ) -> Box<dyn Observation> {
         if registry.is_none() || registry.as_ref().map(|s| s.is_noop()).unwrap_or(false) {
-            return Box::new(NoopObservation::default());
+            return Self::noop().into_box();
         }
+
         let registry = registry.unwrap();
 
         let convention: Box<dyn ObservationConvention<Box<dyn Context>>>;
@@ -76,23 +68,134 @@ impl ObservationImpl {
         context.set_parent_from_current_observation(registry.as_ref());
 
         if is_observation_enabled {
-            return Box::new(NoopObservation::default());
+            return Self::noop().into_box();
         }
 
-        Box::new(SimpleObservation {
+        let convention = Some(convention);
+        SimpleObservation {
             context,
             registry,
             convention,
             handlers: VecDeque::new(),
             filters: Vec::new(),
-        })
+        }
+        .into_box()
+    }
+
+    pub fn start(name: impl Into<String>, registry: Box<dyn ObservationRegistry>) {
+        return Self::create_not_started_from_name(name.into(), DefaultContext::new(), registry)
+            .start();
+    }
+
+    pub fn create_not_started_from_name(
+        name: impl Into<String>,
+        mut context: impl Context + 'static,
+        registry: Box<dyn ObservationRegistry>,
+    ) -> Box<dyn Observation> {
+        if registry.is_noop() {
+            return Self::noop().into_box();
+        }
+
+        let name = name.into();
+        let is_observation_enabled = !registry
+            .observation_config()
+            .is_observation_enabled(name.as_str(), &context);
+
+        context.set_parent_from_current_observation(registry.as_ref());
+
+        if is_observation_enabled {
+            return Self::noop().into_box();
+        }
+
+        SimpleObservation::new(name, registry, context).into_box()
+    }
+    pub fn noop() -> impl Observation {
+        NoopObservation::default()
     }
 }
 
 pub trait Context: Send + Sync + DynClone {
     fn set_parent_from_current_observation(&mut self, registry: &dyn ObservationRegistry);
 
+    fn add_low_cardinality_key_values(&mut self, key_values: KeyValues<Box<dyn KeyValue>>);
+
     fn set_name(&mut self, name: &str);
+
+    fn set_contextual_name(&mut self, contextual_name: &str);
 }
 
 next_web_core::clone_trait_object!(Context);
+
+#[derive(Clone)]
+pub struct DefaultContext {}
+
+impl DefaultContext {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+impl Context for DefaultContext {
+    fn set_parent_from_current_observation(&mut self, registry: &dyn ObservationRegistry) {
+        todo!()
+    }
+
+    fn set_name(&mut self, name: &str) {
+        todo!()
+    }
+    
+    fn add_low_cardinality_key_values(&mut self, key_values: KeyValues<Box<dyn KeyValue>>) {
+        todo!()
+    }
+    
+    fn set_contextual_name(&mut self, contextual_name: &str) {
+        todo!()
+    }
+}
+
+pub trait Event: Send + Sync {
+    fn name(&self) -> &str;
+
+    fn wall_time(&self) -> u64 {
+        0
+    }
+
+    fn contextual_name(&self) -> &str {
+        self.name()
+    }
+}
+
+pub struct EventImpl;
+
+impl EventImpl {
+    pub fn of<T>(name: T, contextual_name: T) -> impl Event
+    where
+        T: Into<String>,
+    {
+        SimpleEvent::new(name, contextual_name)
+    }
+
+    pub fn of_name<T>(name: T) -> impl Event
+    where
+        T: Into<String>,
+    {
+        let name: String = name.into();
+        SimpleEvent::new(name.clone(), name)
+    }
+}
+
+
+pub trait  Scope: Send + Sync {
+    
+    fn current_observation(&self) -> Option<&dyn Observation>;
+
+    fn previous_observation_scope(&self) -> Option<&dyn Scope>;
+
+    fn close(&mut self);
+
+    fn reset(&mut self);
+
+    fn make_current(&mut self);
+
+    fn is_noop(&self) -> bool { true }
+}
+

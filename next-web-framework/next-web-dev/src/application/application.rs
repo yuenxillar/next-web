@@ -2,12 +2,9 @@ use async_trait::async_trait;
 use axum::body::Bytes;
 use axum::http::{Response, StatusCode};
 use axum::Router;
-use hashbrown::HashMap;
 use http_body_util::Full;
 use next_web_core::client::rest_client::RestClient;
-use next_web_core::constants::application_constants::{
-    APPLICATION_BANNER_FILE, APPLICATION_DEFAULT_PORT,
-};
+use next_web_core::constants::application_constants::APPLICATION_DEFAULT_PORT;
 use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
@@ -16,9 +13,6 @@ use next_web_core::interface::apply_router::ApplyRouter;
 use next_web_core::interface::data_decoder::DataDecoder;
 use next_web_core::state::application_state::ApplicationState;
 use next_web_core::AutoRegister;
-use rust_embed_for_web::{EmbedableFile, RustEmbed};
-use std::io::BufRead;
-// use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
@@ -31,13 +25,11 @@ use crate::application::next_application::NextApplication;
 
 use crate::autoregister::register_single::ApplicationDefaultRegisterContainer;
 
-use crate::autoconfigure::context::next_properties::NextProperties;
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::util::local_date_time::LocalDateTime;
 
-use next_web_core::context::application_resources::ApplicationResources;
 use next_web_core::interface::application::application_shutdown::ApplicationShutdown;
 
 use next_web_core::interface::event::application_event_multicaster::ApplicationEventMulticaster;
@@ -68,51 +60,13 @@ pub trait Application: Send + Sync {
 
     /// Show the banner of the application.
     fn banner_show() {
-        if let Some(content) = ApplicationResources::get(APPLICATION_BANNER_FILE) {
-            TopBanner::show(std::str::from_utf8(&content.data()).unwrap_or(DEFAULT_TOP_BANNER));
-        } else {
-            TopBanner::show(DEFAULT_TOP_BANNER);
-        }
-    }
+        // if let Some(content) = ApplicationResources::get(APPLICATION_BANNER_FILE) {
+        //     TopBanner::show(std::str::from_utf8(content.as_ref()).unwrap_or(DEFAULT_TOP_BANNER));
+        // } else {
+        // }
 
-    /// Initialize the message source.
-    async fn init_message_source<T>(
-        &mut self,
-        application_properties: &NextProperties,
-    ) -> HashMap<String, HashMap<String, String>> {
-        let mut messages = HashMap::new();
-        if let Some(message_source) = application_properties.messages() {
-            let mut load_local_message = |name: &str| {
-                if let Some(dyn_file) = ApplicationResources::get(&format!("messages/{}", &name)) {
-                    let data = dyn_file.data();
-                    if !data.is_empty() {
-                        let mut map = HashMap::new();
-                        let _ = data.lines().map(|var| {
-                            var.map(|var1| {
-                                let var2: Vec<&str> = var1.split("=").collect();
-                                if var2.len() == 2 {
-                                    let key = var2.get(0).unwrap();
-                                    let value = var2.get(1).unwrap();
-                                    map.insert(key.to_string(), value.to_string());
-                                }
-                            })
-                        });
-                        messages.insert(name.to_string(), map);
-                    }
-                }
-            };
+        TopBanner::show(DEFAULT_TOP_BANNER);
 
-            // load default messages
-            load_local_message(&"messages.properties");
-
-            message_source.local().map(|item| {
-                item.trim_end().split(",").for_each(|s| {
-                    let name = format!("messages_{}.properties", s);
-                    load_local_message(&name);
-                });
-            });
-        }
-        messages
     }
 
     /// Initialize the logger.

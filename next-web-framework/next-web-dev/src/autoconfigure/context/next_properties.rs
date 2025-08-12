@@ -1,6 +1,6 @@
 use next_web_core::autoconfigure::context::{
     application_properties::AppliationProperties, logger_properties::LoggerProperties,
-    message_source_properties::MessageSourceProperties, server_properties::ServerProperties,
+    server_properties::ServerProperties,
 };
 
 use super::security_properties::SecurityProperties;
@@ -9,7 +9,6 @@ use super::security_properties::SecurityProperties;
 pub struct NextProperties {
     server: ServerProperties,
     appliation: Option<AppliationProperties>,
-    messages: Option<MessageSourceProperties>,
     logger: Option<LoggerProperties>,
     security: Option<SecurityProperties>,
 }
@@ -17,9 +16,6 @@ pub struct NextProperties {
 impl NextProperties {
     pub fn server(&self) -> &ServerProperties {
         &self.server
-    }
-    pub fn messages(&self) -> Option<&MessageSourceProperties> {
-        self.messages.as_ref()
     }
 
     pub fn appliation(&self) -> Option<&AppliationProperties> {

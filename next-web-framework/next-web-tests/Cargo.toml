@@ -10,7 +10,7 @@ readme.workspace = true
 version.workspace = true
 
 [dependencies]
-tokio = { workspace = true }
+tokio = { workspace = true, features= ["sync"]}
 serde = { workspace = true }
 serde_json = { workspace = true }
 next-web-ip = { path = "../next-web-ip", version = "0.1.0" }

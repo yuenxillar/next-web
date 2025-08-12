@@ -9,8 +9,8 @@ pub struct KeyValues<T> {
 
 impl<T> KeyValues<T>
 where
-    T: KeyValue,
-    T: std::cmp::PartialEq,
+    T: AsRef<dyn KeyValue>,
+    // T: std::cmp::PartialEq,
 {
     /// Creates an empty KeyValues instance
     pub fn empty() -> Self {
@@ -69,9 +69,11 @@ where
         if other.sorted_set.is_empty() {
             return self;
         }
-        if self == other {
-            return self;
-        }
+
+        // if self == other {
+        //     return self;
+        // }
+
         if self.sorted_set.is_empty() {
             return other;
         }
@@ -86,7 +88,7 @@ where
         loop {
             match (self_next.take(), other_next.take()) {
                 (Some(self_kv), Some(other_kv)) => {
-                    match self_kv.key().cmp(&other_kv.key()) {
+                    match self_kv.as_ref().key().cmp(&other_kv.as_ref().key()) {
                         Ordering::Less => {
                             merged.push(self_kv);
                             self_next = self_iter.next();

@@ -21,12 +21,20 @@ impl ApplicationState {
         let context: Arc<RwLock<ApplicationContext>> = Arc::new(RwLock::new(application_context));
         Self { context }
     }
+
+    pub async fn get_single_with_name<T>(&self, name: impl Into<String>) -> T
+    where
+        T: Clone + 'static,
+    {
+        let reader = self.context.read().await;
+        reader.get_single_with_name::<T>(name.into()).clone()
+    }
 }
 
 #[derive(Clone)]
 pub struct AcSingleton<T>(pub T)
 where
-    T: Singleton + Clone;
+    T: Clone;
 
 impl<T> Deref for AcSingleton<T>
 where

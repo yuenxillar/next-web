@@ -29,7 +29,6 @@ impl ApplyRouter for AuthenticationRouter {
         let mut router = axum::Router::new();
         let auth_service = ctx.resolve_by_type::<Arc<dyn AuthenticationService>>();
 
-        router = router.route("/test3/666", axum::routing::get(async || "666"));
         if let Some(service) = auth_service.last() {
             let web_security_configure = ctx.resolve_by_type::<Box<dyn WebSecurityConfigure>>();
             let http_security = web_security_configure

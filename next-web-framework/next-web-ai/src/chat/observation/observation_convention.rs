@@ -1,16 +1,19 @@
 use next_web_core::DynClone;
 
-use crate::{observation::observation::Context, util::key_values::KeyValues};
+use crate::{
+    observation::observation::Context,
+    util::{key_value::KeyValue, key_values::KeyValues},
+};
 
 pub trait ObservationConvention<T>: Send + Sync
 where
     Self: DynClone,
 {
-    fn low_cardinality_key_values(&self) -> KeyValues<()> {
+    fn low_cardinality_key_values(&self, context: &dyn Context) -> KeyValues<Box<dyn KeyValue>> {
         KeyValues::empty()
     }
 
-    fn high_cardinality_key_values(&self) -> KeyValues<()> {
+    fn high_cardinality_key_values(&self, context: &dyn Context) -> KeyValues<Box<dyn KeyValue>> {
         KeyValues::empty()
     }
 
@@ -20,7 +23,7 @@ where
         return None;
     }
 
-    fn contextual_name(&self, context: &T) -> Option<&str> {
+    fn contextual_name(&self, context: &dyn Context) -> Option<&str> {
         return None;
     }
 }

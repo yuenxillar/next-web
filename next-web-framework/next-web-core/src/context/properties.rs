@@ -1,18 +1,17 @@
 use clap::Parser;
 use dyn_clone::DynClone;
-use rust_embed_for_web::{EmbedableFile, RustEmbed};
 use hashbrown::HashMap;
 
 use regex::Regex;
 use std::fmt::Debug;
 use std::io::Read;
 
-
 use crate::context::application_args::ApplicationArgs;
-use crate::context::application_resources::ApplicationResources;
+// use crate::context::application_resources::ApplicationResources;
+// use crate::constants::application_constants::APPLICATION_CONFIG_FILE;
+
 
 use super::next_properties::NextProperties;
-use crate::constants::application_constants::APPLICATION_CONFIG_FILE;
 use crate::AutoRegister;
 
 /// ApplicationProperties trait
@@ -120,11 +119,12 @@ pub fn into_application_properties() -> ApplicationProperties {
                 &path
             );
         }
-    } else {
-        if let Some(var) = ApplicationResources::get(APPLICATION_CONFIG_FILE) {
-            config_data = String::from_utf8(var.data()).unwrap();
-        }
     }
+    //  else {
+    //     if let Some(var) = ApplicationResources::get(APPLICATION_CONFIG_FILE) {
+    //         config_data = String::from_utf8(vec![]).unwrap();
+    //     }
+    // }
 
     // replace var
     let mut pre_replace = Vec::new();

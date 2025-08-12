@@ -1,3 +1,5 @@
+pub mod noop_observation;
+pub mod simple_event;
 pub mod noop_observation_registry;
 pub mod observation;
 pub mod observation_documentation;

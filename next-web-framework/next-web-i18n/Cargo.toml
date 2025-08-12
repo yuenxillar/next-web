@@ -1,0 +1,11 @@
+[package]
+name = "next-web-i18n"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sys-locale = { workspace = true }
+next-web-core = { workspace = true }
+serde = { workspace = true }
+
+rudi-dev = { workspace = true }

@@ -3,6 +3,13 @@ use super::observation_registry::{ObservationConfig, ObservationRegistry};
 #[derive(Clone)]
 pub struct SimpleObservationRegistry {}
 
+impl SimpleObservationRegistry {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+
 impl ObservationRegistry for SimpleObservationRegistry {
     fn current_observation(&self) {
         todo!()

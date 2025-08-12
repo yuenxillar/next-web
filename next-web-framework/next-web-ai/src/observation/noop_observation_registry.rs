@@ -5,6 +5,16 @@ pub struct NoopObservationRegistry {
     observation_config: Option<ObservationConfig>,
 }
 
+
+impl NoopObservationRegistry {
+    
+    pub fn new() -> Self {
+        Self {
+            observation_config: None,
+        }
+    }
+}
+
 impl ObservationRegistry for NoopObservationRegistry {
     fn current_observation(&self) {
         todo!()
