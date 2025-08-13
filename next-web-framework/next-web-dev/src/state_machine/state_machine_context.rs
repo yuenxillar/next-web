@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::utils::any_map::AnyValue;
+use next_web_core::util::any_map::AnyValue;
 
 use super::{EventMessage, StateMachine, Transition};
 

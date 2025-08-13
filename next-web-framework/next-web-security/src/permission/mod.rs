@@ -1,4 +1,4 @@
 pub mod service;
-pub mod models;
+pub mod model;
 pub mod manager;
 pub mod middleware;

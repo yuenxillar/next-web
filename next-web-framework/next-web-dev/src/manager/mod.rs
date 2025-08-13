@@ -1,2 +1,2 @@
-#[cfg(feature = "job_scheduler")]
+#[cfg(feature = "scheduler")]
 pub mod job_scheduler_manager;

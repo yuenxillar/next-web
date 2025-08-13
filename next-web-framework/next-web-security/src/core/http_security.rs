@@ -3,10 +3,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use crate::permission::models::permission_group::PermissionGroup;
+use crate::permission::model::permission_group::PermissionGroup;
 
 type BoxError = Box<dyn std::error::Error>;
-type ErrorHandler = Box<dyn Fn(BoxError) -> Response + Send + Sync>;
+type ErrorHandler = Box<dyn FnOnce(BoxError) -> Response + Send + Sync>;
 
 
 pub struct HttpSecurity {
@@ -60,7 +60,7 @@ impl HttpSecurity {
 
     pub fn map_error<F>(mut self, f: F) -> Self
     where
-        F: Fn(BoxError) -> Response + Send + Sync,
+        F: FnOnce(BoxError) -> Response + Send + Sync,
         F: 'static,
     {
         self.error_handler = Box::new(f);

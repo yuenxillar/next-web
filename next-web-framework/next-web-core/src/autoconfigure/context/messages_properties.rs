@@ -1,11 +1,12 @@
-use rudi_dev::{ Properties, Singleton};
-
-#[Singleton(default, binds=[Self::into_properties])]
-#[Properties( prefix = "next.messages")]
-#[derive(Debug, Default, Clone, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct MessagesProperties {
     local: Option<String>,
     base_name: Option<String>,
+
+    /// The time in seconds to reload the messages properties file.
+    /// Unused for now.
+    #[serde(default)]
+    reload_time: u32
 }
 
 impl MessagesProperties {
@@ -15,5 +16,9 @@ impl MessagesProperties {
 
     pub fn base_name(&self) -> Option<&str> {
         self.base_name.as_deref()
+    }
+
+    pub fn reload_time(&self) -> u32 {
+        self.reload_time
     }
 }

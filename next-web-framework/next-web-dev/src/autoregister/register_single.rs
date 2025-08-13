@@ -1,10 +1,9 @@
 use next_web_core::{
     autoregister::auto_register::AutoRegister,
-    context::{
-        application_context::ApplicationContext,
-        properties::ApplicationProperties,
-    },
+    context::{application_context::ApplicationContext, properties::ApplicationProperties},
 };
+
+use crate::autoregister::message_source_service_auto_register::MessageSourceServiceAutoRegister;
 
 use super::job_scheduler_autoregister::JobSchedulerAutoRegister;
 
@@ -32,6 +31,7 @@ impl ApplicationDefaultRegisterContainer {
         properties: &ApplicationProperties,
     ) {
         self.push::<JobSchedulerAutoRegister>();
+        self.push::<MessageSourceServiceAutoRegister>();
 
         for register in self.registers.iter() {
             register.register(ctx, properties).await.unwrap();

@@ -26,6 +26,7 @@ validator = { workspace = true }
 rust-embed = { workspace = true }
 sha2 = { workspace = true }
 reqwest = { workspace = true }
+sys-locale = { workspace = true }
 
 inventory = { workspace = true }
 

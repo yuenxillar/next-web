@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Debug, hash::Hash, sync::Arc};
 
 use async_trait::async_trait;
-use next_web_core::{utils::any_map::AnyValue, DynClone};
+use next_web_core::{util::any_map::AnyValue, DynClone};
 use tokio::sync::broadcast::Sender;
 use tracing::error;
 

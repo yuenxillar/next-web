@@ -44,6 +44,7 @@ flume = { workspace = true }
 validator = { workspace = true}
 thiserror = { workspace = true }
 
+
 rudi-dev = { workspace = true }
 
 tracing-subscriber = { workspace = true }
@@ -57,16 +58,20 @@ next-web-common = { version = "0.1.0", default-features = false, features = [
 reqwest = { workspace = true, features = ["stream"]}
 async-stream = { workspace = true }
 
+
 serde_path_to_error = "0.1.17"
 mime = "0.3.17"
 
 [features]
-default = ["job_scheduler"]
+default = ["scheduler", "i18n"]
 
-tls_rustls = ["axum-server"]
-job_scheduler = ["tokio-cron-scheduler"]
+tls-rustls = ["axum-server"]
+scheduler = ["tokio-cron-scheduler"]
 
 enable-grpc = []
 enable-prometheus = ["axum-prometheus"]
+
+
+i18n = []
 
 trace-log = []

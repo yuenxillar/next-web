@@ -38,9 +38,9 @@ use next_web_core::interface::application::application_shutdown::ApplicationShut
 use next_web_core::interface::event::application_event_multicaster::ApplicationEventMulticaster;
 use next_web_core::interface::event::application_listener::ApplicationListener;
 
-#[cfg(feature = "job_scheduler")]
+#[cfg(feature = "scheduler")]
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
-#[cfg(feature = "job_scheduler")]
+#[cfg(feature = "scheduler")]
 use next_web_core::interface::job::application_job::ApplicationJob;
 
 #[async_trait]
@@ -253,7 +253,7 @@ pub trait Application: Send + Sync {
 
         common_routers.sort_by_key(|k| k.order());
 
-        #[cfg(not(feature = "tls_rustls"))]
+        #[cfg(not(feature = "tls-rustls"))]
         let mut shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
 
         // Add prometheus layer
@@ -324,7 +324,7 @@ pub trait Application: Send + Sync {
             let router = Router::new();
 
             #[cfg(feature = "trace-log")]
-            info!("nest context path: {}", context_path);
+            info!("Nest context path: {}", context_path);
 
             router.nest(context_path, app)
         } else {
@@ -341,9 +341,9 @@ pub trait Application: Send + Sync {
         println!("Application CurrentPid on:  {:?}\n", std::process::id());
 
         // configure certificate and private key used by https
-        #[cfg(feature = "tls_rustls")]
+        #[cfg(feature = "tls-rustls")]
         {
-            let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
+            let tls_config = axum_server::tls-rustls::RustlsConfig::from_pem_file(
                 std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR"))
                     .join("self_signed_certs")
                     .join("cert.pem"),
@@ -361,7 +361,7 @@ pub trait Application: Send + Sync {
             server.serve(app.into_make_service()).await.unwrap();
         }
 
-        #[cfg(not(feature = "tls_rustls"))]
+        #[cfg(not(feature = "tls-rustls"))]
         {
             // run http server
             let listener =

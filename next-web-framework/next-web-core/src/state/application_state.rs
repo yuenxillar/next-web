@@ -17,7 +17,6 @@ pub struct ApplicationState {
 }
 
 impl ApplicationState {
-
     pub fn from_context(application_context: ApplicationContext) -> Self {
         let context: Arc<RwLock<ApplicationContext>> = Arc::new(RwLock::new(application_context));
         Self { context }
@@ -46,10 +45,9 @@ where
     }
 }
 
-
 impl<T> DerefMut for AcSingleton<T>
 where
-    T: Singleton + Clone, 
+    T: Singleton + Clone,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
@@ -59,7 +57,7 @@ where
 impl<S, T> FromRequestParts<S> for AcSingleton<T>
 where
     S: Send + Sync,
-    T: Singleton + Clone + 'static,
+    T: Send + Sync + Clone + 'static,
 {
     type Rejection = (StatusCode, &'static str);
 
@@ -69,14 +67,25 @@ where
         let instance = if let Some(state) = state {
             let singleton_name = get_singleton_name::<T>();
             let reader = state.context.read().await;
-            if reader.contains_single_with_name::<T>(singleton_name.to_owned()) {
-                reader.get_single_with_name::<T>(singleton_name).clone()
+            if reader.contains_single_with_name::<T>(singleton_name.clone()) {
+                reader.get_single_with_name::<T>(singleton_name).to_owned()
+            } else if reader.contains_single_with_name::<T>("") {
+                reader.get_single_with_name::<T>("").to_owned()
             } else {
-                state
+                drop(reader);
+
+                match state
                     .context
                     .write()
                     .await
-                    .resolve_with_name::<T>(singleton_name)
+                    .resolve_option_with_name_async::<T>(singleton_name)
+                    .await
+                {
+                    Some(instance) => instance,
+                    None => {
+                        return Err((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))
+                    }
+                }
             }
         } else {
             return Err((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"));
@@ -104,7 +113,7 @@ where
     }
 }
 
-fn get_singleton_name<T>() -> String {
+fn get_singleton_name<T: ?Sized>() -> String {
     let raw_name = std::any::type_name::<T>();
     let name = raw_name.rsplit("::").next().unwrap_or_default();
 

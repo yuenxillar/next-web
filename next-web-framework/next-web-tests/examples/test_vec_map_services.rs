@@ -65,7 +65,7 @@ impl Application for TestApplication {
     }
 }
 
-async fn get_service(map_service: AcSingleton<TestVecAndMapService>) -> impl IntoResponse {
+async fn get_service(AcSingleton(map_service): AcSingleton<TestVecAndMapService>) -> impl IntoResponse {
     let str1 = map_service.services_vec.iter().map(|s| s.singleton_name()).collect::<Vec<String>>().join(":");
 
     let str2 = map_service

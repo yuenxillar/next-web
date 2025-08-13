@@ -1,11 +1,16 @@
+use std::sync::Arc;
 use std::{collections::HashMap, str::FromStr};
 
-use crate::{properties::messages_properties::MessagesProperties, util::locale::Locale};
+use next_web_core::autoconfigure::context::messages_properties::MessagesProperties;
+use next_web_core::constants::application_constants::I18N;
+use next_web_core::constants::common_constants::{MESSAGES, PROPERTIES};
+use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
+use next_web_core::util::locale::Locale;
 
 #[derive(Clone)]
 pub struct MessageSourceService {
     properties: MessagesProperties,
-    source: HashMap<Locale, HashMap<Box<str>, Message>>,
+    source: Arc<HashMap<Locale, HashMap<Box<str>, Message>>>,
 }
 
 #[derive(Clone, Hash, Eq, PartialEq)]
@@ -15,11 +20,61 @@ struct Message {
 }
 
 impl MessageSourceService {
-    pub fn new(properties: MessagesProperties) -> Self {
+    pub fn from_resouces(properties: MessagesProperties, resources: &ApplicationResources) -> Self {
+        let map = Self::build(&properties, resources);
         Self {
             properties,
-            source: HashMap::new(),
+            source: Arc::new(map),
         }
+    }
+
+    fn build(
+        properties: &MessagesProperties,
+        resources: &ApplicationResources,
+    ) -> HashMap<Locale, HashMap<Box<str>, Message>> {
+        let mut map: HashMap<Locale, HashMap<Box<str>, Message>> = HashMap::new();
+
+        let base_name = properties.base_name().unwrap_or(MESSAGES);
+
+        let iters = resources.load_dir(I18N);
+        iters
+            .into_iter()
+            .filter(|s| s.ends_with(PROPERTIES))
+            .filter(|s| s.starts_with(base_name))
+            .for_each(|path| {
+                // default
+                let locale: Option<Locale> =
+                    if path.eq(&format!("{}/{}.{}", I18N, base_name, PROPERTIES)) {
+                        Some(Locale::locale())
+                    } else {
+                        let mut s1 = path
+                            .replace(base_name, "")
+                            .replace(PROPERTIES, "")
+                            .replace(".", "");
+                        s1.remove(0);
+                        Locale::from_str(s1.as_str()).ok()
+                    };
+
+                locale.map(|val| {
+                    resources.load(path).map(|data| {
+                        if let Ok(messages) = String::from_utf8(data.to_vec()) {
+                            let source = messages.as_ref();
+                            if let Ok(messages) = Self::analysis(source) {
+                                if map.contains_key(&val) {
+                                    // merge messages
+                                    if let Some(m) = map.get_mut(&val) {
+                                        m.extend(messages);
+                                    }
+                                } else {
+                                    map.insert(val, messages);
+                                }
+                            }
+                        }
+                    });
+                });
+            });
+
+        map
     }
 
     pub fn message(&self, code: impl AsRef<str>, locale: Locale) -> Option<String> {
@@ -44,8 +99,9 @@ impl MessageSourceService {
             .unwrap_or_default()
     }
 
-    pub fn message_or_default(&self, code: impl AsRef<str>, locale: Locale) -> Option<String> {
-        self.message(code.as_ref(), locale).or_else(|| {
+    pub fn message_or_default(&self, code: impl AsRef<str>, locale: Locale) -> String {
+        let code = code.as_ref();
+        self.message(code, locale).or_else(|| {
             self.message(
                 code,
                 self.properties
@@ -54,18 +110,7 @@ impl MessageSourceService {
                     .unwrap_or(Locale::locale()),
             )
         })
-    }
-
-    pub fn add_message_source(&mut self, locale: Locale, str: impl AsRef<str>) {
-        let source = str.as_ref();
-        if let Ok(messages) = Self::analysis(source) {
-            if self.source.contains_key(&locale) {
-                // merge messages
-                self.source.get_mut(&locale).map(|map| map.extend(messages));
-            }else {
-                self.source.insert(locale, messages);
-            }
-        }
+        .unwrap_or(code.into())
     }
 
     fn analysis(str: &str) -> Result<HashMap<Box<str>, Message>, &'static str> {
@@ -87,8 +132,15 @@ impl MessageSourceService {
                 let content = value.to_string();
 
                 let indexs: Option<Vec<usize>> = if content.contains("%s") {
-                    let index = content.match_indices("%s").map(|(i, _)| i).collect::<Vec<_>>();
-                    if index.is_empty() { None } else { Some(index) }
+                    let index = content
+                        .match_indices("%s")
+                        .map(|(i, _)| i)
+                        .collect::<Vec<_>>();
+                    if index.is_empty() {
+                        None
+                    } else {
+                        Some(index)
+                    }
                 } else {
                     None
                 };

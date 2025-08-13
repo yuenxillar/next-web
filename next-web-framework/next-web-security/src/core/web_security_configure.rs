@@ -27,7 +27,7 @@ impl WebSecurityConfigure for Test {
             .any_match("/orders/**", |group| group.permissions(vec!["orders"]))
             .any_match("/notice/**", |group| group.permissions(vec!["notice"]))
             .any_match("/comment/**", |group| group.permissions(vec!["comment"]))
-            .any_match("/test/**", |group| group.roles(vec!["test"]))
+            .any_match("/test/**", |group| group.permissions(vec!["test"]))
             .not_match("/**/*.js")
             .not_match("/**/*.css")
             .not_matches(["/pass_route", "/login"])

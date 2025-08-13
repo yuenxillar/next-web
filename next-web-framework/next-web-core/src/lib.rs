@@ -1,7 +1,7 @@
 pub mod convert;
 pub mod common;
 pub mod client;
-pub mod utils;
+pub mod util;
 pub mod constants;
 pub mod context;
 pub mod autoconfigure;

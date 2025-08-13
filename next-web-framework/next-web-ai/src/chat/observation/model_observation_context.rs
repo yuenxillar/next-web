@@ -1,4 +1,4 @@
-use next_web_core::utils::any_map::AnyValue;
+use next_web_core::util::any_map::AnyValue;
 
 use crate::chat::observation::ai_operation_metadata::AiOperationMetadata;
 

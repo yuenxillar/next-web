@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use next_web_core::utils::any_matcher::AnyMatcher;
+use next_web_core::util::any_matcher::AnyMatcher;
 
 use crate::auth::models::login_type::LoginType;
 use crate::core::http_security::HttpSecurity;
 use crate::permission::{
-    models::permission_group::PermissionGroup,
+    model::permission_group::PermissionGroup,
     service::authentication_service::AuthenticationService,
 };
 

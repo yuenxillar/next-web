@@ -17,10 +17,10 @@ impl AutoRegister for JobSchedulerAutoRegister {
         ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut job_scheduler_manager = JobSchedulerManager::new();
-        job_scheduler_manager.start();
+        let mut scheduler_manager = JobSchedulerManager::new();
+        scheduler_manager.start();
         
-        ctx.insert_singleton(job_scheduler_manager);
+        ctx.insert_singleton(scheduler_manager);
         Ok(())
     }
 }

@@ -14,7 +14,7 @@ pub struct TopBanner;
 impl TopBanner {
     pub fn show(banner: &str) {
         print!("{}", banner);
-        println!("\n\tversion: {}", env!("CARGO_PKG_VERSION"));
+        println!("\nversion: {}", env!("CARGO_PKG_VERSION"));
         print!("\n\n");
     }
 }

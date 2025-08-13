@@ -1,1 +1,0 @@
-pub mod message_source_service_auto_register;
