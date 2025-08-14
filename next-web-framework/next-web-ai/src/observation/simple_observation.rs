@@ -14,6 +14,7 @@ use super::{
     observation_registry::ObservationRegistry,
 };
 
+
 pub struct SimpleObservation {
     pub(crate) context: Box<dyn Context>,
     pub(crate) registry: Box<dyn ObservationRegistry>,

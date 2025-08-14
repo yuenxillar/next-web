@@ -3,9 +3,10 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use rudi_core::{Color, Scope};
 use syn::{
-    parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
-    Attribute, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident,
-    PatType, Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath, TypeReference,
+    parse_quote, punctuated::Punctuated, spanned::Spanned,
+    AngleBracketedGenericArguments, Attribute, Expr, Field, Fields, FieldsNamed,
+    FieldsUnnamed, FnArg, GenericArgument, Ident, PatType, Path, PathArguments, PathSegment, Stmt,
+    Token, Type, TypePath, TypeReference,
 };
 
 use crate::{field_or_argument_attr::FieldOrArgumentAttr, value_attr::ValueAttr};
@@ -275,6 +276,7 @@ struct ResolveOne {
 }
 
 fn generate_only_one_field_or_argument_resolve_stmt(
+    field_name: Option<Ident>,
     attrs: &mut Vec<Attribute>,
     color: Color,
     index: usize,
@@ -291,6 +293,26 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         Ok(Some(AttrsValue { value, .. })) => value,
         Ok(None) => FieldOrArgumentAttr::default(),
         Err(AttrsValue { value, .. }) => return Err(value),
+    };
+
+    // If name is empty, It is to generate singleton names using field names
+    let name: Expr = match name {
+        Expr::Lit(expr_lit) => {
+            let str = expr_lit.lit.suffix();
+            if str.is_empty() {
+                let val = super::util::field_name_to_singleton_name(
+                    &field_name.map(|s| s.to_string()).unwrap_or_default(),
+                );
+
+                Expr::Lit(syn::PatLit {
+                    attrs: Default::default(),
+                    lit: syn::Lit::Str(syn::LitStr::new(&val, Span::call_site()))
+                })
+            } else {
+                Expr::Lit(expr_lit)
+            }
+        }
+        _ => name,
     };
 
     // macro processing for properties
@@ -625,7 +647,9 @@ pub(crate) fn generate_argument_resolve_methods(
             }
             FnArg::Typed(PatType { attrs, ty, .. }) => {
                 let ResolveOne { stmt, variable } =
-                    generate_only_one_field_or_argument_resolve_stmt(attrs, color, index, ty)?;
+                    generate_only_one_field_or_argument_resolve_stmt(
+                        None, attrs, color, index, ty,
+                    )?;
 
                 match stmt {
                     ResolveOneValue::Owned { resolve } => ref_mut_cx_stmts.push(resolve),
@@ -741,7 +765,13 @@ pub(crate) fn generate_field_resolve_stmts(
                 let ResolveOne {
                     stmt,
                     variable: field_value,
-                } = generate_only_one_field_or_argument_resolve_stmt(attrs, color, index, ty)?;
+                } = generate_only_one_field_or_argument_resolve_stmt(
+                    field_name.clone(),
+                    attrs,
+                    color,
+                    index,
+                    ty,
+                )?;
 
                 match stmt {
                     ResolveOneValue::Owned { resolve } => ref_mut_cx_stmts.push(resolve),
@@ -778,7 +808,9 @@ pub(crate) fn generate_field_resolve_stmts(
                 let ResolveOne {
                     stmt,
                     variable: field_value,
-                } = generate_only_one_field_or_argument_resolve_stmt(attrs, color, index, ty)?;
+                } = generate_only_one_field_or_argument_resolve_stmt(
+                    None, attrs, color, index, ty,
+                )?;
 
                 match stmt {
                     ResolveOneValue::Owned { resolve } => ref_mut_cx_stmts.push(resolve),

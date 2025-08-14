@@ -1,6 +1,8 @@
+use next_web_core::error::BoxError;
+
 use crate::{
     observation::{
-        observation::{Context, Observation},
+        observation::{Context, Observation, ObservationImpl},
         observation_documentation::{BoxObservationConvention, ObservationDocumentation},
         observation_registry::ObservationRegistry,
     },
@@ -27,8 +29,27 @@ impl ObservationDocumentation for ChatModelObservationDocumentation {
         default_convention: Option<BoxObservationConvention>,
         context: Box<dyn Context>,
         registry: Box<dyn ObservationRegistry>,
-    ) -> anyhow::Result<Box<dyn Observation>> {
-        todo!()
+    ) -> Result<Box<dyn Observation>, BoxError> {
+        if self.default_convention().is_empty() {
+            return Err("No default convention provided for chat model observation".into());
+        }
+
+        let mut observation = ObservationImpl::create_not_started(
+            custom_convention,
+            default_convention,
+            context,
+            Some(registry),
+        );
+
+        if let Some(name) = self.name() {
+            observation.context().set_name(name);
+        }
+
+        if let Some(contextual_name) = self.contextual_name() {
+            observation.contextual_name(contextual_name);
+        }
+
+        Ok(observation)
     }
 
     fn default_convention(&self) -> &'static str {

@@ -176,7 +176,9 @@ pub trait Application: Send + Sync {
         // Register job
         let producers = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
 
-        if let Some(job_schedluer_manager) = ctx.get_single_option::<JobSchedulerManager>() {
+        if let Some(job_schedluer_manager) =
+            ctx.get_single_option_with_name::<JobSchedulerManager>("jobSchedulerManager")
+        {
             let mut schedluer_manager = job_schedluer_manager.clone();
             for producer in producers {
                 schedluer_manager.add_job(producer).await;
@@ -202,9 +204,9 @@ pub trait Application: Send + Sync {
         multicaster.run();
 
         let rest_client = RestClient::new();
-        ctx.insert_singleton_with_name(default_event_publisher, "");
-        ctx.insert_singleton_with_name(multicaster, "");
-        ctx.insert_singleton_with_name(rest_client, "");
+        ctx.insert_singleton_with_name(default_event_publisher, "defaultApplicationEventPublisher");
+        ctx.insert_singleton_with_name(multicaster, "defaultApplicationEventMulticaster");
+        ctx.insert_singleton_with_name(rest_client, "restClient");
     }
 
     /// Bind tcp server.
@@ -343,16 +345,17 @@ pub trait Application: Send + Sync {
         // configure certificate and private key used by https
         #[cfg(feature = "tls-rustls")]
         {
-            let tls_config = axum_server::tls-rustls::RustlsConfig::from_pem_file(
-                std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR"))
-                    .join("self_signed_certs")
-                    .join("cert.pem"),
-                std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR"))
-                    .join("self_signed_certs")
-                    .join("key.pem"),
-            )
-            .await
-            .unwrap();
+            let tls_config = axum_server::tls
+                - rustls::RustlsConfig::from_pem_file(
+                    std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR"))
+                        .join("self_signed_certs")
+                        .join("cert.pem"),
+                    std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR"))
+                        .join("self_signed_certs")
+                        .join("key.pem"),
+                )
+                .await
+                .unwrap();
             let addr = std::net::SocketAddr::from(([0, 0, 0, 0], config.port()));
             let mut server = axum_server::bind_rustls(addr, tls_config);
             // IMPORTANT: This is required to advertise our support for HTTP/2 websockets to the client.
@@ -427,7 +430,7 @@ pub trait Application: Send + Sync {
 
         // Banner show
         Self::banner_show(&resources);
-        
+
         let application = next_application.application();
 
         println!("========================================================================\n");

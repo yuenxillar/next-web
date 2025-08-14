@@ -3,7 +3,10 @@ use next_web_core::DynClone;
 
 use crate::{
     chat::observation::observation_convention::ObservationConvention,
-    observation::{noop_observation_registry::NoopObservationRegistry, simple_observation_registry::SimpleObservationRegistry},
+    observation::{
+        noop_observation_registry::NoopObservationRegistry,
+        simple_observation_registry::SimpleObservationRegistry,
+    },
     util::sync_array::SyncArray,
 };
 
@@ -22,7 +25,9 @@ pub trait ObservationRegistry: DynClone + Send + Sync {
 
     fn observation_config(&self) -> &ObservationConfig;
 
-    fn is_noop(&self) -> bool { true }
+    fn is_noop(&self) -> bool {
+        true
+    }
 }
 
 next_web_core::clone_trait_object!(ObservationRegistry);
@@ -34,8 +39,8 @@ impl ObservationRegistryImpl {
         SimpleObservationRegistry::new()
     }
 
-    pub fn noop() -> impl ObservationRegistry {
-        NoopObservationRegistry::new()
+    pub fn noop() -> NoopObservationRegistry {
+        NoopObservationRegistry::default()
     }
 }
 

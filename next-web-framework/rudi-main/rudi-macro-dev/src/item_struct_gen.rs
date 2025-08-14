@@ -149,17 +149,12 @@ pub(crate) fn generate(
 
     let struct_name = &item_struct.ident;
     let default_name = {
-        let singleton_name = name.to_token_stream().to_string().replacen("\"", "", 2);
+        let singleton_name = name.to_token_stream().to_string().trim().replacen("\"", "", 2);
 
         if singleton_name.is_empty() {
-            let struct_name_str = struct_name.to_string();
-            let mut chars = struct_name_str.chars();
-            if let Some(first_char) = chars.next() {
-                let first_char_lower = first_char.to_lowercase().to_string();
-                first_char_lower + chars.as_str()
-            } else {
-                struct_name_str
-            }
+            let str1 = struct_name.to_string();
+            super::util::singleton_name(&str1)
+
         } else {
             singleton_name
         }

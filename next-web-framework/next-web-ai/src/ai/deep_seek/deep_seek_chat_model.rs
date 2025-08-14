@@ -1,7 +1,7 @@
-use std::pin::Pin;
+use std::{pin::Pin, thread::spawn};
 
 use futures_util::StreamExt;
-use next_web_core::{async_trait, error::BoxError};
+use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError};
 
 use crate::{
     ai::deep_seek::{
@@ -16,23 +16,37 @@ use crate::{
             streaming_chat_model::StreamingChatModel,
         },
         observation::{
+            chat_model_observation_context::ChatModelObservationContext,
             chat_model_observation_convention::ChatModelObservationConvention,
             chat_model_observation_documentation::ChatModelObservationDocumentation,
             default_chat_model_observation_convention::DefaultChatModelObservationConvention,
+            observation_convention,
         },
-        prompt::prompt::Prompt,
+        prompt::{
+            chat_options::{ChatOptions, DefaultChatOptions},
+            prompt::Prompt,
+        },
     },
     model::{model::Model, model_request::ModelRequest, streaming_model::StreamingModel},
-    observation::observation_documentation::ObservationDocumentation,
+    observation::{
+        conventions::ai_provider::AiProvider,
+        noop_observation_registry::NoopObservationRegistry,
+        observation::Observable,
+        observation_documentation::ObservationDocumentation,
+        observation_registry::{ObservationRegistry, ObservationRegistryImpl},
+    },
 };
 
 use super::api::deep_seek_api::ChatApiRespnose;
 
 #[derive(Clone)]
-pub struct DeepSeekChatModel {
-    pub(crate) api: DeepSeekApi,
+pub struct DeepSeekChatModel<T = DefaultChatModelObservationConvention, R = NoopObservationRegistry>
+{
+    // pub(crate) retry_template: RetryTemplate,
     pub(crate) options: DeepSeekChatOptions,
-    pub(crate) observation_convention: Box<dyn ChatModelObservationConvention>,
+    pub(crate) api: DeepSeekApi,
+    pub(crate) observation_registry: R,
+    pub(crate) observation_convention: T,
     // todo retry
 }
 
@@ -41,17 +55,25 @@ impl DeepSeekChatModel {
         Self {
             api,
             options,
-            observation_convention: Box::new(DefaultChatModelObservationConvention::default()),
+            observation_registry: ObservationRegistryImpl::noop(),
+            observation_convention: Default::default(),
         }
     }
 
-    fn crate_request(&self, prompt: Prompt, stream: bool) -> ChatCompletionRequest {
+    fn crate_request(&self, prompt: &Prompt, stream: bool) -> ChatCompletionRequest {
         // prompt.instructions();
 
         ChatCompletionRequest {
             messages: vec![],
             model: prompt.chat_options().get_model().into(),
             stream,
+        }
+    }
+
+    fn build_request_options(request: &ChatCompletionRequest) -> impl ChatOptions {
+        DefaultChatOptions {
+            model: request.model.to_string(),
+            ..Default::default()
         }
     }
 
@@ -66,11 +88,27 @@ impl DeepSeekChatModel {
 
 #[async_trait]
 impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
-    async fn call(&self, request: Prompt) -> Result<ChatResponse, BoxError> {
-        let req: ChatCompletionRequest = self.crate_request(request, false);
+    async fn call(&self, prompt: Prompt) -> Result<ChatResponse, BoxError> {
+        let req: ChatCompletionRequest = self.crate_request(&prompt, false);
 
         // observe
-        // ChatModelObservationDocumentation::ChatModelOperation.observation();
+        let observation_context = ChatModelObservationContext::new(
+            prompt,
+            AiProvider::DeepSeek.to_string(),
+            Self::build_request_options(&req).into_box(),
+        );
+
+        let observation_convention = self.observation_convention.clone().into_box();
+        let observation = match ChatModelObservationDocumentation::ChatModelOperation.observation(
+            Some(observation_convention.clone()),
+            Some(observation_convention),
+            observation_context.into_box(),
+            self.observation_registry.clone().into_box(),
+        ) {
+            Ok(observation) => observation,
+            Err(e) => return Err(e.into()),
+        }
+        .observe(Box::pin(async move { Ok(12) }));
 
         // execute
         let chat_respnose = self.api.send(&req).await?;
@@ -97,12 +135,12 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
 impl StreamingModel<Prompt, ChatResponse> for DeepSeekChatModel {
     async fn stream(
         &self,
-        request: Prompt,
+        prompt: Prompt,
     ) -> Result<
         Pin<Box<dyn futures_core::Stream<Item = Result<ChatResponse, BoxError>> + Send + 'static>>,
         BoxError,
     > {
-        let req: ChatCompletionRequest = self.crate_request(request, true);
+        let req: ChatCompletionRequest = self.crate_request(&prompt, true);
         // execute
         let chat_respnose = self.api.send(&req).await?;
 

@@ -1,3 +1,5 @@
+use next_web_core::error::BoxError;
+
 use crate::{
     chat::observation::observation_convention::ObservationConvention, util::key_name::KeyName,
 };
@@ -28,13 +30,13 @@ pub trait ObservationDocumentation: Send + Sync {
         default_convention: Option<BoxObservationConvention>,
         context: Box<dyn Context>,
         registry: Box<dyn ObservationRegistry>,
-    ) -> anyhow::Result<Box<dyn Observation>> {
+    ) -> Result<Box<dyn Observation>, BoxError> {
         if self.default_convention().is_empty() {
-            anyhow::bail!("default_convention is empty");
+            return Err("default_convention is empty".into());
         }
 
         if let None = default_convention {
-            anyhow::bail!("default_convention is None");
+            return Err("default_convention is None".into());
         }
 
         let mut observation = ObservationImpl::create_not_started(

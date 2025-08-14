@@ -1,11 +1,11 @@
-use next_web_core::DynClone;
-
-use crate::chat::observation::chat_model_observation_context::ChatModelObservationContext;
+use crate::chat::observation::{
+    chat_model_observation_context::ChatModelObservationContext,
+    observation_convention::ObservationConvention,
+};
 
 pub trait ChatModelObservationConvention
 where
-    Self: DynClone,
-    Self: Send + Sync,
+    Self: ObservationConvention<ChatModelObservationContext>,
 {
     fn name(&self) -> &str;
 

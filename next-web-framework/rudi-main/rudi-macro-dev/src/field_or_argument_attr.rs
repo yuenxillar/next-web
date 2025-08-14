@@ -13,7 +13,7 @@ use syn::{parse_quote, Expr, Type};
 #[derive(FromAttr)]
 #[attribute(idents = [autowired])]
 pub(crate) struct FieldOrArgumentAttr {
-    #[attribute(default = default_name(), conflicts = [vec])]
+    #[attribute(default = default_name(), conflicts = [vec, map])]
     pub(crate) name: Expr,
 
     #[attribute(conflicts = [default, vec])]

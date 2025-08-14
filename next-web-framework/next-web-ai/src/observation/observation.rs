@@ -1,10 +1,12 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, future::Future, pin::Pin};
 
-use next_web_core::{convert::into_box::IntoBox, error::BoxError, DynClone};
+use futures_core::future::BoxFuture;
+use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError, DynClone};
 
 use crate::{
     chat::observation::observation_convention::ObservationConvention,
-    observation::{noop_observation::NoopObservation, simple_event::SimpleEvent}, util::{key_value::KeyValue, key_values::KeyValues},
+    observation::{noop_observation::NoopObservation, simple_event::SimpleEvent},
+    util::{key_value::KeyValue, key_values::KeyValues},
 };
 
 use super::{
@@ -12,6 +14,7 @@ use super::{
     simple_observation::SimpleObservation,
 };
 
+// #[async_trait]
 pub trait Observation: Send + Sync {
     fn start(&mut self);
 
@@ -29,11 +32,46 @@ pub trait Observation: Send + Sync {
 
     fn observation_convention(&mut self, observation_convention: BoxObservationConvention);
 
-    fn error(&mut self, error: BoxError);
+    fn error(&mut self, error: &BoxError);
 
     fn event(&mut self, event: Box<dyn Event>);
 
     fn open_scope(&self) -> Box<dyn Scope>;
+}
+
+#[async_trait]
+pub trait Observable {
+    async fn observe<R>(
+        &mut self,
+        run: Pin<Box<dyn Future<Output = Result<R, BoxError>> + Send + 'static>>,
+    ) -> Result<R, BoxError>;
+}
+
+#[async_trait]
+impl<T: Observation + ?Sized> Observable for T {
+    async fn observe<R>(
+        &mut self,
+        run: BoxFuture<'static, Result<R, BoxError>>,
+    ) -> Result<R, BoxError> {
+        self.start();
+        match run.await {
+            Ok(value) => {
+                self.stop();
+                Ok(value)
+            }
+            Err(e) => {
+                self.error(&e);
+                self.stop();
+
+                Err(e)
+            }
+        }
+    }
+}
+
+pub enum ObservationDefaultImpl {
+    Noop(NoopObservation),
+    Simple(SimpleObservation),
 }
 
 pub struct ObservationImpl;
@@ -135,21 +173,13 @@ impl DefaultContext {
     }
 }
 impl Context for DefaultContext {
-    fn set_parent_from_current_observation(&mut self, registry: &dyn ObservationRegistry) {
-        todo!()
-    }
+    fn set_parent_from_current_observation(&mut self, registry: &dyn ObservationRegistry) {}
 
-    fn set_name(&mut self, name: &str) {
-        todo!()
-    }
-    
-    fn add_low_cardinality_key_values(&mut self, key_values: KeyValues<Box<dyn KeyValue>>) {
-        todo!()
-    }
-    
-    fn set_contextual_name(&mut self, contextual_name: &str) {
-        todo!()
-    }
+    fn set_name(&mut self, name: &str) {}
+
+    fn add_low_cardinality_key_values(&mut self, key_values: KeyValues<Box<dyn KeyValue>>) {}
+
+    fn set_contextual_name(&mut self, contextual_name: &str) {}
 }
 
 pub trait Event: Send + Sync {
@@ -183,9 +213,7 @@ impl EventImpl {
     }
 }
 
-
-pub trait  Scope: Send + Sync {
-    
+pub trait Scope: Send + Sync {
     fn current_observation(&self) -> Option<&dyn Observation>;
 
     fn previous_observation_scope(&self) -> Option<&dyn Scope>;
@@ -196,6 +224,7 @@ pub trait  Scope: Send + Sync {
 
     fn make_current(&mut self);
 
-    fn is_noop(&self) -> bool { true }
+    fn is_noop(&self) -> bool {
+        true
+    }
 }
-

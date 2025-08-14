@@ -1907,7 +1907,7 @@ please use instead:
             if evaluate(self) {
                 self.load_provider(eager_create, provider);
             } else {
-                #[cfg(feature = "tracing")]
+                #[cfg(feature = "trace-log")]
                 tracing::warn!("(×) condition not met: {:?}", provider.definition());
             }
         }
@@ -2733,10 +2733,10 @@ impl ProviderRegistry {
         let key = provider.key().clone();
 
         if !self.registry.contains_key(&key) {
-            #[cfg(feature = "tracing")]
+            #[cfg(feature = "trace-log")]
             tracing::debug!("(+) insert new: {:?}", definition);
         } else if allow_override {
-            #[cfg(feature = "tracing")]
+            #[cfg(feature = "trace-log")]
             tracing::warn!("(!) override by `key`: {:?}", definition);
         } else {
             panic!(
@@ -3250,6 +3250,10 @@ impl<T: 'static + Send + Sync> From<Provider<T>> for DynProvider {
         }
     }
 }
+
+#[derive(Clone)]
+pub struct BoxValue<T>(pub T);
+
 
 fn sync_constructor<T, U, F>(
     name: Cow<'static, str>,

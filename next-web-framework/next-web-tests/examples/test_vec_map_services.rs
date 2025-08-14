@@ -42,11 +42,32 @@ impl TestColl for TestService {}
 #[Singleton]
 #[derive(Clone)]
 pub struct TestVecAndMapService {
+
+    /// When using a map, V is required to implement Singleton Trait
     #[autowired(map)]
     pub services_map: HashMap<String, Arc<dyn TestColl>>,
+
     #[autowired(vec)]
     pub services_vec: Vec<Arc<dyn TestColl>>,
+
+    pub store: Option<String>,
+
+    pub test_a: TestA,
 }
+
+#[Singleton(default)]
+#[derive(Clone, Default)]
+pub struct TestA {
+    pub p: i32,
+    pub s: i64,
+    pub d: u64
+}
+
+#[Singleton( name= "store")]
+fn store() -> Option<String> {
+    Some(String::from("store_tets"))
+}
+
 
 #[derive(Clone, Default)]
 struct TestApplication;

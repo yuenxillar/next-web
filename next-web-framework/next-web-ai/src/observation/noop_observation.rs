@@ -1,7 +1,6 @@
 use crate::observation::observation::Observation;
 
 
-
 pub struct NoopObservation {}
 
 

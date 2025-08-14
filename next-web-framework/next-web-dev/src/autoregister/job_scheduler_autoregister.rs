@@ -20,7 +20,7 @@ impl AutoRegister for JobSchedulerAutoRegister {
         let mut scheduler_manager = JobSchedulerManager::new();
         scheduler_manager.start();
         
-        ctx.insert_singleton(scheduler_manager);
+        ctx.insert_singleton_with_name(scheduler_manager, "jobSchedulerManager");
         Ok(())
     }
 }

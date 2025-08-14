@@ -26,7 +26,7 @@ next:
             # with qos 
             # 默认匹配最后两个字符 希望是以下字符-> :0 :1 :2 
             # 如果都没有匹配, QOS 消息质量默认为 1
-            - test/666:0
+            - test/week:0
         # from secs
         connect_timeout: 10
         clean_session: true
