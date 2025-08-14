@@ -160,7 +160,7 @@ impl Observation for SimpleObservation {
         todo!()
     }
     
-    fn error(&mut self, error: next_web_core::error::BoxError) {
+    fn error(&mut self, error: & next_web_core::error::BoxError) {
         todo!()
     }
     

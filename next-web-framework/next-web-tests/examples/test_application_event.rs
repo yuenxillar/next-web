@@ -28,7 +28,7 @@ impl Application for TestApplication {
     // get the application router. (open api  and private api)
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
         let publisher = ctx
-            .get_single::<DefaultApplicationEventPublisher>()
+            .get_single_with_name::<DefaultApplicationEventPublisher>("defaultApplicationEventPublisher")
             .to_owned();
         tokio::spawn(async move {
             loop {
@@ -38,7 +38,8 @@ impl Application for TestApplication {
                 tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
             }
         });
-        axum::Router::new()
+        axum::Router::new().route("/", axum::routing::get(|| async move { "Hello, world!" }
+    ))
     }
 }
 
@@ -71,7 +72,7 @@ impl ApplicationListener for TestListener {
     async fn on_application_event(&mut self, event: &Box<dyn ApplicationEvent>) {
         let any: &dyn Any = event.as_ref();
         let e = any.downcast_ref::<TestEvent>().unwrap();
-        println!("time tick: {}", e.0)
+        println!("Time tick: {}", e.0)
     }
 }
 

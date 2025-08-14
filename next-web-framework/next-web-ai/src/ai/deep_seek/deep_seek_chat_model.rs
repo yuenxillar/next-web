@@ -1,5 +1,4 @@
-use std::{pin::Pin, thread::spawn};
-
+use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
 use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError};
 
@@ -17,23 +16,21 @@ use crate::{
         },
         observation::{
             chat_model_observation_context::ChatModelObservationContext,
-            chat_model_observation_convention::ChatModelObservationConvention,
             chat_model_observation_documentation::ChatModelObservationDocumentation,
             default_chat_model_observation_convention::DefaultChatModelObservationConvention,
-            observation_convention,
         },
         prompt::{
             chat_options::{ChatOptions, DefaultChatOptions},
             prompt::Prompt,
         },
     },
-    model::{model::Model, model_request::ModelRequest, streaming_model::StreamingModel},
+    model::{model::Model, streaming_model::StreamingModel},
     observation::{
         conventions::ai_provider::AiProvider,
         noop_observation_registry::NoopObservationRegistry,
         observation::Observable,
         observation_documentation::ObservationDocumentation,
-        observation_registry::{ObservationRegistry, ObservationRegistryImpl},
+        observation_registry::ObservationRegistryImpl,
     },
 };
 
@@ -99,7 +96,7 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
         );
 
         let observation_convention = self.observation_convention.clone().into_box();
-        let observation = match ChatModelObservationDocumentation::ChatModelOperation.observation(
+        match ChatModelObservationDocumentation::ChatModelOperation.observation(
             Some(observation_convention.clone()),
             Some(observation_convention),
             observation_context.into_box(),
@@ -108,26 +105,27 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
             Ok(observation) => observation,
             Err(e) => return Err(e.into()),
         }
-        .observe(Box::pin(async move { Ok(12) }));
+        .observe(async {
+            // execute
+            let chat_respnose = self.api.send(&req).await?;
 
-        // execute
-        let chat_respnose = self.api.send(&req).await?;
+            let assistant_message = AssistantMessage {
+                text_content: "".to_string(),
+                metadata: None,
+                message_type: MessageType::Assistant,
+            };
 
-        let assistant_message = AssistantMessage {
-            text_content: "".to_string(),
-            metadata: None,
-            message_type: MessageType::Assistant,
-        };
+            let generations = vec![Generation::new(assistant_message)];
+            let chat_completion = match chat_respnose {
+                ChatApiRespnose::Entity(chat_completion) => chat_completion,
+                _ => return Err("Chat completion is not entity".into()),
+            };
 
-        let generations = vec![Generation::new(assistant_message)];
-        let chat_completion = match chat_respnose {
-            ChatApiRespnose::Entity(chat_completion) => chat_completion,
-            _ => return Err("Chat completion is not entity".into()),
-        };
+            let chat_response_meta_data = Self::to_metadata(&chat_completion, &req.model);
 
-        let chat_response_meta_data = Self::to_metadata(&chat_completion, &req.model);
-
-        Ok(ChatResponse::new(chat_response_meta_data, generations))
+            Ok(ChatResponse::new(chat_response_meta_data, generations))
+        })
+        .await
     }
 }
 
@@ -137,9 +135,10 @@ impl StreamingModel<Prompt, ChatResponse> for DeepSeekChatModel {
         &self,
         prompt: Prompt,
     ) -> Result<
-        Pin<Box<dyn futures_core::Stream<Item = Result<ChatResponse, BoxError>> + Send + 'static>>,
+        BoxStream<'static, Result<ChatResponse, BoxError>>,
         BoxError,
     > {
+        
         let req: ChatCompletionRequest = self.crate_request(&prompt, true);
         // execute
         let chat_respnose = self.api.send(&req).await?;

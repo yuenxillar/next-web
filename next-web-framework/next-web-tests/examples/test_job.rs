@@ -40,7 +40,7 @@ impl TestJob {
 impl ApplicationJob for TestJob {
     fn schedule(&self) -> ScheduleType {
         // from_secs
-        ScheduleType::Repeated(2)
+        ScheduleType::Repeated(5)
     }
 
     async fn execute(&self, _context: JobExecutionContext) -> Result<(), BoxError> {

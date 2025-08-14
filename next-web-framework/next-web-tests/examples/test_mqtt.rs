@@ -16,13 +16,13 @@ impl Application for TestApplication {
 
     // get the application router. (open api  and private api)
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
-        let mut instance = MQTTClientProperties::default();
-        instance.set_host("127.0.0.1");
-        instance.set_username("username");
-        instance.set_password("password");
-        instance.set_topics(vec!["test/#".into()]);
+        let mut properties = MQTTClientProperties::default();
+        properties.set_host("127.0.0.1");
+        properties.set_username("username");
+        properties.set_password("password");
+        properties.set_topics(vec!["test/#".into()]);
 
-        ctx.insert_singleton(instance);
+        ctx.insert_singleton(properties);
 
         let auto = MQTTServiceAutoRegister(ctx.resolve_with_name::<MQTTClientProperties>(""));
         auto.register(ctx, &Default::default()).await.ok();

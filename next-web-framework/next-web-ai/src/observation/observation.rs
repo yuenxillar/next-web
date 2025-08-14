@@ -1,6 +1,5 @@
-use std::{collections::VecDeque, future::Future, pin::Pin};
+use std::collections::VecDeque;
 
-use futures_core::future::BoxFuture;
 use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError, DynClone};
 
 use crate::{
@@ -41,17 +40,17 @@ pub trait Observation: Send + Sync {
 
 #[async_trait]
 pub trait Observable {
-    async fn observe<R>(
+    async fn observe<R, 'a>(
         &mut self,
-        run: Pin<Box<dyn Future<Output = Result<R, BoxError>> + Send + 'static>>,
+        run: impl std::future::Future<Output = Result<R, BoxError>> + Send + 'a
     ) -> Result<R, BoxError>;
 }
 
 #[async_trait]
 impl<T: Observation + ?Sized> Observable for T {
-    async fn observe<R>(
+    async fn observe<R, 'a>(
         &mut self,
-        run: BoxFuture<'static, Result<R, BoxError>>,
+        run: impl std::future::Future<Output = Result<R, BoxError>> + Send + 'a,
     ) -> Result<R, BoxError> {
         self.start();
         match run.await {
@@ -68,6 +67,7 @@ impl<T: Observation + ?Sized> Observable for T {
         }
     }
 }
+
 
 pub enum ObservationDefaultImpl {
     Noop(NoopObservation),
