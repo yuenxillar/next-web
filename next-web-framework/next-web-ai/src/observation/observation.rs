@@ -68,27 +68,22 @@ impl<T: Observation + ?Sized> Observable for T {
     }
 }
 
-
-pub enum ObservationDefaultImpl {
-    Noop(NoopObservation),
-    Simple(SimpleObservation),
-}
-
 pub struct ObservationImpl;
 
 impl ObservationImpl {
     pub fn create_not_started(
         custom_convention: Option<BoxObservationConvention>,
         default_convention: Option<BoxObservationConvention>,
-        mut context: Box<dyn Context>,
+        context: impl Context + 'static,
         registry: Option<Box<dyn ObservationRegistry>>,
     ) -> Box<dyn Observation> {
         if registry.is_none() || registry.as_ref().map(|s| s.is_noop()).unwrap_or(false) {
-            return Self::noop().into_box();
+            return Self::noop().into_boxed();
         }
 
         let registry = registry.unwrap();
 
+        let mut context = Box::new(context);
         let convention: Box<dyn ObservationConvention<Box<dyn Context>>>;
         if let Some(custom_convention) = custom_convention {
             convention = custom_convention;
@@ -106,7 +101,7 @@ impl ObservationImpl {
         context.set_parent_from_current_observation(registry.as_ref());
 
         if is_observation_enabled {
-            return Self::noop().into_box();
+            return Self::noop().into_boxed();
         }
 
         let convention = Some(convention);
@@ -117,7 +112,7 @@ impl ObservationImpl {
             handlers: VecDeque::new(),
             filters: Vec::new(),
         }
-        .into_box()
+        .into_boxed()
     }
 
     pub fn start(name: impl Into<String>, registry: Box<dyn ObservationRegistry>) {
@@ -131,7 +126,7 @@ impl ObservationImpl {
         registry: Box<dyn ObservationRegistry>,
     ) -> Box<dyn Observation> {
         if registry.is_noop() {
-            return Self::noop().into_box();
+            return Self::noop().into_boxed();
         }
 
         let name = name.into();
@@ -142,10 +137,10 @@ impl ObservationImpl {
         context.set_parent_from_current_observation(registry.as_ref());
 
         if is_observation_enabled {
-            return Self::noop().into_box();
+            return Self::noop().into_boxed();
         }
 
-        SimpleObservation::new(name, registry, context).into_box()
+        SimpleObservation::new(name, registry, context).into_boxed()
     }
     pub fn noop() -> impl Observation {
         NoopObservation::default()

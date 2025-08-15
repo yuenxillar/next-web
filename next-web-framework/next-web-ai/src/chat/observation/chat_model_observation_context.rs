@@ -17,10 +17,6 @@ pub struct ChatModelObservationContext {
 }
 
 impl ChatModelObservationContext {
-    // pub fn request_options(&self) -> &Box<dyn ChatOptions> {
-    //     &self.request_options
-    // }
-
     pub fn new(
         prompt: Prompt,
         provider: impl Into<String>,
@@ -37,6 +33,13 @@ impl ChatModelObservationContext {
     }
 }
 
+
+impl ChatModelObservationContext {
+
+     pub fn request_options(&self) -> & dyn ChatOptions  {
+        self.request_options.as_ref()
+    }
+}
 
 impl Context for ChatModelObservationContext {
     fn set_parent_from_current_observation(&mut self, registry: &dyn crate::observation::observation_registry::ObservationRegistry) {

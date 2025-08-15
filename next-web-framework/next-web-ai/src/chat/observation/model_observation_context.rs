@@ -3,11 +3,7 @@ use std::collections::BTreeMap;
 use next_web_core::util::any_map::AnyValue;
 
 use crate::{
-    chat::{
-        observation::ai_operation_metadata::AiOperationMetadata,
-        prompt::prompt::{self, Prompt},
-    },
-    util::key_value::KeyValue,
+    chat::observation::ai_operation_metadata::AiOperationMetadata, util::key_value::KeyValue,
 };
 
 #[derive(Clone)]
@@ -39,7 +35,6 @@ impl<Q, R> ModelObservationContext<Q, R> {
         }
     }
 }
-
 
 impl<Q, R> ModelObservationContext<Q, R> {
     pub fn operation_metadata(&self) -> &AiOperationMetadata {

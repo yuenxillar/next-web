@@ -2,10 +2,11 @@ use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
 use next_web_core::error::BoxError;
 
-use crate::ai::deep_seek::chat_model::ChatModel;
+use crate::{ai::deep_seek::chat_model::ChatModel};
 
 const ERROR: [u8; 8] = [123, 34, 101, 114, 114, 111, 114, 34];
 const DATA: [u8; 6] = [100, 97, 116, 97, 58, 32];
+const DONE: [u8; 12] = [100, 97, 116, 97, 58, 32, 91, 68, 79, 78, 69, 93];
 
 #[derive(Clone)]
 pub struct DeepSeekApi {
@@ -55,6 +56,10 @@ impl DeepSeekApi {
                         .into());
                 }
 
+                if  data.starts_with(&DONE) {
+                    println!("\n\nEnd of stream\n\n")
+                }
+                
                 data.split(|&s| s == b'\n')
                     .filter(|line| line.starts_with(&DATA))
                     .map(|line| {
@@ -87,6 +92,7 @@ pub struct ChatCompletionRequest {
     pub(crate) messages: Vec<ChatCompletionMessage>,
     pub(crate) model: Box<str>,
     pub(crate) stream: bool,
+    pub (crate) temperature: Option<f32>,
 }
 
 impl ChatCompletionRequest {
@@ -95,6 +101,7 @@ impl ChatCompletionRequest {
             messages,
             model: model.into(),
             stream,
+            temperature: None,
         }
     }
 }
@@ -162,7 +169,7 @@ pub struct ChatCompletion {
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
-    pub total_tokens: u32,
+    pub total_tokens: u64,
     pub prompt_tokens_details: PromptTokensDetails,
     pub prompt_cache_hit_tokens: u32,
     pub prompt_cache_miss_tokens: u32,
@@ -185,4 +192,21 @@ pub struct Choice {
 #[derive(Debug, serde::Deserialize)]
 pub struct DeltaContent {
     pub content: Box<str>,
+}
+
+#[derive(Clone)]
+pub struct DefaultUsage {
+    pub prompt_tokens: u32,
+	pub completion_tokens: u32,
+	pub total_tokens: u64,
+}
+
+impl crate::chat::meta_data::usage::Usage for  DefaultUsage {
+    fn get_prompt_tokens(&self) -> u32 {
+        self.prompt_tokens
+    }
+
+    fn get_completion_tokens(&self) -> u32 {
+        self.completion_tokens
+    }
 }

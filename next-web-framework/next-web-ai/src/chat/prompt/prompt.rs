@@ -45,7 +45,7 @@ impl ModelRequest<Vec<Box<dyn Message>>> for Prompt {
         todo!()
     }
 
-    fn options(&self) -> Box<dyn ModelOptions> {
-        self.chat_options.clone() as Box<dyn ModelOptions>
+    fn options(&self) -> Option<&dyn ModelOptions> {
+        Some(self.chat_options.as_ref())
     }
 }

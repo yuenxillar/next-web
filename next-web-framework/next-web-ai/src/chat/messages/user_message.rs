@@ -31,17 +31,17 @@ impl UserMessage {
         }
     }
 
-    pub fn text(&self) -> &Bytes {
-        &self.text_content
-    }
-
     pub fn meta_data(&self) -> &HashMap<String, String> {
         &self.metadata
     }
-
-    pub fn message_type(&self) -> MessageType {
-        self.message_type.clone()
-    }
 }
 
-impl Message for UserMessage {}
+impl Message for UserMessage {
+    fn message_type(&self) -> super::message_type::MessageType {
+        self.message_type.clone()
+    }
+
+    fn text(&self) -> &str {
+        std::str::from_utf8(self.text_content.as_ref()).unwrap_or("")
+    }
+}

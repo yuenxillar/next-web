@@ -28,7 +28,7 @@ pub trait ObservationDocumentation: Send + Sync {
         &self,
         custom_convention: Option<BoxObservationConvention>,
         default_convention: Option<BoxObservationConvention>,
-        context: Box<dyn Context>,
+        context: impl Context + 'static,
         registry: Box<dyn ObservationRegistry>,
     ) -> Result<Box<dyn Observation>, BoxError> {
         if self.default_convention().is_empty() {
