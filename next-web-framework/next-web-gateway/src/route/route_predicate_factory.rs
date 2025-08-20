@@ -7,7 +7,7 @@ use matchit::Router;
 use pingora::http::Method;
 use pingora::proxy::Session;
 
-use crate::utils::str_util::StrUtil;
+use crate::util::str_util::StrUtil;
 
 use super::{
     cookie_route_predicate_factory::CookieRoutePredicateFactory,

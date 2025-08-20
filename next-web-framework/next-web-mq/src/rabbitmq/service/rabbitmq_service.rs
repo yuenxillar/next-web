@@ -133,7 +133,7 @@ impl RabbitmqService {
     }
 
     /// basic_publish and properties
-    pub async fn send_message_and_properties<M: Into<Vec<u8>>>(
+    pub async fn send_message_with_properties<M: Into<Vec<u8>>>(
         &self,
         exchange: &str,
         routing_key: &str,

@@ -32,6 +32,8 @@ next-web-websocket = { version = "0.1.2", path = "./next-web-websocket", optiona
 next-web-crud = { version = "0.1.0", path = "./next-web-crud", optional = true}
 next-web-open-api = { version = "*", path = "./next-web-open-api", optional = true}
 
+next-web-gateway = { version = "*", path = "./next-web-gateway", optional = true }
+
 # document
 next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }
 
@@ -40,7 +42,6 @@ next-web-document = { version = "0.1.0", path = "./next-web-document", optional 
 
 # next-web-id = { version = "0.1.0", path = "./next-web-id", optional = true }
 # next-web-ip = { version = "0.1.0", path = "./next-web-ip", optional = true }
-# next-web-gateway = { version = "0.1.0", path = "./next-web-gateway", optional = true }
 
 # next-web-wechat = { version = "0.1.0", path = "./next-web-wechat", optional = true }
 

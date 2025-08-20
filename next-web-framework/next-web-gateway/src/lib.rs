@@ -6,7 +6,7 @@ mod rate_limiter;
 mod route;
 mod service_discovery;
 mod tests;
-mod utils;
+mod util;
 mod models;
 
 

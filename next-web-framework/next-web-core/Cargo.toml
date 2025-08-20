@@ -25,7 +25,7 @@ tracing = { workspace = true }
 validator = { workspace = true }
 rust-embed = { workspace = true }
 sha2 = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, features = ["json", "gzip"]}
 sys-locale = { workspace = true }
 
 inventory = { workspace = true }

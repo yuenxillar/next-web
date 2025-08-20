@@ -75,23 +75,24 @@ pub trait Application: Send + Sync {
         }
     }
 
-    /// Initialize the logger.
-    fn init_logger(&self, application_properties: &ApplicationProperties) {
+    /// Initialize the logging.
+    fn init_logging(&self, application_properties: &ApplicationProperties) {
         let application_name = application_properties
             .next()
             .appliation()
             .map(|app| app.name())
             .unwrap_or_default();
-        let file_appender = application_properties.next().logger().map_or_else(
+        let logging = application_properties.next().logging();
+        let file_appender = logging.map_or_else(
             || None,
-            |logger| {
-                // logger enable?
-                if logger.enable() {
-                    let path = logger.log_dir().unwrap_or_else(|| "./logs");
+            |logging| {
+                // write log?
+                if logging.write() {
+                    let path = logging.log_dir().unwrap_or_else(|| "./logs");
                     let log_name = format!(
                         "{}{}.log",
                         application_name,
-                        if logger.additional_date() {
+                        if logging.additional_date() {
                             format!("-{}", LocalDateTime::date())
                         } else {
                             String::new()
@@ -118,7 +119,7 @@ pub trait Application: Send + Sync {
 
         let logger = tracing_subscriber::fmt()
             // test
-            .with_max_level(tracing::Level::INFO)
+            .with_max_level(logging.map(|log| log.level()).unwrap_or(tracing::Level::INFO))
             .with_ansi(false)
             .event_format(config);
 
@@ -150,15 +151,14 @@ pub trait Application: Send + Sync {
         application_args: &ApplicationArgs,
         application_resources: &ApplicationResources,
     ) {
-        // Register application singleton
-        let mut container = ApplicationDefaultRegisterContainer::new();
-        container.register_all(ctx, application_properties).await;
-
         // Register singletion
         // properties args resources
         ctx.insert_singleton_with_name(application_properties.to_owned(), "");
         ctx.insert_singleton_with_name(application_args.to_owned(), "");
         ctx.insert_singleton_with_name(application_resources.to_owned(), "");
+
+        let mut container = ApplicationDefaultRegisterContainer::new();
+        container.register_all(ctx, application_properties).await;
 
         // Resove autoRegister
         let auto_register = ctx.resolve_by_type::<Arc<dyn AutoRegister>>();
@@ -435,9 +435,9 @@ pub trait Application: Send + Sync {
 
         println!("========================================================================\n");
 
-        application.init_logger(&properties);
+        application.init_logging(&properties);
         println!(
-            "Init logger success!\nCurrent Time: {}\n",
+            "Init logging success!\nCurrent Time: {}\n",
             LocalDateTime::now()
         );
 

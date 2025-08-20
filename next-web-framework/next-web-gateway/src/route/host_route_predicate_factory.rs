@@ -1,6 +1,6 @@
-use crate::utils::str_util::StrUtil;
-
+use crate::util::str_util::StrUtil;
 use super::route_predicate::RoutePredicate;
+use pingora::protocols::http::ServerSession;
 
 #[derive(Debug, Clone)]
 pub struct HostRoutePredicateFactory {
@@ -8,26 +8,29 @@ pub struct HostRoutePredicateFactory {
 }
 
 impl RoutePredicate for HostRoutePredicateFactory {
-    fn matches(&self, session: &mut pingora::protocols::http::ServerSession) -> bool {
-        if let Some(remote_addr) = session.req_header().headers.get("Host") {
-            if let Ok(remote_addr) = remote_addr.to_str() {
-                if remote_addr.is_empty() {
-                    return false;
-                }
+    fn matches(&self, session: &mut ServerSession) -> bool {
+        // 1. 使用更简洁的方式获取Host头
+        let Some(host_header) = session.req_header().headers.get("Host") else {
+            return false;
+        };
 
-                for host in self.hosts.iter() {
-                    if host.contains("*") {
-                        if StrUtil::host_match(remote_addr, &host) {
-                            return true;
-                        }
-                    } else {
-                        if host.eq(remote_addr) {
-                            return true;
-                        }
-                    }
-                }
-            }
+        // 2. 使用if let Ok优化错误处理
+        let Ok(remote_host) = host_header.to_str() else {
+            return false;
+        };
+
+        // 3. 提前检查空值
+        if remote_host.trim().is_empty() {
+            return false;
         }
-        false
+
+        // 4. 使用迭代器方法提高性能和可读性
+        self.hosts.iter().any(|host| {
+            if host.contains('*') {
+                StrUtil::host_match(remote_host, host)
+            } else {
+                host == remote_host
+            }
+        })
     }
 }
