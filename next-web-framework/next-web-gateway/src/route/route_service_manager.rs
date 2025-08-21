@@ -158,6 +158,13 @@ impl From<RoutesProperties> for RoutePredicateService {
             .predicates()
             .iter()
             .map(|predicate| predicate.into())
+            .filter(|factory| {
+                if let &RoutePredicateFactory::Nothing = factory {
+                    false
+                } else {
+                    true
+                }
+            })
             .collect::<Vec<RoutePredicateFactory>>();
 
         // Get Filters from RoutesProperties

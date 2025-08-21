@@ -1,6 +1,5 @@
-use crate::application::key_value::KeyValue;
+use crate::util::key_value::KeyValue;
 use super::route_predicate::RoutePredicate;
-use std::str::FromStr;
 
 #[derive(Debug, Clone)]
 pub struct HeaderRoutePredicateFactory {

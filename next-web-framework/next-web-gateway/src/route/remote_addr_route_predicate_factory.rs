@@ -1,7 +1,9 @@
+use pingora::protocols::l4::socket::SocketAddr;
+
 use crate::util::str_util::StrUtil;
 
 use super::route_predicate::RoutePredicate;
-use pingora::protocols::l4::socket::SocketAddr::Inet;
+
 
 #[derive(Debug, Clone)]
 pub struct RemoteAddrRoutePredicateFactory {
@@ -18,11 +20,15 @@ impl RoutePredicate for RemoteAddrRoutePredicateFactory {
 
         // 2. 提取 IP 地址
         let ip = match client_addr {
-            std::net::SocketAddr::V4(v4) => v4.ip().into(),
-            std::net::SocketAddr::V6(v6) => v6.ip().into(),
+            SocketAddr::Inet(socket_addr) => match socket_addr {
+                std::net::SocketAddr::V4(v4) => v4.to_string(),
+                std::net::SocketAddr::V6(v6) => v6.to_string(),
+            },
+            #[cfg(unix)]
+            SocketAddr::Unix(_) => return false,
         };
 
         // 3. 转换为字符串并进行匹配
-        StrUtil::host_match(&self.remote_addr, &ip.to_string())
+        StrUtil::host_match(&self.remote_addr, &ip)
     }
 }

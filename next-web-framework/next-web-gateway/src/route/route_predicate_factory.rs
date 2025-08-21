@@ -1,12 +1,14 @@
-use core::panic;
+use std::collections::HashSet;
 
-use chrono::NaiveDateTime;
-use chrono::TimeZone;
-use chrono_tz::Tz;
-use matchit::Router;
 use pingora::http::Method;
 use pingora::proxy::Session;
+use regex::Regex;
+use tracing::warn;
 
+use crate::route::x_forwarded_remote_addr_route_predicate_factory::XForwardedRemoteAddrRoutePredicateFactory;
+use crate::route::zoned_datetime_route_predicate_factory::after;
+use crate::route::zoned_datetime_route_predicate_factory::before;
+use crate::route::zoned_datetime_route_predicate_factory::between;
 use crate::util::str_util::StrUtil;
 
 use super::{
@@ -31,12 +33,13 @@ pub enum RoutePredicateFactory {
     PathPredicates(PathRoutePredicateFactory),
     QueryPredicates(QueryRoutePredicateFactory),
     RemoteAddrPredicates(RemoteAddrRoutePredicateFactory),
+    XForwardedRemoteAddr(XForwardedRemoteAddrRoutePredicateFactory),
     Nothing,
 }
 
 impl RoutePredicateFactory {
     pub fn matches(&self, session: &mut Session) -> bool {
-        let result = match self {
+        match self {
             RoutePredicateFactory::ZonedDateTimePredicates(factory) => factory.matches(session),
             RoutePredicateFactory::CookiePredicates(factory) => factory.matches(session),
             RoutePredicateFactory::HeaderPredicates(factory) => factory.matches(session),
@@ -45,152 +48,201 @@ impl RoutePredicateFactory {
             RoutePredicateFactory::PathPredicates(factory) => factory.matches(session),
             RoutePredicateFactory::QueryPredicates(factory) => factory.matches(session),
             RoutePredicateFactory::RemoteAddrPredicates(factory) => factory.matches(session),
+            RoutePredicateFactory::XForwardedRemoteAddr(factory) => factory.matches(session),
             RoutePredicateFactory::Nothing => false,
-        };
-        result
+        }
     }
 }
 
 impl Into<RoutePredicateFactory> for &String {
     fn into(self) -> RoutePredicateFactory {
-        if let Some((str1, str2)) = self.split_once('=') {
-            if str1.is_empty() {
-                return RoutePredicateFactory::Nothing;
-            }
-            if str2.is_empty() {
-                panic!("Invalid remote address format");
-            }
+        // 1. 拆分 key=value
+        let (key, value) = match self.split_once('=') {
+            Some((k, v)) => (k.trim(), v),
+            None => return RoutePredicateFactory::Nothing,
+        };
 
-            return match str1 {
-                "Before" | "After" | "Between" => {
-                    // 先尝试提取出时间部分和时区部分
-                    let (datetime, offset) = {
-                        let mut datetime = Vec::new();
-                        let var = {
-                            if str1 == "Between" {
-                                str2.trim_end().split(",").collect::<Vec<&str>>()
-                            } else {
-                                vec![str2]
-                            }
-                        };
-                        for s in var {
-                            if s.is_empty() {
-                                continue;
-                            }
-                            let parts: Vec<&str> = str2.splitn(2, '[').collect();
-                            if parts.len() != 2 {
-                                panic!("Invalid time format");
-                            }
-                            let time_part = parts[0];
-                            let tz_part = parts[1].trim_end_matches(']');
-                            // 解析时区
-                            let timezone: Tz = match tz_part.parse() {
-                                Ok(tz) => tz,
-                                Err(_) => {
-                                    panic!("Failed to parse timezone");
-                                }
-                            };
-                            // 解析日期时间部分
-                            let naive_datetime = match NaiveDateTime::parse_from_str(
-                                time_part,
-                                "%Y-%m-%dT%H:%M:%S%.3f%z",
-                            ) {
-                                Ok(ndt) => ndt,
-                                Err(_) => {
-                                    panic!("Failed to parse datetime");
-                                }
-                            };
-                            // 结合时区和日期时间
-                            datetime.push(timezone.from_local_datetime(&naive_datetime).unwrap());
-                        }
-                        let offset = if str1 == "Before" {
-                            0
-                        } else if str1 == "After" {
-                            1
-                        } else {
-                            2
-                        };
-                        (datetime, offset)
-                    };
-                    RoutePredicateFactory::ZonedDateTimePredicates(
-                        ZonedDateTimeRoutePredicateFactory { datetime, offset },
-                    )
-                }
-                "Cookie" => {
-                    let cookies: Vec<String> = str2
-                        .trim_end()
-                        .split(",")
-                        .collect::<Vec<&str>>()
-                        .iter()
-                        .map(|f| f.to_string())
-                        .collect();
-
-                    RoutePredicateFactory::CookiePredicates(CookieRoutePredicateFactory { cookies })
-                }
-                "Header" => {
-                    let header = StrUtil::parse_kv_one_and_option(str2);
-                    let regex = header
-                        .v
-                        .clone()
-                        .map(|f| Some(regex::Regex::new(&f).unwrap()))
-                        .unwrap_or_default();
-                    RoutePredicateFactory::HeaderPredicates(HeaderRoutePredicateFactory {
-                        header,
-                        regex,
-                    })
-                }
-                "Host" => {
-                    let hosts = str2
-                        .trim_end()
-                        .split(",")
-                        .collect::<Vec<&str>>()
-                        .iter()
-                        .map(|f| f.to_string())
-                        .collect::<Vec<String>>();
-                    RoutePredicateFactory::HostPredicates(HostRoutePredicateFactory { hosts })
-                }
-                "Method" => {
-                    let method = str2
-                        .trim_end()
-                        .split(',')
-                        .collect::<Vec<&str>>()
-                        .iter()
-                        .map(|f| f.to_uppercase())
-                        .collect::<Vec<String>>();
-                    let methods = method
-                        .iter()
-                        .map(|f| Method::from_bytes(f.as_bytes()).unwrap())
-                        .collect::<Vec<Method>>();
-                    RoutePredicateFactory::MethodPredicates(MethodRoutePredicateFactory { methods })
-                }
-                "Path" => {
-                    let mut paths = Router::new();
-
-                    // let _ = str2
-                    //     .trim_end()
-                    //     .split(",")
-                    //     .collect::<Vec<&str>>()
-                    //     .iter()
-                    //     .map(|f| {
-                    //         println!("f: {}", f);
-                    //         paths.insert(f.to_string(), true).unwrap()
-                    // });
-                    paths.insert(str2.trim_end().to_string(), true).unwrap();
-                    RoutePredicateFactory::PathPredicates(PathRoutePredicateFactory { paths })
-                }
-                "Query" => {
-                    let name = str2.trim_end().to_string();
-                    RoutePredicateFactory::QueryPredicates(QueryRoutePredicateFactory { name })
-                }
-                "RemoteAddr" => {
-                    let remote_addr = str2.trim_end().to_string();
-                    RoutePredicateFactory::RemoteAddrPredicates(RemoteAddrRoutePredicateFactory {
-                        remote_addr,
-                    })
-                }
-                _ => RoutePredicateFactory::Nothing,
-            };
+        if key.is_empty() {
+            return RoutePredicateFactory::Nothing;
         }
-        RoutePredicateFactory::Nothing
+
+        match key {
+            // =============================
+            // 时间谓词: Before, After, Between
+            // =============================
+            "Before" | "After" | "Between" => {
+                let result = match key {
+                    "Before" => before(value),
+                    "After" => after(value),
+                    "Between" => {
+                        let (start, end) = value
+                            .trim()
+                            .split_once(',')
+                            .ok_or("Between predicate requires two timestamps separated by comma")
+                            .unwrap();
+                        between(start.trim(), end.trim())
+                    }
+                    _ => unreachable!(),
+                };
+
+                match result {
+                    Ok(pred) => RoutePredicateFactory::ZonedDateTimePredicates(pred),
+                    Err(e) => {
+                        warn!("Time predicate error: {}", e);
+                        RoutePredicateFactory::Nothing
+                    }
+                }
+            }
+
+            // =============================
+            // Cookie 谓词
+            // =============================
+            "Cookie" => {
+                let cookies = value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+                    .collect();
+
+                RoutePredicateFactory::CookiePredicates(CookieRoutePredicateFactory { cookies })
+            }
+
+            // =============================
+            // Header 谓词
+            // =============================
+            "Header" => {
+                let header = StrUtil::parse_kv_one_and_option(value);
+                let regex = header
+                    .v
+                    .as_ref()
+                    .map(|pattern| Regex::new(pattern))
+                    .transpose()
+                    .unwrap_or_else(|e| {
+                        warn!("Invalid regex in Header predicate: {}", e);
+                        None
+                    });
+
+                RoutePredicateFactory::HeaderPredicates(HeaderRoutePredicateFactory {
+                    header,
+                    regex,
+                })
+            }
+
+            // =============================
+            // Host 谓词
+            // =============================
+            "Host" => {
+                let hosts = value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+                    .collect();
+
+                RoutePredicateFactory::HostPredicates(HostRoutePredicateFactory { hosts })
+            }
+
+            // =============================
+            // Method 谓词
+            // =============================
+            "Method" => {
+                let methods = value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| {
+                        Method::from_bytes(s.as_bytes())
+                            .map_err(|_| format!("Invalid HTTP method: {}", s))
+                    })
+                    .collect::<Result<HashSet<_>, _>>();
+
+                match methods {
+                    Ok(methods) => {
+                        RoutePredicateFactory::MethodPredicates(MethodRoutePredicateFactory {
+                            methods,
+                        })
+                    }
+                    Err(e) => {
+                        warn!("{}", e);
+                        RoutePredicateFactory::Nothing
+                    }
+                }
+            }
+
+            // =============================
+            // Path 谓词
+            // =============================
+            "Path" => {
+                let mut paths = matchit::Router::new();
+                // 支持多个 path，用逗号分隔
+                for path in value.split(',').map(str::trim) {
+                    if !path.is_empty() {
+                        if let Err(e) = paths.insert(path.to_string(), true) {
+                            warn!("Failed to insert path '{}': {}", path, e);
+                        }
+                    }
+                }
+
+                RoutePredicateFactory::PathPredicates(PathRoutePredicateFactory { paths })
+            }
+
+            // =============================
+            // Query 谓词
+            // =============================
+            "Query" => {
+                let name = value.trim().to_string();
+                if name.is_empty() {
+                    warn!("Query predicate requires a parameter name");
+                    return RoutePredicateFactory::Nothing;
+                }
+
+                RoutePredicateFactory::QueryPredicates(QueryRoutePredicateFactory { name })
+            }
+
+            // =============================
+            // RemoteAddr 谓词
+            // =============================
+            "RemoteAddr" => {
+                let remote_addr = value.trim().to_string();
+                if remote_addr.is_empty() {
+                    warn!("RemoteAddr predicate requires an address");
+                    return RoutePredicateFactory::Nothing;
+                }
+
+                RoutePredicateFactory::RemoteAddrPredicates(RemoteAddrRoutePredicateFactory {
+                    remote_addr,
+                })
+            }
+
+            // =============================
+            // XForwardedRemoteAddr 谓词
+            // =============================
+            "XForwardedRemoteAddr" => {
+                let ips = value.trim_end().to_string();
+                if ips.is_empty() {
+                    warn!("XForwardedRemoteAddr predicate requires an address");
+                    return RoutePredicateFactory::Nothing;
+                }
+
+                let allowed_ips = ips.split(",").map(|s| s.to_string()).collect::<Vec<_>>();
+                if allowed_ips.is_empty() {
+                    warn!("XForwardedRemoteAddr predicate requires at least one address");
+                    return RoutePredicateFactory::Nothing;
+                }
+
+                RoutePredicateFactory::XForwardedRemoteAddr(
+                    XForwardedRemoteAddrRoutePredicateFactory { allowed_ips },
+                )
+            }
+
+            // =============================
+            // 未知谓词
+            // =============================
+            _ => {
+                warn!("Unsupported predicate: {}", key);
+                RoutePredicateFactory::Nothing
+            }
+        }
     }
 }

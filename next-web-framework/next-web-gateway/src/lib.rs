@@ -7,7 +7,7 @@ mod route;
 mod service_discovery;
 mod tests;
 mod util;
-mod models;
+mod model;
 
 
 pub mod application;

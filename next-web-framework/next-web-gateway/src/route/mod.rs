@@ -1,3 +1,4 @@
+pub mod x_forwarded_remote_addr_route_predicate_factory;
 pub mod cookie_route_predicate_factory;
 pub mod header_route_predicate_factory;
 pub mod host_route_predicate_factory;

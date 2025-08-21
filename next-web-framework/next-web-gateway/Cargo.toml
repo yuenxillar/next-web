@@ -9,25 +9,25 @@ edition = "2021"
 
 
 [dependencies]
-tokio = { version = "1.43.0", features = ["full"] }
-pingora = { version = "0.4.0", features = ["lb", "proxy"] }
-pingora-limits = "0.4.0"
+pingora = { version = "0.6.0", features = ["lb", "proxy"] }
+pingora-limits = "0.6.0"
 
-serde = { version = "1.0.216", features = ["derive"] }
-serde_yaml = "0.9.34"
+tokio = { workspace = true }
 
-async-trait = "0.1.83"
-regex = "1.11.1"
-chrono = "0.4.39"
-chrono-tz = "0.10.1"
-matchit = "0.8.4"
-parking_lot = "0.12.3"
-hashbrown = "0.15.2"
-bytes = "1.10.0"
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+async-trait = { workspace = true }
+regex = { workspace = true }
 
-tracing = "0.1"
-tracing-subscriber = { version = "0.3.0",  features = ["fmt", "env-filter", "json", "chrono"] }
-tracing-appender = "0.2"
+ipnetwork = { workspace = true }
+chrono = { workspace = true }
+matchit = { workspace = true }
+hashbrown = { workspace = true }
+bytes = { workspace = true }
+
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
 
 #jemallocator = { version = "0.5.4", optional = true }
 

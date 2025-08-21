@@ -1,6 +1,6 @@
 use super::circuit_breaker_error::CircuitBreakerError;
 use super::circuit_state::CircuitState;
-use parking_lot::Mutex;
+use tokio::sync::Mutex;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -83,12 +83,12 @@ impl CircuitBreakerController {
     ///     Ok::<_, std::io::Error>("Operation successful")
     /// });
     /// ```
-    pub fn execute<F, T, E>(&self, f: F) -> Result<T, Box<dyn std::error::Error>>
+    pub async fn execute<F, T, E>(&self, f: F) -> Result<T, Box<dyn std::error::Error>>
     where
         F: FnOnce() -> Result<T, E>,
         E: std::error::Error + 'static,
     {
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().await;
 
         match state.state {
             CircuitState::Open => {
@@ -124,8 +124,8 @@ impl CircuitBreakerController {
         }
     }
 
-    pub fn process(&self, is_ok: bool) {
-        let mut state = self.state.lock();
+    pub async fn process(&self, is_ok: bool) {
+        let mut state = self.state.lock().await;
         match state.state {
             CircuitState::Open => {
                 if let Some(last_failure_time) = state.last_failure_time {
@@ -169,8 +169,8 @@ impl CircuitBreakerController {
     /// # let cb = CircuitBreaker::new(3, Duration::from_secs(60));
     /// assert_eq!(cb.state(), CircuitState::Closed);
     /// ```
-    pub fn state(&self) -> CircuitState {
-        let mut state = self.state.lock();
+    pub async fn state(&self) -> CircuitState {
+        let mut state = self.state.lock().await;
         if state.state == CircuitState::Open {
             if let Some(last_failure_time) = state.last_failure_time {
                 if last_failure_time.elapsed() >= self.wait_duration_in_open_state {
@@ -195,8 +195,8 @@ impl CircuitBreakerController {
     /// # let cb = CircuitBreaker::new(3, Duration::from_secs(60));
     /// cb.handle_failure();
     /// ```
-    pub fn handle_failure(&self) {
-        let mut state = self.state.lock();
+    pub async fn handle_failure(&self) {
+        let mut state = self.state.lock().await;
         state.failures += 1;
         state.last_failure_time = Some(Instant::now());
 
@@ -215,8 +215,8 @@ impl CircuitBreakerController {
     /// # let cb = CircuitBreaker::new(3, Duration::from_secs(60));
     /// cb.handle_success();
     /// ```
-    pub fn handle_success(&self) {
-        let mut state = self.state.lock();
+    pub async fn handle_success(&self) {
+        let mut state = self.state.lock().await;
         state.failures = 0;
         if state.state == CircuitState::HalfOpen {
             self.reset(&mut state);
@@ -254,11 +254,11 @@ impl CircuitBreakerController {
     ///     println!("Circuit opened!");
     /// });
     /// ```
-    pub fn set_on_open<F>(&self, callback: F)
+    pub async fn set_on_open<F>(&self, callback: F)
     where
         F: Fn() + Send + Sync + 'static,
     {
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().await;
         state.on_open = Some(Arc::new(callback));
     }
 
@@ -278,11 +278,11 @@ impl CircuitBreakerController {
     ///     println!("Circuit closed!");
     /// });
     /// ```
-    pub fn set_on_close<F>(&self, callback: F)
+    pub async fn set_on_close<F>(&self, callback: F)
     where
         F: Fn() + Send + Sync + 'static,
     {
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().await;
         state.on_close = Some(Arc::new(callback));
     }
 
@@ -302,11 +302,11 @@ impl CircuitBreakerController {
     ///     println!("Circuit is half-open!");
     /// });
     /// ```
-    pub fn set_on_half_open<F>(&self, callback: F)
+    pub async fn set_on_half_open<F>(&self, callback: F)
     where
         F: Fn() + Send + Sync + 'static,
     {
-        let mut state = self.state.lock();
+        let mut state = self.state.lock().await;
         state.on_half_open = Some(Arc::new(callback));
     }
 }

@@ -69,7 +69,7 @@ impl ProxyHttp for NextGatewayApplication {
             if let Some(circuit_breaker_service_manager) = &self.circuit_breaker_service_manager {
                 if let Some(service) = circuit_breaker_service_manager.services.get(fallback_id) {
                     ctx.fallback_id = Some(fallback_id.into());
-                    if let CircuitState::Open = service.controller.state() {
+                    if let CircuitState::Open = service.controller.state().await {
                         return Err(GatewayError::ServerRejectsRequest.into());
                     }
                 }

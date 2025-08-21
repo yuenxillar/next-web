@@ -42,7 +42,6 @@ axum-core = { version = "0.5.2" }
 axum-valid = { version = "0.24.0" }
 oauth2 = { version = "5.0.0" }
 
-
 mimalloc = { version = "0.1.47" }
 
 # serialization and deserialization
@@ -96,6 +95,7 @@ urlencoding = { version = "2.1.3" }
 dashmap = { version = "6.1.0", features = ["serde"] }
 bytes = { version = "1.10.1" }
 sys-locale = { version = "0.3.2" }
+ipnetwork = { version =  "0.21.1" }
 
 thiserror = { version = "2.0.8" }
 anyhow = { version = "1.0.94" }

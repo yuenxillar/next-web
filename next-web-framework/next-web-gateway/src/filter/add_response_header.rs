@@ -1,4 +1,5 @@
-use crate::application::{key_value::KeyValue, next_gateway_application::ApplicationContext};
+use crate::util::key_value::KeyValue;
+use crate::application::next_gateway_application::ApplicationContext;
 
 use super::gateway_filter::DefaultGatewayFilter;
 
