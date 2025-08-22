@@ -1,13 +1,13 @@
 use crate::application::next_gateway_application::ApplicationContext;
 
-use super::gateway_filter::DefaultGatewayFilter;
+use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct RemoveRequestHeaderFilter {
     pub headers: Vec<String>,
 }
 
-impl DefaultGatewayFilter for RemoveRequestHeaderFilter {
+impl GatewayFilter for RemoveRequestHeaderFilter {
     fn filter(
         &self,
         _ctx: &mut ApplicationContext,

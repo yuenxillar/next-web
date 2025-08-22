@@ -1,11 +1,11 @@
 use crate::application::next_gateway_application::ApplicationContext;
 
-use super::gateway_filter::DefaultGatewayFilter;
+use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct RewritePathFilter {}
 
-impl DefaultGatewayFilter for RewritePathFilter {
+impl GatewayFilter for RewritePathFilter {
     fn filter(
         &self,
         ctx: &mut ApplicationContext,

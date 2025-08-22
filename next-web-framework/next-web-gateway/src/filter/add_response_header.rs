@@ -1,14 +1,14 @@
 use crate::util::key_value::KeyValue;
 use crate::application::next_gateway_application::ApplicationContext;
 
-use super::gateway_filter::DefaultGatewayFilter;
+use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct AddResponseHeaderFilter {
     pub headers: Vec<KeyValue<String>>,
 }
 
-impl DefaultGatewayFilter for AddResponseHeaderFilter {
+impl GatewayFilter for AddResponseHeaderFilter {
     fn filter(
         &self,
         _ctx: &mut ApplicationContext,

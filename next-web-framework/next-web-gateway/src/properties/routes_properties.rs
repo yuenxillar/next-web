@@ -5,9 +5,8 @@ pub struct RoutesProperties {
     pub predicates: Vec<String>,
     pub filters: Vec<String>,
     pub order: Option<i32>,
-    #[serde(rename = "rateLimiter")]
     pub rate_limiter: Option<u16>,
-    pub metadata: Option<RequestMetadata>,
+    pub metadata: Option<RouteMetadata>,
 }
 
 impl RoutesProperties {
@@ -29,8 +28,23 @@ impl RoutesProperties {
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct RequestMetadata {
+pub struct RouteMetadata {
+    pub client: Option<ClientMetadata>,
+    pub cors: Option<CorsMetadata>,
+}
+
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ClientMetadata {
     pub connect_timeout: Option<u64>,
     pub read_timeout: Option<u64>,
     pub write_timeout: Option<u64>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct CorsMetadata {
+    pub allow_origin: Option<String>,
+    pub allow_methods: Option<String>,
+    pub allow_headers: Option<String>,
+    pub max_age : Option<u32>,
 }

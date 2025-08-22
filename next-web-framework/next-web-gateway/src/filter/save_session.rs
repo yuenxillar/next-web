@@ -1,11 +1,11 @@
 use crate::application::next_gateway_application::ApplicationContext;
 
-use super::gateway_filter::DefaultGatewayFilter;
+use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct SaveSessionFilter {}
 
-impl DefaultGatewayFilter for SaveSessionFilter {
+impl GatewayFilter for SaveSessionFilter {
     fn filter(
         &self,
         ctx: &mut ApplicationContext,

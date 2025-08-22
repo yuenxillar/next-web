@@ -1,6 +1,6 @@
 use crate::application::next_gateway_application::ApplicationContext;
 
-use super::gateway_filter::DefaultGatewayFilter;
+use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct RequestSizeFilter {
@@ -8,7 +8,7 @@ pub struct RequestSizeFilter {
     pub max_size: u64,
 }
 
-impl DefaultGatewayFilter for RequestSizeFilter {
+impl GatewayFilter for RequestSizeFilter {
     fn filter(
         &self,
         _ctx: &mut ApplicationContext,

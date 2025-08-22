@@ -1,13 +1,13 @@
 use crate::application::next_gateway_application::ApplicationContext;
 
-use super::gateway_filter::DefaultGatewayFilter;
+use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct SetRequestHostHeaderFilter {
     pub host: String,
 }
 
-impl DefaultGatewayFilter for SetRequestHostHeaderFilter {
+impl GatewayFilter for SetRequestHostHeaderFilter {
     fn filter(
         &self,
         _session: &mut ApplicationContext,

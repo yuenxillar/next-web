@@ -1,13 +1,13 @@
 use crate::application::next_gateway_application::ApplicationContext;
 
-use super::gateway_filter::DefaultGatewayFilter;
+use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct SetStatusFilter {
     pub status: u16,
 }
 
-impl DefaultGatewayFilter for SetStatusFilter {
+impl GatewayFilter for SetStatusFilter {
     fn filter(
         &self,
         _ctx: &mut ApplicationContext,

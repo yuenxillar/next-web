@@ -31,7 +31,7 @@ rudi-dev = { version = "0.8.6", path = "./next-web-framework/rudi-main/rudi-dev"
 # dev dependencies
 tokio = { version = "1.44.1", features = ["rt-multi-thread", "macros"] }
 tokio-util = { version = "0.7.15" }
-async-stream = { version =  "0.3.6" }
+async-stream = { version = "0.3.6" }
 axum = { version = "0.8.3", default-features = false, features = [
     "tokio",
     "tracing",
@@ -62,6 +62,7 @@ printpdf = { version = "0.8.2" }
 # pay
 wechat-pay-rust-sdk = { version = "0.2.18" }
 
+form_urlencoded = { version = "1.2.2" }
 validator = { version = "0.20.0" }
 reqwest = { version = "0.12.15", features = ["json"] }
 aes = { version = "^0.8.4" }
@@ -72,7 +73,7 @@ hashbrown = { version = "0.15.2", features = ["serde"] }
 regex = { version = "1.11.1" }
 jsonwebtoken = { version = "9.3.0" }
 rust-embed-for-web = { version = "11.2.1" }
-rust-embed = { version =  "8.7.2" }
+rust-embed = { version = "8.7.2" }
 clap = { version = "4.5.37", features = ["derive"] }
 matchit = { version = "0.8.4" }
 bcrypt = { version = "0.16.0" }
@@ -95,7 +96,7 @@ urlencoding = { version = "2.1.3" }
 dashmap = { version = "6.1.0", features = ["serde"] }
 bytes = { version = "1.10.1" }
 sys-locale = { version = "0.3.2" }
-ipnetwork = { version =  "0.21.1" }
+ipnetwork = { version = "0.21.1" }
 
 thiserror = { version = "2.0.8" }
 anyhow = { version = "1.0.94" }

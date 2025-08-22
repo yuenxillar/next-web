@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::str::FromStr;
 
 use pingora::http::Method;
 use pingora::proxy::Session;
@@ -225,14 +226,18 @@ impl Into<RoutePredicateFactory> for &String {
                     return RoutePredicateFactory::Nothing;
                 }
 
-                let allowed_ips = ips.split(",").map(|s| s.to_string()).collect::<Vec<_>>();
-                if allowed_ips.is_empty() {
+                let trusted_networks = ips
+                    .split(",")
+                    .map(|source| ipnetwork::IpNetwork::from_str(source))
+                    .filter_map(|v| v.ok())
+                    .collect::<Vec<_>>();
+                if trusted_networks.is_empty() {
                     warn!("XForwardedRemoteAddr predicate requires at least one address");
                     return RoutePredicateFactory::Nothing;
                 }
 
                 RoutePredicateFactory::XForwardedRemoteAddr(
-                    XForwardedRemoteAddrRoutePredicateFactory { allowed_ips },
+                    XForwardedRemoteAddrRoutePredicateFactory { trusted_networks },
                 )
             }
 

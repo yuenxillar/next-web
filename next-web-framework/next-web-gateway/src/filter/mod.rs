@@ -1,3 +1,14 @@
+pub mod map_request_header;
+pub mod prefix_path;
+pub mod preserve_host_header;
+pub mod redirect_to;
+pub mod remove_response_header;
+pub mod request_header_size;
+pub mod request_rate_limiter;
+pub mod rewrite_location_response_header;
+pub mod secure_headers;
+pub mod set_path;
+pub mod add_request_parameter;
 pub mod add_request_header;
 pub mod add_request_headers_if_not_present;
 pub mod add_response_header;

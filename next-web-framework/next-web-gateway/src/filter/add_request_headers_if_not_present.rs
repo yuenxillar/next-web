@@ -1,4 +1,4 @@
-use super::gateway_filter::DefaultGatewayFilter;
+use super::gateway_filter::GatewayFilter;
 use crate::util::key_value::KeyValue;
 use crate::application::next_gateway_application::ApplicationContext;
 
@@ -7,7 +7,7 @@ pub struct AddRequestHeaderIfNotPresentFilter {
     pub headers: Vec<KeyValue<String>>,
 }
 
-impl DefaultGatewayFilter for AddRequestHeaderIfNotPresentFilter {
+impl GatewayFilter for AddRequestHeaderIfNotPresentFilter {
     fn filter(
         &self,
         _ctx: &mut ApplicationContext,

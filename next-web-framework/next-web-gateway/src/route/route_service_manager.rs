@@ -8,8 +8,8 @@ use pingora_limits::rate::Rate;
 
 use crate::{
     application::next_gateway_application::ApplicationContext,
-    filter::gateway_filter::GatewayFilter,
-    properties::routes_properties::RoutesProperties,
+    filter::gateway_filter::DefaultGatewayFilter,
+    properties::routes_properties::{RouteMetadata, RoutesProperties},
     rate_limiter::{RateLimiter, RATE_KEY},
 };
 
@@ -47,7 +47,9 @@ impl RouteServiceManager {
                             work: &RouteWork::Http,
                             fallback_id: DEFAULT_SERVICE_NAME,
                             route_id: DEFAULT_SERVICE_NAME,
+                            metadata: &None
                         };
+
                     } else {
                         rate_limiter.rate.observe(&RATE_KEY, 1);
                     }
@@ -58,6 +60,7 @@ impl RouteServiceManager {
                     work: &service.work,
                     fallback_id: &service.fallback_id,
                     route_id: &service.id,
+                    metadata: &service.metadata
                 };
             }
         }
@@ -68,6 +71,7 @@ impl RouteServiceManager {
             work: &RouteWork::Http,
             fallback_id: DEFAULT_SERVICE_NAME,
             route_id: DEFAULT_SERVICE_NAME,
+            metadata: &None
         }
     }
 
@@ -101,7 +105,9 @@ pub struct RoutepRedicateResult<'a> {
     pub work: &'a RouteWork,
     pub fallback_id: &'a str,
     pub route_id: &'a str,
+    pub metadata: &'a Option<RouteMetadata>,
 }
+
 impl Default for RouteServiceManager {
     fn default() -> Self {
         Self {
@@ -117,9 +123,10 @@ pub struct RoutePredicateService {
     pub work: RouteWork,
     pub upstream: String,
     pub route_predicate_factory: Vec<RoutePredicateFactory>,
-    pub filters: Vec<GatewayFilter>,
+    pub filters: Vec<DefaultGatewayFilter>,
     pub fallback_id: String,
     pub rate_limiter: Option<RateLimiter>,
+    pub metadata: Option<RouteMetadata>,
 }
 
 #[derive(Debug, Clone)]
@@ -172,7 +179,7 @@ impl From<RoutesProperties> for RoutePredicateService {
             .filters()
             .iter()
             .map(|filter| filter.into())
-            .collect::<Vec<GatewayFilter>>();
+            .collect::<Vec<DefaultGatewayFilter>>();
         println!("filters: {:#?}", filters);
         // Sort filters by order
         // filters.sort_by(|a, b| match (a, b) {
@@ -199,8 +206,12 @@ impl From<RoutesProperties> for RoutePredicateService {
                 rate: Arc::new(Rate::new(std::time::Duration::from_secs(1))),
             })
         };
+
+        let id = routes_properties.id().to_string();
+        let metadata = routes_properties.metadata;
+
         Self {
-            id: routes_properties.id().into(),
+            id,
             upstream,
             order,
             work,
@@ -208,6 +219,7 @@ impl From<RoutesProperties> for RoutePredicateService {
             filters,
             fallback_id,
             rate_limiter,
+            metadata
         }
     }
 }

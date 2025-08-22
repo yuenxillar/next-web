@@ -1,13 +1,13 @@
 use crate::application::next_gateway_application::ApplicationContext;
 
-use super::gateway_filter::DefaultGatewayFilter;
+use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct StripPrefixFilter {
     pub offset: usize,
 }
 
-impl DefaultGatewayFilter for StripPrefixFilter {
+impl GatewayFilter for StripPrefixFilter {
     fn filter(
         &self,
         _ctx: &mut ApplicationContext,

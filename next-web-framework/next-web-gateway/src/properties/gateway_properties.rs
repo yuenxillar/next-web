@@ -23,35 +23,6 @@ pub struct GatewayApplicationProperties {
 }
 
 impl GatewayApplicationProperties {
-    pub fn new() -> Self {
-        let config_file = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .join("application.yaml")
-            .display()
-            .to_string();
-        let data = std::fs::read_to_string(config_file).unwrap();
-        let yaml_value = serde_yaml::from_str::<Value>(&data).unwrap();
-        let gateway = yaml_value.get("gateway").unwrap();
-
-        let mut gateway_properties: Self = serde_yaml::from_value(gateway.clone()).unwrap();
-
-        if let Some(circuit_breakers) = gateway.get("circuitbreaker") {
-            if let Some(mapping) = circuit_breakers.as_mapping() {
-                let mut circuitbreaker = Vec::new();
-
-                for (key, value) in mapping.iter() {
-                    let id = key.as_str().unwrap().to_string();
-                    let mut circuit_breaker_properties =
-                        serde_yaml::from_value::<CircuitBreakerProperties>(value.clone()).unwrap();
-                    circuit_breaker_properties.id = id;
-                    circuitbreaker.push(circuit_breaker_properties);
-                }
-                gateway_properties.circuitbreaker = Some(circuitbreaker);
-            }
-        };
-
-        gateway_properties
-    }
-
     pub fn into_services(&self) -> RouteServiceManager {
         let mut services = self
             .routes
@@ -102,6 +73,39 @@ impl GatewayApplicationProperties {
         Some(circuit_breaker_service_manager)
     }
 }
+
+impl Default for GatewayApplicationProperties {
+    fn default() -> Self {
+        let config_file = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("application.yaml")
+            .display()
+            .to_string();
+        let data = std::fs::read_to_string(config_file).unwrap();
+        let yaml_value = serde_yaml::from_str::<Value>(&data).unwrap();
+        let gateway = yaml_value.get("gateway").unwrap();
+
+        let mut gateway_properties: Self = serde_yaml::from_value(gateway.clone()).unwrap();
+
+        if let Some(circuit_breakers) = gateway.get("circuitbreaker") {
+            if let Some(mapping) = circuit_breakers.as_mapping() {
+                let mut circuitbreaker = Vec::new();
+
+                for (key, value) in mapping.iter() {
+                    let id = key.as_str().unwrap().to_string();
+                    let mut circuit_breaker_properties =
+                        serde_yaml::from_value::<CircuitBreakerProperties>(value.clone()).unwrap();
+                    circuit_breaker_properties.id = id;
+                    circuitbreaker.push(circuit_breaker_properties);
+                }
+                gateway_properties.circuitbreaker = Some(circuitbreaker);
+            }
+        };
+
+        gateway_properties
+    }
+}
+
+
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct GlobalCorsProperties {}

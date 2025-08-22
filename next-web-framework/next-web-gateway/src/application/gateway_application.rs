@@ -46,17 +46,17 @@ pub trait GatewayApplication: Send + Sync {
     where
         Self: GatewayApplication + Default,
     {
-        let user_application = Self::default();
+        let application = Self::default();
 
-        user_application.init_logging();
+        application.init_logging();
 
         // Retrieve configuration files and convert them into objects
-        let application_properties = GatewayApplicationProperties::new();
+        let application_properties = GatewayApplicationProperties::default();
         let route_service_manager = application_properties.into_services();
         let mut circuitbreaker_service_manager =
             application_properties.into_circuitbreaker_services();
 
-        let fallback_providers = user_application.fallback_providers();
+        let fallback_providers = application.fallback_providers();
 
         if let Some(manager) = circuitbreaker_service_manager.as_mut() {
             manager.set_fallback_providers(fallback_providers);

@@ -54,15 +54,15 @@ impl ProxyHttp for NextGatewayApplication {
         ctx: &mut Self::CTX,
     ) -> Result<Box<HttpPeer>> {
         // Directly return the assertion operation error for the request implementation
-        let predicate = self.route_service_manager.predicate(session);
+        let route_predicate = self.route_service_manager.predicate(session);
 
-        let predicate_result = predicate.result;
+        let predicate_result = route_predicate.result;
         if !predicate_result {
             return Err(GatewayError::ServerRejectsRequest.into());
         };
 
-        let sevice_name = predicate.service_name;
-        let fallback_id = predicate.fallback_id;
+        let sevice_name = route_predicate.service_name;
+        let fallback_id = route_predicate.fallback_id;
 
         // Is the routing fuse in open or half open position
         if !fallback_id.is_empty() {
@@ -79,9 +79,11 @@ impl ProxyHttp for NextGatewayApplication {
         // Determine whether it is a normal address or a service name
         let normal = sevice_name.contains(".");
 
-        let route_work = predicate.work;
+        let route_work = route_predicate.work;
 
-        ctx.route_id = Some(predicate.route_id.into());
+        ctx.route_id = Some(route_predicate.route_id.into());
+
+        let client_metadata = route_predicate.metadata.as_ref().map(|v| v.client.as_ref());
 
         // Request upstream through routing working mode
         match route_work {
@@ -101,13 +103,31 @@ impl ProxyHttp for NextGatewayApplication {
                     }
                 };
 
-                set_request_timeout(&mut http_peer, std::time::Duration::from_millis(500));
+                client_metadata.map(|v| {
+                    v.map(|d| {
+                        set_request_timeout(
+                            &mut http_peer,
+                            d.connect_timeout,
+                            d.read_timeout,
+                            d.write_timeout,
+                        )
+                    })
+                });
                 return Ok(Box::new(http_peer));
             }
             &RouteWork::Https => {
                 // TODO: Implement HTTPS routing
                 let mut http_peer = HttpPeer::new(sevice_name, false, "".into());
-                set_request_timeout(&mut http_peer, std::time::Duration::from_millis(500));
+                client_metadata.map(|v| {
+                    v.map(|d| {
+                        set_request_timeout(
+                            &mut http_peer,
+                            d.connect_timeout,
+                            d.read_timeout,
+                            d.write_timeout,
+                        )
+                    })
+                });
 
                 return Ok(Box::new(http_peer));
             }
@@ -216,10 +236,16 @@ impl ProxyHttp for NextGatewayApplication {
 pub struct ApplicationContext {
     pub fallback_id: Option<String>,
     pub route_id: Option<String>,
-    pub session: Option<String>
+    pub session: Option<String>,
 }
 
-pub fn set_request_timeout(http: &mut HttpPeer, timeout: Duration) {
-    http.options.connection_timeout = Some(timeout);
-    http.options.read_timeout = Some(timeout);
+pub fn set_request_timeout(
+    http: &mut HttpPeer,
+    connection_timeout: Option<u64>,
+    read_timeout: Option<u64>,
+    write_timeout: Option<u64>,
+) {
+    connection_timeout.map(|v| http.options.connection_timeout = Some(Duration::from_millis(v)));
+    read_timeout.map(|v| http.options.read_timeout = Some(Duration::from_millis(v)));
+    write_timeout.map(|v| http.options.write_timeout = Some(Duration::from_millis(v)));
 }

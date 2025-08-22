@@ -24,6 +24,7 @@ chrono = { workspace = true }
 matchit = { workspace = true }
 hashbrown = { workspace = true }
 bytes = { workspace = true }
+form_urlencoded = { workspace = true }
 
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
