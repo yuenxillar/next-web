@@ -3,7 +3,7 @@ use crate::filter::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct SetPathFilter {
-
+    pub path: String,
 }
 
 impl GatewayFilter  for SetPathFilter {

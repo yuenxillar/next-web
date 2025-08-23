@@ -355,7 +355,7 @@ impl MockData {
             text.push_str("\n\n");
         }
         
-        text.trim_end().to_string()
+        text.trim().to_string()
     }
 
     fn generate_chinese_name() -> String {

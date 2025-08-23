@@ -153,9 +153,9 @@ pub trait Application: Send + Sync {
     ) {
         // Register singletion
         // properties args resources
-        ctx.insert_singleton_with_name(application_properties.to_owned(), "");
-        ctx.insert_singleton_with_name(application_args.to_owned(), "");
-        ctx.insert_singleton_with_name(application_resources.to_owned(), "");
+        ctx.insert_singleton_with_name(application_properties.to_owned(), "applicationProperties");
+        ctx.insert_singleton_with_name(application_args.to_owned(), "applicationArgs");
+        ctx.insert_singleton_with_name(application_resources.to_owned(), "applicationResources");
 
         let mut container = ApplicationDefaultRegisterContainer::new();
         container.register_all(ctx, application_properties).await;

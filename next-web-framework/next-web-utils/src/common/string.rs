@@ -34,7 +34,7 @@ impl StringUtil {
     /// # 返回值
     /// 如果字符串为空或仅包含空白字符，则返回 `true`；否则返回 `false`。
     pub fn is_blank(s: &str) -> bool {
-        s.trim_end().is_empty()
+        s.trim().is_empty()
     }
 
     /// 检查字符串是否非空且不全是空白字符。

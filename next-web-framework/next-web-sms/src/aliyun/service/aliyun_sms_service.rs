@@ -186,12 +186,12 @@ impl SmsService for AliyunCloudSmsService {
 
     fn check_validity<'a>(&self, phone_number: &'a str, sign_name: &'a str) -> bool {
         // 检查手机号码是否合法
-        if phone_number.trim_end().is_empty() {
+        if phone_number.trim().is_empty() {
             return false;
         }
 
         // 检查签名是否合法
-        if sign_name.trim_end().is_empty() {
+        if sign_name.trim().is_empty() {
             return false;
         }
 

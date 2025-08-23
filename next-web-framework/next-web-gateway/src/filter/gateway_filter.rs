@@ -1,10 +1,19 @@
 use pingora::http::{RequestHeader, ResponseHeader};
+use regex::Regex;
 
 use crate::application::next_gateway_application::ApplicationContext;
 use crate::filter::secure_headers::SecureHeadersFilter;
 use crate::filter::set_path::SetPathFilter;
 use crate::{filter::add_request_parameter::AddRequestParameterFilter, util::key_value::KeyValue};
 
+use super::map_request_header::MapRequestHeaderFilter;
+use super::prefix_path::PrefixPathFilter;
+use super::preserve_host_header::PreserveHostHeaderFilter;
+use super::redirect_to::RedirectToFilter;
+use super::remove_response_header::RemoveResponseHeaderFilter;
+use super::request_header_size::RequestHeaderSizeFilter;
+use super::request_rate_limiter::RequestRateLimiterFilter;
+use super::rewrite_location_response_header::RewriteLocationResponseHeaderFilter;
 use super::{
     add_request_header::AddRequestHeaderFilter,
     add_request_headers_if_not_present::AddRequestHeaderIfNotPresentFilter,
@@ -16,6 +25,15 @@ use super::{
     set_response_header::SetResponseHeaderFilter, set_status::SetStatusFilter,
     strip_prefix::StripPrefixFilter,
 };
+
+macro_rules! delegate_filter {
+    ($self:ident, $ctx:ident, $req:ident, $resp:ident, $($variant:ident),*) => {
+        match $self {
+            $(Self::$variant(filter) => filter.filter($ctx, $req, $resp),)*
+            Self::Nothing => {}
+        }
+    };
+}
 
 pub trait GatewayFilter {
     fn filter(
@@ -63,193 +81,245 @@ impl DefaultGatewayFilter {
         upstream_request_header: &mut RequestHeader,
         upstream_response_header: &mut ResponseHeader,
     ) {
-        match self {
-            Self::AddRequestHeader(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::AddRequestHeaderIfNotPresent(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::AddResponseHeader(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::RemoveRequestHeader(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::RequestSize(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::RewritePath(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::RewriteResponseHeader(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::SaveSession(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::SecureHeaders(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::SetRequestHeader(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::SetPath(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::SetRequestHostHeader(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::SetResponseHeader(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::SetStatus(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::StripPrefix(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::AddRequestParameter(gateway_filter) => {
-                gateway_filter.filter(ctx, upstream_request_header, upstream_response_header)
-            }
-            Self::Nothing => {}
-        }
+        delegate_filter!(
+            self,
+            ctx,
+            upstream_request_header,
+            upstream_response_header,
+            AddRequestHeader,
+            AddRequestHeaderIfNotPresent,
+            AddResponseHeader,
+            AddRequestParameter,
+            MapRequestHeader,
+            PrefixPath,
+            PreserveHostHeader,
+            RedirectTo,
+            RemoveRequestHeader,
+            RemoveResponseHeader,
+            RequestHeaderSize,
+            RequestRateLimiter,
+            RequestSize,
+            RewriteLocationResponseHeader,
+            RewritePath,
+            RewriteResponseHeader,
+            SaveSession,
+            SecureHeaders,
+            SetRequestHeader,
+            SetPath,
+            SetRequestHostHeader,
+            SetResponseHeader,
+            SetStatus,
+            StripPrefix
+        );
     }
 }
 
-impl Into<DefaultGatewayFilter> for &String {
-    fn into(self) -> DefaultGatewayFilter {
-        if self.is_empty() {
-            panic!("empty filter name")
+impl From<&str> for DefaultGatewayFilter {
+
+    fn from(str: &str) -> Self {
+        if str.is_empty() {
+            panic!("empty filter name");
         }
-        let (filter_name, value) = if !self.contains("=") {
-            (self.as_str(), "")
+
+        let (filter_name, value) = if let Some(pos) = str.find('=') {
+            (&str[..pos], &str[pos + 1..])
         } else {
-            self.split_once('=').unwrap()
+            (str, "")
         };
 
-        match filter_name.trim_end() {
-            "AddRequestHeader" => {
-                let headers = split_one(value);
-                DefaultGatewayFilter::AddRequestHeader(AddRequestHeaderFilter { headers })
-            }
-            "AddRequestHeaderIfNotPresent" => {
-                let headers = split_one(value);
-                DefaultGatewayFilter::AddRequestHeaderIfNotPresent(
-                    AddRequestHeaderIfNotPresentFilter { headers },
-                )
-            }
-            "AddRequestParameter" => {
-                DefaultGatewayFilter::AddRequestParameter(AddRequestParameterFilter {
-                    parameter: todo!(),
-                })
-            }
-
-            "AddResponseHeader" => {
-                let headers = split_one(value);
-                DefaultGatewayFilter::AddResponseHeader(AddResponseHeaderFilter { headers })
-            }
-
-            "MapRequestHeader" => DefaultGatewayFilter::MapRequestHeader(),
-            // TODO
-            "PrefixPath" => DefaultGatewayFilter::PrefixPath(),
-
-            // TODO
-            "PreserveHostHeader" => DefaultGatewayFilter::PreserveHostHeader(),
-
-            // TODO
-            "RedirectTo" => DefaultGatewayFilter::RedirectTo(),
-
-            "RemoveRequestHeader" => {
-                let headers = split_two(value);
-                DefaultGatewayFilter::RemoveRequestHeader(RemoveRequestHeaderFilter { headers })
-            }
-
-            // TODO
-            "RemoveResponseHeader" => DefaultGatewayFilter::RemoveResponseHeader(),
-            // TODO
-            "RequestHeaderSize" => DefaultGatewayFilter::RequestHeaderSize(),
-
-            // TODO
-            "RequestRateLimiter" => DefaultGatewayFilter::RequestRateLimiter(),
-
-            // default value is 10MB
-            "RequestSize" => DefaultGatewayFilter::RequestSize(RequestSizeFilter {
-                max_size: value.parse().unwrap_or(10485760),
+        match filter_name.trim() {
+            "AddRequestHeader" => Self::AddRequestHeader(AddRequestHeaderFilter {
+                headers: split_kv_pairs(value),
             }),
 
-            // TODO
-            "RewriteLocationResponseHeader" => {
-                DefaultGatewayFilter::RewriteLocationResponseHeader()
+            "AddRequestHeaderIfNotPresent" => Self::AddRequestHeaderIfNotPresent(
+                AddRequestHeaderIfNotPresentFilter {
+                    headers: split_kv_pairs(value),
+                },
+            ),
+
+            "AddRequestParameter" => {
+                let parameters = split_params(value, "&", ",");
+                if parameters.is_empty() {
+                    Self::Nothing
+                } else {
+                    Self::AddRequestParameter(AddRequestParameterFilter { parameters })
+                }
             }
 
-            // TODO
-            "RewritePath" => DefaultGatewayFilter::RewritePath(RewritePathFilter {}),
+            "AddResponseHeader" => Self::AddResponseHeader(AddResponseHeaderFilter {
+                headers: split_kv_pairs(value),
+            }),
+
+            "MapRequestHeader" => {
+                if let Some((key, value)) = value.split_once(',') {
+                    Self::MapRequestHeader(MapRequestHeaderFilter {
+                        header: KeyValue::from((key, value)),
+                    })
+                } else {
+                    Self::Nothing
+                }
+            }
+
+            "PrefixPath" => Self::PrefixPath(PrefixPathFilter {
+                path: value.trim().into(),
+            }),
+
+            "PreserveHostHeader" => Self::PreserveHostHeader(PreserveHostHeaderFilter {}),
+
+            "RedirectTo" => {
+                if let Some((status_str, url)) = value.split_once(',') {
+                    if let Ok(status) = status_str.trim().parse() {
+                        Self::RedirectTo(RedirectToFilter {
+                            status,
+                            url: url.trim().into(),
+                        })
+                    } else {
+                        Self::Nothing
+                    }
+                } else {
+                    Self::Nothing
+                }
+            }
+
+            "RemoveRequestHeader" => Self::RemoveRequestHeader(RemoveRequestHeaderFilter {
+                headers: split_headers(value),
+            }),
+
+            "RemoveResponseHeader" => Self::RemoveResponseHeader(RemoveResponseHeaderFilter {
+                headers: split_headers(value),
+            }),
+
+            "RequestHeaderSize" => {
+                if let Some((max_size_str, error_msg)) = value.split_once(',') {
+                    Self::RequestHeaderSize(RequestHeaderSizeFilter {
+                        max_size: max_size_str.trim().parse().unwrap_or(0),
+                        error_message: error_msg.trim().to_string(),
+                    })
+                } else {
+                    Self::RequestHeaderSize(RequestHeaderSizeFilter {
+                        max_size: value.trim().parse().unwrap_or(0),
+                        error_message: "Request header size exceeded".to_string(),
+                    })
+                }
+            }
+
+            "RequestRateLimiter" => Self::RequestRateLimiter(RequestRateLimiterFilter {
+                rate_limit: value.trim().parse().unwrap_or(0),
+            }),
+
+            "RequestSize" => Self::RequestSize(RequestSizeFilter {
+                max_size: value.trim().parse().unwrap_or(0),
+            }),
+
+            "RewriteLocationResponseHeader" => {
+                let parts: Vec<&str> = value.split(',').map(|s| s.trim()).collect();
+                Self::RewriteLocationResponseHeader(RewriteLocationResponseHeaderFilter {
+                    strip_version_mode: parts.get(0).map(|&s| s.into()).unwrap_or_default(),
+                    location_header_name: parts.get(1).map(|&s| Some(s.into())).unwrap_or_default(),
+                    host_value: parts.get(2).map(|&s| Some(s.into())).unwrap_or_default(),
+                    protocols_regex: parts.get(3).and_then(|&s| Regex::new(s).ok()),
+                })
+            }
 
             "RewriteResponseHeader" => {
-                let header = split_two(value);
-                let regex = if header.len() == 2 {
-                    None
+                let parts: Vec<&str> = value.split(',').map(|s| s.trim()).collect();
+                if parts.len() >= 2 {
+                    let regex = parts.get(2).and_then(|&s| Regex::new(s).ok());
+                    Self::RewriteResponseHeader(RewriteResponseHeaderFilter {
+                        header: (
+                            KeyValue::from((parts[0], parts[1])),
+                            regex,
+                        ),
+                    })
                 } else {
-                    Some(regex::Regex::new(&header[2]).unwrap())
-                };
-                DefaultGatewayFilter::RewriteResponseHeader(RewriteResponseHeaderFilter {
-                    header: (
-                        KeyValue {
-                            k: header[0].to_string(),
-                            v: header[1].to_string(),
-                        },
-                        regex,
-                    ),
-                })
-            }
-            "SaveSession" => DefaultGatewayFilter::SaveSession(SaveSessionFilter {}),
-
-            // TODO
-            "SecureHeaders" => DefaultGatewayFilter::SecureHeaders(SecureHeadersFilter {}),
-
-            "SetRequestHeader" => {
-                let headers = split_one(value);
-                DefaultGatewayFilter::SetRequestHeader(SetRequestHeaderFilter { headers })
+                    Self::Nothing
+                }
             }
 
-            // TODO
-            "SetPath" => DefaultGatewayFilter::SetPath(),
+            "SaveSession" => Self::SaveSession(SaveSessionFilter {}),
+            "SecureHeaders" => Self::SecureHeaders(SecureHeadersFilter {}),
 
-            "SetRequestHostHeader" => {
-                let host = value.to_string();
-                DefaultGatewayFilter::SetRequestHostHeader(SetRequestHostHeaderFilter { host })
-            }
-            "SetResponseHeader" => {
-                let headers = split_one(value);
-                DefaultGatewayFilter::SetResponseHeader(SetResponseHeaderFilter { headers })
-            }
-
-            "SetStatus" => DefaultGatewayFilter::SetStatus(SetStatusFilter {
-                status: value.parse().unwrap_or(200),
-            }),
-            "StripPrefix" => DefaultGatewayFilter::StripPrefix(StripPrefixFilter {
-                offset: value.parse().unwrap_or(0),
+            "SetRequestHeader" => Self::SetRequestHeader(SetRequestHeaderFilter {
+                headers: split_kv_pairs(value),
             }),
 
-            _ => DefaultGatewayFilter::Nothing,
+            "SetPath" => Self::SetPath(SetPathFilter {
+                path: value.trim().to_string(),
+            }),
+
+            "SetRequestHostHeader" => Self::SetRequestHostHeader(SetRequestHostHeaderFilter {
+                host: value.trim().to_string(),
+            }),
+
+            "SetResponseHeader" => Self::SetResponseHeader(SetResponseHeaderFilter {
+                headers: split_kv_pairs(value),
+            }),
+
+            "SetStatus" => Self::SetStatus(SetStatusFilter {
+                status: value.trim().parse().unwrap_or(200),
+            }),
+
+            "StripPrefix" => Self::StripPrefix(StripPrefixFilter {
+                offset: value.trim().parse().unwrap_or(0),
+            }),
+
+            _ => Self::Nothing,
         }
     }
 }
 
-// Split -> X-Request-red:blue,X-Request-green:yellow
-fn split_one(str: &str) -> Vec<KeyValue<String>> {
-    str.trim_end()
+fn split(str: &str) -> Vec<KeyValue<String, String>> {
+    str.trim()
         .split(',')
-        .map(|s| s.trim_end().split(":").collect::<Vec<&str>>())
-        .map(|s| Into::<KeyValue<String>>::into(s))
+        .map(|s| s.trim().split(":").collect::<Vec<&str>>())
+        .map(|s| Into::<KeyValue<String, String>>::into(s))
         .collect()
 }
 
-// Split -> X-Request-Foo,X-Request-Bar
-fn split_two(str: &str) -> Vec<String> {
-    str.trim_end()
+// 使用更高效的字符串分割和处理方式
+fn split_kv_pairs(str: &str) -> Vec<KeyValue<String, String>> {
+    str.trim()
         .split(',')
-        .map(|s| s.trim_end().to_string())
+        .filter_map(|pair| {
+            let mut parts = pair.trim().splitn(2, ':');
+            let key = parts.next()?.trim();
+            let value = parts.next()?.trim();
+            if key.is_empty() || value.is_empty() {
+                None
+            } else {
+                Some(KeyValue::from((key, value)))
+            }
+        })
+        .collect()
+}
+
+fn split_headers(str: &str) -> Vec<String> {
+    str.trim()
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect()
+}
+
+fn split_params<'a>(
+    input: &'a str,
+    param_delimiter: &'a str,
+    kv_delimiter: &'a str,
+) -> Vec<KeyValue<String, String>> {
+    input
+        .trim()
+        .split(param_delimiter)
+        .filter_map(|param| {
+            let mut parts = param.trim().splitn(2, kv_delimiter);
+            let key = parts.next()?.trim();
+            let value = parts.next()?.trim();
+            if key.is_empty() || value.is_empty() {
+                None
+            } else {
+                Some(KeyValue::from((key, value)))
+            }
+        })
         .collect()
 }

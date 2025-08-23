@@ -1,16 +1,18 @@
-gateway:
-  routes:
-    - id: Test
-      uri: lb://UserService
-      predicates: 
-        - Path=/test/**
-        - Header=X-Request-Id
-      metadata:
-        connect_timeout: 100
-    - id: Test1
-      uri: lb://UserService
-      predicates: 
-        - Path=/test/**
-        - Header=X-Request-Id
-      metadata:
-        connect_timeout: 100
+next:
+  gateway:
+    routes:
+      - id: Test
+        uri: lb://UserService
+        predicates: 
+          - Path=/test/**
+          - Header=X-Request-Id
+        metadata:
+          connect_timeout: 100
+      - id: Test1
+        uri: lb://UserService
+        predicates: 
+          - Path=/test/**
+          - Header=X-Request-Id
+          - AddRequestParameter=test, 123 & test1, 456
+        metadata:
+          connect_timeout: 100

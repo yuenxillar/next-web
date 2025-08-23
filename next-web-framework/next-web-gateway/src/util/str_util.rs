@@ -5,14 +5,14 @@ pub struct StrUtil;
 impl StrUtil {
     // Header=X-Request-Id, ch.p
     pub fn parse_kv_one_and_option(str: &str) -> KeyValue<Option<String>> {
-        str.trim_end()
+        str.trim()
             .split_once(',')
             .map(|(n, v)| KeyValue {
                 k: n.into(),
                 v: Some(v.to_string()),
             })
             .unwrap_or(KeyValue {
-                k: str.trim_end().into(),
+                k: str.trim().into(),
                 v: None,
             })
     }

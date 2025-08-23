@@ -113,12 +113,12 @@ impl CircuitBreakerController {
         match f() {
             Ok(result) => {
                 if current_state == CircuitState::HalfOpen {
-                    self.handle_success();
+                    self.handle_success().await;
                 }
                 Ok(result)
             }
             Err(e) => {
-                self.handle_failure();
+                self.handle_failure().await;
                 Err(Box::new(e))
             }
         }
@@ -147,9 +147,9 @@ impl CircuitBreakerController {
 
         drop(state);
         if !is_ok {
-            self.handle_failure();
+            self.handle_failure().await;
         } else {
-            self.handle_success();
+            self.handle_success().await;
         }
     }
 
@@ -309,8 +309,4 @@ impl CircuitBreakerController {
         let mut state = self.state.lock().await;
         state.on_half_open = Some(Arc::new(callback));
     }
-}
-
-fn test() {
-    // pingora_limits::rate::RateComponents
 }

@@ -178,7 +178,7 @@ impl From<RoutesProperties> for RoutePredicateService {
         let filters = routes_properties
             .filters()
             .iter()
-            .map(|filter| filter.into())
+            .map(|s| DefaultGatewayFilter::from(s.as_ref()))
             .collect::<Vec<DefaultGatewayFilter>>();
         println!("filters: {:#?}", filters);
         // Sort filters by order

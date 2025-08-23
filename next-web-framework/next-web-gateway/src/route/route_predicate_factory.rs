@@ -220,7 +220,7 @@ impl Into<RoutePredicateFactory> for &String {
             // XForwardedRemoteAddr 谓词
             // =============================
             "XForwardedRemoteAddr" => {
-                let ips = value.trim_end().to_string();
+                let ips = value.trim().to_string();
                 if ips.is_empty() {
                     warn!("XForwardedRemoteAddr predicate requires an address");
                     return RoutePredicateFactory::Nothing;

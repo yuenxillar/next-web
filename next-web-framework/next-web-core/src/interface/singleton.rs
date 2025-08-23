@@ -21,6 +21,6 @@ pub trait Singleton: Send + Sync {
             .split("::")
             .next()
             .unwrap_or_default()
-            .into()
+            .to_string()
     }
 }

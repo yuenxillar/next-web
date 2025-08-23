@@ -4,7 +4,7 @@ use crate::application::next_gateway_application::ApplicationContext;
 
 #[derive(Debug, Clone)]
 pub struct AddRequestHeaderIfNotPresentFilter {
-    pub headers: Vec<KeyValue<String>>,
+    pub headers: Vec<KeyValue<String, String>>,
 }
 
 impl GatewayFilter for AddRequestHeaderIfNotPresentFilter {

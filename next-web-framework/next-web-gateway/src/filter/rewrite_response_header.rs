@@ -7,7 +7,7 @@ use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct RewriteResponseHeaderFilter {
-    pub header: (KeyValue<String>, Option<Regex>),
+    pub header: (KeyValue<String, String>, Option<Regex>),
 }
 
 impl GatewayFilter for RewriteResponseHeaderFilter {

@@ -9,7 +9,7 @@ pub struct HeaderRoutePredicateFactory {
 
 impl RoutePredicate for HeaderRoutePredicateFactory {
     fn matches(&self, session: &mut pingora::protocols::http::ServerSession) -> bool {
-        let header_name = self.header.k.as_str();
+        let header_name = self.header.k.as_ref();
         
         // 1. 检查头是否存在
         if let Some(header_value_bytes) = session.req_header().headers.get(header_name) {

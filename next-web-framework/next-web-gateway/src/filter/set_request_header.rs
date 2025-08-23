@@ -5,7 +5,7 @@ use super::gateway_filter::GatewayFilter;
 
 #[derive(Debug, Clone)]
 pub struct SetRequestHeaderFilter {
-    pub headers: Vec<KeyValue<String>>,
+    pub headers: Vec<KeyValue<String, String>>,
 }
 
 impl GatewayFilter for SetRequestHeaderFilter {
