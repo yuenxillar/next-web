@@ -4,6 +4,7 @@ use regex::Regex;
 use crate::application::next_gateway_application::ApplicationContext;
 use crate::filter::secure_headers::SecureHeadersFilter;
 use crate::filter::set_path::SetPathFilter;
+use crate::route::route_service_manager::UpStream;
 use crate::{filter::add_request_parameter::AddRequestParameterFilter, util::key_value::KeyValue};
 
 use super::map_request_header::MapRequestHeaderFilter;
@@ -27,9 +28,9 @@ use super::{
 };
 
 macro_rules! delegate_filter {
-    ($self:ident, $ctx:ident, $req:ident, $resp:ident, $($variant:ident),*) => {
+    ($self:ident, $ctx:ident, $upstream:ident, $($variant:ident),*) => {
         match $self {
-            $(Self::$variant(filter) => filter.filter($ctx, $req, $resp),)*
+            $(Self::$variant(filter) => filter.filter($ctx, $upstream),)*
             Self::Nothing => {}
         }
     };
@@ -39,8 +40,7 @@ pub trait GatewayFilter {
     fn filter(
         &self,
         ctx: &mut ApplicationContext,
-        request_header: &mut RequestHeader,
-        respnose_header: &mut ResponseHeader,
+        upstream: &mut UpStream,
     );
 }
 
@@ -78,14 +78,12 @@ impl DefaultGatewayFilter {
     pub fn filter(
         &self,
         ctx: &mut ApplicationContext,
-        upstream_request_header: &mut RequestHeader,
-        upstream_response_header: &mut ResponseHeader,
+        upstream: &mut UpStream,
     ) {
         delegate_filter!(
             self,
             ctx,
-            upstream_request_header,
-            upstream_response_header,
+            upstream,
             AddRequestHeader,
             AddRequestHeaderIfNotPresent,
             AddResponseHeader,

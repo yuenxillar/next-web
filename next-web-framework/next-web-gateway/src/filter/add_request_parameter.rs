@@ -1,7 +1,6 @@
+use crate::route::route_service_manager::UpStream;
 use crate::{filter::gateway_filter::GatewayFilter, util::key_value::KeyValue};
 use form_urlencoded::{parse, Serializer};
-use pingora::http::ResponseHeader;
-use pingora::prelude::RequestHeader;
 use std::collections::HashMap;
 use tracing::warn;
 
@@ -14,9 +13,13 @@ impl GatewayFilter for AddRequestParameterFilter {
     fn filter(
         &self,
         _ctx: &mut crate::application::next_gateway_application::ApplicationContext,
-        request_header: &mut RequestHeader,
-        _response_header: &mut ResponseHeader,
+        upstream: &mut UpStream
     ) {
+          let request_header = match upstream.request_header.as_mut() {
+            Some(request_header) => request_header,
+            None => return,
+        };
+
         // 如果没有参数需要添加，直接返回
         if self.parameters.is_empty() {
             return;

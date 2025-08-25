@@ -1,4 +1,7 @@
-use crate::application::next_gateway_application::ApplicationContext;
+use crate::{
+    application::next_gateway_application::ApplicationContext,
+    route::route_service_manager::UpStream,
+};
 
 use super::gateway_filter::GatewayFilter;
 
@@ -8,12 +11,12 @@ pub struct StripPrefixFilter {
 }
 
 impl GatewayFilter for StripPrefixFilter {
-    fn filter(
-        &self,
-        _ctx: &mut ApplicationContext,
-        request_header: &mut pingora::http::RequestHeader,
-        _respnose_header: &mut pingora::http::ResponseHeader,
-    ) {
+    fn filter(&self, _ctx: &mut ApplicationContext, upstream: &mut UpStream) {
+        let request_header = match upstream.request_header.as_mut() {
+            Some(request_header) => request_header,
+            None => return,
+        };
+
         let raw_path = String::from_utf8_lossy(request_header.raw_path());
 
         let mut path = String::new();

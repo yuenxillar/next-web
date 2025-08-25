@@ -1,3 +1,4 @@
+use crate::route::route_service_manager::UpStream;
 use crate::util::key_value::KeyValue;
 use crate::application::next_gateway_application::ApplicationContext;
 
@@ -12,13 +13,18 @@ impl GatewayFilter for AddResponseHeaderFilter {
     fn filter(
         &self,
         _ctx: &mut ApplicationContext,
-        _request_header: &mut pingora::http::RequestHeader,
-        respnose_header: &mut pingora::http::ResponseHeader,
+        upstream: &mut UpStream,
     ) {
-        for header in &self.headers {
-            respnose_header
+
+        let response_header = match upstream.response_header.as_mut() {
+            Some(response_header) => response_header,
+            None => return,
+        };
+
+        self.headers.iter().for_each(|header| {
+            response_header
                 .append_header(header.k.clone(), header.v.as_str())
                 .ok();
-        }
+        });
     }
 }

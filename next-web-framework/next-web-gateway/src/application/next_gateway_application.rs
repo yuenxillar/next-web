@@ -11,14 +11,15 @@ use crate::circuit_breaker::circuit_breaker_service_manager::CircuitBreakerServi
 use crate::circuit_breaker::circuit_state::CircuitState;
 use crate::error::gateway_error::GatewayError;
 use crate::properties::gateway_properties::GatewayApplicationProperties;
-use crate::route::route_service_manager::{RouteServiceManager, RouteWork};
+use crate::route::route_service_manager::{RouteServiceManager, UpStream};
+use crate::service::route_service::RouteWork;
 
 #[derive(Clone)]
 pub struct NextGatewayApplication {
     application_properties: GatewayApplicationProperties,
     route_service_manager: RouteServiceManager,
     circuit_breaker_service_manager: Option<CircuitBreakerServiceManager>,
-    jingyue_service_discovery: crate::service_discovery::JingYueServiceDiscovery,
+    jingyue_service: crate::service::jingyue_service::JingYueService,
 }
 
 impl NextGatewayApplication {
@@ -31,7 +32,7 @@ impl NextGatewayApplication {
             application_properties,
             route_service_manager,
             circuit_breaker_service_manager,
-            jingyue_service_discovery: crate::service_discovery::JingYueServiceDiscovery {},
+            jingyue_service: crate::service::jingyue_service::JingYueService::default(),
         }
     }
 }
@@ -54,15 +55,14 @@ impl ProxyHttp for NextGatewayApplication {
         ctx: &mut Self::CTX,
     ) -> Result<Box<HttpPeer>> {
         // Directly return the assertion operation error for the request implementation
-        let route_predicate = self.route_service_manager.predicate(session);
+        let route_predicate_result = self.route_service_manager.predicate(session);
 
-        let predicate_result = route_predicate.result;
-        if !predicate_result {
+        if !route_predicate_result.allowable {
             return Err(GatewayError::ServerRejectsRequest.into());
         };
 
-        let sevice_name = route_predicate.service_name;
-        let fallback_id = route_predicate.fallback_id;
+        let sevice_name = route_predicate_result.service_name;
+        let fallback_id = route_predicate_result.fallback_id;
 
         // Is the routing fuse in open or half open position
         if !fallback_id.is_empty() {
@@ -79,11 +79,14 @@ impl ProxyHttp for NextGatewayApplication {
         // Determine whether it is a normal address or a service name
         let normal = sevice_name.contains(".");
 
-        let route_work = route_predicate.work;
+        let route_work = route_predicate_result.work;
 
-        ctx.route_id = Some(route_predicate.route_id.into());
+        ctx.route_id = Some(route_predicate_result.route_id.into());
 
-        let client_metadata = route_predicate.metadata.as_ref().map(|v| v.client.as_ref());
+        let client_metadata = route_predicate_result
+            .metadata
+            .as_ref()
+            .map(|v| v.client.as_ref());
 
         // Request upstream through routing working mode
         match route_work {
@@ -93,7 +96,7 @@ impl ProxyHttp for NextGatewayApplication {
                 } else {
                     // Choose appropriate upstream services
                     if let Some(service) = self
-                        .jingyue_service_discovery
+                        .jingyue_service
                         .select(sevice_name, route_work)
                         .await
                     {
@@ -143,8 +146,7 @@ impl ProxyHttp for NextGatewayApplication {
     ) -> Result<()> {
         self.route_service_manager.filter(
             ctx,
-            upstream_request_header,
-            &mut ResponseHeader::build(200, None)?,
+           UpStream::from_request_header(upstream_request_header)
         );
         Ok(())
     }
@@ -167,8 +169,7 @@ impl ProxyHttp for NextGatewayApplication {
 
         self.route_service_manager.filter(
             ctx,
-            &mut RequestHeader::build("GET", &[47], None)?,
-            upstream_response,
+            UpStream::from_response_header(upstream_response),
         );
         Ok(())
     }

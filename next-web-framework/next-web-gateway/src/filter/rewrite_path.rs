@@ -1,6 +1,6 @@
 use regex::Regex;
 
-use crate::application::next_gateway_application::ApplicationContext;
+use crate::{application::next_gateway_application::ApplicationContext, route::route_service_manager::UpStream};
 
 use super::gateway_filter::GatewayFilter;
 
@@ -14,8 +14,7 @@ impl GatewayFilter for RewritePathFilter {
     fn filter(
         &self,
         ctx: &mut ApplicationContext,
-        request_header: &mut pingora::http::RequestHeader,
-        respnose_header: &mut pingora::http::ResponseHeader,
+        upstream: &mut UpStream,
     ) {
     }
 }

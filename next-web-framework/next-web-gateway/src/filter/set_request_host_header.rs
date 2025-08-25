@@ -1,4 +1,4 @@
-use crate::application::next_gateway_application::ApplicationContext;
+use crate::{application::next_gateway_application::ApplicationContext, route::route_service_manager::UpStream};
 
 use super::gateway_filter::GatewayFilter;
 
@@ -11,11 +11,12 @@ impl GatewayFilter for SetRequestHostHeaderFilter {
     fn filter(
         &self,
         _session: &mut ApplicationContext,
-        request_header: &mut pingora::http::RequestHeader,
-        _respnose_header: &mut pingora::http::ResponseHeader,
+        upstream: &mut UpStream,
     ) {
-        request_header
+        upstream.response_header.as_mut().map(| request_header| {
+            request_header
             .insert_header("host".to_string(), self.host.as_str())
             .ok();
+        });
     }
 }

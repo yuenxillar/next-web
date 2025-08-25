@@ -1,7 +1,7 @@
 use super::next_gateway_application::NextGatewayApplication;
 use crate::circuit_breaker::fallback_provider::FallbackProvider;
 use crate::{
-    background_service::traffic_monitoring_service::TrafficMonitoringService,
+    service::traffic_monitoring_service::TrafficMonitoringService,
     properties::gateway_properties::GatewayApplicationProperties,
 };
 use async_trait::async_trait;
@@ -52,14 +52,14 @@ pub trait GatewayApplication: Send + Sync {
 
         // Retrieve configuration files and convert them into objects
         let application_properties = GatewayApplicationProperties::default();
-        let route_service_manager = application_properties.into_services();
+        let route_service_manager = application_properties.into_manager();
         let mut circuitbreaker_service_manager =
             application_properties.into_circuitbreaker_services();
 
         let fallback_providers = application.fallback_providers();
 
         if let Some(manager) = circuitbreaker_service_manager.as_mut() {
-            manager.set_fallback_providers(fallback_providers);
+            manager.set_fallback_providers(fallback_providers).await;
         }
 
         let gateway_application = NextGatewayApplication::new(
@@ -70,7 +70,7 @@ pub trait GatewayApplication: Send + Sync {
 
         // Create background services
         let traffic_monitoring_service =
-            background_service("TrafficMonitoringService", TrafficMonitoringService::new());
+            background_service("trafficMonitoringService", TrafficMonitoringService::new());
 
         // Create a gateway server
         let mut gateway_server = Server::new(Opt::default()).unwrap();

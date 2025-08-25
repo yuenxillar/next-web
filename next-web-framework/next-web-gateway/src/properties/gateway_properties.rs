@@ -11,7 +11,7 @@ use crate::{
         circuit_breaker_service::CircuitBreakerService,
         circuit_breaker_service_manager::CircuitBreakerServiceManager,
     },
-    route::route_service_manager::{RoutePredicateService, RouteServiceManager},
+    route::route_service_manager::RouteServiceManager, service::route_service::RoutePredicateService,
 };
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -23,7 +23,7 @@ pub struct GatewayApplicationProperties {
 }
 
 impl GatewayApplicationProperties {
-    pub fn into_services(&self) -> RouteServiceManager {
+    pub fn into_manager(&self) -> RouteServiceManager {
         let mut services = self
             .routes
             .iter()

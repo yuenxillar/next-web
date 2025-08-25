@@ -1,4 +1,4 @@
-use crate::application::next_gateway_application::ApplicationContext;
+use crate::{application::next_gateway_application::ApplicationContext, route::route_service_manager::UpStream};
 
 use super::gateway_filter::GatewayFilter;
 
@@ -9,16 +9,15 @@ impl GatewayFilter for SaveSessionFilter {
     fn filter(
         &self,
         ctx: &mut ApplicationContext,
-        request_header: &mut pingora::http::RequestHeader,
-        _respnose_header: &mut pingora::http::ResponseHeader,
+        upstream: &mut UpStream,
     ) {
-        if let Some(session) = &ctx.session {
-            request_header
-                .insert_header(
-                    "Set-Cookie".to_string(),
-                    format!("session_id={}; Path=/", session).as_str(),
-                )
-                .ok();
-        }
+        // if let Some(session) = &ctx.session {
+        //     request_header
+        //         .insert_header(
+        //             "Set-Cookie".to_string(),
+        //             format!("session_id={}; Path=/", session).as_str(),
+        //         )
+        //         .ok();
+        // }
     }
 }

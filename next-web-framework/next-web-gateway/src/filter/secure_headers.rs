@@ -1,4 +1,4 @@
-use crate::filter::gateway_filter::GatewayFilter;
+use crate::{filter::gateway_filter::GatewayFilter, route::route_service_manager::UpStream};
 
 
 #[derive(Debug, Clone)]
@@ -8,8 +8,7 @@ impl GatewayFilter for SecureHeadersFilter {
     fn filter(
         &self,
         ctx: &mut crate::application::next_gateway_application::ApplicationContext,
-        request_header: &mut pingora::prelude::RequestHeader,
-        respnose_header: &mut pingora::http::ResponseHeader,
+        upstream: &mut UpStream,
     ) {
         todo!()
     }
