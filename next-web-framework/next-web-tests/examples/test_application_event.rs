@@ -33,7 +33,7 @@ impl Application for TestApplication {
         tokio::spawn(async move {
             loop {
                 let event = TestEvent(LocalDateTime::timestamp());
-                publisher.publish_event("", Box::new(event)).ok();
+                publisher.publish_event("", event).ok();
 
                 tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
             }
@@ -61,8 +61,8 @@ impl ApplicationEvent for TestEvent {}
 
 #[async_trait]
 impl ApplicationListener for TestListener {
-    fn id(&self) -> String {
-        String::default()
+    fn id(&self) -> &'static str {
+        ""
     }
 
     fn event_id(&self) -> TypeId {

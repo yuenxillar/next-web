@@ -95,10 +95,8 @@ impl ProxyHttp for NextGatewayApplication {
                     HttpPeer::new(sevice_name, false, "".into())
                 } else {
                     // Choose appropriate upstream services
-                    if let Some(service) = self
-                        .jingyue_service
-                        .select(sevice_name, route_work)
-                        .await
+                    if let Some(service) =
+                        self.jingyue_service.select(sevice_name, route_work).await
                     {
                         HttpPeer::new(service.addr(), false, service.name().to_string())
                     } else {
@@ -144,10 +142,8 @@ impl ProxyHttp for NextGatewayApplication {
         upstream_request_header: &mut RequestHeader,
         ctx: &mut Self::CTX,
     ) -> Result<()> {
-        self.route_service_manager.filter(
-            ctx,
-           UpStream::from_request_header(upstream_request_header)
-        );
+        self.route_service_manager
+            .filter(ctx, UpStream::from_request_header(upstream_request_header));
         Ok(())
     }
 
@@ -167,10 +163,8 @@ impl ProxyHttp for NextGatewayApplication {
                 .map(|m| m.services.get(id).map(|s| s.controller.process(true)))
         });
 
-        self.route_service_manager.filter(
-            ctx,
-            UpStream::from_response_header(upstream_response),
-        );
+        self.route_service_manager
+            .filter(ctx, UpStream::from_response_header(upstream_response));
         Ok(())
     }
 

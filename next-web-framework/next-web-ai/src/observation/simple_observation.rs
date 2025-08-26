@@ -14,7 +14,6 @@ use super::{
     observation_registry::ObservationRegistry,
 };
 
-
 pub struct SimpleObservation {
     pub(crate) context: Box<dyn Context>,
     pub(crate) registry: Box<dyn ObservationRegistry>,
@@ -143,31 +142,31 @@ impl Observation for SimpleObservation {
     fn contextual_name(&mut self, contextual_name: &str) {
         self.context.set_contextual_name(contextual_name);
     }
-    
+
     fn parent_observation(&mut self, parent_observation: Box<dyn Observation>) {
         todo!()
     }
-    
+
     fn low_cardinality_key_value(&mut self, key_value: Box<dyn crate::util::key_value::KeyValue>) {
         todo!()
     }
-    
+
     fn high_cardinality_key_value(&mut self, key_value: Box<dyn crate::util::key_value::KeyValue>) {
         todo!()
     }
-    
+
     fn observation_convention(&mut self, observation_convention: BoxObservationConvention) {
         todo!()
     }
-    
-    fn error(&mut self, error: & next_web_core::error::BoxError) {
+
+    fn error(&mut self, error: &next_web_core::error::BoxError) {
         todo!()
     }
-    
+
     fn event(&mut self, event: Box<dyn super::observation::Event>) {
         todo!()
     }
-    
+
     fn open_scope(&self) -> Box<dyn super::observation::Scope> {
         todo!()
     }

@@ -14,12 +14,10 @@ impl RoutePredicate for QueryRoutePredicateFactory {
         };
 
         // 2. 按 '&' 分割并直接使用迭代器检查
-        query_str
-            .split('&')
-            .any(|param| {
-                // 检查参数是否以 `name` 开头
-                // 这涵盖了 `name` 和 `name=value` 两种情况
-                param == self.name || param.starts_with(&format!("{}=", &self.name))
-            })
+        query_str.split('&').any(|param| {
+            // 检查参数是否以 `name` 开头
+            // 这涵盖了 `name` 和 `name=value` 两种情况
+            param == self.name || param.starts_with(&format!("{}=", &self.name))
+        })
     }
 }

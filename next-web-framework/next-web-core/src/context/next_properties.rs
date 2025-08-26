@@ -1,8 +1,7 @@
 use crate::autoconfigure::context::application_properties::AppliationProperties;
+use crate::autoconfigure::context::logging_properties::LoggingProperties;
 use crate::autoconfigure::context::messages_properties::MessagesProperties;
 use crate::autoconfigure::context::server_properties::ServerProperties;
-use crate::autoconfigure::context::logging_properties::LoggingProperties;
-
 
 #[derive(Debug, Clone, serde::Deserialize, Default)]
 pub struct NextProperties {

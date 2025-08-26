@@ -9,7 +9,7 @@ pub struct PathRoutePredicateFactory {
 impl RoutePredicate for PathRoutePredicateFactory {
     fn matches(&self, session: &mut pingora::protocols::http::ServerSession) -> bool {
         let raw_path = session.req_header().raw_path();
-        
+
         // 1. 使用 `from_utf8_lossy` 安全转换，但直接传递 `&str`
         let path_str = match std::str::from_utf8(raw_path) {
             Ok(s) => s,

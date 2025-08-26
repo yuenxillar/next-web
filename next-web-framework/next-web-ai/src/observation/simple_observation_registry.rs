@@ -9,7 +9,6 @@ impl SimpleObservationRegistry {
     }
 }
 
-
 impl ObservationRegistry for SimpleObservationRegistry {
     fn current_observation(&self) {
         todo!()

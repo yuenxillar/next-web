@@ -63,7 +63,9 @@ struct TestData {
     pub age: i32,
 }
 
-#[Singleton(binds=[Self::into_decoder])]
+
+// 现状是指定这个单例名称 暂时不要改动
+#[Singleton(name = "defaultDataDecoder", binds=[Self::into_decoder])]
 #[derive(Clone)]
 pub struct TestDecoder;
 

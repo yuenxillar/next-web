@@ -13,9 +13,10 @@ use next_web_core::context::application_resources::{ApplicationResources, Resour
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::interface::application::application_ready_event::ApplicationReadyEvent;
 use next_web_core::interface::apply_router::ApplyRouter;
-use next_web_core::interface::data_decoder::DataDecoder;
+use next_web_core::interface::use_router::UseRouter;
 use next_web_core::state::application_state::ApplicationState;
 use next_web_core::AutoRegister;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
@@ -26,6 +27,7 @@ use tracing::{error, info, warn};
 
 use crate::application::next_application::NextApplication;
 
+use crate::application::permitted_groups::PERMITTED_GROUPS;
 use crate::autoregister::register_single::ApplicationDefaultRegisterContainer;
 
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
@@ -119,7 +121,11 @@ pub trait Application: Send + Sync {
 
         let logger = tracing_subscriber::fmt()
             // test
-            .with_max_level(logging.map(|log| log.level()).unwrap_or(tracing::Level::INFO))
+            .with_max_level(
+                logging
+                    .map(|log| log.level())
+                    .unwrap_or(tracing::Level::INFO),
+            )
             .with_ansi(false)
             .event_format(config);
 
@@ -157,7 +163,7 @@ pub trait Application: Send + Sync {
         ctx.insert_singleton_with_name(application_args.to_owned(), "applicationArgs");
         ctx.insert_singleton_with_name(application_resources.to_owned(), "applicationResources");
 
-        let mut container = ApplicationDefaultRegisterContainer::new();
+        let mut container = ApplicationDefaultRegisterContainer::default();
         container.register_all(ctx, application_properties).await;
 
         // Resove autoRegister
@@ -216,148 +222,172 @@ pub trait Application: Send + Sync {
         application_properties: &ApplicationProperties,
         time: std::time::Instant,
     ) {
-        let var1 = ctx.resolve_by_type::<Box<dyn ApplicationReadyEvent>>();
-        for item in var1 {
-            item.ready(&mut ctx).await;
+        // 1. Trigger the ApplicationReadyEvent
+        for ready_event in ctx.resolve_by_type::<Box<dyn ApplicationReadyEvent>>() {
+            ready_event.ready(&mut ctx).await;
         }
 
+        // 2. Read server configuration
         let config = application_properties.next().server();
-
         let context_path = config.context_path().unwrap_or("");
         let server_port = config.port().unwrap_or(APPLICATION_DEFAULT_PORT);
-        let server_addr = if config.local().unwrap_or(true) {
-            "127.0.0.1"
-        } else {
-            "0.0.0.0"
-        };
+        #[rustfmt::skip]
+        let server_addr = if config.local().unwrap_or(true) { "127.0.0.1" } else { "0.0.0.0" };
 
-        // Run our app with hyper, listening globally on port
+        // 3. Build basic routing
         let mut app = self
             .application_router(&mut ctx)
             .await
-            // handle not found route
-            .fallback(fall_back);
+            // Handle not found route
+            .fallback(fall_back)
+            // Prevent program panic caused by users not setting routes
+            .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
 
-        // apply router
-        let routers = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
-
-        let (mut open_routers, mut common_routers): (Vec<_>, Vec<_>) =
-            routers.into_iter().partition(|item| item.open());
-
-        let var10 = Router::new();
-
-        open_routers.sort_by_key(|k| k.order());
-        let open_router = open_routers
+        // 4. UseRouter and ApplyRouter
+        let use_routers = ctx.resolve_by_type::<Box<dyn UseRouter>>();
+        app = use_routers
             .into_iter()
-            .map(|item| item.router(&mut ctx))
-            .filter(|item1| item1.has_routes())
-            .fold(var10, |acc, router| acc.merge(router));
+            // Only allowed groups can apply
+            .filter(|s| PERMITTED_GROUPS.contains(&s.group()))
+            .fold(app, |app, item| item.use_router(app, &mut ctx));
 
-        common_routers.sort_by_key(|k| k.order());
+        let (mut open_routers, mut common_routers): (Vec<_>, Vec<_>) = ctx
+            .resolve_by_type::<Box<dyn ApplyRouter>>()
+            .into_iter()
+            .partition(|item| item.open());
 
+        // The sorting should be small and at the top
+        open_routers.sort_by_key(|r| r.order());
+        common_routers.sort_by_key(|r| r.order());
+
+        app = app.merge(
+            open_routers
+                .into_iter()
+                .chain(common_routers.into_iter())
+                .map(|r| r.router(&mut ctx))
+                .filter(|r| r.has_routes())
+                .fold(axum::Router::new(), |acc, r| acc.merge(r)),
+        );
+
+        // 5. Obtain necessary instances
         #[cfg(not(feature = "tls-rustls"))]
-        let mut shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
+        let shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
 
-        // Add prometheus layer
-        #[cfg(feature = "enable-prometheus")]
+        // 6. Add global middleware layer
         {
-            let (prometheus_layer, metric_handle) = axum_prometheus::PrometheusMetricLayer::pair();
-            application_router = application_router
-                .route(
-                    "/metrics",
-                    axum::routing::get(|| async move { metric_handle.render() }),
-                )
-                .layer(prometheus_layer);
-        }
+            app = app
+                // Global panic handler
+                .layer(CatchPanicLayer::custom(handle_panic))
+                // Handler request  max timeout
+                .layer(TimeoutLayer::new(std::time::Duration::from_secs(5)))
+                // Cors
+                .layer(
+                    CorsLayer::new()
+                        .allow_origin(tower_http::cors::Any)
+                        .allow_methods(tower_http::cors::Any)
+                        .allow_headers(tower_http::cors::Any)
+                        .max_age(std::time::Duration::from_secs(60) * 10),
+                );
 
-        // set layer
-        if let Some(http) = config.http() {
-            let val = http
-                .request()
-                .map(|req| {
-                    let var1 = req.trace();
-                    let var2 = req.max_request_size().unwrap_or_default();
-                    (var1, var2)
-                })
-                .unwrap_or_default();
-            let _ = http.response();
-            if val.0 {
-                app = app.route_layer(TraceLayer::new_for_http());
+            // Add prometheus layer
+            #[cfg(feature = "enable-prometheus")]
+            #[rustfmt::skip]
+            {
+                let (prometheus_layer, metric_handle) = axum_prometheus::PrometheusMetricLayer::pair();
+                app = app.route("/metrics", axum::routing::get(|| async move { metric_handle.render() })).layer(prometheus_layer);
             }
-            // 3MB
-            if val.1 >= 3145728 {
-                app = app.route_layer(RequestBodyLimitLayer::new(val.1));
+
+            // Add HTTP configuration related layers
+            if let Some(http) = config.http() {
+                // Request
+                if let Some(req) = http.request() {
+                    {
+                        if req.trace() {
+                            app = app.route_layer(TraceLayer::new_for_http());
+                        }
+                        let limit = req.max_request_size().unwrap_or_default();
+                        if limit > 10 {
+                            app = app.route_layer(RequestBodyLimitLayer::new(limit));
+                        }
+                    }
+                }
+
+                // Response
+                // TODO: response middleware
             }
+
+            // Add
         }
 
-        app = app
-            // global panic handler
-            .layer(CatchPanicLayer::custom(handle_panic))
-            // handler request  max timeout
-            .layer(TimeoutLayer::new(std::time::Duration::from_secs(5)))
-            // cors  pass -> anyeventing request
-            .layer(
-                CorsLayer::new()
-                    .allow_origin(tower_http::cors::Any)
-                    .allow_methods(tower_http::cors::Any)
-                    .allow_headers(tower_http::cors::Any)
-                    .max_age(std::time::Duration::from_secs(60) * 10),
-            );
-
-        app = app.merge(open_router);
-        for item2 in common_routers
-            .into_iter()
-            .map(|item| item.router(&mut ctx))
-            .filter(|item1| item1.has_routes())
-        {
-            app = app.merge(item2);
-        }
-
-        let decoder_list = ctx.resolve_by_type::<Arc<dyn DataDecoder>>();
-        let data_decoder = decoder_list.last();
-
+        // 7. Add State [Context]
         app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
-        if let Some(decoder) = data_decoder {
-            app = app.route_layer(axum::Extension(decoder.to_owned()));
-        }
+        // 8. Nest context path
+        let app = match context_path.is_empty() {
+            true => app,
+            _ => {
+                let router = Router::new();
 
-        let app = if !context_path.is_empty() {
-            let router = Router::new();
+                #[cfg(feature = "trace-log")]
+                info!("Nest context path: {}", context_path);
 
-            #[cfg(feature = "trace-log")]
-            info!("Nest context path: {}", context_path);
-
-            router.nest(context_path, app)
-        } else {
-            app
+                router.nest(context_path, app)
+            }
         };
 
-        println!(
-            "\nApplication Listening  on:  {}",
-            format!("{}:{}", server_addr, server_port)
-        );
+        #[rustfmt::skip]
+        println!("\nApplication Listening  on:  {}", format!("{}:{}", server_addr, server_port));
 
         println!("Application Running    on:  {}", LocalDateTime::now());
         println!("Application StartTime  on:  {:?}", time.elapsed());
         println!("Application CurrentPid on:  {:?}\n", std::process::id());
 
+        // 9. Start server
+        let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
+
+        // Turn off signal monitoring
+        #[cfg(not(feature = "tls-rustls"))]
+        let shutdown_signal = async move {
+            let ctrl_c = async {
+                tokio::signal::ctrl_c()
+                    .await
+                    .expect("failed to install Ctrl+C handler");
+            };
+
+            #[cfg(unix)]
+            let terminate = async {
+                tokio::signal::unix::SignalKind::terminate()
+                    .then(|signal| signal.recv())
+                    .await;
+            };
+
+            #[cfg(not(unix))]
+            let terminate = std::future::pending::<()>();
+
+            tokio::select! {
+                _ = ctrl_c => info!("Received Ctrl+C. Shutting down..."),
+                _ = terminate => info!("Received terminate signal. Shutting down..."),
+            }
+
+            // 执行所有 shutdown hooks
+            for mut service in shutdowns {
+                service.shutdown().await;
+            }
+        };
+
         // configure certificate and private key used by https
         #[cfg(feature = "tls-rustls")]
         {
-            let tls_config = axum_server::tls
-                - rustls::RustlsConfig::from_pem_file(
-                    std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR"))
-                        .join("self_signed_certs")
-                        .join("cert.pem"),
-                    std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR"))
-                        .join("self_signed_certs")
-                        .join("key.pem"),
-                )
-                .await
-                .unwrap();
-            let addr = std::net::SocketAddr::from(([0, 0, 0, 0], config.port()));
-            let mut server = axum_server::bind_rustls(addr, tls_config);
+            use axum_server::tls_rustls::RustlsConfig;
+
+            let certs_dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
+                .join("self_signed_certs");
+            let tls_config =
+                RustlsConfig::from_pem_file(certs_dir.join("cert.pem"), certs_dir.join("key.pem"))
+                    .await
+                    .unwrap();
+
+            let mut server = axum_server::bind_rustls(socket_addr, tls_config);
             // IMPORTANT: This is required to advertise our support for HTTP/2 websockets to the client.
             // If you use axum::serve, it is enabled by default.
             server.http_builder().http2().enable_connect_protocol();
@@ -366,49 +396,13 @@ pub trait Application: Send + Sync {
 
         #[cfg(not(feature = "tls-rustls"))]
         {
-            // run http server
-            let listener =
-                tokio::net::TcpListener::bind(format!("{}:{}", server_addr, server_port))
-                    .await
-                    .unwrap();
+            let listener = tokio::net::TcpListener::bind(&socket_addr).await.unwrap();
 
             axum::serve(
                 listener,
-                app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+                app.into_make_service_with_connect_info::<SocketAddr>(),
             )
-            .with_graceful_shutdown(async move {
-                let ctrl_c = async {
-                    tokio::signal::ctrl_c()
-                        .await
-                        .expect("failed to install Ctrl+C handler");
-                };
-
-                #[cfg(unix)]
-                let terminate = async {
-                    signal::unix::signal(signal::unix::SignalKind::terminate())
-                        .expect("failed to install signal handler")
-                        .recv()
-                        .await;
-                };
-
-                #[cfg(not(unix))]
-                let terminate = std::future::pending::<()>();
-
-                tokio::select! {
-                    _ = ctrl_c =>  {
-                        info!("Received Ctrl+C. Shutting down...");
-                        for service in shutdowns.iter_mut() {
-                            service.shutdown().await;
-                        }
-                    },
-                    _ = terminate =>  {
-                        info!("Received terminate signal. Shutting down...");
-                        for service in shutdowns.iter_mut() {
-                            service.shutdown().await;
-                        }
-                    },
-                }
-            })
+            .with_graceful_shutdown(shutdown_signal)
             .await
             .unwrap();
         }

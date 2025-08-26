@@ -1,6 +1,9 @@
 use regex::Regex;
 
-use crate::{application::next_gateway_application::ApplicationContext, route::route_service_manager::UpStream};
+use crate::{
+    application::next_gateway_application::ApplicationContext,
+    route::route_service_manager::UpStream,
+};
 
 use super::gateway_filter::GatewayFilter;
 
@@ -11,10 +14,5 @@ pub struct RewritePathFilter {
 }
 
 impl GatewayFilter for RewritePathFilter {
-    fn filter(
-        &self,
-        ctx: &mut ApplicationContext,
-        upstream: &mut UpStream,
-    ) {
-    }
+    fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream) {}
 }

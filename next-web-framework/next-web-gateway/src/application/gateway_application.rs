@@ -1,8 +1,8 @@
 use super::next_gateway_application::NextGatewayApplication;
 use crate::circuit_breaker::fallback_provider::FallbackProvider;
 use crate::{
-    service::traffic_monitoring_service::TrafficMonitoringService,
     properties::gateway_properties::GatewayApplicationProperties,
+    service::traffic_monitoring_service::TrafficMonitoringService,
 };
 use async_trait::async_trait;
 use pingora::prelude::background_service;

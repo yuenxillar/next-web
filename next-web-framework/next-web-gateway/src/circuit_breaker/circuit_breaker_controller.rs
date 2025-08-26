@@ -1,8 +1,8 @@
 use super::circuit_breaker_error::CircuitBreakerError;
 use super::circuit_state::CircuitState;
-use tokio::sync::Mutex;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
 
 /// A circuit breaker that can be used to detect failures and encapsulate the logic of preventing a failure from constantly recurring.
 ///

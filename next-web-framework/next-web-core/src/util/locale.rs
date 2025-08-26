@@ -312,7 +312,7 @@ impl std::str::FromStr for Locale {
             "hu-hu" => Ok(Locale::HuHu),
             "tr-tr" => Ok(Locale::TrTr),
             "cs-cz" => Ok(Locale::CsCz),
-            "sl-sl" | "sl-si" => Ok(Locale::SlSl), 
+            "sl-sl" | "sl-si" => Ok(Locale::SlSl),
             "pl-pl" => Ok(Locale::PlPl),
             "sv-se" => Ok(Locale::SvSe),
             "fi-fi" => Ok(Locale::FiFi),
@@ -324,47 +324,45 @@ impl std::str::FromStr for Locale {
 }
 
 impl Locale {
-    
     pub fn locale() -> Self {
         Locale::from_str(&get_locale().unwrap_or("en-us".into())).unwrap_or(Locale::EnUs)
     }
 
-    
     /// 根据 Accept-Language 请求头字符串解析并返回最匹配的受支持的 Locale。
-    /// 
+    ///
     /// 该函数解析类似 "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6" 的字符串。
     /// 它会：
     /// 1. 按逗号分割。
     /// 2. 解析每个项的语言标签和 q 值（默认 q=1.0）。
     /// 3. 按 q 值降序排序。
     /// 4. 遍历排序后的列表，返回第一个能成功匹配到 `Locale` 枚举的项。
-    /// 
+    ///
     /// # 参数
     /// * `language`: 实现 `AsRef<str>` 的类型，通常是 &str 或 String，表示 Accept-Language 头。
-    /// 
+    ///
     /// # 返回值
     /// * `Some(Locale)`: 找到了匹配的受支持语言环境。
     /// * `None`: 输入为空、格式错误或没有找到受支持的语言。
-    /// 
+    ///
     /// # 示例
     /// ```
     /// use your_crate::Locale; // 假设枚举在 your_crate 模块中
-    /// 
+    ///
     /// let header = "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6";
     /// let locale = Locale::from_language(header);
     /// assert_eq!(locale, Some(Locale::ZhCn));
-    /// 
+    ///
     /// let header_en = "en-GB,en;q=0.8,en-US;q=0.6";
     /// let locale = Locale::from_language(header_en);
     /// assert_eq!(locale, Some(Locale::EnGb)); // en-GB 存在
-    /// 
+    ///
     /// let header_only_unsupported = "fr-FR;q=0.9,de-DE;q=0.8";
     /// let locale = Locale::from_language(header_only_unsupported);
     /// assert_eq!(locale, None); // 没有受支持的匹配项
     /// ```
     pub fn from_language(language: impl AsRef<str>) -> Option<Locale> {
         let language = language.as_ref().trim();
-        
+
         // 如果字符串为空，直接返回 None
         if language.is_empty() {
             return None;
@@ -435,12 +433,10 @@ impl Locale {
         // 6. 如果遍历完都没有找到匹配的 Locale，返回 None
         None
     }
-
 }
 
 impl Locale {
-    
-     pub fn all_locales() -> Vec<Locale> {
+    pub fn all_locales() -> Vec<Locale> {
         vec![
             Locale::ZhCn,
             Locale::ZhTw,

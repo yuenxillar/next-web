@@ -37,11 +37,7 @@ macro_rules! delegate_filter {
 }
 
 pub trait GatewayFilter {
-    fn filter(
-        &self,
-        ctx: &mut ApplicationContext,
-        upstream: &mut UpStream,
-    );
+    fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream);
 }
 
 #[derive(Debug, Clone)]
@@ -75,11 +71,7 @@ pub enum DefaultGatewayFilter {
 }
 
 impl DefaultGatewayFilter {
-    pub fn filter(
-        &self,
-        ctx: &mut ApplicationContext,
-        upstream: &mut UpStream,
-    ) {
+    pub fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream) {
         delegate_filter!(
             self,
             ctx,
@@ -113,7 +105,6 @@ impl DefaultGatewayFilter {
 }
 
 impl From<&str> for DefaultGatewayFilter {
-
     fn from(str: &str) -> Self {
         if str.is_empty() {
             panic!("empty filter name");
@@ -130,11 +121,11 @@ impl From<&str> for DefaultGatewayFilter {
                 headers: split_kv_pairs(value),
             }),
 
-            "AddRequestHeaderIfNotPresent" => Self::AddRequestHeaderIfNotPresent(
-                AddRequestHeaderIfNotPresentFilter {
+            "AddRequestHeaderIfNotPresent" => {
+                Self::AddRequestHeaderIfNotPresent(AddRequestHeaderIfNotPresentFilter {
                     headers: split_kv_pairs(value),
-                },
-            ),
+                })
+            }
 
             "AddRequestParameter" => {
                 let parameters = split_params(value, "&", ",");
@@ -225,10 +216,7 @@ impl From<&str> for DefaultGatewayFilter {
                 if parts.len() >= 2 {
                     let regex = parts.get(2).and_then(|&s| Regex::new(s).ok());
                     Self::RewriteResponseHeader(RewriteResponseHeaderFilter {
-                        header: (
-                            KeyValue::from((parts[0], parts[1])),
-                            regex,
-                        ),
+                        header: (KeyValue::from((parts[0], parts[1])), regex),
                     })
                 } else {
                     Self::Nothing

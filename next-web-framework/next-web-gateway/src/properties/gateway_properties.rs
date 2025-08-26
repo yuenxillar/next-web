@@ -11,7 +11,8 @@ use crate::{
         circuit_breaker_service::CircuitBreakerService,
         circuit_breaker_service_manager::CircuitBreakerServiceManager,
     },
-    route::route_service_manager::RouteServiceManager, service::route_service::RoutePredicateService,
+    route::route_service_manager::RouteServiceManager,
+    service::route_service::RoutePredicateService,
 };
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -104,8 +105,6 @@ impl Default for GatewayApplicationProperties {
         gateway_properties
     }
 }
-
-
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct GlobalCorsProperties {}

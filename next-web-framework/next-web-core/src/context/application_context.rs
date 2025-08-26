@@ -6,7 +6,6 @@ use std::{
     sync::Arc,
 };
 
-
 use std::hash::Hash;
 
 use crate::autoregister::auto_register::AutoRegisterModule;
@@ -211,7 +210,9 @@ impl ApplicationContext {
     /// - Panics if there are multiple providers with the same key and the context's [`allow_override`](ApplicationContext::allow_override) is false.
     /// - Panics if there is a provider that panics on construction.
     pub async fn create_async(modules: Vec<ResolveModule>) -> ApplicationContext {
-        ApplicationContextOptions::default().create_async(modules).await
+        ApplicationContextOptions::default()
+            .create_async(modules)
+            .await
     }
 
     /// Async version of [`ApplicationContext::auto_register`].
@@ -227,7 +228,9 @@ impl ApplicationContext {
     /// - Panics if there is a provider that panics on construction.
     #[cfg_attr(docsrs, doc(cfg(feature = "auto-register")))]
     pub async fn auto_register_async() -> ApplicationContext {
-        ApplicationContextOptions::default().auto_register_async().await
+        ApplicationContextOptions::default()
+            .auto_register_async()
+            .await
     }
 
     /// Returns a new ApplicationContextOptions object.
@@ -2087,7 +2090,9 @@ please check all the references to the above type, there are 3 scenarios that wi
     async fn resolve_instance_async<T: 'static>(
         &mut self,
         key: Key,
-        constructor: Arc<dyn for<'a> Fn(&'a mut ApplicationContext) -> BoxFuture<'a, T> + Send + Sync>,
+        constructor: Arc<
+            dyn for<'a> Fn(&'a mut ApplicationContext) -> BoxFuture<'a, T> + Send + Sync,
+        >,
     ) -> T {
         self.dependency_chain.push(key);
         let instance = constructor(self).await;
@@ -2105,10 +2110,6 @@ please check all the references to the above type, there are 3 scenarios that wi
             .collect()
     }
 }
-
-
-
-
 
 /// =======================================================================================================
 
@@ -3254,7 +3255,6 @@ impl<T: 'static + Send + Sync> From<Provider<T>> for DynProvider {
 #[derive(Clone)]
 pub struct BoxValue<T>(pub T);
 
-
 fn sync_constructor<T, U, F>(
     name: Cow<'static, str>,
     transform: F,
@@ -3272,7 +3272,8 @@ where
     Arc::new(constructor)
 }
 
-fn sync_eager_create_function<T: 'static + Send + Sync>() -> fn(&mut ApplicationContext, Cow<'static, str>) {
+fn sync_eager_create_function<T: 'static + Send + Sync>(
+) -> fn(&mut ApplicationContext, Cow<'static, str>) {
     |cx, name| {
         cx.just_create::<T>(name);
     }
@@ -3715,4 +3716,3 @@ impl<T: 'static + Send + Sync> From<Single<T>> for DynSingle {
         }
     }
 }
-

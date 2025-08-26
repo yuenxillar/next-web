@@ -7,7 +7,7 @@ use super::gateway_filter::GatewayFilter;
 #[derive(Debug, Clone)]
 pub struct RedirectToFilter {
     pub status: u16,
-    pub url: Box<str>
+    pub url: Box<str>,
 }
 
 impl GatewayFilter for RedirectToFilter {

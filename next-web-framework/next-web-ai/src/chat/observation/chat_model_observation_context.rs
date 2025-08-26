@@ -1,14 +1,17 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::{chat::{
-    model::chat_response::ChatResponse,
-    observation::{
-        ai_operation_metadata::AiOperationMetadata,
-        conventions::ai_operation_type::AiOperationType,
-        model_observation_context::ModelObservationContext,
+use crate::{
+    chat::{
+        model::chat_response::ChatResponse,
+        observation::{
+            ai_operation_metadata::AiOperationMetadata,
+            conventions::ai_operation_type::AiOperationType,
+            model_observation_context::ModelObservationContext,
+        },
+        prompt::{chat_options::ChatOptions, prompt::Prompt},
     },
-    prompt::{chat_options::ChatOptions, prompt::Prompt},
-}, observation::observation::Context};
+    observation::observation::Context,
+};
 
 #[derive(Clone)]
 pub struct ChatModelObservationContext {
@@ -33,21 +36,23 @@ impl ChatModelObservationContext {
     }
 }
 
-
 impl ChatModelObservationContext {
-
-     pub fn request_options(&self) -> & dyn ChatOptions  {
+    pub fn request_options(&self) -> &dyn ChatOptions {
         self.request_options.as_ref()
     }
 }
 
 impl Context for ChatModelObservationContext {
-    fn set_parent_from_current_observation(&mut self, registry: &dyn crate::observation::observation_registry::ObservationRegistry) {
-        
+    fn set_parent_from_current_observation(
+        &mut self,
+        registry: &dyn crate::observation::observation_registry::ObservationRegistry,
+    ) {
     }
 
-    fn add_low_cardinality_key_values(&mut self, key_values: crate::util::key_values::KeyValues<Box<dyn crate::util::key_value::KeyValue>>) {
-        
+    fn add_low_cardinality_key_values(
+        &mut self,
+        key_values: crate::util::key_values::KeyValues<Box<dyn crate::util::key_value::KeyValue>>,
+    ) {
     }
 
     fn set_name(&mut self, name: &str) {
@@ -67,9 +72,8 @@ impl Deref for ChatModelObservationContext {
     }
 }
 
-
 impl DerefMut for ChatModelObservationContext {
     fn deref_mut(&mut self) -> &mut Self::Target {
-         &mut self.model_observation_context
+        &mut self.model_observation_context
     }
 }

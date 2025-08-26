@@ -13,9 +13,9 @@ impl GatewayFilter for AddRequestParameterFilter {
     fn filter(
         &self,
         _ctx: &mut crate::application::next_gateway_application::ApplicationContext,
-        upstream: &mut UpStream
+        upstream: &mut UpStream,
     ) {
-          let request_header = match upstream.request_header.as_mut() {
+        let request_header = match upstream.request_header.as_mut() {
             Some(request_header) => request_header,
             None => return,
         };

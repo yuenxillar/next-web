@@ -19,7 +19,6 @@ impl Into<KeyValue<String>> for Vec<&str> {
     }
 }
 
-
 impl Into<KeyValue<String, String>> for Vec<&str> {
     fn into(self) -> KeyValue<String, String> {
         if self.len() == 2 {
@@ -35,7 +34,6 @@ impl Into<KeyValue<String, String>> for Vec<&str> {
     }
 }
 
-
 impl From<(&str, &str)> for KeyValue<Box<str>, Box<str>> {
     fn from(value: (&str, &str)) -> Self {
         Self {
@@ -44,7 +42,6 @@ impl From<(&str, &str)> for KeyValue<Box<str>, Box<str>> {
         }
     }
 }
-
 
 impl From<(&str, &str)> for KeyValue<String, String> {
     fn from(value: (&str, &str)) -> Self {

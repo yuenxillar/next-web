@@ -1,5 +1,5 @@
-use crate::util::str_util::StrUtil;
 use super::route_predicate::RoutePredicate;
+use crate::util::str_util::StrUtil;
 use pingora::protocols::http::ServerSession;
 
 #[derive(Debug, Clone)]

@@ -3,7 +3,6 @@ use next_web_core::{autoconfigure::context, DynClone};
 use crate::observation::observation::{Context, Event};
 
 pub trait ObservationHandler: DynClone + Send + Sync {
-
     fn on_start(&mut self, context: &dyn Context);
 
     fn on_stop(&mut self, context: &dyn Context);

@@ -16,11 +16,7 @@ pub trait Singleton: Send + Sync {
         }
     }
 
-    fn group(&self) -> String {
+    fn group(&self) -> &'static str {
         std::any::type_name::<Self>()
-            .split("::")
-            .next()
-            .unwrap_or_default()
-            .to_string()
     }
 }

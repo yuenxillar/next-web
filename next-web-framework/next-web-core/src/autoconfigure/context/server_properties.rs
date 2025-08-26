@@ -44,7 +44,8 @@ impl ServerProperties {
     pub fn local(&self) -> Option<bool> {
         self.local
     }
-
 }
 
-fn default_port() -> Option<u16> { Some(APPLICATION_DEFAULT_PORT)}
+fn default_port() -> Option<u16> {
+    Some(APPLICATION_DEFAULT_PORT)
+}

@@ -33,8 +33,8 @@ impl Application for TestApplication {
         )
     }
 }
-async fn set_token(Path(toekn): Path<String>, req: Request) -> impl IntoResponse {
-    if toekn.is_empty() {
+async fn set_token(Path(token): Path<String>, req: Request) -> impl IntoResponse {
+    if token.is_empty() {
         return "Error";
     }
     let state = req.extensions().get::<ApplicationState>().unwrap();
@@ -42,7 +42,7 @@ async fn set_token(Path(toekn): Path<String>, req: Request) -> impl IntoResponse
         .get_single_with_name::<Arc<Mutex<Vec<String>>>>("tokenStore")
         .await;
 
-    store.lock().await.push(toekn);
+    store.lock().await.push(token);
     "Ok"
 }
 
@@ -61,7 +61,7 @@ impl TestAuthenticationService {
 
 #[async_trait]
 impl AuthenticationService for TestAuthenticationService {
-    fn user_id(&self, req_header: &HeaderMap) -> String {
+    async fn user_id(&self, req_header: &HeaderMap) -> String {
         if let Some(auth_header) = req_header.get("Authorization") {
             let value = auth_header
                 .to_str()
@@ -70,14 +70,14 @@ impl AuthenticationService for TestAuthenticationService {
                 .last()
                 .unwrap_or_default()
                 .to_string();
-            if self.store.blocking_lock().contains(&value) {
-                return "admin".into();
+            if self.store.lock().await.contains(&value) {
+                return String::from("admin");
             }
         }
         String::from("user")
     }
 
-    fn login_type(&self, _req_header: &HeaderMap) -> LoginType {
+    async fn login_type(&self, _req_header: &HeaderMap) -> LoginType {
         LoginType::Username
     }
 

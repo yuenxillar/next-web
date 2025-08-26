@@ -1,7 +1,11 @@
-use std::{any::TypeId, borrow::Cow, fmt::{self, Display}};
+use std::{
+    any::TypeId,
+    borrow::Cow,
+    fmt::{self, Display},
+};
 
 /// 事件键
-/// 
+///
 /// Event key
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Key {
@@ -13,10 +17,7 @@ impl Key {
     /// 创建新的事件键
     /// Create a new event key
     pub fn new(id: impl Into<Cow<'static, str>>, tid: TypeId) -> Self {
-        Self {
-            id: id.into(),
-            tid,
-        }
+        Self { id: id.into(), tid }
     }
 
     /// 获取事件键的ID

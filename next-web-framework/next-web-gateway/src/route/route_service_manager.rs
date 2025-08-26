@@ -7,7 +7,8 @@ use pingora::{
 use crate::{
     application::next_gateway_application::ApplicationContext,
     properties::routes_properties::RouteMetadata,
-    service::route_service::{RoutePredicateService, RouteWork}, util::rate_limiter::RATE_KEY,
+    service::route_service::{RoutePredicateService, RouteWork},
+    util::rate_limiter::RATE_KEY,
 };
 
 static DEFAULT_SERVICE_NAME: &str = "";
@@ -75,9 +76,10 @@ impl RouteServiceManager {
                 .iter()
                 .find(|s| s.id.eq(route_id))
                 .map(|sevice| {
-                    sevice.filters.iter().for_each(|f| {
-                        f.filter(ctx, &mut upstream)
-                    })
+                    sevice
+                        .filters
+                        .iter()
+                        .for_each(|f| f.filter(ctx, &mut upstream))
                 });
         }
     }
@@ -92,14 +94,12 @@ pub struct UpStream<'a, 'b> {
     pub request_header: Option<&'a mut RequestHeader>,
     pub response_header: Option<&'a mut ResponseHeader>,
 
-    pub request_body:  Option<&'b mut Bytes>,
-    pub response_body:  Option<&'b mut Bytes>,
+    pub request_body: Option<&'b mut Bytes>,
+    pub response_body: Option<&'b mut Bytes>,
 }
 
 impl<'a, 'b> UpStream<'a, 'b> {
-    pub fn from_request_header(
-        request_header: &'a mut RequestHeader,
-    ) -> Self {
+    pub fn from_request_header(request_header: &'a mut RequestHeader) -> Self {
         Self {
             request_header: Some(request_header),
             response_header: None,
@@ -108,14 +108,12 @@ impl<'a, 'b> UpStream<'a, 'b> {
         }
     }
 
-    pub fn from_response_header(
-        response_header: &'a mut ResponseHeader,
-    ) -> Self {
+    pub fn from_response_header(response_header: &'a mut ResponseHeader) -> Self {
         Self {
             request_header: None,
             response_header: Some(response_header),
             request_body: None,
-            response_body:None,
+            response_body: None,
         }
     }
 
@@ -124,7 +122,7 @@ impl<'a, 'b> UpStream<'a, 'b> {
             request_header: None,
             response_header: None,
             request_body: request_body.as_mut().map(|s| s),
-            response_body: None
+            response_body: None,
         }
     }
 

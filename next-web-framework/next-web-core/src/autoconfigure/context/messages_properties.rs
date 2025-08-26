@@ -6,7 +6,7 @@ pub struct MessagesProperties {
     /// The time in seconds to reload the messages properties file.
     /// Unused for now.
     #[serde(default)]
-    reload_time: u32
+    reload_time: u32,
 }
 
 impl MessagesProperties {

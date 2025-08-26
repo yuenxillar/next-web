@@ -1,5 +1,10 @@
 use flume::Sender;
-use next_web_core::{error::BoxError, interface::event::{application_event::ApplicationEvent, application_event_publisher::ApplicationEventPublisher}};
+use next_web_core::{
+    error::BoxError,
+    interface::event::{
+        application_event::ApplicationEvent, application_event_publisher::ApplicationEventPublisher,
+    },
+};
 
 #[derive(Clone)]
 pub struct DefaultApplicationEventPublisher {
@@ -24,12 +29,13 @@ impl ApplicationEventPublisher for DefaultApplicationEventPublisher {
     /// Publish event
     fn publish_event(
         &self,
-        id: impl Into<String>,
-        event: Box<dyn ApplicationEvent>,
+        id: impl ToString,
+        event: impl ApplicationEvent,
     ) -> Result<(), BoxError> {
-        if let Some(sender) = &self.channel {
-            sender.send((id.into(), event))?
-        };
-        Ok(())
+        let event = Box::new(event);
+        match self.channel.as_ref() {
+            Some(channel) => channel.send((id.to_string(), event)).map_err(Into::into),
+            None => Ok(()),
+        }
     }
 }

@@ -1,7 +1,13 @@
-
 use flume::{Receiver, Sender};
 use hashbrown::HashMap;
-use next_web_core::{common::key::Key, interface::event::{application_event::ApplicationEvent, application_event_multicaster::ApplicationEventMulticaster, application_listener::ApplicationListener}};
+use next_web_core::{
+    common::key::Key,
+    interface::event::{
+        application_event::ApplicationEvent,
+        application_event_multicaster::ApplicationEventMulticaster,
+        application_listener::ApplicationListener,
+    },
+};
 use parking_lot::Mutex;
 use std::sync::Arc;
 #[cfg(feature = "trace-log")]
@@ -47,7 +53,9 @@ impl DefaultApplicationEventMulticaster {
         let listeners = self.listeners.clone();
         tokio::spawn(async move {
             while let Ok(event) = channel.recv() {
-                if let Some(listeners) = listeners.lock().get(&Key::new(event.0, event.1.event_id())) {
+                if let Some(listeners) =
+                    listeners.lock().get(&Key::new(event.0, event.1.event_id()))
+                {
                     let _ = listeners.send(event.1);
                 }
             }
@@ -57,7 +65,6 @@ impl DefaultApplicationEventMulticaster {
 
 impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
     fn add_application_listener(&mut self, mut listener: Box<dyn ApplicationListener>) {
-        
         let tid = listener.event_id();
 
         let (sender, receiver) = flume::unbounded();

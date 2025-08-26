@@ -90,22 +90,18 @@ impl DeepSeekChatModel {
         };
 
         // if (this.defaultOptions != null) {
-		// 	request = ModelOptionsUtils.merge(this.defaultOptions, request, ChatCompletionRequest.class);
-		// }
+        // 	request = ModelOptionsUtils.merge(this.defaultOptions, request, ChatCompletionRequest.class);
+        // }
 
-		// if (prompt.getOptions() != null) {
-		// 	var updatedRuntimeOptions = ModelOptionsUtils.copyToTarget(prompt.getOptions(), ChatOptions.class,
-		// 			QianFanChatOptions.class);
-		// 	request = ModelOptionsUtils.merge(updatedRuntimeOptions, request, ChatCompletionRequest.class);
-		// }
+        // if (prompt.getOptions() != null) {
+        // 	var updatedRuntimeOptions = ModelOptionsUtils.copyToTarget(prompt.getOptions(), ChatOptions.class,
+        // 			QianFanChatOptions.class);
+        // 	request = ModelOptionsUtils.merge(updatedRuntimeOptions, request, ChatCompletionRequest.class);
+        // }
 
-        if let Some(options) = self.options.as_ref() {
-            
-        }
+        if let Some(options) = self.options.as_ref() {}
 
-        if let Some(options) = prompt.options() {
-
-        }
+        if let Some(options) = prompt.options() {}
 
         Ok(request)
     }
@@ -167,7 +163,7 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
             let chat_respnose = self.api.send(&req).await?;
 
             let chat_completion = match chat_respnose {
-                ChatApiRespnose::Entity(chat_completion) => chat_completion,
+                ChatApiRespnose::Data(chat_completion) => chat_completion,
                 _ => return Err("Chat completion is not entity".into()),
             };
 
@@ -207,7 +203,7 @@ impl StreamingModel<Prompt, ChatResponse> for DeepSeekChatModel {
         let chat_respnose = self.api.send(&req).await?;
 
         let stream = match chat_respnose {
-            ChatApiRespnose::Stream(stream) => stream,
+            ChatApiRespnose::DataStream(stream) => stream,
             _ => return Err("Chat completion is not stream".into()),
         };
 

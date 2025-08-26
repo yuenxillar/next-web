@@ -5,7 +5,9 @@ use axum::{
     extract::{FromRequest, Request},
     http::{header, HeaderMap, StatusCode},
 };
-use next_web_core::interface::data_decoder::DataDecoder;
+use next_web_core::{
+    interface::data_decoder::DataDecoder, state::application_state::ApplicationState,
+};
 use serde::de::DeserializeOwned;
 
 pub struct Data<T>(pub T);
@@ -19,15 +21,23 @@ where
 
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
         if is_json(req.headers()) {
-            let decoder = req.extensions().get::<Arc<dyn DataDecoder>>().cloned();
-            let bytes = Bytes::from_request(req, state).await;
-            if bytes.is_err() {
-                return Err((StatusCode::BAD_REQUEST, "Bad Request"));
+            let decoder = match req.extensions().get::<ApplicationState>() {
+                Some(state) => {
+                    state
+                        .get_single_option_with_name::<Arc<dyn DataDecoder>>("defaultDataDecoder")
+                        .await
+                }
+                _ => None,
+            };
+
+            let bytes_result = Bytes::from_request(req, state).await;
+            match bytes_result {
+                Ok(bytes) => return Self::from_bytes(&bytes, decoder),
+                Err(e) => tracing::error!("Failed to read request body, case: {}", e),
             }
-            Self::from_bytes(&bytes.unwrap(), decoder)
-        } else {
-            Err((StatusCode::BAD_REQUEST, "Bad Request"))
         }
+
+        Err((StatusCode::BAD_REQUEST, "Bad Request"))
     }
 }
 

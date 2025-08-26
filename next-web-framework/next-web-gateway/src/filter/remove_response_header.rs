@@ -2,7 +2,6 @@ use crate::route::route_service_manager::UpStream;
 
 use super::gateway_filter::GatewayFilter;
 
-
 #[derive(Debug, Clone)]
 pub struct RemoveResponseHeaderFilter {
     pub headers: Vec<String>,

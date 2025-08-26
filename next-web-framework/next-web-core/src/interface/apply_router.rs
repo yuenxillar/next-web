@@ -2,13 +2,15 @@ use dyn_clone::DynClone;
 
 use crate::ApplicationContext;
 
-
 pub trait ApplyRouter: DynClone + Send + Sync {
+    fn open(&self) -> bool {
+        false
+    }
 
-    fn open(&self) -> bool { false }
+    fn order(&self) -> i32 {
+        i32::MAX
+    }
 
-    fn order(&self) -> u32 { 100 }
-    
     fn router(&self, ctx: &mut ApplicationContext) -> axum::Router;
 }
 

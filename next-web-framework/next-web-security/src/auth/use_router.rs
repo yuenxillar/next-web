@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::interface::apply_router::ApplyRouter;
+use next_web_core::interface::use_router::UseRouter;
 use rudi_dev::Singleton;
 
 use crate::core::web_security_configure::WebSecurityConfigure;
@@ -11,22 +11,21 @@ use crate::permission::{
 };
 
 #[derive(Clone)]
-#[Singleton(binds = [Self::into_apply_router])]
-pub struct AuthenticationRouter;
+#[Singleton(binds = [Self::into_use_router])]
+pub struct AuthenticationUseRouter;
 
-impl AuthenticationRouter {
-    fn into_apply_router(self) -> Box<dyn ApplyRouter> {
+impl AuthenticationUseRouter {
+    fn into_use_router(self) -> Box<dyn UseRouter> {
         Box::new(self)
     }
 }
 
-impl ApplyRouter for AuthenticationRouter {
-    fn order(&self) -> u32 {
-        u32::MAX
-    }
-
-    fn router(&self, ctx: &mut next_web_core::ApplicationContext) -> axum::Router {
-        let mut router = axum::Router::new();
+impl UseRouter for AuthenticationUseRouter {
+    fn use_router(
+        &self,
+        mut router: axum::Router,
+        ctx: &mut next_web_core::ApplicationContext,
+    ) -> axum::Router {
         let auth_service = ctx.resolve_by_type::<Arc<dyn AuthenticationService>>();
 
         if let Some(service) = auth_service.last() {
@@ -42,7 +41,6 @@ impl ApplyRouter for AuthenticationRouter {
                 request_auth_middleware,
             ));
         }
-
         router
     }
 }
@@ -64,16 +62,17 @@ mod test {
         println!("{:?}", router.at("/test33"));
         println!(
             "{:?}",
-            router.at("/test33/666.js").map(|var| var.params.get("param"))
+            router
+                .at("/test33/666.js")
+                .map(|var| var.params.get("param"))
         );
         println!(
             "{:?}",
-            router.at("/test33/777.css").map(|var| var.params.get("param"))
+            router
+                .at("/test33/777.css")
+                .map(|var| var.params.get("param"))
         );
-        println!(
-            "{:?}",
-            router.at("/test33/666").map(|var| var.value)
-        );
+        println!("{:?}", router.at("/test33/666").map(|var| var.value));
 
         println!("node: {:?}", router);
     }

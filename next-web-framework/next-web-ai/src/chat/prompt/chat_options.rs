@@ -41,7 +41,6 @@ where
 
 next_web_core::clone_trait_object!(ChatOptions);
 
-
 #[derive(Clone, Default)]
 pub struct DefaultChatOptions {
     pub model: String,
@@ -53,7 +52,6 @@ pub struct DefaultChatOptions {
     pub top_k: u64,
     pub top_p: u64,
 }
-
 
 impl ChatOptions for DefaultChatOptions {
     fn get_model(&self) -> &str {
@@ -85,7 +83,7 @@ impl ChatOptions for DefaultChatOptions {
     }
 
     fn get_top_p(&self) -> u64 {
-       self.top_p
+        self.top_p
     }
 
     fn set_model(&mut self, model: &str) {
@@ -113,7 +111,7 @@ impl ChatOptions for DefaultChatOptions {
     }
 
     fn set_top_k(&mut self, top_k: u64) {
-       self.top_k = top_k;
+        self.top_k = top_k;
     }
 
     fn set_top_p(&mut self, top_p: u64) {
@@ -121,7 +119,4 @@ impl ChatOptions for DefaultChatOptions {
     }
 }
 
-
-impl ModelOptions for DefaultChatOptions {
-    
-}
+impl ModelOptions for DefaultChatOptions {}

@@ -1,7 +1,8 @@
 use crate::{
     chat::observation::{
         chat_model_observation_context::ChatModelObservationContext,
-        chat_model_observation_convention::ChatModelObservationConvention, observation_convention::ObservationConvention,
+        chat_model_observation_convention::ChatModelObservationConvention,
+        observation_convention::ObservationConvention,
     },
     util::key_value::{KeyValue, NoneKeyValue, NONE_VALUE},
 };
@@ -29,7 +30,6 @@ impl ChatModelObservationConvention for DefaultChatModelObservationConvention {
         return Some(context.operation_metadata().operation_type.clone());
     }
 }
-
 
 impl<T> ObservationConvention<T> for DefaultChatModelObservationConvention {
     fn supports_context(&self, context: &dyn crate::observation::observation::Context) -> bool {

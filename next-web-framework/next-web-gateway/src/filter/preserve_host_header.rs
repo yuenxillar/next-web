@@ -5,8 +5,6 @@ use super::gateway_filter::GatewayFilter;
 #[derive(Debug, Clone)]
 pub struct PreserveHostHeaderFilter {}
 
-
-
 impl GatewayFilter for PreserveHostHeaderFilter {
     fn filter(
         &self,

@@ -33,7 +33,6 @@ pub struct RouteMetadata {
     pub cors: Option<CorsMetadata>,
 }
 
-
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ClientMetadata {
     pub connect_timeout: Option<u64>,
@@ -46,5 +45,5 @@ pub struct CorsMetadata {
     pub allow_origin: Option<String>,
     pub allow_methods: Option<String>,
     pub allow_headers: Option<String>,
-    pub max_age : Option<u32>,
+    pub max_age: Option<u32>,
 }

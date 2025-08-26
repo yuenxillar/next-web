@@ -1,6 +1,8 @@
 use crate::{
-    interface::job::{context::job_execution_context::JobExecutionContext, schedule_type::ScheduleType},
     error::BoxError,
+    interface::job::{
+        context::job_execution_context::JobExecutionContext, schedule_type::ScheduleType,
+    },
 };
 use async_trait::async_trait;
 
@@ -8,7 +10,6 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait ApplicationJob: Send + Sync {
-    
     fn schedule(&self) -> ScheduleType;
 
     async fn execute(&self, context: JobExecutionContext) -> Result<(), BoxError>;

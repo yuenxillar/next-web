@@ -4,7 +4,6 @@ use crate::util::str_util::StrUtil;
 
 use super::route_predicate::RoutePredicate;
 
-
 #[derive(Debug, Clone)]
 pub struct RemoteAddrRoutePredicateFactory {
     pub remote_addr: String,

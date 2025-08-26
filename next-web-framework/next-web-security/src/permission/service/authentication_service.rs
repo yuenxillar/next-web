@@ -6,9 +6,9 @@ use axum::http::HeaderMap;
 #[async_trait]
 pub trait AuthenticationService: Send + Sync {
 
-    fn user_id(&self, req_header: &HeaderMap) -> String;
+    async fn user_id(&self, req_header: &HeaderMap) -> String;
 
-    fn login_type(&self, req_header: &HeaderMap) -> LoginType;
+    async fn login_type(&self, req_header: &HeaderMap) -> LoginType;
 
     /// Returns the roles of the user with the given `user_id` and `login_type`.
     async fn user_role(&self, user_id: &str, login_type: &LoginType) -> Option<Vec<String>>;

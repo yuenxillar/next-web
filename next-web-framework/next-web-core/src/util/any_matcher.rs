@@ -33,7 +33,9 @@ impl<T> AnyMatcher<T> {
 
     /// 匹配路径（可变引用）
     pub fn at_mut(&mut self, path: &str) -> Result<&mut T, MatchError> {
-        self.root.find_mut(path).map(|cell| unsafe { &mut *cell.get() })
+        self.root
+            .find_mut(path)
+            .map(|cell| unsafe { &mut *cell.get() })
     }
 }
 
@@ -63,7 +65,7 @@ impl<T> Node<T> {
             "**" => NodeType::CatchAll,
             "*" => NodeType::CatchSingle,
             s if s.starts_with("*.") => NodeType::CatchExtension(s[2..].to_string()),
-            s if s.ends_with(".*") => NodeType::PrefixExtension(s[..s.len()-2].to_string()),
+            s if s.ends_with(".*") => NodeType::PrefixExtension(s[..s.len() - 2].to_string()),
             _ => NodeType::Static,
         }
     }
@@ -109,10 +111,10 @@ impl<T> Node<T> {
         new_node.insert_segments(remaining_segments, value)?;
         self.children.push(new_node);
         self.priority += 1;
-        
+
         // 保持子节点按优先级排序
         self.children.sort_by(|a, b| b.priority.cmp(&a.priority));
-        
+
         Ok(())
     }
 
@@ -200,8 +202,8 @@ enum NodeType {
     Root,
     Static,
     CatchSingle,
-    CatchExtension(String),      // 例如 *.ext
-    PrefixExtension(String),     // 例如 prefix.*
+    CatchExtension(String),  // 例如 *.ext
+    PrefixExtension(String), // 例如 prefix.*
     CatchAll,
 }
 
@@ -250,7 +252,10 @@ where
             node_type: self.node_type.clone(),
             priority: self.priority,
             children: self.children.clone(),
-            value: self.value.as_ref().map(|v| UnsafeCell::new(unsafe { &*v.get() }.clone())),
+            value: self
+                .value
+                .as_ref()
+                .map(|v| UnsafeCell::new(unsafe { &*v.get() }.clone())),
         }
     }
 }

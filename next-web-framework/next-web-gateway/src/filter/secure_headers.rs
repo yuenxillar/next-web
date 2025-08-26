@@ -1,6 +1,5 @@
 use crate::{filter::gateway_filter::GatewayFilter, route::route_service_manager::UpStream};
 
-
 #[derive(Debug, Clone)]
 pub struct SecureHeadersFilter;
 

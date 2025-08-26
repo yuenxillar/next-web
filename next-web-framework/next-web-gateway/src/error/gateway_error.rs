@@ -17,7 +17,6 @@ impl std::fmt::Display for GatewayError {
     }
 }
 
-
 impl Error for GatewayError {}
 
 impl Into<Box<pingora::Error>> for GatewayError {

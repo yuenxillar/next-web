@@ -3,7 +3,7 @@ use next_web_core::{
     context::{application_context::ApplicationContext, properties::ApplicationProperties},
 };
 
-use crate::autoregister::message_source_service_auto_register::MessageSourceServiceAutoRegister;
+use crate::autoregister::message_source_service_autoregister::MessageSourceServiceAutoRegister;
 
 use super::job_scheduler_autoregister::JobSchedulerAutoRegister;
 
@@ -12,11 +12,7 @@ pub struct ApplicationDefaultRegisterContainer {
 }
 
 impl ApplicationDefaultRegisterContainer {
-    pub fn new() -> Self {
-        Self {
-            registers: Vec::new(),
-        }
-    }
+ 
 
     fn push<T>(&mut self)
     where
@@ -38,3 +34,12 @@ impl ApplicationDefaultRegisterContainer {
         }
     }
 }
+
+impl Default for ApplicationDefaultRegisterContainer {
+    fn default() -> Self {
+        Self {
+            registers: Vec::new(),
+        }
+    }
+}
+ 

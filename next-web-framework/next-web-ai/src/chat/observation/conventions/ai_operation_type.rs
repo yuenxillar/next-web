@@ -1,7 +1,5 @@
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AiOperationType {
-    
     Chat,
 
     Embbedding,
@@ -10,9 +8,8 @@ pub enum AiOperationType {
 
     Image,
 
-    TextCompletion
+    TextCompletion,
 }
-
 
 impl AsRef<str> for AiOperationType {
     fn as_ref(&self) -> &str {

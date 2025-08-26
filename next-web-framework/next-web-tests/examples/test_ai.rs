@@ -31,10 +31,10 @@ async fn main() {
         );
         let resp = api.send(&req).await.unwrap();
         match resp {
-            ChatApiRespnose::Entity(chat_completion) => {
+            ChatApiRespnose::Data(chat_completion) => {
                 println!("chat_completion: {:?}", chat_completion);
             }
-            ChatApiRespnose::Stream(mut stream) => {
+            ChatApiRespnose::DataStream(mut stream) => {
                 while let Some(chunk) = stream.next().await {
                     if let Ok(chunk) = chunk {
                         chunk.iter().for_each(|str| {

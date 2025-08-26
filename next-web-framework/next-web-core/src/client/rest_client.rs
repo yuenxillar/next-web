@@ -617,5 +617,4 @@ mod tests {
         let result2 = client.get_for_string("https://httpbin.org/get").await;
         assert!(result2.is_ok());
     }
-
 }

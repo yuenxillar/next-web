@@ -18,14 +18,14 @@ impl ZonedDateTimeRoutePredicateFactory {
             Self::After(targets) => {
                 targets.iter().any(|target| {
                     let target_utc = target.with_timezone(&Utc);
-                    now_utc >= target_utc  // After: 当前时间 >= 目标时间
+                    now_utc >= target_utc // After: 当前时间 >= 目标时间
                 })
             }
 
             Self::Before(targets) => {
                 targets.iter().any(|target| {
                     let target_utc = target.with_timezone(&Utc);
-                    now_utc < target_utc  // Before: 当前时间 < 目标时间
+                    now_utc < target_utc // Before: 当前时间 < 目标时间
                 })
             }
 
@@ -59,12 +59,16 @@ fn parse_zoned_datetime(s: &str) -> Result<DateTime<FixedOffset>, Box<dyn std::e
     DateTime::parse_from_rfc3339(&clean).map_err(|e| e.into())
 }
 
-pub(super) fn after(time_str: &str) -> Result<ZonedDateTimeRoutePredicateFactory, Box<dyn std::error::Error>> {
+pub(super) fn after(
+    time_str: &str,
+) -> Result<ZonedDateTimeRoutePredicateFactory, Box<dyn std::error::Error>> {
     let dt = parse_zoned_datetime(time_str)?;
     Ok(ZonedDateTimeRoutePredicateFactory::After(vec![dt]))
 }
 
-pub(super) fn before(time_str: &str) -> Result<ZonedDateTimeRoutePredicateFactory, Box<dyn std::error::Error>> {
+pub(super) fn before(
+    time_str: &str,
+) -> Result<ZonedDateTimeRoutePredicateFactory, Box<dyn std::error::Error>> {
     let dt = parse_zoned_datetime(time_str)?;
     Ok(ZonedDateTimeRoutePredicateFactory::Before(vec![dt]))
 }
@@ -80,6 +84,7 @@ pub(super) fn between(
         return Err("Start time must be before end time".into());
     }
 
-    Ok(ZonedDateTimeRoutePredicateFactory::Between(vec![(start, end)]))
+    Ok(ZonedDateTimeRoutePredicateFactory::Between(vec![(
+        start, end,
+    )]))
 }
-

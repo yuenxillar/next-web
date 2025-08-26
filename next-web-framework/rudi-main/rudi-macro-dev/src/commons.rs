@@ -298,8 +298,8 @@ fn generate_only_one_field_or_argument_resolve_stmt(
     // If name is empty, It is to generate singleton names using field names
     let name: Expr = match name {
         Expr::Lit(expr_lit) => {
-            let str = expr_lit.lit.suffix();
-            if str.is_empty() {
+            let signleton_name = expr_lit.lit.to_token_stream().to_string();
+            if signleton_name.is_empty() {
                 let val = super::util::field_name_to_singleton_name(
                     &field_name.map(|s| s.to_string()).unwrap_or_default(),
                 );

@@ -1,4 +1,7 @@
-use crate::{application::next_gateway_application::ApplicationContext, route::route_service_manager::UpStream};
+use crate::{
+    application::next_gateway_application::ApplicationContext,
+    route::route_service_manager::UpStream,
+};
 
 use super::gateway_filter::GatewayFilter;
 
@@ -6,11 +9,7 @@ use super::gateway_filter::GatewayFilter;
 pub struct SaveSessionFilter {}
 
 impl GatewayFilter for SaveSessionFilter {
-    fn filter(
-        &self,
-        ctx: &mut ApplicationContext,
-        upstream: &mut UpStream,
-    ) {
+    fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream) {
         // if let Some(session) = &ctx.session {
         //     request_header
         //         .insert_header(

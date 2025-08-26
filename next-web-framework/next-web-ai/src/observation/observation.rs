@@ -42,7 +42,7 @@ pub trait Observation: Send + Sync {
 pub trait Observable {
     async fn observe<R, 'a>(
         &mut self,
-        run: impl std::future::Future<Output = Result<R, BoxError>> + Send + 'a
+        run: impl std::future::Future<Output = Result<R, BoxError>> + Send + 'a,
     ) -> Result<R, BoxError>;
 }
 

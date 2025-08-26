@@ -166,7 +166,7 @@ pub(crate) fn generate(
         impl ::next_web_core::interface::singleton::Singleton for #struct_name {
             fn singleton_name(&self) -> String
             {
-                stringify!(#default_name).into()
+                stringify!(#default_name).to_string()
             }
         }
 

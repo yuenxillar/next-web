@@ -3,9 +3,11 @@ use std::sync::Arc;
 use pingora_limits::rate::Rate;
 
 use crate::properties::routes_properties::RoutesProperties;
-use crate::util::rate_limiter::RateLimiter;
-use crate::{filter::gateway_filter::DefaultGatewayFilter, properties::routes_properties::RouteMetadata};
 use crate::route::route_predicate_factory::RoutePredicateFactory;
+use crate::util::rate_limiter::RateLimiter;
+use crate::{
+    filter::gateway_filter::DefaultGatewayFilter, properties::routes_properties::RouteMetadata,
+};
 
 #[derive(Clone)]
 pub struct RoutePredicateService {
@@ -19,7 +21,6 @@ pub struct RoutePredicateService {
     pub rate_limiter: Option<RateLimiter>,
     pub metadata: Option<RouteMetadata>,
 }
-
 
 #[derive(Debug, Clone)]
 pub enum RouteWork {
@@ -111,7 +112,7 @@ impl From<RoutesProperties> for RoutePredicateService {
             filters,
             fallback_id,
             rate_limiter,
-            metadata
+            metadata,
         }
     }
 }

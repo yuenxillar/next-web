@@ -1,4 +1,7 @@
-use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr}, str::FromStr};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    str::FromStr,
+};
 
 use ipnetwork::IpNetwork;
 use pingora::protocols::http::ServerSession;
@@ -12,11 +15,10 @@ pub struct XForwardedRemoteAddrRoutePredicateFactory {
 
 impl RoutePredicate for XForwardedRemoteAddrRoutePredicateFactory {
     fn matches(&self, session: &mut ServerSession) -> bool {
-
         // 提取客户端IP
         let client_ip = match self.extract_client_ip_from_x_forwarded_for(session) {
             Some(ip) => ip,
-            None => return false
+            None => return false,
         };
 
         // 检查IP是否在任何信任的网络中

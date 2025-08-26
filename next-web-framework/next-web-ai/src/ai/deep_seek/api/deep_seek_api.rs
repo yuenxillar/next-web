@@ -2,7 +2,7 @@ use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
 use next_web_core::error::BoxError;
 
-use crate::{ai::deep_seek::chat_model::ChatModel};
+use crate::ai::deep_seek::chat_model::ChatModel;
 
 const ERROR: [u8; 8] = [123, 34, 101, 114, 114, 111, 114, 34];
 const DATA: [u8; 6] = [100, 97, 116, 97, 58, 32];
@@ -30,10 +30,7 @@ impl DeepSeekApi {
         }
     }
 
-    pub async fn send(
-        &self,
-        req: &ChatCompletionRequest,
-    ) -> Result<ChatApiRespnose, BoxError> {
+    pub async fn send(&self, req: &ChatCompletionRequest) -> Result<ChatApiRespnose, BoxError> {
         let resp = self
             .client
             .post(self.base_url.as_ref())
@@ -43,7 +40,7 @@ impl DeepSeekApi {
             .send()
             .await?;
         if !req.stream {
-            return Ok(ChatApiRespnose::Entity(resp.json().await?));
+            return Ok(ChatApiRespnose::Data(resp.json().await?));
         }
 
         // SSE stream
@@ -56,10 +53,10 @@ impl DeepSeekApi {
                         .into());
                 }
 
-                if  data.starts_with(&DONE) {
+                if data.starts_with(&DONE) {
                     println!("\n\nEnd of stream\n\n")
                 }
-                
+
                 data.split(|&s| s == b'\n')
                     .filter(|line| line.starts_with(&DATA))
                     .map(|line| {
@@ -71,13 +68,13 @@ impl DeepSeekApi {
             .unwrap_or_else(|err| Err(err.into()))
         });
 
-        Ok(ChatApiRespnose::Stream(Box::pin(stream)))
+        Ok(ChatApiRespnose::DataStream(Box::pin(stream)))
     }
 }
 
 pub enum ChatApiRespnose {
-    Entity(ChatCompletion),
-    Stream(BoxStream<'static, Result<Vec<ChatCompletion>, BoxError>>),
+    Data(ChatCompletion),
+    DataStream(BoxStream<'static, Result<Vec<ChatCompletion>, BoxError>>),
 }
 
 impl Default for DeepSeekApi {
@@ -92,11 +89,15 @@ pub struct ChatCompletionRequest {
     pub(crate) messages: Vec<ChatCompletionMessage>,
     pub(crate) model: Box<str>,
     pub(crate) stream: bool,
-    pub (crate) temperature: Option<f32>,
+    pub(crate) temperature: Option<f32>,
 }
 
 impl ChatCompletionRequest {
-    pub fn new(messages: Vec<ChatCompletionMessage>, model: impl Into<Box<str>>, stream: bool) -> Self {
+    pub fn new(
+        messages: Vec<ChatCompletionMessage>,
+        model: impl Into<Box<str>>,
+        stream: bool,
+    ) -> Self {
         Self {
             messages,
             model: model.into(),
@@ -106,7 +107,6 @@ impl ChatCompletionRequest {
     }
 }
 
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ChatCompletionMessage {
     pub(crate) role: Box<str>,
@@ -114,7 +114,6 @@ pub struct ChatCompletionMessage {
 }
 
 impl ChatCompletionMessage {
-    
     pub fn new(role: impl Into<Box<str>>, content: impl Into<Box<str>>) -> Self {
         Self {
             role: role.into(),
@@ -197,11 +196,11 @@ pub struct DeltaContent {
 #[derive(Clone)]
 pub struct DefaultUsage {
     pub prompt_tokens: u32,
-	pub completion_tokens: u32,
-	pub total_tokens: u64,
+    pub completion_tokens: u32,
+    pub total_tokens: u64,
 }
 
-impl crate::chat::meta_data::usage::Usage for  DefaultUsage {
+impl crate::chat::meta_data::usage::Usage for DefaultUsage {
     fn get_prompt_tokens(&self) -> u32 {
         self.prompt_tokens
     }

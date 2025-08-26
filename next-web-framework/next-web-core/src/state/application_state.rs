@@ -29,6 +29,16 @@ impl ApplicationState {
         let reader = self.context.read().await;
         reader.get_single_with_name::<T>(name.into()).clone()
     }
+
+    pub async fn get_single_option_with_name<T>(&self, name: impl Into<String>) -> Option<T>
+    where
+        T: Clone + 'static,
+    {
+        let reader = self.context.read().await;
+        reader
+            .get_single_option_with_name::<T>(name.into())
+            .cloned()
+    }
 }
 
 #[derive(Clone)]
@@ -67,25 +77,30 @@ where
         let instance = if let Some(state) = state {
             let singleton_name = get_singleton_name::<T>();
             let reader = state.context.read().await;
-            if reader.contains_single_with_name::<T>(singleton_name.clone()) {
-                reader.get_single_with_name::<T>(singleton_name).to_owned()
-            } else if reader.contains_single_with_name::<T>("") {
-                reader.get_single_with_name::<T>("").to_owned()
-            } else {
-                drop(reader);
 
-                match state
-                    .context
-                    .write()
-                    .await
-                    .resolve_option_with_name_async::<T>(singleton_name)
-                    .await
-                {
-                    Some(instance) => instance,
+            match reader.get_single_option_with_name::<T>(singleton_name.clone()) {
+                Some(instance_with_name) => instance_with_name.clone(),
+                None => match reader.get_single_option_with_name::<T>("") {
+                    Some(instance) => instance.clone(),
                     None => {
-                        return Err((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))
+                        drop(reader);
+                        match state
+                            .context
+                            .write()
+                            .await
+                            .resolve_option_with_name_async::<T>(singleton_name)
+                            .await
+                        {
+                            Some(instance) => instance,
+                            None => {
+                                return Err((
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    "Internal Server Error",
+                                ))
+                            }
+                        }
                     }
-                }
+                },
             }
         } else {
             return Err((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"));
