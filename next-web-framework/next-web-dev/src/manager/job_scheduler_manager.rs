@@ -3,14 +3,12 @@ use std::sync::Arc;
 use flume::Sender;
 use hashbrown::HashSet;
 use next_web_core::{
-    interface::{
-        job::{
+    error::BoxError, interface::{
+        group::Group, job::{
             application_job::ApplicationJob, context::job_execution_context::JobExecutionContext,
             schedule_type::ScheduleType,
-        },
-        singleton::Singleton,
-    },
-    error::BoxError,
+        }, singleton::Singleton
+    }
 };
 use tokio::sync::RwLock;
 use tokio_cron_scheduler::{Job, JobScheduler};
@@ -24,7 +22,9 @@ pub struct JobSchedulerManager {
     context: JobExecutionContext,
 }
 
-impl Singleton for JobSchedulerManager {}
+impl Group      for JobSchedulerManager {}
+impl Singleton  for JobSchedulerManager {}
+
 
 impl JobSchedulerManager {
     pub fn new() -> Self {

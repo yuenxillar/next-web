@@ -3,7 +3,7 @@ use std::
 ;
 
 use elasticsearch::{Elasticsearch, auth::Credentials, http::transport::Transport};
-use next_web_core::interface::{service::Service, singleton::Singleton};
+use next_web_core::interface::{group::Group, service::Service, singleton::Singleton};
 
 use crate::properties::elasticsearch_properties::ElasticsearchClientProperties;
 
@@ -21,6 +21,9 @@ pub struct ElasticsearchService {
     ///  Elasticsearch client instance
     client: Elasticsearch,
 }
+
+
+impl Group      for ElasticsearchService {}
 impl Singleton  for ElasticsearchService {}
 impl Service    for ElasticsearchService {}
 

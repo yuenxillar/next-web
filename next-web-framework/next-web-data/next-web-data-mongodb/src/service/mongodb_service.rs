@@ -4,7 +4,7 @@ use mongodb::{
     Client,
     options::{ClientOptions, Compressor, Credential, ServerAddress},
 };
-use next_web_core::interface::{service::Service, singleton::Singleton};
+use next_web_core::interface::{group::Group, service::Service, singleton::Singleton};
 
 use crate::properties::mongodb_properties::MongodbClientProperties;
 
@@ -15,6 +15,8 @@ pub struct MongodbService {
     database: mongodb::Database,
 }
 
+
+impl Group      for MongodbService {}
 impl Singleton  for MongodbService {}
 impl Service    for MongodbService {}
 

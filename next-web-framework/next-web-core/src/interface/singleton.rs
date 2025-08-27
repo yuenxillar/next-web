@@ -1,4 +1,10 @@
-pub trait Singleton: Send + Sync {
+use crate::interface::group::Group;
+
+pub trait Singleton
+where
+    Self: Send + Sync,
+    Self: Group,
+{
     fn singleton_name(&self) -> String {
         let raw_name = std::any::type_name::<Self>();
         let name = raw_name.rsplit("::").next().unwrap_or_default();
@@ -14,9 +20,5 @@ pub trait Singleton: Send + Sync {
             }
             None => name.to_string(), // Fallback for an unlikely empty string case.
         }
-    }
-
-    fn group(&self) -> &'static str {
-        std::any::type_name::<Self>()
     }
 }

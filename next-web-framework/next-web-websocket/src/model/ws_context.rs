@@ -3,7 +3,7 @@ use std::{panic, sync::Arc};
 
 use crate::properties::ws_properties::WebSocketProperties;
 
-use super::handler::WebSocketHandler;
+use crate::handler::websocket_handler::WebSocketHandler;
 
 /// WebSocket 上下文，提供 WebSocket 相关配置和处理器。
 ///
@@ -85,7 +85,7 @@ impl WebSocketContext {
 #[Singleton]
 impl WebSocketContext {
     #[autowired]
-    fn private_constructor(#[autowired] properties: WebSocketProperties) -> Self {
+    pub fn constructor(#[autowired] properties: WebSocketProperties) -> Self {
         Self {
             properties,
             handlers: matchit::Router::new(),

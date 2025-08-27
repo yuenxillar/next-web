@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::StreamExt;
-use next_web_core::interface::{service::Service, singleton::Singleton};
+use next_web_core::interface::{group::Group, service::Service, singleton::Singleton};
 use redis::{Client, Value, aio::MultiplexedConnection};
 
 #[cfg(feature = "expired-key-listener")]
@@ -19,19 +19,25 @@ use crate::properties::redis_properties::RedisClientProperties;
 #[derive(Clone)]
 pub struct RedisService {
     /// Redis客户端配置属性
+    /// 
     /// Redis client configuration properties
     properties: RedisClientProperties,
     /// Redis客户端实例
+    /// 
     ///  Redis client instance
     client: Client,
     /// Redis连接池
+    /// 
     /// Redis connection pool
     pub(crate) connections: Vec<MultiplexedConnection>,
     /// 当前连接索引
+    /// 
     /// Current connection index
     index: Arc<AtomicUsize>,
 }
 
+
+impl Group      for RedisService {}
 impl Singleton  for RedisService {}
 impl Service    for RedisService {}
 

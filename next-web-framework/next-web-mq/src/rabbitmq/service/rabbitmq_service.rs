@@ -11,6 +11,7 @@ use amqprs::channel::QueueDeclareArguments;
 use amqprs::connection::Connection;
 use amqprs::connection::OpenConnectionArguments;
 use amqprs::BasicProperties;
+use next_web_core::interface::group::Group;
 use next_web_core::interface::service::Service;
 
 use next_web_core::interface::singleton::Singleton;
@@ -25,8 +26,10 @@ pub struct RabbitmqService {
     channel: Channel,
 }
 
-impl Singleton for RabbitmqService {}
-impl Service for RabbitmqService {}
+
+impl Group      for RabbitmqService {}
+impl Singleton  for RabbitmqService {}
+impl Service    for RabbitmqService {}
 
 impl RabbitmqService {
     pub async fn new(properties: RabbitMQClientProperties, binds: Vec<BindExchange>) -> Self {

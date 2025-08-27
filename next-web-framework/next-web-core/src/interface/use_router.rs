@@ -1,16 +1,13 @@
 use dyn_clone::DynClone;
 
-use crate::ApplicationContext;
+use crate::{interface::group::Group, ApplicationContext};
 
 pub trait UseRouter
 where
-    Self: DynClone + Send + Sync,
+    Self: Send + Sync,
+    Self: Group + DynClone,
 {
     fn use_router(&self, router: axum::Router, ctx: &mut ApplicationContext) -> axum::Router;
-
-    fn group(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
 }
 
 dyn_clone::clone_trait_object!(UseRouter);

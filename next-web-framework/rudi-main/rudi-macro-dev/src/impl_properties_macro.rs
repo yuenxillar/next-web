@@ -1,7 +1,7 @@
 use crate::PropertiesAttr;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{Fields, ItemStruct, Lit, LitStr};
+use syn::{Fields, ItemStruct, LitStr};
 
 pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Result<TokenStream> {
     let required_derives = vec!["Debug", "Clone", "Deserialize"];
@@ -38,10 +38,10 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
     };
 
     // 得到字段的总计数
-    let field_count = Lit::Int(syn::LitInt::new(
-        &fields.len().to_string(),
-        item_struct.ident.span(),
-    ));
+    // let field_count = Lit::Int(syn::LitInt::new(
+    //     &fields.len().to_string(),
+    //     item_struct.ident.span(),
+    // ));
 
     // 生成字段访问和赋值代码
     let field_assignments = fields
@@ -157,7 +157,7 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                                     }
                                 }).unwrap_or_default()
                             } else {
-                                noting += 1;
+                                noting = true;
                                 None
                             }
                         },
@@ -170,7 +170,6 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                             if let Some(value) = properties.one_value::<#inner>(#key_str) {
                                 Some(value)
                             } else {
-                                noting += 1;
                                 None
                             }
                         },
@@ -189,16 +188,15 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                                     if value.is_number() {
                                         value.as_str().map(|t| t.to_string()).unwrap_or_default()
                                     } else {
-
-                                        noting += 1;
+                                        noting = true;
                                         Default::default()
                                     }
                                 } else {
-                                    noting += 1;
+                                    noting = true;
                                     Default::default()
                                 }
                             } else {
-                                noting += 1;
+                                noting = true;
                                 Default::default()
                             }
                         },
@@ -211,7 +209,7 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                             if let Some(value) = properties.one_value::<#field_type>(#key_str) {
                                 value
                             } else {
-                                noting += 1;
+                                noting = true;
                                 Default::default()
                             }
                         },
@@ -296,13 +294,13 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                 ctx: &mut ::next_web_core::context::application_context::ApplicationContext,
                 properties: &::next_web_core::context::properties::ApplicationProperties,
             ) -> std::result::Result<(), std::boxed::Box<dyn std::error::Error>> {
-                let mut noting = 0;
+                let mut noting = false;
 
                 let instance = Self {
                     #(#field_assignments)*
                 };
 
-                if noting == #field_count {
+                if noting {
                     panic!("\nIncorrect assembly of properties! Struct: {} \n", stringify!(#struct_name));
                 }
 

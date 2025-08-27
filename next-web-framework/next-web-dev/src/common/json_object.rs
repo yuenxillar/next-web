@@ -2,12 +2,10 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::{borrow::Cow, collections::BTreeMap};
 
-use crate::error::json_object_error::JsonObjectError;
-
 /// 定义一个可序列化和反序列化的 JSON 对象结构体。
 ///
 /// The structure encapsulates a `BTreeMap` to store key-value pairs and provides various operation interfaces.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug)]
 pub struct JsonObject {
     /// 存储 JSON 键值对的核心数据结构。
     ///
@@ -27,6 +25,22 @@ impl JsonObject {
         Self::default()
     }
 
+    /// 从 JSON 字符串解析出 JsonObject 实例
+    ///
+    /// Parse JsonObject instance from JSON string
+    ///
+    /// # 参数
+    /// - `json_str`: 包含 JSON 数据的字符串。
+    ///   - `json_str`: A string containing JSON data.
+    ///
+    /// # 返回值
+    /// 如果解析成功，返回JsonObject对象；否则返回 `JsonObjectError::ParseError`
+    /// If parsing is successful, return JsonObject object; Otherwise, return 'JsonObjectiError:: ParseError`
+    pub fn parse(json_str: &str) -> Result<Self, JsonObjectError> {
+        serde_json::from_str::<Self>(json_str)
+            .map_err(|e| JsonObjectError::ParseError(e.to_string()))
+    }
+
     /// 从 JSON 字符串解析出指定类型的对象实例。
     ///
     /// Parses a specified type object from a JSON string.
@@ -39,7 +53,7 @@ impl JsonObject {
     /// 如果解析成功，返回指定类型的对象；否则返回 `JsonObjectError::ParseError`。
     /// If parsing is successful, returns the specified type object; otherwise returns `JsonObjectError::ParseError`.
     pub fn parse_object<T: DeserializeOwned>(json_str: &str) -> Result<T, JsonObjectError> {
-        serde_json::from_str::<T>(json_str).map_err(|_| JsonObjectError::ParseError)
+        serde_json::from_str::<T>(json_str).map_err(|e| JsonObjectError::ParseError(e.to_string()))
     }
 }
 
@@ -412,6 +426,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_parse() {
+        let json_str = r#"{"name": "Alice", "age": 30}"#;
+        let json_obj = match JsonObject::parse(json_str) {
+            Ok(obj) => obj,
+            Err(error) => {
+                eprintln!("{}", error);
+                return;
+            }
+        };
+
+        assert_eq!(json_obj.get::<String>("name").unwrap(), "Alice");
+        assert_eq!(json_obj.get::<i64>("age").unwrap(), 30);
+    }
+
+    #[test]
     fn test_new() {
         let json_obj = JsonObject::new();
         assert_eq!(json_obj.size(), 0);
@@ -495,5 +524,80 @@ mod tests {
 
         assert_eq!(json_obj.size(), 0);
         assert!(json_obj.is_empty());
+    }
+}
+
+/// 定义 `JsonObject` 操作中可能出现的错误类型。
+///
+/// Defines error types that may occur during `JsonObject` operations.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum JsonObjectError {
+    /// 键为空。
+    ///
+    /// Key is empty.
+    KeyIsEmpty,
+    /// 键已存在。
+    ///
+    /// Key already exists.
+    KeyAlreadyExists,
+    /// 值为 `null`。
+    ///
+    /// Value is null.
+    ValueIsNull,
+    /// 键或值为 `null`。
+    ///
+    /// Key or value is null.
+    KeyOrValueIsNull,
+    /// 解析错误。
+    ///
+    /// Parse error.
+    ParseError(String),
+}
+
+impl std::fmt::Display for JsonObjectError {
+    /// 格式化错误信息。
+    ///
+    /// Formats the error message.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JsonObjectError::KeyIsEmpty => write!(f, "键为空"),
+            JsonObjectError::KeyAlreadyExists => write!(f, "键已存在"),
+            JsonObjectError::ValueIsNull => write!(f, "值为 null"),
+            JsonObjectError::KeyOrValueIsNull => write!(f, "键或值为 null"),
+            JsonObjectError::ParseError(error) => {
+                write!(f, "JsonObjectError::ParseError: {}", error)
+            }
+        }
+    }
+}
+
+impl std::error::Error for JsonObjectError {}
+
+
+
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
+impl Serialize for JsonObject {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(self.raw_value.len()))?;
+        for (k, v) in &self.raw_value {
+            map.serialize_entry(k, v)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for JsonObject {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw_value: BTreeMap<Cow<'static, str>, serde_json::Value> =
+            Deserialize::deserialize(deserializer)?;
+        Ok(JsonObject { raw_value })
     }
 }

@@ -12,8 +12,7 @@ use std::sync::Arc;
 use axum::extract::ws::CloseFrame;
 use next_web_core::async_trait;
 use next_web_dev::Singleton;
-use next_web_websocket::core::handler::Result;
-use next_web_websocket::core::handler::WebSocketHandler;
+use next_web_websocket::handler::websocket_handler::{Result, WebSocketHandler};
 use next_web_websocket::Message;
 
 use crate::models::session::WebSocketSession;

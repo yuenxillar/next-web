@@ -24,13 +24,16 @@ impl Application for TestApplication {
 
     // get the application router. (open api  and private api)
     async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
-        ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
         axum::Router::new().nest(
             "/login",
             axum::Router::new()
                 .route("/setToken/{token}", post(set_token))
                 .route("/auth", post(async || "Authorized")),
         )
+    }
+
+    async fn before_start(&self, ctx: &mut ApplicationContext) {
+        ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
     }
 }
 async fn set_token(Path(token): Path<String>, req: Request) -> impl IntoResponse {

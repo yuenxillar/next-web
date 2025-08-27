@@ -8,9 +8,8 @@ use next_web_core::{async_trait, ApplicationContext};
 use next_web_core::context::properties::ApplicationProperties;
 use next_web_dev::application::Application;
 use next_web_dev::Singleton;
-use next_web_websocket::core::handler::Result;
-use next_web_websocket::core::handler::WebSocketHandler;
-use next_web_websocket::models::session::WebSocketSession;
+use next_web_websocket::handler::websocket_handler::{Result, WebSocketHandler};
+use next_web_websocket::model::session::WebSocketSession;
 use next_web_websocket::Message;
 use axum::extract::ws::CloseFrame;
 

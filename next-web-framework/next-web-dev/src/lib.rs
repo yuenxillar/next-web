@@ -14,12 +14,10 @@ pub mod middleware;
 pub mod util;
 pub mod application;
 pub mod state_machine;
-
+pub mod common;
 
 #[cfg(feature = "i18n")]
 pub mod i18n;
-
-mod tests;
 
 pub use rudi_dev::{Singleton, Transient, SingleOwner, Properties};
 

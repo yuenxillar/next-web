@@ -248,7 +248,7 @@ pub trait Application: Send + Sync {
         app = use_routers
             .into_iter()
             // Only allowed groups can apply
-            .filter(|s| PERMITTED_GROUPS.contains(&s.group()))
+            .filter(|s| PERMITTED_GROUPS.contains(&s.group().name()))
             .fold(app, |app, item| item.use_router(app, &mut ctx));
 
         let (mut open_routers, mut common_routers): (Vec<_>, Vec<_>) = ctx
@@ -494,9 +494,9 @@ pub trait Application: Send + Sync {
             );
         }
 
-        println!("========================================================================");
-
         application.before_start(&mut ctx).await;
+
+        println!("========================================================================");
 
         application
             .bind_tcp_server(ctx, &properties, start_time)
