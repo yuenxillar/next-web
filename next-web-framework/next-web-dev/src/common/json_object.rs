@@ -2,24 +2,26 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::{borrow::Cow, collections::BTreeMap};
 
-/// 定义一个可序列化和反序列化的 JSON 对象结构体。
+/// 定义一个可序列化和反序列化的 JSON 对象结构体
 ///
 /// The structure encapsulates a `BTreeMap` to store key-value pairs and provides various operation interfaces.
 #[derive(Clone, Debug)]
 pub struct JsonObject {
-    /// 存储 JSON 键值对的核心数据结构。
+    /// 存储 JSON 键值对的核心数据结构
     ///
     /// Core data structure storing JSON key-value pairs.
     raw_value: BTreeMap<Cow<'static, str>, Value>,
 }
 
 impl JsonObject {
-    /// 创建一个新的 `JsonObject` 实例。
-    ///
-    /// Creates a new instance of `JsonObject`.
+    /// 创建一个新的 `JsonObject` 实例
     ///
     /// # 返回值
     /// 返回一个初始化的 `JsonObject` 实例
+    /// 
+    /// Creates a new instance of `JsonObject`.
+    /// 
+    /// # Returns
     /// Returns an initialized `JsonObject` instance
     pub fn new() -> Self {
         Self::default()
@@ -27,85 +29,102 @@ impl JsonObject {
 
     /// 从 JSON 字符串解析出 JsonObject 实例
     ///
+    /// # 参数
+    /// - `json_str`: 包含 JSON 数据的字符串
+    /// 
+    ///  # 返回值
+    /// 如果解析成功，返回JsonObject对象；否则返回 `JsonObjectError::ParseError`
+    /// 
     /// Parse JsonObject instance from JSON string
     ///
-    /// # 参数
-    /// - `json_str`: 包含 JSON 数据的字符串。
-    ///   - `json_str`: A string containing JSON data.
+    /// - `json_str`: A string containing JSON data.
     ///
-    /// # 返回值
-    /// 如果解析成功，返回JsonObject对象；否则返回 `JsonObjectError::ParseError`
+    //// # Returns
     /// If parsing is successful, return JsonObject object; Otherwise, return 'JsonObjectiError:: ParseError`
     pub fn parse(json_str: &str) -> Result<Self, JsonObjectError> {
         serde_json::from_str::<Self>(json_str)
             .map_err(|e| JsonObjectError::ParseError(e.to_string()))
     }
 
-    /// 从 JSON 字符串解析出指定类型的对象实例。
-    ///
+    /// 从 JSON 字符串解析出指定类型的对象实例
+    /// 
+    /// # 参数
+    /// - `json_str`: 包含 JSON 数据的字符串
+    /// 
+    /// # 返回值
+    /// 如果解析成功，返回指定类型的对象；否则返回 `JsonObjectError::ParseError`
+    /// 
     /// Parses a specified type object from a JSON string.
     ///
-    /// # 参数
-    /// - `json_str`: 包含 JSON 数据的字符串。
-    ///   - `json_str`: A string containing JSON data.
-    ///
-    /// # 返回值
-    /// 如果解析成功，返回指定类型的对象；否则返回 `JsonObjectError::ParseError`。
+    /// - `json_str`: A string containing JSON data.
+    /// 
+    /// # Returns
     /// If parsing is successful, returns the specified type object; otherwise returns `JsonObjectError::ParseError`.
     pub fn parse_object<T: DeserializeOwned>(json_str: &str) -> Result<T, JsonObjectError> {
         serde_json::from_str::<T>(json_str).map_err(|e| JsonObjectError::ParseError(e.to_string()))
     }
 }
 
-/// 为 `JsonObject` 提供功能接口。
 impl JsonObject {
-    /// 获取 `JsonObject` 中键值对的数量。
-    ///
-    /// Gets the number of key-value pairs in `JsonObject`.
+    /// 获取 `JsonObject` 中键值对的数量
     ///
     /// # 返回值
-    /// 返回键值对的总数。
+    /// 返回键值对的总数
+    /// 
+    /// Gets the number of key-value pairs in `JsonObject`.
+    /// 
+    /// # Returns
     /// Returns the total number of key-value pairs.
     pub fn size(&self) -> usize {
         self.raw_value.len()
     }
 
-    /// 检查 `JsonObject` 是否为空。
-    ///
-    /// Checks if `JsonObject` is empty.
+    /// 检查 `JsonObject` 是否为空
     ///
     /// # 返回值
-    /// 如果没有任何键值对，返回 `true`；否则返回 `false`。
+    /// 如果没有任何键值对，返回 `true`；否则返回 `false`
+    /// 
+    /// Checks if `JsonObject` is empty.
+    /// 
+    /// # Returns
     /// Returns `true` if there are no key-value pairs; otherwise returns `false`.
     pub fn is_empty(&self) -> bool {
         self.raw_value.is_empty()
     }
 
-    /// 检查 `JsonObject` 是否包含指定键。
-    ///
-    /// Checks if `JsonObject` contains the specified key.
+    /// 检查 `JsonObject` 是否包含指定键
     ///
     /// # 参数
-    /// - `key`: 需要检查的键。
-    ///   - `key`: The key to check.
+    /// - `key`: 需要检查的键
     ///
     /// # 返回值
-    /// 如果包含指定键，返回 `true`；否则返回 `false`。
+    /// 如果包含指定键，返回 `true`；否则返回 `false`
+    /// 
+    /// Checks if `JsonObject` contains the specified key.
+    /// 
+    /// # Parameters
+    /// - `key`: The key to check.
+    ///
+    /// # Returns
     /// Returns `true` if the specified key exists; otherwise returns `false`.
     pub fn contains_key(&self, key: &str) -> bool {
         self.raw_value.contains_key(key)
     }
 
-    /// 根据键获取值并反序列化为指定类型。
-    ///
-    /// Retrieves the value associated with the specified key and deserializes it into the specified type.
+    /// 根据键获取值并反序列化为指定类型
     ///
     /// # 参数
-    /// - `key`: 需要查找的键。
-    ///   - `key`: The key to look up.
+    /// - `key`: 需要查找的键
+    /// 
+    ///  # 返回值
+    /// 如果键存在且反序列化成功，返回对应的值；否则返回 `None`
+    /// 
+    /// Retrieves the value associated with the specified key and deserializes it into the specified type.
     ///
-    /// # 返回值
-    /// 如果键存在且反序列化成功，返回对应的值；否则返回 `None`。
+    /// # Parameters
+    /// - `key`: The key to look up.
+    ///
+    /// # Returns
     /// If the key exists and deserialization is successful, returns the corresponding value; otherwise returns `None`.
     pub fn get<V: DeserializeOwned>(&self, key: &str) -> Option<V> {
         self.raw_value
@@ -113,19 +132,23 @@ impl JsonObject {
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 
-    /// 根据键获取值并反序列化为指定类型，如果键不存在则返回默认值。
+        /// 根据键获取值并反序列化为指定类型，如果键不存在则返回默认值
+    ///
+    /// # 参数
+    /// - `key`: 需要查找的键
+    /// - `default`: 默认值
+    ///
+    /// # 返回值
+    /// 如果键存在且反序列化成功，返回对应的值；否则返回默认值
     ///
     /// Retrieves the value associated with the specified key and deserializes it into the specified type.
     /// If the key does not exist, returns the default value.
     ///
-    /// # 参数
-    /// - `key`: 需要查找的键。
-    ///   - `key`: The key to look up.
-    /// - `default`: 默认值。
-    ///   - `default`: The default value.
+    /// # Parameters
+    /// - `key`: The key to look up.
+    /// - `default`: The default value.
     ///
-    /// # 返回值
-    /// 如果键存在且反序列化成功，返回对应的值；否则返回默认值。
+    /// # Returns
     /// If the key exists and deserialization is successful, returns the corresponding value; otherwise returns the default value.
     pub fn get_or_default<V: DeserializeOwned>(&self, key: &str, default: V) -> V {
         if let Some(v) = self.raw_value.get(key) {
@@ -134,91 +157,115 @@ impl JsonObject {
         default
     }
 
-    /// 根据键获取浮点数值。
+    /// 根据键获取浮点数值
+    ///
+    /// # 参数
+    /// - `key`: 需要查找的键
+    ///
+    /// # 返回值
+    /// 如果键存在且值为浮点数，返回对应的值；否则返回 `None`
     ///
     /// Retrieves the floating-point value associated with the specified key.
     ///
-    /// # 参数
-    /// - `key`: 需要查找的键。
-    ///   - `key`: The key to look up.
+    /// # Parameters
+    /// - `key`: The key to look up.
     ///
-    /// # 返回值
-    /// 如果键存在且值为浮点数，返回对应的值；否则返回 `None`。
+    /// # Returns
     /// If the key exists and the value is a floating-point number, returns the corresponding value; otherwise returns `None`.
     pub fn get_double(&self, key: &str) -> Option<f64> {
         self.raw_value.get(key).and_then(|v| v.as_f64())
     }
 
-    /// 根据键获取整数值。
+    /// 根据键获取整数值
+    ///
+    /// # 参数
+    /// - `key`: 需要查找的键
+    ///
+    /// # 返回值
+    /// 如果键存在且值为整数，返回对应的值；否则返回 `None`
     ///
     /// Retrieves the integer value associated with the specified key.
     ///
-    /// # 参数
-    /// - `key`: 需要查找的键。
-    ///   - `key`: The key to look up.
+    /// # Parameters
+    /// - `key`: The key to look up.
     ///
-    /// # 返回值
-    /// 如果键存在且值为整数，返回对应的值；否则返回 `None`。
+    /// # Returns
     /// If the key exists and the value is an integer, returns the corresponding value; otherwise returns `None`.
     pub fn get_int(&self, key: &str) -> Option<i64> {
         self.raw_value.get(key).and_then(|v| v.as_i64())
     }
 
-    /// 根据键获取无符号整数值。
+    /// 根据键获取无符号整数值
+    ///
+    /// # 参数
+    /// - `key`: 需要查找的键
+    ///
+    /// # 返回值
+    /// 如果键存在且值为无符号整数，返回对应的值；否则返回 `None`
     ///
     /// Retrieves the unsigned integer value associated with the specified key.
     ///
-    /// # 参数
-    /// - `key`: 需要查找的键。
-    ///   - `key`: The key to look up.
+    /// # Parameters
+    /// - `key`: The key to look up.
     ///
-    /// # 返回值
-    /// 如果键存在且值为无符号整数，返回对应的值；否则返回 `None`。
+    /// # Returns
     /// If the key exists and the value is an unsigned integer, returns the corresponding value; otherwise returns `None`.
     pub fn get_uint(&self, key: &str) -> Option<u64> {
         self.raw_value.get(key).and_then(|v| v.as_u64())
     }
 
-    /// 根据键获取字符串值。
+    /// 根据键获取字符串值
+    ///
+    /// # 参数
+    /// - `key`: 需要查找的键
+    ///
+    /// # 返回值
+    /// 如果键存在且值为字符串，返回对应的值；否则返回 `None`
     ///
     /// Retrieves the string value associated with the specified key.
     ///
-    /// # 参数
-    /// - `key`: 需要查找的键。
-    ///   - `key`: The key to look up.
+    /// # Parameters
+    /// - `key`: The key to look up.
     ///
-    /// # 返回值
-    /// 如果键存在且值为字符串，返回对应的值；否则返回 `None`。
+    /// # Returns
     /// If the key exists and the value is a string, returns the corresponding value; otherwise returns `None`.
     pub fn get_str(&self, key: &str) -> Option<&str> {
         self.raw_value.get(key).and_then(|v| v.as_str())
     }
 
-    /// 根据键获取布尔值。
+    /// 根据键获取布尔值
+    ///
+    /// # 参数
+    /// - `key`: 需要查找的键
+    ///
+    /// # 返回值
+    /// 如果键存在且值为布尔值，返回对应的值；否则返回 `None`
     ///
     /// Retrieves the boolean value associated with the specified key.
     ///
-    /// # 参数
-    /// - `key`: 需要查找的键。
-    ///   - `key`: The key to look up.
+    /// # Parameters
+    /// - `key`: The key to look up.
     ///
-    /// # 返回值
-    /// 如果键存在且值为布尔值，返回对应的值；否则返回 `None`。
+    /// # Returns
     /// If the key exists and the value is a boolean, returns the corresponding value; otherwise returns `None`.
     pub fn get_bool(&self, key: &str) -> Option<bool> {
         self.raw_value.get(key).and_then(|v| v.as_bool())
     }
 
-    /// 根据键获取 JSON 数组，并反序列化为指定类型。
+    /// 根据键获取 JSON 数组，并反序列化为指定类型
+    ///
+    /// # 参数
+    /// - `key`: 需要查找的键
+    ///
+    /// # 返回值
+    /// 如果键存在且值为数组，返回反序列化后的列表；否则返回空列表
     ///
     /// Retrieves the JSON array associated with the specified key and deserializes it into the specified type.
     ///
-    /// # 参数
-    /// - `key`: 需要查找的键。
-    ///   - `key`: The key to look up.
+    /// # Parameters
+    /// - `key`: The key to look up.
     ///
-    /// # 返回值
-    /// 如果键存在且值为数组，返回反序列化后的列表；否则返回空列表。
+    /// # Returns
     /// If the key exists and the value is an array, returns the deserialized list; otherwise returns an empty list.
     pub fn get_json_array<V: DeserializeOwned>(&self, key: &str) -> Vec<V> {
         self.raw_value
@@ -232,36 +279,44 @@ impl JsonObject {
             .unwrap_or_default()
     }
 
-    /// 设置指定键的值，如果键已存在则覆盖原有值。
+    /// 设置指定键的值，如果键已存在则覆盖原有值
+    ///
+    /// # 参数
+    /// - `key`: 需要设置的键
+    /// - `value`: 需要设置的值
+    ///
+    /// # 返回值
+    /// 返回自身以支持链式调用
     ///
     /// Sets the value for the specified key, overwriting the existing value if the key already exists.
     ///
-    /// # 参数
-    /// - `key`: 需要设置的键。
-    ///   - `key`: The key to set.
-    /// - `value`: 需要设置的值。
-    ///   - `value`: The value to set.
+    /// # Parameters
+    /// - `key`: The key to set.
+    /// - `value`: The value to set.
     ///
-    /// # 返回值
-    /// 返回自身以支持链式调用。
+    /// # Returns
     /// Returns itself to support method chaining.
     pub fn set<V: Into<Value>>(mut self, key: impl Into<Cow<'static, str>>, value: V) -> Self {
         self.raw_value.insert(key.into(), value.into());
         self
     }
 
-    /// 设置指定键的值，如果键已存在则覆盖原有值。
+    /// 设置指定键的值，如果键已存在则覆盖原有值
+    ///
+    /// # 参数
+    /// - `key`: 需要设置的键
+    /// - `value`: 需要设置的值
+    ///
+    /// # 返回值
+    /// 如果键已存在，返回被覆盖的旧值；否则返回 `None`
     ///
     /// Sets the value for the specified key, overwriting the existing value if the key already exists.
     ///
-    /// # 参数
-    /// - `key`: 需要设置的键。
-    ///   - `key`: The key to set.
-    /// - `value`: 需要设置的值。
-    ///   - `value`: The value to set.
+    /// # Parameters
+    /// - `key`: The key to set.
+    /// - `value`: The value to set.
     ///
-    /// # 返回值
-    /// 如果键已存在，返回被覆盖的旧值；否则返回 `None`。
+    /// # Returns
     /// If the key already exists, returns the old value that was replaced; otherwise returns `None`.
     pub fn set_opt<V: Into<Value>>(
         &mut self,
@@ -271,18 +326,22 @@ impl JsonObject {
         self.raw_value.insert(key.into(), value.into())
     }
 
-    /// 设置指定键的值，如果键已存在则返回错误。
+    /// 设置指定键的值，如果键已存在则返回错误
+    ///
+    /// # 参数
+    /// - `key`: 需要设置的键
+    /// - `value`: 需要设置的值
+    ///
+    /// # 返回值
+    /// 如果键不存在且设置成功，返回 `Ok(())`；否则返回相应的错误
     ///
     /// Sets the value for the specified key and returns an error if the key already exists.
     ///
-    /// # 参数
-    /// - `key`: 需要设置的键。
-    ///   - `key`: The key to set.
-    /// - `value`: 需要设置的值。
-    ///   - `value`: The value to set.
+    /// # Parameters
+    /// - `key`: The key to set.
+    /// - `value`: The value to set.
     ///
-    /// # 返回值
-    /// 如果键不存在且设置成功，返回 `Ok(())`；否则返回相应的错误。
+    /// # Returns
     /// If the key does not exist and setting is successful, returns `Ok(())`; otherwise returns the corresponding error.
     pub fn put_once<V: Into<Value>>(
         &mut self,
@@ -301,18 +360,22 @@ impl JsonObject {
         Ok(())
     }
 
-    /// 设置指定键的值，如果值为 `null` 则返回错误。
+    /// 设置指定键的值，如果值为 `null` 则返回错误
+    ///
+    /// # 参数
+    /// - `key`: 需要设置的键
+    /// - `value`: 需要设置的值
+    ///
+    /// # 返回值
+    /// 如果值不为 `null` 且设置成功，返回 `Ok(())`；否则返回相应的错误
     ///
     /// Sets the value for the specified key and returns an error if the value is `null`.
     ///
-    /// # 参数
-    /// - `key`: 需要设置的键。
-    ///   - `key`: The key to set.
-    /// - `value`: 需要设置的值。
-    ///   - `value`: The value to set.
+    /// # Parameters
+    /// - `key`: The key to set.
+    /// - `value`: The value to set.
     ///
-    /// # 返回值
-    /// 如果值不为 `null` 且设置成功，返回 `Ok(())`；否则返回相应的错误。
+    /// # Returns
     /// If the value is not `null` and setting is successful, returns `Ok(())`; otherwise returns the corresponding error.
     pub fn put_opt<V: Into<Value>>(
         &mut self,
@@ -333,91 +396,176 @@ impl JsonObject {
         Ok(())
     }
 
-    /// 将另一个可迭代的键值对集合中的所有键值对添加到 `JsonObject` 中。
+    /// 将另一个可迭代的键值对集合中的所有键值对添加到 `JsonObject` 中
+    ///
+    /// # 参数
+    /// - `data`: 包含键值对的可迭代集合
     ///
     /// Adds all key-value pairs from another iterable collection to `JsonObject`.
     ///
-    /// # 参数
-    /// - `data`: 包含键值对的可迭代集合。
-    ///   - `data`: An iterable collection containing key-value pairs.
+    /// # Parameters
+    /// - `data`: An iterable collection containing key-value pairs.
     pub fn put_all(&mut self, data: impl IntoIterator<Item = (Cow<'static, str>, Value)>) {
         self.raw_value.extend(data);
     }
 
-    /// 获取 `JsonObject` 的原始 `BTreeMap` 引用。
+    /// 获取 `JsonObject` 的原始 `BTreeMap` 引用
+    ///
+    /// # 返回值
+    /// 返回底层 `BTreeMap` 的不可变引用
     ///
     /// Gets a reference to the underlying `BTreeMap`.
     ///
-    /// # 返回值
-    /// 返回底层 `BTreeMap` 的不可变引用。
+    /// # Returns
     /// Returns an immutable reference to the underlying `BTreeMap`.
     pub fn raw_value(&self) -> &BTreeMap<Cow<'static, str>, Value> {
         &self.raw_value
     }
 
-    /// 清空 `JsonObject` 中的所有键值对。
+    /// 清空 `JsonObject` 中的所有键值对
     ///
     /// Clears all key-value pairs in `JsonObject`.
     pub fn clear(&mut self) {
         self.raw_value.clear()
     }
 
-    /// 获取 `JsonObject` 中所有值的引用列表。
+    /// 获取 `JsonObject` 中所有值的引用列表
+    ///
+    /// # 返回值
+    /// 返回所有值的引用列表
     ///
     /// Gets a list of references to all values in `JsonObject`.
     ///
-    /// # 返回值
-    /// 返回所有值的引用列表。
+    /// # Returns
     /// Returns a list of references to all values.
     pub fn values(&self) -> Vec<&Value> {
         self.raw_value.values().collect()
     }
 
-    /// 获取 `JsonObject` 中所有键的引用列表。
+    /// 获取 `JsonObject` 中所有键的引用列表
+    ///
+    /// # 返回值
+    /// 返回所有键的引用列表
     ///
     /// Gets a list of references to all keys in `JsonObject`.
     ///
-    /// # 返回值
-    /// 返回所有键的引用列表。
+    /// # Returns
     /// Returns a list of references to all keys.
     pub fn keys(&self) -> Vec<&Cow<'static, str>> {
         self.raw_value.keys().collect()
     }
 
-    /// 将 `JsonObject` 转换为 JSON 字符串。
+    /// 将 `JsonObject` 转换为 JSON 字符串
+    ///
+    /// # 返回值
+    /// 返回紧凑格式的 JSON 字符串
     ///
     /// Converts `JsonObject` to a compact JSON string.
     ///
-    /// # 返回值
-    /// 返回紧凑格式的 JSON 字符串。
+    /// # Returns
     /// Returns a compact JSON string.
     pub fn to_json_string(&self) -> String {
         serde_json::to_string(&self.raw_value).unwrap_or_default()
     }
 
-    /// 将 `JsonObject` 转换为格式化的 JSON 字符串。
+    /// 将 `JsonObject` 转换为格式化的 JSON 字符串
+    ///
+    /// # 返回值
+    /// 返回格式化的 JSON 字符串
     ///
     /// Converts `JsonObject` to a pretty-printed JSON string.
     ///
-    /// # 返回值
-    /// 返回格式化的 JSON 字符串。
+    /// # Returns
     /// Returns a pretty-printed JSON string.
     pub fn to_json_string_pretty(&self) -> String {
         serde_json::to_string_pretty(&self.raw_value).unwrap_or_default()
     }
 }
 
-/// 实现 `Default` 特性以提供默认的 `JsonObject` 实例。
+/// 实现 `Default` 特性以提供默认的 `JsonObject` 实例
 ///
 /// Implements the `Default` trait to provide a default `JsonObject` instance.
 impl Default for JsonObject {
-    /// 创建一个默认的 `JsonObject` 实例。
+    /// 创建一个默认的 `JsonObject` 实例
     ///
     /// Creates a default `JsonObject` instance.
     fn default() -> Self {
         Self {
             raw_value: BTreeMap::new(),
         }
+    }
+}
+
+/// 定义 `JsonObject` 操作中可能出现的错误类型
+///
+/// Defines error types that may occur during `JsonObject` operations.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum JsonObjectError {
+    /// 键为空
+    ///
+    /// Key is empty.
+    KeyIsEmpty,
+    /// 键已存在
+    ///
+    /// Key already exists.
+    KeyAlreadyExists,
+    /// 值为 `null`
+    ///
+    /// Value is null.
+    ValueIsNull,
+    /// 键或值为 `null`
+    ///
+    /// Key or value is null.
+    KeyOrValueIsNull,
+    /// 解析错误
+    ///
+    /// Parse error.
+    ParseError(String),
+}
+
+impl std::fmt::Display for JsonObjectError {
+    /// 格式化错误信息
+    ///
+    /// Formats the error message.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JsonObjectError::KeyIsEmpty => write!(f, "键为空"),
+            JsonObjectError::KeyAlreadyExists => write!(f, "键已存在"),
+            JsonObjectError::ValueIsNull => write!(f, "值为 null"),
+            JsonObjectError::KeyOrValueIsNull => write!(f, "键或值为 null"),
+            JsonObjectError::ParseError(error) => {
+                write!(f, "JsonObjectError::ParseError: {}", error)
+            }
+        }
+    }
+}
+
+impl std::error::Error for JsonObjectError {}
+
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
+impl Serialize for JsonObject {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(self.raw_value.len()))?;
+        for (k, v) in &self.raw_value {
+            map.serialize_entry(k, v)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for JsonObject {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw_value: BTreeMap<Cow<'static, str>, serde_json::Value> =
+            Deserialize::deserialize(deserializer)?;
+        Ok(JsonObject { raw_value })
     }
 }
 
@@ -431,8 +579,7 @@ mod tests {
         let json_obj = match JsonObject::parse(json_str) {
             Ok(obj) => obj,
             Err(error) => {
-                eprintln!("{}", error);
-                return;
+                panic!("parse error: {}", error)
             }
         };
 
@@ -524,80 +671,5 @@ mod tests {
 
         assert_eq!(json_obj.size(), 0);
         assert!(json_obj.is_empty());
-    }
-}
-
-/// 定义 `JsonObject` 操作中可能出现的错误类型。
-///
-/// Defines error types that may occur during `JsonObject` operations.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum JsonObjectError {
-    /// 键为空。
-    ///
-    /// Key is empty.
-    KeyIsEmpty,
-    /// 键已存在。
-    ///
-    /// Key already exists.
-    KeyAlreadyExists,
-    /// 值为 `null`。
-    ///
-    /// Value is null.
-    ValueIsNull,
-    /// 键或值为 `null`。
-    ///
-    /// Key or value is null.
-    KeyOrValueIsNull,
-    /// 解析错误。
-    ///
-    /// Parse error.
-    ParseError(String),
-}
-
-impl std::fmt::Display for JsonObjectError {
-    /// 格式化错误信息。
-    ///
-    /// Formats the error message.
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JsonObjectError::KeyIsEmpty => write!(f, "键为空"),
-            JsonObjectError::KeyAlreadyExists => write!(f, "键已存在"),
-            JsonObjectError::ValueIsNull => write!(f, "值为 null"),
-            JsonObjectError::KeyOrValueIsNull => write!(f, "键或值为 null"),
-            JsonObjectError::ParseError(error) => {
-                write!(f, "JsonObjectError::ParseError: {}", error)
-            }
-        }
-    }
-}
-
-impl std::error::Error for JsonObjectError {}
-
-
-
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-
-impl Serialize for JsonObject {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(Some(self.raw_value.len()))?;
-        for (k, v) in &self.raw_value {
-            map.serialize_entry(k, v)?;
-        }
-        map.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for JsonObject {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw_value: BTreeMap<Cow<'static, str>, serde_json::Value> =
-            Deserialize::deserialize(deserializer)?;
-        Ok(JsonObject { raw_value })
     }
 }

@@ -72,7 +72,6 @@ chrono = { version = "0.4.40" }
 hashbrown = { version = "0.15.2", features = ["serde"] }
 regex = { version = "1.11.1" }
 jsonwebtoken = { version = "9.3.0" }
-rust-embed-for-web = { version = "11.2.1" }
 rust-embed = { version = "8.7.2" }
 clap = { version = "4.5.37", features = ["derive"] }
 matchit = { version = "0.8.4" }

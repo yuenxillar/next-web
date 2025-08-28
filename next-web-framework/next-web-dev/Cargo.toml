@@ -32,7 +32,6 @@ tokio-util = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 chrono = { workspace = true }
-rust-embed  = { workspace = true }
 once_cell = { workspace = true }
 hashbrown = { workspace = true }
 tracing = { workspace = true }
