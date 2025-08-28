@@ -6,7 +6,7 @@ use syn::{parse_macro_input, spanned::Spanned, Expr, ItemFn, ReturnType, Type};
 
 use crate::{
     common::retry_attr::RetryAttr,
-    utils::param_info::{extract_param_info, ParamInfo},
+    util::param_info::{extract_param_info, ParamInfo},
 };
 
 pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStream {
