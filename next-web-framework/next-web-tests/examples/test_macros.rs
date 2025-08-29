@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
-use next_web_macro::{Builder, FieldName, GetSet};
+use next_web_core::interface::desensitized::Desensitized;
+use next_web_macro::{Builder, Desensitized, FieldName, GetSet};
 
 /// This is a test macro
 
@@ -14,7 +15,7 @@ pub struct TestMacro {
     y: Option<f32>,
 }
 
-#[derive(Default, GetSet)]
+#[derive(Default, GetSet, Desensitized)]
 struct TestA {
     s1: f32,
     s2: u32,
@@ -24,11 +25,16 @@ struct TestA {
     s6: Option<i32>,
     s7: Box<str>,
     s8: Cow<'static, str>,
+    #[de(email)]
     s9: String,
-    s10: &'static str,
-    s11: bool,
+    #[de(phone)]
+    s10: Option<Box<str>>,
+    #[de(phone)]
+    s11: Cow<'static, str>,
+
 }
 
 fn main() {
-    let test_a = TestA::default();
+    let mut test_a = TestA::default();
+   test_a.desensitize();
 }

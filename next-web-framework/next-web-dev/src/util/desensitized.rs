@@ -213,6 +213,17 @@ impl DesensitizedUtil {
         format!("{}{}{}", prefix, stars, suffix)
     }
 
+    pub fn ip(ip: &str) -> String {
+        let parts: Vec<&str> = ip.split('.').collect();
+
+        // 确保是有效的IPv4地址（4个部分）
+        if parts.len() != 4 {
+            return ip.to_string(); // 如果不是标准IPv4格式，直接返回原字符串
+        }
+    
+        format!("{}.*.*.{}", parts[0], parts[3])
+    }
+
     /// 通用字符串脱敏 (保留指定长度的前缀和后缀，中间用 `*` 号代替)
     ///
     /// # 参数
@@ -272,24 +283,6 @@ impl DesensitizedUtil {
     }
 }
 
-/// 为常见类型实现脱敏 trait
-/// 允许 `String` 和 `&str` 类型直接调用 `.desensitize()` 方法进行通用脱敏。
-///
-/// Trait for desensitizing common types.
-/// Allows `String` and `&str` types to directly call the `.desensitize()` method for generic desensitization.
-pub trait Desensitize {
-    /// 执行脱敏操作
-    ///
-    /// # 返回值
-    /// 返回脱敏后的字符串
-    ///
-    /// Performs the desensitization operation.
-    ///
-    /// # Returns
-    /// Returns the desensitized string.
-    fn desensitize(&self) -> String;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -307,7 +300,10 @@ mod tests {
             DesensitizedUtil::email("test@example.com"),
             "te****@example.com"
         );
-        assert_eq!(DesensitizedUtil::email("ab@example.com"), "ab****@example.com");
+        assert_eq!(
+            DesensitizedUtil::email("ab@example.com"),
+            "ab****@example.com"
+        );
         assert_eq!(DesensitizedUtil::email("a@b.com"), "a****@b.com");
     }
 

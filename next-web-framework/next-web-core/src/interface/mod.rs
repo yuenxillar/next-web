@@ -12,3 +12,4 @@ pub mod singleton;
 pub mod status;
 pub mod stream;
 pub mod use_router;
+pub mod desensitized;
