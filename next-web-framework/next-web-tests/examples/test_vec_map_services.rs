@@ -63,7 +63,7 @@ pub struct TestA {
     pub d: u64
 }
 
-#[Singleton( name= "store")]
+#[Singleton( name = "store")]
 fn store() -> Option<String> {
     Some(String::from("store_tets"))
 }

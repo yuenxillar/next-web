@@ -23,7 +23,7 @@ impl Application for TestApplication {
     async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)
-    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new().nest(
             "/login",
             axum::Router::new()

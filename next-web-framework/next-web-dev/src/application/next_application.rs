@@ -19,10 +19,15 @@ pub struct NextApplication<A: Application> {
 
 impl<A: Application + Default> NextApplication<A> {
     pub fn new() -> Self {
+        let application_args = ApplicationArgs::default();
+        let application_resources = ApplicationResources::default();
+        let application_properties =
+            ApplicationProperties::from((&application_args, &application_resources));
+
         Self {
-            application_properties: ApplicationProperties::default(),
-            application_args: ApplicationArgs::default(),
-            application_resources: ApplicationResources::default(),
+            application_properties,
+            application_args,
+            application_resources,
             application: A::default(),
         }
     }

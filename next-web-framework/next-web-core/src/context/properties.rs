@@ -9,6 +9,7 @@ use std::io::Read;
 use crate::constants::application_constants::APPLICATION_CONFIG;
 use crate::context::application_args::ApplicationArgs;
 use crate::context::application_resources::ResourceLoader;
+use crate::traits::application;
 
 use super::application_resources::ApplicationResources;
 use super::next_properties::NextProperties;
@@ -74,12 +75,6 @@ impl ApplicationProperties {
     }
 }
 
-impl ApplicationProperties {
-    pub fn from_resources(application_resources: &ApplicationResources) -> Self {
-        into_application_properties(application_resources)
-    }
-}
-
 impl Default for ApplicationProperties {
     fn default() -> Self {
         Self {
@@ -90,13 +85,12 @@ impl Default for ApplicationProperties {
 }
 
 fn into_application_properties(
+    application_args: &ApplicationArgs,
     application_resources: &ApplicationResources,
 ) -> ApplicationProperties {
     use serde_yaml::Value;
 
-    let args = ApplicationArgs::parse();
-
-    let config_path: Option<String> = args.config_location;
+    let config_path: Option<String> = application_args.config_location.clone();
 
     let mut config = String::new();
 
@@ -181,6 +175,12 @@ fn into_application_properties(
 
     // return
     return application_properties;
+}
+
+impl From<(&ApplicationArgs, &ApplicationResources)> for ApplicationProperties {
+    fn from((args, resources): (&ApplicationArgs, &ApplicationResources)) -> Self {
+        into_application_properties(args, resources)
+    }
 }
 
 impl Drop for ApplicationProperties {

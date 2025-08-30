@@ -25,6 +25,7 @@ pub fn get_set(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(FieldName)]
 pub fn field_name(input: TokenStream) -> TokenStream {
+    println!("88888");
     let input = parse_macro_input!(input as DeriveInput);
     let stream = impl_macro_field_name(&input);
     stream.into()
@@ -51,7 +52,6 @@ pub fn all_constructor(input: TokenStream) -> TokenStream {
     let stream = impl_macro_db_mapper(&input);
     stream.into()
 }
-
 
 #[proc_macro_attribute]
 pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {

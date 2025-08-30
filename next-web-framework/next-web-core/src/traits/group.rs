@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::common::group_name::GroupName;
 
 pub trait Group
@@ -11,3 +13,18 @@ where
         }
     }
 }
+
+
+impl<T: Group + ?Sized> Group for Box<T> {
+    fn group(&self) -> GroupName {
+        (**self).group()
+    }
+}
+
+
+impl<T: Group + ?Sized> Group for Arc<T> {
+    fn group(&self) -> GroupName {
+        (**self).group()
+    }
+}
+

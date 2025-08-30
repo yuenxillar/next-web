@@ -69,8 +69,7 @@ pub(crate) fn impl_macro_desensitized(input: &syn::DeriveInput) -> TokenStream {
     };
 
     // println!("expanded: {}", expanded.to_string());
-
-    TokenStream::from(expanded)
+    expanded.into()
 }
 
 /// 查找字段的脱敏类型

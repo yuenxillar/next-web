@@ -37,7 +37,7 @@ async fn download_bytes() -> impl IntoResponse {
     // 10MB
     let bytes = Bytes::from(vec![0x01; 1024 * 1024 * 10]);
     // 10KB/s
-    ResponseStream::new(BytesStream::new(bytes, Some("test.txt".into()))).target_rate(1024 * 10)
+    ResponseStream::new(BytesStream::new(bytes, Some("test.txt".into()))).target_rate(1024 * 1024)
 }
 
 async fn download_network_file() -> impl IntoResponse {

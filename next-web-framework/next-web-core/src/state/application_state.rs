@@ -67,7 +67,8 @@ where
 impl<S, T> FromRequestParts<S> for AcSingleton<T>
 where
     S: Send + Sync,
-    T: Send + Sync + Clone + 'static,
+    T: Send + Sync + 'static,
+    T: Singleton + Clone
 {
     type Rejection = (StatusCode, &'static str);
 

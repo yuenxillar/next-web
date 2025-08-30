@@ -15,7 +15,7 @@ pub(crate) fn impl_macro_get_set(input: &syn::DeriveInput) -> proc_macro::TokenS
     let get_methods = generate_get_methods(fields);
     let set_methods = generate_set_methods(fields);
 
-    let token_stream = quote! {
+    let expanded = quote! {
 
         impl #name {
             #( #get_methods )*
@@ -23,7 +23,7 @@ pub(crate) fn impl_macro_get_set(input: &syn::DeriveInput) -> proc_macro::TokenS
         }
     };
 
-    token_stream.into()
+    expanded.into()
 }
 
 // Generate Getter Methods
