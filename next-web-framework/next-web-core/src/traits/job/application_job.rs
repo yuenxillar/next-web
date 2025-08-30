@@ -1,6 +1,6 @@
 use crate::{
     error::BoxError,
-    interface::job::{
+    traits::job::{
         context::job_execution_context::JobExecutionContext, schedule_type::ScheduleType,
     },
 };

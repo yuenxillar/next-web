@@ -1,6 +1,6 @@
 use axum::{http::StatusCode, response::IntoResponse};
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, interface::data_decoder::DataDecoder,
+    async_trait, context::properties::ApplicationProperties, traits::data_decoder::DataDecoder,
     ApplicationContext,
 };
 use next_web_dev::{

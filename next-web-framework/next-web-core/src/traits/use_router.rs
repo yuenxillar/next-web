@@ -1,6 +1,6 @@
 use dyn_clone::DynClone;
 
-use crate::{interface::group::Group, ApplicationContext};
+use crate::{traits::group::Group, ApplicationContext};
 
 pub trait UseRouter
 where

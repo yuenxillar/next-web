@@ -1,7 +1,7 @@
 use flume::Sender;
 use next_web_core::{
     error::BoxError,
-    interface::event::{
+    traits::event::{
         application_event::ApplicationEvent, application_event_publisher::ApplicationEventPublisher,
     },
 };

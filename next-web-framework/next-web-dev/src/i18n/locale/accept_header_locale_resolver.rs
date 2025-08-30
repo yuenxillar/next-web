@@ -1,4 +1,4 @@
-use next_web_core::{interface::locale_resolver::LocaleResolver, util::locale::Locale};
+use next_web_core::{traits::locale_resolver::LocaleResolver, util::locale::Locale};
 
 #[derive(Clone)]
 pub struct AcceptHeaderLocaleResolver;

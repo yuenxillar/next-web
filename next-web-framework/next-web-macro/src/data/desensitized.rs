@@ -59,7 +59,7 @@ pub(crate) fn impl_macro_desensitized(input: &syn::DeriveInput) -> TokenStream {
         }).filter(|val| !val.is_empty()).collect::<Vec<_>>();
 
     let expanded = quote! {
-        impl ::next_web_core::interface::desensitized::Desensitized for #name {
+        impl ::next_web_core::traits::desensitized::Desensitized for #name {
             fn desensitize(&mut self) {
                 use ::next_web_dev::util::desensitized::DesensitizedUtil;
 

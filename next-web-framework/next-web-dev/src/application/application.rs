@@ -11,9 +11,9 @@ use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
 use next_web_core::context::properties::{ApplicationProperties, Properties};
-use next_web_core::interface::application::application_ready_event::ApplicationReadyEvent;
-use next_web_core::interface::apply_router::ApplyRouter;
-use next_web_core::interface::use_router::UseRouter;
+use next_web_core::traits::application::application_ready_event::ApplicationReadyEvent;
+use next_web_core::traits::apply_router::ApplyRouter;
+use next_web_core::traits::use_router::UseRouter;
 use next_web_core::state::application_state::ApplicationState;
 use next_web_core::AutoRegister;
 use std::net::SocketAddr;
@@ -35,15 +35,15 @@ use crate::event::default_application_event_multicaster::DefaultApplicationEvent
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::util::local_date_time::LocalDateTime;
 
-use next_web_core::interface::application::application_shutdown::ApplicationShutdown;
+use next_web_core::traits::application::application_shutdown::ApplicationShutdown;
 
-use next_web_core::interface::event::application_event_multicaster::ApplicationEventMulticaster;
-use next_web_core::interface::event::application_listener::ApplicationListener;
+use next_web_core::traits::event::application_event_multicaster::ApplicationEventMulticaster;
+use next_web_core::traits::event::application_listener::ApplicationListener;
 
 #[cfg(feature = "scheduler")]
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
 #[cfg(feature = "scheduler")]
-use next_web_core::interface::job::application_job::ApplicationJob;
+use next_web_core::traits::job::application_job::ApplicationJob;
 
 #[async_trait]
 pub trait Application: Send + Sync {

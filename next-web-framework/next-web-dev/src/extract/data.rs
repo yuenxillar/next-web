@@ -6,7 +6,7 @@ use axum::{
     http::{header, HeaderMap, StatusCode},
 };
 use next_web_core::{
-    interface::data_decoder::DataDecoder, state::application_state::ApplicationState,
+    traits::data_decoder::DataDecoder, state::application_state::ApplicationState,
 };
 use serde::de::DeserializeOwned;
 

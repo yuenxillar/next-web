@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, interface::{service::Service, singleton::Singleton}, ApplicationContext, AutoRegister
+    async_trait, context::properties::ApplicationProperties, traits::{service::Service, singleton::Singleton}, ApplicationContext, AutoRegister
 };
 use redis::{Cmd, ConnectionLike};
 use rudi_dev::Singleton;

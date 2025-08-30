@@ -1,5 +1,5 @@
 use axum::response::IntoResponse;
-use next_web_core::interface::stream::into_response_stream::IntoRespnoseStream;
+use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
 
 pub struct ResponseStream<T> {
     target_rate: usize,

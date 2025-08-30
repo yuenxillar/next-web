@@ -7,7 +7,7 @@ pub mod constants;
 pub mod context;
 pub mod convert;
 pub mod error;
-pub mod interface;
+pub mod traits;
 pub mod state;
 pub mod util;
 

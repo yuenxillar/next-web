@@ -1,3 +1,4 @@
+
 use crate::rabbitmq::core::bind_exchange::BindExchange;
 use crate::rabbitmq::core::listener::rabbit_listener::RabbitListener;
 use amqprs::callbacks::DefaultChannelCallback;
@@ -11,10 +12,10 @@ use amqprs::channel::QueueDeclareArguments;
 use amqprs::connection::Connection;
 use amqprs::connection::OpenConnectionArguments;
 use amqprs::BasicProperties;
-use next_web_core::interface::group::Group;
-use next_web_core::interface::service::Service;
+use next_web_core::traits::group::Group;
+use next_web_core::traits::service::Service;
 
-use next_web_core::interface::singleton::Singleton;
+use next_web_core::traits::singleton::Singleton;
 use tracing::{error, info};
 
 use crate::rabbitmq::properties::rabbitmq_properties::RabbitMQClientProperties;

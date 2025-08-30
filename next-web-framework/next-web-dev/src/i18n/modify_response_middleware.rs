@@ -2,7 +2,7 @@ use axum::{
     body::{Body, Bytes}, extract::{Request, State}, middleware::Next, response::Response
 };
 use http_body_util::BodyExt;
-use next_web_core::interface::locale_resolver::LocaleResolver;
+use next_web_core::traits::locale_resolver::LocaleResolver;
 
 use crate::{i18n::locale::accept_header_locale_resolver::AcceptHeaderLocaleResolver, service::message_source_service::MessageSourceService};
 

@@ -1,10 +1,10 @@
 use std::any::{Any, TypeId};
 
-use next_web_core::interface::event::application_event_publisher::ApplicationEventPublisher;
+use next_web_core::traits::event::application_event_publisher::ApplicationEventPublisher;
 use next_web_core::{
     async_trait,
     context::properties::ApplicationProperties,
-    interface::event::{
+    traits::event::{
         application_event::ApplicationEvent, application_listener::ApplicationListener,
     },
     ApplicationContext,

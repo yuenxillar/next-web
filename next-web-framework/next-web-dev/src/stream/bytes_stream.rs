@@ -7,7 +7,7 @@ use axum::{
     BoxError,
 };
 use futures::{stream, StreamExt};
-use next_web_core::interface::stream::into_response_stream::IntoRespnoseStream;
+use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
 
 use crate::{stream::DEFAULT_CHUNK_SIZE, util::local_date_time::LocalDateTime};
 

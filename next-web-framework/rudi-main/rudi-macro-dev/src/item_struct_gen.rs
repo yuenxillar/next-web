@@ -164,8 +164,8 @@ pub(crate) fn generate(
         #item_struct
 
 
-        impl ::next_web_core::interface::group::Group           for #struct_name {}
-        impl ::next_web_core::interface::singleton::Singleton   for #struct_name {
+        impl ::next_web_core::traits::group::Group           for #struct_name {}
+        impl ::next_web_core::traits::singleton::Singleton   for #struct_name {
             fn singleton_name(&self) -> String
             {
                 stringify!(#default_name).to_string()

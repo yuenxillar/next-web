@@ -1,4 +1,4 @@
-use crate::interface::group::Group;
+use crate::traits::group::Group;
 
 pub trait Singleton
 where

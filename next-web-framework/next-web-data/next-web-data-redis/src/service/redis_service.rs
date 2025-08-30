@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::StreamExt;
-use next_web_core::interface::{group::Group, service::Service, singleton::Singleton};
+use next_web_core::traits::{group::Group, service::Service, singleton::Singleton};
 use redis::{Client, Value, aio::MultiplexedConnection};
 
 #[cfg(feature = "expired-key-listener")]

@@ -2,7 +2,7 @@ use next_web_core::{
     async_trait,
     context::properties::ApplicationProperties,
     error::BoxError,
-    interface::job::{
+    traits::job::{
         application_job::ApplicationJob, context::job_execution_context::JobExecutionContext,
         schedule_type::ScheduleType,
     },

@@ -4,7 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use futures::StreamExt;
-use next_web_core::interface::stream::into_response_stream::IntoRespnoseStream;
+use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
 use std::{
     path::Path,
     time::{Duration, Instant},

@@ -10,7 +10,7 @@ use crate::{
 };
 
 use hashbrown::HashMap;
-use next_web_core::interface::{group::Group, service::Service, singleton::Singleton};
+use next_web_core::traits::{group::Group, service::Service, singleton::Singleton};
 use rumqttc::{
     AsyncClient, ConnectReturnCode, Event, MqttOptions, NetworkOptions, Packet, QoS,
     SubscribeFilter,

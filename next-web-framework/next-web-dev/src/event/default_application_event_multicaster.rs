@@ -2,7 +2,7 @@ use flume::{Receiver, Sender};
 use hashbrown::HashMap;
 use next_web_core::{
     common::key::Key,
-    interface::event::{
+    traits::event::{
         application_event::ApplicationEvent,
         application_event_multicaster::ApplicationEventMulticaster,
         application_listener::ApplicationListener,

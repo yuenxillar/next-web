@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, interface::desensitized::Desensitized,
+    async_trait, context::properties::ApplicationProperties, traits::desensitized::Desensitized,
     ApplicationContext,
 };
 use next_web_dev::application::Application;

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use next_web_core::interface::group::Group;
-use next_web_core::interface::use_router::UseRouter;
+use next_web_core::traits::group::Group;
+use next_web_core::traits::use_router::UseRouter;
 use rudi_dev::Singleton;
 
 use crate::core::web_security_configure::WebSecurityConfigure;

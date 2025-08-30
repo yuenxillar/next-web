@@ -3,7 +3,7 @@ use std::sync::Arc;
 use flume::Sender;
 use hashbrown::HashSet;
 use next_web_core::{
-    error::BoxError, interface::{
+    error::BoxError, traits::{
         group::Group, job::{
             application_job::ApplicationJob, context::job_execution_context::JobExecutionContext,
             schedule_type::ScheduleType,

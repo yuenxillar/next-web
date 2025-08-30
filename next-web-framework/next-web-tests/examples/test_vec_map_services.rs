@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use axum::response::IntoResponse;
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, interface::service::Service,
+    async_trait, context::properties::ApplicationProperties, traits::service::Service,
     state::application_state::AcSingleton, ApplicationContext,
 };
 use next_web_dev::{application::Application, Singleton};

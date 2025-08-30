@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::{
     ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
-    interface::singleton::Singleton,
+    traits::singleton::Singleton,
 };
 use rudi_dev::Singleton;
 

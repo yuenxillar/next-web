@@ -9,7 +9,7 @@ use axum::{
 };
 use tokio::sync::RwLock;
 
-use crate::{interface::singleton::Singleton, ApplicationContext};
+use crate::{traits::singleton::Singleton, ApplicationContext};
 
 #[derive(Clone)]
 pub struct ApplicationState {

@@ -7,7 +7,7 @@ use axum::http::{HeaderMap, HeaderName};
 use axum::BoxError;
 use axum::{body::Body, response::Response};
 use futures::StreamExt;
-use next_web_core::interface::stream::into_response_stream::IntoRespnoseStream;
+use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
 use once_cell::sync::Lazy;
 use reqwest::{header, Client};
 use reqwest::{Method, StatusCode};
