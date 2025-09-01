@@ -1,4 +1,3 @@
-
 extern crate proc_macro;
 
 use crate::common::retry::impl_macro_retry;
@@ -25,7 +24,6 @@ pub fn get_set(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(FieldName)]
 pub fn field_name(input: TokenStream) -> TokenStream {
-    println!("88888");
     let input = parse_macro_input!(input as DeriveInput);
     let stream = impl_macro_field_name(&input);
     stream.into()

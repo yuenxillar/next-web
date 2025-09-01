@@ -4,7 +4,6 @@ use syn::{parse_quote, Expr, ExprPath};
 #[derive(FromAttr)]
 #[attribute(idents = [value])]
 pub(crate) struct RetryAttr {
-
     #[attribute(default = default_max_attempts())]
     pub(crate) max_attempts: Expr,
 
@@ -25,7 +24,6 @@ fn default_max_attempts() -> Expr {
 fn default_delay() -> Expr {
     parse_quote!(1000)
 }
-
 
 impl Default for RetryAttr {
     fn default() -> Self {

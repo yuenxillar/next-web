@@ -58,6 +58,7 @@ where
     }
 }
 
+
 #[derive(Default, serde::Serialize, GetSet, Desensitized)]
 struct TestA {
     #[de(email)]

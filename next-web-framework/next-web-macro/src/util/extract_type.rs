@@ -1,6 +1,4 @@
-use syn::{
-    ReturnType, Type, PathArguments, GenericArgument
-};
+use syn::{GenericArgument, PathArguments, ReturnType, Type};
 
 pub(crate) fn extract_error_type(return_type: &ReturnType) -> Option<Type> {
     if let ReturnType::Type(_, ty) = return_type {

@@ -73,7 +73,7 @@ pub(crate) fn impl_macro_desensitized(input: &syn::DeriveInput) -> TokenStream {
 }
 
 /// 查找字段的脱敏类型
-/// 
+///
 /// Search for the desensitization type of a field
 fn find_desensitization_type(field: &Field) -> Option<DesensitizationType> {
     for attr in &field.attrs {
@@ -157,13 +157,15 @@ impl DesensitizationType {
 //     (3, 4) // 默认值
 // }
 
-
 fn is_string(ty: &syn::Type) -> bool {
     if let syn::Type::Path(type_path) = ty {
         if type_path.path.segments.len() == 1 {
-            return type_path.path.segments.first()
-            .map(|val| val.ident == "String")
-            .unwrap_or(false);
+            return type_path
+                .path
+                .segments
+                .first()
+                .map(|val| val.ident == "String")
+                .unwrap_or(false);
         }
     }
     false

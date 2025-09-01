@@ -18,14 +18,17 @@ pub(crate) fn impl_macro_field_name(input: &syn::DeriveInput) -> TokenStream {
         .filter(|item| !item.starts_with("_"))
         .collect::<Vec<_>>();
 
-    let methods = fileds_names.iter().map(|item| {
-        let method_name = Ident::new(&format!("field_{}", item), Span::call_site().into());
-        return quote! {
-            pub fn #method_name() -> &'static str {
-                stringify!(#item)
-            }
-        };
-    }).collect::<Vec<proc_macro2::TokenStream>>();
+    let methods = fileds_names
+        .iter()
+        .map(|item| {
+            let method_name = Ident::new(&format!("field_{}", item), Span::call_site().into());
+            return quote! {
+                pub fn #method_name() -> &'static str {
+                    stringify!(#item)
+                }
+            };
+        })
+        .collect::<Vec<proc_macro2::TokenStream>>();
 
     let expanded = quote! {
         impl #name {
@@ -33,7 +36,7 @@ pub(crate) fn impl_macro_field_name(input: &syn::DeriveInput) -> TokenStream {
         }
     };
 
-    println!("expanded: {}", expanded.to_string());
+    // println!("expanded: {}", expanded.to_string());
 
     expanded.into()
 }
