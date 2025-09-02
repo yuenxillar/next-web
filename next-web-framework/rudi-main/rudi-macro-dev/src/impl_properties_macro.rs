@@ -27,7 +27,9 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         }
     }
 
-    let prefix = attr.prefix.to_token_stream().to_string().replace("\"", "");
+    let prefix_expr = attr.prefix;
+
+    let prefix = prefix_expr.to_token_stream().to_string().replace("\"", "");
     let dynamic = attr.dynamic;
 
 
@@ -201,12 +203,7 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
     // dynamic_field
     let dynamic_field = if dynamic {
         quote! {
-            base: {
-                let mut map = ::std::collections::HashMap::new();
-                // properties.
-
-                map
-            },
+            base: if let Some(values) = properties.dynamic_value(#prefix_expr) { values } else { Default::default() },
         }
     }else {
         quote! {}
@@ -316,6 +313,8 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
             }
         }
     };
+
+    // println!("expanded: {}", expanded);
 
     Ok(expanded.into())
 }

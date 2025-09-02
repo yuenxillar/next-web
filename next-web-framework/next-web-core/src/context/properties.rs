@@ -1,10 +1,10 @@
 use dyn_clone::DynClone;
-use hashbrown::HashMap;
+
 
 use regex::Regex;
-use std::collections::HashSet;
 use std::fmt::Debug;
 use std::io::Read;
+use std::collections::HashMap;
 
 use crate::constants::application_constants::APPLICATION_CONFIG;
 use crate::context::application_args::ApplicationArgs;
@@ -66,28 +66,28 @@ impl ApplicationProperties {
         &self,
         key: &str,
     ) -> Option<HashMap<String, T>> {
-        if let Some(map) = self.mapping_value.as_ref() {
+        if let Some(mapping) = self.mapping_value.as_ref() {
             // 查找key的动态值
             let index = key.split(".").collect::<Vec<_>>().len();
-            let keys = map
+            let values = mapping
                 .keys()
                 .filter(|s| s.starts_with(key))
                 .filter(|s| index == (s.split(".").collect::<Vec<_>>().len() + 1))
                 .filter_map(|key| {
-                    let var = map.get(key).map(|value| {
-                        serde_yaml::from_value::<T>(value.to_owned())
-                    }.ok()).unwrap_or_default();
+                    let v = match mapping
+                        .get(key)
+                        .map(|value| { serde_yaml::from_value::<T>(value.to_owned()) }.ok())
+                       {
+                        Some(val) => if val.is_none() { return None; } else { val.unwrap() },
+                        None => return None
+                    };
 
-                    Some((key.split(".").last().unwrap_or_default(), var.unwrap()))
+                    let k = key.split(".").last().map(ToString::to_string).unwrap_or(format!("dynamic{}", index));
+                    Some((k, v))
                 })
                 .collect::<HashMap<_, _>>();
 
-            // if let Some(value) = map.get(key) {
-            //     return serde_yaml::from_value::<T>(value.to_owned())
-            //         .map(|v| Some(v))
-            //         .unwrap_or_default();
-            // }
-            return None;
+            return Some(values);
         }
         None
     }

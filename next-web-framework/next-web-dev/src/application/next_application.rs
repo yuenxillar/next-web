@@ -1,6 +1,6 @@
 use std::ops::Deref;
+use std::collections::HashMap;
 
-use hashbrown::HashMap;
 use next_web_core::context::{
     application_args::ApplicationArgs, application_resources::ApplicationResources,
     properties::ApplicationProperties,

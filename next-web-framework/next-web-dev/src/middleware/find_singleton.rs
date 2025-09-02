@@ -4,14 +4,17 @@ use axum::{
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
 };
-use next_web_core::{state::application_state::ApplicationState, traits::singleton::Singleton, util::singleton::SingletonUtil};
+use next_web_core::{
+    state::application_state::ApplicationState,
+    util::singleton::SingletonUtil,
+};
 
 #[derive(Clone)]
 pub struct FindSingleton<T>(pub T);
 
 impl<T> Deref for FindSingleton<T>
 where
-    T: Singleton + Clone,
+    T: Clone,
 {
     type Target = T;
 
@@ -22,7 +25,7 @@ where
 
 impl<T> DerefMut for FindSingleton<T>
 where
-    T: Singleton + Clone,
+    T: Clone,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
@@ -33,7 +36,7 @@ impl<S, T> FromRequestParts<S> for FindSingleton<T>
 where
     S: Send + Sync,
     T: Send + Sync + 'static,
-    T: Singleton + Clone
+    T: Clone,
 {
     type Rejection = (StatusCode, &'static str);
 
