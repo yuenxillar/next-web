@@ -1,12 +1,14 @@
 use std::borrow::Cow;
 
-use next_web_macro::{Builder, Desensitized, FieldName, GetSet};
+use next_web_core::traits::desensitized::Desensitized;
+use next_web_macros::{Builder, Desensitized, FieldName, GetSet};
 
 /// This is a test macro
 #[allow(unused)]
-#[derive(Default, FieldName, GetSet, Builder)]
+#[derive(Debug, Default, FieldName, GetSet, Builder)]
 pub struct TestMacro {
     #[get_set(skip_get)]
+    #[builder(into)]
     description: String,
     #[builder(default, into)]
     weight: u32,
@@ -16,11 +18,9 @@ pub struct TestMacro {
     y: Option<f32>,
 }
 
-
 fn default_x() -> f32 {
     2.0
 }
-
 
 #[allow(unused)]
 #[derive(Default, GetSet, Desensitized, FieldName)]
@@ -43,10 +43,34 @@ struct TestA {
 }
 
 fn main() {
+    // Getters and setters
+    let mut test_a = TestA::default();
+    test_a.get_s4();
+    test_a.set_s4(None);
+
+
+    // Field name
+    assert_eq!(TestA::field_s2(), "s2");
+    assert_eq!(TestA::field_s5(), "s5");
+    assert_eq!(TestA::field_s7(), "s7");
+    assert_eq!(TestA::field_s8(), "s8");
+    assert_eq!(TestA::field_s9(), "s9");
+
+
+    // Desensitized
+    test_a.desensitize();
+    
+
+    // Builder
     let test = TestMacroBuilder::builder()
-    .weight(12u32)
-    .x(3.2)
-    .y(Some(3.5))
-    .build()
-    .unwrap();
+        .weight(32u32)
+        .description("this is a test macro")
+        .x(1.2)
+        .y(2.3)
+        .build();
+
+    match test {
+        Ok(val) => println!("{:?}", val),
+        Err(msg) => eprintln!("Error: {}", msg),
+    }
 }

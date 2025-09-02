@@ -6,7 +6,7 @@ use axum::{
     http::{header, HeaderMap, StatusCode},
 };
 use next_web_core::{
-    traits::data_decoder::DataDecoder, state::application_state::ApplicationState,
+    state::application_state::ApplicationState, traits::data_decoder::DataDecoder,
 };
 use serde::de::DeserializeOwned;
 
@@ -22,11 +22,12 @@ where
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
         if is_json(req.headers()) {
             let decoder = match req.extensions().get::<ApplicationState>() {
-                Some(state) => {
-                    state
-                        .get_single_option_with_name::<Arc<dyn DataDecoder>>("defaultDataDecoder")
-                        .await
-                }
+                Some(state) => state
+                    .context()
+                    .read()
+                    .await
+                    .get_single_option_with_name::<Arc<dyn DataDecoder>>("defaultDataDecoder")
+                    .cloned(),
                 _ => None,
             };
 

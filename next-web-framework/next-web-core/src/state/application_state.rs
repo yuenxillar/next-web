@@ -1,15 +1,8 @@
-use std::{
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use std::sync::Arc;
 
-use axum::{
-    extract::{FromRef, FromRequestParts},
-    http::{request::Parts, StatusCode},
-};
 use tokio::sync::RwLock;
 
-use crate::{traits::singleton::Singleton, ApplicationContext};
+use crate::ApplicationContext;
 
 #[derive(Clone)]
 pub struct ApplicationState {
@@ -22,126 +15,11 @@ impl ApplicationState {
         Self { context }
     }
 
-    pub async fn get_single_with_name<T>(&self, name: impl Into<String>) -> T
-    where
-        T: Clone + 'static,
-    {
-        let reader = self.context.read().await;
-        reader.get_single_with_name::<T>(name.into()).clone()
+    pub fn context(&self) -> &Arc<RwLock<ApplicationContext>> {
+        & self.context
     }
 
-    pub async fn get_single_option_with_name<T>(&self, name: impl Into<String>) -> Option<T>
-    where
-        T: Clone + 'static,
-    {
-        let reader = self.context.read().await;
-        reader
-            .get_single_option_with_name::<T>(name.into())
-            .cloned()
-    }
-}
-
-#[derive(Clone)]
-pub struct AcSingleton<T>(pub T);
-
-impl<T> Deref for AcSingleton<T>
-where
-    T: Singleton + Clone,
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T> DerefMut for AcSingleton<T>
-where
-    T: Singleton + Clone,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<S, T> FromRequestParts<S> for AcSingleton<T>
-where
-    S: Send + Sync,
-    T: Send + Sync + 'static,
-    T: Singleton + Clone
-{
-    type Rejection = (StatusCode, &'static str);
-
-    async fn from_request_parts(req: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let state = req.extensions.get::<ApplicationState>();
-
-        let instance = if let Some(state) = state {
-            let singleton_name = get_singleton_name::<T>();
-            let reader = state.context.read().await;
-
-            match reader.get_single_option_with_name::<T>(singleton_name.clone()) {
-                Some(instance_with_name) => instance_with_name.clone(),
-                None => match reader.get_single_option_with_name::<T>("") {
-                    Some(instance) => instance.clone(),
-                    None => {
-                        drop(reader);
-                        match state
-                            .context
-                            .write()
-                            .await
-                            .resolve_option_with_name_async::<T>(singleton_name)
-                            .await
-                        {
-                            Some(instance) => instance,
-                            None => {
-                                return Err((
-                                    StatusCode::INTERNAL_SERVER_ERROR,
-                                    "Internal Server Error",
-                                ))
-                            }
-                        }
-                    }
-                },
-            }
-        } else {
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"));
-        };
-
-        Ok(Self(instance))
-    }
-}
-
-impl<T> FromRef<ApplicationState> for AcSingleton<T>
-where
-    T: Singleton + Clone + 'static,
-{
-    fn from_ref(state: &ApplicationState) -> Self {
-        let singleton_name = get_singleton_name::<T>();
-
-        AcSingleton(
-            state
-                .context
-                .try_write()
-                .unwrap()
-                .resolve_with_name::<T>(singleton_name)
-                .clone(),
-        )
-    }
-}
-
-fn get_singleton_name<T: ?Sized>() -> String {
-    let raw_name = std::any::type_name::<T>();
-    let name = raw_name.rsplit("::").next().unwrap_or_default();
-
-    // Convert the first character to lowercase and concatenate with the rest of the string.
-    let mut chars = name.chars();
-    match chars.next() {
-        Some(first_char) => {
-            let mut singleton_name = String::with_capacity(name.len());
-            singleton_name.extend(first_char.to_lowercase());
-            singleton_name.push_str(chars.as_str());
-            singleton_name
-        }
-        None => name.to_string(), // Fallback for an unlikely empty string case.
+    pub fn context_mut(&mut self) -> &mut Arc<RwLock<ApplicationContext>> {
+        &mut self.context
     }
 }

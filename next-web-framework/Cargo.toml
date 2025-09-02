@@ -38,7 +38,7 @@ next-web-gateway = { version = "*", path = "./next-web-gateway", optional = true
 next-web-document = { version = "0.1.0", path = "./next-web-document", optional = true }
 
 # next-web-email = { version = "0.1.0", path = "./next-web-email", optional = true }
-# next-web-macro = { version = "0.1.0", path = "./next-web-macro", optional = true }
+# next-web-macros = { version = "0.1.0", path = "./next-web-macros", optional = true }
 
 # next-web-id = { version = "0.1.0", path = "./next-web-id", optional = true }
 # next-web-ip = { version = "0.1.0", path = "./next-web-ip", optional = true }
@@ -54,7 +54,7 @@ common =  ["next-web-common"]
 utils = ["next-web-utils"]
 # document = ["next-web-document"]
 # email = ["next-web-email"]
-# macro = ["next-web-macro"]
+# macro = ["next-web-macros"]
 # mqtt = ["next-web-mqtt"]
 # sms = ["next-web-sms"]
 mq = ["next-web-mq"]

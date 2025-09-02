@@ -1,5 +1,5 @@
 [package]
-name = "next-web-macro"
+name = "next-web-macros"
 version = "0.1.0"
 edition = "2021"
 

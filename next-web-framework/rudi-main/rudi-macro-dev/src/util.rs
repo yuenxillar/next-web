@@ -1,3 +1,5 @@
+use syn::{GenericArgument, PathArguments};
+
 pub(crate) fn singleton_name(name: &str) -> String {
     let name = name.trim().replacen("\"", "", 2);
     let mut chars = name.chars();
@@ -36,4 +38,31 @@ pub(crate) fn field_name_to_singleton_name(field_name: &str) -> String {
     }
 
     name
+}
+
+pub(crate) fn is_option(ty: &syn::Type) -> bool {
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            return segment.ident == "Option";
+        }
+    }
+    false
+}
+
+pub(crate) fn extract_option_inner_type(ty: &syn::Type) -> Option<syn::Type> {
+    // 检查是否为 Option 类型
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            if segment.ident == "Option" {
+                // 提取泛型参数
+                if let PathArguments::AngleBracketed(args) = &segment.arguments {
+                    if let Some(GenericArgument::Type(inner_type)) = args.args.first() {
+                        return Some(inner_type.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }

@@ -3,9 +3,9 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use axum::response::IntoResponse;
 use next_web_core::{
     async_trait, context::properties::ApplicationProperties, traits::service::Service,
-    state::application_state::AcSingleton, ApplicationContext,
+    ApplicationContext,
 };
-use next_web_dev::{application::Application, Singleton};
+use next_web_dev::{application::Application, middleware::find_singleton::FindSingleton, Singleton};
 
 #[Singleton(binds = [Self::into_test_coll])]
 #[derive(Clone, Debug)]
@@ -42,7 +42,6 @@ impl TestColl for TestService {}
 #[Singleton]
 #[derive(Clone)]
 pub struct TestVecAndMapService {
-
     /// When using a map, V is required to implement Singleton Trait
     #[autowired(map)]
     pub services_map: HashMap<String, Arc<dyn TestColl>>,
@@ -60,14 +59,13 @@ pub struct TestVecAndMapService {
 pub struct TestA {
     pub p: i32,
     pub s: i64,
-    pub d: u64
+    pub d: u64,
 }
 
-#[Singleton( name = "store")]
+#[Singleton(name = "store")]
 fn store() -> Option<String> {
     Some(String::from("store_tets"))
 }
-
 
 #[derive(Clone, Default)]
 struct TestApplication;
@@ -78,16 +76,20 @@ impl Application for TestApplication {
     async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)
-    async fn application_router(
-        &mut self,
-        _ctx: &mut ApplicationContext,
-    ) -> axum::Router {
+    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new().route("/getVecAndMapService", axum::routing::get(get_service))
     }
 }
 
-async fn get_service(AcSingleton(map_service): AcSingleton<TestVecAndMapService>) -> impl IntoResponse {
-    let str1 = map_service.services_vec.iter().map(|s| s.singleton_name()).collect::<Vec<String>>().join(":");
+async fn get_service(
+    FindSingleton(map_service): FindSingleton<TestVecAndMapService>,
+) -> impl IntoResponse {
+    let str1 = map_service
+        .services_vec
+        .iter()
+        .map(|s| s.singleton_name())
+        .collect::<Vec<String>>()
+        .join(":");
 
     let str2 = map_service
         .services_map

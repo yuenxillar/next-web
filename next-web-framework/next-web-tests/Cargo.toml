@@ -14,7 +14,7 @@ tokio = { workspace = true, features= ["sync"]}
 serde = { workspace = true }
 serde_json = { workspace = true }
 next-web-ip = { path = "../next-web-ip", version = "0.1.0" }
-next-web-macro = { path = "../next-web-macro", version = "0.1.0" }
+next-web-macros = { path = "../next-web-macros", version = "0.1.0" }
 next-web-websocket = { path = "../next-web-websocket", version = "*" }
 # next-web-mqtt = { path = "../next-web-mqtt", version = "0.1.2" }
 # next-web-data-redis = { path = "../next-web-data/next-web-data-redis", version = "0.1.0", features = ["expired-key-listener"]}
@@ -33,6 +33,8 @@ axum = { workspace = true, features = ["multipart"] }
 tokio-util = { workspace = true }
 futures = { workspace = true }
 matchit = { workspace = true}
+tracing ={ workspace = true}
+
 
 [dev-dependencies]
 next-web-mqtt = { path = "../next-web-mqtt", version = "*" }

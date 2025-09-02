@@ -32,7 +32,7 @@ impl Application for TestApplication {
         )
     }
 
-    async fn before_start(&self, ctx: &mut ApplicationContext) {
+    async fn before_start(&mut self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
     }
 }
@@ -42,8 +42,11 @@ async fn set_token(Path(token): Path<String>, req: Request) -> impl IntoResponse
     }
     let state = req.extensions().get::<ApplicationState>().unwrap();
     let store = state
+        .context()
+        .read()
+        .await
         .get_single_with_name::<Arc<Mutex<Vec<String>>>>("tokenStore")
-        .await;
+        .clone();
 
     store.lock().await.push(token);
     "Ok"

@@ -1,15 +1,14 @@
-use clap::Parser;
 use dyn_clone::DynClone;
 use hashbrown::HashMap;
 
 use regex::Regex;
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::io::Read;
 
 use crate::constants::application_constants::APPLICATION_CONFIG;
 use crate::context::application_args::ApplicationArgs;
 use crate::context::application_resources::ResourceLoader;
-use crate::traits::application;
 
 use super::application_resources::ApplicationResources;
 use super::next_properties::NextProperties;
@@ -58,6 +57,36 @@ impl ApplicationProperties {
                     .map(|v| Some(v))
                     .unwrap_or_default();
             }
+            return None;
+        }
+        None
+    }
+
+    pub fn dynamic_value<T: serde::de::DeserializeOwned>(
+        &self,
+        key: &str,
+    ) -> Option<HashMap<String, T>> {
+        if let Some(map) = self.mapping_value.as_ref() {
+            // 查找key的动态值
+            let index = key.split(".").collect::<Vec<_>>().len();
+            let keys = map
+                .keys()
+                .filter(|s| s.starts_with(key))
+                .filter(|s| index == (s.split(".").collect::<Vec<_>>().len() + 1))
+                .filter_map(|key| {
+                    let var = map.get(key).map(|value| {
+                        serde_yaml::from_value::<T>(value.to_owned())
+                    }.ok()).unwrap_or_default();
+
+                    Some((key.split(".").last().unwrap_or_default(), var.unwrap()))
+                })
+                .collect::<HashMap<_, _>>();
+
+            // if let Some(value) = map.get(key) {
+            //     return serde_yaml::from_value::<T>(value.to_owned())
+            //         .map(|v| Some(v))
+            //         .unwrap_or_default();
+            // }
             return None;
         }
         None

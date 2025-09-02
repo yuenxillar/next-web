@@ -10,7 +10,6 @@ use crate::{
 };
 
 pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStream {
-    // 解析属性参数
     let RetryAttr {
         max_attempts,
         delay,
@@ -22,7 +21,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         Err(err) => return err.to_compile_error().into(),
     };
 
-    // 判断参数是否合法
+    // Determine whether the parameters are valid
     if let Some(multilier) = &multiplier {
         if let Expr::Lit(expr_lit) = multilier {
             if let syn::Lit::Int(lit_int) = &expr_lit.lit {
@@ -40,7 +39,6 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         }
     }
 
-    // 解析函数
     let input_fn = parse_macro_input!(item as ItemFn);
     let fn_name = &input_fn.sig.ident;
     let fn_block = &input_fn.block;
@@ -48,7 +46,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
     let fn_inputs = &input_fn.sig.inputs;
     let fn_output = &input_fn.sig.output;
 
-    // 获取参数的信息
+    //  Obtain information on parameters
     let params: Vec<ParamInfo> = extract_param_info(&input_fn);
 
     let clones = params
@@ -81,7 +79,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         None => quote! {},
     };
 
-    // 检查函数返回值是否为Result
+    // Check if the return value of the function is Result
     if !match fn_output {
         ReturnType::Default => false,
         ReturnType::Type(_, ty) => {
@@ -99,7 +97,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         panic!("The retry macro can only be applied to functions that return Result");
     }
 
-    // 生成重试逻辑
+    // Generate the retry logic
     let retry_logic = if is_async {
         quote! {
             async fn #fn_name(#fn_inputs) #fn_output {

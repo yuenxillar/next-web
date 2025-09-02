@@ -1,4 +1,5 @@
 use quote::ToTokens;
+use syn::{GenericArgument, PathArguments};
 
 pub enum FieldType {
     String,
@@ -92,5 +93,24 @@ impl FieldType {
             }
         }
         false
+    }
+
+    /// Extract the inner type of Option type
+    pub fn extract_option_inner_type(ty: &syn::Type) -> Option<syn::Type> {
+        // 检查是否为 Option 类型
+        if let syn::Type::Path(type_path) = ty {
+            if let Some(segment) = type_path.path.segments.last() {
+                if segment.ident == "Option" {
+                    // 提取泛型参数
+                    if let PathArguments::AngleBracketed(args) = &segment.arguments {
+                        if let Some(GenericArgument::Type(inner_type)) = args.args.first() {
+                            return Some(inner_type.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        None
     }
 }

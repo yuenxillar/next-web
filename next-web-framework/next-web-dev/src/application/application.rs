@@ -55,7 +55,7 @@ pub trait Application: Send + Sync {
 
     /// Before starting the application
     #[allow(unused_variables)]
-    async fn before_start(&self, ctx: &mut ApplicationContext) {}
+    async fn before_start(&mut self, ctx: &mut ApplicationContext) {}
 
     /// Register the rpc server.
     #[cfg(feature = "enable-grpc")]

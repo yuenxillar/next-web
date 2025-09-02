@@ -1,10 +1,14 @@
+use axum::response::IntoResponse;
+use axum::Json;
+use next_web_core::AutoRegister;
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::application::Application;
+use next_web_dev::middleware::find_singleton::FindSingleton;
 use next_web_dev::Singleton;
 use next_web_mqtt::auto_register::mqtt_service_auto_register::MQTTServiceAutoRegister;
 use next_web_mqtt::core::topic::base_topic::BaseTopic;
 use next_web_mqtt::properties::mqtt_properties::MQTTClientProperties;
-use next_web_core::AutoRegister;
+use next_web_mqtt::service::mqtt_service::MQTTService;
 
 #[derive(Clone, Default)]
 struct TestApplication;
@@ -22,14 +26,21 @@ impl Application for TestApplication {
         properties.set_password("password");
         properties.set_topics(vec!["test/#".into()]);
 
-        ctx.insert_singleton(properties);
-
-        let auto = MQTTServiceAutoRegister(ctx.resolve_with_name::<MQTTClientProperties>(""));
+        let auto = MQTTServiceAutoRegister(properties);
         auto.register(ctx, &Default::default()).await.ok();
-        // A route must be set up, otherwise it will panic
-        // 必须设置一条路线，否则会引起程序退出
-        axum::Router::new().route("/", axum::routing::get(|| async move { "Ok" }))
+
+        axum::Router::new().route("/publish", axum::routing::post(publish_message))
     }
+}
+
+async fn publish_message(
+    FindSingleton(mqtt_service): FindSingleton<MQTTService>,
+    Json(msg): Json<String>,
+) -> impl IntoResponse {
+    let topic = "test/publish";
+    mqtt_service.publish(topic, msg).await.ok();
+
+    "Ok"
 }
 
 #[Singleton( binds = [Self::into_base_topic])]

@@ -7,6 +7,8 @@ use syn::Expr;
 pub(crate) struct PropertiesAttr {
     #[attribute(default = default_name())]
     pub(crate) prefix: Expr,
+
+    pub(crate) dynamic: bool,
 }
 
 fn default_name() -> Expr {
@@ -17,6 +19,7 @@ impl Default for PropertiesAttr {
     fn default() -> Self {
         Self {
             prefix: default_name(),
+            dynamic: false,
         }
     }
 }

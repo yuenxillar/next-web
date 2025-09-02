@@ -114,7 +114,7 @@ impl Application for TestApplication {
         axum::Router::new().route("/", axum::routing::get(|| async move { "Ok" }))
     }
 
-    async fn before_start(&self, _ctx: &mut ApplicationContext) {
+    async fn before_start(&mut self, _ctx: &mut ApplicationContext) {
         tokio::spawn(async move {
             let transition_configure = StateMachineTransitionConfigure::default()
                 .with(

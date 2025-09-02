@@ -1,12 +1,15 @@
-use crate::PropertiesAttr;
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{Fields, ItemStruct, LitStr};
 
+use crate::{
+    util::{extract_option_inner_type, is_option},
+    PropertiesAttr,
+};
+
 pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Result<TokenStream> {
     let required_derives = vec!["Debug", "Clone", "Deserialize"];
-    let existing_derives = item_struct
-        .clone()
+    let existing_derives = &item_struct
         .attrs
         .iter()
         .filter(|attr| attr.path().is_ident("derive"))
@@ -25,8 +28,9 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
     }
 
     let prefix = attr.prefix.to_token_stream().to_string().replace("\"", "");
+    let dynamic = attr.dynamic;
 
-    // 先获取字段和值的映射关系
+
     let fields = match &item_struct.fields {
         Fields::Named(fields_named) => &fields_named.named,
         _ => {
@@ -44,76 +48,51 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
     // ));
 
     // 生成字段访问和赋值代码
-    let field_assignments = fields
+    // Generate field access and assignment code
+    let common_fields = fields
         .iter()
-        .filter_map(|field| {
+        .enumerate()
+        .filter(|(_, field)| field.ident.is_some())
+        .filter_map(|(index, field)| {
+            // 直接跳过第一个字段, 有妙用
+            if dynamic && index == 0{
+                return None;
+            }
+
             let field_name = field.ident.as_ref()?;
             let field_type = &field.ty;
 
             // 检查字段类型是否是 Option<T>
-            let is_option = if let syn::Type::Path(type_path) = field_type {
-                if let Some(path_segment) = type_path.path.segments.last() {
-                    path_segment.ident == "Option"
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
+            // Check if the field type is Option<T>
+            let is_option = is_option(field_type);
 
             // 提取 Option<T> 中的 T 类型
-            let inner_type = if is_option {
-                if let syn::Type::Path(type_path) = field_type {
-                    if let Some(path_segment) = type_path.path.segments.last() {
-                        if let syn::PathArguments::AngleBracketed(args) = &path_segment.arguments {
-                            if let Some(arg) = args.args.first() {
-                                if let syn::GenericArgument::Type(inner) = arg {
-                                    Some(inner)
-                                } else {
-                                    None
-                                }
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            // Extract the T type from Option<T>
+            let inner_type = extract_option_inner_type(field_type);
 
-            // 获取 #[value = "..."] 属性
-            let value_attr = field
+            // 获取 #[key = "..."] 属性
+            // 如果找到了 value 属性，则使用它的值，否则使用字段名作为键
+            //
+            // Retrieve the # [key="..."] attribute
+            // If the value attribute is found, use its value; otherwise, use the field name as the key
+            let key_name = field
                 .attrs
                 .iter()
-                .find(|attr| attr.path().is_ident("value"));
-
-            // 如果找到了 value 属性，则使用它的值，否则使用字段名
-            let key_name = if let Some(attr) = value_attr {
-                if let Ok(meta) = attr.meta.require_name_value() {
-                    if let syn::Expr::Lit(expr_lit) = &meta.value {
-                        if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-                            lit_str.value()
-                        } else {
-                            field_name.to_string()
+                .find(|attr| attr.path().is_ident("key"))
+                .map(|attr| {
+                    if let Ok(meta) = attr.meta.require_name_value() {
+                        if let syn::Expr::Lit(expr_lit) = &meta.value {
+                            if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+                                return lit_str.value();
+                            }
                         }
-                    } else {
-                        field_name.to_string()
                     }
-                } else {
                     field_name.to_string()
-                }
-            } else {
-                field_name.to_string()
-            };
+                })
+                .unwrap_or(field_name.to_string());
 
             // 根据前缀是否存在决定键的格式
+            // Determine the format of the key based on whether the prefix exists or not
             let key = if prefix.is_empty() {
                 key_name
             } else {
@@ -219,10 +198,24 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         })
         .collect::<Vec<_>>();
 
-    // 生成代码后，删除字段上的 value 属性
+    // dynamic_field
+    let dynamic_field = if dynamic {
+        quote! {
+            base: {
+                let mut map = ::std::collections::HashMap::new();
+                // properties.
+
+                map
+            },
+        }
+    }else {
+        quote! {}
+    };
+
+    // 生成代码后，删除字段上的 key 属性
     if let Fields::Named(fields_named) = &mut item_struct.fields {
         for field in &mut fields_named.named {
-            field.attrs.retain(|attr| !attr.path().is_ident("value"));
+            field.attrs.retain(|attr| !attr.path().is_ident("key"));
         }
     }
 
@@ -251,13 +244,13 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                 let bind_array = value.parse::<syn::ExprArray>()?;
                 let binds = bind_array.to_token_stream().to_string();
                 if !binds.contains("into_properties") {
-                    panic!("Singleton or SingleOwner macro must contain ::into_properties");
+                    return Err(syn::Error::new(Span::call_site(), "Singleton or SingleOwner macro must contain ::into_properties"));
                 }
             }
             Ok(())
         });
         if !binds_exist {
-            panic!("Singleton or SingleOwner macro must support binds `#[Singleton(binds = [Self::into_properties])]`")
+            panic!("Singleton or SingleOwner macro must support binds `#[Singleton(binds = [Self::into_properties])]`");
         }
         name
     });
@@ -297,7 +290,9 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                 let mut noting = false;
 
                 let instance = Self {
-                    #(#field_assignments)*
+                    #dynamic_field
+
+                    #(#common_fields)*
                 };
 
                 if noting {

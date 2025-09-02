@@ -30,7 +30,6 @@ pub(crate) fn impl_macro_desensitized(input: &syn::DeriveInput) -> TokenStream {
             match desens_type {
                 Some(desens_type) => {
                     let de = desens_type.to_ident();
-                    // println!("de = {}", de.to_string());
                     match desens_type {
                         DesensitizationType::Generic(_start, _end) => todo!(),
                         _ => {
@@ -69,6 +68,7 @@ pub(crate) fn impl_macro_desensitized(input: &syn::DeriveInput) -> TokenStream {
     };
 
     // println!("expanded: {}", expanded.to_string());
+    
     expanded.into()
 }
 
