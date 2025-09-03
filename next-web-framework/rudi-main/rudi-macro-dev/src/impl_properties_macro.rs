@@ -3,7 +3,7 @@ use quote::{quote, ToTokens};
 use syn::{Fields, ItemStruct, LitStr};
 
 use crate::{
-    util::{extract_option_inner_type, is_option},
+    util::{extract_option_inner_type, is_string},
     PropertiesAttr,
 };
 
@@ -32,7 +32,6 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
     let prefix = prefix_expr.to_token_stream().to_string().replace("\"", "");
     let dynamic = attr.dynamic;
 
-
     let fields = match &item_struct.fields {
         Fields::Named(fields_named) => &fields_named.named,
         _ => {
@@ -43,12 +42,6 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         }
     };
 
-    // 得到字段的总计数
-    // let field_count = Lit::Int(syn::LitInt::new(
-    //     &fields.len().to_string(),
-    //     item_struct.ident.span(),
-    // ));
-
     // 生成字段访问和赋值代码
     // Generate field access and assignment code
     let common_fields = fields
@@ -56,147 +49,92 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         .enumerate()
         .filter(|(_, field)| field.ident.is_some())
         .filter_map(|(index, field)| {
-            // 直接跳过第一个字段, 有妙用
-            if dynamic && index == 0{
+            // （如果是 dynamic） 跳过第一个字段
+            if dynamic && index == 0 {
                 return None;
             }
 
             let field_name = field.ident.as_ref()?;
             let field_type = &field.ty;
 
-            // 检查字段类型是否是 Option<T>
-            // Check if the field type is Option<T>
-            let is_option = is_option(field_type);
+            // 检查是否为 Option<T>
+            let (is_option, inner_type) = match extract_option_inner_type(field_type) {
+                Some(ty) => (true, ty),
+                None => (false, field_type.clone()),
+            };
 
-            // 提取 Option<T> 中的 T 类型
-            // Extract the T type from Option<T>
-            let inner_type = extract_option_inner_type(field_type);
-
-            // 获取 #[key = "..."] 属性
-            // 如果找到了 value 属性，则使用它的值，否则使用字段名作为键
-            //
-            // Retrieve the # [key="..."] attribute
-            // If the value attribute is found, use its value; otherwise, use the field name as the key
+            // 获取 key 属性或使用字段名
             let key_name = field
                 .attrs
                 .iter()
                 .find(|attr| attr.path().is_ident("key"))
-                .map(|attr| {
-                    if let Ok(meta) = attr.meta.require_name_value() {
+                .and_then(|attr| {
+                    attr.meta.require_name_value().ok().and_then(|meta| {
                         if let syn::Expr::Lit(expr_lit) = &meta.value {
                             if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-                                return lit_str.value();
+                                return Some(lit_str.value());
                             }
                         }
-                    }
-                    field_name.to_string()
+                        None
+                    })
                 })
-                .unwrap_or(field_name.to_string());
+                .unwrap_or_else(|| field_name.to_string());
 
-            // 根据前缀是否存在决定键的格式
-            // Determine the format of the key based on whether the prefix exists or not
+            // 构建最终 key
             let key = if prefix.is_empty() {
                 key_name
             } else {
-                format!("{}.{}", &prefix, key_name)
+                format!("{}.{}", prefix, key_name)
             };
-
             let key_str = LitStr::new(&key, field_name.span());
 
-            // 检查是否为字符串类型
-            let is_string_type = if is_option {
-                let inner = inner_type.as_ref().unwrap();
-                let inner_str = quote!(#inner).to_string();
-                inner_str.eq("String")
+            // 判断是否为 String 类型（考虑 Option<String>）
+            let is_string_type = is_string(&inner_type);
+
+            // 生成核心表达式：从 properties 中提取值
+            let extract_value_expr = if is_string_type {
+                // String 类型需要支持数字转字符串
+                quote! {
+                    || -> Option<String> {
+                        // 优先尝试 one_value
+                        if let Some(s) = properties.one_value::<String>(#key_str) {
+                            return Some(s);
+                        }
+
+                        match properties.one_value::<String>(#key_str) {
+                            Some(s) => Some(s),
+                            None => {
+                                match properties.one_value::<i64>(#key_str) {
+                                    Some(s) => Some(s.to_string()),
+                                    None => match properties.one_value::<f64>(#key_str) {
+                                            Some(s) => Some(s.to_string()),
+                                            None => None,
+                                    }
+                                }
+                            }
+                        }
+                    }()
+                }
             } else {
-                let type_str = quote!(#field_type).to_string();
-                type_str.eq("String")
+                // 非字符串类型：直接尝试 one_value
+                quote! {
+                    properties.one_value::<#inner_type>(#key_str)
+                }
             };
 
-            // 根据字段类型生成不同的代码
-            if is_option {
-                let inner = inner_type.unwrap();
-
-                if is_string_type {
-                    // 针对 Option<String> 类型生成带类型转换的代码
-                    Some(quote! {
-                        // 对于 Option<String> 字段，需要支持从数字转换
-                        #field_name: {
-                            if let Some(value) = properties.one_value::<#inner>(#key_str) {
-                                Some(value)
-                            } else if let Some(map_value) = properties.mapping_value() {
-                                map_value.get(#key_str).map(|item| {
-                                    let var1 = item
-                                        .as_f64()
-                                        .map(|var2| Some(var2.to_string()))
-                                        .unwrap_or_default();
-
-                                    if item.is_number() {
-                                        item.as_i64().map(|var| var.to_string()).or(var1)
-                                    } else {
-                                        None
-                                    }
-                                }).unwrap_or_default()
-                            } else {
-                                noting = true;
-                                None
-                            }
-                        },
-                    })
-                } else {
-                    // 针对其他 Option<T> 类型生成标准代码
-                    Some(quote! {
-                        // 对于普通的 Option<T> 字段
-                        #field_name: {
-                            if let Some(value) = properties.one_value::<#inner>(#key_str) {
-                                Some(value)
-                            } else {
-                                None
-                            }
-                        },
-                    })
-                }
+            // 根据 Option<T> 和 T 生成最终字段赋值
+            let field_init = if is_option {
+                quote! { #field_name: #extract_value_expr, }
             } else {
-                if is_string_type {
-                    // 针对 String 类型生成带类型转换的代码
-                    Some(quote! {
-                        // 对于 String 类型字段，需要支持从数字转换
-                        #field_name: {
-                            if let Some(value) = properties.one_value::<#field_type>(#key_str) {
-                                value
-                            } else if let Some(map) = properties.mapping_value() {
-                                if let Some(value) = map.get(#key_str) {
-                                    if value.is_number() {
-                                        value.as_str().map(|t| t.to_string()).unwrap_or_default()
-                                    } else {
-                                        noting = true;
-                                        Default::default()
-                                    }
-                                } else {
-                                    noting = true;
-                                    Default::default()
-                                }
-                            } else {
-                                noting = true;
-                                Default::default()
-                            }
-                        },
-                    })
-                } else {
-                    // 针对其他普通类型生成标准代码
-                    Some(quote! {
-                        // 对于普通类型 T
-                        #field_name: {
-                            if let Some(value) = properties.one_value::<#field_type>(#key_str) {
-                                value
-                            } else {
-                                noting = true;
-                                Default::default()
-                            }
-                        },
-                    })
+                quote! {
+                    #field_name: #extract_value_expr.unwrap_or_else(|| {
+                        noting = true;
+                        Default::default()
+                    }),
                 }
-            }
+            };
+
+            Some(field_init)
         })
         .collect::<Vec<_>>();
 
@@ -205,7 +143,7 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         quote! {
             base: if let Some(values) = properties.dynamic_value(#prefix_expr) { values } else { Default::default() },
         }
-    }else {
+    } else {
         quote! {}
     };
 
@@ -216,7 +154,7 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
         }
     }
 
-    let struct_name = &item_struct.ident;
+    let struct_ident = &item_struct.ident;
 
     // 检查是否有 #[Singleton(name = "")] 属性
     let singleton_name = item_struct.attrs.iter().find_map(|attr| {
@@ -253,37 +191,26 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
     });
 
     // 如果没有找到 Singleton 属性或者 name 参数，生成默认名称
-    let _default_name = {
-        let struct_name_str = struct_name.to_string();
-        let mut chars = struct_name_str.chars();
-        // 将首字母小写
-        if let Some(first_char) = chars.next() {
-            let first_char_lower = first_char.to_lowercase().to_string();
-            first_char_lower + chars.as_str()
-        } else {
-            struct_name_str
-        }
-    };
 
-    let singleton_name_value = if let Some(name) = singleton_name {
+    let singleton_name = if let Some(name) = singleton_name {
         name
     } else {
         // default_name
-        String::new()
+        super::util::singleton_name(&struct_ident.to_string())
     };
 
-    let singleton_name = LitStr::new(&singleton_name_value, struct_name.span());
+    let singleton_name = LitStr::new(&singleton_name, struct_ident.span());
 
     let expanded = quote! {
         #item_struct
 
         #[next_web_core::async_trait]
-        impl ::next_web_core::AutoRegister for #struct_name {
+        impl ::next_web_core::AutoRegister for #struct_ident {
             async fn register(
                 &self,
                 ctx: &mut ::next_web_core::context::application_context::ApplicationContext,
-                properties: &::next_web_core::context::properties::ApplicationProperties,
-            ) -> std::result::Result<(), std::boxed::Box<dyn std::error::Error>> {
+                properties: & ::next_web_core::context::properties::ApplicationProperties,
+            ) -> ::std::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error>> {
                 let mut noting = false;
 
                 let instance = Self {
@@ -293,10 +220,10 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
                 };
 
                 if noting {
-                    panic!("\nIncorrect assembly of properties! Struct: {} \n", stringify!(#struct_name));
+                    panic!("\nIncorrect assembly of properties! Struct: {} \n", stringify!(#struct_ident));
                 }
 
-                ctx.insert_singleton(instance);
+                ctx.insert_singleton_with_name(instance, #singleton_name);
                 Ok(())
             }
 
@@ -305,11 +232,11 @@ pub fn generate(attr: PropertiesAttr, mut item_struct: ItemStruct) -> syn::Resul
             }
         }
 
-        impl ::next_web_core::context::properties::Properties for #struct_name {}
+        impl ::next_web_core::context::properties::Properties for #struct_ident {}
 
-        impl #struct_name {
-            fn into_properties(self) -> std::boxed::Box<dyn ::next_web_core::context::properties::Properties> {
-                std::boxed::Box::new(self)
+        impl #struct_ident {
+            fn into_properties(self) -> ::std::boxed::Box<dyn ::next_web_core::context::properties::Properties> {
+                ::std::boxed::Box::new(self)
             }
         }
     };

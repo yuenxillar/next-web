@@ -133,6 +133,7 @@ pub(crate) fn generate(
             }
         }
     };
+
     // println!("constructor: {}", constructor.to_string());
 
     #[cfg(not(feature = "auto-register"))]
@@ -147,25 +148,33 @@ pub(crate) fn generate(
         quote! {}
     };
 
-    let struct_name = &item_struct.ident;
+    // Is properties
+    let is_properties = item_struct
+        .attrs
+        .iter()
+        .any(|val| val.path().is_ident("Properties"));
+
     let default_name = {
-        let singleton_name = name.to_token_stream().to_string().trim().replacen("\"", "", 2);
-
-        if singleton_name.is_empty() {
-            let str1 = struct_name.to_string();
-            super::util::singleton_name(&str1)
-
-        } else {
-            singleton_name
-        }
+        let singleton_name = name
+            .to_token_stream()
+            .to_string()
+            .trim()
+            .replacen("\"", "", 2);
+        singleton_name
+            .is_empty()
+            .then(|| match is_properties {
+                true => format!("defaultProperties{}", struct_ident.to_string()),
+                false => super::util::singleton_name(&struct_ident.to_string()),
+            })
+            .unwrap_or(singleton_name)
     };
 
     let expand = quote! {
         #item_struct
 
 
-        impl ::next_web_core::traits::group::Group           for #struct_name {}
-        impl ::next_web_core::traits::singleton::Singleton   for #struct_name {
+        impl ::next_web_core::traits::group::Group           for #struct_ident {}
+        impl ::next_web_core::traits::singleton::Singleton   for #struct_ident {
             fn singleton_name(&self) -> String
             {
                 stringify!(#default_name).to_string()
@@ -192,6 +201,8 @@ pub(crate) fn generate(
 
         #auto_register
     };
-    // println!("expand: {:?}", expand.to_string());
+
+    // println!("expanded: {:?}", expand.to_string());
+    
     Ok(expand)
 }

@@ -299,14 +299,45 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         Expr::Lit(expr_lit) => {
             let signleton_name = expr_lit.lit.to_token_stream().to_string().replace("\"", "");
             if signleton_name.is_empty() {
-                let val = super::util::field_name_to_singleton_name(
-                    &field_name.map(|s| s.to_string()).unwrap_or_default(),
-                );
+                match field_name {
+                    Some(_name) => {
+                        let singleton_name =
+                            super::util::field_name_to_singleton_name(&_name.to_string());
 
-                Expr::Lit(syn::PatLit {
-                    attrs: Default::default(),
-                    lit: syn::Lit::Str(syn::LitStr::new(&val, Span::call_site())),
-                })
+                        Expr::Lit(syn::PatLit {
+                            attrs: Default::default(),
+                            lit: syn::Lit::Str(syn::LitStr::new(
+                                &singleton_name,
+                                Span::call_site(),
+                            )),
+                        })
+                    }
+                    None => {
+                        if let syn::Type::Path(path) = field_or_argument_ty {
+                            let ident = match path.path.get_ident() {
+                                Some(ident) => ident.clone(),
+                                None => {
+                                    return Err(syn::Error::new(
+                                        field_or_argument_ty.span(),
+                                        "not support non-ident type",
+                                    ))
+                                }
+                            };
+                            let singleton_name =
+                                super::util::singleton_name(&ident.to_string());
+
+                            Expr::Lit(syn::PatLit {
+                                attrs: Default::default(),
+                                lit: syn::Lit::Str(syn::LitStr::new(
+                                    &singleton_name,
+                                    Span::call_site(),
+                                )),
+                            })
+                        } else {
+                            Expr::Lit(expr_lit)
+                        }
+                    }
+                }
             } else {
                 Expr::Lit(expr_lit)
             }

@@ -1,10 +1,9 @@
 use dyn_clone::DynClone;
 
-
 use regex::Regex;
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Read;
-use std::collections::HashMap;
 
 use crate::constants::application_constants::APPLICATION_CONFIG;
 use crate::context::application_args::ApplicationArgs;
@@ -30,7 +29,7 @@ pub struct ApplicationProperties {
 
     /// Only for register that have not been deserialized
     #[serde(skip_deserializing)]
-    mapping_value: Option<HashMap<String, serde_yaml::Value>>,
+    mapping: Option<serde_yaml::Value>,
 }
 
 impl ApplicationProperties {
@@ -51,13 +50,34 @@ impl ApplicationProperties {
     /// assert_eq!(props.one_value::<String>("key1"), Some("value1".to_string()));
     ///
     pub fn one_value<T: serde::de::DeserializeOwned>(&self, key: &str) -> Option<T> {
-        if let Some(map) = self.mapping_value.as_ref() {
-            if let Some(value) = map.get(key) {
-                return serde_yaml::from_value::<T>(value.to_owned())
-                    .map(|v| Some(v))
+        if let Some(mapping) = self.mapping.as_ref() {
+            if key.is_empty() {
+                return None;
+            }
+
+            let keys: Vec<&str> = key.split(".").collect::<Vec<_>>();
+            let index = keys.len();
+
+            if index == 1 {
+                return mapping
+                    .get(key)
+                    .map(|val| serde_yaml::from_value::<T>(val.clone()).ok())
                     .unwrap_or_default();
             }
-            return None;
+
+            if let Some(mut value) = mapping.get(keys[0]) {
+                for (i, k) in keys.iter().enumerate().skip(1) {
+                    match value.get(k) {
+                        Some(val) => {
+                            if i == index - 1 {
+                                return serde_yaml::from_value::<T>(val.clone()).ok();
+                            }
+                            value = val;
+                        }
+                        None => return None,
+                    }
+                }
+            };
         }
         None
     }
@@ -66,41 +86,64 @@ impl ApplicationProperties {
         &self,
         key: &str,
     ) -> Option<HashMap<String, T>> {
-        if let Some(mapping) = self.mapping_value.as_ref() {
+        if let Some(mapping) = self.mapping.as_ref() {
             // 查找key的动态值
-            let index = key.split(".").collect::<Vec<_>>().len();
-            let values = mapping
-                .keys()
-                .filter(|s| s.starts_with(key))
-                .filter(|s| index == (s.split(".").collect::<Vec<_>>().len() + 1))
-                .filter_map(|key| {
-                    let v = match mapping
-                        .get(key)
-                        .map(|value| { serde_yaml::from_value::<T>(value.to_owned()) }.ok())
-                       {
-                        Some(val) => if val.is_none() { return None; } else { val.unwrap() },
-                        None => return None
-                    };
+            let keys = key.split(".").collect::<Vec<_>>();
+            let index = keys.len();
 
-                    let k = key.split(".").last().map(ToString::to_string).unwrap_or(format!("dynamic{}", index));
-                    Some((k, v))
-                })
-                .collect::<HashMap<_, _>>();
+            if index <= 1 {
+                return None;
+            }
 
-            return Some(values);
+            if let Some(mut value) = mapping.get(keys[0]) {
+                for (i, k) in keys.iter().enumerate().skip(1) {
+                    match value.get(k) {
+                        Some(val) => {
+                            if i == index - 1 {
+                                match val.as_mapping() {
+                                    Some(_mapping) => {
+                                        return Some(
+                                            _mapping
+                                                .iter()
+                                                .filter_map(|(k, v)| {
+                                                    let value = match serde_yaml::from_value::<T>(
+                                                        v.to_owned(),
+                                                    )
+                                                    .ok()
+                                                    {
+                                                        Some(val) => val,
+                                                        None => return None,
+                                                    };
+
+                                                    let key = k
+                                                        .as_str()
+                                                        .map(ToString::to_string)
+                                                        .unwrap_or(format!("dynamic{}", index));
+                                                    Some((key, value))
+                                                })
+                                                .collect::<HashMap<_, _>>(),
+                                        )
+                                    }
+
+                                    None => return None,
+                                }
+                            }
+                            value = val;
+                        }
+                        None => return None,
+                    }
+                }
+            };
         }
         None
     }
 
-    pub fn set_mapping(&mut self, mapping: HashMap<String, serde_yaml::Value>) {
-        if mapping.is_empty() {
-            return;
-        }
-        self.mapping_value = Some(mapping);
+    pub fn set_mapping(&mut self, mapping: serde_yaml::Value) {
+        self.mapping = Some(mapping);
     }
 
-    pub fn mapping_value(&self) -> Option<&HashMap<String, serde_yaml::Value>> {
-        self.mapping_value.as_ref()
+    pub fn mapping(&self) -> Option<&serde_yaml::Value> {
+        self.mapping.as_ref()
     }
 }
 
@@ -108,7 +151,7 @@ impl Default for ApplicationProperties {
     fn default() -> Self {
         Self {
             next: NextProperties::default(),
-            mapping_value: None,
+            mapping: None,
         }
     }
 }
@@ -163,39 +206,7 @@ fn into_application_properties(
     // TODO
 
     // mapping value
-    let values = serde_yaml::from_str::<Value>(&config).unwrap();
-    let mut mapping: HashMap<String, Value> = HashMap::new();
-
-    // prepare a recursive function to fill in
-    fn populate_map(prefix: String, value: &Value, map: &mut HashMap<String, Value>) {
-        match value {
-            Value::Mapping(map_value) => {
-                for (k, v) in map_value {
-                    if let Some(key) = k.as_str() {
-                        populate_map(
-                            format!(
-                                "{}{}",
-                                if prefix.is_empty() {
-                                    String::new()
-                                } else {
-                                    format!("{}.", prefix)
-                                },
-                                key
-                            ),
-                            v,
-                            map,
-                        );
-                    }
-                }
-            }
-            _ => {
-                map.insert(prefix, value.clone());
-            }
-        }
-    }
-
-    // fill in the map
-    populate_map(String::new(), &values, &mut mapping);
+    let mapping = serde_yaml::from_str::<Value>(&config).unwrap();
 
     // into application properties
     let mut application_properties: ApplicationProperties =

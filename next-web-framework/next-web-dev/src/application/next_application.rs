@@ -1,5 +1,4 @@
 use std::ops::Deref;
-use std::collections::HashMap;
 
 use next_web_core::context::{
     application_args::ApplicationArgs, application_resources::ApplicationResources,
@@ -82,7 +81,7 @@ impl<A: Application + Default> NextApplication<A> {
     }
 
     /// Get the application configure mappping.
-    pub fn set_configure_mappping(&mut self, mapping: HashMap<String, serde_yaml::Value>) {
+    pub fn set_configure_mappping(&mut self, mapping: serde_yaml::Value) {
         self.application_properties.set_mapping(mapping);
     }
 }
