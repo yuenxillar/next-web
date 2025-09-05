@@ -10,7 +10,7 @@ use crate::{
 };
 
 use hashbrown::HashMap;
-use next_web_core::traits::{group::Group, service::Service, singleton::Singleton};
+use next_web_core::traits::{service::Service, singleton::Singleton};
 use rumqttc::{
     AsyncClient, ConnectReturnCode, Event, MqttOptions, NetworkOptions, Packet, QoS,
     SubscribeFilter,
@@ -45,7 +45,6 @@ pub struct MQTTService {
     client: AsyncClient,
 }
 
-impl Group      for MQTTService {}
 impl Singleton  for MQTTService {}
 impl Service    for MQTTService {}
 

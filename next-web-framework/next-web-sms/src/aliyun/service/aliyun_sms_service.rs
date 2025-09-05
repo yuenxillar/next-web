@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::SystemTime};
 
 use chrono::DateTime;
-use next_web_core::{async_trait, error::BoxError, traits::{group::Group, service::Service, singleton::Singleton}};
+use next_web_core::{async_trait, error::BoxError, traits::{service::Service, singleton::Singleton}};
 use once_cell::sync::Lazy;
 use reqwest::{
     header::{HeaderMap, HeaderName},
@@ -86,7 +86,6 @@ impl AliyunCloudSmsService {
 }
 
 
-impl Group      for AliyunCloudSmsService {}
 impl Singleton  for AliyunCloudSmsService {}
 impl Service    for AliyunCloudSmsService {}
 

@@ -2,14 +2,14 @@ use from_attr::FromAttr;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, Expr, ItemFn, ReturnType, Type};
+use syn::{ spanned::Spanned, Expr, ItemFn, ReturnType, Type};
 
 use crate::{
-    common::retry_attr::RetryAttr,
+    attrs::retry_attr::RetryAttr,
     util::param_info::{extract_param_info, ParamInfo},
 };
 
-pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
     let RetryAttr {
         max_attempts,
         delay,
@@ -39,15 +39,14 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: TokenStream) -> TokenStr
         }
     }
 
-    let input_fn = parse_macro_input!(item as ItemFn);
-    let fn_name = &input_fn.sig.ident;
-    let fn_block = &input_fn.block;
-    let is_async = input_fn.sig.asyncness.is_some();
-    let fn_inputs = &input_fn.sig.inputs;
-    let fn_output = &input_fn.sig.output;
+    let fn_name = &item.sig.ident;
+    let fn_block = &item.block;
+    let is_async = item.sig.asyncness.is_some();
+    let fn_inputs = &item.sig.inputs;
+    let fn_output = &item.sig.output;
 
     //  Obtain information on parameters
-    let params: Vec<ParamInfo> = extract_param_info(&input_fn);
+    let params: Vec<ParamInfo> = extract_param_info(&item);
 
     let clones = params
         .iter()

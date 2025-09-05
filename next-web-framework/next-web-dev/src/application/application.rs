@@ -11,10 +11,10 @@ use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
 use next_web_core::context::properties::{ApplicationProperties, Properties};
+use next_web_core::state::application_state::ApplicationState;
 use next_web_core::traits::application::application_ready_event::ApplicationReadyEvent;
 use next_web_core::traits::apply_router::ApplyRouter;
 use next_web_core::traits::use_router::UseRouter;
-use next_web_core::state::application_state::ApplicationState;
 use next_web_core::AutoRegister;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -506,14 +506,25 @@ pub trait Application: Send + Sync {
 
 fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response<Full<Bytes>> {
     error!("Application handle panic, case: {:?}", err);
-    let err_str = format!(
-        "internal server error, case: {:?},\ntimestamp: {}",
-        err,
+
+    let err_ref = err.as_ref();
+    let error = if let Some(s) = err_ref.downcast_ref::<&str>() {
+        s.to_string()
+    } else if let Some(s) = err_ref.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        String::from("Unknown error")
+    };
+
+    let msg = format!(
+        "Internal Server Error, Case: {:?}\ntimestamp: {}",
+        error,
         LocalDateTime::timestamp()
     );
+
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
-        .body(err_str.into())
+        .body(msg.into())
         .unwrap()
 }
 

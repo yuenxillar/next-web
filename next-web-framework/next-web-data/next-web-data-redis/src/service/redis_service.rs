@@ -6,9 +6,8 @@ use std::{
     },
 };
 
-use futures::StreamExt;
-use next_web_core::traits::{group::Group, service::Service, singleton::Singleton};
-use redis::{Client, Value, aio::MultiplexedConnection};
+use next_web_core::traits::{service::Service, singleton::Singleton};
+use redis::{Client, aio::MultiplexedConnection};
 
 #[cfg(feature = "expired-key-listener")]
 use crate::core::event::expired_keys_event::RedisExpiredKeysEvent;
@@ -37,7 +36,6 @@ pub struct RedisService {
 }
 
 
-impl Group      for RedisService {}
 impl Singleton  for RedisService {}
 impl Service    for RedisService {}
 

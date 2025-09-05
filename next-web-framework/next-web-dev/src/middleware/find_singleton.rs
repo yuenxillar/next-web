@@ -45,6 +45,7 @@ where
 
         let instance = if let Some(state) = state {
             let singleton_name = SingletonUtil::name::<T>();
+
             let reader = state.context().read().await;
 
             match reader.get_single_option_with_name::<T>(singleton_name.clone()) {

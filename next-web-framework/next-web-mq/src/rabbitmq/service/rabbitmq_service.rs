@@ -12,7 +12,6 @@ use amqprs::channel::QueueDeclareArguments;
 use amqprs::connection::Connection;
 use amqprs::connection::OpenConnectionArguments;
 use amqprs::BasicProperties;
-use next_web_core::traits::group::Group;
 use next_web_core::traits::service::Service;
 
 use next_web_core::traits::singleton::Singleton;
@@ -28,7 +27,6 @@ pub struct RabbitmqService {
 }
 
 
-impl Group      for RabbitmqService {}
 impl Singleton  for RabbitmqService {}
 impl Service    for RabbitmqService {}
 

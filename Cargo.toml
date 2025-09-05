@@ -43,6 +43,7 @@ axum-valid = { version = "0.24.0" }
 oauth2 = { version = "5.0.0" }
 
 mimalloc = { version = "0.1.47" }
+jemallocator = { version = "0.5.4" }
 
 # serialization and deserialization
 serde = { version = "1.0.219", features = ["derive"] }
@@ -151,6 +152,13 @@ tracing-subscriber = { version = "0.3.0", features = [
 ] }
 
 
+[profile.release]
+codegen-units = 1
+incremental = true
+lto = true
+opt-level = 'z'    # Optimize for size
+
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 private_interfaces = "deny"
@@ -158,8 +166,5 @@ private_bounds = "deny"
 unreachable_pub = "deny"
 missing_docs = "warn"
 
-[profile.release]
-codegen-units = 1
-incremental = true
-lto = true
-opt-level = 'z'    # Optimize for size
+[workspace.lints.clippy]
+todo = "warn"

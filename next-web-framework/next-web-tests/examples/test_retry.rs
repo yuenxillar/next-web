@@ -1,5 +1,5 @@
 use next_web_dev::util::local_date_time::LocalDateTime;
-use next_web_macros::retry;
+use next_web_macros::Retry;
 
 #[derive(Debug)]
 enum TestMatch {
@@ -7,7 +7,7 @@ enum TestMatch {
     Job(u64),
 }
 
-#[retry(max_attempts = 3, delay = 1000, backoff = backoff_test, retry_for = [TestMatch::App, TestMatch::Job(123)], multiplier = 2)]
+#[Retry(max_attempts = 3, delay = 1000, backoff = backoff_test, retry_for = [TestMatch::App, TestMatch::Job(123)], multiplier = 2)]
 fn test_retry() -> Result<(), TestMatch> {
     let timestamp_sec = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

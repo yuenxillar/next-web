@@ -50,11 +50,12 @@ impl ApplicationProperties {
     /// assert_eq!(props.one_value::<String>("key1"), Some("value1".to_string()));
     ///
     pub fn one_value<T: serde::de::DeserializeOwned>(&self, key: &str) -> Option<T> {
-        if let Some(mapping) = self.mapping.as_ref() {
-            if key.is_empty() {
-                return None;
-            }
+        if key.is_empty() {
+            return None;
+        }
 
+        if let Some(mapping) = self.mapping.as_ref() {
+            
             let keys: Vec<&str> = key.split(".").collect::<Vec<_>>();
             let index = keys.len();
 
@@ -86,6 +87,10 @@ impl ApplicationProperties {
         &self,
         key: &str,
     ) -> Option<HashMap<String, T>> {
+        if key.is_empty() {
+            return None;
+        }
+
         if let Some(mapping) = self.mapping.as_ref() {
             // 查找key的动态值
             let keys = key.split(".").collect::<Vec<_>>();

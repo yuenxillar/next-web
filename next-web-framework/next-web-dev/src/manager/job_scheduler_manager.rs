@@ -4,7 +4,7 @@ use flume::Sender;
 use hashbrown::HashSet;
 use next_web_core::{
     error::BoxError, traits::{
-        group::Group, job::{
+        job::{
             application_job::ApplicationJob, context::job_execution_context::JobExecutionContext,
             schedule_type::ScheduleType,
         }, singleton::Singleton
@@ -22,7 +22,6 @@ pub struct JobSchedulerManager {
     context: JobExecutionContext,
 }
 
-impl Group      for JobSchedulerManager {}
 impl Singleton  for JobSchedulerManager {}
 
 

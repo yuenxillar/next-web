@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use minio_rsc::{provider::StaticProvider, Minio};
-use next_web_core::traits::{group::Group, service::Service, singleton::Singleton};
+use next_web_core::traits::{service::Service, singleton::Singleton};
 
 use crate::properties::minio_properties::MinioClientProperties;
 
@@ -11,7 +11,6 @@ pub struct MinioService {
     client: Minio,
 }
 
-impl Group      for MinioService {}
 impl Singleton  for MinioService {}
 impl Service    for MinioService {}
 

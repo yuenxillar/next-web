@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use next_web_core::traits::group::Group;
 use next_web_core::traits::use_router::UseRouter;
 use rudi_dev::Singleton;
 

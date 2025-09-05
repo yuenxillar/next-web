@@ -19,10 +19,16 @@ pub mod common;
 #[cfg(feature = "i18n")]
 pub mod i18n;
 
-pub use rudi_dev::{Singleton, Transient, SingleOwner, Properties};
 
 #[cfg(feature = "scheduler")]
 pub use tokio_cron_scheduler::Job;
 
+pub use rudi_dev::{Singleton, Transient, SingleOwner, Properties};
+
+#[cfg(target_os = "windows")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+#[cfg(target_os = "linux")]
+#[global_allocator]
+static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;

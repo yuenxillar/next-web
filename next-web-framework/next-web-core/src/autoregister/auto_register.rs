@@ -43,7 +43,7 @@ pub trait AutoRegister: Sync + Send {
 #[doc(hidden)]
 pub use inventory::submit;
 
-use crate::{DynProvider, Module};
+use crate::context::application_context::{DynProvider, Module};
 
 #[doc(hidden)]
 pub struct ProviderRegister {

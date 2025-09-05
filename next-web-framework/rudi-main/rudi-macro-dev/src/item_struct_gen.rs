@@ -172,8 +172,6 @@ pub(crate) fn generate(
     let expand = quote! {
         #item_struct
 
-
-        impl ::next_web_core::traits::group::Group           for #struct_ident {}
         impl ::next_web_core::traits::singleton::Singleton   for #struct_ident {
             fn singleton_name(&self) -> String
             {

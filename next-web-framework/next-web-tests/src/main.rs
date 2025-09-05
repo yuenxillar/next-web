@@ -4,13 +4,14 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
-use tracing::info;
 use axum::{extract::ConnectInfo, response::IntoResponse, routing::get};
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{
     application::Application, middleware::find_singleton::FindSingleton, Singleton,
 };
+use next_web_macros::Find;
 use tokio::sync::Mutex;
+use tracing::info;
 
 /// Test application
 #[derive(Default, Clone)]
@@ -22,25 +23,38 @@ impl Application for TestApplication {
 
     async fn before_start(&mut self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
-        ctx.insert_singleton_with_name(Arc::new(Mutex::new(HashSet::<SocketAddr>::new())), "requestIps");
+        ctx.insert_singleton_with_name(Arc::new(Mutex::new(HashSet::<SocketAddr>::new())),"requestIps");
+
+        ctx.insert_singleton_with_name(ApplicationStore::default(), "applicationStoreTwo");
     }
 
     async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new()
             .route("/hello", get(req_hello))
             .route("/record", get(req_record))
+            .route("/recordTwo", get(req_record_two))
     }
 }
 
 async fn req_hello() -> impl IntoResponse {
     " Hello Axum! \n Hello Next Web!"
 }
-
 async fn req_record(
     FindSingleton(store): FindSingleton<ApplicationStore>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
     store.add(addr).await;
+    "Ok"
+}
+
+#[Find]
+async fn req_record_two(
+    // Search for singleton using variable names
+    FindSingleton(application_store_two): FindSingleton<ApplicationStore>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+) -> impl IntoResponse {
+    application_store_two.add(addr).await;
+    panic!("123");
     "Ok"
 }
 
@@ -52,15 +66,28 @@ pub struct ApplicationStore {
 }
 
 impl ApplicationStore {
-
     async fn add(&self, addr: SocketAddr) {
-        self.request_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.request_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         match self.request_ips.lock().await.insert(addr) {
             true => info!("Store add new ip: {}", addr.to_string()),
-            false => info!("Ip already exists in store: {}", addr.to_string())
-        }   
+            false => info!("Ip already exists in store: {}", addr.to_string()),
+        }
 
-        info!("Current request count: {}", self.request_count.load(std::sync::atomic::Ordering::Relaxed))     
+        info!(
+            "Current request count: {}",
+            self.request_count
+                .load(std::sync::atomic::Ordering::Relaxed)
+        )
+    }
+}
+
+impl Default for ApplicationStore {
+    fn default() -> Self {
+        Self {
+            request_count: Arc::new(AtomicU32::new(u32::MAX / 2)),
+            request_ips: Default::default(),
+        }
     }
 }
 
