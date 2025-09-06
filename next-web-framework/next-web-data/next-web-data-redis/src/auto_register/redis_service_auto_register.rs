@@ -1,7 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, traits::{service::Service, singleton::Singleton}, ApplicationContext, AutoRegister
+    ApplicationContext, AutoRegister, async_trait,
+    context::properties::ApplicationProperties,
+    traits::singleton::Singleton,
 };
 use redis::{Cmd, ConnectionLike};
 use rudi_dev::Singleton;
@@ -55,7 +57,6 @@ impl AutoRegister for RedisServiceAutoRegister {
             ctx.insert_singleton_with_name(redis_lock_service, service_name);
         }
 
-      
         let singleton_name = redis_service.singleton_name();
         for _ in 0..7 {
             let connect = redis_service
@@ -74,10 +75,20 @@ impl AutoRegister for RedisServiceAutoRegister {
         #[cfg(feature = "expired-key-listener")]
         {
             let services = ctx.resolve_by_type::<Box<dyn RedisExpiredKeysEvent>>();
-            if let Some(service) = services.first() {
-                let rs = ctx.get_single_with_name::<RedisService>(singleton_name);
-                rs.expired_key_listener(service.to_owned()).await?;
+            let redis_service = ctx.get_single_with_name::<RedisService>(singleton_name);
+            if let Some(service) = services.last() {
+                redis_service
+                    .expired_key_listener(service.to_owned())
+                    .await?;
             }
+
+            // Set notify-keyspace-events to Ex to receive expired key events
+            redis_service.to_owned().req_command(Cmd::new().arg(&[
+                "CONFIG",
+                "SET",
+                "notify-keyspace-events",
+                "Ex",
+            ]))?;
         }
 
         Ok(())

@@ -1,6 +1,6 @@
 [package]
 name = "next-web-dev"
-version = "0.1.6"
+version = "0.1.7"
 keywords = ["http", "web", "framework"]
 description = "Next Web Dev!"
 license.workspace = true

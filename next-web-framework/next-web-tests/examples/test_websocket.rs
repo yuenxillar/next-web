@@ -43,7 +43,7 @@ impl WebSocketHandler for TestWebSocket {
     /// When the client sends a message, it will enter the following method
     async fn on_message(&self, _session: &WebSocketSession, message: Message) -> Result<()> {
         if let Message::Text(msg) = message {
-            println!("User message: {:?}", msg);
+            println!("User message: {}", msg.to_string());
         }
         Ok(())
     }

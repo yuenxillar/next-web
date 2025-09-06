@@ -37,6 +37,30 @@ impl RedisClientProperties {
     pub fn connect_timeout(&self) -> Option<u64> {
         self.connect_timeout
     }
+
+    pub fn set_username(&mut self, username: Option<String>) {
+        self.username = username;
+    }
+
+    pub fn set_password(&mut self, password: Option<String>) {
+        self.password = password;
+    }
+
+    pub fn set_host(&mut self, host: Option<String>) {
+        self.host = host;
+    }
+
+    pub fn set_port(&mut self, port: Option<u16>) {
+        self.port = port;
+    }
+
+    pub fn set_database(&mut self, database: Option<u64>) {
+        self.database = database;
+    }
+
+    pub fn set_connect_timeout(&mut self, connect_timeout: Option<u64>) {
+        self.connect_timeout = connect_timeout;
+    }
 }
 
 impl Default for RedisClientProperties {

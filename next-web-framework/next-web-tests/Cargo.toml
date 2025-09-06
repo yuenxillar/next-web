@@ -15,9 +15,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 next-web-ip = { path = "../next-web-ip", version = "0.1.0" }
 next-web-macros = { path = "../next-web-macros", version = "0.1.0" }
-next-web-websocket = { path = "../next-web-websocket", version = "*" }
-# next-web-mqtt = { path = "../next-web-mqtt", version = "0.1.2" }
-# next-web-data-redis = { path = "../next-web-data/next-web-data-redis", version = "0.1.0", features = ["expired-key-listener"]}
 
 next-web-dev = { path = "../next-web-dev", version = "0.1.4" }
 next-web-core = { workspace = true }
@@ -26,10 +23,9 @@ next-web-core = { workspace = true }
 next-web-document = { path = "../next-web-document", version = "0.1.0", features = [
     "excel",
 ] }
-next-web-security= { path = "../next-web-security", version = "*" }
 
 rust_xlsxwriter = { workspace = true }
-axum = { workspace = true, features = ["multipart"] }
+axum = { workspace = true, features = ["multipart", "query"] }
 tokio-util = { workspace = true }
 futures = { workspace = true }
 matchit = { workspace = true}
@@ -39,4 +35,9 @@ tracing ={ workspace = true}
 [dev-dependencies]
 next-web-mqtt = { path = "../next-web-mqtt", version = "*" }
 next-web-ai = { path = "../next-web-ai", version = "*", features = ["deep-seek"]}
+next-web-websocket = { path = "../next-web-websocket", version = "*" }
+next-web-security = { path = "../next-web-security", version = "*" }
+next-web-data-redis = { path = "../next-web-data/next-web-data-redis", version = "*", features = ["expired-key-listener"]}
+next-web-data-database = { path = "../next-web-data/next-web-data-database", version = "*"}
+
 validator = { version = "0.20.0", features = ["derive"] }

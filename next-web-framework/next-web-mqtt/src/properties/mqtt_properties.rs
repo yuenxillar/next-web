@@ -38,8 +38,7 @@ pub struct MQTTClientProperties {
     ///
     /// 要订阅的主题列表(可选)
     /// 我们执行字符分割以确定您订阅主题所需的消息质量
-    /// 示例: ["topic1/#", "topic2/+/test"] or ["topic1/#:0", "topic2/+/test:1"]
-    topics: Option<Vec<String>>,
+    topics: Option<Vec<Topic>>,
 
     /// Keep alive interval in milliseconds (optional)
     ///
@@ -97,7 +96,7 @@ impl MQTTClientProperties {
     ///
     /// 返回要订阅的主题列表
     /// 如果没有配置主题，返回空向量
-    pub fn topics(&self) -> Vec<String> {
+    pub fn topics(&self) -> Vec<Topic> {
         if let Some(topics) = self.topics.as_ref() {
             return topics.clone();
         }
@@ -145,7 +144,7 @@ impl MQTTClientProperties {
         self.password = Some(password.to_string());
     }
 
-    pub fn set_topics(&mut self, topics: impl IntoIterator<Item = String>) {
+    pub fn set_topics(&mut self, topics: impl IntoIterator<Item = Topic>) {
         self.topics = Some(topics.into_iter().collect());
     }
 
@@ -160,4 +159,12 @@ impl MQTTClientProperties {
     pub fn set_clean_session(&mut self, clean_session: bool) {
         self.clean_session = Some(clean_session);
     }
+}
+
+
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
+
+pub struct Topic {
+    pub topic:  String,
+    pub qos:    Option<u8>,
 }

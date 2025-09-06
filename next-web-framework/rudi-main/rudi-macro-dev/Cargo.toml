@@ -2,7 +2,7 @@
 name = "rudi-macro-dev"
 description = "Macros for Rudi."
 keywords = ["dependency-injection", "ioc", "di", "dependency"]
-version = "0.1.1"
+version = "0.1.2"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true

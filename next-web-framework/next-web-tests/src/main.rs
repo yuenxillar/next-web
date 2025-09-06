@@ -39,6 +39,7 @@ impl Application for TestApplication {
 async fn req_hello() -> impl IntoResponse {
     " Hello Axum! \n Hello Next Web!"
 }
+
 async fn req_record(
     FindSingleton(store): FindSingleton<ApplicationStore>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -54,7 +55,6 @@ async fn req_record_two(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
     application_store_two.add(addr).await;
-    panic!("123");
     "Ok"
 }
 

@@ -2,8 +2,9 @@
 name = "next-web-data-database"
 version = "0.1.0"
 edition = "2024"
-description = "Database data provider for Next Web Framework"
+description = "Next Web Data Database"
 readme = "README.md"
+keywords = ["next-web", "database", "rbatis"]
 license.workspace = true
 
 [dependencies]

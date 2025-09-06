@@ -1,13 +1,10 @@
 use axum::response::IntoResponse;
 use axum::Json;
-use next_web_core::AutoRegister;
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::application::Application;
 use next_web_dev::middleware::find_singleton::FindSingleton;
 use next_web_dev::Singleton;
-use next_web_mqtt::auto_register::mqtt_service_auto_register::MQTTServiceAutoRegister;
 use next_web_mqtt::core::topic::base_topic::BaseTopic;
-use next_web_mqtt::properties::mqtt_properties::MQTTClientProperties;
 use next_web_mqtt::service::mqtt_service::MQTTService;
 
 #[derive(Clone, Default)]
@@ -19,16 +16,7 @@ impl Application for TestApplication {
     async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)
-    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router {
-        let mut properties = MQTTClientProperties::default();
-        properties.set_host("127.0.0.1");
-        properties.set_username("username");
-        properties.set_password("password");
-        properties.set_topics(vec!["test/#".into()]);
-
-        let auto = MQTTServiceAutoRegister(properties);
-        auto.register(ctx, &Default::default()).await.ok();
-
+    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new().route("/publish", axum::routing::post(publish_message))
     }
 }
@@ -39,7 +27,6 @@ async fn publish_message(
 ) -> impl IntoResponse {
     let topic = "test/publish";
     mqtt_service.publish(topic, msg).await.ok();
-
     "Ok"
 }
 

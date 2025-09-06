@@ -1,41 +1,3 @@
-# Next Web Data Database
-
-Database - make everything simpler
-
-
-# Tips
-Currently supports MySQL and PostgreSQL
-In theory, What Rbatis supports should be included
-
-# Usage 
-If you want to use it, please ensure that the file contains the following content
-
-CARGO_MANIFEST_DIR/resources/application.yaml
-
-# Used in conjunction, otherwise useless
-
-And lib
-
-next-web-dev
-
-
-```yaml
-
-next:
-    data: 
-     database:
-        driver: mysql
-        host: localhost
-        port: 3306
-        username: root
-        password: 123456
-        database: test_db
-
-```
-
-```rust
-#![allow(missing_docs)]
-
 use next_web_core::async_trait;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::application::Application;
@@ -72,5 +34,3 @@ async fn req_version(
 async fn main() {
     TestApplication::run().await;
 }
-
-```

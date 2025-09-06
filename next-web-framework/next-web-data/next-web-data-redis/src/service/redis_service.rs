@@ -42,6 +42,7 @@ impl Service    for RedisService {}
 
 impl RedisService {
     /// 创建新的Redis服务实例
+    /// 
     ///  Create new Redis service instance
     pub fn new(properties: RedisClientProperties) -> Self {
         let client = Self::build_client(&properties);
@@ -57,6 +58,7 @@ impl RedisService {
     }
 
     /// 构建Redis客户端
+    /// 
     /// Build Redis client
     fn build_client(config: &RedisClientProperties) -> Client {
         let url = crate::service::gen_url(config, true);
@@ -65,12 +67,14 @@ impl RedisService {
     }
 
     /// 获取Redis客户端引用
+    /// 
     ///  Get Redis client reference
     pub fn get_client(&self) -> &Client {
         &self.client
     }
 
-    /// 获取当前Redis连接
+    ///  获取当前Redis连接
+    /// 
     ///  Get current Redis connection
     pub fn get_connection(&self) -> Option<MultiplexedConnection> {
         if self.connections.is_empty() {
@@ -87,12 +91,16 @@ impl RedisService {
     }
 
     /// 过期键监听器
+    /// 
     ///  Expired key listener
     #[cfg(feature = "expired-key-listener")]
     pub(crate) async fn expired_key_listener(
         &self,
         mut service: Box<dyn RedisExpiredKeysEvent>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        use futures::StreamExt;
+        use redis::Value;
+
         let (mut sink, mut stream) = self.get_client().get_async_pubsub().await?.split();
         sink.psubscribe(format!(
             "__keyevent@{}__:expired",
@@ -113,12 +121,14 @@ impl RedisService {
     }
 
     /// 获取配置属性
+    /// 
     ///  Get configuration properties
     pub fn properties(&self) -> &RedisClientProperties {
         &self.properties
     }
 
     /// 获取当前连接索引
+    /// 
     /// Get current connection index
     pub fn index(&self) -> usize {
         self.index.load(Ordering::Relaxed)
@@ -127,16 +137,13 @@ impl RedisService {
 
 impl Deref for RedisService {
     type Target = Client;
-    /// 解引用为Redis客户端
-    ///  Dereference to Redis client
+
     fn deref(&self) -> &Self::Target {
         &self.client
     }
 }
 
 impl DerefMut for RedisService {
-    /// 可变解引用为Redis客户端
-    ///  Mutable dereference to Redis client
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.client
     }

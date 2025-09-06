@@ -107,7 +107,7 @@ impl MQTTService {
         interceptor: Box<dyn MessageInterceptor>,
     ) -> AsyncClient {
         let mut options = MqttOptions::new(
-            properties.client_id().unwrap_or("next-web-mqtt"),
+            properties.client_id().unwrap_or_default(),
             properties.host().unwrap_or("127.0.0.1"),
             properties.port().unwrap_or(1883),
         );
@@ -121,11 +121,11 @@ impl MQTTService {
                 properties.username().unwrap_or_default(),
                 properties.password().unwrap_or_default(),
             );
-
+        
         let (client, mut eventloop) = AsyncClient::new(options, 999);
 
         let mut network_options = NetworkOptions::new();
-        network_options.set_connection_timeout(properties.connect_timeout().unwrap_or(5));
+        network_options.set_connection_timeout(properties.connect_timeout().unwrap_or(10));
         eventloop.set_network_options(network_options);
 
         let topics = properties.topics();
@@ -134,18 +134,15 @@ impl MQTTService {
         // subscribe topics
         let need_subscribe_topics = topics
             .iter()
-            .map(|topic| {
-                if topic.len() > 2 {
-                    let two_char = &topic[topic.len() - 2..];
-                    let qos: QoS = match two_char {
-                        ":0" => QoS::AtMostOnce,
-                        ":1" => QoS::AtLeastOnce,
-                        ":2" => QoS::ExactlyOnce,
-                        _ => QoS::AtLeastOnce,
-                    };
-                    return SubscribeFilter::new(topic.clone(), qos);
-                }
-                SubscribeFilter::new(topic.clone(), QoS::AtLeastOnce)
+            .map(|t| {
+                let qos: QoS = t.qos.as_ref().map(|q|  match *q {
+                    0 => QoS::AtMostOnce,
+                    1=> QoS::AtLeastOnce,
+                    2 => QoS::ExactlyOnce,
+                    _ => QoS::AtLeastOnce,
+                }).unwrap_or(QoS::AtLeastOnce);
+                
+                SubscribeFilter::new(t.topic.clone(), qos)
             })
             .collect::<Vec<_>>();
         client.try_subscribe_many(need_subscribe_topics).unwrap();
@@ -197,8 +194,8 @@ impl MQTTService {
                         // This generally refers to the need to receive ack information and re subscribe to the topic after reconnection
                         match ack.code {
                             ConnectReturnCode::Success => {
-                                for topic in topics.iter() {
-                                    client_1.subscribe(topic, QoS::AtLeastOnce).await.unwrap();
+                                for t in topics.iter() {
+                                    client_1.subscribe(t.topic.clone(), rumqttc::qos(t.qos.unwrap_or(0)).unwrap_or(QoS::AtLeastOnce)).await.unwrap();
                                 }
                                 warn!("Client reconnection successful, try re subscribing to the themes")
                             }
@@ -212,7 +209,7 @@ impl MQTTService {
                     }
 
                     _ => {
-                        // dodo -> Outgoing
+                        // TODO -> Outgoing
                     }
                 }
             }

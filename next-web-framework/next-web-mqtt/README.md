@@ -21,12 +21,10 @@ next:
         username: user1
         password: 123
         topics:
-            - test/#
-            - testtopic/#
-            # with qos 
-            # 默认匹配最后两个字符 希望是以下字符-> :0 :1 :2 
-            # 如果都没有匹配, QOS 消息质量默认为 1
-            - test/week:0
+            - topic: "test/#"
+                qos: 1
+            - topic: "testtopic/#"
+                qos: 0
         # from secs
         connect_timeout: 10
         clean_session: true
@@ -36,17 +34,17 @@ next:
 ```rust
 #![allow(missing_docs)]
 
-use next_web_core::async_trait;
-use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
-use next_web_dev::{
-    application::Application,
-    Singleton,
-};
-use next_web_mqtt::{core::topic::base_topic::BaseTopic, service::mqtt_service::MQTTService};
+use axum::response::IntoResponse;
+use axum::Json;
+use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
+use next_web_dev::application::Application;
+use next_web_dev::middleware::find_singleton::FindSingleton;
+use next_web_dev::Singleton;
+use next_web_mqtt::core::topic::base_topic::BaseTopic;
+use next_web_mqtt::service::mqtt_service::MQTTService;
 
-/// Test application
-#[derive(Default, Clone)]
-pub struct TestApplication;
+#[derive(Clone, Default)]
+struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
@@ -54,29 +52,33 @@ impl Application for TestApplication {
     async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)
-    async fn application_router(
-        &mut self,
-        ctx: &mut ApplicationContext,
-    ) -> axum::Router {
-        let mqtt = ctx.get_single_with_name::<MQTTService>("mqttService");
-        mqtt.publish("test/two", "hello world!").await.unwrap();
-        axum::Router::new()
+    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
+        axum::Router::new().route("/publish", axum::routing::post(publish_message))
     }
 }
 
-#[Singleton(binds = [Self::into_base_topic])]
+async fn publish_message(
+    FindSingleton(mqtt_service): FindSingleton<MQTTService>,
+    Json(msg): Json<String>,
+) -> impl IntoResponse {
+    let topic = "test/publish";
+    mqtt_service.publish(topic, msg).await.ok();
+    "Ok"
+}
+
+#[Singleton( binds = [Self::into_base_topic])]
 #[derive(Clone)]
-pub struct TestOneBaseTopic;
+pub(crate) struct TestOneBaseTopic;
 
 impl TestOneBaseTopic {
     fn into_base_topic(self) -> Box<dyn BaseTopic> {
         Box::new(self)
     }
 }
- 
-#[Singleton(binds = [Self::into_base_topic])]
+
+#[Singleton( binds = [Self::into_base_topic])]
 #[derive(Clone)]
-pub struct TestTwoBaseTopic;
+pub(crate) struct TestTwoBaseTopic;
 
 impl TestTwoBaseTopic {
     fn into_base_topic(self) -> Box<dyn BaseTopic> {
@@ -92,7 +94,7 @@ impl BaseTopic for TestOneBaseTopic {
 
     async fn consume(&self, topic: &str, message: &[u8]) {
         println!(
-            "Received message0, Topic: {}, Data Content: {:?}",
+            "Received message1, Topic: {}, Data Content: {:?}",
             topic,
             String::from_utf8_lossy(message)
         );
@@ -102,17 +104,18 @@ impl BaseTopic for TestOneBaseTopic {
 #[async_trait]
 impl BaseTopic for TestTwoBaseTopic {
     fn topic(&self) -> &'static str {
-        "test/#"
+        "test/123"
     }
 
     async fn consume(&self, topic: &str, message: &[u8]) {
         println!(
-            "Received message1, Topic: {}, Data Content: {:?}",
+            "Received message2, Topic: {}, Data Content: {:?}",
             topic,
             String::from_utf8_lossy(message)
         );
     }
 }
+
 #[tokio::main]
 async fn main() {
     TestApplication::run().await;
