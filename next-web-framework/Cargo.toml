@@ -15,8 +15,7 @@ description = "Just a simple web infrastructure framework"
 [dependencies]
 # next-web libs
 next-web-dev = { version = "0.1.6", path = "./next-web-dev"}
-# next-web-core = { version = "0.1.3", path = "./next-web-core" }
-
+next-web-core = { version = "0.1.4", path = "./next-web-core" }
 
 next-web-security = { version = "0.1.0", path = "./next-web-security", optional = true }
 next-web-ai = { version = "*", path = "./next-web-ai", optional = true }

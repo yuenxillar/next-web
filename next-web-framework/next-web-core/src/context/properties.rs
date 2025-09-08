@@ -150,6 +150,10 @@ impl ApplicationProperties {
     pub fn mapping(&self) -> Option<&serde_yaml::Value> {
         self.mapping.as_ref()
     }
+
+    pub fn mapping_mut(&mut self) -> Option<&mut serde_yaml::Value> {
+        self.mapping.as_mut()
+    }
 }
 
 impl Default for ApplicationProperties {
