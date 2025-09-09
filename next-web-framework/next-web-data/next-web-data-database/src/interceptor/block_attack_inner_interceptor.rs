@@ -9,10 +9,10 @@ use rbs::Value;
 use tracing::warn;
 
 #[derive(Debug, Default)]
-pub struct DefaultDatabaseInterceptor;
+pub struct BlockAttackInnerInterceptor;
 
 #[async_trait]
-impl Intercept for DefaultDatabaseInterceptor {
+impl Intercept for BlockAttackInnerInterceptor {
     /// if return Some(false) will be break
     async fn before(
         &self,

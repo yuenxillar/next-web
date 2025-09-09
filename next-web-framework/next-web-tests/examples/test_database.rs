@@ -1,13 +1,14 @@
 use next_web_core::async_trait;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
+use next_web_data_database::transactional::transactionl_executor::TransactionalExecutor;
 use next_web_dev::application::Application;
 
-use axum::routing::get;
+use axum::routing::{get, post};
 use next_web_data_database::service::database_service::DatabaseService;
 use next_web_dev::middleware::find_singleton::FindSingleton;
 
 /// Test application
-#[derive(Default, Clone)] 
+#[derive(Default, Clone)]
 pub struct TestApplication;
 
 #[async_trait]
@@ -16,7 +17,9 @@ impl Application for TestApplication {
     async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
 
     async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
-        axum::Router::new().route("/version", get(req_version))
+        axum::Router::new()
+            .route("/version", get(req_version))
+            .route("/transaction", post(req_transaction))
     }
 }
 
@@ -28,6 +31,24 @@ async fn req_version(
         .await
         .unwrap_or("unknown version".to_string());
     version
+}
+
+async fn req_transaction(
+    FindSingleton(service): FindSingleton<DatabaseService>,
+) -> impl axum::response::IntoResponse {
+    match service.execute_transaction(|rbs| async {
+        // insert
+
+        // update
+
+        // And Error
+        Err("Error".into())
+    }).await {
+        Ok(_) => {},
+        Err(_) => {},
+    };
+    
+    "Ok"
 }
 
 #[tokio::main]

@@ -8,51 +8,94 @@ use std::{
     result::Result as StdResult,
 };
 
-type Result<V> = StdResult<V, rbatis::Error>;
+type Result<T> = StdResult<T, rbatis::Error>;
 
-/// 可为执行器实现 trait
 #[async_trait]
-pub trait SelectWrapper {
-    async fn select_list<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<Vec<T>>
+pub trait QueryWrapper {
+    async fn select_list<T, V>(&self, wrapper: SelectWrapper<'static, T>) -> Result<Vec<T>>
     where
         T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned,
     {
-        self.execute(wrapper).await
+        self.execute_wrapper(wrapper).await
     }
 
-    async fn select_one<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<T>
+    async fn select_one<T, V>(&self, wrapper: SelectWrapper<'static, T>) -> Result<T>
     where
         T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned,
     {
-        self.execute(wrapper).await
+        self.execute_wrapper(wrapper).await
     }
 
-    async fn select_count<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<usize>
+    async fn select_count<T, V>(&self, wrapper: SelectWrapper<'static, T>) -> Result<u64>
     where
         T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned,
     {
-        self.execute(wrapper.select(vec!["COUNT(1) as count"]))
+        self.execute_wrapper(wrapper.select(vec!["COUNT(1) as count"]))
             .await
     }
 
-    async fn execute<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<V>
+    async fn select_by_id<T, V>(&self, id: V) -> Result<T>
+    where
+        T: DeserializeOwned + TableName + Send,
+        V: Into<rbs::Value> + Send;
+
+    async fn select_by_ids<T, V>(&self, ids: V) -> Result<T>
+    where
+        T: DeserializeOwned + TableName + Send,
+        V: IntoIterator + Send,
+        V::Item: Into<rbs::Value> + Send;
+
+    async fn execute_wrapper<T, V>(&self, wrapper: SelectWrapper<'static, T>) -> Result<V>
     where
         T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned;
 }
 
 #[async_trait]
-impl SelectWrapper for RBatis {
-    async fn execute<T, V>(&self, wrapper: QueryWrapper<'static, T>) -> Result<V>
+impl QueryWrapper for RBatis {
+    async fn execute_wrapper<T, V>(&self, wrapper: SelectWrapper<'static, T>) -> Result<V>
     where
         T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned,
     {
         self.query_decode(&wrapper.generate_sql(), Vec::with_capacity(0))
             .await
+    }
+
+    async fn select_by_id<T, V>(&self, id: V) -> Result<T>
+    where
+        T: DeserializeOwned + TableName + Send,
+        V: Into<rbs::Value> + Send,
+    {
+        self.query_decode(
+            &format!("SELECT * FROM {} WHERE id = ?", T::table_name()),
+            vec![id.into()],
+        )
+        .await
+    }
+
+    async fn select_by_ids<T, V>(&self, ids: V) -> Result<T>
+    where
+        T: DeserializeOwned + TableName + Send,
+        V: IntoIterator + Send,
+        V::Item: Into<rbs::Value> + Send,
+    {
+        let ids = ids
+            .into_iter()
+            .map(Into::<rbs::Value>::into)
+            .collect::<Vec<_>>();
+        self.query_decode(
+            &format!(
+                "SELECT * FROM {} WHERE id IN ({})",
+                T::table_name(),
+                vec!["?"; ids.len()].join(", ")
+            ),
+            ids,
+        )
+        .await
     }
 }
 
@@ -189,25 +232,33 @@ impl<'a> Default for ConditionNode<'a> {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub enum JoinMode {
+    #[default]
+    And,
+    Or,
+}
+
 /// 优化后的QueryWrapper结构体
 #[derive(Debug, Clone, Default)]
-pub struct QueryWrapper<'a, T>
+pub struct SelectWrapper<'a, T>
 where
     T: DeserializeOwned,
     T: TableName,
 {
-    pub root_condition: ConditionNode<'a>,
-    pub order_by: Vec<OrderBy<'a>>,
-    pub group_by: Vec<Cow<'a, str>>,
-    pub having: Option<Cow<'a, str>>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
-    pub select_columns: Vec<Cow<'a, str>>,
-    pub custom_sql: Option<Cow<'a, str>>,
+    root_condition: ConditionNode<'a>,
+    order_by: Vec<OrderBy<'a>>,
+    group_by: Vec<Cow<'a, str>>,
+    having: Option<Cow<'a, str>>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+    select_columns: Vec<Cow<'a, str>>,
+    custom_sql: Option<Cow<'a, str>>,
     _marker: PhantomData<T>,
+    join_mode: JoinMode,
 }
 
-impl<'a, T> QueryWrapper<'a, T>
+impl<'a, T> SelectWrapper<'a, T>
 where
     T: DeserializeOwned,
     T: TableName,
@@ -224,6 +275,7 @@ where
             select_columns: Vec::new(),
             custom_sql: None,
             _marker: PhantomData,
+            join_mode: JoinMode::And,
         }
     }
 
@@ -236,12 +288,17 @@ where
                 self.root_condition = new_node;
             }
             _ => {
+                let op = match self.join_mode {
+                    JoinMode::And => LogicalOperator::And,
+                    JoinMode::Or => LogicalOperator::Or,
+                };
                 let old_root = std::mem::replace(&mut self.root_condition, ConditionNode::Empty);
                 self.root_condition = ConditionNode::Branch {
                     left: Box::new(old_root),
-                    op: LogicalOperator::And,
+                    op,
                     right: Box::new(new_node),
                 };
+                self.join_mode = JoinMode::And; // 重置为默认
             }
         }
     }
@@ -344,10 +401,12 @@ where
     {
         let column_str = column().into();
         let value_str = value.into();
+        let formatted_value = format!("%{}%", value_str);
+
         self.add_condition(Condition {
             column: column_str,
             operator: CompareOperator::Like,
-            value: ConditionValue::Single(value_str),
+            value: ConditionValue::Single(Cow::Owned(formatted_value)),
         });
         self
     }
@@ -503,16 +562,16 @@ where
 
     /// 添加OR逻辑操作符
     pub fn or(mut self) -> Self {
-        // 找到最后一个Branch节点，将其操作符改为OR
-        self.change_last_operator(LogicalOperator::Or);
+        self.join_mode = JoinMode::Or;
         self
     }
 
     /// 修改最后一个操作符
+    #[allow(unused)]
     fn change_last_operator(&mut self, op: LogicalOperator) {
         fn find_last_branch<'b>(node: &'b mut ConditionNode) -> Option<&'b mut LogicalOperator> {
             match node {
-                ConditionNode::Branch { left: _, op, right } => {
+                ConditionNode::Branch { op, right, .. } => {
                     if let Some(last_op) = find_last_branch(right) {
                         Some(last_op)
                     } else {
@@ -532,9 +591,9 @@ where
     /// 添加嵌套条件
     pub fn nested<F>(mut self, f: F) -> Self
     where
-        F: FnOnce(QueryWrapper<'a, T>) -> QueryWrapper<'a, T>,
+        F: FnOnce(SelectWrapper<'a, T>) -> SelectWrapper<'a, T>,
     {
-        let nested = f(QueryWrapper::new());
+        let nested = f(SelectWrapper::new());
 
         if let ConditionNode::Empty = nested.root_condition {
             return self;
@@ -547,12 +606,17 @@ where
                 self.root_condition = nested_node;
             }
             _ => {
+                let op = match self.join_mode {
+                    JoinMode::And => LogicalOperator::And,
+                    JoinMode::Or => LogicalOperator::Or,
+                };
                 let old_root = std::mem::replace(&mut self.root_condition, ConditionNode::Empty);
                 self.root_condition = ConditionNode::Branch {
                     left: Box::new(old_root),
-                    op: LogicalOperator::And,
+                    op,
                     right: Box::new(nested_node),
                 };
+                self.join_mode = JoinMode::And; // 重置为默认
             }
         }
 
@@ -818,6 +882,7 @@ where
     }
 
     /// 将PascalCase转换为snake_case
+    #[allow(unused)]
     fn to_snake_case(pascal_case: &str) -> Cow<'_, str> {
         if pascal_case.chars().all(|c| c.is_lowercase() || c == '_') {
             return Cow::Borrowed(pascal_case);
@@ -840,7 +905,7 @@ where
     }
 }
 
-impl<'a, T> Wrapper<T> for QueryWrapper<'_, T>
+impl<'a, T> Wrapper<T> for SelectWrapper<'_, T>
 where
     T: DeserializeOwned,
     T: TableName,
@@ -856,81 +921,80 @@ mod tests {
     use serde::Deserialize;
 
     #[derive(Clone, Default, Deserialize)]
-    struct Test;
+    struct User;
 
-    impl Test {
+    impl User {
         pub fn name() -> &'static str {
             "name"
         }
     }
 
-    impl TableName for Test {
+    impl TableName for User {
         fn table_name() -> &'static str {
-            "test"
+            "user"
         }
     }
 
     #[test]
     fn test_simple_query() {
-        let query = QueryWrapper::<Test>::new()
+        let query = SelectWrapper::<User>::new()
             .eq(|| "name", "张三")
             .gt(|| "age", "18")
-            .build_sql("users");
+            .generate_sql();
 
         assert_eq!(
             query,
-            "SELECT * FROM users WHERE name = '张三' AND age > '18'"
+            "SELECT * FROM user WHERE name = '张三' AND age > '18'"
         );
     }
 
     #[test]
     fn test_complex_query() {
-        let query = QueryWrapper::<Test>::new()
+        let query = SelectWrapper::<User>::new()
             .eq(|| "status", "active")
             .or()
             .nested(|q| q.eq(|| "role", "admin").gt(|| "level", "5"))
             .order_by_desc(|| "created_at")
             .limit(10)
             .offset(20)
-            .build_sql("users");
+            .generate_sql();
 
         assert_eq!(
             query,
-            "SELECT * FROM users WHERE status = 'active' OR (role = 'admin' AND level > '5') ORDER BY created_at DESC LIMIT 10 OFFSET 20"
+            "SELECT * FROM user WHERE status = 'active' OR (role = 'admin' AND level > '5') ORDER BY created_at DESC LIMIT 10 OFFSET 20"
         );
     }
 
     #[test]
     fn test_in_condition() {
-        let query = QueryWrapper::<Test>::new()
+        let query = SelectWrapper::<User>::new()
             .r#in(|| "id", vec!["1", "2", "3"])
-            .build_sql("users");
+            .generate_sql();
 
-        assert_eq!(query, "SELECT * FROM users WHERE id IN ('1', '2', '3')");
+        assert_eq!(query, "SELECT * FROM user WHERE id IN ('1', '2', '3')");
     }
 
     #[test]
     fn test_between_condition() {
-        let query = QueryWrapper::<Test>::new()
+        let query = SelectWrapper::<User>::new()
             .between(|| "age", "18", "30")
-            .build_sql("users");
+            .generate_sql();
 
-        assert_eq!(query, "SELECT * FROM users WHERE age BETWEEN '18' AND '30'");
+        assert_eq!(query, "SELECT * FROM user WHERE age BETWEEN '18' AND '30'");
     }
 
     #[test]
     fn test_like_condition() {
-        let name = || "张三";
-        let query = QueryWrapper::<Test>::new()
-            .like(Test::name, "张")
-            .build_sql("users");
+        let query = SelectWrapper::<User>::new()
+            .like(User::name, "张")
+            .generate_sql();
 
-        assert_eq!(query, "SELECT * FROM users WHERE name LIKE '%张%'");
+        assert_eq!(query, "SELECT * FROM user WHERE name LIKE '%张%'");
     }
 
     #[test]
     fn test_group_by_having() {
-        let query = QueryWrapper::<Test>::new()
+        let query = SelectWrapper::<User>::new()
             .select(vec!["department", "COUNT(*) as count"])
             .group_by(vec!["department"])
             .having("COUNT(*) > 5")
@@ -944,13 +1008,13 @@ mod tests {
 
     #[test]
     fn test_count() {
-        let query = QueryWrapper::<Test>::new()
+        let query = SelectWrapper::<User>::new()
             .select(vec!["COUNT(1) as count"])
-            .eq(|| "name", "huihui")
+            .eq(|| "name", "zhangsan")
             .generate_sql();
         assert_eq!(
             query,
-            "SELECT COUNT(1) as count FROM test WHERE name = 'huihui'"
+            "SELECT COUNT(1) as count FROM user WHERE name = 'zhangsan'"
         );
     }
 }

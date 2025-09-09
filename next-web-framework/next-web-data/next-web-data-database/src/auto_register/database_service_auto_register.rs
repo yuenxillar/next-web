@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton, ApplicationContext, AutoRegister
+    ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
+    traits::singleton::Singleton,
 };
 use rudi_dev::Singleton;
 
 use crate::{
-    core::interceptor::default_database_interceptor::DefaultDatabaseInterceptor,
+    interceptor::block_attack_inner_interceptor::BlockAttackInnerInterceptor,
     properties::database_properties::DatabaseClientProperties,
     service::database_service::DatabaseService,
 };
@@ -46,8 +47,7 @@ impl AutoRegister for DatabaseServiceAutoRegister {
         // Find interceptors
         let mut intercepts = ctx.resolve_by_type::<Arc<dyn rbatis::intercept::Intercept>>();
 
-        if !intercepts.is_empty() {}
-        let default_database_interceptor = Arc::new(DefaultDatabaseInterceptor::default())
+        let default_database_interceptor = Arc::new(BlockAttackInnerInterceptor::default())
             as Arc<dyn rbatis::intercept::Intercept>;
 
         intercepts.insert(0, default_database_interceptor);
@@ -64,7 +64,7 @@ impl AutoRegister for DatabaseServiceAutoRegister {
     }
 }
 
-
+#[allow(unused)]
 fn generate_datasource_id(id: &str) -> String {
     let binding = id.to_lowercase();
     let database_id = binding.as_str();
