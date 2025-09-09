@@ -7,3 +7,5 @@ pub const APPLICATION_BANNER: &'static str = "/banner.txt";
 pub const I18N: &'static str = "/i18n";
 
 pub const RESOURCES: &'static str = "resources";
+
+pub const SECURE_PROPERTIES_MARK: &'static str = "nsp";

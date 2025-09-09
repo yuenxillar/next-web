@@ -28,6 +28,9 @@ pub struct RequestProperties {
     max_request_size: Option<usize>,
     trace: Option<bool>,
     location: Option<String>,
+
+    /// from_secs
+    timeout: Option<u64>,
 }
 
 impl RequestProperties {
@@ -35,8 +38,9 @@ impl RequestProperties {
         Self {
             max_file_size: None,
             max_request_size: None,
-            trace: None,
+            trace: Some(true),
             location: None,
+            timeout: Some(5),
         }
     }
 
@@ -50,6 +54,10 @@ impl RequestProperties {
 
     pub fn trace(&self) -> bool {
         self.trace.unwrap_or(false)
+    }
+
+    pub fn timeout(&self) -> Option<u64> {
+        self.timeout
     }
 
     pub fn location(&self) -> Option<&str> {

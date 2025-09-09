@@ -3,3 +3,6 @@ pub mod hash_slot;
 pub mod local_date_time;
 pub mod domain;
 pub mod thread;
+
+#[cfg(feature = "decrypt-properties")]
+pub mod aes;

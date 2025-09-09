@@ -1,8 +1,6 @@
 use async_trait::async_trait;
-use axum::body::Bytes;
-use axum::http::{Response, StatusCode};
+use axum::http::StatusCode;
 use axum::Router;
-use http_body_util::Full;
 use next_web_core::client::rest_client::RestClient;
 use next_web_core::constants::application_constants::{
     APPLICATION_BANNER, APPLICATION_DEFAULT_PORT,
@@ -23,7 +21,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use crate::application::next_application::NextApplication;
 
@@ -234,6 +232,12 @@ pub trait Application: Send + Sync {
         #[rustfmt::skip]
         let server_addr = if config.local().unwrap_or(true) { "127.0.0.1" } else { "0.0.0.0" };
 
+        let req_timeout = config.http().map(|http| {
+            http.request()
+                .map(|req| req.timeout().unwrap_or(5))
+                .unwrap_or(5)
+        });
+
         // 3. Build basic routing
         let mut app = self
             .application_router(&mut ctx)
@@ -277,9 +281,11 @@ pub trait Application: Send + Sync {
         {
             app = app
                 // Global panic handler
-                .layer(CatchPanicLayer::custom(handle_panic))
+                .layer(CatchPanicLayer::new())
                 // Handler request  max timeout
-                .layer(TimeoutLayer::new(std::time::Duration::from_secs(5)))
+                .layer(TimeoutLayer::new(std::time::Duration::from_secs(
+                    req_timeout.unwrap_or(5),
+                )))
                 // Cors
                 .layer(
                     CorsLayer::new()
@@ -298,10 +304,11 @@ pub trait Application: Send + Sync {
             }
 
             // Add HTTP configuration related layers
-            if let Some(http) = config.http() {
-                // Request
-                if let Some(req) = http.request() {
-                    {
+
+            match config.http() {
+                Some(http) => {
+                    // Request
+                    if let Some(req) = http.request() {
                         if req.trace() {
                             app = app.route_layer(TraceLayer::new_for_http());
                         }
@@ -310,11 +317,14 @@ pub trait Application: Send + Sync {
                             app = app.route_layer(RequestBodyLimitLayer::new(limit));
                         }
                     }
-                }
 
-                // Response
-                // TODO: response middleware
-            }
+                    // Response
+                    // TODO: response middleware
+                    #[allow(unused_variables)]
+                    if let Some(resp) = http.response() {}
+                }
+                None => {}
+            };
 
             // Add
         }
@@ -418,22 +428,13 @@ pub trait Application: Send + Sync {
 
         // Get a base application instance
         let mut next_application: NextApplication<Self> = NextApplication::new();
+
+        // Before to next step, map the application properties
+        next_application.decrypt_properties();
+        
         let properties = next_application.application_properties().clone();
         let args = next_application.application_args().clone();
         let resources = next_application.application_resources().clone();
-
-        // Banner show
-        Self::banner_show(&resources);
-
-        let application = next_application.application();
-
-        println!("========================================================================\n");
-
-        application.init_logging(&properties);
-        println!(
-            "Init logging success!\nCurrent Time: {}\n",
-            LocalDateTime::now()
-        );
 
         let mut ctx = ApplicationContext::options()
             .allow_override(
@@ -446,6 +447,19 @@ pub trait Application: Send + Sync {
             .auto_register();
         println!(
             "Init application context success!\nCurrent Time: {}\n",
+            LocalDateTime::now()
+        );
+
+        // Banner show
+        Self::banner_show(&resources);
+
+        let application = next_application.application();
+
+        println!("========================================================================\n");
+
+        application.init_logging(&properties);
+        println!(
+            "Init logging success!\nCurrent Time: {}\n",
             LocalDateTime::now()
         );
 
@@ -504,29 +518,26 @@ pub trait Application: Send + Sync {
     }
 }
 
-fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response<Full<Bytes>> {
-    error!("Application handle panic, case: {:?}", err);
+// fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response<Full<Bytes>> {
+//     if let Some(s) = err.downcast_ref::<String>() {
+//         tracing::error!("Service panicked: {}", s);
+//     } else if let Some(s) = err.downcast_ref::<&str>() {
+//         tracing::error!("Service panicked: {}", s);
+//     } else {
+//         tracing::error!("Service panicked but `CatchPanic` was unable to downcast the panic info");
+//     };
 
-    let err_ref = err.as_ref();
-    let error = if let Some(s) = err_ref.downcast_ref::<&str>() {
-        s.to_string()
-    } else if let Some(s) = err_ref.downcast_ref::<String>() {
-        s.clone()
-    } else {
-        String::from("Unknown error")
-    };
+//     let msg = format!(
+//         "Internal Server Error, Case: {:?}\ntimestamp: {}",
+//         error,
+//         LocalDateTime::timestamp()
+//     );
 
-    let msg = format!(
-        "Internal Server Error, Case: {:?}\ntimestamp: {}",
-        error,
-        LocalDateTime::timestamp()
-    );
-
-    Response::builder()
-        .status(StatusCode::INTERNAL_SERVER_ERROR)
-        .body(msg.into())
-        .unwrap()
-}
+//     Response::builder()
+//         .status(StatusCode::INTERNAL_SERVER_ERROR)
+//         .body(msg.into())
+//         .unwrap()
+// }
 
 /// no route match handler
 async fn fall_back() -> (StatusCode, &'static str) {

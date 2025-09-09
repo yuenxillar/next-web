@@ -1,19 +1,19 @@
 use std::ops::Deref;
 
-use next_web_core::context::{
+use next_web_core::{constants::application_constants::SECURE_PROPERTIES_MARK, context::{
     application_args::ApplicationArgs, application_resources::ApplicationResources,
     properties::ApplicationProperties,
-};
+}};
 
 use super::application::Application;
 use next_web_core::autoconfigure::context::server_properties::ServerProperties;
 
 #[derive(Default)]
 pub struct NextApplication<A: Application> {
-    application_properties: ApplicationProperties,
-    application_args: ApplicationArgs,
-    application_resources: ApplicationResources,
-    application: A,
+    pub(crate) application_properties: ApplicationProperties,
+    pub(crate) application_args: ApplicationArgs,
+    pub(crate) application_resources: ApplicationResources,
+    pub(crate) application: A,
 }
 
 impl<A: Application + Default> NextApplication<A> {
@@ -83,6 +83,36 @@ impl<A: Application + Default> NextApplication<A> {
     /// Get the application configure mappping.
     pub fn set_configure_mappping(&mut self, mapping: serde_yaml::Value) {
         self.application_properties.set_mapping(mapping);
+    }
+
+    /// Decrypt the properties.
+    pub(crate) fn decrypt_properties(&mut self) {
+        // 不解密关于 Server 相关的配置
+
+        if let Some(mapping) = self.application_properties.mapping_mut() {
+                println!("mapping: {:#?}", mapping);
+                
+                match mapping.as_mapping_mut() {
+                    Some(mapping) => {
+                        let var = mapping.iter_mut().filter(|(_key, value)| 
+                            {
+                                match value {
+                                    serde_yaml::Value::String(s) => {
+                                        if s.starts_with(SECURE_PROPERTIES_MARK) && &s[3..4] == ":" {
+                                            
+                                        }
+
+                                        true
+                                    },
+                                    serde_yaml::Value::Mapping(mapping) => todo!(),
+                                    _ => false
+                                }                     
+                            }
+                        );
+                    },
+                    None => {}
+                }
+        }
     }
 }
 

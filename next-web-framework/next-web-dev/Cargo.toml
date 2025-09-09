@@ -48,6 +48,8 @@ flume = { workspace = true }
 validator = { workspace = true}
 thiserror = { workspace = true }
 
+aes-gcm = { workspace = true, optional = true }
+
 rudi-dev = { workspace = true }
 
 tracing-subscriber = { workspace = true }
@@ -68,7 +70,7 @@ mimalloc = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = ["scheduler", "i18n"]
+default = ["scheduler", "i18n", "decrypt-properties"]
 
 tls-rustls = ["axum-server"]
 scheduler = ["tokio-cron-scheduler"]
@@ -77,5 +79,6 @@ enable-grpc = []
 enable-prometheus = ["axum-prometheus"]
 
 i18n = []
+decrypt-properties = ["aes-gcm"]
 
 trace-log = []
