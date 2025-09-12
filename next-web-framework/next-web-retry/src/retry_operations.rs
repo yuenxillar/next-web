@@ -3,33 +3,32 @@ use std::error::Error;
 use async_trait::async_trait;
 
 use crate::{
-    recovery_callback::RecoveryCallback, retry_callback::RetryCallback, retry_state::RetryState,
+    error::retry_error::RetryError, recovery_callback::RecoveryCallback, retry_callback::RetryCallback, retry_state::RetryState
 };
 
 #[async_trait]
-pub trait RetryOperations<T, E>
+pub trait RetryOperations<T>
 where
     Self: Send + Sync,
-    E: Error,
 {
-    async fn execute(&self, retry_callback: &dyn RetryCallback<T, E>) -> Result<T, E>;
+    async fn execute(&self, retry_callback: &dyn RetryCallback<T>) -> Result<T, RetryError>;
 
     async fn execute_with_recovery(
         &self,
-        retry_callback: &dyn RetryCallback<T, E>,
+        retry_callback: &dyn RetryCallback<T>,
         recovery_callback: &dyn RecoveryCallback<T>,
-    ) -> Result<T, E>;
+    ) -> Result<T, RetryError>;
 
     async fn execute_with_state(
         &self,
-        retry_callback: &dyn RetryCallback<T, E>,
+        retry_callback: &dyn RetryCallback<T>,
         state: &dyn RetryState,
-    ) -> Result<T, E>;
+    ) -> Result<T, RetryError>;
 
     async fn execute_with_all(
         &self,
-        retry_callback: &dyn RetryCallback<T, E>,
+        retry_callback: &dyn RetryCallback<T>,
         recovery_callback: &dyn RecoveryCallback<T>,
         state: &dyn RetryState,
-    ) -> Result<T, E>;
+    ) -> Result<T, RetryError>;
 }

@@ -29,7 +29,7 @@ impl RetryContextCache for MapRetryContextCache {
         todo!()
     }
 
-    fn contains_key(&self, key: &str) {
+    fn contains_key(&self, key: &str) -> bool {
         todo!()
     }
 }

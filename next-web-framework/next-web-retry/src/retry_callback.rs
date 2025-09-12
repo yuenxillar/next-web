@@ -1,29 +1,24 @@
-use std::error::Error;
-
 use async_trait::async_trait;
 
-use crate::retry_context::RetryContext;
-
+use crate::{error::retry_error::RetryError, retry_context::RetryContext};
 
 #[async_trait]
-pub trait RetryCallback<T, E>
+pub trait RetryCallback<T>
 where
     Self: Send + Sync,
-    E: Error,
 {
-    async fn do_with_retry(&self, context: &dyn RetryContext) -> Result<T, E>;
+    async fn do_with_retry(&self, context: &dyn RetryContext) -> Result<T, RetryError>;
 }
 
 
 #[async_trait]
-impl<F, Fut, T, E> RetryCallback<T, E> for F
+impl<F, Fut, T> RetryCallback<T> for F
 where
-    E: Error,
     F: Send + Sync,
     F: Fn(&dyn RetryContext) -> Fut,
-    Fut: Future<Output = Result<T, E>> + Send + Sync,
+    Fut: Future<Output = Result<T, RetryError>> + Send + Sync,
 {
-    async fn do_with_retry(&self, context: &dyn RetryContext) -> Result<T, E> {
+    async fn do_with_retry(&self, context: &dyn RetryContext) -> Result<T, RetryError> {
         self(context).await
     }
 }

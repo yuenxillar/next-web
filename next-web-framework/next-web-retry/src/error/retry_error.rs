@@ -1,11 +1,21 @@
 use std::error::Error;
 
-
+use crate::error::AnyError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RetryError {
     Custom(String),
-    Default
+    Any(Box<dyn AnyError>),
+    ExhaustedRetryError(WithCauseError),
+    Default(WithCauseError),
+    TerminatedRetryError(WithCauseError),
+    BackOffInterruptedError(WithCauseError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct WithCauseError {
+    pub msg: String,
+    pub cause: Option<Box<dyn AnyError>>,
 }
 
 impl Error for RetryError {

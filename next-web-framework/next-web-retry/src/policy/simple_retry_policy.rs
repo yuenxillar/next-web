@@ -2,8 +2,8 @@ use std::{any::Any, collections::HashMap, sync::Arc};
 
 use crate::{
     classifier::{binary_Error_classifier::BinaryExceptionClassifier, classifier::Classifier},
-    error::{CloneableError, retry_error::RetryError},
-    retry_context::RetryContext,
+    error::{retry_error::RetryError, AnyError},
+    retry_context::{AttributeAccessor, RetryContext},
     retry_policy::RetryPolicy,
 };
 
@@ -101,7 +101,7 @@ impl SimpleRetryPolicy {
         self.max_attempts_supplier = Some(Arc::new(max_attempts_supplier));
     }
 
-    fn retry_for_error(&self, error: &Option<Box<dyn CloneableError>>) -> bool {
+    fn retry_for_error(&self, error: &Option<Box<dyn AnyError>>) -> bool {
         match error {
             Some(e) => self.recoverable_classifier.classify(e),
             None => false,
@@ -136,7 +136,7 @@ impl RetryPolicy for SimpleRetryPolicy {
     fn register_error(
         &mut self,
         context: &mut dyn RetryContext,
-        error: Option<&dyn CloneableError>,
+        error: Option<&dyn AnyError>,
     ) {
         let ctx: &mut dyn Any = context;
         match ctx.downcast_mut::<SimpleRetryContext>() {
@@ -155,10 +155,12 @@ impl RetryPolicy for SimpleRetryPolicy {
     }
 }
 
+
+#[derive(Clone)]
 struct SimpleRetryContext {
     parent: Option<Arc<dyn RetryContext>>,
     count: u16,
-    last_error: Option<Box<dyn CloneableError>>,
+    last_error: Option<Box<dyn AnyError>>,
     terminate: bool,
 }
 
@@ -175,11 +177,30 @@ impl SimpleRetryContext {
         }
     }
 
-    pub fn register_error(&mut self, error: Option<Box<dyn CloneableError>>) {
+    pub fn register_error(&mut self, error: Option<Box<dyn AnyError>>) {
         if let Some(error) = error {
             self.last_error = Some(error);
             self.count += 1;
         }
+    }
+}
+
+
+impl AttributeAccessor<bool> for  SimpleRetryContext {
+    fn has_attribute(&self, name: &str) -> bool {
+        todo!()
+    }
+
+    fn set_attribute(&mut self, name: &str, value: bool) {
+        todo!()
+    }
+
+    fn remove_attribute(&mut self, name: &str) -> Option<bool> {
+        todo!()
+    }
+
+    fn get_attribute(&self, name: &str) -> Option<& bool> {
+        todo!()
     }
 }
 
@@ -200,7 +221,7 @@ impl RetryContext for SimpleRetryContext {
         self.count
     }
 
-    fn get_last_error(&self) -> Option<Box<dyn CloneableError>> {
+    fn get_last_error(&self) -> Option<Box<dyn AnyError>> {
         self.last_error.as_ref().cloned()
     }
 }

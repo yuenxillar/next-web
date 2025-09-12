@@ -7,6 +7,8 @@ where
     Self: Send + Sync
 {
     fn get(&self, key: &str) -> Option<&dyn  RetryContext>;
+
+    fn get_mut(&self, key: &str) -> Option<&mut dyn  RetryContext>;
     
     fn put(&mut self, key: &str, value: Arc<dyn RetryContext>);
 

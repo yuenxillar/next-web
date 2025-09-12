@@ -2,7 +2,7 @@ use std::any::Any;
 
 use dyn_clone::DynClone;
 
-use crate::error::CloneableError;
+use crate::error::AnyError;
 
 pub mod retry_context_constants {
     pub const NAME: &str = "context.name";
@@ -27,7 +27,7 @@ where
 
     fn get_retry_count(&self) -> u16;
 
-    fn get_last_error(&self) -> Option<Box<dyn CloneableError>>;
+    fn get_last_error(&self) -> Option<Box<dyn AnyError>>;
 }
 
 dyn_clone::clone_trait_object!(RetryContext);
@@ -39,4 +39,8 @@ where
     fn has_attribute(&self, name: &str) -> bool;
 
     fn set_attribute(&mut self, name: &str, value: V);
+
+    fn remove_attribute(&mut self, name: &str) -> Option<V>;
+
+    fn get_attribute(&self, name: &str) -> Option<& V>;
 }

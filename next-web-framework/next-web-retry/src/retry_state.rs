@@ -1,12 +1,12 @@
-use crate::error::CloneableError;
+use crate::error::AnyError;
 
-pub trait RetryState
+pub trait RetryState<K = String>
 where
     Self: Send + Sync,
 {
-    fn get_key(&self) -> Option<&str>;
+    fn get_key(&self) -> Option<& K>;
 
     fn is_force_refresh(&self) -> bool;
 
-    fn rollback_for(&self, error: &dyn CloneableError) -> bool;
+    fn rollback_for(&self, error: &dyn AnyError) -> bool;
 }
