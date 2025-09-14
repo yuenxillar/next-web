@@ -323,8 +323,7 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                                     ))
                                 }
                             };
-                            let singleton_name =
-                                super::util::singleton_name(&ident.to_string());
+                            let singleton_name = super::util::singleton_name(&ident.to_string());
 
                             Expr::Lit(syn::PatLit {
                                 attrs: Default::default(),
@@ -572,10 +571,10 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                     .into_token_stream();
                 let resolve = match color {
                     Color::Async => parse_quote! {
-                        let #ident: HashMap<String, #ty>  = HashMap::from_iter(cx.resolve_by_type_async::<#ty>().await.into_iter().map(|v| (v.singleton_name(), v)));
+                        let #ident: ::std::collections::HashMap<String, #ty>  = ::std::collections::HashMap::from_iter(cx.resolve_by_type_async::<#ty>().await.into_iter().map(|v| (v.singleton_name(), v)));
                     },
                     Color::Sync => parse_quote! {
-                        let #ident: HashMap<String, #ty>  = HashMap::from_iter(cx.resolve_by_type::<#ty>().into_iter().map(|v| (v.singleton_name(), v)));
+                        let #ident: ::std::collections::HashMap<String, #ty>  = ::std::collections::HashMap::from_iter(cx.resolve_by_type::<#ty>().into_iter().map(|v| (v.singleton_name(), v)));
                     },
                 };
 

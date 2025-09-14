@@ -3,13 +3,15 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+use next_web_core::DynClone;
+
 pub mod back_off_interrupted_error;
 pub mod retry_error;
 
 pub trait AnyError
 where
     Self: Send + Sync,
-    Self: std::error::Error + dyn_clone::DynClone,
+    Self: std::error::Error + DynClone,
 {
     fn to_boxed(&self) -> Box<dyn AnyError>;
 
@@ -66,4 +68,4 @@ impl Hash for Box<dyn AnyError> {
     }
 }
 
-dyn_clone::clone_trait_object!(AnyError where Self: Send + Sync);
+next_web_core::clone_trait_object!(AnyError where Self: Send + Sync);

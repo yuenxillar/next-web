@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use crate::{policy::retry_context_cache::RetryContextCache, retry_context::RetryContext};
-
 
 #[derive(Clone)]
 pub struct MapRetryContextCache {
@@ -21,7 +18,11 @@ impl RetryContextCache for MapRetryContextCache {
         todo!()
     }
 
-    fn put(&mut self, key: &str, value: Arc<dyn RetryContext>) {
+    fn get_mut(&self, key: &str) -> Option<&mut dyn  RetryContext> {
+        None
+    }
+
+    fn put(&mut self, key: &str, value: Box<dyn RetryContext>) {
         todo!()
     }
 

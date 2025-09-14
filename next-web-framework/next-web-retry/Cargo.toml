@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-async-trait = { workspace = true }
+next-web-core = { workspace = true }
 serde = { workspace = true }
-dyn-clone = { workspace = true }
 tokio = { workspace = true, features = ["sync"]}
 tracing = { workspace = true }

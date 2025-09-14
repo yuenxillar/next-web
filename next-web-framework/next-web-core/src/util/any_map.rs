@@ -121,7 +121,7 @@ impl AnyMap {
 /// 缓存值类型枚举
 ///
 /// Cache value type enum
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum AnyValue {
     String(String),
     Number(i64),
@@ -129,6 +129,7 @@ pub enum AnyValue {
     Float(f32),
     Array(Vec<AnyValue>),
     Object(Box<dyn AnyClone>),
+    #[default]
     Null,
 }
 
@@ -336,6 +337,12 @@ impl Into<AnyValue> for i64 {
 }
 
 impl Into<AnyValue> for u32 {
+    fn into(self) -> AnyValue {
+        AnyValue::Number(self as i64)
+    }
+}
+
+impl Into<AnyValue> for u16 {
     fn into(self) -> AnyValue {
         AnyValue::Number(self as i64)
     }

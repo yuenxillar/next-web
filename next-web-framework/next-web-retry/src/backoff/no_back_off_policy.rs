@@ -1,13 +1,20 @@
 use crate::{
     backoff::{back_off_context::BackOffContext, back_off_policy::BackOffPolicy},
-    error::{back_off_interrupted_error::BackOffInterruptedError, retry_error::RetryError},
+    error::retry_error::RetryError,
     retry_context::RetryContext,
 };
 
 pub struct NoBackOffPolicy {}
 
+
+impl NoBackOffPolicy {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl BackOffPolicy for NoBackOffPolicy {
-    fn start(&self, _context: &dyn RetryContext) -> Option<std::sync::Arc<dyn BackOffContext>> {
+    fn start(&self, _context: &dyn RetryContext) -> Option<&dyn BackOffContext> {
         None
     }
 

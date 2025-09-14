@@ -55,7 +55,7 @@ impl RabbitmqService {
 
     async fn build_channel(
         options: &RabbitMQClientProperties,
-        binds: &Vec<BindExchange>,
+        binds: &[BindExchange],
     ) -> Channel {
         // open a connection to RabbitMQ server
         let mut properties = OpenConnectionArguments::new(

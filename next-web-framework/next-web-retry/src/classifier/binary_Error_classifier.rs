@@ -3,16 +3,16 @@ use std::collections::HashMap;
 use crate::{classifier::classifier::Classifier, error::retry_error::RetryError};
 
 #[derive(Clone)]
-pub struct BinaryExceptionClassifier<T = RetryError, C = bool> {
+pub struct BinaryErrorClassifier<T = RetryError, C = bool> {
     traverse_causes: bool,
     default_value: Option<C>,
     classified: HashMap<T, C>,
 }
 
-impl BinaryExceptionClassifier {
+impl BinaryErrorClassifier {
     pub fn default_classifier() -> Self {
         let mut map: HashMap<RetryError, bool> = Default::default();
-        map.insert(RetryError::Default, true);
+        map.insert(RetryError::Custom("TODO".to_string()), true);
         Self::with_retryable_errors_and_default_value(map, false)
     }
 
@@ -44,9 +44,8 @@ impl BinaryExceptionClassifier {
     }
 }
 
-
-impl<T, C> Classifier<T, C> for BinaryExceptionClassifier {
-    fn classify(&self, classifiable: &C ) -> T {
+impl<T, C> Classifier<T, C> for BinaryErrorClassifier {
+    fn classify(&self, classifiable: &C) -> T {
         todo!()
     }
 }

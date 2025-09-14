@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use dyn_clone::DynClone;
+use next_web_core::{util::any_map::AnyValue, DynClone};
 
 use crate::error::AnyError;
 
@@ -17,7 +17,7 @@ pub trait RetryContext
 where
     Self: Send + Sync,
     Self: Any,
-    Self: AttributeAccessor<bool> + DynClone,
+    Self: AttributeAccessor + DynClone,
 {
     fn set_exhausted_only(&mut self);
 
@@ -30,17 +30,17 @@ where
     fn get_last_error(&self) -> Option<Box<dyn AnyError>>;
 }
 
-dyn_clone::clone_trait_object!(RetryContext);
+next_web_core::clone_trait_object!(RetryContext);
 
-pub trait AttributeAccessor<V>
+pub trait AttributeAccessor
 where
     Self: Send + Sync,
 {
     fn has_attribute(&self, name: &str) -> bool;
 
-    fn set_attribute(&mut self, name: &str, value: V);
+    fn set_attribute(&mut self, name: &str, value: AnyValue);
 
-    fn remove_attribute(&mut self, name: &str) -> Option<V>;
+    fn remove_attribute(&mut self, name: &str) -> Option<AnyValue>;
 
-    fn get_attribute(&self, name: &str) -> Option<& V>;
+    fn get_attribute(&self, name: &str) -> Option<& AnyValue>;
 }

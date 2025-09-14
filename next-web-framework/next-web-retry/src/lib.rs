@@ -1,3 +1,4 @@
+pub mod context;
 pub mod classifier;
 pub mod error;
 pub mod recovery_callback;
@@ -10,3 +11,10 @@ pub mod retry_callback;
 pub mod retry_operations;
 pub mod support;
 pub mod policy;
+
+
+pub trait Predicate<T>
+where Self: Send + Sync
+ {
+    
+}

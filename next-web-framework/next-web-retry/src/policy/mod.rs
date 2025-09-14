@@ -1,3 +1,9 @@
+pub mod binary_error_classifier_retry_policy;
+pub mod predicate_retry_policy;
+pub mod composite_retry_policy;
+pub mod always_retry_policy;
+pub mod timeout_retry_policy;
+pub mod max_attempts_retry_policy;
 pub mod map_retry_context_cache;
 pub mod simple_retry_policy;
 pub mod retry_context_cache;
