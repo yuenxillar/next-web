@@ -93,5 +93,12 @@ impl Default for ApplicationStore {
 
 #[tokio::main]
 async fn main() {
+
+    {
+        let mut s = String::new();
+        let s_ref = &s;
+
+        println!("ref: {}", s_ref)
+    }
     TestApplication::run().await;
 }

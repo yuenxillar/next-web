@@ -15,7 +15,7 @@ impl<F, Fut, T> RetryCallback<T> for F
 where
     F: Send + Sync,
     F: Fn(&dyn RetryContext) -> Fut,
-    Fut: Future<Output = Result<T, RetryError>> + Send + Sync,
+    Fut: Future<Output = Result<T, RetryError>> + Send,
 {
     async fn do_with_retry(&self, context: &dyn RetryContext) -> Result<T, RetryError> {
         self(context).await

@@ -9,23 +9,23 @@ pub trait RetryOperations<T>
 where
     Self: Send + Sync,
 {
-    async fn execute(&mut self, retry_callback: &dyn RetryCallback<T>) -> Result<T, RetryError>;
+    async fn execute(&mut self, retry_callback:  impl RetryCallback<T>) -> Result<T, RetryError>;
 
     async fn execute_with_recovery(
         &mut self,
-        retry_callback: &dyn RetryCallback<T>,
+        retry_callback: impl RetryCallback<T>,
         recovery_callback: &dyn RecoveryCallback<T>,
     ) -> Result<T, RetryError>;
 
     async fn execute_with_state(
         &mut self,
-        retry_callback: &dyn RetryCallback<T>,
+        retry_callback: impl  RetryCallback<T>,
         state: &dyn RetryState,
     ) -> Result<T, RetryError>;
 
     async fn execute_with_all(
         &mut self,
-        retry_callback: &dyn RetryCallback<T>,
+        retry_callback: impl RetryCallback<T>,
         recovery_callback: &dyn RecoveryCallback<T>,
         state: &dyn RetryState,
     ) -> Result<T, RetryError>;

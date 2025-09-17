@@ -2,7 +2,7 @@ use std::{any::Any, sync::Arc, time::Duration};
 
 use crate::{
     backoff::{
-        back_off_context::BackOffContext, back_off_policy::BackOffPolicy, fixed_back_off_policy::FixedBackOffPolicy, no_back_off_policy::NoBackOffPolicy, uniform_random_back_off_policy::UniformRandomBackOffPolicy
+        back_off_context::BackOffContext, back_off_policy::BackOffPolicy, exponential_back_off_policy::ExponentialBackOffPolicy,  fixed_back_off_policy::FixedBackOffPolicy, no_back_off_policy::NoBackOffPolicy, uniform_random_back_off_policy::UniformRandomBackOffPolicy
     }, classifier::{binary_error_classifier::BinaryErrorClassifier, binary_error_classifier_builder::BinaryErrorClassifierBuilder}, error::{
         retry_error::{RetryError, WithCauseError}, AnyError
     }, policy::{
@@ -40,9 +40,9 @@ impl RetryTemplate {
     }
 
     // 2.0.5
-    pub async fn do_execute<T>(
+    async fn do_execute<T>(
         &mut self,
-        retry_callback: &dyn RetryCallback<T>,
+        retry_callback: impl RetryCallback<T>,
         recovery_callback: Option<&dyn RecoveryCallback<T>>,
         state: Option<&dyn RetryState>,
     ) -> Result<T, RetryError> 
@@ -64,7 +64,7 @@ impl RetryTemplate {
 
         let block = async {
             // Give clients a chance to enhance the context...
-            let running = self.do_open_interceptors(retry_callback, context.as_ref());
+            let running = self.do_open_interceptors(context.as_ref());
 
             if !running {
                 return Err(RetryError::TerminatedRetryError(WithCauseError {
@@ -115,7 +115,7 @@ impl RetryTemplate {
                 let result = retry_callback.do_with_retry(context.as_ref()).await;
                 match result {
                     Ok(result) => {
-                        self.do_on_success_interceptors(retry_callback, context.as_ref(), &result);
+                        self.do_on_success_interceptors(context.as_ref(), &result);
                         return Ok(result);
                     }
                     Err(error) => {
@@ -134,7 +134,7 @@ impl RetryTemplate {
                                     }
                                 ))
                         };
-                        self.do_on_error_interceptors(retry_callback, context.as_ref(), &error);
+                        self.do_on_error_interceptors(  context.as_ref(), &error);
 
                         match e {
                             Some(error) => return Err(error),
@@ -205,7 +205,7 @@ impl RetryTemplate {
             last_error.is_none() || exhausted,
         )
         .await;
-        self.do_close_interceptors(retry_callback, context.as_ref(), last_error.as_deref());
+        self.do_close_interceptors(context.as_ref(), last_error.as_deref());
 
         result
     }
@@ -233,11 +233,11 @@ impl RetryTemplate {
         self.listeners.len() > 0
     }
 
-    pub fn can_retry(&self, retry_policy: &dyn RetryPolicy, context: &dyn RetryContext) -> bool {
+    fn can_retry(&self, retry_policy: &dyn RetryPolicy, context: &dyn RetryContext) -> bool {
         retry_policy.can_retry(context)
     }
 
-    pub async fn close(
+    async fn close(
         &self,
         retry_policy: &dyn RetryPolicy,
         context: &mut dyn RetryContext,
@@ -264,7 +264,7 @@ impl RetryTemplate {
         }
     }
 
-    pub async fn register_error(
+    async fn register_error(
         &self,
         retry_policy: &dyn RetryPolicy,
         state: Option<&dyn RetryState>,
@@ -278,7 +278,7 @@ impl RetryTemplate {
         Ok(())
     }
 
-    pub async fn register_context(
+    async fn register_context(
         &self,
         context: impl Into<Box<dyn RetryContext>>,
         state: Option<&dyn RetryState>,
@@ -306,7 +306,7 @@ impl RetryTemplate {
         }
     }
 
-    pub async fn open(
+    async fn open(
         &self,
         retry_policy: &dyn RetryPolicy,
         state: Option<&dyn RetryState>,
@@ -358,7 +358,7 @@ impl RetryTemplate {
         }
     }
 
-    pub async fn do_open_internal(
+    async fn do_open_internal(
         &self,
         retry_policy: &dyn RetryPolicy,
         state: Option<&dyn RetryState>,
@@ -381,14 +381,14 @@ impl RetryTemplate {
         return context;
     }
 
-    pub async fn do_open_internal_with_retry_policy(
+    async fn do_open_internal_with_retry_policy(
         &self,
         retry_policy: &dyn RetryPolicy,
     ) -> Box<dyn RetryContext> {
         self.do_open_internal(retry_policy, None).await
     }
 
-    pub async fn handle_retry_exhausted<T>(
+    async fn handle_retry_exhausted<T>(
         &self,
         recovery_callback: Option<&dyn RecoveryCallback<T>>,
         context: &mut dyn RetryContext,
@@ -468,9 +468,8 @@ impl RetryTemplate {
         }
     }
 
-    pub fn do_open_interceptors<T>(
+    fn do_open_interceptors(
         &self,
-        _callback: &dyn RetryCallback<T>,
         context: &dyn RetryContext,
     ) -> bool {
         let mut result = true;
@@ -482,9 +481,8 @@ impl RetryTemplate {
         result
     }
 
-    pub fn do_close_interceptors<T>(
+    fn do_close_interceptors(
         &self,
-        _callback: &dyn RetryCallback<T>,
         context: &dyn RetryContext,
         last_error: Option<&dyn AnyError>,
     ) {
@@ -493,9 +491,8 @@ impl RetryTemplate {
         }
     }
 
-    pub fn do_on_success_interceptors<T>(
+    fn do_on_success_interceptors<T>(
         &self,
-        _callback: &dyn RetryCallback<T>,
         context: &dyn RetryContext,
         result: &T,
     ) 
@@ -506,9 +503,8 @@ impl RetryTemplate {
         }
     }
 
-    pub fn do_on_error_interceptors<T>(
+    fn do_on_error_interceptors(
         &self,
-        _callback: &dyn RetryCallback<T>,
         context: &dyn RetryContext,
         error: &dyn AnyError,
     ) {
@@ -517,12 +513,21 @@ impl RetryTemplate {
         }
     }
 
-    pub fn should_rethrow(
+    #[allow(unused_variables)]
+    fn should_rethrow(
         &self,
         retry_policy: &dyn RetryPolicy,
         context: &dyn RetryContext,
         state: Option<&dyn RetryState>,
     ) -> bool {
+        if let Some(state) = state {
+            let error = match context.get_last_error() {
+                Some(error) => error,
+                None => return false
+            };
+            return state.rollback_for(error.as_ref());
+        }
+
         false
     }
 }
@@ -563,13 +568,13 @@ impl<T> RetryOperations<T> for RetryTemplate
 where T: Send,
 T: 'static
 {
-    async fn execute(&mut self, retry_callback: &dyn RetryCallback<T>) -> Result<T, RetryError> {
+    async fn execute(&mut self, retry_callback: impl RetryCallback<T>) -> Result<T, RetryError> {
         self.do_execute(retry_callback, None, None).await
     }
 
     async fn execute_with_recovery(
         &mut self,
-        retry_callback: &dyn RetryCallback<T>,
+        retry_callback: impl RetryCallback<T>,
         recovery_callback: &dyn RecoveryCallback<T>,
     ) -> Result<T, RetryError> {
         self.do_execute(retry_callback, Some(recovery_callback), None)
@@ -578,7 +583,7 @@ T: 'static
 
     async fn execute_with_state(
         &mut self,
-        retry_callback: &dyn RetryCallback<T>,
+        retry_callback: impl  RetryCallback<T>,
         state: &dyn RetryState,
     ) -> Result<T, RetryError> {
         self.do_execute(retry_callback, None, Some(state)).await
@@ -586,7 +591,7 @@ T: 'static
 
     async fn execute_with_all(
         &mut self,
-        retry_callback: &dyn RetryCallback<T>,
+        retry_callback: impl  RetryCallback<T>,
         recovery_callback: &dyn RecoveryCallback<T>,
         state: &dyn RetryState,
     ) -> Result<T, RetryError> {
@@ -636,12 +641,17 @@ impl RetryTemplateBuilder {
         self
     }
 
-    pub fn exponential_backoff(mut self,initial_interval:u64, multiplier: f32, max_interval: u64) -> Self {
+    pub fn exponential_backoff(mut self,initial_interval:u64, multiplier: f32, max_interval : u64, with_random: bool) -> Self {
         assert!(self.back_off_policy.is_none(), "You have already selected backoff policy");
         assert!(initial_interval >= 1, "Initial interval should be >= 1");
         assert!(multiplier > 1.0, "Multiplier should be > 1");
         assert!(max_interval > initial_interval, "Max interval should be > than initial interval");
+        let mut policy = if with_random { ExponentialBackOffPolicy::with_random() } else { ExponentialBackOffPolicy::default() };
 
+        policy.set_initial_interval(initial_interval);
+		policy.set_multiplier(multiplier);
+		policy.set_max_interval(max_interval);
+		self.back_off_policy = Some(Arc::new(policy));
 
         self
     }
@@ -683,15 +693,44 @@ impl RetryTemplateBuilder {
     }
 
     pub fn retry_on(mut self, error: RetryError) -> Self {
+
+        self.classifier_builder.as_mut().map(|bin| 
+            bin.retry_on(Some(error)));
+        self
+    }
+
+     pub fn retry_on_all(mut self, errors: impl IntoIterator<Item=RetryError>) -> Self {
+         self._classifier_builder().map(|bin| {
+            errors.into_iter().for_each(|error| bin.retry_on(Some(error)));
+        });
         self
     }
 
     pub fn not_retry_on(mut self, error: RetryError) -> Self {
+        self.classifier_builder.as_mut().map(|bin| 
+            bin.no_retry_on(Some(error)));
         self
     }
 
-    pub fn traversing_causes(mut self) -> Self {
+
+     pub fn not_retry_on_all(mut self, errors: impl IntoIterator<Item=RetryError>) -> Self {
+        self._classifier_builder().map(|bin| {
+            errors.into_iter().for_each(|error| bin.no_retry_on(Some(error)));
+        });
         self
+    }
+
+
+    pub fn traversing_causes(mut self) -> Self {
+        self._classifier_builder().as_mut().map(|x| x.traverse_causes = true);
+        self
+    }
+
+    fn _classifier_builder(&mut self)  -> Option<&mut BinaryErrorClassifierBuilder>{
+        if self.classifier_builder.is_none() {
+            self.classifier_builder = Some(BinaryErrorClassifierBuilder::default());
+        }
+        self.classifier_builder.as_mut()
     }
 
     pub fn with_listener(mut self, listner: impl RetryListener + 'static) -> Self {
@@ -741,7 +780,12 @@ impl RetryTemplateBuilder {
         let mut final_policy = CompositeRetryPolicy::new();
 
 
-        final_policy.set_policies(vec![self.base_retry_policy.map(|v| v.clone()).unwrap(), exception_retry_policy.unwrap()]);
+
+        let polices = vec![
+            self.base_retry_policy.map(|v| v.clone()).expect("Base retry policy is not set") , 
+            exception_retry_policy.expect("Exception retry policy is not set")
+        ];
+        final_policy.set_policies(polices);
 		retry_template.set_retry_policy(final_policy);
 
 
@@ -754,7 +798,7 @@ impl RetryTemplateBuilder {
             &mut self.back_off_policy,
             None
         );
-        retry_template.back_off_policy = back_off_policy.unwrap();
+        retry_template.back_off_policy = back_off_policy.expect("Backoff policy is not set");
 
         // Listeners
        if let Some(listeners) = self.listeners {
@@ -768,5 +812,19 @@ impl RetryTemplateBuilder {
 impl Default for RetryTemplate {
     fn default() -> Self {
         RetryTemplateBuilder::default().build()
+    }
+}
+
+
+mod test { 
+
+    use super::*;
+
+    #[test]
+    fn test_retry_template_builder() {
+        let retry_template = RetryTemplate::builder()
+        .max_attempts(2)
+        .fixed_backoff(1000)
+        .build();
     }
 }

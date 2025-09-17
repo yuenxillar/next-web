@@ -2,7 +2,11 @@ use std::any::Any;
 
 use next_web_core::{convert::into_box::IntoBox, util::time::LocalTime};
 
-use crate::{context::retry_context_support::RetryContextSupport, retry_context::{AttributeAccessor, RetryContext}, retry_policy::RetryPolicy};
+use crate::{
+    context::retry_context_support::RetryContextSupport,
+    retry_context::{AttributeAccessor, RetryContext},
+    retry_policy::RetryPolicy,
+};
 
 #[derive(Clone)]
 pub struct TimeoutRetryPolicy {
@@ -21,7 +25,6 @@ impl TimeoutRetryPolicy {
     pub fn set_timeout(&mut self, timeout: u64) {
         self.timeout = timeout;
     }
-
 }
 
 impl Default for TimeoutRetryPolicy {
@@ -35,14 +38,11 @@ impl RetryPolicy for TimeoutRetryPolicy {
         let any: &dyn Any = context;
         match any.downcast_ref::<TimeoutRetryContext>() {
             Some(context) => context.is_alive(),
-            None => false
+            None => false,
         }
     }
 
-    fn open(
-        &self,
-        context: Option<&dyn RetryContext>,
-    ) -> Box<dyn RetryContext> {
+    fn open(&self, context: Option<&dyn RetryContext>) -> Box<dyn RetryContext> {
         TimeoutRetryContext::new(self.timeout).into_boxed()
     }
 
@@ -61,26 +61,23 @@ impl RetryPolicy for TimeoutRetryPolicy {
     }
 }
 
-
 #[derive(Clone)]
 struct TimeoutRetryContext {
     timeout: u64,
-    start: u64
+    start: u64,
 }
 
 impl TimeoutRetryContext {
-
     pub fn new(timeout: u64) -> Self {
         Self {
             start: LocalTime::timestamp(),
-            timeout
+            timeout,
         }
     }
     fn is_alive(&self) -> bool {
         (LocalTime::timestamp() - self.start) <= self.timeout
     }
 }
-
 
 impl AttributeAccessor for TimeoutRetryContext {
     fn has_attribute(&self, name: &str) -> bool {
@@ -95,7 +92,7 @@ impl AttributeAccessor for TimeoutRetryContext {
         todo!()
     }
 
-    fn get_attribute(&self, name: &str) -> Option<& next_web_core::util::any_map::AnyValue> {
+    fn get_attribute(&self, name: &str) -> Option<&next_web_core::util::any_map::AnyValue> {
         todo!()
     }
 }

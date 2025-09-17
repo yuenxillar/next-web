@@ -28,6 +28,14 @@ impl BinaryErrorClassifier {
         }
     }
 
+    pub fn with_default_value(default_value: bool) -> Self {
+        Self {
+            traverse_causes: false,
+            default_value: Some(default_value),
+            classified: HashMap::new()
+        }
+    }
+
     pub fn with_retryable_errors_and_default_value(
         type_map: HashMap<RetryError, bool>,
         default_value: bool,
@@ -39,8 +47,23 @@ impl BinaryErrorClassifier {
         }
     }
 
+    pub fn with_retryable_errors_collects_and_default_value(
+        errors: impl IntoIterator<Item = RetryError>,
+        default_value: bool,
+    ) -> Self {
+        let mut classifier = Self::with_default_value(default_value);
+        let items = errors.into_iter();
+        classifier.set_type_map(items.map(|key| (key,default_value )).collect::<HashMap<_, _>>());
+
+        classifier
+    }
+
     pub fn set_traverse_causes(&mut self, traverse_causes: bool) {
         self.traverse_causes = traverse_causes;
+    }
+
+    pub fn set_type_map(&mut self, type_map: HashMap<RetryError, bool>) {
+        self.classified = type_map;
     }
 }
 
