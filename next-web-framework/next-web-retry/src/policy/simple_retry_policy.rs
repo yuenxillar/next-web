@@ -1,11 +1,11 @@
-use std::{any::Any, collections::HashMap, sync::Arc};
+use std::{any::Any, collections::HashMap, sync::{atomic::{AtomicBool, AtomicU16, Ordering}, Arc}};
 
 use next_web_core::util::any_map::AnyValue;
 
 use crate::{
     classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier},
     error::{AnyError, retry_error::RetryError},
-    retry_context::{AttributeAccessor, RetryContext},
+    retry_context::{SyncAttributeAccessor, RetryContext},
     retry_policy::RetryPolicy,
 };
 
@@ -99,11 +99,8 @@ impl SimpleRetryPolicy {
         self.max_attempts_supplier = Some(Arc::new(max_attempts_supplier));
     }
 
-    fn retry_for_error(&self, error: &Option<Box<dyn AnyError>>) -> bool {
-        match error {
-            Some(e) => self.recoverable_classifier.classify(e),
-            None => false,
-        }
+    fn retry_for_error(&self, error: Option<&RetryError>) -> bool {
+        self.recoverable_classifier.classify(error)
     }
 }
 
@@ -116,7 +113,7 @@ impl Default for SimpleRetryPolicy {
 impl RetryPolicy for SimpleRetryPolicy {
     fn can_retry(&self, context: &dyn RetryContext) -> bool {
         let error = context.get_last_error();
-        if (error.is_none() || self.retry_for_error(&error))
+        if (error.is_none() || self.retry_for_error(error.as_ref()))
             && context.get_retry_count() < self.get_max_attempts()
         {
             false
@@ -125,20 +122,15 @@ impl RetryPolicy for SimpleRetryPolicy {
         }
     }
 
-    fn open(&self, parent: Option<&dyn RetryContext>) -> Box<dyn RetryContext> {
-        return Box::new(SimpleRetryContext {
-            parent: None,
-            count: 0,
-            last_error: None,
-            terminate: false,
-        });
+    fn open(&self, parent: Option<&dyn RetryContext>) -> Arc<dyn RetryContext> {
+        return Arc::new(SimpleRetryContext::default());
     }
 
     fn close(&self, _context: &dyn RetryContext) {}
 
-    fn register_error(&self, context: &mut dyn RetryContext, error: Option<&dyn AnyError>) {
-        let ctx: &mut dyn Any = context;
-        match ctx.downcast_mut::<SimpleRetryContext>() {
+    fn register_error(&self, context: &dyn RetryContext, error: Option<&dyn AnyError>) {
+        let ctx: & dyn Any = context;
+        match ctx.downcast_ref::<SimpleRetryContext>() {
             Some(simple_context) => {
                 simple_context.register_error(error.map(|s| s.to_boxed()));
             }
@@ -157,9 +149,9 @@ impl RetryPolicy for SimpleRetryPolicy {
 #[derive(Clone)]
 struct SimpleRetryContext {
     pub(crate) parent: Option<Arc<dyn RetryContext>>,
-    count: u16,
-    last_error: Option<Box<dyn AnyError>>,
-    terminate: bool,
+    count: Arc<AtomicU16>,
+    last_error: Option<RetryError>,
+    terminate: Arc<AtomicBool>,
 }
 
 impl SimpleRetryContext {
@@ -169,45 +161,58 @@ impl SimpleRetryContext {
     {
         Self {
             parent: Some(Arc::new(context)),
-            count: 0,
+            count: Arc::new(AtomicU16::new(0)),
             last_error: None,
-            terminate: false,
+            terminate: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    pub fn register_error(&mut self, error: Option<Box<dyn AnyError>>) {
+    pub fn register_error(&self, error: Option<Box<dyn AnyError>>) {
         if let Some(error) = error {
-            self.last_error = Some(error);
-            self.count += 1;
+            // TODO
+            // self.last_error.replace(Some(RetryError::Any(error)));
+            self.count.store(self.count.load(Ordering::Relaxed), Ordering::Relaxed);
         }
     }
 }
 
-impl AttributeAccessor for SimpleRetryContext { 
+impl Default for SimpleRetryContext {
+    fn default() -> Self {
+        Self {
+            parent: None,
+            count: Arc::new(AtomicU16::new(0)),
+            last_error: None,
+            terminate: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+
+impl SyncAttributeAccessor for SimpleRetryContext { 
     fn has_attribute(&self, name: &str) -> bool {
         todo!()
     }
 
-    fn set_attribute(&mut self, name: &str, value: AnyValue) {
+    fn set_attribute(&self, name: &str, value: AnyValue) {
         todo!()
     }
 
-    fn remove_attribute(&mut self, name: &str) -> Option<AnyValue> {
+    fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
         todo!()
     }
 
-    fn get_attribute(&self, name: &str) -> Option<&AnyValue> {
+    fn get_attribute(&self, name: &str) -> Option<& AnyValue> {
         todo!()
     }
 }
 
 impl RetryContext for SimpleRetryContext {
     fn set_exhausted_only(&mut self) {
-        self.terminate = true;
+        self.terminate.store(true, Ordering::Relaxed);
     }
 
     fn is_exhausted_only(&self) -> bool {
-        self.terminate
+        self.terminate.load(Ordering::Relaxed)
     }
 
     fn get_parent(&self) -> Option<&dyn RetryContext> {
@@ -215,10 +220,10 @@ impl RetryContext for SimpleRetryContext {
     }
 
     fn get_retry_count(&self) -> u16 {
-        self.count
+        self.count.load(Ordering::Relaxed)
     }
 
-    fn get_last_error(&self) -> Option<Box<dyn AnyError>> {
-        self.last_error.as_ref().cloned()
+    fn get_last_error(&self) -> Option<RetryError> {
+        self.last_error.clone()
     }
 }

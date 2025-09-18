@@ -25,7 +25,7 @@ impl RetryPolicy for PredicateRetryPolicy {
     fn open(
         &self,
         context: Option<&dyn crate::retry_context::RetryContext>,
-    ) -> Box<dyn crate::retry_context::RetryContext> {
+    ) -> Arc<dyn crate::retry_context::RetryContext> {
         todo!()
     }
 
@@ -35,7 +35,7 @@ impl RetryPolicy for PredicateRetryPolicy {
 
     fn register_error(
         &self,
-        context: &mut dyn crate::retry_context::RetryContext,
+        context: &dyn crate::retry_context::RetryContext,
         error: Option<&dyn crate::error::AnyError>,
     ) {
         todo!()

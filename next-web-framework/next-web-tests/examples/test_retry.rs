@@ -1,6 +1,7 @@
+use next_web_core::util::any_map::AnyValue;
 use next_web_dev::util::local_date_time::LocalDateTime;
 use next_web_macros::Retry;
-use next_web_retry::{retry_operations::RetryOperations, support::retry_template::RetryTemplate};
+use next_web_retry::{error::retry_error::RetryError, retry_context::RetryContext, retry_operations::RetryOperations, support::retry_template::RetryTemplate};
 
 #[derive(Debug)]
 enum TestMatch {
@@ -25,23 +26,27 @@ fn backoff_test(error: &TestMatch) {
     println!("function test_retry backoff: {:?}", error);
 }
 
-
 #[tokio::main]
 async fn main() {
     // test retry
-    if let Err(e) = test_retry() {
-        println!("error: {:?}", e);
-    }
+    // if let Err(e) = test_retry() {
+    //     println!("error: {:?}", e);
+    // }
 
-    let s = String::from("hello");
+    let result = RetryTemplate::builder()
+        .build()
+        .execute(|mut ctx: Box<dyn RetryContext>| async move {
 
-    let func = |ctx| {
-        async {
-            println!("s:{}", s.clone());
+            let retry_count = ctx.as_ref().get_attribute("retryCount");
+            let value = retry_count.map(|s| s.as_number().unwrap()).unwrap();
+            println!("value: {}", value);
+            
+            if  value < 3 {
+                ctx.as_mut().set_attribute("retryCount", AnyValue::Number(value + 1));
+                return Err(RetryError::Custom(String::from("test")));
+            }
             Ok(132)
-        }
-    };
-    let result = RetryTemplate::builder().build()
-    .execute(func).await;
+        })
+        .await;
     println!("result: {:?}", result);
 }

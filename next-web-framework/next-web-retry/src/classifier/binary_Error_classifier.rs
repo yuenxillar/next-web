@@ -67,8 +67,8 @@ impl BinaryErrorClassifier {
     }
 }
 
-impl<T, C> Classifier<T, C> for BinaryErrorClassifier {
-    fn classify(&self, classifiable: &C) -> T {
+impl Classifier<RetryError, bool> for BinaryErrorClassifier {
+    fn classify(&self, classifiable: Option<&RetryError>) -> bool {
         todo!()
     }
 }

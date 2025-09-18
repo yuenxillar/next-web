@@ -12,6 +12,15 @@ pub enum RetryError {
     BackOffInterruptedError(WithCauseError),
 }
 
+
+impl RetryError {
+    pub fn as_any_error(self) -> Option<Box<dyn AnyError>> {
+        match self {
+            RetryError::Any(any_error) => Some(any_error),
+            _ => None,
+        }
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WithCauseError {
     pub msg: String,

@@ -25,16 +25,6 @@ pub struct RetryTemplate {
 impl RetryTemplate {
     const GLOBAL_STATE: &str = "state.global";
 
-    fn _default() -> Self {
-        Self {
-            back_off_policy: Arc::new(NoBackOffPolicy::default()),
-            retry_policy: Box::new(SimpleRetryPolicy::with_max_attempts(3)),
-            listeners: vec![Arc::new(DefaultRetryListener {})],
-            retry_context_cache: Arc::new(RwLock::new(MapRetryContextCache::new())),
-            last_error_on_exhausted: false,
-        }
-    }
-
     pub fn builder() -> RetryTemplateBuilder {
         RetryTemplateBuilder::default()
     }
@@ -108,11 +98,12 @@ impl RetryTemplate {
              * recovery in handleRetryExhausted without the callback processing (which
              * would throw an exception).
              */
-            while self.can_retry(self.retry_policy.as_ref(), context.as_ref()) && context.is_exhausted_only() {
+            while self.can_retry(self.retry_policy.as_ref(), context.as_ref()) && !context.is_exhausted_only() {
                 // Reset the last exception, so if we are successful
                 // the close interceptors will not think we failed...
                 last_error = None;
-                let result = retry_callback.do_with_retry(context.as_ref()).await;
+                println!("6666");
+                let result = retry_callback.do_with_retry(context.clone()).await;
                 match result {
                     Ok(result) => {
                         self.do_on_success_interceptors(context.as_ref(), &result);
@@ -174,13 +165,14 @@ impl RetryTemplate {
                  * but if we get this far in a stateful retry there's a reason for it,
                  * like a circuit breaker or a rollback classifier.
                  */
-                exhausted = true;
-                return self
-                    .handle_retry_exhausted(recovery_callback, context.as_mut(), state)
-                    .await;
+                
             }
 
-            Err(RetryError::Custom("()".to_string()))
+            exhausted = true;
+                return self
+                    .handle_retry_exhausted(recovery_callback, context.as_ref(), state)
+                    .await;
+            // Err(RetryError::Custom("Not executed, it should be a condition mismatch".to_string()))
         };
 
         let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block)) {
@@ -200,7 +192,7 @@ impl RetryTemplate {
         // end
         self.close(
             self.retry_policy.as_ref(),
-            context.as_mut(),
+            context.as_ref(),
             state,
             last_error.is_none() || exhausted,
         )
@@ -240,7 +232,7 @@ impl RetryTemplate {
     async fn close(
         &self,
         retry_policy: &dyn RetryPolicy,
-        context: &mut dyn RetryContext,
+        context: &dyn RetryContext,
         state: Option<&dyn RetryState>,
         succeeded: bool,
     ) {
@@ -268,11 +260,11 @@ impl RetryTemplate {
         &self,
         retry_policy: &dyn RetryPolicy,
         state: Option<&dyn RetryState>,
-        context: impl Into<Box<dyn RetryContext>>,
+        context: impl Into<Arc<dyn RetryContext>>,
         error: Option<&dyn AnyError>,
     ) -> Result<(), RetryError> {
-        let mut context = context.into();
-        retry_policy.register_error(context.as_mut(), error);
+        let context = context.into();
+        retry_policy.register_error(context.as_ref(), error);
         self.register_context(context, state).await?;
 
         Ok(())
@@ -280,7 +272,7 @@ impl RetryTemplate {
 
     async fn register_context(
         &self,
-        context: impl Into<Box<dyn RetryContext>>,
+        context: impl Into<Arc<dyn RetryContext>>,
         state: Option<&dyn RetryState>,
     ) -> Result<(), RetryError> {
         let context = context.into();
@@ -310,7 +302,7 @@ impl RetryTemplate {
         &self,
         retry_policy: &dyn RetryPolicy,
         state: Option<&dyn RetryState>,
-    ) -> Result<Box<dyn RetryContext>, RetryError> {
+    ) -> Result<Arc<dyn RetryContext>, RetryError> {
         if state.is_none() {
             return Ok(self.do_open_internal_with_retry_policy(retry_policy).await);
         }
@@ -362,8 +354,8 @@ impl RetryTemplate {
         &self,
         retry_policy: &dyn RetryPolicy,
         state: Option<&dyn RetryState>,
-    ) -> Box<dyn RetryContext> {
-        let mut context = retry_policy.open(None);
+    ) -> Arc<dyn RetryContext> {
+        let context = retry_policy.open(None);
         if let Some(state) = state {
             context.set_attribute(
                 retry_context_constants::STATE_KEY,
@@ -384,14 +376,14 @@ impl RetryTemplate {
     async fn do_open_internal_with_retry_policy(
         &self,
         retry_policy: &dyn RetryPolicy,
-    ) -> Box<dyn RetryContext> {
+    ) -> Arc<dyn RetryContext> {
         self.do_open_internal(retry_policy, None).await
     }
 
     async fn handle_retry_exhausted<T>(
         &self,
         recovery_callback: Option<&dyn RecoveryCallback<T>>,
-        context: &mut dyn RetryContext,
+        context: &dyn RetryContext,
         state: Option<&dyn RetryState>,
     ) -> Result<T, RetryError> {
         context.set_attribute(retry_context_constants::EXHAUSTED, AnyValue::Boolean(true));
@@ -445,7 +437,7 @@ impl RetryTemplate {
         }
         Err(RetryError::Default(WithCauseError {
             msg: "Exception in retry".to_string(),
-            cause: context.get_last_error(),
+            cause: context.get_last_error().map(RetryError::as_any_error).unwrap_or_default(),
         }))
     }
 
@@ -454,7 +446,7 @@ impl RetryTemplate {
             return match context.get_last_error() {
                 Some(error) => RetryError::Default(WithCauseError {
                     msg: "RetryError default".to_string(),
-                    cause: Some(error),
+                    cause: error.as_any_error(),
                 }),
                 None => {
                     RetryError::Custom("Retry exhausted with no last error to rethrow".to_string())
@@ -463,7 +455,7 @@ impl RetryTemplate {
         } else {
             RetryError::ExhaustedRetryError(WithCauseError {
                 msg: msg.to_string(),
-                cause: context.get_last_error(),
+                cause: context.get_last_error().map(RetryError::as_any_error).unwrap_or_default(),
             })
         }
     }
@@ -525,7 +517,7 @@ impl RetryTemplate {
                 Some(error) => error,
                 None => return false
             };
-            return state.rollback_for(error.as_ref());
+            return state.rollback_for(error.as_any_error().unwrap().as_ref());
         }
 
         false
@@ -811,7 +803,13 @@ impl RetryTemplateBuilder {
 
 impl Default for RetryTemplate {
     fn default() -> Self {
-        RetryTemplateBuilder::default().build()
+         Self {
+            back_off_policy: Arc::new(NoBackOffPolicy::default()),
+            retry_policy: Box::new(SimpleRetryPolicy::with_max_attempts(3)),
+            listeners: vec![Arc::new(DefaultRetryListener {})],
+            retry_context_cache: Arc::new(RwLock::new(MapRetryContextCache::new())),
+            last_error_on_exhausted: false,
+        }
     }
 }
 

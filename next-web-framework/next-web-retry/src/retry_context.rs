@@ -1,8 +1,9 @@
-use std::any::Any;
+use std::{any::Any, collections::BTreeMap, sync::{atomic::Ordering, Arc, RwLock}};
 
 use next_web_core::{util::any_map::AnyValue, DynClone};
+use tokio::sync::RwLock;
 
-use crate::error::AnyError;
+use crate::error::retry_error::RetryError;
 
 pub mod retry_context_constants {
     pub const NAME: &str = "context.name";
@@ -17,7 +18,7 @@ pub trait RetryContext
 where
     Self: Send + Sync,
     Self: Any,
-    Self: AttributeAccessor + DynClone,
+    Self: SyncAttributeAccessor + DynClone,
 {
     fn set_exhausted_only(&mut self);
 
@@ -27,20 +28,88 @@ where
 
     fn get_retry_count(&self) -> u16;
 
-    fn get_last_error(&self) -> Option<Box<dyn AnyError>>;
+    fn get_last_error(&self) -> Option<RetryError>;
 }
 
 next_web_core::clone_trait_object!(RetryContext);
 
-pub trait AttributeAccessor
+pub trait SyncAttributeAccessor
 where
-    Self: Send + Sync,
+    Self: Send + Sync
 {
     fn has_attribute(&self, name: &str) -> bool;
 
-    fn set_attribute(&mut self, name: &str, value: AnyValue);
+    fn set_attribute(&self, name: &str, value: AnyValue);
 
-    fn remove_attribute(&mut self, name: &str) -> Option<AnyValue>;
+    fn remove_attribute(&self, name: &str) -> Option<AnyValue>;
 
     fn get_attribute(&self, name: &str) -> Option<& AnyValue>;
+}
+
+#[derive(Clone, Default)]
+pub struct AttributeAccessorSupport {
+    attributes: Arc<RwLock<BTreeMap<String, AnyValue>>>,
+}
+
+impl SyncAttributeAccessor for AttributeAccessorSupport {
+    fn has_attribute(&self, name: &str) -> bool {
+      self.attributes.try_read().map(|s| s.contains_key(name)).unwrap_or_default() 
+    }
+
+    fn set_attribute(&self, name: &str, value: AnyValue) {
+        self.attributes.insert(name.to_string(), value);
+    }
+
+    fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
+        self.attributes.remove(name).map(|s| s.1)
+    }
+
+    fn get_attribute<'a>(&'a self, name: &str) -> Option<&'a AnyValue> {
+        self.attributes.try_read().map(|s| s.get(name)).unwrap_or_default()
+    }
+}
+
+#[macro_export]
+macro_rules! impl_retry_context {
+    ($StructName:ident) => {
+        impl crate::retry_context::SyncAttributeAccessor for $StructName {
+            fn has_attribute(&self, name: &str) -> bool {
+                self.context_support.has_attribute(name)
+            }
+
+            fn set_attribute(&self, name: &str, value: next_web_core::util::any_map::AnyValue) {
+                self.context_support.set_attribute(name, value)
+            }
+
+            fn remove_attribute(&self, name: &str) -> Option<next_web_core::util::any_map::AnyValue> {
+                self.context_support.remove_attribute(name)
+            }
+
+            fn get_attribute(&self, name: &str) -> Option<next_web_core::util::any_map::AnyValue> {
+                self.context_support.get_attribute(name)
+            }
+        }
+
+        impl crate::retry_context::RetryContext for $StructName {
+            fn set_exhausted_only(&mut self) {
+                self.context_support.set_exhausted_only()
+            }
+
+            fn is_exhausted_only(&self) -> bool {
+                self.context_support.is_exhausted_only()
+            }
+
+            fn get_parent(&self) -> Option<&dyn crate::retry_context::RetryContext> {
+               self.context_support.get_parent()
+            }
+
+            fn get_retry_count(&self) -> u16 {
+                self.context_support.get_retry_count()
+            }
+
+            fn get_last_error(&self) -> Option<crate::error::retry_error::RetryError> {
+                self.context_support.get_last_error()
+            }
+        }
+    };
 }

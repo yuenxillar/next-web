@@ -1,4 +1,4 @@
-use std::sync::{atomic::{AtomicU16, Ordering}, Arc};
+use std::{any::Any, sync::{atomic::{AtomicU16, Ordering}, Arc}};
 
 use next_web_core::convert::into_box::IntoBox;
 
@@ -36,19 +36,24 @@ impl RetryPolicy for MaxAttemptsRetryPolicy {
 
     fn open(
         &self,
-        context: Option<&dyn RetryContext>,
-    ) -> Box<dyn RetryContext> {
-        RetryContextSupport::new().into_boxed()
+        _context: Option<&dyn RetryContext>,
+    ) -> Arc<dyn RetryContext> {
+        // TODO parent
+        Arc::new(RetryContextSupport::default())
     }
 
     fn close(&self, _context: &dyn RetryContext) {}
 
     fn register_error(
         &self,
-        context: &mut dyn RetryContext,
+        context: &dyn RetryContext,
         error: Option<&dyn crate::error::AnyError>,
     ) {
-        todo!()
+        // TODO parent
+        let any: &dyn Any = context;
+        if let Some(ctx) = any.downcast_ref::<RetryContextSupport>() {
+            ctx.register_error(error);
+        }
     }
 
     fn get_max_attempts(&self) -> u16 {

@@ -1,10 +1,11 @@
-use std::any::Any;
+use std::{any::Any, sync::Arc};
 
-use next_web_core::{convert::into_box::IntoBox, util::time::LocalTime};
+use next_web_core::util::time::LocalTime;
 
 use crate::{
     context::retry_context_support::RetryContextSupport,
-    retry_context::{AttributeAccessor, RetryContext},
+    error::retry_error::RetryError,
+    retry_context::{RetryContext, SyncAttributeAccessor},
     retry_policy::RetryPolicy,
 };
 
@@ -42,19 +43,19 @@ impl RetryPolicy for TimeoutRetryPolicy {
         }
     }
 
-    fn open(&self, context: Option<&dyn RetryContext>) -> Box<dyn RetryContext> {
-        TimeoutRetryContext::new(self.timeout).into_boxed()
+    fn open(&self, context: Option<&dyn RetryContext>) -> Arc<dyn RetryContext> {
+        Arc::new(TimeoutRetryContext::new(self.timeout))
     }
 
     fn close(&self, _context: &dyn RetryContext) {}
 
     fn register_error(
         &self,
-        context: &mut dyn RetryContext,
+        context: &dyn RetryContext,
         error: Option<&dyn crate::error::AnyError>,
     ) {
-        let context: &mut dyn Any = context;
-        match context.downcast_mut::<RetryContextSupport>() {
+        let context: &dyn Any = context;
+        match context.downcast_ref::<RetryContextSupport>() {
             Some(context) => context.register_error(error),
             None => {}
         }
@@ -79,20 +80,20 @@ impl TimeoutRetryContext {
     }
 }
 
-impl AttributeAccessor for TimeoutRetryContext {
+impl SyncAttributeAccessor for TimeoutRetryContext {
     fn has_attribute(&self, name: &str) -> bool {
         todo!()
     }
 
-    fn set_attribute(&mut self, name: &str, value: next_web_core::util::any_map::AnyValue) {
+    fn set_attribute(&self, name: &str, value: next_web_core::util::any_map::AnyValue) {
         todo!()
     }
 
-    fn remove_attribute(&mut self, name: &str) -> Option<next_web_core::util::any_map::AnyValue> {
+    fn remove_attribute(&self, name: &str) -> Option<next_web_core::util::any_map::AnyValue> {
         todo!()
     }
 
-    fn get_attribute(&self, name: &str) -> Option<&next_web_core::util::any_map::AnyValue> {
+    fn get_attribute(&self, name: &str) -> Option<& next_web_core::util::any_map::AnyValue> {
         todo!()
     }
 }
@@ -114,7 +115,7 @@ impl RetryContext for TimeoutRetryContext {
         todo!()
     }
 
-    fn get_last_error(&self) -> Option<Box<dyn crate::error::AnyError>> {
+    fn get_last_error(&self) -> Option<RetryError> {
         todo!()
     }
 }
