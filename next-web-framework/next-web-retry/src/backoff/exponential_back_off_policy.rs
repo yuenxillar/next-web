@@ -1,5 +1,13 @@
-use crate::backoff::{
-    back_off_policy::BackOffPolicy, sleeping_back_off_policy::SleepingBackOffPolicy,
+use std::{any::Any, sync::Arc};
+
+use next_web_core::async_trait;
+
+use crate::{
+    backoff::{
+        back_off_context::BackOffContext, back_off_policy::BackOffPolicy,
+        sleeping_back_off_policy::SleepingBackOffPolicy,
+    },
+    error::retry_error::RetryError,
 };
 
 #[derive(Clone)]
@@ -35,25 +43,42 @@ impl ExponentialBackOffPolicy {
     }
 }
 
+#[async_trait]
 impl BackOffPolicy for ExponentialBackOffPolicy {
-    fn start(
+    async fn start(
         &self,
         context: &dyn crate::retry_context::RetryContext,
-    ) -> Option<&dyn super::back_off_context::BackOffContext> {
-        todo!()
+    ) -> Option<Arc<dyn BackOffContext>> {
+        Some(Arc::new(ExponentialBackOffContext {
+            interval: todo!(),
+            multiplier: todo!(),
+            max_interval: todo!(),
+        }))
     }
 
-    fn backoff(
+    async fn backoff(
         &self,
-        context: &dyn super::back_off_context::BackOffContext,
+        context: Option<&dyn BackOffContext>,
     ) -> Result<(), crate::error::retry_error::RetryError> {
-        todo!()
+        if let Some(context) = context {
+            let any: &dyn Any = context;
+            match any.downcast_ref::<ExponentialBackOffContext>() {
+                Some(ctx) => {
+                    let sleep_time = ctx.get_sleep_and_increment();
+                    self.sleep(sleep_time).await;
+                }
+                None => {}
+            }
+        }
+
+        Ok(())
     }
 }
 
+#[async_trait]
 impl SleepingBackOffPolicy for ExponentialBackOffPolicy {
-    fn sleep(&self, sleep: u64) {
-        todo!()
+    async fn sleep(&self, sleep: u64) {
+        tokio::time::sleep(tokio::time::Duration::from_millis(sleep)).await;
     }
 }
 
@@ -65,5 +90,18 @@ impl Default for ExponentialBackOffPolicy {
             multiplier: Default::default(),
             with_random: Default::default(),
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct ExponentialBackOffContext {
+    interval: u64,
+    multiplier: f32,
+    max_interval: u64,
+}
+
+impl ExponentialBackOffContext {
+    pub fn get_sleep_and_increment(&self) -> u64 {
+        0
     }
 }

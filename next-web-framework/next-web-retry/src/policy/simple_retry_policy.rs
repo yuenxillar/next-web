@@ -201,13 +201,13 @@ impl SyncAttributeAccessor for SimpleRetryContext {
         todo!()
     }
 
-    fn get_attribute(&self, name: &str) -> Option<& AnyValue> {
+    fn get_attribute(&self, name: &str) -> Option<AnyValue> {
         todo!()
     }
 }
 
 impl RetryContext for SimpleRetryContext {
-    fn set_exhausted_only(&mut self) {
+    fn set_exhausted_only(&self) {
         self.terminate.store(true, Ordering::Relaxed);
     }
 

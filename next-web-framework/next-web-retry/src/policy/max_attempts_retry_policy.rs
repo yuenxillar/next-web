@@ -1,7 +1,4 @@
 use std::{any::Any, sync::{atomic::{AtomicU16, Ordering}, Arc}};
-
-use next_web_core::convert::into_box::IntoBox;
-
 use crate::{context::retry_context_support::RetryContextSupport, retry_context::RetryContext, retry_policy::RetryPolicy};
 
 #[derive(Clone)]

@@ -1,3 +1,9 @@
+use std::sync::Arc;
+
+use next_web_core::async_trait;
+
+use crate::backoff::back_off_context::BackOffContext;
+
 use super::back_off_policy::BackOffPolicy;
 
 #[derive(Clone)]
@@ -21,18 +27,18 @@ impl UniformRandomBackOffPolicy {
     }
 }
 
-
+#[async_trait]
 impl BackOffPolicy for UniformRandomBackOffPolicy {
-    fn start(
+    async fn start(
         &self,
         context: &dyn crate::retry_context::RetryContext,
-    ) -> Option<&dyn super::back_off_context::BackOffContext> {
+    ) -> Option<Arc<dyn BackOffContext>> {
         todo!()
     }
 
-    fn backoff(
+    async fn backoff(
         &self,
-        context: &dyn super::back_off_context::BackOffContext,
+        context: Option<&dyn BackOffContext>,
     ) -> Result<(), crate::error::retry_error::RetryError> {
         todo!()
     }

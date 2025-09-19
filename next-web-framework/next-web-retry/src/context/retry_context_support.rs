@@ -1,5 +1,7 @@
 use std::sync::{atomic::{AtomicBool, AtomicU16, Ordering}, Arc};
 
+use next_web_core::util::any_map::AnyClone;
+
 use crate::{error::retry_error::RetryError, retry_context::{SyncAttributeAccessor, AttributeAccessorSupport, RetryContext}};
 
 
@@ -20,7 +22,10 @@ impl RetryContextSupport {
     }
 
     pub fn register_error(&self, error: Option<&dyn crate::error::AnyError>) {
-
+        // self.last_error = error.map(|e| RetryError::Any(e.to_boxed()));
+        if error.is_some() {
+            self.count.fetch_add(1, Ordering::Relaxed);
+        }
     }
 }
 
@@ -43,7 +48,7 @@ impl SyncAttributeAccessor for RetryContextSupport {
 }
 
 impl RetryContext for RetryContextSupport {
-    fn set_exhausted_only(&mut self) {
+    fn set_exhausted_only(&self) {
        self.terminate.store(true, Ordering::Relaxed)
     }
 

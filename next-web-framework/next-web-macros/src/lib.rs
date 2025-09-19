@@ -55,7 +55,7 @@ pub fn all_constructor(input: TokenStream) -> TokenStream {
 #[doc = ""]
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
-pub fn Retry(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn Retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as ItemFn);
     impl_macro_retry(attr, item)
 }

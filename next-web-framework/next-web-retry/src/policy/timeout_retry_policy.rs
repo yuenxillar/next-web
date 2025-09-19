@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use next_web_core::util::time::LocalTime;
+use next_web_core::util::{any_map::AnyValue, time::LocalTime};
 
 use crate::{
     context::retry_context_support::RetryContextSupport,
@@ -85,21 +85,21 @@ impl SyncAttributeAccessor for TimeoutRetryContext {
         todo!()
     }
 
-    fn set_attribute(&self, name: &str, value: next_web_core::util::any_map::AnyValue) {
+    fn set_attribute(&self, name: &str, value: AnyValue) {
         todo!()
     }
 
-    fn remove_attribute(&self, name: &str) -> Option<next_web_core::util::any_map::AnyValue> {
+    fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
         todo!()
     }
 
-    fn get_attribute(&self, name: &str) -> Option<& next_web_core::util::any_map::AnyValue> {
+    fn get_attribute(&self, name: &str) -> Option<AnyValue> {
         todo!()
     }
 }
 
 impl RetryContext for TimeoutRetryContext {
-    fn set_exhausted_only(&mut self) {
+    fn set_exhausted_only(&self) {
         todo!()
     }
 

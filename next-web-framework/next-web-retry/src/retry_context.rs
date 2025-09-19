@@ -1,13 +1,13 @@
-use std::{any::Any, collections::BTreeMap, sync::{atomic::Ordering, Arc, RwLock}};
+use std::{any::Any, collections::BTreeMap, sync::Arc};
 
-use next_web_core::{util::any_map::AnyValue, DynClone};
-use tokio::sync::RwLock;
+use next_web_core::{DynClone, util::any_map::AnyValue};
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 use crate::error::retry_error::RetryError;
 
 pub mod retry_context_constants {
     pub const NAME: &str = "context.name";
-    pub const STATE_KEY: & str = "context.state";
+    pub const STATE_KEY: &str = "context.state";
     pub const CLOSED: &str = "context.closed";
     pub const RECOVERED: &str = "context.recovered";
     pub const EXHAUSTED: &str = "context.exhausted";
@@ -20,7 +20,7 @@ where
     Self: Any,
     Self: SyncAttributeAccessor + DynClone,
 {
-    fn set_exhausted_only(&mut self);
+    fn set_exhausted_only(&self);
 
     fn is_exhausted_only(&self) -> bool;
 
@@ -35,7 +35,7 @@ next_web_core::clone_trait_object!(RetryContext);
 
 pub trait SyncAttributeAccessor
 where
-    Self: Send + Sync
+    Self: Send + Sync,
 {
     fn has_attribute(&self, name: &str) -> bool;
 
@@ -43,7 +43,7 @@ where
 
     fn remove_attribute(&self, name: &str) -> Option<AnyValue>;
 
-    fn get_attribute(&self, name: &str) -> Option<& AnyValue>;
+    fn get_attribute(&self, name: &str) -> Option<AnyValue>;
 }
 
 #[derive(Clone, Default)]
@@ -53,19 +53,27 @@ pub struct AttributeAccessorSupport {
 
 impl SyncAttributeAccessor for AttributeAccessorSupport {
     fn has_attribute(&self, name: &str) -> bool {
-      self.attributes.try_read().map(|s| s.contains_key(name)).unwrap_or_default() 
+        self.attributes
+            .try_read()
+            .map(|m| m.contains_key(name))
+            .unwrap_or_default()
     }
 
     fn set_attribute(&self, name: &str, value: AnyValue) {
-        self.attributes.insert(name.to_string(), value);
+        self.attributes
+            .try_write()
+            .map(|mut m| m.insert(name.to_string(), value)).ok();
     }
 
     fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
-        self.attributes.remove(name).map(|s| s.1)
+        self.attributes
+            .try_write()
+            .map(|mut m| m.remove(name))
+            .unwrap_or_default()
     }
 
-    fn get_attribute<'a>(&'a self, name: &str) -> Option<&'a AnyValue> {
-        self.attributes.try_read().map(|s| s.get(name)).unwrap_or_default()
+    fn get_attribute(&self, name: &str) -> Option<AnyValue> {
+        self.attributes.try_read().map(|m| m.get(name).cloned()).unwrap_or_default()        
     }
 }
 
@@ -81,7 +89,10 @@ macro_rules! impl_retry_context {
                 self.context_support.set_attribute(name, value)
             }
 
-            fn remove_attribute(&self, name: &str) -> Option<next_web_core::util::any_map::AnyValue> {
+            fn remove_attribute(
+                &self,
+                name: &str,
+            ) -> Option<next_web_core::util::any_map::AnyValue> {
                 self.context_support.remove_attribute(name)
             }
 
@@ -91,7 +102,7 @@ macro_rules! impl_retry_context {
         }
 
         impl crate::retry_context::RetryContext for $StructName {
-            fn set_exhausted_only(&mut self) {
+            fn set_exhausted_only(&self) {
                 self.context_support.set_exhausted_only()
             }
 
@@ -100,7 +111,7 @@ macro_rules! impl_retry_context {
             }
 
             fn get_parent(&self) -> Option<&dyn crate::retry_context::RetryContext> {
-               self.context_support.get_parent()
+                self.context_support.get_parent()
             }
 
             fn get_retry_count(&self) -> u16 {

@@ -1,7 +1,10 @@
 use next_web_core::util::any_map::AnyValue;
 use next_web_dev::util::local_date_time::LocalDateTime;
-use next_web_macros::Retry;
-use next_web_retry::{error::retry_error::RetryError, retry_context::RetryContext, retry_operations::RetryOperations, support::retry_template::RetryTemplate};
+use next_web_macros::Retryable;
+use next_web_retry::{
+    error::retry_error::RetryError, retry_context::RetryContext, retry_operations::RetryOperations,
+    support::retry_template::RetryTemplate,
+};
 
 #[derive(Debug)]
 enum TestMatch {
@@ -9,7 +12,7 @@ enum TestMatch {
     Job(u64),
 }
 
-#[Retry(max_attempts = 3, delay = 1000, backoff = backoff_test, retry_for = [TestMatch::App, TestMatch::Job(123)], multiplier = 2)]
+#[Retryable(max_attempts = 3, delay = 1000, backoff = backoff_test, retry_for = [TestMatch::App, TestMatch::Job(123)], multiplier = 2)]
 fn test_retry() -> Result<(), TestMatch> {
     let timestamp_sec = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -26,26 +29,36 @@ fn backoff_test(error: &TestMatch) {
     println!("function test_retry backoff: {:?}", error);
 }
 
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum SelfRetryError {
+    Custom(String)
+}
+
 #[tokio::main]
 async fn main() {
-    // test retry
+    // test retryable
     // if let Err(e) = test_retry() {
     //     println!("error: {:?}", e);
     // }
 
     let result = RetryTemplate::builder()
+        .max_attempts(2)
+        .exponential_backoff(1000,  6000, 2.0, false)
         .build()
-        .execute(|mut ctx: Box<dyn RetryContext>| async move {
+        .execute(|ctx: std::sync::Arc<dyn RetryContext>| async move {
+            let retry_count = ctx.get_attribute("retryCount");
+            let value = retry_count
+                .map(|s| s.as_number().unwrap_or_default())
+                .unwrap_or_default();
+            println!("Retry Count: {}", value);
 
-            let retry_count = ctx.as_ref().get_attribute("retryCount");
-            let value = retry_count.map(|s| s.as_number().unwrap()).unwrap();
-            println!("value: {}", value);
-            
-            if  value < 3 {
-                ctx.as_mut().set_attribute("retryCount", AnyValue::Number(value + 1));
-                return Err(RetryError::Custom(String::from("test")));
+            if value < 3 {
+                ctx.set_attribute("retryCount", AnyValue::Number(value + 1));
+                return Err(RetryError::Custom("Test Retry Error: from 3.".to_string()));
             }
-            Ok(132)
+
+            Ok(())
         })
         .await;
     println!("result: {:?}", result);

@@ -40,7 +40,7 @@ impl RetryTemplate {
     {
 
         // Allow the retry policy to initialise itself...
-        let mut context = self.open(self.retry_policy.as_ref(), state).await.unwrap();
+        let context = self.open(self.retry_policy.as_ref(), state).await.unwrap();
 
         // trace!("RetryContext retrieved: {:?}", context);
 
@@ -72,16 +72,16 @@ impl RetryTemplate {
             }
 
             // Get or Start the backoff context...
-            let mut back_off_context: Option<&dyn BackOffContext> = None;
+            let mut back_off_context: Option<Arc<dyn BackOffContext>> = None;
             let resource = context.get_attribute("backOffContext");
             if let Some(resource) = resource {
-                back_off_context = Some(resource);
+                back_off_context = Some(Arc::new(resource));
             }
 
             if back_off_context.is_none() {
-                back_off_context = self.back_off_policy.as_ref().start(context.as_ref());
+                back_off_context = self.back_off_policy.as_ref().start(context.as_ref()).await;
 
-                if let Some(back_off_context) = back_off_context {
+                if let Some(back_off_context) = back_off_context.as_deref() {
                     context.set_attribute(
                         "backOffContext",
                         back_off_context
@@ -102,7 +102,6 @@ impl RetryTemplate {
                 // Reset the last exception, so if we are successful
                 // the close interceptors will not think we failed...
                 last_error = None;
-                println!("6666");
                 let result = retry_callback.do_with_retry(context.clone()).await;
                 match result {
                     Ok(result) => {
@@ -110,11 +109,10 @@ impl RetryTemplate {
                         return Ok(result);
                     }
                     Err(error) => {
-                        last_error = Some(Box::new(error.clone()));
+                        last_error = error.as_any_error();
                         
-                        let cloned_context = context.clone();
-                        let e = match self.register_error(self.retry_policy.as_ref() , state, cloned_context, 
-                            None
+                        let e = match self.register_error(self.retry_policy.as_ref() , state, context.clone() , 
+                            last_error.as_deref()                           
                         ).await
                          {
                                 Ok(_) => None,
@@ -125,7 +123,7 @@ impl RetryTemplate {
                                     }
                                 ))
                         };
-                        self.do_on_error_interceptors(  context.as_ref(), &error);
+                        self.do_on_error_interceptors(context.as_ref(), &error);
 
                         match e {
                             Some(error) => return Err(error),
@@ -135,19 +133,17 @@ impl RetryTemplate {
                         if self.can_retry(self.retry_policy.as_ref(), context.as_ref())
                             && !context.is_exhausted_only()
                         {
-                            if let Some(bfc) = back_off_context {
-                                match self.back_off_policy.as_ref().backoff(bfc) {
-                                    Ok(_) => {}
-                                    Err(e) => {
-                                        match e {
-                                            RetryError::BackOffInterruptedError(error) => {
-                                                // last_error = Some(e.clone());
-                                                return Err(RetryError::BackOffInterruptedError(
-                                                    error,
-                                                ));
-                                            }
-                                            _ => {}
+                            match self.back_off_policy.as_ref().backoff(back_off_context.as_deref()).await {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    match e {
+                                        RetryError::BackOffInterruptedError(error) => {
+                                            // last_error = Some(e.clone());
+                                            return Err(RetryError::BackOffInterruptedError(
+                                                error,
+                                            ));
                                         }
+                                        _ => {}
                                     }
                                 }
                             }
@@ -165,13 +161,17 @@ impl RetryTemplate {
                  * but if we get this far in a stateful retry there's a reason for it,
                  * like a circuit breaker or a rollback classifier.
                  */
+
+                if state.is_some() && context.has_attribute(Self::GLOBAL_STATE) {
+                    break;
+                }
                 
             }
 
             exhausted = true;
-                return self
-                    .handle_retry_exhausted(recovery_callback, context.as_ref(), state)
-                    .await;
+            return self
+                .handle_retry_exhausted(recovery_callback, context.as_ref(), state)
+                .await;
             // Err(RetryError::Custom("Not executed, it should be a condition mismatch".to_string()))
         };
 
@@ -260,10 +260,10 @@ impl RetryTemplate {
         &self,
         retry_policy: &dyn RetryPolicy,
         state: Option<&dyn RetryState>,
-        context: impl Into<Arc<dyn RetryContext>>,
+        context: Arc<dyn RetryContext>,
         error: Option<&dyn AnyError>,
     ) -> Result<(), RetryError> {
-        let context = context.into();
+        // let context = context.into();
         retry_policy.register_error(context.as_ref(), error);
         self.register_context(context, state).await?;
 
@@ -272,10 +272,10 @@ impl RetryTemplate {
 
     async fn register_context(
         &self,
-        context: impl Into<Arc<dyn RetryContext>>,
+        context: Arc<dyn RetryContext>,
         state: Option<&dyn RetryState>,
     ) -> Result<(), RetryError> {
-        let context = context.into();
+        // let context = context.into();
         match state {
             Some(state) => {
                 let key = state.get_key();
@@ -437,7 +437,7 @@ impl RetryTemplate {
         }
         Err(RetryError::Default(WithCauseError {
             msg: "Exception in retry".to_string(),
-            cause: context.get_last_error().map(RetryError::as_any_error).unwrap_or_default(),
+            cause: context.get_last_error().as_ref().map(RetryError::as_any_error).unwrap_or_default(),
         }))
     }
 
@@ -455,7 +455,7 @@ impl RetryTemplate {
         } else {
             RetryError::ExhaustedRetryError(WithCauseError {
                 msg: msg.to_string(),
-                cause: context.get_last_error().map(RetryError::as_any_error).unwrap_or_default(),
+                cause: context.get_last_error().as_ref().map(RetryError::as_any_error).unwrap_or_default(),
             })
         }
     }
@@ -633,7 +633,7 @@ impl RetryTemplateBuilder {
         self
     }
 
-    pub fn exponential_backoff(mut self,initial_interval:u64, multiplier: f32, max_interval : u64, with_random: bool) -> Self {
+    pub fn exponential_backoff(mut self,initial_interval:u64,  max_interval : u64, multiplier: f32, with_random: bool) -> Self {
         assert!(self.back_off_policy.is_none(), "You have already selected backoff policy");
         assert!(initial_interval >= 1, "Initial interval should be >= 1");
         assert!(multiplier > 1.0, "Multiplier should be > 1");
@@ -770,8 +770,6 @@ impl RetryTemplateBuilder {
         }
 
         let mut final_policy = CompositeRetryPolicy::new();
-
-
 
         let polices = vec![
             self.base_retry_policy.map(|v| v.clone()).expect("Base retry policy is not set") , 

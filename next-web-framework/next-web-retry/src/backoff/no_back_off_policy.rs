@@ -1,3 +1,7 @@
+use std::sync::Arc;
+
+use next_web_core::async_trait;
+
 use crate::{
     backoff::{back_off_context::BackOffContext, back_off_policy::BackOffPolicy},
     error::retry_error::RetryError,
@@ -13,12 +17,13 @@ impl NoBackOffPolicy {
     }
 }
 
+#[async_trait]
 impl BackOffPolicy for NoBackOffPolicy {
-    fn start(&self, _context: &dyn RetryContext) -> Option<&dyn BackOffContext> {
+    async fn start(&self, _context: &dyn RetryContext) -> Option<Arc<dyn BackOffContext>> {
         None
     }
 
-    fn backoff(&self, _context: &dyn BackOffContext) -> Result<(), RetryError> {
+    async fn backoff(&self, _context: Option<&dyn BackOffContext>,) -> Result<(), RetryError> {
         Ok(())
     }
 }

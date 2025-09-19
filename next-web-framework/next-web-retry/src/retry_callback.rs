@@ -15,9 +15,8 @@ where
 #[async_trait]
 impl<F, Fut, T> RetryCallback<T> for F
 where
-    F: Fn(Arc<dyn RetryContext>) -> Fut,
-    F: Send + Sync,
-    Fut: Future<Output = Result<T, RetryError>> + Send,
+    F: Fn(Arc<dyn RetryContext>) -> Fut + Send + Sync,
+    Fut: Future<Output = Result<T, RetryError>> + Send + 'static,
 {
     async fn do_with_retry(&self, context: Arc<dyn RetryContext>) -> Result<T, RetryError> {
         self(context).await

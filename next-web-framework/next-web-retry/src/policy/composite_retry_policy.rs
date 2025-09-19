@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use crate::{
     context::retry_context_support::RetryContextSupport,
     impl_retry_context,
-    retry_context::{SyncAttributeAccessor, RetryContext},
+    retry_context::RetryContext,
     retry_policy::{NO_MAXIMUM_ATTEMPTS_SET, RetryPolicy},
 };
 
