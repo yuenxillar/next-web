@@ -7,9 +7,10 @@ pub enum RetryError {
     Custom(String),
     Any(Box<dyn AnyError>),
     ExhaustedRetryError(WithCauseError),
-    Default(WithCauseError),
     TerminatedRetryError(WithCauseError),
     BackOffInterruptedError(WithCauseError),
+    Default(WithCauseError),
+    Parent
 }
 
 
@@ -22,6 +23,12 @@ impl RetryError {
             RetryError::Default(error) => Some(Box::new(DefaultAnyError(error.clone()))),
             RetryError::TerminatedRetryError(error) => Some(Box::new(DefaultAnyError(error.clone()))),
             RetryError::BackOffInterruptedError(error) => Some(Box::new(DefaultAnyError(error.clone()))),
+            RetryError::Parent => Some(
+                Box::new(DefaultAnyError(WithCauseError {
+                    msg: "Retry Parent Error".to_string(),
+                    cause: None,
+                }))
+            )
         }
     }
 }
@@ -50,8 +57,4 @@ impl std::fmt::Display for DefaultAnyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "DefaultAnyError")
     }
-}
-
-fn ma() {
-   
 }

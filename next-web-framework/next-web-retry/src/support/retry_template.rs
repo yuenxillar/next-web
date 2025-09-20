@@ -98,7 +98,7 @@ impl RetryTemplate {
              * recovery in handleRetryExhausted without the callback processing (which
              * would throw an exception).
              */
-            while self.can_retry(self.retry_policy.as_ref(), context.as_ref()) && !context.is_exhausted_only() {
+            while self.can_retry(self.retry_policy.as_ref(), context.as_ref()).await && !context.is_exhausted_only() {
                 // Reset the last exception, so if we are successful
                 // the close interceptors will not think we failed...
                 last_error = None;
@@ -130,7 +130,7 @@ impl RetryTemplate {
                             None => {}
                         };
 
-                        if self.can_retry(self.retry_policy.as_ref(), context.as_ref())
+                        if self.can_retry(self.retry_policy.as_ref(), context.as_ref()).await
                             && !context.is_exhausted_only()
                         {
                             match self.back_off_policy.as_ref().backoff(back_off_context.as_deref()).await {
@@ -161,7 +161,6 @@ impl RetryTemplate {
                  * but if we get this far in a stateful retry there's a reason for it,
                  * like a circuit breaker or a rollback classifier.
                  */
-
                 if state.is_some() && context.has_attribute(Self::GLOBAL_STATE) {
                     break;
                 }
@@ -225,8 +224,8 @@ impl RetryTemplate {
         self.listeners.len() > 0
     }
 
-    fn can_retry(&self, retry_policy: &dyn RetryPolicy, context: &dyn RetryContext) -> bool {
-        retry_policy.can_retry(context)
+    async fn can_retry(&self, retry_policy: &dyn RetryPolicy, context: &dyn RetryContext) -> bool {
+        retry_policy.can_retry(context).await
     }
 
     async fn close(
@@ -435,8 +434,9 @@ impl RetryTemplate {
                 self.last_error_on_exhausted || !do_recover,
             );
         }
+
         Err(RetryError::Default(WithCauseError {
-            msg: "Exception in retry".to_string(),
+            msg: "Error in retry".to_string(),
             cause: context.get_last_error().as_ref().map(RetryError::as_any_error).unwrap_or_default(),
         }))
     }
@@ -752,15 +752,15 @@ impl RetryTemplateBuilder {
             self.base_retry_policy = Some(Arc::new(MaxAttemptsRetryPolicy::default()));
         }
 
-        let mut  exception_retry_policy: Option<Arc<dyn RetryPolicy>> = None;
+        let mut error_retry_policy: Option<Arc<dyn RetryPolicy>> = None;
         if self.retry_on_predicate.is_none() {
             let esxception_classifier: BinaryErrorClassifier = match &self.classifier_builder {
                 Some(classifier_builder) => classifier_builder.to_owned().build(),
                 None => BinaryErrorClassifier::default_classifier()
             };
-            exception_retry_policy = Some(Arc::new(BinaryErrorClassifierRetryPolicy::new(esxception_classifier)));
+            error_retry_policy = Some(Arc::new(BinaryErrorClassifierRetryPolicy::new(esxception_classifier)));
         }else {
-            exception_retry_policy = Some(
+            error_retry_policy = Some(
                 Arc::new(
                     PredicateRetryPolicy::new(
                         std::mem::replace(&mut self.retry_on_predicate, None).unwrap(),
@@ -773,7 +773,7 @@ impl RetryTemplateBuilder {
 
         let polices = vec![
             self.base_retry_policy.map(|v| v.clone()).expect("Base retry policy is not set") , 
-            exception_retry_policy.expect("Exception retry policy is not set")
+            error_retry_policy.expect("Exception retry policy is not set")
         ];
         final_policy.set_policies(polices);
 		retry_template.set_retry_policy(final_policy);
@@ -812,9 +812,8 @@ impl Default for RetryTemplate {
 }
 
 
-mod test { 
-
-    use super::*;
+mod test {
+    use super::RetryTemplate;
 
     #[test]
     fn test_retry_template_builder() {

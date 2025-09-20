@@ -1,16 +1,21 @@
-use std::sync::{atomic::{AtomicBool, AtomicU16, Ordering}, Arc};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicU16, Ordering},
+};
 
-use next_web_core::util::any_map::AnyClone;
+use tokio::sync::Mutex;
 
-use crate::{error::retry_error::RetryError, retry_context::{SyncAttributeAccessor, AttributeAccessorSupport, RetryContext}};
-
+use crate::{
+    error::retry_error::RetryError,
+    retry_context::{AttributeAccessorSupport, RetryContext, SyncAttributeAccessor},
+};
 
 #[derive(Clone)]
 pub struct RetryContextSupport {
     parent: Option<Arc<dyn RetryContext>>,
     count: Arc<AtomicU16>,
     terminate: Arc<AtomicBool>,
-    last_error: Option<RetryError>,
+    last_error: Arc<Mutex<Option<RetryError>>>,
     attribute_support: AttributeAccessorSupport,
 }
 
@@ -22,9 +27,12 @@ impl RetryContextSupport {
     }
 
     pub fn register_error(&self, error: Option<&dyn crate::error::AnyError>) {
-        // self.last_error = error.map(|e| RetryError::Any(e.to_boxed()));
-        if error.is_some() {
+        if let Some(error) = error {
             self.count.fetch_add(1, Ordering::Relaxed);
+            self.last_error
+                .try_lock()
+                .map(|mut lock| lock.replace(RetryError::Any(error.to_boxed())))
+                .ok();
         }
     }
 }
@@ -49,7 +57,7 @@ impl SyncAttributeAccessor for RetryContextSupport {
 
 impl RetryContext for RetryContextSupport {
     fn set_exhausted_only(&self) {
-       self.terminate.store(true, Ordering::Relaxed)
+        self.terminate.store(true, Ordering::Relaxed)
     }
 
     fn is_exhausted_only(&self) -> bool {
@@ -65,7 +73,7 @@ impl RetryContext for RetryContextSupport {
     }
 
     fn get_last_error(&self) -> Option<RetryError> {
-       self.last_error.clone()
+        self.last_error.try_lock().map(|lock| lock.clone()).unwrap_or_default()
     }
 }
 
@@ -75,7 +83,7 @@ impl Default for RetryContextSupport {
             parent: None,
             count: Arc::new(AtomicU16::new(0)),
             terminate: Arc::new(AtomicBool::new(false)),
-            last_error: None,
+            last_error: Arc::new(Mutex::new(None)),
             attribute_support: AttributeAccessorSupport::default(),
         }
     }

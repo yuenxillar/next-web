@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use next_web_core::util::{any_map::AnyValue, time::LocalTime};
+use next_web_core::{async_trait, util::{any_map::AnyValue, time::LocalTime}};
 
 use crate::{
     context::retry_context_support::RetryContextSupport,
@@ -34,8 +34,10 @@ impl Default for TimeoutRetryPolicy {
     }
 }
 
+
+#[async_trait]
 impl RetryPolicy for TimeoutRetryPolicy {
-    fn can_retry(&self, context: &dyn RetryContext) -> bool {
+    async fn can_retry(&self, context: &dyn RetryContext) -> bool {
         let any: &dyn Any = context;
         match any.downcast_ref::<TimeoutRetryContext>() {
             Some(context) => context.is_alive(),
@@ -119,3 +121,10 @@ impl RetryContext for TimeoutRetryContext {
         todo!()
     }
 }
+
+impl ToString for TimeoutRetryPolicy {
+    fn to_string(&self) -> String {
+        "TimeoutRetryPolicy".to_string()
+    }
+}
+

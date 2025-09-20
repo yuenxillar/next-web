@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use next_web_core::async_trait;
+
 use crate::retry_policy::RetryPolicy;
 
 
@@ -8,8 +10,10 @@ use crate::retry_policy::RetryPolicy;
 pub struct AlwaysRetryPolicy;
 
 
+
+#[async_trait]
 impl RetryPolicy for AlwaysRetryPolicy {
-    fn can_retry(&self, context: &dyn crate::retry_context::RetryContext) -> bool {
+    async fn can_retry(&self, context: &dyn crate::retry_context::RetryContext) -> bool {
         true
     }
 
@@ -30,5 +34,11 @@ impl RetryPolicy for AlwaysRetryPolicy {
         error: Option<&dyn crate::error::AnyError>,
     ) {
         todo!()
+    }
+}
+
+impl ToString for AlwaysRetryPolicy {
+    fn to_string(&self) -> String {
+        "AlwaysRetryPolicy".to_string()
     }
 }

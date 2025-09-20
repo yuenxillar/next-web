@@ -1,5 +1,7 @@
 use std::{any::Any, sync::Arc};
 
+use next_web_core::async_trait;
+
 use crate::{
     context::retry_context_support::RetryContextSupport,
     impl_retry_context,
@@ -29,8 +31,10 @@ impl CompositeRetryPolicy {
     }
 }
 
+
+#[async_trait]
 impl RetryPolicy for CompositeRetryPolicy {
-    fn can_retry(&self, context: &dyn RetryContext) -> bool {
+    async fn can_retry(&self, context: &dyn RetryContext) -> bool {
 
         let any: &dyn Any = context;
         if let Some(ctx) = any.downcast_ref::<CompositeRetryContext>() {
@@ -39,14 +43,15 @@ impl RetryPolicy for CompositeRetryPolicy {
             if self.optimistic {
                 retryable = false;
                 for (i, c) in ctx.contexts.iter().enumerate() {
-                    if ctx.policies[i].can_retry(c.as_ref()) {
+                    if ctx.policies[i].can_retry(c.as_ref()).await {
                         retryable = true;
                     }
                 }
             }
             else {
                 for (i, c) in ctx.contexts.iter().enumerate() {
-                    if !ctx.policies[i].can_retry(c.as_ref()) {
+                    if !ctx.policies[i].can_retry(c.as_ref()).await {
+                        // println!("Retry policy {} failed.", ctx.policies[i].as_ref().to_string());
                         retryable = false;
                     }
                 }
@@ -117,3 +122,10 @@ struct CompositeRetryContext {
 }
 
 impl_retry_context!(CompositeRetryContext);
+
+
+impl ToString for CompositeRetryPolicy {
+    fn to_string(&self) -> String {
+        "CompositeRetryPolicy".to_string()
+    }
+}

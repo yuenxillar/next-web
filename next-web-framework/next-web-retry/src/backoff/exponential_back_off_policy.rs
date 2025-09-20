@@ -1,14 +1,12 @@
-use std::{any::Any, sync::Arc};
+use std::{any::Any, sync::{atomic::{AtomicU64, Ordering}, Arc}};
 
 use next_web_core::async_trait;
+use tracing::warn;
 
-use crate::{
-    backoff::{
+use crate::backoff::{
         back_off_context::BackOffContext, back_off_policy::BackOffPolicy,
         sleeping_back_off_policy::SleepingBackOffPolicy,
-    },
-    error::retry_error::RetryError,
-};
+    };
 
 #[derive(Clone)]
 pub struct ExponentialBackOffPolicy {
@@ -31,15 +29,36 @@ impl ExponentialBackOffPolicy {
     }
 
     pub fn set_initial_interval(&mut self, initial_interval: u64) {
-        self.initial_interval = initial_interval;
+        if initial_interval < 1 {
+            warn!("Initial interval must be at least 1, but was {initial_interval}");
+        }
+        self.initial_interval = if initial_interval > 1 { initial_interval } else { 1 };
     }
 
     pub fn set_max_interval(&mut self, max_interval: u64) {
-        self.max_interval = max_interval;
+        if max_interval < 1 {
+            warn!("Max interval must be positive, but was  {max_interval}");
+        }
+        self.max_interval = if max_interval > 0 { max_interval } else { 1 };
     }
 
     pub fn set_multiplier(&mut self, multiplier: f32) {
-        self.multiplier = multiplier;
+        if multiplier <= 1.0 {
+            warn!("Multiplier must be > 1.0 for effective exponential backoff, but was {multiplier}");
+        }
+        self.multiplier = if multiplier > 1.0 { multiplier } else { 1.0 };
+    }
+
+    pub fn get_initial_interval(&self) -> u64 {
+        self.initial_interval
+    }
+
+    pub fn get_max_interval(&self) -> u64 {
+        self.max_interval
+    }
+
+    pub fn get_multiplier(&self) -> f32 {
+        self.multiplier
     }
 }
 
@@ -47,12 +66,12 @@ impl ExponentialBackOffPolicy {
 impl BackOffPolicy for ExponentialBackOffPolicy {
     async fn start(
         &self,
-        context: &dyn crate::retry_context::RetryContext,
+        _context: &dyn crate::retry_context::RetryContext,
     ) -> Option<Arc<dyn BackOffContext>> {
         Some(Arc::new(ExponentialBackOffContext {
-            interval: todo!(),
-            multiplier: todo!(),
-            max_interval: todo!(),
+            interval: Arc::new(AtomicU64::new(self.initial_interval)),
+            multiplier: self.multiplier,
+            max_interval: self.max_interval,
         }))
     }
 
@@ -95,13 +114,46 @@ impl Default for ExponentialBackOffPolicy {
 
 #[derive(Clone)]
 pub struct ExponentialBackOffContext {
-    interval: u64,
+    interval: Arc<AtomicU64>,
     multiplier: f32,
     max_interval: u64,
 }
 
 impl ExponentialBackOffContext {
     pub fn get_sleep_and_increment(&self) -> u64 {
-        0
+        
+        let mut sleep = self.get_interval();
+        let max = self.get_max_interval();
+
+        if sleep > max {
+            sleep = max;
+        }else {
+            self.interval.store(self.get_next_interval(), Ordering::Relaxed);
+        };
+        
+        // TODO random
+        sleep
+    }
+
+    pub fn get_interval(&self) -> u64 {
+        self.interval.load(Ordering::Relaxed)
+    }
+
+    pub fn get_multiplier(&self) -> f32 {
+        self.multiplier
+    }
+
+    pub fn get_next_interval(&self) -> u64 {
+        self.interval.load(Ordering::Relaxed) * (self.multiplier as u64)
+    }
+
+    pub fn get_max_interval(&self) -> u64 {
+        self.max_interval
+    }
+}
+
+impl BackOffContext for ExponentialBackOffContext {
+    fn get_value(&self) -> Option<&next_web_core::util::any_map::AnyValue> {
+        None
     }
 }

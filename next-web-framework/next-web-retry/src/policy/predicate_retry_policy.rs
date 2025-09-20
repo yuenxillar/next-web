@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use next_web_core::async_trait;
+
 use crate::{error::retry_error::RetryError, retry_policy::RetryPolicy, Predicate};
 
 #[derive(Clone)]
@@ -17,8 +19,9 @@ impl PredicateRetryPolicy {
     }
 }
 
+#[async_trait]
 impl RetryPolicy for PredicateRetryPolicy {
-    fn can_retry(&self, context: &dyn crate::retry_context::RetryContext) -> bool {
+    async fn can_retry(&self, context: &dyn crate::retry_context::RetryContext) -> bool {
         todo!()
     }
 
@@ -39,5 +42,11 @@ impl RetryPolicy for PredicateRetryPolicy {
         error: Option<&dyn crate::error::AnyError>,
     ) {
         todo!()
+    }
+}
+
+impl ToString for PredicateRetryPolicy {
+    fn to_string(&self) -> String {
+        "PredicateRetryPolicy".to_string()
     }
 }

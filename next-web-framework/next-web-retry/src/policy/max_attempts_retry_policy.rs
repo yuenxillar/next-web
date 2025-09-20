@@ -1,4 +1,6 @@
 use std::{any::Any, sync::{atomic::{AtomicU16, Ordering}, Arc}};
+use next_web_core::async_trait;
+
 use crate::{context::retry_context_support::RetryContextSupport, retry_context::RetryContext, retry_policy::RetryPolicy};
 
 #[derive(Clone)]
@@ -26,8 +28,10 @@ impl Default for MaxAttemptsRetryPolicy {
     }
 }
 
+
+#[async_trait]
 impl RetryPolicy for MaxAttemptsRetryPolicy {
-    fn can_retry(&self, context: &dyn RetryContext) -> bool {
+    async fn can_retry(&self, context: &dyn RetryContext) -> bool {
         context.get_retry_count() < self.get_max_attempts()
     }
 
@@ -55,5 +59,12 @@ impl RetryPolicy for MaxAttemptsRetryPolicy {
 
     fn get_max_attempts(&self) -> u16 {
         self.max_attempts.load(Ordering::Relaxed)
+    }
+}
+
+
+impl ToString for MaxAttemptsRetryPolicy {
+    fn to_string(&self) -> String {
+        "MaxAttemptsRetryPolicy".to_string()
     }
 }

@@ -1,17 +1,19 @@
 use std::sync::Arc;
 
-use next_web_core::DynClone;
+use next_web_core::{async_trait, DynClone};
 
 use crate::{error::AnyError, retry_context::RetryContext};
 
 
 pub const NO_MAXIMUM_ATTEMPTS_SET: u16 = 0;
+
+#[async_trait]
 pub trait RetryPolicy
 where
     Self: Send + Sync,
-    Self: DynClone
+    Self: DynClone + ToString,
 {
-    fn can_retry(&self, context: &dyn RetryContext) -> bool;
+    async fn can_retry(&self, context: &dyn RetryContext) -> bool;
 
     fn open(&self, context:  Option<&dyn RetryContext>) -> Arc<dyn RetryContext>;
 

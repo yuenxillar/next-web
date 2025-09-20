@@ -1,6 +1,6 @@
 use std::{any::Any, collections::HashMap, sync::{atomic::{AtomicBool, AtomicU16, Ordering}, Arc}};
 
-use next_web_core::util::any_map::AnyValue;
+use next_web_core::{async_trait, util::any_map::AnyValue};
 
 use crate::{
     classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier},
@@ -99,8 +99,8 @@ impl SimpleRetryPolicy {
         self.max_attempts_supplier = Some(Arc::new(max_attempts_supplier));
     }
 
-    fn retry_for_error(&self, error: Option<&RetryError>) -> bool {
-        self.recoverable_classifier.classify(error)
+    async fn retry_for_error(&self, error: Option<&RetryError>) -> bool {
+        self.recoverable_classifier.classify(error).await
     }
 }
 
@@ -110,10 +110,11 @@ impl Default for SimpleRetryPolicy {
     }
 }
 
+#[async_trait]
 impl RetryPolicy for SimpleRetryPolicy {
-    fn can_retry(&self, context: &dyn RetryContext) -> bool {
+    async fn can_retry(&self, context: &dyn RetryContext) -> bool {
         let error = context.get_last_error();
-        if (error.is_none() || self.retry_for_error(error.as_ref()))
+        if (error.is_none() || self.retry_for_error(error.as_ref()).await)
             && context.get_retry_count() < self.get_max_attempts()
         {
             false
@@ -225,5 +226,12 @@ impl RetryContext for SimpleRetryContext {
 
     fn get_last_error(&self) -> Option<RetryError> {
         self.last_error.clone()
+    }
+}
+
+
+impl ToString for SimpleRetryPolicy {
+    fn to_string(&self) -> String {
+        "SimpleRetryPolicy".to_string()
     }
 }
