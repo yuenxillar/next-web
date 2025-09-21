@@ -2,6 +2,9 @@
 name = "next-web-retry"
 version = "0.1.0"
 edition = "2024"
+description = "A retry template"
+license.workspace = true
+readme = "README.md"
 
 [dependencies]
 next-web-core = { workspace = true }

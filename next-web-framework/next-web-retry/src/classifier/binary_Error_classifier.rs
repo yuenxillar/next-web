@@ -17,7 +17,7 @@ pub struct BinaryErrorClassifier<T = RetryError, C = bool> {
 impl BinaryErrorClassifier {
     pub fn default_classifier() -> Self {
         let mut map: HashMap<RetryError, bool> = Default::default();
-        map.insert(RetryError::Parent, true);
+        map.insert(RetryError::Custom("TODO".to_string()), true);
         Self::with_retryable_errors_and_default_value(map, false)
     }
 

@@ -10,7 +10,6 @@ pub enum RetryError {
     TerminatedRetryError(WithCauseError),
     BackOffInterruptedError(WithCauseError),
     Default(WithCauseError),
-    Parent
 }
 
 
@@ -23,12 +22,6 @@ impl RetryError {
             RetryError::Default(error) => Some(Box::new(DefaultAnyError(error.clone()))),
             RetryError::TerminatedRetryError(error) => Some(Box::new(DefaultAnyError(error.clone()))),
             RetryError::BackOffInterruptedError(error) => Some(Box::new(DefaultAnyError(error.clone()))),
-            RetryError::Parent => Some(
-                Box::new(DefaultAnyError(WithCauseError {
-                    msg: "Retry Parent Error".to_string(),
-                    cause: None,
-                }))
-            )
         }
     }
 }

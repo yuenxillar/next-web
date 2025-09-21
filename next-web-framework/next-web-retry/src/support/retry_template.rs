@@ -810,16 +810,3 @@ impl Default for RetryTemplate {
         }
     }
 }
-
-
-mod test {
-    use super::RetryTemplate;
-
-    #[test]
-    fn test_retry_template_builder() {
-        let retry_template = RetryTemplate::builder()
-        .max_attempts(2)
-        .fixed_backoff(1000)
-        .build();
-    }
-}

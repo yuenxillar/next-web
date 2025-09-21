@@ -22,10 +22,12 @@ impl ExponentialBackOffPolicy {
     }
 
     pub fn with_random() -> Self {
-        Self {
-            with_random: true,
-            ..Default::default()
-        }
+        // Self {
+        //     with_random: true,
+        //     ..Default::default()
+        // }
+
+        unimplemented!("Randomized backoff is not implemented yet.");
     }
 
     pub fn set_initial_interval(&mut self, initial_interval: u64) {
