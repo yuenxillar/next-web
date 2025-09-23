@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use next_web_core::util::any_map::AnyValue;
+use next_web_core::models::any_value::AnyValue;
 use next_web_dev::util::local_date_time::LocalDateTime;
 use next_web_macros::Retryable;
 use next_web_retry::{
@@ -15,7 +15,7 @@ enum TestMatch {
     B(u64),
 }
 
-#[Retryable(max_attempts = 3, delay = 1000, backoff = backoff_test, retry_for = [TestMatch::A, TestMatch::B(123)], multiplier = 2)]
+#[Retryable(max_attempts = 4, delay = 1000, backoff = backoff_test, retry_for = [TestMatch::A, TestMatch::B(123)], multiplier = 2)]
 fn test_retry() -> Result<(), TestMatch> {
     let timestamp_sec = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

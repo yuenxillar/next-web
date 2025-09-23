@@ -4,7 +4,6 @@ use crate::common::retry::impl_macro_retry;
 use crate::data::builder::impl_macro_builder;
 use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
-use crate::database::db_mapper::impl_macro_db_mapper;
 use crate::singleton::find::impl_macro_find_singleton;
 use data::desensitized::impl_macro_desensitized;
 use proc_macro::TokenStream;
@@ -12,7 +11,7 @@ use syn::parse_macro_input;
 use syn::DeriveInput;
 use syn::ItemFn;
 
-mod attrs;
+mod web;
 mod common;
 mod data;
 mod database;
@@ -42,15 +41,6 @@ pub fn desensitized(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     impl_macro_desensitized(&input)
 }
-
-// database
-#[proc_macro_derive(DbMapper, attributes(d))]
-pub fn all_constructor(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let stream = impl_macro_db_mapper(&input);
-    stream.into()
-}
-
 
 #[doc = ""]
 #[allow(non_snake_case)]

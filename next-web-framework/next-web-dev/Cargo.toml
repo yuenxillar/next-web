@@ -11,6 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 next-web-core = { workspace = true }
+next-web-macros = { workspace = true }
 next-web-common = { version = "0.1.0", default-features = false, features = [
     "query-wrapper",
 ] }
@@ -34,16 +35,13 @@ serde_yaml = { workspace = true }
 serde_json = { workspace = true }
 
 tokio-util = { workspace = true }
-async-trait = { workspace = true }
 futures = { workspace = true }
 chrono = { workspace = true }
 once_cell = { workspace = true }
-hashbrown = { workspace = true }
 tracing = { workspace = true }
 tracing-appender = { workspace = true }
 regex = { workspace = true }
 jsonwebtoken = { workspace = true }
-parking_lot = { workspace = true }
 flume = { workspace = true }
 validator = { workspace = true}
 thiserror = { workspace = true }
@@ -54,14 +52,11 @@ rudi-dev = { workspace = true }
 
 tracing-subscriber = { workspace = true }
 
-
 reqwest = { workspace = true, features = ["stream"]}
 async-stream = { workspace = true }
 
-
 serde_path_to_error = "0.1.17"
 mime = "0.3.17"
-
 
 [target.'cfg(windows)'.dependencies]
 mimalloc = { workspace = true }

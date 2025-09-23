@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU16, Ordering},
 };
 
+use next_web_core::models::any_value::AnyValue;
 use tokio::sync::Mutex;
 
 use crate::{
@@ -42,15 +43,15 @@ impl SyncAttributeAccessor for RetryContextSupport {
         self.attribute_support.has_attribute(name)
     }
 
-    fn set_attribute(&self, name: &str, value: next_web_core::util::any_map::AnyValue) {
+    fn set_attribute(&self, name: &str, value: AnyValue) {
         self.attribute_support.set_attribute(name, value)
     }
 
-    fn remove_attribute(&self, name: &str) -> Option<next_web_core::util::any_map::AnyValue> {
+    fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
         self.attribute_support.remove_attribute(name)
     }
 
-    fn get_attribute(&self, name: &str) -> Option<next_web_core::util::any_map::AnyValue> {
+    fn get_attribute(&self, name: &str) -> Option<AnyValue> {
         self.attribute_support.get_attribute(name)
     }
 }

@@ -1,6 +1,6 @@
 use std::{any::Any, sync::{atomic::{AtomicU64, Ordering}, Arc}};
 
-use next_web_core::async_trait;
+use next_web_core::{async_trait, models::any_value::AnyValue};
 use tracing::warn;
 
 use crate::backoff::{
@@ -155,7 +155,7 @@ impl ExponentialBackOffContext {
 }
 
 impl BackOffContext for ExponentialBackOffContext {
-    fn get_value(&self) -> Option<&next_web_core::util::any_map::AnyValue> {
+    fn get_value(&self) -> Option<&AnyValue> {
         None
     }
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::util::any_matcher::AnyMatcher;
+use next_web_core::models::any_matcher::AnyMatcher;
 
 use crate::auth::models::login_type::LoginType;
 use crate::core::http_security::HttpSecurity;

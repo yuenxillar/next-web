@@ -1,7 +1,6 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use flume::Sender;
-use hashbrown::HashSet;
 use next_web_core::{
     error::BoxError, traits::{
         job::{

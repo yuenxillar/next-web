@@ -1,14 +1,13 @@
 use flume::{Receiver, Sender};
-use hashbrown::HashMap;
+use tokio::sync::Mutex;
+use std::collections::HashMap;
 use next_web_core::{
-    common::key::Key,
-    traits::event::{
+    async_trait, common::key::Key, traits::event::{
         application_event::ApplicationEvent,
         application_event_multicaster::ApplicationEventMulticaster,
         application_listener::ApplicationListener,
-    },
+    }
 };
-use parking_lot::Mutex;
 use std::sync::Arc;
 #[cfg(feature = "trace-log")]
 use tracing::debug;
@@ -54,7 +53,7 @@ impl DefaultApplicationEventMulticaster {
         tokio::spawn(async move {
             while let Ok(event) = channel.recv() {
                 if let Some(listeners) =
-                    listeners.lock().get(&Key::new(event.0, event.1.event_id()))
+                    listeners.lock().await.get(&Key::new(event.0, event.1.event_id()))
                 {
                     let _ = listeners.send(event.1);
                 }
@@ -63,13 +62,14 @@ impl DefaultApplicationEventMulticaster {
     }
 }
 
+#[async_trait]
 impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
-    fn add_application_listener(&mut self, mut listener: Box<dyn ApplicationListener>) {
+    async fn add_application_listener(&mut self, mut listener: Box<dyn ApplicationListener>) {
         let tid = listener.event_id();
 
         let (sender, receiver) = flume::unbounded();
         let key = Key::new(listener.id(), listener.event_id());
-        let mut listeners = self.listeners.lock();
+        let mut listeners = self.listeners.lock().await;
         if listeners.contains_key(&key) {
             panic!(
                 "Listener already exists for event type: {:?}, key: {}",
@@ -92,10 +92,10 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
         }
     }
 
-    fn remove_application_listener(&mut self, key: &Key) {
+    async fn remove_application_listener(&mut self, key: &Key) {
         // 使用监听器的唯一ID进行匹配删除
         // Use listener's unique ID to match and remove
-        if let Some(_) = self.listeners.lock().remove(key) {
+        if let Some(_) = self.listeners.lock().await.remove(key) {
             #[cfg(feature = "trace-log")]
             debug!("Removed listener for event type: {}", key);
         };

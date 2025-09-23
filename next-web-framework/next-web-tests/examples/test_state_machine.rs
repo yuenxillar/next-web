@@ -1,7 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, util::any_map::AnyValue,
+    async_trait, context::properties::ApplicationProperties, models::any_value::AnyValue,
     ApplicationContext,
 };
 use next_web_dev::{

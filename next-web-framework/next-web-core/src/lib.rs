@@ -1,3 +1,4 @@
+pub mod models;
 pub mod autoconfigure;
 pub mod autoregister;
 pub mod client;

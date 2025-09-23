@@ -5,7 +5,7 @@ use quote::quote;
 use syn::{ spanned::Spanned, Expr, ItemFn, ReturnType, Type};
 
 use crate::{
-    attrs::retry_attr::RetryAttr,
+    common::retry_attr::RetryAttr,
     util::param_info::{extract_param_info, ParamInfo},
 };
 
@@ -103,7 +103,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
                 let max_attempts: u8 = #max_attempts;
                 let mut delay: u64 = #delay;
 
-                let mut retry_count: u8 = 0;
+                let mut attempt_count : u8 = 0;
                 loop {
                     #(#clones)*
 
@@ -111,19 +111,18 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
                     match result {
                         Ok(var) => return Ok(var),
                         Err(error) => {
-
                             #retry_for
 
-                            if retry_count >= max_attempts {
+                            if attempt_count   >=  max_attempts - 1 {
                                 #backoff
                                 return Err(error);
                             }
 
-                            retry_count += 1;
-
                             ::tokio::time::sleep(::std::time::Duration::from_millis(delay)).await;
 
                             #multiplier
+                            
+                            attempt_count  += 1;
                         }
                     }
                 }
@@ -137,8 +136,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
                 let max_attempts: u8 = #max_attempts;
                 let mut delay: u64 = #delay;
 
-                let mut retry_count: u8 = 0;
-
+                let mut attempt_count : u8 = 0;
                 loop {
                     #(#clones)*
 
@@ -146,19 +144,18 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
                     match result {
                         Ok(var) => return Ok(var),
                         Err(error) => {
-
                             #retry_for
 
-                           if retry_count >= max_attempts {
+                           if attempt_count   >=  max_attempts - 1  {
                                 #backoff
                                 return Err(error);
                             }
 
-                            retry_count += 1;
-
                             ::std::thread::sleep(::std::time::Duration::from_millis(delay));
 
                             #multiplier
+
+                            attempt_count  += 1;
                         }
                     }
                 }

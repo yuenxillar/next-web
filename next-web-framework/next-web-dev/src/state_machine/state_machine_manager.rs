@@ -6,7 +6,7 @@ use super::{
     state_machine_context::StateMachineKey, EventMessage, StateMachine, StateMachineAction,
     Transition,
 };
-use hashbrown::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use tokio::sync::{broadcast::Receiver, RwLock};
 use tracing::error;
 
@@ -36,7 +36,7 @@ where
         }
     }
 
-    pub fn add_action<K>(&mut self, key: K, action: Box<dyn StateMachineAction<S, E>>) -> &mut Self
+    pub async fn add_action<K>(&mut self, key: K, action: Box<dyn StateMachineAction<S, E>>) -> &mut Self
     where
         S: Hash + Eq + PartialEq,
         E: Hash + Eq + PartialEq,
@@ -49,12 +49,14 @@ where
             event: key.3.clone(),
         };
 
-        self.key.entry(k).or_insert();
+        if !self.key.contains(&k) {
+            self.key.insert(k);
+        }
+
         self.action
-            .try_write()
-            .map(|mut s| s.insert(key, action))
-            .map_err(|e| error!("StateMachineManager add action error: {:?}", e))
-            .ok();
+            .write()
+            .await
+            .insert(key, action);
         self
     }
 

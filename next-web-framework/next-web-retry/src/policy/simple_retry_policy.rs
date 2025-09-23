@@ -1,6 +1,6 @@
 use std::{any::Any, collections::HashMap, sync::{atomic::{AtomicBool, AtomicU16, Ordering}, Arc}};
 
-use next_web_core::{async_trait, util::any_map::AnyValue};
+use next_web_core::{async_trait, models::any_value::AnyValue};
 
 use crate::{
     classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier},

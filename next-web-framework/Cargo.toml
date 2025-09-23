@@ -11,11 +11,11 @@ version = "0.1.0"
 rust-version = "1.86.0"
 description = "Just a simple web infrastructure framework"
 
-
 [dependencies]
 # next-web libs
 next-web-dev = { version = "0.1.6", path = "./next-web-dev"}
 next-web-core = { version = "0.1.4", path = "./next-web-core" }
+next-web-macros = { version = "0.1.0", path = "./next-web-macros"}
 
 next-web-security = { version = "0.1.0", path = "./next-web-security", optional = true }
 next-web-ai = { version = "*", path = "./next-web-ai", optional = true }
@@ -31,6 +31,7 @@ next-web-websocket = { version = "0.1.2", path = "./next-web-websocket", optiona
 next-web-crud = { version = "0.1.0", path = "./next-web-crud", optional = true}
 next-web-open-api = { version = "*", path = "./next-web-open-api", optional = true}
 next-web-retry =  {version = "*", path = "./next-web-retry", optional = true}
+
 
 next-web-gateway = { version = "*", path = "./next-web-gateway", optional = true }
 

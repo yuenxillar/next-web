@@ -1,4 +1,4 @@
-use async_trait::async_trait;
+use next_web_core::async_trait;
 use axum::http::StatusCode;
 use axum::Router;
 use next_web_core::client::rest_client::RestClient;
