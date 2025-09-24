@@ -9,6 +9,7 @@ use std::{
 use std::hash::Hash;
 
 use crate::autoregister::auto_register::AutoRegisterModule;
+use crate::util::singleton::SingletonUtil;
 
 /// A context is a container for all the providers and instances.
 ///
@@ -738,6 +739,17 @@ impl ApplicationContext {
             Resolved::NotSingletonOrTransient(definition) => {
                 not_singleton_or_transient_panic(definition)
             }
+            Resolved::NotSingletonOrSingleOwner(_) | Resolved::NoReturn => unreachable!(),
+        }
+    }
+
+    pub fn resolve_with_default_name<T: 'static + Send + Sync>(
+        &mut self
+    ) -> T {
+        let name = "".into();
+        match self.inner_resolve(name, Behaviour::CreateThenReturnSingletonOrTransient) {
+            Resolved::SingletonOrTransient(instance) => instance,
+            Resolved::NotFoundProvider(_)| Resolved::NotSingletonOrTransient(_) => self.resolve_with_name(SingletonUtil::name::<T>()),
             Resolved::NotSingletonOrSingleOwner(_) | Resolved::NoReturn => unreachable!(),
         }
     }

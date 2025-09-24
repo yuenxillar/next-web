@@ -1,6 +1,6 @@
-use next_web_core::async_trait;
 use axum::http::StatusCode;
 use axum::Router;
+use next_web_core::async_trait;
 use next_web_core::client::rest_client::RestClient;
 use next_web_core::constants::application_constants::{
     APPLICATION_BANNER, APPLICATION_DEFAULT_PORT,
@@ -21,13 +21,15 @@ use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
-use tracing::{info, warn};
+use tracing::{info, error};
 
 use crate::application::next_application::NextApplication;
 
 use crate::application::permitted_groups::PERMITTED_GROUPS;
+use crate::autoregister::handler_autoregister::HttpHandlerAutoRegister;
 use crate::autoregister::register_single::ApplicationDefaultRegisterContainer;
 
+use crate::autoregister::scheduler_autoregister::SchedulerAutoRegister;
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
@@ -41,15 +43,12 @@ use next_web_core::traits::event::application_listener::ApplicationListener;
 #[cfg(feature = "scheduler")]
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
 #[cfg(feature = "scheduler")]
-use next_web_core::traits::job::application_job::ApplicationJob;
+use next_web_core::traits::schedule::scheduled_task::ScheduledTask;
 
 #[async_trait]
 pub trait Application: Send + Sync {
     /// Initialize the middleware.
     async fn init_middleware(&mut self, properties: &ApplicationProperties);
-
-    // Get the application router. (open api  and private api)
-    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> axum::Router;
 
     /// Before starting the application
     #[allow(unused_variables)]
@@ -177,21 +176,6 @@ pub trait Application: Send + Sync {
         ctx: &mut ApplicationContext,
         _application_properties: &ApplicationProperties,
     ) {
-        // Register job
-        let producers = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
-
-        if let Some(job_schedluer_manager) =
-            ctx.get_single_option_with_name::<JobSchedulerManager>("jobSchedulerManager")
-        {
-            let mut schedluer_manager = job_schedluer_manager.clone();
-            for producer in producers {
-                schedluer_manager.add_job(producer).await;
-            }
-            schedluer_manager.start();
-        } else {
-            warn!("Job scheduler manager not found.");
-        }
-
         // Register application event
         let (tx, rx) = flume::unbounded();
         let mut default_event_publisher = DefaultApplicationEventPublisher::new();
@@ -201,16 +185,44 @@ pub trait Application: Send + Sync {
         multicaster.set_event_channel(rx);
 
         let listeners = ctx.resolve_by_type::<Box<dyn ApplicationListener>>();
-        listeners.into_iter().for_each(|listener| {
-            multicaster.add_application_listener(listener);
-        });
+        for listener in listeners.into_iter() {
+            multicaster.add_application_listener(listener).await;
+        }
 
         multicaster.run();
+
+        // Register jobs
+        #[cfg(feature = "scheduler")]
+        {
+            let mut manager = JobSchedulerManager::with_channel_size(240).await;
+            for scheduler in inventory::iter::<&dyn SchedulerAutoRegister>.into_iter() {
+                if let Err(error) = manager.add(scheduler.register(ctx)).await {
+                    error!("JobSchedulerManager Failed to add job: {}", error);
+                }
+            }
+
+            // let producers = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
+            // for producer in producers {
+            //     manager.add_job(producer).await;
+            // }
+            
+            manager.start().await;
+
+            ctx.insert_singleton_with_name(manager, "jobSchedulerManager");
+        }
 
         let rest_client = RestClient::new();
         ctx.insert_singleton_with_name(default_event_publisher, "defaultApplicationEventPublisher");
         ctx.insert_singleton_with_name(multicaster, "defaultApplicationEventMulticaster");
         ctx.insert_singleton_with_name(rest_client, "restClient");
+    }
+
+    // Get the application router. (open api  and private api)
+    #[allow(unused_variables)]
+    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> Router {
+        inventory::iter::<&dyn HttpHandlerAutoRegister>
+            .into_iter()
+            .fold(Router::new(), |router, handler| handler.register(router))
     }
 
     /// Bind tcp server.
@@ -379,13 +391,13 @@ pub trait Application: Send + Sync {
                 _ = terminate => info!("Received terminate signal. Shutting down..."),
             }
 
-            // 执行所有 shutdown hooks
+            // Execute all shutdown hooks
             for mut service in shutdowns {
                 service.shutdown().await;
             }
         };
 
-        // configure certificate and private key used by https
+        // Configure certificate and private key used by https
         #[cfg(feature = "tls-rustls")]
         {
             use axum_server::tls_rustls::RustlsConfig;
@@ -431,10 +443,14 @@ pub trait Application: Send + Sync {
 
         // Before to next step, map the application properties
         next_application.decrypt_properties();
-        
+
         let properties = next_application.application_properties().clone();
         let args = next_application.application_args().clone();
         let resources = next_application.application_resources().clone();
+
+        // Banner show
+        Self::banner_show(&resources);
+        println!("========================================================================\n");
 
         let mut ctx = ApplicationContext::options()
             .allow_override(
@@ -445,17 +461,13 @@ pub trait Application: Send + Sync {
                     .unwrap_or(false),
             )
             .auto_register();
+
         println!(
             "Init application context success!\nCurrent Time: {}\n",
             LocalDateTime::now()
         );
 
-        // Banner show
-        Self::banner_show(&resources);
-
         let application = next_application.application();
-
-        println!("========================================================================\n");
 
         application.init_logging(&properties);
         println!(

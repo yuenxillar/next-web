@@ -1,44 +1,35 @@
-use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_quote, spanned::Spanned, Error, FnArg, Ident, ItemFn, Type};
+use syn::{parse_quote, spanned::Spanned, Error, FnArg, Ident, ItemFn, LitStr, Type};
 
-pub fn impl_macro_find_singleton(_attr: TokenStream, item: ItemFn) -> TokenStream {
-    generate(item).unwrap_or_else(|e| e.to_compile_error().into())
-}
+pub(crate) fn impl_find_attribute(
+    item: &mut ItemFn,
 
-fn generate(mut item: ItemFn) -> Result<TokenStream, Error> {
+    produces: Option<LitStr>,
+) -> Result<proc_macro2::TokenStream, Error> {
     let vis = &item.vis;
+    let mut variables = Vec::new();
 
-    if let None = item.sig.asyncness {
-        return Err(Error::new(
-            item.sig.fn_token.span(),
-            "The function must be declared as async",
-        ));
-    };
-
-    let inputs = &item.sig.inputs;
-    if inputs.iter().any(|val| match val {
-        FnArg::Receiver(_) => true,
-        _ => false,
-    }) {
-        return Err(Error::new(
-            inputs.span(),
-            "The function must not have a receiver, self",
-        ));
-    }
-
-    let mut streams = Vec::new();
     for (index, fn_arg) in item.sig.inputs.iter_mut().enumerate() {
         match fn_arg {
             FnArg::Receiver(_) => {}
             FnArg::Typed(pat_type) => {
-
-                // println!("pate: {:#?}", pat_type);
                 match pat_type.ty.as_mut() {
                     syn::Type::Path(type_path) => {
+                        if !pat_type
+                            .attrs
+                            .iter()
+                            .any(|attr| attr.path().is_ident("find"))
+                        {
+                            continue;
+                        }
 
-                        let is_single = type_path.path.segments.iter().any(|seg| seg.ident.to_string().contains("FindSingleton"));
+                        let is_single = type_path
+                            .path
+                            .segments
+                            .iter()
+                            .any(|seg| seg.ident.to_string().contains("FindSingleton"));
+
                         for seg in type_path.path.segments.iter_mut() {
                             if seg.ident.to_string().contains("FindSingleton")
                                 && match &seg.arguments {
@@ -48,13 +39,11 @@ fn generate(mut item: ItemFn) -> Result<TokenStream, Error> {
                             {
                                 match &mut seg.arguments {
                                     syn::PathArguments::AngleBracketed(angle_bracketed) => {
-                                        let mut  flag = false;
+                                        let mut flag = false;
                                         if let Some(syn::GenericArgument::Type(typ)) =
                                             angle_bracketed.args.first()
                                         {
                                             if let Type::Path(type_path) = typ {
-                                                
-
                                                 let original_variable = match pat_type.pat.as_ref() {
                                                     syn::Pat::Ident(pat_ident) => {
                                                         pat_ident.ident.clone()
@@ -79,42 +68,53 @@ fn generate(mut item: ItemFn) -> Result<TokenStream, Error> {
 
                                                 let arg = Type::Path(type_path.clone());
 
-                                                let variable = Ident::new(& format!("_my_state{}", index), Span::call_site());
+                                                let variable = Ident::new(
+                                                    &format!("_my_service{}", index),
+                                                    Span::call_site(),
+                                                );
                                                 let single_name = Ident::new(&crate::util::single::field_name_to_singleton_name(&original_variable.to_string()), Span::call_site());
                                                 let stream = quote! {
                                                     let #original_variable = #variable.get_single_with_name::<#arg>(stringify!(#single_name)).await;
                                                 };
 
-                                                streams.push(stream);
+                                                variables.push(stream);
 
                                                 flag = true;
                                             }
                                         }
 
                                         if flag {
-
                                             angle_bracketed.args.clear();
                                             angle_bracketed.args.push(syn::GenericArgument::Type(
                                                     parse_quote!(::next_web_core::state::application_state::ApplicationState)
                                             ));
-                                            
-                                            let pat = syn::Pat::Ident(
-                                                syn::PatIdent { attrs: vec![], by_ref: None, mutability: None, ident: 
-                                                    Ident::new(format!("_my_state{}", index).as_str(), Span::call_site()), subpat: None
-                                                }
-                                            );
+
+                                            let pat = syn::Pat::Ident(syn::PatIdent {
+                                                attrs: vec![],
+                                                by_ref: None,
+                                                mutability: None,
+                                                ident: Ident::new(
+                                                    format!("_my_service{}", index).as_str(),
+                                                    Span::call_site(),
+                                                ),
+                                                subpat: None,
+                                            });
                                             pat_type.pat = Box::new(pat);
                                         }
                                     }
 
                                     _ => {}
                                 }
+
+                                pat_type.attrs.retain(|attr| !attr.path().is_ident("find"));
                             }
                         }
 
                         if is_single {
-                            let arg: syn::Type  = parse_quote!(::next_web_core::state::application_state::ApplicationState);
-                            let path: syn::Path = parse_quote!(::axum::Extension<#arg>);
+                            let arg: syn::Type = parse_quote!(
+                                ::next_web_core::state::application_state::ApplicationState
+                            );
+                            let path: syn::Path = parse_quote!(::next_web_dev::Extension<#arg>);
                             type_path.path = path;
                         }
                     }
@@ -127,12 +127,54 @@ fn generate(mut item: ItemFn) -> Result<TokenStream, Error> {
     let sig = &item.sig;
     let block = &item.block.stmts;
 
-    let token_stream = quote! {
-        #vis #sig 
-        {
-            #(#streams)*
+    let _return = block.iter().any(|stmt| match stmt {
+        syn::Stmt::Expr(expr, _semi) => match expr {
+            syn::Expr::Return(_) => true,
+            _ => false,
+        },
+        _ => false,
+    });
 
-            #(#block)*
+    let async_: proc_macro2::TokenStream = if  _return{
+        parse_quote!(async)
+    } else {
+        parse_quote!()
+    };
+
+    let await_: proc_macro2::TokenStream = if _return {
+        parse_quote!(.await)
+    } else {
+        parse_quote!()
+    };
+
+    let modify_body = match produces {
+        Some(produces) => quote! {
+            body.headers_mut()
+            .insert(
+                ::next_web_dev::http::header::CONTENT_TYPE,
+                ::next_web_dev::http::HeaderValue::from_static(#produces))
+            .unwrap();
+        },
+        None => quote! {},
+    };
+
+    let token_stream = quote! {
+        #vis #sig
+        {
+            #[allow(unused_mut)]
+            let mut body = 
+            #async_ {
+                #(#variables)*
+
+                #(#block)*
+
+            }
+            #await_
+            .into_response();
+
+            #modify_body
+    
+            body
         }
     };
 

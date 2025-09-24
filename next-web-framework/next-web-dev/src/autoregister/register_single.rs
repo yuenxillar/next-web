@@ -5,7 +5,6 @@ use next_web_core::{
 
 use crate::autoregister::message_source_service_autoregister::MessageSourceServiceAutoRegister;
 
-use super::job_scheduler_autoregister::JobSchedulerAutoRegister;
 
 pub struct ApplicationDefaultRegisterContainer {
     registers: Vec<Box<dyn AutoRegister>>,
@@ -26,7 +25,6 @@ impl ApplicationDefaultRegisterContainer {
         ctx: &mut ApplicationContext,
         properties: &ApplicationProperties,
     ) {
-        self.push::<JobSchedulerAutoRegister>();
         self.push::<MessageSourceServiceAutoRegister>();
 
         for register in self.registers.iter() {

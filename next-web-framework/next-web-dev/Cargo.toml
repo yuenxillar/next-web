@@ -45,6 +45,7 @@ jsonwebtoken = { workspace = true }
 flume = { workspace = true }
 validator = { workspace = true}
 thiserror = { workspace = true }
+inventory = { workspace = true }
 
 aes-gcm = { workspace = true, optional = true }
 

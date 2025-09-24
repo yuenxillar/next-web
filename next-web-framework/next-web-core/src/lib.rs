@@ -1,3 +1,4 @@
+pub mod scheduler;
 pub mod models;
 pub mod autoconfigure;
 pub mod autoregister;

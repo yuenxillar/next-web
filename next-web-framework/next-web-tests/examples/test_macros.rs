@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use next_web_core::traits::desensitized::Desensitized;
-use next_web_macros::{Builder, Desensitized, FieldName, GetSet};
+use next_web_dev::{Builder, Desensitized, FieldName, GetSet};
 
 /// This is a test macro
 #[allow(unused)]

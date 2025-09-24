@@ -6,7 +6,7 @@ pub mod apply_router;
 pub mod data_decoder;
 pub mod event;
 pub mod from_context;
-pub mod job;
+pub mod schedule;
 pub mod locale_resolver;
 pub mod service;
 pub mod singleton;

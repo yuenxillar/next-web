@@ -90,7 +90,7 @@ impl<A: Application + Default> NextApplication<A> {
         // 不解密关于 Server 相关的配置
 
         if let Some(mapping) = self.application_properties.mapping_mut() {
-                println!("mapping: {:#?}", mapping);
+                // println!("mapping: {:#?}", mapping);
                 
                 match mapping.as_mapping_mut() {
                     Some(mapping) => {

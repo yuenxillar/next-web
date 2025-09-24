@@ -4,7 +4,6 @@ use crate::common::retry::impl_macro_retry;
 use crate::data::builder::impl_macro_builder;
 use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
-use crate::singleton::find::impl_macro_find_singleton;
 use data::desensitized::impl_macro_desensitized;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
@@ -50,10 +49,38 @@ pub fn Retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
     impl_macro_retry(attr, item)
 }
 
+// web
+
 #[doc = ""]
-#[allow(non_snake_case)]
 #[proc_macro_attribute]
-pub fn Find(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as ItemFn);
-    impl_macro_find_singleton(attr, item)
+#[allow(non_snake_case)]
+pub fn RequestMapping(args: TokenStream, input: TokenStream) -> TokenStream {
+    crate::web::routing::with_method(None, args, input)
+}
+
+macro_rules! method_macro {
+    ($method:ident, $variant:ident) => {
+        
+        #[doc = ""]
+        #[proc_macro_attribute]
+        #[allow(non_snake_case)]
+        pub fn $method(args: TokenStream, input: TokenStream) -> TokenStream {
+            crate::web::routing::with_method(Some(crate::web::routing::Method::$variant), args, input)
+        }
+    };
+}
+
+method_macro!(GetMapping,       Get);
+method_macro!(PostMapping,      Post);
+method_macro!(PutMapping,       Put);
+method_macro!(DeleteMapping,    Delete);
+method_macro!(PatchMapping,     Patch);
+method_macro!(AnyMapping,       Any);
+
+
+#[doc = ""]
+#[proc_macro_attribute]
+#[allow(non_snake_case)]
+pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
+    crate::web::scheduled::impl_macro_scheduled(args, input)
 }

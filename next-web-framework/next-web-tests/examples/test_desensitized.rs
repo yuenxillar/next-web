@@ -10,7 +10,7 @@ use next_web_core::{
     ApplicationContext,
 };
 use next_web_dev::application::Application;
-use next_web_macros::{Desensitized, GetSet};
+use next_web_dev::{Desensitized, GetSet};
 
 #[derive(Clone, Default)]
 struct TestApplication;

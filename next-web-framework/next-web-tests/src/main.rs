@@ -4,12 +4,13 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
-use axum::{extract::ConnectInfo, response::IntoResponse, routing::get};
+use axum::{extract::ConnectInfo, response::IntoResponse};
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{
-    application::Application, middleware::find_singleton::FindSingleton, Singleton,
+    application::Application, middleware::find_singleton::FindSingleton,
+    util::local_date_time::LocalDateTime, AnyMapping, GetMapping, PostMapping, RequestMapping,
+    Singleton,
 };
-use next_web_macros::Find;
 use tokio::sync::Mutex;
 use tracing::info;
 
@@ -23,24 +24,27 @@ impl Application for TestApplication {
 
     async fn before_start(&mut self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
-        ctx.insert_singleton_with_name(Arc::new(Mutex::new(HashSet::<SocketAddr>::new())),"requestIps");
+        ctx.insert_singleton_with_name(
+            Arc::new(Mutex::new(HashSet::<SocketAddr>::new())),
+            "requestIps",
+        );
 
         ctx.insert_singleton_with_name(ApplicationStore::default(), "applicationStoreTwo");
     }
-
-    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
-        axum::Router::new()
-            .route("/hello", get(req_hello))
-            .route("/record", get(req_record))
-            .route("/recordTwo", get(req_record_two))
-    }
 }
 
-async fn req_hello() -> impl IntoResponse {
+#[RequestMapping(method = "GET", path = "/timestamp")]
+pub async fn req_timestamp() -> impl IntoResponse {
+    LocalDateTime::now()
+}
+
+#[GetMapping(path = "/hello")]
+pub async fn req_hello() -> impl IntoResponse {
     " Hello Axum! \n Hello Next Web!"
 }
 
-async fn req_record(
+#[PostMapping(path = "/record")]
+pub async fn req_record(
     FindSingleton(store): FindSingleton<ApplicationStore>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
@@ -48,14 +52,20 @@ async fn req_record(
     "Ok"
 }
 
-#[Find]
-async fn req_record_two(
+#[AnyMapping(
+    path = "/recordTwo", 
+    headers = ["Content-Type", "Authorization"],
+    consumes = "application/json",
+    produces = "application/json"
+)]
+pub async fn req_record_two(
     // Search for singleton using variable names
-    FindSingleton(application_store_two): FindSingleton<ApplicationStore>,
+    #[find] FindSingleton(application_store_two): FindSingleton<ApplicationStore>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
     application_store_two.add(addr).await;
-    "Ok"
+    
+    return "{\"message\": \"Ok\"}";
 }
 
 #[Singleton(name = "applicationStore")]
@@ -93,12 +103,5 @@ impl Default for ApplicationStore {
 
 #[tokio::main]
 async fn main() {
-
-    {
-        let mut s = String::new();
-        let s_ref = &s;
-
-        println!("ref: {}", s_ref)
-    }
     TestApplication::run().await;
 }

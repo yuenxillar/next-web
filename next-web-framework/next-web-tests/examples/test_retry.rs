@@ -2,7 +2,7 @@ use std::error::Error;
 
 use next_web_core::models::any_value::AnyValue;
 use next_web_dev::util::local_date_time::LocalDateTime;
-use next_web_macros::Retryable;
+use next_web_dev::Retryable;
 use next_web_retry::{
     error::retry_error::RetryError, retry_context::RetryContext, retry_operations::RetryOperations,
     support::retry_template::RetryTemplate,

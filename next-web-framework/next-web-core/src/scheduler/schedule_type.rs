@@ -8,5 +8,6 @@ pub enum ScheduleType {
     /// This will schedule a job that is only run once after the duration has passed.
     /// second
     OneShot(u64),
+    /// One shot job at a specific instant in time.
     OneShotAtInstant(std::time::Instant),
 }
