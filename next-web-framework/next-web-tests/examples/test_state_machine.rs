@@ -135,8 +135,8 @@ impl Application for TestApplication {
                 StateMachineGenerator::generate("testStateMachine", transition_configure)
                     .add_state_listener(TestEventListener::default());
 
-            let var = state_machie.start();
-            var.send_event(EventMessage::new(
+            let machine = state_machie.start().await;
+            machine.send_event(EventMessage::new(
                 TestEvent::Open,
                 Some(AnyValue::Boolean(true)),
             ))

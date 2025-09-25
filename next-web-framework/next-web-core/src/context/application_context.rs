@@ -746,10 +746,10 @@ impl ApplicationContext {
     pub fn resolve_with_default_name<T: 'static + Send + Sync>(
         &mut self
     ) -> T {
-        let name = "".into();
+        let name = SingletonUtil::name::<T>().into();
         match self.inner_resolve(name, Behaviour::CreateThenReturnSingletonOrTransient) {
             Resolved::SingletonOrTransient(instance) => instance,
-            Resolved::NotFoundProvider(_)| Resolved::NotSingletonOrTransient(_) => self.resolve_with_name(SingletonUtil::name::<T>()),
+            Resolved::NotFoundProvider(_)| Resolved::NotSingletonOrTransient(_) => self.resolve_with_name(""),
             Resolved::NotSingletonOrSingleOwner(_) | Resolved::NoReturn => unreachable!(),
         }
     }

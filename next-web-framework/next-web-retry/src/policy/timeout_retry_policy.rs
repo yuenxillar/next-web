@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use next_web_core::{async_trait, models::any_value::AnyValue, util::time::LocalTime};
+use next_web_core::{async_trait, models::any_value::AnyValue};
 
 use crate::{
     context::retry_context_support::RetryContextSupport,
@@ -33,7 +33,6 @@ impl Default for TimeoutRetryPolicy {
         Self { timeout: 1000 }
     }
 }
-
 
 #[async_trait]
 impl RetryPolicy for TimeoutRetryPolicy {
@@ -73,12 +72,12 @@ struct TimeoutRetryContext {
 impl TimeoutRetryContext {
     pub fn new(timeout: u64) -> Self {
         Self {
-            start: LocalTime::timestamp(),
+            start: timestamp(),
             timeout,
         }
     }
     fn is_alive(&self) -> bool {
-        (LocalTime::timestamp() - self.start) <= self.timeout
+        (timestamp() - self.start) <= self.timeout
     }
 }
 
@@ -128,3 +127,9 @@ impl ToString for TimeoutRetryPolicy {
     }
 }
 
+fn timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}

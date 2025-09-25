@@ -1,3 +1,4 @@
+pub mod logic;
 pub mod single;
 pub mod attributes;
 pub mod extract_type;

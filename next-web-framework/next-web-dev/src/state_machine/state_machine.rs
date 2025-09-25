@@ -52,12 +52,12 @@ where
         }
     }
 
-    pub fn start(mut self) -> Arc<Self>{
+    pub async fn start(mut self) -> Arc<Self>{
         // create manager
         let mut manager = StateMachineManager::<S, E>::new(self.id.clone());
 
         for configure in &self.transition_configure.inner {
-            manager.add_action((self.id().into(), configure.transition()), configure.action());
+            manager.add_action((self.id().into(), configure.transition()), configure.action()).await;
         }
 
         let (sender, receiver) = tokio::sync::broadcast::channel::<EventMessage<E>>(100);

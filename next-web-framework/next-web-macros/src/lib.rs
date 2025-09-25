@@ -77,8 +77,33 @@ method_macro!(DeleteMapping,    Delete);
 method_macro!(PatchMapping,     Patch);
 method_macro!(AnyMapping,       Any);
 
-
-#[doc = ""]
+#[doc = "A procedural macro attribute for defining scheduled tasks.\n\n\
+         This attribute can be applied to a function to register it as a scheduled job\n\
+         with configurable timing behavior. It supports three scheduling modes:\n\n\
+         - **Cron-based scheduling**: via the `cron` parameter (e.g., `\"0 0 2 * * *\"`).\n\
+         - **Fixed-rate execution**: via the `fixed_rate` parameter (executes repeatedly at fixed intervals).\n\
+         - **One-shot execution**: when `one_shot = true`, the task runs once after an optional `initial_delay`.\n\n\
+         # Parameters\n\n\
+         - `cron`: A cron expression in 6-field format (seconds, minutes, hours, day-of-month, month, day-of-week). \n\
+           Mutually exclusive with `fixed_rate`.\n\
+         - `fixed_rate`: Interval between executions (as a positive integer literal). \n\
+           Mutually exclusive with `cron`.\n\
+         - `initial_delay`: Delay before the first execution (in units specified by `time_unit`).\n\
+         - `timezone`: IANA time zone ID (e.g., `\"Asia/Shanghai\"`, `\"UTC\"`). \n\
+           If empty or omitted, the scheduler's default time zone is used.\n\
+         - `time_unit`: Time unit for `fixed_rate` and `initial_delay` (e.g., `\"ms\"`, `\"s\"`, `\"m\"`). \n\
+           Interpretation depends on the underlying scheduler.\n\
+         - `one_shot`: If `true`, the task runs exactly once (typically after `initial_delay`). \n\
+           In this mode, `cron` and `fixed_rate` are ignored.\n\n\
+         # Examples\n\n\
+         ```rust\n\
+         #[Scheduled(cron = \"0 0 3 * * *\", timezone = \"UTC\")]\n\
+         fn daily_cleanup() { /* ... */ }\n\n\
+         #[Scheduled(fixed_rate = 30, time_unit = \"s\", initial_delay = 5)]\n\
+         fn heartbeat() { /* ... */ }\n\n\
+         #[Scheduled(one_shot = true, initial_delay = 10, time_unit = \"s\")]\n\
+         fn delayed_init() { /* ... */ }\n\
+         ```"]
 #[proc_macro_attribute]
 #[allow(non_snake_case)]
 pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {

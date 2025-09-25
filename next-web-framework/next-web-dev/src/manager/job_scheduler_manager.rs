@@ -1,9 +1,9 @@
 use std::{collections::HashSet, sync::Arc};
 
 use next_web_core::{
-    error::BoxError,
     scheduler::{context::JobExecutionContext, schedule_type::ScheduleType},
-    traits::{schedule::scheduled_task::ScheduledTask, singleton::Singleton},
+    traits::singleton::Singleton,
+    util::time::TimeUnit,
 };
 use tokio::sync::RwLock;
 use tokio_cron_scheduler::{Job, JobScheduler, JobSchedulerError};
@@ -37,16 +37,16 @@ impl JobSchedulerManager {
         Ok(())
     }
 
-    pub async fn add_job(&self, job: Arc<dyn ScheduledTask>) {
-        let jjb = Self::generate_job(job, self.context.clone());
-        if jjb.is_err() {
-            warn!(
-                "JobSchedulerManager failed to add job, error: {}",
-                jjb.err().unwrap()
-            );
-            return;
-        }
-    }
+    // pub async fn add_job(&self, job: Arc<dyn ScheduledTask>) {
+    //     let jjb = Self::generate_job(job, self.context.clone());
+    //     if jjb.is_err() {
+    //         warn!(
+    //             "JobSchedulerManager failed to add job, error: {}",
+    //             jjb.err().unwrap()
+    //         );
+    //         return;
+    //     }
+    // }
 
     pub async fn remove(&self, guid: Vec<u8>) {
         match guid.try_into() {
@@ -70,7 +70,7 @@ impl JobSchedulerManager {
         // Add code to be run during/after shutdown
         self.scheduler.set_shutdown_handler(Box::new(|| {
             Box::pin(async move {
-                println!("Shut down done");
+                println!("Scheduler Done.");
             })
         }));
 
@@ -80,71 +80,146 @@ impl JobSchedulerManager {
 
     fn pack(job: AnJob) -> Result<Job, JobSchedulerError> {
         match job {
-            AnJob::Async(run) => Job::new_repeated_async(
-                std::time::Duration::from_millis(1000),
-                move |_uid, _lock| run(),
-            ),
-            AnJob::Sync(run) => {
-                Job::new_repeated(std::time::Duration::from_millis(900), move |_uid, _lock| {
-                    run()
-                })
+            AnJob::Async((ty, run)) => {
+                let job = match ty {
+                    ScheduleType::Cron(args) => {
+                        let schedule = args.cron.unwrap();
+                        match args.timezone {
+                            Some(timezone) => match schedule.to_lowercase().as_str() {
+                                "local" => Job::new_cron_job_async_tz(
+                                    schedule,
+                                    chrono::Local,
+                                    move |_uid, _lock| run(),
+                                )?,
+                                "utc" => Job::new_cron_job_async_tz(
+                                    schedule,
+                                    chrono::Utc,
+                                    move |_uid, _lock| run(),
+                                )?,
+                                _ => Job::new_cron_job_async_tz(
+                                    schedule,
+                                    timezone.parse::<chrono_tz::Tz>().unwrap_or(chrono_tz::UTC),
+                                    move |_uid, _lock| run(),
+                                )?,
+                            },
+                            None => Job::new_cron_job_async(schedule, move |_uid, _lock| run())?,
+                        }
+                    }
+                    ScheduleType::FixedRate(args) => {
+                        let value = args.fixed_rate.unwrap();
+
+                        let duration = args
+                            .time_unit
+                            .map(|unit| unit.parse::<TimeUnit>().unwrap_or(TimeUnit::Milliseconds))
+                            .map(|unit| unit.to_duration(value))
+                            .unwrap_or(std::time::Duration::from_millis(value));
+
+                        Job::new_repeated_async(duration, move |_uid, _lock| run())?
+                    }
+
+                    ScheduleType::OneShot(args) => {
+                        let value = args.initial_delay.unwrap();
+                        let duration = args
+                            .time_unit
+                            .map(|unit| unit.parse::<TimeUnit>().unwrap_or(TimeUnit::Milliseconds))
+                            .map(|unit| unit.to_duration(value))
+                            .unwrap_or(std::time::Duration::from_millis(value));
+                        Job::new_one_shot_async(duration, move |_uid, _lock| run())?
+                    }
+                };
+
+                Ok(job)
+            }
+            AnJob::Sync((ty, run)) => {
+                let job = match ty {
+                    ScheduleType::Cron(args) => {
+                        let schedule = args.cron.unwrap();
+                        match args.timezone {
+                            Some(timezone) => match schedule.to_lowercase().as_str() {
+                                "local" => {
+                                    Job::new_tz(schedule, chrono::Local, move |_uid, _lock| run())?
+                                }
+                                "utc" => {
+                                    Job::new_tz(schedule, chrono::Utc, move |_uid, _lock| run())?
+                                }
+                                _ => Job::new_tz(
+                                    schedule,
+                                    timezone.parse::<chrono_tz::Tz>().unwrap_or(chrono_tz::UTC),
+                                    move |_uid, _lock| run(),
+                                )?,
+                            },
+                            None => {
+                                Job::new_cron_job::<_, _, ()>(schedule, move |_uid, _lock| run())?
+                            }
+                        }
+                    }
+                    ScheduleType::FixedRate(args) => {
+                        let value = args.fixed_rate.unwrap();
+
+                        let duration = args
+                            .time_unit
+                            .map(|unit| unit.parse::<TimeUnit>().unwrap_or(TimeUnit::Milliseconds))
+                            .map(|unit| unit.to_duration(value))
+                            .unwrap_or(std::time::Duration::from_millis(value));
+
+                        Job::new_repeated(duration, move |_uid, _lock| run())?
+                    }
+
+                    ScheduleType::OneShot(args) => {
+                        let value = args.initial_delay.unwrap();
+                        let duration = args
+                            .time_unit
+                            .map(|unit| unit.parse::<TimeUnit>().unwrap_or(TimeUnit::Milliseconds))
+                            .map(|unit| unit.to_duration(value))
+                            .unwrap_or(std::time::Duration::from_millis(value));
+                        Job::new_one_shot(duration, move |_uid, _lock| run())?
+                    }
+                };
+
+                Ok(job)
             }
         }
     }
 
-    fn generate_job(
-        job: Arc<dyn ScheduledTask>,
-        context: JobExecutionContext,
-    ) -> Result<Job, BoxError> {
-        let schedule = job.schedule();
+    // fn generate_job(
+    //     job: Arc<dyn ScheduledTask>,
+    //     context: JobExecutionContext,
+    // ) -> Result<Job, BoxError> {
+    //     let schedule = job.schedule();
+    //     let jjb = match schedule {
+    //         ScheduleType::Cron(cron) => Job::new_cron_job_async("cron", move |_uid, _lock| {
+    //             Box::pin({
+    //                 let var1 = job.clone();
+    //                 let var2 = context.clone();
+    //                 async move {
+    //                     var1.execute(var2).await;
+    //                 }
+    //             })
+    //         }),
+    //         ScheduleType::FixedRate(interval) => {
+    //             Job::new_repeated_async(std::time::Duration::from_secs(1000), move |_uid, _lock| {
+    //                 Box::pin({
+    //                     let var1 = job.clone();
+    //                     let var2 = context.clone();
+    //                     async move {
+    //                         var1.execute(var2).await;
+    //                     }
+    //                 })
+    //             })
+    //         }
+    //         ScheduleType::OneShot(with_args) => {
+    //             Job::new_one_shot_async(std::time::Duration::from_secs(1000), move |_uid, _lock| {
+    //                 Box::pin({
+    //                     let var1 = job.clone();
+    //                     let var2 = context.clone();
+    //                     async move {
+    //                         var1.execute(var2).await;
+    //                     }
+    //                 })
+    //             })
+    //         }
+    //     };
 
-        let jjb = match schedule {
-            ScheduleType::Cron(cron) => Job::new_cron_job_async(cron, move |_uid, _lock| {
-                Box::pin({
-                    let var1 = job.clone();
-                    let var2 = context.clone();
-                    async move {
-                        var1.execute(var2).await;
-                    }
-                })
-            }),
-            ScheduleType::Repeated(interval) => Job::new_repeated_async(
-                std::time::Duration::from_secs(interval),
-                move |_uid, _lock| {
-                    Box::pin({
-                        let var1 = job.clone();
-                        let var2 = context.clone();
-                        async move {
-                            var1.execute(var2).await;
-                        }
-                    })
-                },
-            ),
-            ScheduleType::OneShot(interval) => Job::new_one_shot_async(
-                std::time::Duration::from_secs(interval),
-                move |_uid, _lock| {
-                    Box::pin({
-                        let var1 = job.clone();
-                        let var2 = context.clone();
-                        async move {
-                            var1.execute(var2).await;
-                        }
-                    })
-                },
-            ),
-            ScheduleType::OneShotAtInstant(instant) => {
-                Job::new_one_shot_at_instant_async(instant, move |_uid, _lock| {
-                    Box::pin({
-                        let var1 = job.clone();
-                        let var2 = context.clone();
-                        async move {
-                            var1.execute(var2).await;
-                        }
-                    })
-                })
-            }
-        };
-
-        Ok(jjb?)
-    }
+    //     Ok(jjb?)
+    // }
 }
