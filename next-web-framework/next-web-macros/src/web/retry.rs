@@ -5,7 +5,7 @@ use quote::quote;
 use syn::{ spanned::Spanned, Expr, ItemFn, ReturnType, Type};
 
 use crate::{
-    common::retry_attr::RetryAttr,
+    web::attrs::retry_attr::RetryAttr,
     util::param_info::{extract_param_info, ParamInfo},
 };
 

@@ -24,12 +24,43 @@ impl Application for TestApplication {
 
     async fn before_start(&mut self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
-        ctx.insert_singleton_with_name(
-            Arc::new(Mutex::new(HashSet::<SocketAddr>::new())),
-            "requestIps",
-        );
 
+        #[rustfmt::skip]
+        ctx.insert_singleton_with_name(Arc::new(Mutex::new(HashSet::<SocketAddr>::new())),"requestIps");
         ctx.insert_singleton_with_name(ApplicationStore::default(), "applicationStoreTwo");
+    }
+}
+
+#[Singleton(name = "applicationStore")]
+#[derive(Clone)]
+pub struct ApplicationStore {
+    pub request_count: Arc<AtomicU32>,
+    pub request_ips: Arc<Mutex<HashSet<SocketAddr>>>,
+}
+
+impl ApplicationStore {
+    async fn add(&self, addr: SocketAddr) {
+        self.request_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        match self.request_ips.lock().await.insert(addr) {
+            true => info!("Store add new ip: {}", addr.to_string()),
+            false => info!("Ip already exists in store: {}", addr.to_string()),
+        }
+
+        info!(
+            "Current request count: {}",
+            self.request_count
+                .load(std::sync::atomic::Ordering::Relaxed)
+        )
+    }
+}
+
+impl Default for ApplicationStore {
+    fn default() -> Self {
+        Self {
+            request_count: Arc::new(AtomicU32::new(u32::MAX / 2)),
+            request_ips: Default::default(),
+        }
     }
 }
 
@@ -64,40 +95,20 @@ pub async fn req_record_two(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
     application_store_two.add(addr).await;
-    
+
     return "{\"message\": \"Ok\"}";
 }
 
-#[Singleton(name = "applicationStore")]
-#[derive(Clone)]
-pub struct ApplicationStore {
-    pub request_count: Arc<AtomicU32>,
-    pub request_ips: Arc<Mutex<HashSet<SocketAddr>>>,
-}
+#[allow(unused)]
+struct TestNestRoutes;
 
-impl ApplicationStore {
-    async fn add(&self, addr: SocketAddr) {
-        self.request_count
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        match self.request_ips.lock().await.insert(addr) {
-            true => info!("Store add new ip: {}", addr.to_string()),
-            false => info!("Ip already exists in store: {}", addr.to_string()),
-        }
+#[RequestMapping(path = "/nest")]
+impl TestNestRoutes {
 
-        info!(
-            "Current request count: {}",
-            self.request_count
-                .load(std::sync::atomic::Ordering::Relaxed)
-        )
-    }
-}
-
-impl Default for ApplicationStore {
-    fn default() -> Self {
-        Self {
-            request_count: Arc::new(AtomicU32::new(u32::MAX / 2)),
-            request_ips: Default::default(),
-        }
+    // Request -> /nest/call
+    #[GetMapping(path = "/call", produces = "application/json")]
+    async fn req_call() -> impl IntoResponse {
+        "Called"
     }
 }
 

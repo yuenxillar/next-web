@@ -1,9 +1,10 @@
 extern crate proc_macro;
 
-use crate::common::retry::impl_macro_retry;
 use crate::data::builder::impl_macro_builder;
+use crate::data::constructor::impl_macro_required_args_constructor;
 use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
+use crate::web::retry::impl_macro_retry;
 use data::desensitized::impl_macro_desensitized;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
@@ -35,19 +36,19 @@ pub fn builder(input: TokenStream) -> TokenStream {
     impl_macro_builder(&input)
 }
 
+#[proc_macro_derive(RequiredArgsConstructor, attributes(constructor))]
+pub fn required_args_constructor(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    impl_macro_required_args_constructor(&input)
+}
+
 #[proc_macro_derive(Desensitized, attributes(de))]
 pub fn desensitized(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     impl_macro_desensitized(&input)
 }
 
-#[doc = ""]
-#[allow(non_snake_case)]
-#[proc_macro_attribute]
-pub fn Retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as ItemFn);
-    impl_macro_retry(attr, item)
-}
+
 
 // web
 
@@ -108,4 +109,12 @@ method_macro!(AnyMapping,       Any);
 #[allow(non_snake_case)]
 pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::scheduled::impl_macro_scheduled(args, input)
+}
+
+#[doc = ""]
+#[allow(non_snake_case)]
+#[proc_macro_attribute]
+pub fn Retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as ItemFn);
+    impl_macro_retry(attr, item)
 }

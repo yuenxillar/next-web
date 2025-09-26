@@ -19,7 +19,7 @@ pub mod common;
 pub use axum::*;
 pub use inventory::submit;
 
-pub use next_web_macros::{GetSet, Builder, FieldName, Desensitized};
+pub use next_web_macros::{GetSet, Builder, FieldName, RequiredArgsConstructor, Desensitized};
 pub use next_web_macros::{RequestMapping, GetMapping, PostMapping, PutMapping, DeleteMapping, PatchMapping, AnyMapping};
 pub use next_web_macros::{Retryable, Scheduled};
 
