@@ -1,7 +1,7 @@
 use std::{any::Any, collections::BTreeMap, sync::Arc};
 
 use next_web_core::{DynClone, models::any_value::AnyValue};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::error::retry_error::RetryError;
 
@@ -48,32 +48,32 @@ where
 
 #[derive(Clone, Default)]
 pub struct AttributeAccessorSupport {
-    attributes: Arc<RwLock<BTreeMap<String, AnyValue>>>,
+    attributes: Arc<Mutex<BTreeMap<String, AnyValue>>>,
 }
 
 impl SyncAttributeAccessor for AttributeAccessorSupport {
     fn has_attribute(&self, name: &str) -> bool {
         self.attributes
-            .try_read()
+            .try_lock()
             .map(|m| m.contains_key(name))
             .unwrap_or_default()
     }
 
     fn set_attribute(&self, name: &str, value: AnyValue) {
         self.attributes
-            .try_write()
+            .try_lock()
             .map(|mut m| m.insert(name.to_string(), value)).ok();
     }
 
     fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
         self.attributes
-            .try_write()
+            .try_lock()
             .map(|mut m| m.remove(name))
             .unwrap_or_default()
     }
 
     fn get_attribute(&self, name: &str) -> Option<AnyValue> {
-        self.attributes.try_read().map(|m| m.get(name).cloned()).unwrap_or_default()        
+        self.attributes.try_lock().map(|m| m.get(name).cloned()).unwrap_or_default()        
     }
 }
 

@@ -4,7 +4,8 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
-use axum::{extract::ConnectInfo, response::IntoResponse};
+use next_web_dev::axum_extract::ConnectInfo;
+use next_web_dev::response::IntoResponse;
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{
     application::Application, middleware::find_singleton::FindSingleton,
@@ -28,6 +29,60 @@ impl Application for TestApplication {
         #[rustfmt::skip]
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(HashSet::<SocketAddr>::new())),"requestIps");
         ctx.insert_singleton_with_name(ApplicationStore::default(), "applicationStoreTwo");
+    }
+}
+
+#[RequestMapping(method = "GET", path = "/timestamp")]
+pub async fn req_timestamp() -> impl IntoResponse {
+    LocalDateTime::now()
+}
+
+#[GetMapping(path = "/hello")]
+pub async fn req_hello() -> impl IntoResponse {
+    " Hello Axum! \n Hello Next Web!"
+}
+
+#[PostMapping(path = "/record")]
+pub async fn req_record(
+    FindSingleton(store): FindSingleton<ApplicationStore>,
+    ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr> ,
+) -> impl IntoResponse {
+    store.add(addr).await;
+    "Ok"
+}
+
+#[AnyMapping(
+    path = "/recordTwo", 
+    headers = ["Content-Type", "Authorization"],
+    consumes = "application/json",
+    produces = "application/json"
+)]
+pub async fn req_record_two(
+    // Search for singleton using variable names
+    #[find] FindSingleton(application_store_two): FindSingleton<ApplicationStore>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+) -> impl IntoResponse {
+    application_store_two.add(addr).await;
+
+    return "{\"message\": \"Ok\"}";
+}
+
+#[allow(unused)]
+struct TestUserRoutes;
+
+#[RequestMapping(path = "/user")]
+impl TestUserRoutes {
+
+    // Request -> /user/login
+    #[GetMapping(path = "/login")]
+    async fn req_login() -> impl IntoResponse {
+        "Ok"
+    }
+
+    // Request -> /user/logout
+    #[PostMapping(path = "/logout")]
+    async fn req_logout() -> impl IntoResponse {
+        "Ok"
     }
 }
 
@@ -61,54 +116,6 @@ impl Default for ApplicationStore {
             request_count: Arc::new(AtomicU32::new(u32::MAX / 2)),
             request_ips: Default::default(),
         }
-    }
-}
-
-#[RequestMapping(method = "GET", path = "/timestamp")]
-pub async fn req_timestamp() -> impl IntoResponse {
-    LocalDateTime::now()
-}
-
-#[GetMapping(path = "/hello")]
-pub async fn req_hello() -> impl IntoResponse {
-    " Hello Axum! \n Hello Next Web!"
-}
-
-#[PostMapping(path = "/record")]
-pub async fn req_record(
-    FindSingleton(store): FindSingleton<ApplicationStore>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-) -> impl IntoResponse {
-    store.add(addr).await;
-    "Ok"
-}
-
-#[AnyMapping(
-    path = "/recordTwo", 
-    headers = ["Content-Type", "Authorization"],
-    consumes = "application/json",
-    produces = "application/json"
-)]
-pub async fn req_record_two(
-    // Search for singleton using variable names
-    #[find] FindSingleton(application_store_two): FindSingleton<ApplicationStore>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-) -> impl IntoResponse {
-    application_store_two.add(addr).await;
-
-    return "{\"message\": \"Ok\"}";
-}
-
-#[allow(unused)]
-struct TestNestRoutes;
-
-#[RequestMapping(path = "/nest")]
-impl TestNestRoutes {
-
-    // Request -> /nest/call
-    #[GetMapping(path = "/call", produces = "application/json")]
-    async fn req_call() -> impl IntoResponse {
-        "Called"
     }
 }
 

@@ -3,6 +3,7 @@ name = "next-web-dev"
 version = "0.1.7"
 keywords = ["http", "web", "framework"]
 description = "Next Web Dev!"
+homepage = "https://crates.io/crates/next-web-dev"
 license.workspace = true
 edition.workspace = true
 
@@ -17,7 +18,7 @@ next-web-common = { version = "0.1.0", default-features = false, features = [
 ] }
 
 tokio = { workspace = true, features = ["signal", "macros", "net", "fs"] }
-axum = { workspace = true, features = ["http1", "http2"] }
+axum = { workspace = true, features = ["http2"] }
 axum-server = { version = "0.7.1", features = ["tls-rustls"], optional = true }
 axum-prometheus = { workspace = true, optional = true }
 tower-http = { workspace = true, features = [

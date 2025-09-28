@@ -557,8 +557,7 @@ impl RetryTemplate {
 
 #[async_trait]
 impl<T> RetryOperations<T> for RetryTemplate 
-where T: Send,
-T: 'static
+where T: Send + 'static
 {
     async fn execute(&mut self, retry_callback: impl RetryCallback<T>) -> Result<T, RetryError> {
         self.do_execute(retry_callback, None, None).await

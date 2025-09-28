@@ -151,7 +151,7 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
         .cloned()
         .collect();
 
-    let stream = quote! {
+    let expanded = quote! {
         #(#doc_attributes)*
         #[allow(non_camel_case_types)]
         #vis struct #name;
@@ -170,7 +170,7 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
         ::next_web_dev::submit_scheduler!(#name);
     };
 
-    // println!("token_stream: {}", stream.to_string());
+    // println!("token_stream: {}", expanded.to_string());
 
-    stream.into()
+    expanded.into()
 }

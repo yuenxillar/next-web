@@ -24,7 +24,7 @@ pub(crate) fn impl_macro_field_name(input: &syn::DeriveInput) -> TokenStream {
             let method_name = Ident::new(&format!("field_{}", item), Span::call_site().into());
             return quote! {
                 pub fn #method_name() -> &'static str {
-                    stringify!(#item)
+                    #item
                 }
             };
         })

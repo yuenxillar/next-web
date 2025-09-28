@@ -5,6 +5,8 @@ use crate::data::constructor::impl_macro_required_args_constructor;
 use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
 use crate::web::retry::impl_macro_retry;
+use crate::web::pre_authorize::impl_macro_pre_authorize;
+
 use data::desensitized::impl_macro_desensitized;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
@@ -114,7 +116,15 @@ pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
 #[doc = ""]
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
+pub fn PreAuthorize(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item_fn = parse_macro_input!(item as ItemFn);
+    impl_macro_pre_authorize(attr, item_fn)
+}
+
+#[doc = ""]
+#[allow(non_snake_case)]
+#[proc_macro_attribute]
 pub fn Retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as ItemFn);
-    impl_macro_retry(attr, item)
+    let item_fn = parse_macro_input!(item as ItemFn);
+    impl_macro_retry(attr, item_fn)
 }

@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{punctuated::Punctuated, spanned::Spanned, token::Token, Error, Meta};
+use syn::{punctuated::Punctuated, spanned::Spanned, Error, Meta};
 
 use crate::util::{field_type::FieldType, logic::Logic};
 
