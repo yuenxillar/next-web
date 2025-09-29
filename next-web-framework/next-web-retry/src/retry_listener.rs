@@ -12,9 +12,10 @@ where
 
     fn on_success(&self, context: &dyn RetryContext, result: &dyn Any) {}
 
-
     fn on_error(&self, context: &dyn RetryContext, error: &dyn AnyError) {}
 }
+
+
 pub struct DefaultRetryListener {}
 
 impl RetryListener for DefaultRetryListener {

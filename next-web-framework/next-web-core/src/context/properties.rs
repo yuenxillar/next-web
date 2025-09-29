@@ -1,7 +1,5 @@
 use dyn_clone::DynClone;
 
-use regex::Regex;
-use serde::de::value;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Read;
@@ -19,7 +17,6 @@ use crate::AutoRegister;
 /// This trait is used to insert properties into the application.
 ///
 /// Please implement this trait in your application.
-///
 ///
 pub trait Properties: DynClone + AutoRegister {}
 
@@ -182,7 +179,7 @@ impl ApplicationProperties {
             mapping
                 .iter_mut()
                 .map(|val| val.1)
-                .for_each(|value| helper_function(temporary.as_ref(), value));
+                .for_each(|value| helper(temporary.as_ref(), value));
         });
     }
 
@@ -199,7 +196,7 @@ impl ApplicationProperties {
     }
 }
 
-fn helper_function(temporary: Option<&serde_yaml::Value>, value: &mut serde_yaml::Value) {
+fn helper(temporary: Option<&serde_yaml::Value>, value: &mut serde_yaml::Value) {
     match value {
         serde_yaml::Value::String(s) => {
             let s = s.trim();
@@ -242,7 +239,7 @@ fn helper_function(temporary: Option<&serde_yaml::Value>, value: &mut serde_yaml
         serde_yaml::Value::Mapping(mapping) => {
             mapping
                 .iter_mut()
-                .for_each(|(_, value)| helper_function(temporary, value));
+                .for_each(|(_, value)| helper(temporary, value));
         }
         _ => return,
     };
@@ -293,18 +290,6 @@ fn into_application_properties(
             config = String::from_utf8(data.to_vec()).unwrap();
         }
     }
-
-    // replace var
-    let mut pre_replace = Vec::new();
-    if let Ok(re) = Regex::new(r"\$\{(.*?)\}") {
-        re.captures_iter(&config.as_ref()).for_each(|item| {
-            item.get(1)
-                .map(|s| s.as_str())
-                .map(|s1| pre_replace.push(s1.to_string()));
-        });
-    };
-
-    // TODO
 
     // mapping value
     let mapping = serde_yaml::from_str::<Value>(&config).unwrap();

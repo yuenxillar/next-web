@@ -6,12 +6,12 @@ use syn::{GenericParam, ItemFn, ReturnType};
 
 use crate::{
     commons::{self, ArgumentResolveStmts},
-    autowired_attr::AutowiredAttr,
+    resource_attr::ResourceAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
 
 // #[Singleton]
-// fn One(#[autowired(name = "hello")] i: i32) -> String {
+// fn One(#[resource(name = "hello")] i: i32) -> String {
 //     i.to_string()
 // }
 
@@ -20,9 +20,9 @@ pub(crate) fn generate(
     mut item_fn: ItemFn,
     scope: Scope,
 ) -> syn::Result<TokenStream> {
-    let AutowiredAttr { path } = match AutowiredAttr::remove_attributes(&mut item_fn.attrs) {
+    let ResourceAttr { path } = match ResourceAttr::remove_attributes(&mut item_fn.attrs) {
         Ok(Some(AttrsValue { value: attr, .. })) => attr,
-        Ok(None) => AutowiredAttr::default(),
+        Ok(None) => ResourceAttr::default(),
         Err(AttrsValue { value: e, .. }) => return Err(e),
     };
 

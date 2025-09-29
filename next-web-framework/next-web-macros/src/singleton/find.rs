@@ -114,7 +114,7 @@ pub(crate) fn impl_find_attribute(
                             let arg: syn::Type = parse_quote!(
                                 ::next_web_core::state::application_state::ApplicationState
                             );
-                            let path: syn::Path = parse_quote!(::next_web_dev::Extension<#arg>);
+                            let path: syn::Path = parse_quote!(::next_web_dev::extract::Extension<#arg>);
                             type_path.path = path;
                         }
                     }

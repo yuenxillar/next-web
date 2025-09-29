@@ -1,6 +1,7 @@
 use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
 use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError};
+use next_web_retry::{retry_operations::RetryOperations, support::retry_template::RetryTemplate};
 
 use crate::{
     ai::deep_seek::{
@@ -43,19 +44,20 @@ pub struct DeepSeekChatModel<T = DefaultChatModelObservationConvention, R = Noop
 {
     // pub(crate) retry_template: RetryTemplate,
     pub(crate) options: Option<DeepSeekChatOptions>,
-    pub(crate) api: DeepSeekApi,
+    pub(crate) deep_seek_api: DeepSeekApi,
     pub(crate) observation_registry: R,
     pub(crate) observation_convention: T,
-    // todo retry
+    pub(crate) retry_template: RetryTemplate,
 }
 
 impl DeepSeekChatModel {
-    pub fn new(api: DeepSeekApi, options: Option<DeepSeekChatOptions>) -> Self {
+    pub fn new(deep_seek_api: DeepSeekApi, options: Option<DeepSeekChatOptions>) -> Self {
         Self {
-            api,
+            deep_seek_api,
             options,
             observation_registry: ObservationRegistryImpl::noop(),
             observation_convention: Default::default(),
+            retry_template: Default::default(),
         }
     }
 
@@ -160,7 +162,13 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
         }
         .observe(async {
             // execute
-            let chat_respnose = self.api.send(&req).await?;
+            let chat_respnose = self
+                .retry_template
+                .execute(
+                    #[allow(unused_variables)]
+                    |ctx| self.deep_seek_api.chat_completion_entity(&req),
+                )
+                .await?;
 
             let chat_completion = match chat_respnose {
                 ChatApiRespnose::Data(chat_completion) => chat_completion,
@@ -200,7 +208,7 @@ impl StreamingModel<Prompt, ChatResponse> for DeepSeekChatModel {
     ) -> Result<BoxStream<'static, Result<ChatResponse, BoxError>>, BoxError> {
         let req: ChatCompletionRequest = self.crate_request(&prompt, true)?;
         // execute
-        let chat_respnose = self.api.send(&req).await?;
+        let chat_respnose = self.deep_seek_api.chat_completion_entity(&req).await?;
 
         let stream = match chat_respnose {
             ChatApiRespnose::DataStream(stream) => stream,

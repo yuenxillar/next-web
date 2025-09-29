@@ -1,5 +1,5 @@
 use from_attr::FromAttr;
 
 #[derive(FromAttr)]
-#[attribute(idents = [autowired])]
+#[attribute(idents = [resource])]
 pub(crate) struct ImplFnOrEnumVariantAttr;

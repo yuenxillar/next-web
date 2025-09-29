@@ -98,17 +98,17 @@ impl TestSingletonImplThree {
 #[Singleton]
 #[derive(Clone)]
 pub struct TestSingletonConsumer {
-    #[autowired(name = "testSingletonImplOne")]
+    #[resource(name = "testSingletonImplOne")]
     pub single: Arc<dyn TestSingleton>,
 
-    #[autowired(vec)]
+    #[resource(vec)]
     pub single_vec: Vec<Arc<dyn TestSingleton>>,
 
     // 这里 V 的泛型需要实现 Singleton trait 然后单例名称为 K
-    #[autowired(map)]
+    #[resource(map)]
     pub single_map: std::collections::HashMap<String, Arc<dyn TestSingleton>>,
 
-    #[autowired(name = "testSingletonImplThree", option)]
+    #[resource(name = "testSingletonImplThree", option)]
     pub single_option: Option<Arc<dyn TestSingleton>>,
 }
 

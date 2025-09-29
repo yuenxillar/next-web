@@ -3,6 +3,8 @@ use next_web_core::{
     context::{application_context::ApplicationContext, properties::ApplicationProperties},
 };
 
+
+#[cfg(feature = "enable-i18n")]
 use crate::autoregister::message_source_service_autoregister::MessageSourceServiceAutoRegister;
 
 

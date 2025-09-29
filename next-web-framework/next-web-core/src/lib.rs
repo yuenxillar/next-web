@@ -1,3 +1,4 @@
+pub mod proxy;
 pub mod scheduler;
 pub mod models;
 pub mod autoconfigure;

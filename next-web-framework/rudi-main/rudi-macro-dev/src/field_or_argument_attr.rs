@@ -1,7 +1,7 @@
 use from_attr::{FlagOrValue, FromAttr};
 use syn::{parse_quote, Expr, Type};
 
-// #[autowired(
+// #[resource(
 //     name = "..",
 //     option,
 //     default = 42,
@@ -11,7 +11,7 @@ use syn::{parse_quote, Expr, Type};
 // )]
 
 #[derive(FromAttr)]
-#[attribute(idents = [autowired])]
+#[attribute(idents = [resource])]
 pub(crate) struct FieldOrArgumentAttr {
     #[attribute(default = default_name(), conflicts = [vec, map])]
     pub(crate) name: Expr,

@@ -4,7 +4,7 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
-use next_web_dev::axum_extract::ConnectInfo;
+use next_web_dev::extract::ConnectInfo;
 use next_web_dev::response::IntoResponse;
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{

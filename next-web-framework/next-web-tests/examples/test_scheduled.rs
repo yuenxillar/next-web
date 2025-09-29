@@ -24,7 +24,7 @@ impl Application for TestApplication {
 #[Singleton(binds=[Self::into_task])]
 #[derive(Clone)]
 pub struct TestTask {
-    #[autowired(default)]
+    #[resource(default)]
     pub number: Arc<AtomicI32>,
 }
 

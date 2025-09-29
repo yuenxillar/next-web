@@ -55,7 +55,7 @@ async fn set_token(Path(token): Path<String>, req: Request) -> impl IntoResponse
 #[Singleton(binds = [Self::into_authentication_service])]
 #[derive(Clone)]
 struct TestAuthenticationService {
-    #[autowired(name = "tokenStore")]
+    #[resource(name = "tokenStore")]
     store: Arc<Mutex<Vec<String>>>,
 }
 

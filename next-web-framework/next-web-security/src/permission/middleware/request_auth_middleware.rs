@@ -16,7 +16,7 @@ pub(crate) async fn request_auth_middleware(
     req: Request,
     next: Next,
 ) -> Result<Response, Response> {
-    let http_security = user_auth_manager.http_security();
+    let http_security = user_auth_manager.http_security().as_ref();
     
     // 快速路径：如果不需要认证检查，直接继续
     if http_security.match_type == MatchType::NotMatch {

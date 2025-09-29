@@ -14,7 +14,7 @@ use next_web_dev::Singleton;
 #[Singleton(binds = [Self::into_expired_key_listener])]
 #[derive(Clone)]
 pub(crate) struct TestExpiredKeyListener {
-    #[autowired(name = "redisService")]
+    #[resource(name = "redisService")]
     pub redis_service: RedisService,
 }
 

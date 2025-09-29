@@ -1,5 +1,7 @@
 use std::error::Error;
 
+use next_web_core::error::BoxError;
+
 use crate::error::AnyError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -49,5 +51,12 @@ impl std::error::Error for DefaultAnyError {}
 impl std::fmt::Display for DefaultAnyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "DefaultAnyError")
+    }
+}
+
+impl Into<RetryError> for BoxError
+{
+    fn into(self) -> RetryError {
+        todo!()
     }
 }

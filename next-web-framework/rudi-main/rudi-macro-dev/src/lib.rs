@@ -1,5 +1,5 @@
 mod util;
-mod autowired_attr;
+mod resource_attr;
 mod value_attr;
 mod commons;
 mod field_or_argument_attr;

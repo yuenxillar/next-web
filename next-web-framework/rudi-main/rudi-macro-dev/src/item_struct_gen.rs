@@ -5,7 +5,7 @@ use rudi_core::{Color, Scope};
 use syn::ItemStruct;
 
 use crate::{
-    autowired_attr::AutowiredAttr,
+    resource_attr::ResourceAttr,
     commons::{self, FieldResolveStmts, ResolvedFields},
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
@@ -15,9 +15,9 @@ pub(crate) fn generate(
     mut item_struct: ItemStruct,
     scope: Scope,
 ) -> syn::Result<TokenStream> {
-    let AutowiredAttr { path } = match AutowiredAttr::remove_attributes(&mut item_struct.attrs) {
+    let ResourceAttr { path } = match ResourceAttr::remove_attributes(&mut item_struct.attrs) {
         Ok(Some(AttrsValue { value: attr, .. })) => attr,
-        Ok(None) => AutowiredAttr::default(),
+        Ok(None) => ResourceAttr::default(),
         Err(AttrsValue { value: e, .. }) => return Err(e),
     };
 

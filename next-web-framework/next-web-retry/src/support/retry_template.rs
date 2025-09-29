@@ -31,12 +31,12 @@ impl RetryTemplate {
 
     // 2.0.5
     async fn do_execute<T>(
-        &mut self,
+        &self,
         retry_callback: impl RetryCallback<T>,
         recovery_callback: Option<&dyn RecoveryCallback<T>>,
         state: Option<&dyn RetryState>,
     ) -> Result<T, RetryError> 
-    where T: 'static
+    where T: Send + 'static
     {
 
         // Allow the retry policy to initialise itself...
@@ -67,7 +67,7 @@ impl RetryTemplate {
             if !context.has_attribute(retry_context_constants::MAX_ATTEMPTS) {
                 context.set_attribute(
                     retry_context_constants::MAX_ATTEMPTS,
-                    self.retry_policy.as_mut().get_max_attempts().into(),
+                    self.retry_policy.as_ref().get_max_attempts().into(),
                 );
             }
 
@@ -478,19 +478,19 @@ impl RetryTemplate {
         context: &dyn RetryContext,
         last_error: Option<&dyn AnyError>,
     ) {
-        for listener in self.listeners.iter().rev() {
+        for listener in self.listeners.iter().rev().map(AsRef::as_ref) {
             listener.close(context, last_error);
         }
     }
 
-    fn do_on_success_interceptors<T>(
+    fn do_on_success_interceptors<'a, T>(
         &self,
         context: &dyn RetryContext,
-        result: &T,
+        result: &'a T,
     ) 
     where T: Any
     {
-        for listener in self.listeners.iter().rev() {
+        for listener in self.listeners.iter().rev().map(AsRef::as_ref) {
             listener.on_success(context, result);
         }
     }
@@ -500,7 +500,7 @@ impl RetryTemplate {
         context: &dyn RetryContext,
         error: &dyn AnyError,
     ) {
-        for listener in self.listeners.iter().rev() {
+        for listener in self.listeners.iter().rev().map(AsRef::as_ref) {
             listener.on_error(context, error);
         }
     }
@@ -559,12 +559,12 @@ impl RetryTemplate {
 impl<T> RetryOperations<T> for RetryTemplate 
 where T: Send + 'static
 {
-    async fn execute(&mut self, retry_callback: impl RetryCallback<T>) -> Result<T, RetryError> {
+    async fn execute(&self, retry_callback: impl RetryCallback<T>) -> Result<T, RetryError> {
         self.do_execute(retry_callback, None, None).await
     }
 
     async fn execute_with_recovery(
-        &mut self,
+        &self,
         retry_callback: impl RetryCallback<T>,
         recovery_callback: &dyn RecoveryCallback<T>,
     ) -> Result<T, RetryError> {
@@ -573,7 +573,7 @@ where T: Send + 'static
     }
 
     async fn execute_with_state(
-        &mut self,
+        &self,
         retry_callback: impl  RetryCallback<T>,
         state: &dyn RetryState,
     ) -> Result<T, RetryError> {
@@ -581,7 +581,7 @@ where T: Send + 'static
     }
 
     async fn execute_with_all(
-        &mut self,
+        &self,
         retry_callback: impl  RetryCallback<T>,
         recovery_callback: &dyn RecoveryCallback<T>,
         state: &dyn RetryState,

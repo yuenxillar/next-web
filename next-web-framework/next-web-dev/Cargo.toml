@@ -16,9 +16,12 @@ next-web-macros = { workspace = true }
 next-web-common = { version = "0.1.0", default-features = false, features = [
     "query-wrapper",
 ] }
+next-web-security   = { workspace = true, optional = true }
+next-web-retry      = { workspace = true, optional = true }
 
 tokio = { workspace = true, features = ["signal", "macros", "net", "fs"] }
 axum = { workspace = true, features = ["http2"] }
+axum-core = { workspace = true }
 axum-server = { version = "0.7.1", features = ["tls-rustls"], optional = true }
 axum-prometheus = { workspace = true, optional = true }
 tower-http = { workspace = true, features = [
@@ -60,6 +63,7 @@ async-stream = { workspace = true }
 
 serde_path_to_error = "0.1.17"
 mime = "0.3.17"
+headers = "0.4.1"
 
 [target.'cfg(windows)'.dependencies]
 mimalloc = { workspace = true }
@@ -68,16 +72,20 @@ mimalloc = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = ["i18n", "decrypt-properties"]
-full = ["enable-scheduling", "i18n", "decrypt-properties"]
+default = ["enable-i18n", "decrypt-properties"]
+full = ["enable-scheduling", "enable-web-security", "enable-retry", "enable-i18n", "decrypt-properties"]
 
 tls-rustls = ["axum-server"]
 
-enable-scheduling = ["tokio-cron-scheduler"]
+# web
+enable-scheduling   = ["tokio-cron-scheduler"]
+enable-web-security = ["next-web-security"]
+enable-retry        = ["next-web-retry"]
+
 enable-grpc = []
 enable-prometheus = ["axum-prometheus"]
+enable-i18n = []
 
-i18n = []
 decrypt-properties = ["aes-gcm"]
 
 trace-log = []

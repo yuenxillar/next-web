@@ -84,8 +84,8 @@ impl WebSocketContext {
 
 #[Singleton]
 impl WebSocketContext {
-    #[autowired]
-    pub fn constructor(#[autowired] properties: WebSocketProperties) -> Self {
+    #[resource]
+    pub fn constructor(#[resource] properties: WebSocketProperties) -> Self {
         Self {
             properties,
             handlers: matchit::Router::new(),

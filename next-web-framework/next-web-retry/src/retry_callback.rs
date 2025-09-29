@@ -7,18 +7,19 @@ use crate::{error::retry_error::RetryError, retry_context::RetryContext};
 #[async_trait]
 pub trait RetryCallback<T>
 where
-    Self: Send+ Sync,
+    Self: Send + Sync,
 {
     async fn do_with_retry(&self, context: Arc<dyn RetryContext>) -> Result<T, RetryError>;
 }
 
 #[async_trait]
-impl<F, Fut, T> RetryCallback<T> for F
+impl<F, Fut, R, T> RetryCallback<T> for F
 where
     F: Fn(Arc<dyn RetryContext>) -> Fut + Send + Sync,
-    Fut: Future<Output = Result<T, RetryError>> + Send + 'static,
+    R: Into<RetryError>,
+    Fut: Future<Output = Result<T, R>> + Send,
 {
-    async fn do_with_retry(&self, context: Arc<dyn RetryContext>) -> Result<T, RetryError> {
-        self(context).await
+    async fn do_with_retry(& self, context: Arc<dyn RetryContext>) -> Result<T, RetryError> {
+        self(context).await.map_err(Into::into)
     }
 }

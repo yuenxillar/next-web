@@ -30,7 +30,7 @@ impl DeepSeekApi {
         }
     }
 
-    pub async fn send(&self, req: &ChatCompletionRequest) -> Result<ChatApiRespnose, BoxError> {
+    pub async fn chat_completion_entity(&self, req: &ChatCompletionRequest) -> Result<ChatApiRespnose, BoxError> {
         let resp = self
             .client
             .post(self.base_url.as_ref())

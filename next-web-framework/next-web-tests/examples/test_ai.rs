@@ -29,7 +29,7 @@ async fn main() {
             ChatModel::Chat.get_name(),
             true,
         );
-        let resp = api.send(&req).await.unwrap();
+        let resp = api.chat_completion_entity(&req).await.unwrap();
         match resp {
             ChatApiRespnose::Data(chat_completion) => {
                 println!("chat_completion: {:?}", chat_completion);

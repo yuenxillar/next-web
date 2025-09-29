@@ -18,6 +18,8 @@ reqwest = { workspace = true, features = ["stream"]}
 tokio = { workspace = true, features = ["sync"]}
 anyhow = { workspace = true}
 
+next-web-retry = { workspace = true }
+
 [dev-dependencies]
 tokio.workspace = true
 
