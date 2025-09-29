@@ -20,10 +20,10 @@ struct TestApplication;
 #[async_trait]
 impl Application for TestApplication {
     /// initialize the middleware.
-    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(& self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)
-    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new().nest(
             "/login",
             axum::Router::new()
@@ -32,7 +32,7 @@ impl Application for TestApplication {
         )
     }
 
-    async fn before_start(&mut self, ctx: &mut ApplicationContext) {
+    async fn before_start(&self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
     }
 }

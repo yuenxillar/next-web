@@ -1,9 +1,9 @@
 use std::ops::Deref;
 
-use next_web_core::{constants::application_constants::SECURE_PROPERTIES_MARK, context::{
+use next_web_core::context::{
     application_args::ApplicationArgs, application_resources::ApplicationResources,
     properties::ApplicationProperties,
-}};
+};
 
 use super::application::Application;
 use next_web_core::autoconfigure::context::server_properties::ServerProperties;
@@ -71,8 +71,8 @@ impl<A: Application + Default> NextApplication<A> {
     }
 
     /// Get the application.
-    pub fn application(&mut self) -> &mut A {
-        &mut self.application
+    pub fn application(&self) -> & A {
+        & self.application
     }
 
     /// Set the application register.
@@ -85,35 +85,6 @@ impl<A: Application + Default> NextApplication<A> {
         self.application_properties.set_mapping(mapping);
     }
 
-    /// Decrypt the properties.
-    pub(crate) fn decrypt_properties(&mut self) {
-        // 不解密关于 Server 相关的配置
-
-        if let Some(mapping) = self.application_properties.mapping_mut() {
-                // println!("mapping: {:#?}", mapping);
-                
-                match mapping.as_mapping_mut() {
-                    Some(mapping) => {
-                        let var = mapping.iter_mut().filter(|(_key, value)| 
-                            {
-                                match value {
-                                    serde_yaml::Value::String(s) => {
-                                        if s.starts_with(SECURE_PROPERTIES_MARK) && &s[3..4] == ":" {
-                                            
-                                        }
-
-                                        true
-                                    },
-                                    serde_yaml::Value::Mapping(mapping) => todo!(),
-                                    _ => false
-                                }                     
-                            }
-                        );
-                    },
-                    None => {}
-                }
-        }
-    }
 }
 
 impl<A: Application> Deref for NextApplication<A> {

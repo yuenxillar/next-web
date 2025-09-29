@@ -107,14 +107,14 @@ struct TestApplication;
 #[async_trait]
 impl Application for TestApplication {
     /// initialize the middleware.
-    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)
-    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new().route("/", axum::routing::get(|| async move { "Ok" }))
     }
 
-    async fn before_start(&mut self, _ctx: &mut ApplicationContext) {
+    async fn before_start(&self, _ctx: &mut ApplicationContext) {
         tokio::spawn(async move {
             let transition_configure = StateMachineTransitionConfigure::default()
                 .with(

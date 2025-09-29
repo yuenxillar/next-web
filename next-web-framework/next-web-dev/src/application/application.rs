@@ -21,7 +21,8 @@ use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
-use tracing::{info, error};
+#[allow(unused_imports)]
+use tracing::{error, info};
 
 use crate::application::next_application::NextApplication;
 
@@ -29,7 +30,7 @@ use crate::application::permitted_groups::PERMITTED_GROUPS;
 use crate::autoregister::handler_autoregister::HttpHandlerAutoRegister;
 use crate::autoregister::register_single::ApplicationDefaultRegisterContainer;
 
-use crate::autoregister::scheduler_autoregister::SchedulerAutoRegister;
+
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
@@ -40,27 +41,42 @@ use next_web_core::traits::application::application_shutdown::ApplicationShutdow
 use next_web_core::traits::event::application_event_multicaster::ApplicationEventMulticaster;
 use next_web_core::traits::event::application_listener::ApplicationListener;
 
-#[cfg(feature = "scheduler")]
+#[cfg(feature = "enable-scheduling")]
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
-#[cfg(feature = "scheduler")]
+#[cfg(feature = "enable-scheduling")]
+use crate::autoregister::scheduler_autoregister::SchedulerAutoRegister;
+#[cfg(feature = "enable-scheduling")]
+#[allow(unused_imports)]
 use next_web_core::traits::schedule::scheduled_task::ScheduledTask;
 
 #[async_trait]
 pub trait Application: Send + Sync {
     /// Initialize the middleware.
-    async fn init_middleware(&mut self, properties: &ApplicationProperties);
+    async fn init_middleware(&self, properties: &ApplicationProperties);
 
     /// Before starting the application
     #[allow(unused_variables)]
-    async fn before_start(&mut self, ctx: &mut ApplicationContext) {}
+    async fn before_start(&self, ctx: &mut ApplicationContext) {}
 
     /// Register the rpc server.
     #[cfg(feature = "enable-grpc")]
-    async fn register_rpc_server(&mut self, properties: &ApplicationProperties);
+    async fn register_rpc_server(
+        &self, 
+        ctx: &mut ApplicationContext,
+        application_properties: &ApplicationProperties,
+        application_args: &ApplicationArgs,
+        application_resources: &ApplicationResources,
+    );
 
     /// Register the grpc client.
     #[cfg(feature = "enable-grpc")]
-    async fn connect_rpc_client(&mut self, properties: &ApplicationProperties);
+    async fn connect_rpc_client(
+        &self, 
+        ctx: &mut ApplicationContext,
+        application_properties: &ApplicationProperties,
+        application_args: &ApplicationArgs,
+        application_resources: &ApplicationResources,
+    );
 
     /// Show the banner of the application.
     fn banner_show(application_resources: &ApplicationResources) {
@@ -136,7 +152,7 @@ pub trait Application: Send + Sync {
 
     /// Autowire properties
     async fn autowire_properties(
-        &mut self,
+        &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
     ) {
@@ -155,10 +171,10 @@ pub trait Application: Send + Sync {
         application_resources: &ApplicationResources,
     ) {
         // Register singletion
-        // properties args resources
-        ctx.insert_singleton_with_name(application_properties.to_owned(), "applicationProperties");
-        ctx.insert_singleton_with_name(application_args.to_owned(), "applicationArgs");
-        ctx.insert_singleton_with_name(application_resources.to_owned(), "applicationResources");
+        // [properties] [args] [resources]
+        ctx.insert_singleton_with_name(application_properties.to_owned(),   "applicationProperties");
+        ctx.insert_singleton_with_name(application_args.to_owned(),         "applicationArgs");
+        ctx.insert_singleton_with_name(application_resources.to_owned(),    "applicationResources");
 
         let mut container = ApplicationDefaultRegisterContainer::default();
         container.register_all(ctx, application_properties).await;
@@ -192,7 +208,7 @@ pub trait Application: Send + Sync {
         multicaster.run();
 
         // Register jobs
-        #[cfg(feature = "scheduler")]
+        #[cfg(feature = "enable-scheduling")]
         {
             let mut manager = JobSchedulerManager::with_channel_size(240).await;
             for scheduler in inventory::iter::<&dyn SchedulerAutoRegister>.into_iter() {
@@ -205,7 +221,7 @@ pub trait Application: Send + Sync {
             // for producer in producers {
             //     manager.add_job(producer).await;
             // }
-            
+
             manager.start().await;
 
             ctx.insert_singleton_with_name(manager, "jobSchedulerManager");
@@ -213,13 +229,13 @@ pub trait Application: Send + Sync {
 
         let rest_client = RestClient::new();
         ctx.insert_singleton_with_name(default_event_publisher, "defaultApplicationEventPublisher");
-        ctx.insert_singleton_with_name(multicaster, "defaultApplicationEventMulticaster");
-        ctx.insert_singleton_with_name(rest_client, "restClient");
+        ctx.insert_singleton_with_name(multicaster,             "defaultApplicationEventMulticaster");
+        ctx.insert_singleton_with_name(rest_client,             "restClient");
     }
 
-    // Get the application router. (open api  and private api)
+    // Get the application router.
     #[allow(unused_variables)]
-    async fn application_router(&mut self, ctx: &mut ApplicationContext) -> Router {
+    async fn application_router(&self, ctx: &mut ApplicationContext) -> Router {
         inventory::iter::<&dyn HttpHandlerAutoRegister>
             .into_iter()
             .fold(Router::new(), |router, handler| handler.register(router))
@@ -227,22 +243,25 @@ pub trait Application: Send + Sync {
 
     /// Bind tcp server.
     async fn bind_tcp_server(
-        &mut self,
+        &self,
         mut ctx: ApplicationContext,
         application_properties: &ApplicationProperties,
         time: std::time::Instant,
     ) {
-        // 1. Trigger the ApplicationReadyEvent
-        for ready_event in ctx.resolve_by_type::<Box<dyn ApplicationReadyEvent>>() {
-            ready_event.ready(&mut ctx).await;
-        }
-
-        // 2. Read server configuration
+        // 1. Read server configuration
         let config = application_properties.next().server();
         let context_path = config.context_path().unwrap_or("");
         let server_port = config.port().unwrap_or(APPLICATION_DEFAULT_PORT);
-        #[rustfmt::skip]
-        let server_addr = if config.local().unwrap_or(true) { "127.0.0.1" } else { "0.0.0.0" };
+
+        let server_addr = if let Some(addr) = config.addr() {
+            addr
+        } else {
+            if config.local().unwrap_or(true) {
+                "127.0.0.1"
+            } else {
+                "0.0.0.0"
+            }
+        };
 
         let req_timeout = config.http().map(|http| {
             http.request()
@@ -250,7 +269,7 @@ pub trait Application: Send + Sync {
                 .unwrap_or(5)
         });
 
-        // 3. Build basic routing
+        // 2. Build basic routing
         let mut app = self
             .application_router(&mut ctx)
             .await
@@ -259,7 +278,7 @@ pub trait Application: Send + Sync {
             // Prevent program panic caused by users not setting routes
             .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
 
-        // 4. UseRouter and ApplyRouter
+        // 3. UseRouter and ApplyRouter
         let use_routers = ctx.resolve_by_type::<Box<dyn UseRouter>>();
         app = use_routers
             .into_iter()
@@ -267,29 +286,24 @@ pub trait Application: Send + Sync {
             .filter(|s| PERMITTED_GROUPS.contains(&s.group().name()))
             .fold(app, |app, item| item.use_router(app, &mut ctx));
 
-        let (mut open_routers, mut common_routers): (Vec<_>, Vec<_>) = ctx
-            .resolve_by_type::<Box<dyn ApplyRouter>>()
-            .into_iter()
-            .partition(|item| item.open());
+        let mut apply_routers: Vec<_> = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
 
         // The sorting should be small and at the top
-        open_routers.sort_by_key(|r| r.order());
-        common_routers.sort_by_key(|r| r.order());
+        apply_routers.sort_by_key(|r| r.order());
 
         app = app.merge(
-            open_routers
+            apply_routers
                 .into_iter()
-                .chain(common_routers.into_iter())
-                .map(|r| r.router(&mut ctx))
-                .filter(|r| r.has_routes())
+                .map(|val| val.router(&mut ctx))
+                .filter(|val| val.has_routes())
                 .fold(axum::Router::new(), |acc, r| acc.merge(r)),
         );
 
-        // 5. Obtain necessary instances
+        // 4. Obtain necessary instances
         #[cfg(not(feature = "tls-rustls"))]
         let shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
 
-        // 6. Add global middleware layer
+        // 5. Add global middleware layer
         {
             app = app
                 // Global panic handler
@@ -341,7 +355,12 @@ pub trait Application: Send + Sync {
             // Add
         }
 
-        // 7. Add State [Context]
+        // 6. Trigger the ApplicationReadyEvent
+        for ready_event in ctx.resolve_by_type::<Box<dyn ApplicationReadyEvent>>() {
+            ready_event.ready(&mut ctx).await;
+        }
+
+        // 7. Add State to [Context]
         app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
         // 8. Nest context path
@@ -441,12 +460,13 @@ pub trait Application: Send + Sync {
         // Get a base application instance
         let mut next_application: NextApplication<Self> = NextApplication::new();
 
-        // Before to next step, map the application properties
-        next_application.decrypt_properties();
+        // Perform a series of processing on application properties before executing the next step
+        next_application.application_properties.decrypt();
+        next_application.application_properties.replace_placeholders();
 
-        let properties = next_application.application_properties().clone();
-        let args = next_application.application_args().clone();
-        let resources = next_application.application_resources().clone();
+        let properties= next_application.application_properties();
+        let args            = next_application.application_args();
+        let resources  = next_application.application_resources();
 
         // Banner show
         Self::banner_show(&resources);
@@ -469,14 +489,14 @@ pub trait Application: Send + Sync {
 
         let application = next_application.application();
 
-        application.init_logging(&properties);
+        application.init_logging(properties);
         println!(
             "Init logging success!\nCurrent Time: {}\n",
             LocalDateTime::now()
         );
 
         // Autowire properties
-        application.autowire_properties(&mut ctx, &properties).await;
+        application.autowire_properties(&mut ctx, properties).await;
         println!(
             "Autowire properties success!\nCurrent Time: {}\n",
             LocalDateTime::now()
@@ -484,7 +504,7 @@ pub trait Application: Send + Sync {
 
         // Register singleton
         application
-            .register_singleton(&mut ctx, &properties, &args, &resources)
+            .register_singleton(&mut ctx, properties, args, resources)
             .await;
         println!(
             "Register singleton success!\nCurrent Time: {}\n",
@@ -492,14 +512,14 @@ pub trait Application: Send + Sync {
         );
 
         // Init infrastructure
-        application.init_infrastructure(&mut ctx, &properties).await;
+        application.init_infrastructure(&mut ctx, properties).await;
         println!(
             "Init infrastructure success!\nCurrent Time: {}\n",
             LocalDateTime::now()
         );
 
         // Init middleware
-        application.init_middleware(&properties).await;
+        application.init_middleware(properties).await;
         println!(
             "Init middleware success!\nCurrent Time: {}\n",
             LocalDateTime::now()
@@ -507,13 +527,13 @@ pub trait Application: Send + Sync {
 
         #[cfg(feature = "enable-grpc")]
         {
-            application.register_rpc_server(&properties).await;
+            application.register_rpc_server(&mut ctx, properties, args, resources).await;
             println!(
                 "Register grpc server success!\nCurrent Time: {}\n",
                 LocalDateTime::now()
             );
 
-            application.connect_rpc_client(&properties).await;
+            application.connect_rpc_client(&mut ctx, properties, args, resources).await;
             println!(
                 "Connect grpc client success!\nCurrent Time: {}\n",
                 LocalDateTime::now()
@@ -525,7 +545,7 @@ pub trait Application: Send + Sync {
         println!("========================================================================");
 
         application
-            .bind_tcp_server(ctx, &properties, start_time)
+            .bind_tcp_server(ctx, properties, start_time)
             .await;
     }
 }
@@ -553,5 +573,5 @@ pub trait Application: Send + Sync {
 
 /// no route match handler
 async fn fall_back() -> (StatusCode, &'static str) {
-    (StatusCode::NOT_FOUND, "not macth route")
+    (StatusCode::NOT_FOUND, "Route not found")
 }

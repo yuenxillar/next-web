@@ -17,8 +17,8 @@ struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
-    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
-    async fn before_start(&mut self, _ctx: &mut ApplicationContext) {}
+    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn before_start(&self, _ctx: &mut ApplicationContext) {}
 }
 
 #[Singleton(binds=[Self::into_task])]

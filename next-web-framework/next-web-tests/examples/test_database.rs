@@ -14,9 +14,9 @@ pub struct TestApplication;
 #[async_trait]
 impl Application for TestApplication {
     /// initialize the middleware.
-    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
-    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new()
             .route("/version", get(req_version))
             .route("/transaction", post(req_transaction))

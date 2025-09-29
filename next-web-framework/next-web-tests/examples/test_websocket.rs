@@ -3,11 +3,9 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use axum::Router;
-use next_web_core::{async_trait, ApplicationContext};
 use next_web_core::context::properties::ApplicationProperties;
 use next_web_dev::application::Application;
-use next_web_dev::Singleton;
+use next_web_dev::{async_trait, Singleton};
 use next_web_websocket::handler::websocket_handler::{Result, WebSocketHandler};
 use next_web_websocket::model::session::WebSocketSession;
 use next_web_websocket::Message;
@@ -73,15 +71,7 @@ pub struct TestWSApplication;
 #[async_trait]
 impl Application for TestWSApplication {
     /// initialize the middleware.
-    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
-
-    // get the application router. (open api  and private api)
-    async fn application_router(
-        &mut self,
-        _ctx: &mut ApplicationContext,
-    ) -> Router {
-        Router::new()
-    }
+    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
 }
 

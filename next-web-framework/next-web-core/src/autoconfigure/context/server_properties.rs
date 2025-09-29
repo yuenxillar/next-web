@@ -9,6 +9,7 @@ use super::http_properties::HttpProperties;
 pub struct ServerProperties {
     #[serde(default = "default_port")]
     port: Option<u16>,
+    addr: Option<String>,
     context_path: Option<String>,
     http: Option<HttpProperties>,
     local: Option<bool>,
@@ -22,6 +23,7 @@ impl ServerProperties {
         local: Option<bool>,
     ) -> Self {
         Self {
+            addr: None,
             port,
             context_path,
             http,
@@ -31,6 +33,10 @@ impl ServerProperties {
 
     pub fn port(&self) -> Option<u16> {
         self.port
+    }
+
+    pub fn addr(&self) -> Option<&str> {
+        self.addr.as_deref()
     }
 
     pub fn context_path(&self) -> Option<&str> {

@@ -21,9 +21,9 @@ pub struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
-    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
-    async fn before_start(&mut self, ctx: &mut ApplicationContext) {
+    async fn before_start(&self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
 
         #[rustfmt::skip]

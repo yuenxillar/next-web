@@ -26,15 +26,15 @@ pub use next_web_macros::{
     AnyMapping, DeleteMapping, GetMapping, PatchMapping, PostMapping, PutMapping, RequestMapping,
 };
 pub use next_web_macros::{Builder, Desensitized, FieldName, GetSet, RequiredArgsConstructor};
-pub use next_web_macros::{Retryable, Scheduled};
+pub use next_web_macros::Retryable;
+
+#[cfg(feature = "enable-scheduling")]
+pub use next_web_macros::Scheduled;
 
 pub use next_web_core::*;
 
 #[cfg(feature = "i18n")]
 pub mod i18n;
-
-#[cfg(feature = "scheduler")]
-pub use tokio_cron_scheduler::Job;
 
 pub use rudi_dev::{Properties, SingleOwner, Singleton, Transient};
 

@@ -68,11 +68,12 @@ mimalloc = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = ["scheduler", "i18n", "decrypt-properties"]
+default = ["i18n", "decrypt-properties"]
+full = ["enable-scheduling", "i18n", "decrypt-properties"]
 
 tls-rustls = ["axum-server"]
-scheduler = ["tokio-cron-scheduler"]
 
+enable-scheduling = ["tokio-cron-scheduler"]
 enable-grpc = []
 enable-prometheus = ["axum-prometheus"]
 

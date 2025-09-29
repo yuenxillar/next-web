@@ -15,7 +15,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 next-web-ip = { path = "../next-web-ip", version = "0.1.0" }
 
-next-web-dev = { path = "../next-web-dev", version = "0.1.4" }
+next-web-dev = { path = "../next-web-dev", version = "0.1.4", features = ["full"]}
 next-web-core = { workspace = true }
 # next-web-data-database = { path = "../next-web-data-database", version = "0.1.0" }
 # next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "0.1.0" }

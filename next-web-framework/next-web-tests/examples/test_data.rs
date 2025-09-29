@@ -5,17 +5,21 @@ pub struct TestData {
     #[builder(into)]
     pub name: String,
 
-    #[constructor(default)]
+    // #[constructor(default)]
     pub age: u32,
 
     // not method `set_birthday`
-    #[builder(into)]
+    #[builder(into, default)]
     #[get_set(skip_set)]
-    #[constructor(required)]
-    pub birthday: Option<String>,
+    #[constructor(into)]
+    pub birthday: String,
 
-    #[builder(into)]
+    #[builder(into, default = "default_address")]
     pub address: Option<String>,
+}
+
+fn default_address() -> Option<String> {
+    Some("Canada".into())
 }
 
 fn main() {
@@ -23,10 +27,9 @@ fn main() {
         .name("Ferris")
         .age(10)
         .birthday("2015-05-15")
-        .address("Canada")
         .build()
         .unwrap();
-    let mut data2 = TestData::from_args("Ferris".into(), 10, Some("2015-05-15".into()));
+    let mut data2 = TestData::from_args("Ferris".into(), 10, "2015-05-15");
     data2.set_address(Some("Canada".into()));
 
     assert_eq!(data1.get_birthday(), data1.get_birthday());

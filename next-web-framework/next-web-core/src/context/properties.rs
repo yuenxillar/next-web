@@ -1,11 +1,12 @@
 use dyn_clone::DynClone;
 
 use regex::Regex;
+use serde::de::value;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Read;
 
-use crate::constants::application_constants::APPLICATION_CONFIG;
+use crate::constants::application_constants::{APPLICATION_CONFIG, SECURE_PROPERTIES_MARK};
 use crate::context::application_args::ApplicationArgs;
 use crate::context::application_resources::ResourceLoader;
 
@@ -55,7 +56,6 @@ impl ApplicationProperties {
         }
 
         if let Some(mapping) = self.mapping.as_ref() {
-            
             let keys: Vec<&str> = key.split(".").collect::<Vec<_>>();
             let index = keys.len();
 
@@ -143,6 +143,49 @@ impl ApplicationProperties {
         None
     }
 
+    /// Decrypt the properties.
+    pub fn decrypt(&mut self) {
+        // 不解密关于 Server 相关的配置
+
+        if let Some(mapping) = self.mapping_mut() {
+            // println!("mapping: {:#?}", mapping);
+
+            match mapping.as_mapping_mut() {
+                Some(mapping) => {
+                    let var = mapping.iter_mut().filter(|(_key, value)| match value {
+                        serde_yaml::Value::String(s) => {
+                            if s.starts_with(SECURE_PROPERTIES_MARK) && &s[3..4] == ":" {}
+
+                            true
+                        }
+                        serde_yaml::Value::Mapping(mapping) => todo!(),
+                        _ => false,
+                    });
+                }
+                None => {}
+            }
+        }
+    }
+
+    /// Replace the placeholders in the properties.
+    pub fn replace_placeholders(&mut self) {
+        // Two situations
+        // ${author.name}  $${MY_ENV_VAR}
+
+        let temporary = self.mapping.clone();
+        self.mapping.as_mut().map(|mapping| {
+            let mapping = match mapping.as_mapping_mut() {
+                Some(mapping) => mapping,
+                None => return,
+            };
+
+            mapping
+                .iter_mut()
+                .map(|val| val.1)
+                .for_each(|value| helper_function(temporary.as_ref(), value));
+        });
+    }
+
     pub fn set_mapping(&mut self, mapping: serde_yaml::Value) {
         self.mapping = Some(mapping);
     }
@@ -154,6 +197,55 @@ impl ApplicationProperties {
     pub fn mapping_mut(&mut self) -> Option<&mut serde_yaml::Value> {
         self.mapping.as_mut()
     }
+}
+
+fn helper_function(temporary: Option<&serde_yaml::Value>, value: &mut serde_yaml::Value) {
+    match value {
+        serde_yaml::Value::String(s) => {
+            let s = s.trim();
+            if s.starts_with("${") && s.ends_with("}") {
+                let mut temporary = match temporary {
+                    Some(temporary) => temporary,
+                    None => return,
+                };
+
+                let key = s[2..s.len() - 1].to_string();
+                let mut iter = key.split('.').peekable();
+                while let Some(parts) = iter.next() {
+                    match temporary.get(parts) {
+                        Some(val) => {
+                            temporary = val;
+                        }
+                        None => panic!("The key [{}] is not found in the configuration file", key),
+                    }
+
+                    if iter.peek().is_none() {
+                        // End of the key
+                        *value = temporary.clone();
+                    }
+                }
+
+                return;
+            }
+
+            if s.starts_with("$${") && s.ends_with("}") {
+                let val = s[3..s.len() - 1].to_string();
+                let key = val.trim();
+                // My suggestion is to panic directly
+                let var = match std::env::var(key) {
+                        Ok(var) => var,
+                        Err(_) => panic!("In the configuration file, the environment variable [{}] cannot be obtained. Please check the environment configuration.", key),
+                    };
+                *value = serde_yaml::Value::String(var);
+            }
+        }
+        serde_yaml::Value::Mapping(mapping) => {
+            mapping
+                .iter_mut()
+                .for_each(|(_, value)| helper_function(temporary, value));
+        }
+        _ => return,
+    };
 }
 
 impl Default for ApplicationProperties {

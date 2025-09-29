@@ -34,36 +34,44 @@ pub fn impl_macro_required_args_constructor(input: &syn::DeriveInput) -> TokenSt
                 let field_name = field.ident.as_ref();
                 let field_type = &field.ty;
 
-                let  (mut required, mut default, mut skip) = (false, false, false); 
+                let (mut required, mut default, mut into) = (false, false, false);
                 field.attrs.iter().for_each(|attr| {
                     if attr.path().is_ident("constructor") {
                         if let Meta::List(meta_list) = &attr.meta {
-                          
                             let meta: Punctuated<Meta, syn::Token![,]> = match meta_list
-                                .parse_args_with(Punctuated::<Meta, syn::Token![,]>::parse_terminated)
-                            {
+                                .parse_args_with(
+                                    Punctuated::<Meta, syn::Token![,]>::parse_terminated,
+                                ) {
                                 Ok(nested_meta) => nested_meta,
                                 Err(_) => return,
                             };
 
                             required = meta.iter().any(|meta| meta.path().is_ident("required"));
                             default = meta.iter().any(|meta| meta.path().is_ident("default"));
-                            skip = meta.iter().any(|meta| meta.path().is_ident("skip"));
+                            into = meta.iter().any(|meta| meta.path().is_ident("into"));
                         }
                     }
                 });
-                if skip {
+
+                if default {
                     return (quote! {}, quote! {#field_name: Default::default()});
+                }
+
+                if into {
+                    return (
+                        quote! {#field_name: impl Into<#field_type>,},
+                        quote! {#field_name: #field_name.into()},
+                    );
                 }
 
                 if is_option {
                     if required {
-                        (quote! {#field_name: #field_type}, quote! {#field_name})
-                    }else {
+                        (quote! {#field_name: #field_type,}, quote! {#field_name})
+                    } else {
                         (quote! {}, quote! {#field_name: None})
                     }
                 } else {
-                    (quote! {#field_name: #field_type}, quote! {#field_name})
+                    (quote! {#field_name: #field_type,}, quote! {#field_name})
                 }
             })
             .collect::<Vec<_>>()
@@ -74,7 +82,7 @@ pub fn impl_macro_required_args_constructor(input: &syn::DeriveInput) -> TokenSt
             impl #name {
 
                 pub fn from_args(
-                    #(#args),*
+                    #(#args)*
                 ) -> Self {
                     Self {
                         #(#fields),*
@@ -87,5 +95,6 @@ pub fn impl_macro_required_args_constructor(input: &syn::DeriveInput) -> TokenSt
     });
 
     println!("expanded: {}", expanded.to_string());
+
     TokenStream::from(expanded)
 }
