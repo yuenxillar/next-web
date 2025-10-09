@@ -1,6 +1,8 @@
 use std::any::Any;
 
-use crate::{error::AnyError, retry_context::RetryContext};
+use next_web_core::models::any_error::AnyError;
+
+use crate:: retry_context::RetryContext;
 
 pub trait RetryListener
 where

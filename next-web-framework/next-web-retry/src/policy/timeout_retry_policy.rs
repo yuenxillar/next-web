@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use next_web_core::{async_trait, models::any_value::AnyValue};
+use next_web_core::{async_trait, models::{any_error::AnyError, any_value::AnyValue}};
 
 use crate::{
     context::retry_context_support::RetryContextSupport,
@@ -53,7 +53,7 @@ impl RetryPolicy for TimeoutRetryPolicy {
     fn register_error(
         &self,
         context: &dyn RetryContext,
-        error: Option<&dyn crate::error::AnyError>,
+        error: Option<&dyn AnyError>,
     ) {
         let context: &dyn Any = context;
         match context.downcast_ref::<RetryContextSupport>() {

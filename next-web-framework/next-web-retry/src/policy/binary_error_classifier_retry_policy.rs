@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
-use next_web_core::async_trait;
+use next_web_core::{async_trait, models::any_error::AnyError};
 
 use crate::{
     classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier},
     context::retry_context_support::RetryContextSupport,
-    error::AnyError,
     retry_context::RetryContext,
     retry_policy::RetryPolicy,
 };

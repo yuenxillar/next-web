@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use next_web_core::{async_trait, DynClone};
+use next_web_core::{async_trait, models::any_error::AnyError, DynClone};
 
-use crate::{error::AnyError, retry_context::RetryContext};
+use crate::retry_context::RetryContext;
 
 
 pub const NO_MAXIMUM_ATTEMPTS_SET: u16 = 0;

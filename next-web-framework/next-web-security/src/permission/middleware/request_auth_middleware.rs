@@ -6,8 +6,7 @@ use axum::{
 };
 
 use crate::{
-    core::http_security::MatchType,
-    permission::manager::user_authorization_manager::UserAuthenticationManager,
+    config::web::http_security::MatchType, permission::manager::user_authorization_manager::UserAuthenticationManager
 };
 
 pub(crate) async fn request_auth_middleware(

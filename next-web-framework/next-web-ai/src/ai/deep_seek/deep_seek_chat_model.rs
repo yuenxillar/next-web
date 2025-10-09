@@ -146,7 +146,7 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
         // observe
         let mut observation_context = ChatModelObservationContext::new(
             prompt,
-            AiProvider::DeepSeek.to_string(),
+            AiProvider::DeepSeek,
             Self::build_request_options(&req).into_boxed(),
         );
 

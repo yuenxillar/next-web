@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::async_trait;
+use next_web_core::{async_trait, models::any_error::AnyError};
 
 use crate::retry_policy::RetryPolicy;
 
@@ -31,7 +31,7 @@ impl RetryPolicy for AlwaysRetryPolicy {
     fn register_error(
         &self,
         context: &dyn crate::retry_context::RetryContext,
-        error: Option<&dyn crate::error::AnyError>,
+        error: Option<&dyn AnyError>,
     ) {
         todo!()
     }

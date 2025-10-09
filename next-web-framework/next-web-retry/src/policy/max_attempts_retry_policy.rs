@@ -1,5 +1,5 @@
 use std::{any::Any, sync::{atomic::{AtomicU16, Ordering}, Arc}};
-use next_web_core::async_trait;
+use next_web_core::{async_trait, models::any_error::AnyError};
 
 use crate::{context::retry_context_support::RetryContextSupport, retry_context::RetryContext, retry_policy::RetryPolicy};
 
@@ -48,7 +48,7 @@ impl RetryPolicy for MaxAttemptsRetryPolicy {
     fn register_error(
         &self,
         context: &dyn RetryContext,
-        error: Option<&dyn crate::error::AnyError>,
+        error: Option<&dyn AnyError>,
     ) {
         // TODO parent
         let any: &dyn Any = context;

@@ -43,6 +43,13 @@ pub struct LoggingProperties {
     ///
     /// Whether to append a date suffix to the log file name.
     additional_date: Option<bool>,
+
+    /// 日志格式
+    /// 
+    /// # Log Format
+    /// 
+    /// The format of the log messages.
+    format: Option<String>,
 }
 
 impl LoggingProperties {
@@ -136,6 +143,11 @@ impl LoggingProperties {
     pub fn additional_date(&self) -> bool {
         self.additional_date.unwrap_or(false)
     }
+
+    /// 获取日志格式
+    pub fn format(&self) -> Option<&str> {
+        self.format.as_deref()
+    }
 }
 
 impl Default for LoggingProperties {
@@ -162,6 +174,7 @@ impl Default for LoggingProperties {
             log_dir: None,
             log_maximum_size: None,
             additional_date: None,
+            format: None,
         }
     }
 }

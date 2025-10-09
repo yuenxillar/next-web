@@ -7,6 +7,7 @@ edition = "2021"
 next-web-core = { workspace = true }
 rudi-dev = { workspace = true }
 axum = { workspace = true }
+tracing = { workspace = true }
 
 bcrypt = { workspace = true }
 matchit = { workspace = true }

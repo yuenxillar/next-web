@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use next_web_core::async_trait;
+use next_web_core::{async_trait, models::any_error::AnyError};
 
 use crate::{
     context::retry_context_support::RetryContextSupport,
@@ -87,7 +87,7 @@ impl RetryPolicy for CompositeRetryPolicy {
     fn register_error(
         &self,
         context: &dyn RetryContext,
-        error: Option<&dyn crate::error::AnyError>,
+        error: Option<&dyn AnyError>,
     ) {
         let any: &dyn Any = context;
         if let Some(ctx) = any.downcast_ref::<CompositeRetryContext>() {

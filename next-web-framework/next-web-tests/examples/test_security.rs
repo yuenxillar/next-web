@@ -3,13 +3,13 @@ use std::sync::Arc;
 use axum::{
     extract::Path, extract::Request, http::HeaderMap, response::IntoResponse, routing::post,
 };
-use next_web_core::state::application_state::ApplicationState;
 #[allow(missing_docs)]
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
+use next_web_core::{state::application_state::ApplicationState, util::http_method::HttpMethod};
 use next_web_dev::{application::Application, Singleton};
 use next_web_security::{
-    auth::models::login_type::LoginType,
-    core::{http_security::HttpSecurity, web_security_configure::WebSecurityConfigure},
+    auth::models::login_type::LoginType, config::web::http_security::HttpSecurity,
+    core::web_security_configure::WebSecurityConfigure,
     permission::service::authentication_service::AuthenticationService,
 };
 use tokio::sync::Mutex;
@@ -20,7 +20,7 @@ struct TestApplication;
 #[async_trait]
 impl Application for TestApplication {
     /// initialize the middleware.
-    async fn init_middleware(& self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
@@ -116,8 +116,19 @@ impl TestWebSecurityConfigure {
 }
 
 impl WebSecurityConfigure for TestWebSecurityConfigure {
-    fn configure(&self) -> next_web_security::core::http_security::HttpSecurity {
+    fn configure(&self) -> HttpSecurity {
         HttpSecurity::new()
+            .authorize_http_requests(|mut auth| {
+                auth.request_matchers(vec!["/login", "/logout", "/open"])
+                    .permit_all()
+                    .request_matchers(HttpMethod::Options)
+                    .has_authority("admin")
+                    .any_request()
+                    .authenticated();
+            })
+            .form_login(|form| {
+                
+            })
             .any_match("/login/auth", |group| group.roles(vec!["admin"]))
             .disable()
     }

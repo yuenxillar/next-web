@@ -1,11 +1,10 @@
+use crate::service::message_source_service::MessageSourceService;
 use next_web_core::{
     async_trait,
     context::{application_resources::ApplicationResources, properties::ApplicationProperties},
+    util::singleton::SingletonUtil,
     ApplicationContext, AutoRegister,
 };
-use tracing::warn;
-
-use crate::service::message_source_service::MessageSourceService;
 
 #[derive(Default)]
 pub struct MessageSourceServiceAutoRegister;
@@ -21,21 +20,14 @@ impl AutoRegister for MessageSourceServiceAutoRegister {
         ctx: &mut ApplicationContext,
         properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let message_source_properties = match properties.next().messages() {
-            Some(properties) => properties,
-            None => {
-                warn!("No message source properties found\n");
-                return Ok(());
-            }
-        };
+        let message_source_properties = properties.next().messages().cloned().unwrap_or_default();
 
         // Retrieve the messages file from the resource
-        let application_resources = ctx.get_single::<ApplicationResources>();
+        let application_resources =
+            ctx.get_single_with_name(SingletonUtil::name::<ApplicationResources>());
 
-        let message_source_service = MessageSourceService::from_resouces(
-            message_source_properties.to_owned(),
-            application_resources,
-        );
+        let message_source_service =
+            MessageSourceService::from_resouces(message_source_properties, application_resources);
 
         ctx.insert_singleton_with_name(message_source_service, "messageSourceService");
 

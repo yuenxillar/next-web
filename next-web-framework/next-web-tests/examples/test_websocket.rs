@@ -63,7 +63,6 @@ impl WebSocketHandler for TestWebSocket {
     }
 }
 
-/// 
 #[derive(Clone, Default)]
 pub struct TestWSApplication;
 

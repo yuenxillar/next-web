@@ -1,4 +1,5 @@
-use crate::error::AnyError;
+use next_web_core::models::any_error::AnyError;
+
 
 pub trait RetryState<K = String>
 where

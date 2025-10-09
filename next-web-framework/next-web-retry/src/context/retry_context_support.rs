@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU16, Ordering},
 };
 
-use next_web_core::models::any_value::AnyValue;
+use next_web_core::models::{any_error::AnyError, any_value::AnyValue};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -27,7 +27,7 @@ impl RetryContextSupport {
         s
     }
 
-    pub fn register_error(&self, error: Option<&dyn crate::error::AnyError>) {
+    pub fn register_error(&self, error: Option<&dyn AnyError>) {
         if let Some(error) = error {
             self.count.fetch_add(1, Ordering::Relaxed);
             self.last_error

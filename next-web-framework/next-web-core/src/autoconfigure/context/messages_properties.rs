@@ -22,3 +22,13 @@ impl MessagesProperties {
         self.reload_time
     }
 }
+
+impl Default for MessagesProperties {
+    fn default() -> Self {
+        Self {
+            local: Default::default(),
+            base_name: Default::default(),
+            reload_time: Default::default(),
+        }
+    }
+}

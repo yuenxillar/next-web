@@ -7,13 +7,13 @@ use next_web_core::constants::common_constants::{MESSAGES, PROPERTIES};
 use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
 use next_web_core::util::locale::Locale;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MessageSourceService {
     properties: MessagesProperties,
     source: Arc<HashMap<Locale, HashMap<Box<str>, Message>>>,
 }
 
-#[derive(Clone, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct Message {
     indexs: Option<Vec<usize>>,
     content: String,
@@ -21,10 +21,12 @@ struct Message {
 
 impl MessageSourceService {
     pub fn from_resouces(properties: MessagesProperties, resources: &ApplicationResources) -> Self {
-        let map = Self::build(&properties, resources);
+        let locales = Self::build(&properties, resources);
+
+        println!("messages: {:?}", locales);
         Self {
             properties,
-            source: Arc::new(map),
+            source: Arc::new(locales),
         }
     }
 
@@ -39,8 +41,7 @@ impl MessageSourceService {
         let iters = resources.load_dir(I18N);
         iters
             .into_iter()
-            .filter(|s| s.ends_with(PROPERTIES))
-            .filter(|s| s.starts_with(base_name))
+            .filter(|s| s.starts_with(& format!("{}/{}", I18N, base_name)) && s.ends_with(PROPERTIES))
             .for_each(|path| {
                 // default
                 let locale: Option<Locale> =
@@ -48,12 +49,15 @@ impl MessageSourceService {
                         Some(Locale::locale())
                     } else {
                         let mut s1 = path
-                            .replace(base_name, "")
+                            .replace(& format!("{}/{}", I18N, base_name), "")
                             .replace(PROPERTIES, "")
                             .replace(".", "");
                         s1.remove(0);
                         Locale::from_str(s1.as_str()).ok()
                     };
+
+                println!("path: {}", path);
+                println!("locale: {:?}", locale);
 
                 locale.map(|val| {
                     resources.load(path).map(|data| {
@@ -129,7 +133,7 @@ impl MessageSourceService {
             if let Some(index) = s.find('=') {
                 let (key, value) = s.split_at(index);
                 let key = key.trim().into();
-                let content = value.to_string();
+                let content = value[1..].to_string();
 
                 let indexs: Option<Vec<usize>> = if content.contains("%s") {
                     let index = content
@@ -158,12 +162,12 @@ impl MessageSourceService {
         let mut text = message.content.clone();
 
         if let Some(indexes) = &message.indexs {
-            for (arg_idx, &arg) in args.iter().enumerate() {
-                if let Some(&placeholder_pos) = indexes.get(arg_idx) {
+            for index in (0..args.len()).rev() {
+                 if let Some(&placeholder_pos) = indexes.get(index) {
                     let start = placeholder_pos;
                     let end = placeholder_pos + 2;
                     if end <= text.len() {
-                        text.replace_range(start..end, arg);
+                        text.replace_range(start..end, args[index]);
                     }
                 }
             }

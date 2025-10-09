@@ -30,7 +30,6 @@ use crate::application::permitted_groups::PERMITTED_GROUPS;
 use crate::autoregister::handler_autoregister::HttpHandlerAutoRegister;
 use crate::autoregister::register_single::ApplicationDefaultRegisterContainer;
 
-
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
@@ -42,9 +41,9 @@ use next_web_core::traits::event::application_event_multicaster::ApplicationEven
 use next_web_core::traits::event::application_listener::ApplicationListener;
 
 #[cfg(feature = "enable-scheduling")]
-use crate::manager::job_scheduler_manager::JobSchedulerManager;
-#[cfg(feature = "enable-scheduling")]
 use crate::autoregister::scheduler_autoregister::SchedulerAutoRegister;
+#[cfg(feature = "enable-scheduling")]
+use crate::manager::job_scheduler_manager::JobSchedulerManager;
 #[cfg(feature = "enable-scheduling")]
 #[allow(unused_imports)]
 use next_web_core::traits::schedule::scheduled_task::ScheduledTask;
@@ -61,7 +60,7 @@ pub trait Application: Send + Sync {
     /// Register the rpc server.
     #[cfg(feature = "enable-grpc")]
     async fn register_rpc_server(
-        &self, 
+        &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
         application_args: &ApplicationArgs,
@@ -71,7 +70,7 @@ pub trait Application: Send + Sync {
     /// Register the grpc client.
     #[cfg(feature = "enable-grpc")]
     async fn connect_rpc_client(
-        &self, 
+        &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
         application_args: &ApplicationArgs,
@@ -119,9 +118,16 @@ pub trait Application: Send + Sync {
             },
         );
 
+        let default_format = "%Y-%m-%d %H:%M:%S%.3f";
         let config = tracing_subscriber::fmt::format()
             .with_timer(tracing_subscriber::fmt::time::ChronoLocal::new(
-                "%Y-%m-%d %H:%M:%S%.3f".to_string(),
+                logging
+                    .map(|val| {
+                        val.format()
+                            .map(ToString::to_string)
+                            .unwrap_or(default_format.to_string())
+                    })
+                    .unwrap_or(default_format.to_string()),
             ))
             .with_level(true)
             .with_target(true)
@@ -172,9 +178,9 @@ pub trait Application: Send + Sync {
     ) {
         // Register singletion
         // [properties] [args] [resources]
-        ctx.insert_singleton_with_name(application_properties.to_owned(),   "applicationProperties");
-        ctx.insert_singleton_with_name(application_args.to_owned(),         "applicationArgs");
-        ctx.insert_singleton_with_name(application_resources.to_owned(),    "applicationResources");
+        ctx.insert_singleton_with_name(application_properties.to_owned(), "applicationProperties");
+        ctx.insert_singleton_with_name(application_args.to_owned(), "applicationArgs");
+        ctx.insert_singleton_with_name(application_resources.to_owned(), "applicationResources");
 
         let mut container = ApplicationDefaultRegisterContainer::default();
         container.register_all(ctx, application_properties).await;
@@ -229,8 +235,8 @@ pub trait Application: Send + Sync {
 
         let rest_client = RestClient::new();
         ctx.insert_singleton_with_name(default_event_publisher, "defaultApplicationEventPublisher");
-        ctx.insert_singleton_with_name(multicaster,             "defaultApplicationEventMulticaster");
-        ctx.insert_singleton_with_name(rest_client,             "restClient");
+        ctx.insert_singleton_with_name(multicaster, "defaultApplicationEventMulticaster");
+        ctx.insert_singleton_with_name(rest_client, "restClient");
     }
 
     // Get the application router.
@@ -462,11 +468,13 @@ pub trait Application: Send + Sync {
 
         // Perform a series of processing on application properties before executing the next step
         next_application.application_properties.decrypt();
-        next_application.application_properties.replace_placeholders();
+        next_application
+            .application_properties
+            .replace_placeholders();
 
-        let properties= next_application.application_properties();
-        let args            = next_application.application_args();
-        let resources  = next_application.application_resources();
+        let properties = next_application.application_properties();
+        let args = next_application.application_args();
+        let resources = next_application.application_resources();
 
         // Banner show
         Self::banner_show(&resources);
@@ -527,13 +535,17 @@ pub trait Application: Send + Sync {
 
         #[cfg(feature = "enable-grpc")]
         {
-            application.register_rpc_server(&mut ctx, properties, args, resources).await;
+            application
+                .register_rpc_server(&mut ctx, properties, args, resources)
+                .await;
             println!(
                 "Register grpc server success!\nCurrent Time: {}\n",
                 LocalDateTime::now()
             );
 
-            application.connect_rpc_client(&mut ctx, properties, args, resources).await;
+            application
+                .connect_rpc_client(&mut ctx, properties, args, resources)
+                .await;
             println!(
                 "Connect grpc client success!\nCurrent Time: {}\n",
                 LocalDateTime::now()

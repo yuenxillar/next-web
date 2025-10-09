@@ -1,12 +1,9 @@
 use std::{any::Any, collections::HashMap, sync::{atomic::{AtomicBool, AtomicU16, Ordering}, Arc}};
 
-use next_web_core::{async_trait, models::any_value::AnyValue};
+use next_web_core::{async_trait, models::{any_error::AnyError, any_value::AnyValue}};
 
 use crate::{
-    classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier},
-    error::{AnyError, retry_error::RetryError},
-    retry_context::{SyncAttributeAccessor, RetryContext},
-    retry_policy::RetryPolicy,
+    classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier}, error::retry_error::RetryError, retry_context::{RetryContext, SyncAttributeAccessor}, retry_policy::RetryPolicy
 };
 
 #[derive(Clone)]

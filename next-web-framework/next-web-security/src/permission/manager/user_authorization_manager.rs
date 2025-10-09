@@ -3,7 +3,7 @@ use std::sync::Arc;
 use next_web_core::models::any_matcher::AnyMatcher;
 
 use crate::auth::models::login_type::LoginType;
-use crate::core::http_security::HttpSecurity;
+use crate::config::web::http_security::HttpSecurity;
 use crate::permission::{
     model::permission_group::PermissionGroup,
     service::authentication_service::AuthenticationService,

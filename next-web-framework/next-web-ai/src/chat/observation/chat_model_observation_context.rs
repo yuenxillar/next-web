@@ -22,12 +22,12 @@ pub struct ChatModelObservationContext {
 impl ChatModelObservationContext {
     pub fn new(
         prompt: Prompt,
-        provider: impl Into<String>,
+        provider: impl ToString,
         request_options: Box<dyn ChatOptions>,
     ) -> Self {
         let operation_metadata = AiOperationMetadata {
             operation_type: AiOperationType::Chat.to_string(),
-            provider: provider.into(),
+            provider: provider.to_string(),
         };
         Self {
             model_observation_context: ModelObservationContext::new(prompt, operation_metadata),
