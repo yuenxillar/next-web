@@ -5,7 +5,7 @@ use hashbrown::HashMap;
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use crate::models::any_value::AnyValue;
+use crate::anys::any_value::AnyValue;
 
 /// Support AnyMap caching for different data types
 ///

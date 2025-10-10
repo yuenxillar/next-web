@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use next_web_core::{error::BoxError, models::any_error::AnyError};
+use next_web_core::{error::BoxError, anys::any_error::AnyError};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

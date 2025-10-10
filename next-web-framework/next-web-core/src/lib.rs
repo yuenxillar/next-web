@@ -1,6 +1,6 @@
 pub mod proxy;
 pub mod scheduler;
-pub mod models;
+pub mod anys;
 pub mod autoconfigure;
 pub mod autoregister;
 pub mod client;
@@ -19,3 +19,5 @@ pub use self::context::application_context::*;
 pub use async_trait::async_trait;
 pub use dyn_clone::{clone_trait_object, DynClone};
 
+#[cfg(feature = "http-request")]
+pub extern crate headers;

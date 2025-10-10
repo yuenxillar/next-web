@@ -26,13 +26,15 @@ validator = { workspace = true }
 sha2 = { workspace = true }
 reqwest = { workspace = true, features = ["json", "gzip"]}
 sys-locale = { workspace = true }
+headers = { workspace = true, optional = true }
 
 inventory = { workspace = true }
-
 
 tower-layer = "0.3.3"
 tower-service = "0.3.3"
 
 [features]
-default = ["trace-log"]
+default = ["trace-log", "http-request"]
+http-request = ["headers"]
+
 trace-log = []

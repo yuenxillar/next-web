@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::{async_trait, models::any_error::AnyError, DynClone};
+use next_web_core::{async_trait, anys::any_error::AnyError, DynClone};
 
 use crate::retry_context::RetryContext;
 

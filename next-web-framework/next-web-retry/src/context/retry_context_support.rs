@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU16, Ordering},
 };
 
-use next_web_core::models::{any_error::AnyError, any_value::AnyValue};
+use next_web_core::anys::{any_error::AnyError, any_value::AnyValue};
 use tokio::sync::Mutex;
 
 use crate::{

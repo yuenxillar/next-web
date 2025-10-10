@@ -1,3 +1,4 @@
+pub mod abstract_authentication_processing_filter;
 pub mod simple_url_authentication_failure_handler;
 pub mod authentication_failure_handler;
 pub mod authentication_success_handler;

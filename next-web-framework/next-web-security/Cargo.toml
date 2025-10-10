@@ -9,5 +9,6 @@ rudi-dev = { workspace = true }
 axum = { workspace = true }
 tracing = { workspace = true }
 
-bcrypt = { workspace = true }
+
+bcrypt  = { workspace = true }
 matchit = { workspace = true }

@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use next_web_core::models::any_value::AnyValue;
+use next_web_core::anys::any_value::AnyValue;
 use next_web_dev::retry::error::retry_error::RetryError;
 use next_web_dev::retry::retry_context::RetryContext;
 use next_web_dev::retry::retry_operations::RetryOperations;
