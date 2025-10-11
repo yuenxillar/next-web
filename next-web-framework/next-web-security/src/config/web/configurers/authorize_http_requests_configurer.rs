@@ -1,13 +1,17 @@
 use std::{any::Any, cell::RefCell, marker::PhantomData, sync::Arc};
 
 use axum::extract::Request;
+use next_web_core::traits::Required::Required;
 use next_web_core::util::http_method::HttpMethod;
+use next_web_core::ApplicationContext;
 
 use crate::access::hierarchicalroles::role_hierarchy::RoleHierarchy;
+use crate::authorization::authorization_decision::AuthorizationDecision;
 use crate::config::web::abstract_request_matcher_registry::AbstractRequestMatcherRegistry;
 use crate::config::web::http_security_builder::HttpSecurityBuilder;
 use crate::web::access::intercept::authorization_filter::AuthorizationFilter;
 use crate::web::access::intercept::request_matcher_delegating_authorization_manager::RequestMatcherDelegatingAuthorizationManager;
+use crate::web::default_security_filter_chain::DefaultSecurityFilterChain;
 use crate::web::util::matcher::request_matcher_entry::RequestMatcherEntry;
 use crate::{
     access::intercept::request_authorization_context::RequestAuthorizationContext,
@@ -42,6 +46,22 @@ pub struct AuthorizeHttpRequestsConfigurer<H> {
 impl<H> AuthorizeHttpRequestsConfigurer<H> {
     pub fn open(&self) -> () {}
 
+    pub fn new(
+        context: &ApplicationContext
+    ) -> Self {
+        Self {
+            _marker: (),
+            registry: (),
+            publisher: (),
+            role_hierarchy: (),
+            security_configurer_adapter: (),
+        }
+    }
+
+
+    pub fn get_registry(&self) -> AuthorizationManagerRequestMatcherRegistry {
+        self.registry.clone()
+    }
     fn add_mapping<T1, T2>(
         &mut self,
         matchers: T1,
@@ -58,12 +78,16 @@ impl<H> AuthorizeHttpRequestsConfigurer<H> {
 
         &self.registry
     }
+
+    pub fn permit_all_authorization_manager() -> AuthorizationDecision {
+        AuthorizationDecision::new(true)
+    }
 }
 
 impl<H> SecurityConfigurer<H> for AuthorizeHttpRequestsConfigurer<H>
 where
     H: Send + Sync,
-    H: HttpSecurityBuilder<H>
+    H: HttpSecurityBuilder<H>,
 {
     fn init(&self, _http: H) {}
 
@@ -73,13 +97,26 @@ where
         // TODO
         // authorization_filter.setAuthorizationEventPublisher(this.publisher);
 
-        authorization_filter.setShouldFilterAllDispatcherTypes(this.registry.shouldFilterAllDispatcherTypes);
-		authorization_filter.setSecurityContextHolderStrategy(getSecurityContextHolderStrategy());
-        
+        authorization_filter
+            .setShouldFilterAllDispatcherTypes(this.registry.shouldFilterAllDispatcherTypes);
+        authorization_filter.setSecurityContextHolderStrategy(getSecurityContextHolderStrategy());
+
         http.add_filter((self.security_configurer_adapter.post_process(object)));
     }
 }
 
+
+impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>> for  AuthorizeHttpRequestsConfigurer<H> {
+    fn get_object(&self) -> & SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+        todo!()
+    }
+
+    fn get_object_mut(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+        todo!()
+    }
+}
+
+#[derive(Clone)]
 pub struct AuthorizationManagerRequestMatcherRegistry<C = AuthorizedUrl> {
     any_request_configured: bool,
 

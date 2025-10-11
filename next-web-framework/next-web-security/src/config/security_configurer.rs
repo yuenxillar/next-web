@@ -4,7 +4,7 @@ pub trait SecurityConfigurer<O, B: SecurityBuilder<O>>
 where
     Self: Send + Sync,
 {
-    fn init(&self, builer: B);
+    fn init(&mut self, builer: &mut  B);
 
-    fn configure(&self, builer: B);
+    fn configure(&mut self, builer:&mut B);
 }

@@ -63,16 +63,12 @@ impl ObjectPostProcessor for CompositeObjectPostProcessor {
     }
 }
 
+#[allow(unused_variables)]
 impl<O, B> SecurityConfigurer<O, B> for SecurityConfigurerAdapter<O, B>
 where
     B: SecurityBuilder<O>,
 {
-    fn init(&self, builer: B) {
-        todo!()
-    }
+    fn init(&self, builer: B) {}
 
-    fn configure(&self, builer: B) {
-        todo!()
-    }
-
+    fn configure(&self, builer: B) {}
 }

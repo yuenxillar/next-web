@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::extract::Request;
 
-use crate::authorization::authorization_manager::AuthorizationManager;
+use crate::{authorization::authorization_manager::AuthorizationManager, core::filter::Filter};
 
 pub struct AuthorizationFilter {
     authorization_manager: Arc<dyn AuthorizationManager<Request>>,
@@ -21,5 +21,12 @@ impl AuthorizationFilter {
             filter_error_dispatch: true,
             filter_async_dispatch: true
         }
+    }
+}
+
+
+impl Filter for AuthorizationFilter {
+    fn do_filter(&self, req: & Request, res: & axum::response::Response, next: axum::middleware::Next) {
+        todo!()
     }
 }

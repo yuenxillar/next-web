@@ -37,6 +37,21 @@ where
     }
 }
 
+impl<T, B> Default for AbstractHttpConfigurer<T, B>
+where
+    T: Required<AbstractHttpConfigurer<T, B>>,
+    B: HttpSecurityBuilder<B>,
+    Self: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>,
+{
+    fn default() -> Self {
+        Self {
+            security_configurer_adapter: todo!(),
+            _marker_1: Default::default(),
+            _marker_2: Default::default(),
+        }
+    }
+}
+
 impl<T, B> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>
     for AbstractHttpConfigurer<T, B>
 where

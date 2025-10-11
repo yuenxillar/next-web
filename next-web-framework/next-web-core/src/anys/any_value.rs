@@ -2,7 +2,6 @@ use std::{any::Any, fmt};
 
 use crate::traits::any_clone::AnyClone;
 
-
 #[derive(Clone, Default)]
 pub enum AnyValue {
     String(String),

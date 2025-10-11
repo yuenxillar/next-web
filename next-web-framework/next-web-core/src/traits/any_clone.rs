@@ -14,7 +14,8 @@ pub trait AnyClone: Any + Send + Sync {
 /// Implement AnyClone for all types that implement Clone+Send+Sync
 impl<T> AnyClone for T
 where
-    T: Any + Clone + Send + Sync,
+    T: Any + Clone,
+    T: Send + Sync,
 {
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self

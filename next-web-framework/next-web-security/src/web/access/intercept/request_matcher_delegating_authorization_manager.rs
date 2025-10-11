@@ -10,7 +10,7 @@ use crate::web::util::matcher::request_matcher_entry::RequestMatcherEntry;
 use crate::authorization::authorization_manager::AuthorizationManager;
 use crate::access::intercept::request_authorization_context::RequestAuthorizationContext;
 
-
+#[derive(Clone)]
 pub struct RequestMatcherDelegatingAuthorizationManager {
 
 }
@@ -23,6 +23,9 @@ impl AuthorizationManager<Request> for RequestMatcherDelegatingAuthorizationMana
         None
     }
 }
+
+
+#[derive(Clone)]
 pub struct RequestMatcherDelegatingAuthorizationManagerBuilder {
     any_request_configured: bool,
     pub(crate) mappings: Vec<RequestMatcherEntry<Arc<dyn AuthorizationManager<RequestAuthorizationContext>>>>

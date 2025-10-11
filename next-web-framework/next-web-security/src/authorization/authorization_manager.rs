@@ -1,5 +1,3 @@
-use std::future::Future;
-
 use next_web_core::async_trait;
 
 use crate::{

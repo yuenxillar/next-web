@@ -1,3 +1,4 @@
+pub mod authentication_manager;
 pub mod authentication_details_source;
 pub mod authorities_authorization_manager;
 pub mod authentication_trust_resolver;

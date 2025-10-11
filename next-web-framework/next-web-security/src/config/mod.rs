@@ -1,3 +1,4 @@
+pub mod authentication;
 pub mod security_builder;
 pub mod object_post_processor;
 pub mod security_configurer_adapter;
