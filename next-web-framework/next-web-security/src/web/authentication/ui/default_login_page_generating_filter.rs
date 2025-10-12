@@ -1,5 +1,5 @@
 use axum::extract::Request;
-use next_web_core::{anys::any_map::AnyMap, traits::Required::Required};
+use next_web_core::{anys::any_map::AnyMap, traits::required::Required};
 
 use crate::{
     core::{authentication_error::AuthenticationError, filter::Filter},

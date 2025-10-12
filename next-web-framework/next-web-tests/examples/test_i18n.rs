@@ -1,6 +1,6 @@
 use next_web_dev::extract::Path;
 use next_web_dev::i18n::locale::accept_header_locale_resolver::AcceptHeaderLocaleResolver;
-use next_web_dev::middleware::find_singleton::FindSingleton;
+use next_web_dev::extract::find_singleton::FindSingleton;
 use next_web_dev::response::IntoResponse;
 use next_web_dev::service::message_source_service::MessageSourceService;
 use next_web_dev::traits::locale_resolver::LocaleResolver;

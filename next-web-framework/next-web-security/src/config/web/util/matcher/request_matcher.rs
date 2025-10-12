@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 use axum::extract::Request;
 use next_web_core::{util::http_method::HttpMethod, DynClone};
@@ -6,7 +6,7 @@ use next_web_core::{util::http_method::HttpMethod, DynClone};
 pub trait RequestMatcher
 where
     Self: DynClone,
-    Self: Debug
+    Self: Debug + Send + Sync
 {
     fn matches(&self, request: &Request) -> bool;
 }
@@ -22,7 +22,7 @@ impl RequestMatcher for HttpMethod {
 impl<T> RequestMatcher for (HttpMethod, T)
 where
     T: IntoIterator<Item = &'static str>,
-    T: Clone + Debug
+    T: Clone + Debug + Send + Sync
 {
     fn matches(&self, request: &Request) -> bool {
         todo!()

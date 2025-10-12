@@ -20,6 +20,7 @@ impl<T> AuthorityAuthorizationManager<T> {
         Self {
             context: PhantomData,
             authorities,
+            delegate: todo!(),
         }
     }
 

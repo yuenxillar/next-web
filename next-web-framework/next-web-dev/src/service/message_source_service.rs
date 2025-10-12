@@ -23,7 +23,7 @@ impl MessageSourceService {
     pub fn from_resouces(properties: MessagesProperties, resources: &ApplicationResources) -> Self {
         let locales = Self::build(&properties, resources);
 
-        println!("messages: {:?}", locales);
+        // println!("messages: {:?}", locales);
         Self {
             properties,
             source: Arc::new(locales),
@@ -56,8 +56,8 @@ impl MessageSourceService {
                         Locale::from_str(s1.as_str()).ok()
                     };
 
-                println!("path: {}", path);
-                println!("locale: {:?}", locale);
+                // println!("path: {}", path);
+                // println!("locale: {:?}", locale);
 
                 locale.map(|val| {
                     resources.load(path).map(|data| {

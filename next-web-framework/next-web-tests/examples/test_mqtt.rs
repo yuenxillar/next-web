@@ -2,7 +2,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::application::Application;
-use next_web_dev::middleware::find_singleton::FindSingleton;
+use next_web_dev::extract::find_singleton::FindSingleton;
 use next_web_dev::Singleton;
 use next_web_mqtt::core::topic::base_topic::BaseTopic;
 use next_web_mqtt::service::mqtt_service::MQTTService;

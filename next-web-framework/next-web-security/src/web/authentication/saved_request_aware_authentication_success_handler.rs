@@ -24,10 +24,11 @@ impl Deref for SavedRequestAwareAuthenticationSuccessHandler {
 impl SavedRequestAwareAuthenticationSuccessHandler {
 
     pub fn new() -> Self {
-        Self { request_cache: HttpSessionRequestCache::new(),
+        Self { request_cache: Arc::new(HttpSessionRequestCache::new()),
             abstract_authentication_target_url_request_handler: todo!(),
          }
     }
+
     pub fn on_authentication_success(
         &self,
         request: &Request,
@@ -55,5 +56,7 @@ impl SavedRequestAwareAuthenticationSuccessHandler {
 
 
 impl AuthenticationSuccessHandler for SavedRequestAwareAuthenticationSuccessHandler {
-    
+    fn on_authentication_success(&self, request: &Request, response: &mut axum::response::Response, authentication: &dyn Authentication) {
+        todo!()
+    }
 }

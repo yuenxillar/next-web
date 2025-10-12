@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use next_web_core::traits::Required::Required;
+use next_web_core::traits::required::Required;
 
 use crate::{
     config::{
@@ -190,6 +190,7 @@ where
 impl<H> SecurityConfigurer<FormLoginConfigurer<H>, H> for FormLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
+    H: SecurityBuilder<FormLoginConfigurer<H>>,
     H: AuthenticationFilterConfigurer<H>,
     H: Clone,
 {

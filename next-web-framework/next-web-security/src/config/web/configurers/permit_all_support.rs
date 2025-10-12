@@ -27,35 +27,35 @@ impl PermitAllSupport {
     T1: IntoIterator<Item = T2>,
     T2: RequestMatcher
     {
-        let configurer = http.get_configurer::<ExpressionUrlAuthorizationConfigurer>();
-        let http_configurer = http.get_configurer::<AuthorizeHttpRequestsConfigurer>();
+        // let configurer = http.get_configurer::<ExpressionUrlAuthorizationConfigurer>();
+        // let http_configurer = http.get_configurer::<AuthorizeHttpRequestsConfigurer>();
 
-        let one_configurer_present = configurer.is_none() ^ http_configurer.is_none();
+        // let one_configurer_present = configurer.is_none() ^ http_configurer.is_none();
 
-        assert!( one_configurer_present,
-            "permit_all only works with either HttpSecurity.authorizeRequests() or HttpSecurity.authorizeHttpRequests 
-                Please define one or the other but not both."
-        );
+        // assert!( one_configurer_present,
+        //     "permit_all only works with either HttpSecurity.authorizeRequests() or HttpSecurity.authorizeHttpRequests 
+        //         Please define one or the other but not both."
+        // );
 
-        for matcher in request_matchers.into_iter() {
-            if let Some(configurer) = configurer {
-                configurer.get_registry().add_mapping(
-                    0,
-                    UrlMapping::new(
-                        matcher,
+        // for matcher in request_matchers.into_iter() {
+        //     if let Some(configurer) = configurer {
+        //         configurer.get_registry().add_mapping(
+        //             0,
+        //             UrlMapping::new(
+        //                 matcher,
                         
-                    )
+        //             )
 
-                )
-            }else {
-                if let Some(http_configurer) = http_configurer {
-                    http_configurer.add_first(
-                        matcher,
-                        AuthorizeHttpRequestsConfigurer::permit_all_authorization_manager()
-                    )
-                }
-            }
-        }
+        //         )
+        //     }else {
+        //         if let Some(http_configurer) = http_configurer {
+        //             http_configurer.add_first(
+        //                 matcher,
+        //                 AuthorizeHttpRequestsConfigurer::permit_all_authorization_manager()
+        //             )
+        //         }
+        //     }
+        // }
 
     }
 }

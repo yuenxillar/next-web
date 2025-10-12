@@ -1,4 +1,8 @@
+use axum::extract::Request;
+
 use crate::web::savedrequest::request_cache::RequestCache;
+
+use super::SavedRequest;
 
 pub struct HttpSessionRequestCache {}
 
@@ -9,15 +13,15 @@ impl HttpSessionRequestCache {
 }
 
 impl RequestCache for HttpSessionRequestCache {
-    fn save_request(&self, request: &axum::extract::Request) -> Result<String, String> {
+    fn save_request(&self, request: &axum::extract::Request) {
         todo!()
     }
 
-    fn get_request(&self, request: &axum::extract::Request) -> Option<String> {
+    fn get_request(&self, request: &axum::extract::Request) -> Option<&dyn SavedRequest> {
         todo!()
     }
 
-    fn get_matching_request(&self, request: &axum::extract::Request) {
+    fn get_matching_request(&self, request: &axum::extract::Request) ->Option<& Request> {
         todo!()
     }
 

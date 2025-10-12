@@ -6,7 +6,7 @@ use next_web_core::{
     ApplicationContext,
 };
 use next_web_dev::{
-    application::Application, middleware::find_singleton::FindSingleton, Singleton,
+    application::Application, extract::find_singleton::FindSingleton, Singleton,
 };
 
 #[derive(Clone, Default)]

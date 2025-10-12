@@ -6,7 +6,7 @@ use axum::{
 };
 use next_web_core::{
     anys::any_value::AnyValue,
-    traits::{ordered::Ordered, Required::Required},
+    traits::{ordered::Ordered, required::Required},
     ApplicationContext,
 };
 
@@ -64,9 +64,9 @@ pub enum MatchType {
 
 impl HttpSecurity {
     pub fn new(
-        object_post_processor: Arc<dyn ObjectPostProcessor>,
-        authentication_builder: AuthenticationManagerBuilder,
-        shared_objects: HashMap<String, AnyValue>,
+        // object_post_processor: Arc<dyn ObjectPostProcessor>,
+        // authentication_builder: AuthenticationManagerBuilder,
+        // shared_objects: HashMap<String, AnyValue>,
     ) -> Self {
         Self {
             any_match: Vec::new(),
@@ -75,8 +75,10 @@ impl HttpSecurity {
             error_handler: Box::new(|_| (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()),
 
             filter_orders: Default::default(),
-            request_matcher: AnyRequestMatcher::default(),
+            request_matcher: Arc::new(AnyRequestMatcher::default()),
             filters: Default::default(),
+            request_matcher_configurer: todo!(),
+            authentication_manager: todo!(),
         }
     }
 
@@ -150,11 +152,12 @@ impl HttpSecurity {
     where
         C: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, Self>>,
     {
-        let existing_config = self.get_configurer::<C>();
-        match existing_config {
-            Some(existing_config) => existing_config,
-            None => self.with(configurer),
-        }
+        // let existing_config = self.get_configurer::<C>();
+        // match existing_config {
+        //     Some(existing_config) => existing_config,
+        //     None => self.with(configurer),
+        // }
+        todo!()
     }
 
     fn get_context(&self) -> &ApplicationContext {
@@ -228,6 +231,11 @@ impl Clone for HttpSecurity {
             not_match: self.not_match.clone(),
             match_type: self.match_type.clone(),
             error_handler: Box::new(|_| (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()),
+            request_matcher_configurer: todo!(),
+            filters: todo!(),
+            request_matcher: todo!(),
+            filter_orders: todo!(),
+            authentication_manager: todo!(),
         }
     }
 }
@@ -239,6 +247,11 @@ impl Default for HttpSecurity {
             not_match: Default::default(),
             match_type: MatchType::NotMatch,
             error_handler: Box::new(|_| (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()),
+            request_matcher_configurer: todo!(),
+            filters: todo!(),
+            request_matcher: todo!(),
+            filter_orders: todo!(),
+            authentication_manager: todo!(),
         }
     }
 }

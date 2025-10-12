@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, sync::Arc};
 
-use next_web_core::{traits::Required::Required, util::http_method::HttpMethod};
+use next_web_core::{traits::required::Required, util::http_method::HttpMethod};
 
 use crate::{
     authorization::authentication_details_source::AuthenticationDetailsSource,
@@ -252,7 +252,8 @@ where
     T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
     T: Required<AbstractHttpConfigurer<T, B>>,
     T: AuthenticationFilterConfigurer<B>,
-    F: Required<AbstractAuthenticationProcessingFilter>,
+    T: Sync + Send,
+    F: Required<AbstractAuthenticationProcessingFilter> + Sync + Send,
 {
     fn init(&mut self, http: &mut B) {
         // self.update_authentication_defaults();

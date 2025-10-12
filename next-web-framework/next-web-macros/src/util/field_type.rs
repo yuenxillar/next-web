@@ -1,6 +1,7 @@
 use quote::ToTokens;
 use syn::{GenericArgument, PathArguments};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FieldType {
     String,
     Number,
@@ -8,6 +9,7 @@ pub enum FieldType {
     Array,
     Object,
     Option,
+    Result,
 }
 
 impl FieldType {
@@ -15,6 +17,10 @@ impl FieldType {
         match ty {
             syn::Type::Array(_) => FieldType::Array,
             syn::Type::Path(type_path) => {
+                if FieldType::is_result(ty) {
+                    return FieldType::Result;
+                }
+
                 if FieldType::is_option(ty) {
                     return FieldType::Option;
                 }
@@ -90,6 +96,15 @@ impl FieldType {
         if let syn::Type::Path(type_path) = ty {
             if let Some(segment) = type_path.path.segments.last() {
                 return segment.ident == "Option";
+            }
+        }
+        false
+    }
+
+    pub fn is_result(ty: &syn::Type) -> bool {
+        if let syn::Type::Path(type_path) = ty {
+            if let Some(segment) = type_path.path.segments.last() {
+                return segment.ident == "Result";
             }
         }
         false

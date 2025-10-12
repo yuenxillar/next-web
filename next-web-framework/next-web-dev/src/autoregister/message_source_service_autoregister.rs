@@ -6,7 +6,8 @@ use next_web_core::{
     ApplicationContext, AutoRegister,
 };
 
-#[derive(Default)]
+use super::default_autoregister::DefaultAutoRegister;
+
 pub struct MessageSourceServiceAutoRegister;
 
 #[async_trait]
@@ -33,4 +34,10 @@ impl AutoRegister for MessageSourceServiceAutoRegister {
 
         Ok(())
     }
+}
+
+impl DefaultAutoRegister for MessageSourceServiceAutoRegister {}
+
+crate::submit! {
+    &MessageSourceServiceAutoRegister as &dyn crate::autoregister::default_autoregister::DefaultAutoRegister
 }

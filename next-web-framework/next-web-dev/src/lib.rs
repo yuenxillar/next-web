@@ -12,7 +12,7 @@ pub mod macros;
 pub mod manager;
 pub mod middleware;
 pub mod service;
-pub mod state_machine;
+
 pub mod stream;
 pub mod util;
 
@@ -21,6 +21,7 @@ pub use axum::Router;
 
 pub use headers;
 pub use inventory::submit;
+pub use crate::extract::required_header::header_names;
 
 pub use rudi_dev::{Properties, SingleOwner, Singleton, Transient};
 
@@ -30,6 +31,8 @@ pub use next_web_macros::{
 };
 pub use next_web_macros::{Builder, Desensitized, FieldName, GetSet, RequiredArgsConstructor};
 
+#[cfg(feature = "enable-state-machine")]
+pub mod state_machine;
 
 #[cfg(feature = "enable-scheduling")]
 pub use next_web_macros::Scheduled;

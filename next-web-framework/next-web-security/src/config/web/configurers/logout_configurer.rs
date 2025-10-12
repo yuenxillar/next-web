@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use next_web_core::traits::Required::Required;
+use next_web_core::traits::required::Required;
 
 use crate::{
     config::{
@@ -51,11 +51,10 @@ impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for LogoutConfigurer<H
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn init(&self, builer: H) {
-        todo!()
+    fn init(&mut self, builer: &mut H) {
     }
 
-    fn configure(&self, builer: H) {
+    fn configure(&mut self, builer:&mut  H) {
         todo!()
     }
 }

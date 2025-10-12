@@ -4,11 +4,11 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
+use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::extract::ConnectInfo;
 use next_web_dev::response::IntoResponse;
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{
-    application::Application, middleware::find_singleton::FindSingleton,
+    application::Application, extract::find_singleton::FindSingleton,
     util::local_date_time::LocalDateTime, AnyMapping, GetMapping, PostMapping, RequestMapping,
     Singleton,
 };
@@ -45,7 +45,7 @@ pub async fn req_hello() -> impl IntoResponse {
 #[PostMapping(path = "/record")]
 pub async fn req_record(
     FindSingleton(store): FindSingleton<ApplicationStore>,
-    ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr> ,
+    ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
     store.add(addr).await;
     "Ok"
@@ -53,18 +53,21 @@ pub async fn req_record(
 
 #[AnyMapping(
     path = "/recordTwo", 
-    headers = ["Content-Type", "Authorization"],
-    consumes = "application/json",
-    produces = "application/json"
+    headers  = ["ContentType", "Authorization"],
+    consume = "application/json",
+    produce = "application/json"
 )]
 pub async fn req_record_two(
     // Search for singleton using variable names
     #[find] FindSingleton(application_store_two): FindSingleton<ApplicationStore>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-) -> impl IntoResponse {
+
+    next_web_dev::extract::typed_header::TypedHeader(content_type): next_web_dev::extract::typed_header::TypedHeader<next_web_dev::headers::ContentType>,
+) -> Result<&'static str, ()> {
     application_store_two.add(addr).await;
 
-    return "{\"message\": \"Ok\"}";
+    info!("Content-Type: {}", content_type.to_string());
+    return Ok("{\"message\": \"Ok\"}");
 }
 
 #[allow(unused)]
@@ -72,7 +75,6 @@ struct TestUserRoutes;
 
 #[RequestMapping(path = "/user")]
 impl TestUserRoutes {
-
     // Request -> /user/login
     #[GetMapping(path = "/login")]
     async fn req_login() -> impl IntoResponse {

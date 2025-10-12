@@ -16,9 +16,10 @@ pub struct AuthenticatedAuthorizationManager {
 
 impl AuthenticatedAuthorizationManager {
     pub fn authenticated() -> Self {
-        AuthenticatedAuthorizationManager {
-            authorization_strategy: Arc::new(AuthenticatedAuthorizationStrategy::new()),
-        }
+        // AuthenticatedAuthorizationManager {
+        //     authorization_strategy: Arc::new(AuthenticatedAuthorizationStrategy::new()),
+        // }
+        todo!()
     }
 
     pub fn fully_authenticated() -> Self {
@@ -108,7 +109,7 @@ struct FullyAuthenticatedAuthorizationStrategy {
 
 impl FullyAuthenticatedAuthorizationStrategy {
     pub fn new() -> Self {
-        Self {}
+        Self { abstract_authorization_strategy: todo!() }
     }
 }
 
@@ -126,7 +127,7 @@ struct RememberMeAuthorizationStrategy {
 
 impl RememberMeAuthorizationStrategy {
     pub fn new() -> Self {
-        Self {}
+        Self { abstract_authorization_strategy: todo!() }
     }
 }
 
@@ -144,7 +145,7 @@ struct AnonymousAuthorizationStrategy {
 
 impl AnonymousAuthorizationStrategy {
     pub fn new() -> Self {
-        Self {}
+        Self { abstract_authorization_strategy: todo!() }
     }
 }
 

@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use next_web_core::traits::Required::Required;
+use next_web_core::traits::required::Required;
 
 use crate::{
     config::{

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use axum::response::IntoResponse;
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{
-    application::Application, middleware::find_singleton::FindSingleton, Properties, Singleton,
+    application::Application, extract::find_singleton::FindSingleton, Properties, Singleton,
 };
 
 #[derive(Clone, Default)]

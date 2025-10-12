@@ -72,7 +72,7 @@ mimalloc = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = ["enable-i18n", "decrypt-properties"]
+default = ["enable-i18n", "enable-state-machine", "decrypt-properties"]
 full = ["enable-scheduling", "enable-web-security", "enable-retry", "enable-i18n", "decrypt-properties"]
 
 tls-rustls = ["axum-server"]
@@ -85,6 +85,7 @@ enable-retry        = ["next-web-retry"]
 enable-grpc = []
 enable-prometheus = ["axum-prometheus"]
 enable-i18n = []
+enable-state-machine = []
 
 decrypt-properties = ["aes-gcm"]
 

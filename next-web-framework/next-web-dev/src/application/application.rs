@@ -27,8 +27,8 @@ use tracing::{error, info};
 use crate::application::next_application::NextApplication;
 
 use crate::application::permitted_groups::PERMITTED_GROUPS;
+use crate::autoregister::default_autoregister::DefaultAutoRegister;
 use crate::autoregister::handler_autoregister::HttpHandlerAutoRegister;
-use crate::autoregister::register_single::ApplicationDefaultRegisterContainer;
 
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
@@ -178,17 +178,19 @@ pub trait Application: Send + Sync {
     ) {
         // Register singletion
         // [properties] [args] [resources]
-        ctx.insert_singleton_with_name(application_properties.to_owned(), "applicationProperties");
-        ctx.insert_singleton_with_name(application_args.to_owned(), "applicationArgs");
-        ctx.insert_singleton_with_name(application_resources.to_owned(), "applicationResources");
+        ctx.insert_singleton_with_name(application_properties.to_owned(),   "applicationProperties");
+        ctx.insert_singleton_with_name(application_args.to_owned(),         "applicationArgs");
+        ctx.insert_singleton_with_name(application_resources.to_owned(),    "applicationResources");
 
-        let mut container = ApplicationDefaultRegisterContainer::default();
-        container.register_all(ctx, application_properties).await;
+        // If a declarative macro is used for submission, it should not be found in the Application Context
+        for default_auto_register in inventory::iter::<&dyn DefaultAutoRegister>.into_iter() {
+            default_auto_register.register(ctx, application_properties).await.unwrap();
+        }
 
         // Resove autoRegister
-        let auto_register = ctx.resolve_by_type::<Arc<dyn AutoRegister>>();
-        for item in auto_register.iter() {
-            item.register(ctx, application_properties).await.unwrap();
+        let auto_registers = ctx.resolve_by_type::<Arc<dyn AutoRegister>>();
+        for auto_register in auto_registers.iter() {
+            auto_register.register(ctx, application_properties).await.unwrap();
         }
     }
 

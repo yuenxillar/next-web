@@ -9,6 +9,7 @@ use syn::{parse_macro_input, spanned::Spanned, ItemFn, LitStr};
 use syn::{Expr, FnArg, Ident, Item, ItemImpl, Lit, Meta};
 
 use crate::singleton::find::impl_find_attribute;
+use crate::util::attributes::add_args;
 
 use super::attrs::request_mapping_attr::RequestMappingAttr;
 
@@ -28,28 +29,25 @@ pub fn with_method(method: Option<Method>, attr: TokenStream, input: TokenStream
 
 fn impl_item_fn(
     method: Option<Method>,
-    item_fn: ItemFn,
+    mut item_fn: ItemFn,
     attr: TokenStream,
 ) -> Result<TokenStream2, syn::Error> {
-    let vis = &item_fn.vis;
-    let sig = &item_fn.sig;
-    let name = &sig.ident;
 
-    if sig.asyncness.is_none() {
+    if item_fn.sig.asyncness.is_none() {
         return Err(syn::Error::new(
-            sig.span(),
+            item_fn.sig.span(),
             "Function must be declared as async",
         ));
     }
 
-    if matches!(sig.output, syn::ReturnType::Default) {
+    if matches!(item_fn.sig.output, syn::ReturnType::Default) {
         return Err(syn::Error::new_spanned(
             item_fn,
             "Function has no return type. Cannot be used as handler",
         ));
     }
 
-    let inputs = &sig.inputs;
+    let inputs = &item_fn.sig.inputs;
     if inputs.iter().any(|val| match val {
         FnArg::Receiver(_) => true,
         _ => false,
@@ -64,14 +62,29 @@ fn impl_item_fn(
         method_,
         path,
         headers,
-        consumes,
-        produces,
+        consume,
+        produce,
     } = match RequestMappingAttr::from_tokens(attr.into()) {
         Ok(attr) => attr,
         Err(error) => return Err(error),
     };
 
-    let ast = match impl_find_attribute(&mut item_fn.clone(), produces) {
+
+    let headers = headers.into_iter()
+    .filter(|header| !header.value().trim().is_empty() )
+    .enumerate()
+        .map(|(index, header)| {
+            let header = Ident::new(& header.value().trim(), Span::call_site());
+            let var_name = Ident::new(& format!("__required_header_{}", index), Span::call_site());
+            quote! {
+                #var_name : ::next_web_dev::extract::RequiredHeader<::next_web_dev::header_names::#header>
+            }
+        });
+
+    // Add the required parameters to the function's argument list
+    add_args(&mut item_fn, headers);
+
+    let ast = match impl_find_attribute(&mut item_fn, consume, produce) {
         Ok(stream) => stream,
         Err(e) => return Err(e),
     };
@@ -110,6 +123,9 @@ fn impl_item_fn(
         .cloned()
         .collect();
 
+    let vis = &item_fn.vis;
+    let name     = &item_fn.sig.ident;
+    
     let stream = quote! {
         #(#doc_attributes)*
         #[allow(non_camel_case_types)]
@@ -151,8 +167,8 @@ fn impl_item_impl(
         method_,
         path,
         headers,
-        consumes,
-        produces,
+        consume,
+        produce,
     } = match RequestMappingAttr::from_tokens(attr.into()) {
         Ok(attr) => attr,
         Err(error) => return Err(error),
@@ -248,10 +264,13 @@ fn impl_item_impl(
         })
         .collect::<Vec<_>>();
 
-    indexs.dedup(); 
-    indexs.reverse(); 
-    
-    let functions = indexs.iter().map(|index| item_impl.items.remove(*index)).collect::<Vec<_>>();
+    indexs.dedup();
+    indexs.reverse();
+
+    let functions = indexs
+        .iter()
+        .map(|index| item_impl.items.remove(*index))
+        .collect::<Vec<_>>();
     let stream = quote! {
         #item_impl
 

@@ -15,14 +15,14 @@ pub struct RequestMatcherDelegatingAuthorizationManager {
 
 }
 
-#[async_trait]
-impl AuthorizationManager<Request> for RequestMatcherDelegatingAuthorizationManager {
+// #[async_trait]
+// impl AuthorizationManager<Request> for RequestMatcherDelegatingAuthorizationManager {
     
-    async fn check(&self, authentication: Box<dyn Authentication>, request: Request) -> Option<AuthorizationDecision> {
+//     async fn check(&self, authentication: Box<dyn Authentication>, request: Request) -> Option<AuthorizationDecision> {
 
-        None
-    }
-}
+//         None
+//     }
+// }
 
 
 #[derive(Clone)]

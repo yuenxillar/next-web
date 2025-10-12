@@ -12,8 +12,8 @@ use crate::{
 #[async_trait]
 pub trait AuthorizationManager<T>
 where
-    Self: Send,
-    T: Send + 'static
+    Self:   Send + Sync,
+    T:      Send + Sync +  'static
 {
     async fn check(&self, authentication: Box<dyn Authentication>, object: T) -> Option<AuthorizationDecision>;
     async fn verify(&self, authentication: Box<dyn Authentication>, object: T) -> Result<(), AccessDeniedError>

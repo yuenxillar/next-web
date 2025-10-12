@@ -6,7 +6,7 @@ pub struct AbstractAuthenticationProcessingFilter {}
 
 
 impl AbstractAuthenticationProcessingFilter {
-    pub fn get_remember_me_services<'a>(&'a self) -> &'a dyn RememberMeServices {
+    pub fn get_remember_me_services(&self) -> &dyn RememberMeServices {
         
         todo!()
     }

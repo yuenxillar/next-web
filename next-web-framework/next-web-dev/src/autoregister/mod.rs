@@ -1,6 +1,5 @@
+pub mod default_autoregister;
 pub mod handler_autoregister;
-pub mod register_single;
-
 
 #[cfg(feature = "enable-scheduling")]
 pub mod scheduler_autoregister;

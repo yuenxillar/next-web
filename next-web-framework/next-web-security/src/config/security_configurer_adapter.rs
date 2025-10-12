@@ -11,6 +11,7 @@ use crate::config::{
 pub struct SecurityConfigurerAdapter<O, B>
 where
     B: SecurityBuilder<O>,
+    O: Send + Sync,
     Self: SecurityConfigurer<O, B>,
 {
     security_builder: Option<B>,
@@ -22,6 +23,7 @@ where
 impl<O, B> SecurityConfigurerAdapter<O, B>
 where
     B: SecurityBuilder<O>,
+    O: Send + Sync,
     Self: SecurityConfigurer<O, B>,
 {
     pub fn post_process<T>(&self, object: T)
@@ -67,8 +69,9 @@ impl ObjectPostProcessor for CompositeObjectPostProcessor {
 impl<O, B> SecurityConfigurer<O, B> for SecurityConfigurerAdapter<O, B>
 where
     B: SecurityBuilder<O>,
+    O: Send + Sync
 {
-    fn init(&self, builer: B) {}
+    fn init(&mut self, builer: &mut B) {}
 
-    fn configure(&self, builer: B) {}
+    fn configure(&mut self, builer: &mut B) {}
 }

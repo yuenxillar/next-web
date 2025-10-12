@@ -2,12 +2,14 @@ use proc_macro2::Span;
 use quote::quote;
 use syn::{parse_quote, spanned::Spanned, Error, FnArg, Ident, ItemFn, LitStr, Type};
 
+use crate::util::{attributes::add_args, field_type::FieldType};
+
 pub(crate) fn impl_find_attribute(
     item: &mut ItemFn,
 
-    produces: Option<LitStr>,
+    consume: Option<LitStr>,
+    produce: Option<LitStr>,
 ) -> Result<proc_macro2::TokenStream, Error> {
-    let vis = &item.vis;
     let mut variables = Vec::new();
 
     for (index, fn_arg) in item.sig.inputs.iter_mut().enumerate() {
@@ -114,7 +116,8 @@ pub(crate) fn impl_find_attribute(
                             let arg: syn::Type = parse_quote!(
                                 ::next_web_core::state::application_state::ApplicationState
                             );
-                            let path: syn::Path = parse_quote!(::next_web_dev::extract::Extension<#arg>);
+                            let path: syn::Path =
+                                parse_quote!(::next_web_dev::extract::Extension<#arg>);
                             type_path.path = path;
                         }
                     }
@@ -124,10 +127,7 @@ pub(crate) fn impl_find_attribute(
         }
     }
 
-    let sig = &item.sig;
-    let block = &item.block.stmts;
-
-    let _return = block.iter().any(|stmt| match stmt {
+    let _return = item.block.stmts.iter().any(|stmt| match stmt {
         syn::Stmt::Expr(expr, _semi) => match expr {
             syn::Expr::Return(_) => true,
             _ => false,
@@ -135,7 +135,7 @@ pub(crate) fn impl_find_attribute(
         _ => false,
     });
 
-    let async_: proc_macro2::TokenStream = if  _return{
+    let async_: proc_macro2::TokenStream = if _return {
         parse_quote!(async)
     } else {
         parse_quote!()
@@ -147,9 +147,9 @@ pub(crate) fn impl_find_attribute(
         parse_quote!()
     };
 
-    let modify_body = match produces {
+    let modify_body = match produce {
         Some(produces) => quote! {
-            body.headers_mut()
+            resp.headers_mut()
             .insert(
                 ::next_web_dev::http::header::CONTENT_TYPE,
                 ::next_web_dev::http::HeaderValue::from_static(#produces))
@@ -158,23 +158,74 @@ pub(crate) fn impl_find_attribute(
         None => quote! {},
     };
 
+    let verify_content_type = match consume {
+        Some(consumes) => {
+            if !consumes.value().trim().is_empty() {
+                // Add corresponding parameters to the function parameter list
+                add_args(
+                    item,
+                    [
+                        quote! {
+                        ::next_web_dev::extract::typed_header::TypedHeader(__verify_content_type) : ::next_web_dev::extract::typed_header::TypedHeader<::next_web_dev::headers::ContentType>
+                    }].into_iter(),
+                );
+
+                quote! {
+                    if !__verify_content_type.to_string().contains(#consumes) {
+                        return (::next_web_dev::http::StatusCode::UNSUPPORTED_MEDIA_TYPE, "Unsupported Media Type").into_response();
+                    }
+                }
+            } else {
+                quote! {}
+            }
+        }
+        None => quote! {},
+    };
+
+    // Unified return type
+    let unified_return_type = match syn::parse2::<syn::ReturnType>(
+        quote! { -> impl ::next_web_dev::response::IntoResponse},
+    ) {
+        Ok(return_type) => return_type,
+        Err(error) => return Err(error),
+    };
+
+    let return_type = if let syn::ReturnType::Type(_, typ) = &item.sig.output {
+        if FieldType::is_result(typ.as_ref()) {
+            quote! {: #typ }
+        } else {
+            quote! {}
+        }
+    } else {
+        quote! {}
+    };
+
+    item.sig.output = unified_return_type;
+
+    let sig  = &item.sig;
+    let block= &item.block.stmts;
+    let vis = &item.vis;
+
     let token_stream = quote! {
         #vis #sig
         {
-            #[allow(unused_mut)]
-            let mut body = 
-            #async_ {
+            #verify_content_type
+
+            let result #return_type  =
+            #async_
+            {
                 #(#variables)*
 
                 #(#block)*
 
             }
-            #await_
-            .into_response();
+            #await_ ;
+
+            let mut resp = result.into_response();
 
             #modify_body
-    
-            body
+
+            resp
         }
     };
 
