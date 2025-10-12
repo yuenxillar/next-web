@@ -55,7 +55,7 @@ pub trait Application: Send + Sync {
 
     /// Before starting the application
     #[allow(unused_variables)]
-    async fn before_start(&self, ctx: &mut ApplicationContext) {}
+    async fn on_ready(&self, ctx: &mut ApplicationContext) {}
 
     /// Register the rpc server.
     #[cfg(feature = "enable-grpc")]
@@ -368,10 +368,13 @@ pub trait Application: Send + Sync {
             ready_event.ready(&mut ctx).await;
         }
 
-        // 7. Add State to [Context]
+        // 7. On Ready
+        self.on_ready(&mut ctx).await;
+
+        // 8. Add State to [Context]
         app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
-        // 8. Nest context path
+        // 9. Nest context path
         let app = match context_path.is_empty() {
             true => app,
             _ => {
@@ -391,7 +394,7 @@ pub trait Application: Send + Sync {
         println!("Application StartTime  on:  {:?}", time.elapsed());
         println!("Application CurrentPid on:  {:?}\n", std::process::id());
 
-        // 9. Start server
+        // 10. Start server
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
 
         // Turn off signal monitoring
@@ -553,8 +556,6 @@ pub trait Application: Send + Sync {
                 LocalDateTime::now()
             );
         }
-
-        application.before_start(&mut ctx).await;
 
         println!("========================================================================");
 

@@ -4,7 +4,7 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
+use next_web_dev::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::extract::ConnectInfo;
 use next_web_dev::response::IntoResponse;
 use next_web_dev::{
@@ -23,7 +23,7 @@ pub struct TestApplication;
 impl Application for TestApplication {
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
-    async fn before_start(&self, ctx: &mut ApplicationContext) {
+    async fn on_ready(&self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
 
         #[rustfmt::skip]

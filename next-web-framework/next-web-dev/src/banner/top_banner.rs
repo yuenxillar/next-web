@@ -18,7 +18,7 @@ impl TopBanner {
             Self::green(":: Next Web ::"),
             env!("CARGO_PKG_VERSION")
         );
-        println!("\n{}", Self::bold(& format!("Home Page: {}", env!("CARGO_PKG_HOMEPAGE"))));
+        println!("\n{}", Self::bold(& format!("Home Page: \x1b[4m{}\x1b[24m", env!("CARGO_PKG_HOMEPAGE"))));
         println!("{}", Self::bold("Thank you for using it."));
         print!("\n\n");
     }

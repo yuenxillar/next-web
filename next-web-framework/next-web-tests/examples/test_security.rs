@@ -32,7 +32,7 @@ impl Application for TestApplication {
         )
     }
 
-    async fn before_start(&self, ctx: &mut ApplicationContext) {
+    async fn on_ready(&self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
     }
 }
