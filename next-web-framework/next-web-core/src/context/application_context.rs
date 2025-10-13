@@ -8,6 +8,8 @@ use std::{
 
 use std::hash::Hash;
 
+use tracing::trace;
+
 use crate::autoregister::auto_register::AutoRegisterModule;
 use crate::util::singleton::SingletonUtil;
 
@@ -371,7 +373,8 @@ impl ApplicationContext {
         self.provider_registry.insert(provider, self.allow_override);
         self.single_registry.insert(key.clone(), single);
 
-        println!(
+        #[cfg(feature = "trace-log")]
+        trace!(
             "Singleton registry insert registered successfully!\nkey: {:?}\n",
             key
         );

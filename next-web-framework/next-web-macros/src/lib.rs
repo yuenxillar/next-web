@@ -4,6 +4,7 @@ use crate::data::builder::impl_macro_builder;
 use crate::data::constructor::impl_macro_required_args_constructor;
 use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
+use crate::web::idempotency::impl_macro_idempotency;
 use crate::web::pre_authorize::impl_macro_pre_authorize;
 use crate::web::retry::impl_macro_retry;
 
@@ -341,6 +342,14 @@ method_macro!(AnyMapping, Any);
 #[allow(non_snake_case)]
 pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::scheduled::impl_macro_scheduled(args, input)
+}
+
+#[doc = ""]
+#[allow(non_snake_case)]
+#[proc_macro_attribute]
+pub fn Idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item_fn = parse_macro_input!(item as ItemFn);
+    impl_macro_idempotency(attr, item_fn)
 }
 
 #[doc = ""]

@@ -116,6 +116,15 @@ fn impl_item_fn(
         }
     };
 
+    // Build http method handler configurer
+    let http_method_handler_configurer = quote! {
+        ::next_web_dev::configurer::http_method_handler_configurer::HttpMethodHandlerConfigurer::default()
+        .with_idempotency_configurer()
+
+        ;
+    };
+
+
     let doc_attributes: Vec<syn::Attribute> = item_fn
         .attrs
         .iter()
@@ -132,7 +141,10 @@ fn impl_item_fn(
         #vis struct #name;
 
         impl ::next_web_dev::autoregister::handler_autoregister::HttpHandlerAutoRegister for #name {
-            fn register(& self, __router: ::next_web_dev::Router) -> ::next_web_dev::Router {
+            fn register<'a>(& self,
+                __router:           ::next_web_dev::Router, 
+                __context:  &'a mut ::next_web_dev::configurer::http_method_handler_configurer::RouterContext
+            ) -> ::next_web_dev::Router {
                 #ast
 
                 __router.route(#path, ::next_web_dev::routing::#method(#name))

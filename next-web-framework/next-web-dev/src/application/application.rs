@@ -31,6 +31,7 @@ use crate::autoregister::default_autoregister::DefaultAutoRegister;
 use crate::autoregister::handler_autoregister::HttpHandlerAutoRegister;
 
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
+use crate::configurer::http_method_handler_configurer::RouterContext;
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::util::local_date_time::LocalDateTime;
@@ -134,6 +135,9 @@ pub trait Application: Send + Sync {
             .with_line_number(true)
             .with_thread_ids(true)
             .with_file(true)
+            .with_ansi(true)
+            .with_source_location(true)
+            .with_thread_ids(true)
             .with_thread_names(true);
 
         // tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
@@ -244,9 +248,10 @@ pub trait Application: Send + Sync {
     // Get the application router.
     #[allow(unused_variables)]
     async fn application_router(&self, ctx: &mut ApplicationContext) -> Router {
+        let mut context = RouterContext::default();
         inventory::iter::<&dyn HttpHandlerAutoRegister>
             .into_iter()
-            .fold(Router::new(), |router, handler| handler.register(router))
+            .fold(Router::new(), |router, handler| handler.register(router, &mut context))
     }
 
     /// Bind tcp server.
@@ -387,6 +392,8 @@ pub trait Application: Send + Sync {
             }
         };
 
+        println!("\n========================================================================");
+
         #[rustfmt::skip]
         println!("\nApplication Listening  on:  {}", format!("{}:{}", server_addr, server_port));
 
@@ -495,69 +502,46 @@ pub trait Application: Send + Sync {
             )
             .auto_register();
 
-        println!(
-            "Init application context success!\nCurrent Time: {}\n",
-            LocalDateTime::now()
-        );
+        info!("Init application context success!",);
 
         let application = next_application.application();
 
         application.init_logging(properties);
-        println!(
-            "Init logging success!\nCurrent Time: {}\n",
-            LocalDateTime::now()
-        );
+        info!("Init logging success!");
 
         // Autowire properties
         application.autowire_properties(&mut ctx, properties).await;
-        println!(
-            "Autowire properties success!\nCurrent Time: {}\n",
-            LocalDateTime::now()
-        );
+        info!("Autowire properties success!");
 
         // Register singleton
         application
             .register_singleton(&mut ctx, properties, args, resources)
             .await;
-        println!(
-            "Register singleton success!\nCurrent Time: {}\n",
-            LocalDateTime::now()
-        );
+        info!("Register singleton success!");
 
         // Init infrastructure
         application.init_infrastructure(&mut ctx, properties).await;
-        println!(
-            "Init infrastructure success!\nCurrent Time: {}\n",
-            LocalDateTime::now()
+        info!(
+            "Init infrastructure success!",
         );
 
         // Init middleware
         application.init_middleware(properties).await;
-        println!(
-            "Init middleware success!\nCurrent Time: {}\n",
-            LocalDateTime::now()
-        );
+        info!("Init middleware success!");
 
         #[cfg(feature = "enable-grpc")]
         {
             application
                 .register_rpc_server(&mut ctx, properties, args, resources)
                 .await;
-            println!(
-                "Register grpc server success!\nCurrent Time: {}\n",
-                LocalDateTime::now()
-            );
+            info!("Register grpc server success!");
 
             application
                 .connect_rpc_client(&mut ctx, properties, args, resources)
                 .await;
-            println!(
-                "Connect grpc client success!\nCurrent Time: {}\n",
-                LocalDateTime::now()
-            );
-        }
 
-        println!("========================================================================");
+            info!("Connect grpc client success!",);
+        }
 
         application
             .bind_tcp_server(ctx, properties, start_time)

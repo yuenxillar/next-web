@@ -1,9 +1,11 @@
 use axum::Router;
 
+use crate::configurer::http_method_handler_configurer::RouterContext;
+
 pub trait HttpHandlerAutoRegister
 where Self: Send + Sync +'static
 {
-    fn register(&self, __router: Router) -> Router;
+    fn register<'a>(&self, __router: Router, __context: &'a mut RouterContext) -> Router;
 }
 
 inventory::collect!(&'static dyn HttpHandlerAutoRegister);

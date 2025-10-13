@@ -12,6 +12,7 @@ pub mod macros;
 pub mod manager;
 pub mod middleware;
 pub mod service;
+pub mod configurer;
 
 pub mod stream;
 pub mod util;

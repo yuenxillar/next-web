@@ -5,7 +5,6 @@ pub mod autoconfigure;
 pub mod autoregister;
 pub mod client;
 pub mod common;
-pub mod config;
 pub mod constants;
 pub mod context;
 pub mod convert;

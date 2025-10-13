@@ -89,4 +89,4 @@ enable-state-machine = []
 
 decrypt-properties = ["aes-gcm"]
 
-trace-log = []
+trace-log = ["next-web-core/trace-log"]
