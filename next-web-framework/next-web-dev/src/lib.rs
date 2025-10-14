@@ -30,6 +30,8 @@ pub use next_web_core::*;
 pub use next_web_macros::{
     AnyMapping, DeleteMapping, GetMapping, PatchMapping, PostMapping, PutMapping, RequestMapping,
 };
+pub use next_web_macros::Idempotency;
+
 pub use next_web_macros::{Builder, Desensitized, FieldName, GetSet, RequiredArgsConstructor};
 
 #[cfg(feature = "enable-state-machine")]

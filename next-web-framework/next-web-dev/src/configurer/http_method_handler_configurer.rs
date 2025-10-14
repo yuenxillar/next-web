@@ -1,22 +1,14 @@
-use crate::configurer::idempotency_configurer::IdempotencyConfigurer;
 
 pub struct HttpMethodHandlerConfigurer {
-    pub(crate) idempotency_configurer: Option<IdempotencyConfigurer>,
 }
 
 impl HttpMethodHandlerConfigurer {
-    pub fn with_idempotency_configurer(mut self, idempotency_configurer: IdempotencyConfigurer) -> Self {
-        self.idempotency_configurer = Some(idempotency_configurer);
-        self
-    }
-
-
+ 
 }
 
 impl Default for HttpMethodHandlerConfigurer {
     fn default() -> Self {
         Self {
-            idempotency_configurer: Default::default(),
         }
     }
 }
@@ -24,5 +16,43 @@ impl Default for HttpMethodHandlerConfigurer {
 
 #[derive(Default)]
 pub struct RouterContext {
-    is_idempotency: bool,
+    pub(crate) state: RouteState,
+    pub(crate) index: usize,
+
+    // pub(crate) has_idempotency: bool,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum RouteState {
+    #[default]
+    None,
+
+    Default,
+    /// This means the polling is over
+    End,
+}
+
+impl RouterContext {
+}
+
+impl Iterator for RouterContext {
+    type Item = RouteState;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let elements = [
+            RouteState::Default,
+            RouteState::End,
+        ];
+
+        if self.index >= elements.len() {
+            return None;
+        }
+
+        self.state = elements[self.index];
+
+        let result = Some(elements[self.index]);
+        self.index += 1;
+
+        result
+    }
 }

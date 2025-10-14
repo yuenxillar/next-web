@@ -4,13 +4,17 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
-use next_web_dev::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
-use next_web_dev::extract::ConnectInfo;
-use next_web_dev::response::IntoResponse;
 use next_web_dev::{
     application::Application, extract::find_singleton::FindSingleton,
     util::local_date_time::LocalDateTime, AnyMapping, GetMapping, PostMapping, RequestMapping,
     Singleton,
+};
+use next_web_dev::{
+    async_trait, context::properties::ApplicationProperties, ApplicationContext, Idempotency,
+};
+use next_web_dev::{extract::ConnectInfo, traits::store::idempotency_store::IdempotencyStore};
+use next_web_dev::{
+    response::{Html, IntoResponse}, store::memory_idempotency_store::MemoryIdempotencyStore,
 };
 use tokio::sync::Mutex;
 use tracing::info;
@@ -29,6 +33,11 @@ impl Application for TestApplication {
         #[rustfmt::skip]
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(HashSet::<SocketAddr>::new())),"requestIps");
         ctx.insert_singleton_with_name(ApplicationStore::default(), "applicationStoreTwo");
+
+        ctx.insert_singleton_with_name(
+            Arc::new(MemoryIdempotencyStore::new()) as Arc<dyn IdempotencyStore<Value = ()>>,
+            "memoryIdempotencyStore",
+        );
     }
 }
 
@@ -61,12 +70,9 @@ pub async fn req_record_two(
     // Search for singleton using variable names
     #[find] FindSingleton(application_store_two): FindSingleton<ApplicationStore>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-
-    next_web_dev::extract::typed_header::TypedHeader(content_type): next_web_dev::extract::typed_header::TypedHeader<next_web_dev::headers::ContentType>,
 ) -> Result<&'static str, ()> {
     application_store_two.add(addr).await;
 
-    info!("Content-Type: {}", content_type.to_string());
     return Ok("{\"message\": \"Ok\"}");
 }
 
@@ -78,13 +84,14 @@ impl TestUserRoutes {
     // Request -> /user/login
     #[GetMapping(path = "/login")]
     async fn req_login() -> impl IntoResponse {
-        "Ok"
+        Html("<h1>Login Page</h1>")
     }
 
     // Request -> /user/logout
-    #[PostMapping(path = "/logout")]
+    #[Idempotency(name = "memoryIdempotencyStore", key = "Idempotency-Key1", cache_key_prefix = "test_key", ttl = 10)]
+    #[RequestMapping(method = "POST", path = "/logout")]
     async fn req_logout() -> impl IntoResponse {
-        "Ok"
+        Html("<h1>Logout Page</h1>")
     }
 }
 

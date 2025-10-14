@@ -31,7 +31,7 @@ use crate::autoregister::default_autoregister::DefaultAutoRegister;
 use crate::autoregister::handler_autoregister::HttpHandlerAutoRegister;
 
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
-use crate::configurer::http_method_handler_configurer::RouterContext;
+use crate::configurer::http_method_handler_configurer::{RouteState, RouterContext};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::util::local_date_time::LocalDateTime;
@@ -64,8 +64,8 @@ pub trait Application: Send + Sync {
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
-        application_args: &ApplicationArgs,
-        application_resources: &ApplicationResources,
+        application_args:       &ApplicationArgs,
+        application_resources:  &ApplicationResources,
     );
 
     /// Register the grpc client.
@@ -74,8 +74,8 @@ pub trait Application: Send + Sync {
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
-        application_args: &ApplicationArgs,
-        application_resources: &ApplicationResources,
+        application_args:       &ApplicationArgs,
+        application_resources:  &ApplicationResources,
     );
 
     /// Show the banner of the application.
@@ -182,19 +182,25 @@ pub trait Application: Send + Sync {
     ) {
         // Register singletion
         // [properties] [args] [resources]
-        ctx.insert_singleton_with_name(application_properties.to_owned(),   "applicationProperties");
-        ctx.insert_singleton_with_name(application_args.to_owned(),         "applicationArgs");
-        ctx.insert_singleton_with_name(application_resources.to_owned(),    "applicationResources");
+        ctx.insert_singleton_with_name(application_properties.to_owned(), "applicationProperties");
+        ctx.insert_singleton_with_name(application_args.to_owned(), "applicationArgs");
+        ctx.insert_singleton_with_name(application_resources.to_owned(), "applicationResources");
 
         // If a declarative macro is used for submission, it should not be found in the Application Context
         for default_auto_register in inventory::iter::<&dyn DefaultAutoRegister>.into_iter() {
-            default_auto_register.register(ctx, application_properties).await.unwrap();
+            default_auto_register
+                .register(ctx, application_properties)
+                .await
+                .unwrap();
         }
 
         // Resove autoRegister
         let auto_registers = ctx.resolve_by_type::<Arc<dyn AutoRegister>>();
         for auto_register in auto_registers.iter() {
-            auto_register.register(ctx, application_properties).await.unwrap();
+            auto_register
+                .register(ctx, application_properties)
+                .await
+                .unwrap();
         }
     }
 
@@ -249,9 +255,26 @@ pub trait Application: Send + Sync {
     #[allow(unused_variables)]
     async fn application_router(&self, ctx: &mut ApplicationContext) -> Router {
         let mut context = RouterContext::default();
-        inventory::iter::<&dyn HttpHandlerAutoRegister>
+
+        let iterator = inventory::iter::<&dyn HttpHandlerAutoRegister>
             .into_iter()
-            .fold(Router::new(), |router, handler| handler.register(router, &mut context))
+            .collect::<Vec<_>>();
+
+        let mut router = Router::new();
+        while let Some(state) = context.next() {
+            let len = iterator.len();
+
+            for index in 0..len {
+                let item = &iterator[index];
+                match state {
+                    RouteState::End => break,
+                    _ => {
+                        router = item.register(router, &mut context);
+                    }
+                }
+            }
+        }
+        router
     }
 
     /// Bind tcp server.
@@ -521,9 +544,7 @@ pub trait Application: Send + Sync {
 
         // Init infrastructure
         application.init_infrastructure(&mut ctx, properties).await;
-        info!(
-            "Init infrastructure success!",
-        );
+        info!("Init infrastructure success!",);
 
         // Init middleware
         application.init_middleware(properties).await;
