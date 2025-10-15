@@ -344,7 +344,51 @@ pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::scheduled::impl_macro_scheduled(args, input)
 }
 
-#[doc = ""]
+/// 实现幂等性属性的过程宏
+///
+/// # 属性参数说明
+/// - `name`:   可选字符串字面量，指定 IdempotencyStore 的单例名称, 可以指定名称使用自己实现的 Store, 默认为`memoryIdempotencyStore`
+/// - `key`:    可选字符串字面量，用于获取请求头的键值，默认值为 `Idempotency-key`
+/// - `cache_key_prefix`: 可选字符串字面量，应用再缓存键的前缀
+/// - `ttl`: 可选整数字面量，缓存存活时间(Time To Live), 默认为秒
+///
+/// # 注意
+/// 当前宏 只支持 Mehod 为 `POST`  
+/// 你应该使用 `PostMapping` 或者 `RequestMapping( method = "POST")`
+/// 
+/// # 示例
+/// ```rust
+/// #[Idempotency(name = "myIdempotencyStore", key = "Idempotency-key", cache_key_prefix = "test", ttl = 6)]
+/// #[PostMapping(path = "/createOrder")]
+/// async fn create_user(user_id: String) -> impl IntoResponse {
+///     
+///     "Ok"
+/// }
+/// 
+/// ```
+/// 
+/// Process macros for implementing idempotent properties
+///
+/// # Description of Attribute Parameters
+/// - ` name `: optional string literal, specifying the singleton name of IdempotencyStore, can specify the name to use their own implemented Store, default is ` memoryIdempotencyStore '`
+/// - ` key `: optional string literal, used to obtain the key value of the request header, default value is ` Idempotency key ``
+/// - ` cache_key_prefix `: optional string literal, apply the prefix of the cached key again
+/// - ` ttl `: optional integer face count, cache live time (Time To Live), default is seconds
+///
+/// # Attention
+/// The current macro only supports Mehod as' POST '`
+/// You should use PostMapping or RequestMapping (method="POST")`
+/// 
+/// # Example
+/// ```rust
+/// #[Idempotency(name = "myIdempotencyStore", key = "Idempotency-key", cache_key_prefix = "test", ttl = 6)]
+/// #[PostMapping(path = "/createOrder")]
+/// async fn create_user(user_id: String) -> impl IntoResponse {
+///     
+///     "Ok"
+/// }
+/// 
+/// ```
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
 pub fn Idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -360,7 +404,93 @@ pub fn PreAuthorize(attr: TokenStream, item: TokenStream) -> TokenStream {
     impl_macro_pre_authorize(attr, item_fn)
 }
 
-#[doc = ""]
+/// 实现可重试逻辑的过程宏
+///
+/// # 属性参数说明
+/// - `max_attempts`:   最大重试次数，默认为 1
+/// - `delay`:          每次重试的延迟时间，默认为 1000 毫秒
+/// - `backoff`:        可选退避策略路径
+/// - `retry_for`:      需要重试的错误类型列表，匹配这些错误时会触发重试, 这里的类型应该和重试函数的返回类型一致
+/// - `multiplier`:     可选乘数表达式，用于计算每次重试的延迟时间
+///
+/// # 注意
+/// 当前函数应返回 std::result::Result<T, E> 类型，其中 T 为正常返回值类型，E 为需要重试的错误类型
+/// 
+/// # 示例
+/// 
+/// ```rust
+/// #[derive(Debug)]
+/// enum TestMatch {
+///    A,
+///    B(u64),
+/// }
+///
+/// #[Retryable(
+///     max_attempts = 3,
+///     delay = 100,
+///     backoff = test_backoff,
+///     retry_for = [TestMatch::A],
+///     multiplier = 2
+/// )]
+/// fn test_retry() -> Result<(), TestMatch> {
+///    let timestamp_sec = std::time::SystemTime::now()
+///       .duration_since(std::time::UNIX_EPOCH)
+///       .unwrap()
+///       .as_secs();
+///     match timestamp_sec % 2 {
+///         0 => Err(TestMatch::B(123)),
+///         _ => Err(TestMatch::A),
+///     }
+/// }
+/// 
+/// fn test_backoff(error: &TestMatch) {
+///    println!("function test_retry backoff: {:?}", error);
+/// }
+/// ```
+///
+/// Process macros for implementing retry logic
+///
+/// # Description of Attribute Parameters
+/// Max attempts: Maximum number of retries, default is 1
+/// - ` delay `: The default delay time for each retry is 1000 milliseconds
+/// - ` backoff `: Optional backoff policy path
+/// - ` retry_for `: a list of error types that need to be retried. Matching these errors will trigger a retry, and the type here should be consistent with the return type of the retry function
+/// - ` multiplier `: an optional multiplier expression used to calculate the delay time for each retry
+///
+/// # Attention
+/// The current function should return std:: result:: Result<T, E>type, where T is the normal return value type and E is the error type that needs to be retried
+/// 
+/// # Example
+/// ```rust
+/// 
+/// #[derive(Debug)]
+/// enum TestMatch {
+///    A,
+///    B(u64),
+/// }
+///
+/// #[Retryable(
+///     max_attempts = 3,
+///     delay = 100,
+///     backoff = test_backoff,
+///     retry_for = [TestMatch::A],
+///     multiplier = 2
+/// )]
+/// fn test_retry() -> Result<(), TestMatch> {
+///    let timestamp_sec = std::time::SystemTime::now()
+///       .duration_since(std::time::UNIX_EPOCH)
+///       .unwrap()
+///       .as_secs();
+///     match timestamp_sec % 2 {
+///         0 => Err(TestMatch::B(123)),
+///         _ => Err(TestMatch::A),
+///     }
+/// }
+/// 
+/// fn test_backoff(error: &TestMatch) {
+///    println! ("function test_retry backoff: {:?}", error);
+/// }
+/// ```
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
 pub fn Retryable(attr: TokenStream, item: TokenStream) -> TokenStream {

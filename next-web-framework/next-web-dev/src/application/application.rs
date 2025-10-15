@@ -12,6 +12,7 @@ use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::state::application_state::ApplicationState;
 use next_web_core::traits::application::application_ready_event::ApplicationReadyEvent;
 use next_web_core::traits::apply_router::ApplyRouter;
+use next_web_core::traits::properties_post_processor::PropertiesPostProcessor;
 use next_web_core::traits::use_router::UseRouter;
 use next_web_core::AutoRegister;
 use std::net::SocketAddr;
@@ -64,8 +65,8 @@ pub trait Application: Send + Sync {
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
-        application_args:       &ApplicationArgs,
-        application_resources:  &ApplicationResources,
+        application_args: &ApplicationArgs,
+        application_resources: &ApplicationResources,
     );
 
     /// Register the grpc client.
@@ -74,8 +75,8 @@ pub trait Application: Send + Sync {
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
-        application_args:       &ApplicationArgs,
-        application_resources:  &ApplicationResources,
+        application_args: &ApplicationArgs,
+        application_resources: &ApplicationResources,
     );
 
     /// Show the banner of the application.
@@ -420,9 +421,9 @@ pub trait Application: Send + Sync {
         #[rustfmt::skip]
         println!("\nApplication Listening  on:  {}", format!("{}:{}", server_addr, server_port));
 
-        println!("Application Running    on:  {}", LocalDateTime::now());
-        println!("Application StartTime  on:  {:?}", time.elapsed());
-        println!("Application CurrentPid on:  {:?}\n", std::process::id());
+        println!("Application Running    on:  {}",      LocalDateTime::now());
+        println!("Application StartTime  on:  {:?}",    time.elapsed());
+        println!("Application CurrentPid on:  {:?}\n",  std::process::id());
 
         // 10. Start server
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
@@ -502,30 +503,36 @@ pub trait Application: Send + Sync {
         let mut next_application: NextApplication<Self> = NextApplication::new();
 
         // Perform a series of processing on application properties before executing the next step
-        next_application.application_properties.decrypt();
         next_application
             .application_properties
             .replace_placeholders();
 
-        let properties = next_application.application_properties();
-        let args = next_application.application_args();
-        let resources = next_application.application_resources();
-
         // Banner show
-        Self::banner_show(&resources);
+        Self::banner_show(next_application.application_resources());
         println!("========================================================================\n");
 
+        let allow_override = next_application
+            .application_properties()
+            .next()
+            .appliation()
+            .map(|s| s.context().allow_override())
+            .unwrap_or(false);
         let mut ctx = ApplicationContext::options()
-            .allow_override(
-                properties
-                    .next()
-                    .appliation()
-                    .map(|s| s.context().allow_override())
-                    .unwrap_or(false),
-            )
+            .allow_override(allow_override)
             .auto_register();
 
         info!("Init application context success!",);
+
+        let mut post_processors = ctx.resolve_by_type::<Box<dyn PropertiesPostProcessor>>();
+        post_processors.sort_by_key(|item| item.order());
+
+        post_processors.into_iter().for_each(|mut item| {
+            item.post_process_properties(next_application.application_properties.mapping_mut())
+        });
+
+        let properties= next_application.application_properties();
+        let args            = next_application.application_args();
+        let resources  = next_application.application_resources();
 
         let application = next_application.application();
 

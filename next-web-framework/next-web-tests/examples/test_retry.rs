@@ -15,7 +15,7 @@ enum TestMatch {
     B(u64),
 }
 
-#[Retryable(max_attempts = 4, delay = 1000, backoff = backoff_test, retry_for = [TestMatch::A, TestMatch::B(123)], multiplier = 2)]
+#[Retryable(max_attempts = 4, delay = 1000, backoff = test_backoff, retry_for = [TestMatch::A, TestMatch::B(123)], multiplier = 2)]
 fn test_retry() -> Result<(), TestMatch> {
     let timestamp_sec = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -29,7 +29,7 @@ fn test_retry() -> Result<(), TestMatch> {
 }
 
 #[allow(unused)]
-fn backoff_test(error: &TestMatch) {
+fn test_backoff(error: &TestMatch) {
     println!("function test_retry backoff: {:?}", error);
 }
 

@@ -27,7 +27,7 @@ impl BytesStream {
 impl IntoRespnoseStream for BytesStream {
     fn into_response_stream(self, target_rate: usize) -> Response {
         if self.body.is_empty() {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response();
+            return (StatusCode::OK, "").into_response();
         }
 
         if self.body.len() < DEFAULT_CHUNK_SIZE * 2 {

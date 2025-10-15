@@ -61,6 +61,10 @@ tracing-subscriber = { workspace = true }
 reqwest = { workspace = true, features = ["stream"]}
 async-stream = { workspace = true }
 
+md5  = {workspace = true, optional = true }
+sha1 = {workspace = true, optional = true }
+sha2 = {workspace = true, optional = true }
+
 serde_path_to_error = "0.1.17"
 mime = "0.3.17"
 
@@ -87,6 +91,7 @@ enable-prometheus = ["axum-prometheus"]
 enable-i18n = []
 enable-state-machine = []
 
-decrypt-properties = ["aes-gcm"]
+digester = ["md5", "sha1", "sha2"]
+decrypt-properties = ["aes-gcm", "digester"]
 
 trace-log = ["next-web-core/trace-log"]

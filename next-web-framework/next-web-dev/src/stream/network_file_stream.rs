@@ -16,7 +16,7 @@ use tracing::error;
 
 use crate::util::local_date_time::LocalDateTime;
 
-static CLIENT: Lazy<Client> = Lazy::new(|| Client::new());
+pub static GLOBAL_CLIENT: Lazy<Client> = Lazy::new(|| Client::new());
 
 pub struct NetworkFileStream {
     url: String,
@@ -56,7 +56,7 @@ impl IntoRespnoseStream for NetworkFileStream {
         }
 
         tokio::spawn(async move {
-            let resp = match CLIENT
+            let resp = match GLOBAL_CLIENT
                 .request(
                     Method::from_bytes(self.method.as_bytes()).unwrap_or(Method::GET),
                     self.url,

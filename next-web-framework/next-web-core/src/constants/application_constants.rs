@@ -8,4 +8,4 @@ pub const I18N: &'static str = "/i18n";
 
 pub const RESOURCES: &'static str = "resources";
 
-pub const SECURE_PROPERTIES_MARK: &'static str = "nsp";
+pub const NEXT_SECURE_PROPERTIES: &'static str = "nsp";

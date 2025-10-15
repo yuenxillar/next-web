@@ -3,7 +3,6 @@ use std::path::Path;
 use std::fs::File;
 use std::string::String;
 use std::vec::Vec;
-use md2::Md2;
 use md5;
 use sha1::Sha1;
 use sha2::{Sha256, Sha384, Sha512, Digest};
@@ -13,10 +12,6 @@ use sha2::{Sha256, Sha384, Sha512, Digest};
 /// Hash Algorithm Enum
 #[derive(Debug, Clone, Copy)]
 pub enum HashAlgorithm {
-    /// MD2 哈希算法 
-    /// 
-    ///  MD2 Hash Algorithm
-    Md2,
     /// MD5 哈希算法 
     /// 
     ///  MD5 Hash Algorithm
@@ -64,11 +59,6 @@ impl Digester for String {
 impl Digester for &[u8] {
     fn hash(&self, algorithm: HashAlgorithm) -> String {
         match algorithm {
-            HashAlgorithm::Md2 => {
-                let mut hasher = Md2::new();
-                hasher.update(self);
-                format!("{:x}", hasher.finalize())
-            }
             HashAlgorithm::Md5 => {
                 let digest = md5::compute(self);
                 format!("{:x}", digest)

@@ -1,3 +1,4 @@
+pub mod crypto;
 pub mod application;
 pub mod autoconfigure;
 pub mod autoregister;
@@ -32,7 +33,8 @@ pub use next_web_macros::{
 };
 pub use next_web_macros::Idempotency;
 
-pub use next_web_macros::{Builder, Desensitized, FieldName, GetSet, RequiredArgsConstructor};
+pub use next_web_macros::{Builder, FieldName, GetSet, RequiredArgsConstructor};
+pub use next_web_macros::Desensitized;
 
 #[cfg(feature = "enable-state-machine")]
 pub mod state_machine;
