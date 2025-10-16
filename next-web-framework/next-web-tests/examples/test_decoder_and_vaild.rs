@@ -18,6 +18,7 @@ struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
@@ -37,7 +38,7 @@ struct TestValidator {
     pub name: String,
     #[validate(range(min = 1, max = 120, message = "minimum  is 1, maximum  is 120"))]
     pub age: u8,
-    #[validate(range(min = 20, max = 200,message = "minimum  is 20, maximum  is 200"))]
+    #[validate(range(min = 20, max = 200, message = "minimum  is 20, maximum  is 200"))]
     pub weight: u16,
 }
 
@@ -62,7 +63,6 @@ struct TestData {
     pub name: String,
     pub age: i32,
 }
-
 
 // 现状是指定这个单例名称 暂时不要改动
 #[Singleton(name = "defaultDataDecoder", binds=[Self::into_decoder])]

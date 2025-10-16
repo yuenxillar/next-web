@@ -3,13 +3,13 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use axum::extract::ws::CloseFrame;
 use next_web_core::context::properties::ApplicationProperties;
 use next_web_dev::application::Application;
 use next_web_dev::{async_trait, Singleton};
 use next_web_websocket::handler::websocket_handler::{Result, WebSocketHandler};
 use next_web_websocket::model::session::WebSocketSession;
 use next_web_websocket::Message;
-use axum::extract::ws::CloseFrame;
 
 /// Test
 #[Singleton(binds = [Self::into_websocket_handler])]
@@ -66,12 +66,12 @@ impl WebSocketHandler for TestWebSocket {
 #[derive(Clone, Default)]
 pub struct TestWSApplication;
 
-
 #[async_trait]
 impl Application for TestWSApplication {
+    type ErrorSolve = ();
+
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
-
 }
 
 #[tokio::main]

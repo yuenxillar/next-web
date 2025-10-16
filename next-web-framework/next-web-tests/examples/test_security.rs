@@ -19,6 +19,8 @@ struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
+
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
@@ -126,9 +128,7 @@ impl WebSecurityConfigure for TestWebSecurityConfigure {
                     .any_request()
                     .authenticated();
             })
-            .form_login(|form| {
-                
-            })
+            .form_login(|form| {})
             .any_match("/login/auth", |group| group.roles(vec!["admin"]))
             .disable()
     }

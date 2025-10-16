@@ -15,6 +15,8 @@ struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
+
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
@@ -45,7 +47,10 @@ async fn download_network_file() -> impl IntoResponse {
     ResponseStream::new(NetworkFileStream::new(
         "http://127.0.0.1:11000/bytes",
         "GET",
-        Some(HashMap::from_iter(vec![("Test-Header".into(), "test".into())])),
+        Some(HashMap::from_iter(vec![(
+            "Test-Header".into(),
+            "test".into(),
+        )])),
     ))
     .target_rate(1024 * 7)
 }

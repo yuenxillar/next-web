@@ -1,5 +1,7 @@
 use axum::http::StatusCode;
+use axum::response::Response;
 use axum::Router;
+
 use next_web_core::async_trait;
 use next_web_core::client::rest_client::RestClient;
 use next_web_core::constants::application_constants::{
@@ -12,6 +14,7 @@ use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::state::application_state::ApplicationState;
 use next_web_core::traits::application::application_ready_event::ApplicationReadyEvent;
 use next_web_core::traits::apply_router::ApplyRouter;
+use next_web_core::traits::error_solver::ErrorSolver;
 use next_web_core::traits::properties_post_processor::PropertiesPostProcessor;
 use next_web_core::traits::use_router::UseRouter;
 use next_web_core::AutoRegister;
@@ -51,7 +54,13 @@ use crate::manager::job_scheduler_manager::JobSchedulerManager;
 use next_web_core::traits::schedule::scheduled_task::ScheduledTask;
 
 #[async_trait]
-pub trait Application: Send + Sync {
+pub trait Application
+where
+    Self: Send + Sync,
+    Self: 'static,
+{
+    type ErrorSolve: ErrorSolver;
+
     /// Initialize the middleware.
     async fn init_middleware(&self, properties: &ApplicationProperties);
 
@@ -89,6 +98,26 @@ pub trait Application: Send + Sync {
         {
             TopBanner::show(DEFAULT_TOP_BANNER);
         }
+    }
+
+    fn catch_panic(err: Box<dyn std::any::Any + Send>) -> Response {
+        let error = if let Some(msg) = err.downcast_ref::<String>() {
+            error!("Service panicked: {}", msg);
+            msg.to_string()
+        } else if let Some(msg) = err.downcast_ref::<&str>() {
+            error!("Service panicked: {}", msg);
+            msg.to_string()
+        } else {
+            error!("Service panicked but `CatchPanic` was unable to downcast the panic info");
+            String::with_capacity(0)
+        };
+
+        let msg = Self::ErrorSolve::solve_error(error);
+
+        Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(msg.into())
+            .unwrap()
     }
 
     /// Initialize the logging.
@@ -344,7 +373,7 @@ pub trait Application: Send + Sync {
         {
             app = app
                 // Global panic handler
-                .layer(CatchPanicLayer::new())
+                .layer(CatchPanicLayer::custom(Self::catch_panic))
                 // Handler request  max timeout
                 .layer(TimeoutLayer::new(std::time::Duration::from_secs(
                     req_timeout.unwrap_or(5),
@@ -421,9 +450,9 @@ pub trait Application: Send + Sync {
         #[rustfmt::skip]
         println!("\nApplication Listening  on:  {}", format!("{}:{}", server_addr, server_port));
 
-        println!("Application Running    on:  {}",      LocalDateTime::now());
-        println!("Application StartTime  on:  {:?}",    time.elapsed());
-        println!("Application CurrentPid on:  {:?}\n",  std::process::id());
+        println!("Application Running    on:  {}", LocalDateTime::now());
+        println!("Application StartTime  on:  {:?}", time.elapsed());
+        println!("Application CurrentPid on:  {:?}\n", std::process::id());
 
         // 10. Start server
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
@@ -530,9 +559,9 @@ pub trait Application: Send + Sync {
             item.post_process_properties(next_application.application_properties.mapping_mut())
         });
 
-        let properties= next_application.application_properties();
-        let args            = next_application.application_args();
-        let resources  = next_application.application_resources();
+        let properties = next_application.application_properties();
+        let args = next_application.application_args();
+        let resources = next_application.application_resources();
 
         let application = next_application.application();
 
@@ -576,27 +605,6 @@ pub trait Application: Send + Sync {
             .await;
     }
 }
-
-// fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response<Full<Bytes>> {
-//     if let Some(s) = err.downcast_ref::<String>() {
-//         tracing::error!("Service panicked: {}", s);
-//     } else if let Some(s) = err.downcast_ref::<&str>() {
-//         tracing::error!("Service panicked: {}", s);
-//     } else {
-//         tracing::error!("Service panicked but `CatchPanic` was unable to downcast the panic info");
-//     };
-
-//     let msg = format!(
-//         "Internal Server Error, Case: {:?}\ntimestamp: {}",
-//         error,
-//         LocalDateTime::timestamp()
-//     );
-
-//     Response::builder()
-//         .status(StatusCode::INTERNAL_SERVER_ERROR)
-//         .body(msg.into())
-//         .unwrap()
-// }
 
 /// no route match handler
 async fn fall_back() -> (StatusCode, &'static str) {

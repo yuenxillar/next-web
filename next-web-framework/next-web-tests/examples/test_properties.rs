@@ -11,6 +11,8 @@ struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
+
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
@@ -20,7 +22,10 @@ impl Application for TestApplication {
             .route("/properties", axum::routing::get(req_properties))
             .route("/serverPort", axum::routing::get(req_server_port))
             .route("/redisProperties", axum::routing::get(req_redis_properties))
-            .route("/redisDynamicProperties", axum::routing::get(req_redis_dynamic_properties))
+            .route(
+                "/redisDynamicProperties",
+                axum::routing::get(req_redis_dynamic_properties),
+            )
     }
 }
 
@@ -33,7 +38,10 @@ async fn req_properties(
 async fn req_server_port(
     FindSingleton(properties): FindSingleton<ApplicationProperties>,
 ) -> impl IntoResponse {
-    format!("Server port: {:?}", properties.one_value::<u32>("next.server.port").unwrap())
+    format!(
+        "Server port: {:?}",
+        properties.one_value::<u32>("next.server.port").unwrap()
+    )
 }
 
 async fn req_redis_properties(
@@ -67,7 +75,6 @@ pub struct TestDynamicRedisProperties {
     /// This is necessary, try not to change it as much as possible
     /// 这是必要的，尽量不要改变它, 后面的字段可以自定义
     pub base: HashMap<String, TestRedisProperties>,
-   
 }
 
 #[tokio::main]

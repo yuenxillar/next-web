@@ -10,9 +10,8 @@ pub enum HttpMethod {
     Patch,
     Delete,
     Options,
-    Trace
+    Trace,
 }
-
 
 impl ToString for HttpMethod {
     fn to_string(&self) -> String {
@@ -25,7 +24,8 @@ impl ToString for HttpMethod {
             HttpMethod::Delete => "DELETE",
             HttpMethod::Options => "OPTIONS",
             HttpMethod::Trace => "TRACE",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 impl FromStr for HttpMethod {
@@ -42,7 +42,7 @@ impl FromStr for HttpMethod {
             "DELETE" => Ok(HttpMethod::Delete),
             "OPTIONS" => Ok(HttpMethod::Options),
             "TRACE" => Ok(HttpMethod::Trace),
-            _ => Err("Invalid HTTP method")
+            _ => Err("Invalid HTTP method"),
         }
     }
 }

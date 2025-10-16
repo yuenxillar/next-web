@@ -1,7 +1,10 @@
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_dev::{
     application::Application,
-    scheduler::{context::JobExecutionContext, schedule_type::{ScheduleType, WithArgs}},
+    scheduler::{
+        context::JobExecutionContext,
+        schedule_type::{ScheduleType, WithArgs},
+    },
     traits::schedule::scheduled_task::ScheduledTask,
     util::local_date_time::LocalDateTime,
     Scheduled, Singleton,
@@ -17,6 +20,8 @@ struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
+
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 }
 
@@ -49,19 +54,13 @@ impl ScheduledTask for TestTask {
 // Local or Utc or .....
 #[Scheduled(cron = "*/3 * * * * *", timezone = "Asia/Shanghai")]
 async fn test_cron_scheduled() {
-    println!(
-        "Cron Scheduled Task!       time: {}",
-        LocalDateTime::now()
-    );
+    println!("Cron Scheduled Task!       time: {}", LocalDateTime::now());
 }
 
 // Fixed Rate Scheduled Task
 #[Scheduled(fixed_rate = 2000, time_unit = "ms")]
 async fn test_fixed_rate_scheduled() {
-    println!(
-        "Fixed Rate Scheduled Task! time: {}",
-        LocalDateTime::now()
-    );
+    println!("Fixed Rate Scheduled Task! time: {}", LocalDateTime::now());
 }
 
 // One Shot Scheduled Task

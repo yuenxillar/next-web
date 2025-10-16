@@ -17,6 +17,7 @@ struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
@@ -45,11 +46,7 @@ struct ApiResult<T> {
     data: Option<T>,
 }
 
-
-impl<T: serde::Serialize> ApiResult<T> {
-
-}
-
+impl<T: serde::Serialize> ApiResult<T> {}
 
 impl<T> IntoResponse for ApiResult<T>
 where

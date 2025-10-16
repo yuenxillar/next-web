@@ -13,6 +13,7 @@ pub struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
@@ -36,18 +37,21 @@ async fn req_version(
 async fn req_transaction(
     FindSingleton(service): FindSingleton<DatabaseService>,
 ) -> impl axum::response::IntoResponse {
-    match service.execute_transaction(|rbs| async {
-        // insert
+    match service
+        .execute_transaction(|rbs| async {
+            // insert
 
-        // update
+            // update
 
-        // And Error
-        Err("Error".into())
-    }).await {
-        Ok(_) => {},
-        Err(_) => {},
+            // And Error
+            Err("Error".into())
+        })
+        .await
+    {
+        Ok(_) => {}
+        Err(_) => {}
     };
-    
+
     "Ok"
 }
 

@@ -22,13 +22,17 @@ pub struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
+
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)
     async fn application_router(&self, ctx: &mut ApplicationContext) -> axum::Router {
         let publisher = ctx
-            .get_single_with_name::<DefaultApplicationEventPublisher>("defaultApplicationEventPublisher")
+            .get_single_with_name::<DefaultApplicationEventPublisher>(
+                "defaultApplicationEventPublisher",
+            )
             .to_owned();
         tokio::spawn(async move {
             loop {
@@ -38,8 +42,7 @@ impl Application for TestApplication {
                 tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
             }
         });
-        axum::Router::new().route("/", axum::routing::get(|| async move { "Hello, world!" }
-    ))
+        axum::Router::new().route("/", axum::routing::get(|| async move { "Hello, world!" }))
     }
 }
 

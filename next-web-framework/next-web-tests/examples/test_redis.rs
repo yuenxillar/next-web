@@ -45,6 +45,7 @@ struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
     // get the application router. (open api  and private api)

@@ -5,15 +5,15 @@ use next_web_core::{
     async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
     ApplicationContext,
 };
-use next_web_dev::{
-    application::Application, extract::find_singleton::FindSingleton, Singleton,
-};
+use next_web_dev::{application::Application, extract::find_singleton::FindSingleton, Singleton};
 
 #[derive(Clone, Default)]
 pub struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
+
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
@@ -74,7 +74,6 @@ struct TestSingletonImplThree;
 impl TestSingleton for TestSingletonImplOne {}
 impl TestSingleton for TestSingletonImplTwo {}
 impl TestSingleton for TestSingletonImplThree {}
-
 
 impl TestSingletonImplOne {
     fn into_test_singleton(self: Self) -> Arc<dyn TestSingleton> {

@@ -1,7 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, anys::any_value::AnyValue,
+    anys::any_value::AnyValue, async_trait, context::properties::ApplicationProperties,
     ApplicationContext,
 };
 use next_web_dev::{
@@ -106,6 +106,8 @@ struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
+
     /// initialize the middleware.
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
@@ -136,11 +138,12 @@ impl Application for TestApplication {
                     .add_state_listener(TestEventListener::default());
 
             let machine = state_machie.start().await;
-            machine.send_event(EventMessage::new(
-                TestEvent::Open,
-                Some(AnyValue::Boolean(true)),
-            ))
-            .await;
+            machine
+                .send_event(EventMessage::new(
+                    TestEvent::Open,
+                    Some(AnyValue::Boolean(true)),
+                ))
+                .await;
         });
     }
 }

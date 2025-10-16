@@ -26,6 +26,8 @@ pub struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
+    type ErrorSolve = ();
+
     async fn init_middleware(&self, _properties: &ApplicationProperties) {}
 
     async fn on_ready(&self, ctx: &mut ApplicationContext) {
@@ -54,8 +56,8 @@ pub async fn req_hello() -> impl IntoResponse {
 
 #[PostMapping(path = "/record")]
 pub async fn req_record(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     FindSingleton(store): FindSingleton<ApplicationStore>,
-    ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
     store.add(addr).await;
     "Ok"
