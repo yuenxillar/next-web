@@ -32,6 +32,7 @@ Cargo.lock
 *.ppt
 *.pptx
 
+.zed
 
 application-local.yaml
-application.yaml
+#application.yaml

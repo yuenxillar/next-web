@@ -14,7 +14,8 @@ use next_web_dev::{
 };
 use next_web_dev::{extract::ConnectInfo, traits::store::idempotency_store::IdempotencyStore};
 use next_web_dev::{
-    response::{Html, IntoResponse}, store::memory_idempotency_store::MemoryIdempotencyStore,
+    response::{Html, IntoResponse},
+    store::memory_idempotency_store::MemoryIdempotencyStore,
 };
 use tokio::sync::Mutex;
 use tracing::info;
@@ -61,7 +62,7 @@ pub async fn req_record(
 }
 
 #[AnyMapping(
-    path = "/recordTwo", 
+    path = "/recordTwo",
     headers  = ["ContentType", "Authorization"],
     consume = "application/json",
     produce = "application/json"
@@ -88,7 +89,12 @@ impl TestUserRoutes {
     }
 
     // Request -> /user/logout
-    #[Idempotency(name = "memoryIdempotencyStore", key = "Idempotency-Key1", cache_key_prefix = "test_key", ttl = 10)]
+    #[Idempotency(
+        name = "memoryIdempotencyStore",
+        key = "Idempotency-Key",
+        cache_key_prefix = "test_key",
+        ttl = 10
+    )]
     #[RequestMapping(method = "POST", path = "/logout")]
     async fn req_logout() -> impl IntoResponse {
         Html("<h1>Logout Page</h1>")
@@ -131,4 +137,17 @@ impl Default for ApplicationStore {
 #[tokio::main]
 async fn main() {
     TestApplication::run().await;
+}
+
+#[cfg(test)]
+mod tests {
+    use next_web_dev::util::aes::local_file_encrypt;
+
+    #[test]
+    fn test_local_file_encrypt() {
+        match local_file_encrypt("2025/10/16/test") {
+            Ok(_) => {}
+            Err(error) => println!("Error encrypting file, case: {error}"),
+        };
+    }
 }

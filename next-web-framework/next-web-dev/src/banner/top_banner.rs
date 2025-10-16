@@ -1,10 +1,10 @@
 pub static DEFAULT_TOP_BANNER: &str = r#"
- _    _              _                           _     
-|  \ | |            | |                         | |    
-|   \| |  ___ __  __| |_  ______ __      __ ___ | |__  
-|  . ` | / _ \\ \/ /| __||______|\ \ /\ / // _ \| '_ \ 
+ _    _              _                           _
+|  \ | |            | |                         | |
+|   \| |  ___ __  __| |_  ______ __      __ ___ | |__
+|  . ` | / _ \\ \/ /| __||______|\ \ /\ / // _ \| '_ \
 |  |\  ||  __/ >  < | |_          \ V  V /|  __/| |_) |
-\__| \_/ \___|/_/\_\ \__|          \_/\_/  \___||_.__/ 
+\__| \_/ \___|/_/\_\ \__|          \_/\_/  \___||_.__/
 "#;
 
 #[derive(Debug)]
@@ -14,11 +14,17 @@ impl TopBanner {
     pub fn show(banner: &str) {
         print!("{}", banner);
         println!(
-            "\n{} \t\t\t\t (v{}.RELEASE)",
+            "\n{} \t\t\t\t (v{}.Develop)",
             Self::green(":: Next Web ::"),
             env!("CARGO_PKG_VERSION")
         );
-        println!("\n{}", Self::bold(& format!("Home Page: \x1b[4m{}\x1b[24m", env!("CARGO_PKG_HOMEPAGE"))));
+        println!(
+            "\n{}",
+            Self::bold(&format!(
+                "Home Page: \x1b[4m{}\x1b[24m",
+                env!("CARGO_PKG_HOMEPAGE")
+            ))
+        );
         println!("{}", Self::bold("Thank you for using it."));
         print!("\n");
     }

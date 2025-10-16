@@ -2,11 +2,11 @@ use from_attr::FromAttr;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{ spanned::Spanned, Expr, ItemFn, ReturnType, Type};
+use syn::{spanned::Spanned, Expr, ItemFn, ReturnType, Type};
 
 use crate::{
-    web::attrs::retry_attr::RetryAttr,
     util::param_info::{extract_param_info, ParamInfo},
+    web::attrs::retry_attr::RetryAttr,
 };
 
 pub(crate) fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
@@ -83,11 +83,9 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
         ReturnType::Default => false,
         ReturnType::Type(_, ty) => {
             if let Type::Path(type_path) = &**ty {
-                type_path
-                    .path
-                    .segments
-                    .last()
-                    .map_or(false, |seg| seg.ident == "Result")
+                type_path.path.segments.last().map_or(false, |seg| {
+                    seg.ident == "Result" || seg.ident == "StdResult"
+                })
             } else {
                 false
             }
@@ -121,7 +119,7 @@ pub(crate) fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
                             ::tokio::time::sleep(::std::time::Duration::from_millis(delay)).await;
 
                             #multiplier
-                            
+
                             attempt_count  += 1;
                         }
                     }

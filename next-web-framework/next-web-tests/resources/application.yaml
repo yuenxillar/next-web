@@ -1,0 +1,41 @@
+server_addr: 192.168.18.168
+
+next:
+  server:
+    port: 11000
+
+  messages:
+    local: "zh_CN"
+
+  data:
+    redis:
+      dynamic:
+        master:
+          host: "localhost"
+          port: 6379
+          password: "123456"
+          database: 0
+
+        slave1:
+          host: ${server_addr}
+          port: 6380
+          # 在某些字段 需要添加双引号保证正确格式， 例如在这里会将 password 解析为 Number 导致反序列化失败
+          password: "123456"
+          database: 0
+
+        slave2:
+          host: nsp:Vk9TcukN8LKuErVJ2Vq44GNBbj/P5WheCIgbteX3JtKAUkEfWxqBIVJD/b+E+5ibBCaTv9vyLOySJI+3hKUElKVYsFIJ2ifHrw==
+          port: 6381
+          password: nsp:Iu/BPHAkTTPmUf8PwpD6RtovUNqN6Q00/CZZr3CjMJ/dTrEudeesbNWc+7tbsOBSW0dra+2pwT5a8MiiBu6XDtMW8r8=
+          database: 0
+
+  tests:
+    version: "1.0.0"
+    model: "test"
+    enable: true
+    date: "2021-12-20"
+
+  logging:
+    format: "%Y-%m-%d %H:%M:%S%.3f"
+windows:
+  computername: ${COMPUTERNAME}

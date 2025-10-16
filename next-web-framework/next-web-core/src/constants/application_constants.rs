@@ -9,3 +9,5 @@ pub const I18N: &'static str = "/i18n";
 pub const RESOURCES: &'static str = "resources";
 
 pub const NEXT_SECURE_PROPERTIES: &'static str = "nsp";
+
+pub const NEXT_DECRYPT_PASSWORD: &'static str = "NEXT_DECRYPT_PASSWORD";

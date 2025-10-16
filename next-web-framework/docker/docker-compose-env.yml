@@ -25,7 +25,7 @@ services:
       - "3306:3306"
     environment:
       - TZ: Asia/Shanghai
-      - MYSQL_ROOT_HOST: %
+      - MYSQL_ROOT_HOST: "%"
       - MYSQL_DATABASE: test_db
       - MYSQL_ROOT_USER: root
       - MYSQL_ROOT_PASSWORD: 123456
@@ -118,7 +118,6 @@ services:
       # 插件地址
       # https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download/3.10.0/rabbitmq_delayed_message_exchange-3.10.0.ez
 
-
   mqtt:
     image: eclipse-mosquitto:latest
     container_name: proxy-mqtt
@@ -143,7 +142,6 @@ services:
       - ${WORK_SPACE}docker/docker-config/mosquitto/acl:/etc/mosquitto/aclfile
       - ${WORK_SPACE}docker/docker-data/mosquitto/data:/mosquitto/data
       - ${WORK_SPACE}docker/docker-log/mosquitto/log:/mosquitto/log
-
 
   nacos:
     image: nacos/nacos-server:latest

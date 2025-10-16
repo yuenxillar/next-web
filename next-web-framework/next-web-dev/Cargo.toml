@@ -52,7 +52,6 @@ validator = { workspace = true}
 thiserror = { workspace = true }
 inventory = { workspace = true }
 
-aes-gcm = { workspace = true, optional = true }
 
 rudi-dev = { workspace = true }
 
@@ -61,13 +60,16 @@ tracing-subscriber = { workspace = true }
 reqwest = { workspace = true, features = ["stream"]}
 async-stream = { workspace = true }
 
-md5  = {workspace = true, optional = true }
-sha1 = {workspace = true, optional = true }
-sha2 = {workspace = true, optional = true }
+md5     = {workspace = true, optional = true }
+sha1    = {workspace = true, optional = true }
+sha2    = {workspace = true, optional = true }
+base64  = {workspace = true, optional = true }
+aes-gcm = { workspace = true, optional = true }
+scrypt  = { workspace = true, optional = true }
+rand    = { workspace = true, optional = true }
 
 serde_path_to_error = "0.1.17"
 mime = "0.3.17"
-
 
 [target.'cfg(windows)'.dependencies]
 mimalloc = { workspace = true }
@@ -92,6 +94,6 @@ enable-i18n = []
 enable-state-machine = []
 
 digester = ["md5", "sha1", "sha2"]
-decrypt-properties = ["aes-gcm", "digester"]
+decrypt-properties = ["aes-gcm", "base64", "scrypt", "rand"]
 
 trace-log = ["next-web-core/trace-log"]

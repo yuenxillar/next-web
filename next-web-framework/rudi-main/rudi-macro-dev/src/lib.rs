@@ -1,6 +1,3 @@
-mod util;
-mod resource_attr;
-mod value_attr;
 mod commons;
 mod field_or_argument_attr;
 mod impl_fn_or_enum_variant_attr;
@@ -10,7 +7,10 @@ mod item_fn_gen;
 mod item_impl_gen;
 mod item_struct_gen;
 mod properties_attr;
+mod resource_attr;
 mod struct_or_function_attr;
+mod util;
+mod value_attr;
 
 use from_attr::FromAttr;
 use proc_macro::TokenStream;
@@ -57,7 +57,6 @@ fn generate_from_properties(attr: TokenStream, item: TokenStream) -> TokenStream
     result.unwrap_or_else(|e| e.to_compile_error()).into()
 }
 
-
 /// 单例过程宏
 ///
 /// # 参数说明
@@ -77,11 +76,11 @@ fn generate_from_properties(attr: TokenStream, item: TokenStream) -> TokenStream
 /// - `vec`:            保证获取到所有此类型的单例，应和 `name` 参数排斥, 字段类型应为 `Vec<T>`
 /// - `map`:            保证获取到所有此类型的单例, 前提当前字段实现了 `Singleton` trait, 字段类型应为 `std::collections::HashMap<K, V>`
 /// - `ref`:            引用类型, & T
-/// 
+///
 /// # 示例
 /// ```rust
 /// use std::sync::Arc;
-/// 
+///
 /// #[Singleton(
 ///     name = "myDataImpl",
 ///     condition = test_condition,
@@ -93,24 +92,24 @@ fn generate_from_properties(attr: TokenStream, item: TokenStream) -> TokenStream
 ///     /// 这里用的是字段名称去仓库找单例并注入 `more_data` -> `moreData`, 若是指定名称则不会这样处理
 ///     more_data: Option<Vec<u8>>,
 /// }
-/// 
-/// trait Data {  
-///     fn call() -> &'static str; 
+///
+/// trait Data {
+///     fn call() -> &'static str;
 /// }
-/// 
+///
 /// impl Data for DataImpl {
 ///     fn call() -> &'static str {
 ///         "hello"
 ///     }
 /// }
-/// 
+///
 /// impl DataImpl {
-///     
+///
 ///     fn into_data(self) -> Arc<dyn Data> {
 ///         Arc::new(self)
 ///     }
 /// }
-/// 
+///
 /// fn test_condition(cx: &ApplicationContext) -> bool {
 ///    !cx.contains_single_with_name::<i32>("5")
 /// }
@@ -124,7 +123,7 @@ fn generate_from_properties(attr: TokenStream, item: TokenStream) -> TokenStream
 /// - ` condition `: Optional conditional closure or path, used to control whether the Provider of this singleton is inserted into the Context
 /// - ` bindings `: a list of binding paths, usually where the dynamic implementation of the structure can be filled in
 /// - ` async `: Optional asynchronous tag path value, specifying whether it is an asynchronous singleton (rename using the ` # [async] ` property)
-/// - ` auto_degister `: Whether it is automatically registered to the container (only valid when the ` auto register ` feature is enabled, default is ` DEFAULT_SUTD_RIGIST `)
+/// - ` auto_register `: Whether it is automatically registered to the container (only valid when the ` auto register ` feature is enabled, default is ` DEFAULT_SUTD_RIGIST `)
 /// - ` default `: Use a struct to implement the ` Default ` trait and inject instances into the repository
 ///
 /// # Auxiliary Macro Parameter Description
@@ -135,11 +134,11 @@ fn generate_from_properties(attr: TokenStream, item: TokenStream) -> TokenStream
 /// - ` vec `: Ensure to obtain all singleton of this type, which should be excluded from the ` name ` parameter, and the field type should be ` Vec<T>`
 /// - ` map `: Ensure that all singleton instances of this type are obtained, provided that the current field implements the ` Singleton ` trait and the field type should be ` std:: collections: HashMap<K, V>`
 /// - ref: Reference type,&T
-/// 
+///
 /// # Example
 /// ```rust
 /// use std::sync::Arc;
-/// 
+///
 /// #[Singleton(
 ///     name = "myDataImpl",
 ///     condition = test_condition,
@@ -148,32 +147,31 @@ fn generate_from_properties(attr: TokenStream, item: TokenStream) -> TokenStream
 /// struct DataImpl {
 ///     #[resource(name = "testData")]
 ///     data: String,
-///Here, the field name is used to search for a single instance in the warehouse and inject 'more_data' ->'moreData'. If a name is specified, it will not be processed in this way
+/// Here, the field name is used to search for a single instance in the warehouse and inject 'more_data' ->'moreData'. If a name is specified, it will not be processed in this way
 ///     more_data: Option<Vec<u8>>,
 /// }
-/// 
-/// trait Data {  
-///     fn call() -> &'static str;  
+///
+/// trait Data {
+///     fn call() -> &'static str;
 /// }
-/// 
+///
 /// impl Data for DataImpl {
 ///     fn call() -> &'static str {
 ///         "hello"
 ///     }
 /// }
-/// 
+///
 /// impl DataImpl {
-///     
+///
 ///     fn into_data(self) -> Arc<dyn Data> {
 ///         Arc::new(self)
 ///     }
 /// }
-/// 
+///
 /// fn test_condition(cx: &ApplicationContext) -> bool {
 ///    ! cx.contains_single_with_name::<i32>("5")
 /// }
 /// ```
-///
 #[doc = include_str!("./docs/attribute_macro.md")]
 #[proc_macro_attribute]
 #[allow(non_snake_case)]
@@ -199,7 +197,7 @@ pub fn SingleOwner(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate(attr, item, Scope::SingleOwner)
 }
 
-/// Define a properties. 
+/// Define a properties.
 /// Please use in conjunction with this macro: `#[rudi::Singleton(eager_create = true)]`
 /// Please add serde_yaml to your dependencies.
 #[doc = ""]

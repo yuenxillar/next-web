@@ -1,4 +1,8 @@
-use next_web_core::{constants::application_constants::NEXT_SECURE_PROPERTIES, traits::{ordered::Ordered, properties_post_processor::PropertiesPostProcessor}};
+use next_web_core::{
+    constants::application_constants::{NEXT_DECRYPT_PASSWORD, NEXT_SECURE_PROPERTIES},
+    context::application_args::ApplicationArgs,
+    traits::{ordered::Ordered, properties_post_processor::PropertiesPostProcessor},
+};
 use rudi_dev::Singleton;
 use serde_yaml::Value;
 
@@ -11,6 +15,7 @@ impl DecryptPropertiesPostProcessor {
         Box::new(self)
     }
 }
+
 impl Ordered for DecryptPropertiesPostProcessor {
     fn order(&self) -> i32 {
         i32::MIN
@@ -20,31 +25,55 @@ impl Ordered for DecryptPropertiesPostProcessor {
 /// Decrypt the properties.
 impl PropertiesPostProcessor for DecryptPropertiesPostProcessor {
     fn post_process_properties(&mut self, mapping: Option<&mut serde_yaml::Value>) {
-         if let Some(mapping) = mapping {
-            // println!("mapping: {:#?}", mapping);
+        let args = ApplicationArgs::default();
+        let password = match args.decrypt_password.as_ref() {
+            Some(s) => Some(s.clone()),
+            None => match std::env::var(NEXT_DECRYPT_PASSWORD) {
+                Ok(password) => Some(password),
+                Err(_) => None,
+            },
+        };
 
+        let password = match password {
+            Some(password) => password,
+            None => {
+                return;
+            }
+        };
+
+        if let Some(mapping) = mapping {
             match mapping.as_mapping_mut() {
                 Some(mapping) => {
-
-                   let mut ref_mapping = mapping;
-                    loop {
-                        ref_mapping.iter_mut().for_each(|(_key, value)| match value {
-                            Value::String(value) => {
-                                if value.starts_with(NEXT_SECURE_PROPERTIES) && value[3..4] == *":" {
-                                    let val = value[4..].trim();
-
-                                    // decrypt
-                                    // let decrypted = crate::crypto::decrypt(val).unwrap();
-                                }
-                            }
-                            Value::Mapping(mapping) => todo!(),
-                            _ => {}
-                        });
-
+                    for (_key, value) in mapping.iter_mut() {
+                        decrypt_properties(value, &password);
                     }
                 }
-                None => return
+                None => return,
             }
         }
+    }
+}
+
+fn decrypt_properties(value: &mut Value, password: &str) {
+    match value {
+        Value::String(s) => {
+            if s.starts_with(NEXT_SECURE_PROPERTIES) && s[3..4] == *":" {
+                let ciphertext = s[4..].trim();
+                match crate::util::aes::decrypt(ciphertext, password) {
+                    Ok(plaintext) => *s = plaintext,
+                    Err(e) => {
+                        panic!("Failed to decrypt '{}': {}", ciphertext, e);
+                    }
+                }
+            }
+        }
+        Value::Mapping(m) => {
+            // 递归处理每个子字段
+            for (_, v) in m.iter_mut() {
+                decrypt_properties(v, password);
+            }
+        }
+        // 其他类型（Array, Bool, Null 等）不处理
+        _ => {}
     }
 }

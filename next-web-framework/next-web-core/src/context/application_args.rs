@@ -5,6 +5,9 @@ use clap::Parser;
 pub struct ApplicationArgs {
     #[arg(long)]
     pub config_location: Option<String>,
+
+    #[arg(long)]
+    pub decrypt_password: Option<String>,
 }
 
 impl Default for ApplicationArgs {
