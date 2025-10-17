@@ -2,8 +2,6 @@ use std::{error::Error, fmt::Display};
 
 use next_web_core::anys::{any_error::AnyError, any_value::AnyValue};
 
-
-
 #[derive(Debug, Clone)]
 pub struct AuthenticationError {
     msg: String,

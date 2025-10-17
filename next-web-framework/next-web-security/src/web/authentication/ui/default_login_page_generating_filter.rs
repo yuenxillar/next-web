@@ -94,14 +94,14 @@ impl DefaultLoginPageGeneratingFilter {
         self.authentication_url = Some(url.into());
     }
 
-    fn generate_login_page_html(
+    async fn generate_login_page_html(
         &self,
         request: &mut Request,
         login_error: bool,
         logout_success: bool,
     ) -> String {
         let error_msg = if login_error {
-            self.get_login_error_message(request)
+            self.get_login_error_message(request).await
         } else {
             "Invalid credentials".to_string()
         };
@@ -171,9 +171,9 @@ impl DefaultLoginPageGeneratingFilter {
         html
     }
 
-    fn get_login_error_message(&self, request: &mut Request) -> String {
+    async fn get_login_error_message(&self, request: &mut Request) -> String {
         if let Some(map) = request.extensions().get::<AnyMap>() {
-            if let Some(value) = map.get("NEXT_SECURITY_LAST_ERROR")  {
+            if let Some(value) = map.get("NEXT_SECURITY_LAST_ERROR").await  {
                 if let Some(value) = value.as_object::<AuthenticationError>() {
                     let msg = value.get_message().to_string();
                     if !msg.is_empty() {

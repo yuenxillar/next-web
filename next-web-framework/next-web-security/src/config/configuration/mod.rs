@@ -1,0 +1,1 @@
+pub mod autowire_singleton_factory_object_post_processor;

@@ -118,8 +118,8 @@ impl TestWebSecurityConfigure {
 }
 
 impl WebSecurityConfigure for TestWebSecurityConfigure {
-    fn configure(&self) -> HttpSecurity {
-        HttpSecurity::new()
+    fn configure(self) -> HttpSecurity {
+        HttpSecurity::default()
             .authorize_http_requests(|mut auth| {
                 auth.request_matchers(vec!["/login", "/logout", "/open"])
                     .permit_all()
@@ -129,8 +129,6 @@ impl WebSecurityConfigure for TestWebSecurityConfigure {
                     .authenticated();
             })
             .form_login(|form| {})
-            .any_match("/login/auth", |group| group.roles(vec!["admin"]))
-            .disable()
     }
 }
 

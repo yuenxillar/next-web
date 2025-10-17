@@ -1,20 +1,17 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, sync::Arc};
 
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
+use axum::response::Response;
 use next_web_core::{
-    anys::any_value::AnyValue,
-    traits::{ordered::Ordered, required::Required},
+    anys::any_map::AnyMap,
+    traits::{any_clone::AnyClone, ordered::Ordered, required::Required},
     ApplicationContext,
 };
 
 use crate::{
     authorization::authentication_manager::AuthenticationManager,
     config::{
+        abstract_configured_security_builder::AbstractConfiguredSecurityBuilder,
         authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
-        object_post_processor::ObjectPostProcessor,
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
@@ -34,7 +31,6 @@ use crate::{
         },
     },
     core::filter::Filter,
-    permission::model::permission_group::PermissionGroup,
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
 
@@ -42,90 +38,104 @@ type BoxError = Box<dyn std::error::Error>;
 type ErrorHandler = Box<dyn FnOnce(BoxError) -> Response + Send + Sync>;
 
 pub struct HttpSecurity {
-    pub(crate) any_match: Vec<(&'static str, PermissionGroup)>,
-    pub(crate) not_match: Vec<&'static str>,
-    pub(crate) match_type: MatchType,
-    pub(crate) error_handler: ErrorHandler,
+    // pub(crate) any_match: Vec<(&'static str, PermissionGroup)>,
+    // pub(crate) not_match: Vec<&'static str>,
+    // pub(crate) match_type: MatchType,
+    // pub(crate) error_handler: ErrorHandler,
 
     request_matcher_configurer: RequestMatcherConfigurer,
     filters: Vec<OrderedFilter>,
     request_matcher: Arc<dyn RequestMatcher>,
     filter_orders: FilterOrderRegistration,
-    authentication_manager: Arc<dyn AuthenticationManager>,
+    authentication_manager: Option<Arc<dyn AuthenticationManager>>,
+
+    abstract_configured_security_builder:
+        AbstractConfiguredSecurityBuilder<DefaultSecurityFilterChain, Self>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum MatchType {
-    #[default]
-    AllMatch,
-    OnlyMatchOwner,
-    NotMatch,
-}
+// #[derive(Debug, Clone, PartialEq, Eq, Default)]
+// pub enum MatchType {
+//     #[default]
+//     AllMatch,
+//     OnlyMatchOwner,
+//     NotMatch,
+// }
 
 impl HttpSecurity {
     pub fn new(
-        // object_post_processor: Arc<dyn ObjectPostProcessor>,
-        // authentication_builder: AuthenticationManagerBuilder,
-        // shared_objects: HashMap<String, AnyValue>,
+        authentication_builder: AuthenticationManagerBuilder,
+        shared_objects: AnyMap,
     ) -> Self {
-        Self {
-            any_match: Vec::new(),
-            match_type: MatchType::default(),
-            not_match: Vec::new(),
-            error_handler: Box::new(|_| (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()),
-
+        let abstract_configured_security_builder = AbstractConfiguredSecurityBuilder::new(false);
+        let http_security = Self {
             filter_orders: Default::default(),
             request_matcher: Arc::new(AnyRequestMatcher::default()),
             filters: Default::default(),
-            request_matcher_configurer: todo!(),
-            authentication_manager: todo!(),
-        }
+            request_matcher_configurer: RequestMatcherConfigurer::new(),
+            authentication_manager: Default::default(),
+            abstract_configured_security_builder,
+        };
+
+        http_security.set_shared_object(
+            std::any::type_name::<AuthenticationManagerBuilder>(),
+            authentication_builder,
+        );
+
+        shared_objects.for_each(|name, object| {
+            http_security.set_shared_object(name.to_string(), object.to_owned());
+        });
+
+        http_security
     }
 
-    pub fn any_match<F>(mut self, path: &'static str, f: F) -> Self
-    where
-        F: FnOnce(PermissionGroup) -> PermissionGroup,
-    {
-        let permission_group = f(PermissionGroup::default());
-        self.any_match.push((path, permission_group));
-        self
+    fn get_context(&self) -> &ApplicationContext {
+        todo!()
     }
 
-    pub fn not_match(mut self, path: &'static str) -> Self {
-        self.not_match.push(path);
-        self
-    }
+    // pub fn any_match<F>(mut self, path: &'static str, f: F) -> Self
+    // where
+    //     F: FnOnce(PermissionGroup) -> PermissionGroup,
+    // {
+    //     let permission_group = f(PermissionGroup::default());
+    //     self.any_match.push((path, permission_group));
+    //     self
+    // }
 
-    pub fn not_matches<P>(mut self, paths: P) -> Self
-    where
-        P: IntoIterator<Item = &'static str>,
-    {
-        for path in paths {
-            self.not_match.push(path);
-        }
-        self
-    }
+    // pub fn not_match(mut self, path: &'static str) -> Self {
+    //     self.not_match.push(path);
+    //     self
+    // }
 
-    pub fn map_error<F>(mut self, f: F) -> Self
-    where
-        F: FnOnce(BoxError) -> Response + Send + Sync,
-        F: 'static,
-    {
-        self.error_handler = Box::new(f);
-        self
-    }
+    // pub fn not_matches<P>(mut self, paths: P) -> Self
+    // where
+    //     P: IntoIterator<Item = &'static str>,
+    // {
+    //     for path in paths {
+    //         self.not_match.push(path);
+    //     }
+    //     self
+    // }
 
-    pub fn disable(mut self) -> Self {
-        self.match_type = MatchType::OnlyMatchOwner;
-        self
-    }
+    // pub fn map_error<F>(mut self, f: F) -> Self
+    // where
+    //     F: FnOnce(BoxError) -> Response + Send + Sync,
+    //     F: 'static,
+    // {
+    //     self.error_handler = Box::new(f);
+    //     self
+    // }
 
-    pub fn disable_all(mut self) -> Self {
-        self.match_type = MatchType::NotMatch;
-        self.any_match.clear();
-        self.not_match.clear();
-        self
-    }
+    // pub fn disable(mut self) -> Self {
+    //     self.match_type = MatchType::OnlyMatchOwner;
+    //     self
+    // }
+
+    // pub fn disable_all(mut self) -> Self {
+    //     self.match_type = MatchType::NotMatch;
+    //     self.any_match.clear();
+    //     self.not_match.clear();
+    //     self
+    // }
 }
 
 impl HttpSecurity {
@@ -148,6 +158,21 @@ impl HttpSecurity {
         self
     }
 
+    // pub fn headers(self) -> Self {
+    // }
+
+    // pub fn cors(self) -> Self {
+    // }
+
+    // pub fn session_management(self) -> Self {
+    // }
+
+    // pub fn port_mapper(self) -> Self {
+    // }
+
+    // pub fn x509(self) -> Self {
+    // }
+
     fn get_or_apply<C>(&self, mut configurer: C) -> C
     where
         C: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, Self>>,
@@ -157,10 +182,6 @@ impl HttpSecurity {
         //     Some(existing_config) => existing_config,
         //     None => self.with(configurer),
         // }
-        todo!()
-    }
-
-    fn get_context(&self) -> &ApplicationContext {
         todo!()
     }
 }
@@ -222,42 +243,47 @@ impl HttpSecurityBuilder<Self> for HttpSecurity {
     {
         todo!()
     }
+
+    fn set_shared_object<N, C>(&self, name: N, object: C)
+    where
+        N: Into<Cow<'static, str>>,
+        C: AnyClone,
+    {
+        todo!()
+    }
 }
 
 impl Clone for HttpSecurity {
     fn clone(&self) -> Self {
         Self {
-            any_match: self.any_match.clone(),
-            not_match: self.not_match.clone(),
-            match_type: self.match_type.clone(),
-            error_handler: Box::new(|_| (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()),
-            request_matcher_configurer: todo!(),
-            filters: todo!(),
-            request_matcher: todo!(),
-            filter_orders: todo!(),
-            authentication_manager: todo!(),
+            request_matcher_configurer: self.request_matcher_configurer.clone(),
+            filters: self.filters.clone(),
+            request_matcher: self.request_matcher.clone(),
+            filter_orders: self.filter_orders.clone(),
+            authentication_manager: self.authentication_manager.clone(),
+            abstract_configured_security_builder: self.abstract_configured_security_builder.clone(),
         }
     }
 }
 
 impl Default for HttpSecurity {
     fn default() -> Self {
-        Self {
-            any_match: Default::default(),
-            not_match: Default::default(),
-            match_type: MatchType::NotMatch,
-            error_handler: Box::new(|_| (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()),
-            request_matcher_configurer: todo!(),
-            filters: todo!(),
-            request_matcher: todo!(),
-            filter_orders: todo!(),
-            authentication_manager: todo!(),
-        }
+        Self::new(AuthenticationManagerBuilder::new(), AnyMap::new())
     }
 }
 
 #[derive(Clone)]
-pub struct RequestMatcherConfigurer {}
+pub struct RequestMatcherConfigurer {
+    matchers: Vec<Arc<dyn RequestMatcher>>,
+}
+
+impl RequestMatcherConfigurer {
+    pub fn new() -> Self {
+        Self {
+            matchers: Vec::new(),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct OrderedFilter {

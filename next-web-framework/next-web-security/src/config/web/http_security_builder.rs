@@ -1,3 +1,7 @@
+use std::borrow::Cow;
+
+use next_web_core::traits::any_clone::AnyClone;
+
 use crate::{
     config::{security_builder::SecurityBuilder, security_configurer::SecurityConfigurer},
     core::filter::Filter,
@@ -29,4 +33,9 @@ where
     where
         F: Filter,
         F1: Filter;
+
+    fn set_shared_object<N, C>(&self, name: N, object: C)
+    where
+        N: Into<Cow<'static, str>>,
+        C: AnyClone;
 }

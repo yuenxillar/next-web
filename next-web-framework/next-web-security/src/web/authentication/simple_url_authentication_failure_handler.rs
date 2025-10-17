@@ -40,13 +40,13 @@ impl SimpleUrlAuthenticationFailureHandler {
         }
     }
 
-    pub fn save_error(&self, request: &Request, error: &AuthenticationError) {
+    pub async fn save_error(&self, request: &Request, error: &AuthenticationError) {
         if self.forward_to_destination {
             match request.extensions().get::<AnyMap>() {
                 Some(map) => map.set(
                     "NEXT_SECURITY_LAST_ERROR",
                     AnyValue::Object(error.clone().into_boxed()),
-                ),
+                ).await,
                 None => {}
             }
         } else {

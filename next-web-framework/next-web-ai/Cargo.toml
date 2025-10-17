@@ -26,6 +26,8 @@ tokio.workspace = true
 
 
 [features]
-default = ["deep-seek"]
+default = ["deep-seek", "mcp-server"]
 
 deep-seek = []
+
+mcp-server = []

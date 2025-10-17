@@ -46,22 +46,24 @@ where
 
 #[derive(Clone)]
 pub struct CompositeObjectPostProcessor {
-    post_processors: Vec<Arc<dyn ObjectPostProcessor>>,
+    post_processors: Vec<Arc<dyn ObjectPostProcessor<AnyValue>>>,
 }
 
 impl CompositeObjectPostProcessor {
-    fn add_object_post_processor(&mut self, var: impl ObjectPostProcessor + 'static) {
+    fn add_object_post_processor(&mut self, var: impl ObjectPostProcessor<AnyValue> + 'static) {
         self.post_processors.push(Arc::new(var));
     }
 }
 
-impl ObjectPostProcessor for CompositeObjectPostProcessor {
-    fn post_process(&self, mut object: AnyValue) -> AnyValue {
+impl ObjectPostProcessor<AnyValue> for CompositeObjectPostProcessor {
+    fn post_process(&self, object: AnyValue) -> Option<AnyValue> {
+        let mut value = Some(object);
         for opp in self.post_processors.iter().map(AsRef::as_ref) {
-            object = opp.post_process(object);
+            if let Some(val) = value {
+                value = opp.post_process(val);
+            }
         }
-
-        object
+        value
     }
 }
 

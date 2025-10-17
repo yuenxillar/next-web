@@ -380,6 +380,15 @@ impl ApplicationContext {
         );
     }
 
+    #[track_caller]
+    pub fn insert_singleton_with_default_name<T>(&mut self, instance: T)
+    where
+        T: 'static + Clone + Send + Sync,
+    {
+        let name = SingletonUtil::name::<T>();
+        self.insert_singleton_with_name(instance, name);
+    }
+
     /// Appends a standalone [`SingleOwner`](crate::Scope::SingleOwner) instance to the context with default name `""`.
     ///
     /// # Panics
@@ -746,13 +755,13 @@ impl ApplicationContext {
         }
     }
 
-    pub fn resolve_with_default_name<T: 'static + Send + Sync>(
-        &mut self
-    ) -> T {
+    pub fn resolve_with_default_name<T: 'static + Send + Sync>(&mut self) -> T {
         let name = SingletonUtil::name::<T>().into();
         match self.inner_resolve(name, Behaviour::CreateThenReturnSingletonOrTransient) {
             Resolved::SingletonOrTransient(instance) => instance,
-            Resolved::NotFoundProvider(_)| Resolved::NotSingletonOrTransient(_) => self.resolve_with_name(""),
+            Resolved::NotFoundProvider(_) | Resolved::NotSingletonOrTransient(_) => {
+                self.resolve_with_name("")
+            }
             Resolved::NotSingletonOrSingleOwner(_) | Resolved::NoReturn => unreachable!(),
         }
     }
@@ -1725,6 +1734,12 @@ impl ApplicationContext {
         self.single_registry
             .get_ref(&key)
             .unwrap_or_else(|| panic!("no instance registered for: {:?}", key))
+    }
+
+    #[track_caller]
+    pub fn get_single_with_default_name<T: 'static>(&self) -> Option<&T> {
+        let name = SingletonUtil::name::<T>();
+        self.get_single_option_with_name::<T>(name)
     }
 
     /// Returns an optional reference to a [`Singleton`](crate::Scope::Singleton) or [`SingleOwner`](crate::Scope::SingleOwner) instance based on the given type and default name `""`.

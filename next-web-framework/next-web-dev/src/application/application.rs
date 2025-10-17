@@ -1,5 +1,5 @@
 use axum::http::StatusCode;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use axum::Router;
 
 use next_web_core::async_trait;
@@ -59,6 +59,9 @@ where
     Self: Send + Sync,
     Self: 'static,
 {
+    /// The error solver for the application.
+    ///
+    /// Apply it to the `catch_panic` function
     type ErrorSolve: ErrorSolver;
 
     /// Initialize the middleware.
@@ -90,34 +93,43 @@ where
 
     /// Show the banner of the application.
     fn banner_show(application_resources: &ApplicationResources) {
-        if let None = application_resources
-            .load(APPLICATION_BANNER)
-            .map(|content| {
-                TopBanner::show(std::str::from_utf8(content.as_ref()).unwrap_or(DEFAULT_TOP_BANNER))
-            })
-        {
-            TopBanner::show(DEFAULT_TOP_BANNER);
-        }
+        if let Some(content) = application_resources.load(APPLICATION_BANNER) {
+            if let Ok(txt) = std::str::from_utf8(content.as_ref()) {
+                TopBanner::show(txt);
+                return;
+            }
+        };
+
+        TopBanner::show(DEFAULT_TOP_BANNER);
     }
 
-    fn catch_panic(err: Box<dyn std::any::Any + Send>) -> Response {
+    /// Suitable for capturing panic in application
+    fn catch_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
         let error = if let Some(msg) = err.downcast_ref::<String>() {
-            error!("Service panicked: {}", msg);
             msg.to_string()
         } else if let Some(msg) = err.downcast_ref::<&str>() {
-            error!("Service panicked: {}", msg);
             msg.to_string()
         } else {
             error!("Service panicked but `CatchPanic` was unable to downcast the panic info");
             String::with_capacity(0)
         };
 
-        let msg = Self::ErrorSolve::solve_error(error);
+        error!("Service panicked: {}", &error);
 
-        Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(msg.into())
-            .unwrap()
+        let mut resp = Self::ErrorSolve::solve_error(error).into_response();
+
+        *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+
+        resp
+    }
+
+    /// No matching route handler
+    async fn fallback() -> Response {
+        let mut resp = Self::ErrorSolve::solve_error(String::from("Not Found")).into_response();
+
+        *resp.status_mut() = StatusCode::NOT_FOUND;
+
+        resp
     }
 
     /// Initialize the logging.
@@ -212,9 +224,9 @@ where
     ) {
         // Register singletion
         // [properties] [args] [resources]
-        ctx.insert_singleton_with_name(application_properties.to_owned(), "applicationProperties");
-        ctx.insert_singleton_with_name(application_args.to_owned(), "applicationArgs");
-        ctx.insert_singleton_with_name(application_resources.to_owned(), "applicationResources");
+        ctx.insert_singleton_with_default_name(application_properties.to_owned());
+        ctx.insert_singleton_with_default_name(application_args.to_owned());
+        ctx.insert_singleton_with_default_name(application_resources.to_owned());
 
         // If a declarative macro is used for submission, it should not be found in the Application Context
         for default_auto_register in inventory::iter::<&dyn DefaultAutoRegister>.into_iter() {
@@ -272,13 +284,13 @@ where
 
             manager.start().await;
 
-            ctx.insert_singleton_with_name(manager, "jobSchedulerManager");
+            ctx.insert_singleton_with_default_name(manager);
         }
 
         let rest_client = RestClient::new();
-        ctx.insert_singleton_with_name(default_event_publisher, "defaultApplicationEventPublisher");
-        ctx.insert_singleton_with_name(multicaster, "defaultApplicationEventMulticaster");
-        ctx.insert_singleton_with_name(rest_client, "restClient");
+        ctx.insert_singleton_with_default_name(default_event_publisher);
+        ctx.insert_singleton_with_default_name(multicaster);
+        ctx.insert_singleton_with_default_name(rest_client);
     }
 
     // Get the application router.
@@ -340,7 +352,7 @@ where
             .application_router(&mut ctx)
             .await
             // Handle not found route
-            .fallback(fall_back)
+            .fallback(Self::fallback)
             // Prevent program panic caused by users not setting routes
             .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
 
@@ -371,22 +383,6 @@ where
 
         // 5. Add global middleware layer
         {
-            app = app
-                // Global panic handler
-                .layer(CatchPanicLayer::custom(Self::catch_panic))
-                // Handler request  max timeout
-                .layer(TimeoutLayer::new(std::time::Duration::from_secs(
-                    req_timeout.unwrap_or(5),
-                )))
-                // Cors
-                .layer(
-                    CorsLayer::new()
-                        .allow_origin(tower_http::cors::Any)
-                        .allow_methods(tower_http::cors::Any)
-                        .allow_headers(tower_http::cors::Any)
-                        .max_age(std::time::Duration::from_secs(60) * 10),
-                );
-
             // Add prometheus layer
             #[cfg(feature = "enable-prometheus")]
             #[rustfmt::skip]
@@ -396,17 +392,16 @@ where
             }
 
             // Add HTTP configuration related layers
-
             match config.http() {
                 Some(http) => {
                     // Request
                     if let Some(req) = http.request() {
                         if req.trace() {
-                            app = app.route_layer(TraceLayer::new_for_http());
+                            app = app.layer(TraceLayer::new_for_http());
                         }
                         let limit = req.max_request_size().unwrap_or_default();
                         if limit > 10 {
-                            app = app.route_layer(RequestBodyLimitLayer::new(limit));
+                            app = app.layer(RequestBodyLimitLayer::new(limit));
                         }
                     }
 
@@ -418,7 +413,22 @@ where
                 None => {}
             };
 
-            // Add
+            // Middleware
+            app = app
+                // Cors
+                .layer(
+                    CorsLayer::new()
+                        .allow_origin(tower_http::cors::Any)
+                        .allow_methods(tower_http::cors::Any)
+                        .allow_headers(tower_http::cors::Any)
+                        .max_age(std::time::Duration::from_secs(60) * 10),
+                )
+                // Handler request  max timeout
+                .layer(TimeoutLayer::new(std::time::Duration::from_secs(
+                    req_timeout.unwrap_or(5),
+                )))
+                // Global panic handler
+                .layer(CatchPanicLayer::custom(Self::catch_panic));
         }
 
         // 6. Trigger the ApplicationReadyEvent
@@ -604,9 +614,4 @@ where
             .bind_tcp_server(ctx, properties, start_time)
             .await;
     }
-}
-
-/// no route match handler
-async fn fall_back() -> (StatusCode, &'static str) {
-    (StatusCode::NOT_FOUND, "Route not found")
 }

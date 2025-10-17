@@ -1,5 +1,5 @@
 use std::any::Any;
-use std::sync::RwLock;
+use tokio::sync::RwLock;
 
 use hashbrown::HashMap;
 use std::borrow::Cow;
@@ -10,7 +10,7 @@ use crate::anys::any_value::AnyValue;
 /// Support AnyMap caching for different data types
 ///
 /// 支持不同数据类型的 AnyMap 缓存
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AnyMap {
     /// The underlying concurrent hash map storing cache items
     ///
@@ -54,15 +54,12 @@ impl AnyMap {
     /// ```
     /// cache.set("my_key", "my_value", Some(Duration::from_secs(60)));
     /// ```
-    pub fn set<K, V>(&self, key: K, value: V)
+    pub async fn set<K, V>(&self, key: K, value: V)
     where
         K: Into<Cow<'static, str>>,
         V: Into<AnyValue>,
     {
-        self.data
-            .write()
-            .map(|mut s| s.insert(key.into(), value.into()))
-            .ok();
+        self.data.write().await.insert(key.into(), value.into());
     }
 
     /// Gets a value by key, returns None if expired or not found
@@ -80,42 +77,44 @@ impl AnyMap {
     /// ```
     /// let value = cache.get("my_key");
     /// ```
-    pub fn get<K: AsRef<str>>(&self, key: K) -> Option<AnyValue> {
+    pub async fn get<K: AsRef<str>>(&self, key: K) -> Option<AnyValue> {
         self.data
             .read()
-            .map(|s| s.get(key.as_ref()).map(|s| s.to_owned()))
-            .unwrap_or_default()
+            .await
+            .get(key.as_ref())
+            .map(|s| s.to_owned())
     }
 
     /// 删除键
-    pub fn remove<K: AsRef<str>>(&self, key: K) -> Option<AnyValue> {
-        self.data
-            .write()
-            .map(|mut s| s.remove(key.as_ref()))
-            .unwrap_or_default()
+    pub async fn remove<K: AsRef<str>>(&self, key: K) -> Option<AnyValue> {
+        self.data.write().await.remove(key.as_ref())
     }
 
     /// 检查键是否存在
-    pub fn exists<K: AsRef<str>>(&self, key: K) -> bool {
-        self.data
-            .read()
-            .map(|s| s.contains_key(key.as_ref()))
-            .unwrap_or_default()
+    pub async fn exists<K: AsRef<str>>(&self, key: K) -> bool {
+        self.data.read().await.contains_key(key.as_ref())
     }
 
     /// 清除所有键
-    pub fn clear(&mut self) {
-        let _ = self.data.write().map(|mut s| s.clear());
+    pub async fn clear(&mut self) {
+        let _ = self.data.write().await.clear();
     }
 
     /// 获取缓存项数量
-    pub fn len(&self) -> usize {
-        self.data.read().map(|s| s.len()).unwrap_or_default()
+    pub async fn len(&self) -> usize {
+        self.data.read().await.len()
     }
 
     /// 检查缓存是否为空
-    pub fn is_empty(&self) -> bool {
-        self.data.read().map(|s| s.is_empty()).unwrap_or_default()
+    pub async fn is_empty(&self) -> bool {
+        self.data.read().await.is_empty()
+    }
+
+    pub async fn for_each<F>(&self, mut f: F)
+    where
+        F: FnMut(&str, &AnyValue),
+    {
+        self.data.read().await.iter().for_each(|(k, v)| f(k, v));
     }
 }
 
