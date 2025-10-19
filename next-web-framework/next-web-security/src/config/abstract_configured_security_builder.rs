@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::{collections::BTreeMap, marker::PhantomData};
 
-use crate::config::object_post_processor::ObjectPostProcessor;
 use crate::config::security_configurer::SecurityConfigurer;
 use crate::config::{
     abstract_security_builder::AbstractSecurityBuilder, security_builder::SecurityBuilder,

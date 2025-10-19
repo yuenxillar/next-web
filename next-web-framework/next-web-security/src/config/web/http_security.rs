@@ -1,10 +1,8 @@
 use std::{borrow::Cow, sync::Arc};
 
-use axum::response::Response;
+use axum::{extract::Request, http::request, response::Response};
 use next_web_core::{
-    anys::any_map::AnyMap,
-    traits::{any_clone::AnyClone, ordered::Ordered, required::Required},
-    ApplicationContext,
+    anys::any_map::AnyMap, error::BoxError, traits::{any_clone::AnyClone, ordered::Ordered, required::Required}, ApplicationContext
 };
 
 use crate::{
@@ -34,15 +32,11 @@ use crate::{
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
 
-type BoxError = Box<dyn std::error::Error>;
-type ErrorHandler = Box<dyn FnOnce(BoxError) -> Response + Send + Sync>;
-
 pub struct HttpSecurity {
     // pub(crate) any_match: Vec<(&'static str, PermissionGroup)>,
     // pub(crate) not_match: Vec<&'static str>,
     // pub(crate) match_type: MatchType,
     // pub(crate) error_handler: ErrorHandler,
-
     request_matcher_configurer: RequestMatcherConfigurer,
     filters: Vec<OrderedFilter>,
     request_matcher: Arc<dyn RequestMatcher>,
@@ -173,6 +167,15 @@ impl HttpSecurity {
     // pub fn x509(self) -> Self {
     // }
 
+    fn perform_build(&mut self) -> DefaultSecurityFilterChain{
+        self.filters.sort_by(|a, b| a.order().cmp(& b.order()));
+
+        let filters = std::mem::take(&mut self.filters);
+        // let request_matcher = std::mem::take(&mut self.request_matcher);
+        // DefaultSecurityFilterChain::new(request_matcher, filters)
+        todo!()
+    }
+
     fn get_or_apply<C>(&self, mut configurer: C) -> C
     where
         C: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, Self>>,
@@ -184,6 +187,8 @@ impl HttpSecurity {
         // }
         todo!()
     }
+
+
 }
 
 impl SecurityBuilder<DefaultSecurityFilterChain> for HttpSecurity {
@@ -251,6 +256,7 @@ impl HttpSecurityBuilder<Self> for HttpSecurity {
     {
         todo!()
     }
+
 }
 
 impl Clone for HttpSecurity {
@@ -302,10 +308,10 @@ impl Ordered for OrderedFilter {
 impl Filter for OrderedFilter {
     fn do_filter(
         &self,
-        req: &axum::extract::Request,
-        res: &Response,
-        next: axum::middleware::Next,
-    ) {
-        todo!()
+        req: &mut Request,
+        res: &mut Response,
+    ) -> Result<(), BoxError>{
+       
+       Ok(())
     }
 }

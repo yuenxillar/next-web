@@ -221,12 +221,7 @@ impl DefaultLoginPageGeneratingFilter {
 }
 
 impl Filter for DefaultLoginPageGeneratingFilter {
-    fn do_filter(
-        &self,
-        req: &axum::extract::Request,
-        res: &axum::response::Response,
-        next: axum::middleware::Next,
-    ) {
+    fn do_filter(&self, req: &mut axum::extract::Request, res: &mut axum::response::Response) -> Result<(), next_web_core::error::BoxError>{
         todo!()
     }
 }

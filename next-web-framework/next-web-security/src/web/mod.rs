@@ -1,3 +1,5 @@
+pub mod firewall;
+pub mod filter_chain_proxy;
 pub mod security_filter_chain;
 pub mod default_security_filter_chain;
 pub mod authentication_entry_point;

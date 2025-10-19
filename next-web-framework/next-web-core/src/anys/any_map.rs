@@ -110,11 +110,14 @@ impl AnyMap {
         self.data.read().await.is_empty()
     }
 
-    pub async fn for_each<F>(&self, mut f: F)
+    pub fn for_each<F>(&self, mut f: F)
     where
         F: FnMut(&str, &AnyValue),
     {
-        self.data.read().await.iter().for_each(|(k, v)| f(k, v));
+        self.data
+            .try_read()
+            .map(|map| map.iter().for_each(|(k, v)| f(k, v)))
+            .ok();
     }
 }
 

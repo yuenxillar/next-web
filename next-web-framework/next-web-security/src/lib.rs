@@ -1,6 +1,6 @@
-pub mod authentication;
+
 pub mod access;
-pub mod auth;
+pub mod authentication;
 pub mod authorization;
 pub mod config;
 pub mod core;
@@ -11,43 +11,21 @@ pub mod web;
 
 
 
-// #[derive(Clone)]
-// #[rudi_dev::Singleton(binds = [Self::into_use_router])]
-// pub struct AuthenticationUseRouter;
+use core::filter::Filter;
 
-// impl AuthenticationUseRouter {
-//     fn into_use_router(self) -> Box<dyn next_web_core::traits::use_router::UseRouter> {
-//         Box::new(self)
-//     }
-// }
+type Result<R> = std::result::Result<R, R>;
+pub async fn web_security_middleware(
+    axum::extract::State(proxy): axum::extract::State<
+        std::sync::Arc<crate::web::filter_chain_proxy::FilterChainProxy>,
+    >,
+    mut req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Result<axum::response::Response> {
+    let mut resp = axum::response::Response::default();
+    match proxy.do_filter(&mut req, &mut resp) {
+        Ok(_) => {}
+        Err(_error) => return Err(resp),
+    };
 
-// impl next_web_core::traits::use_router::UseRouter for AuthenticationUseRouter {
-//     fn use_router(
-//         &self,
-//         mut router: axum::Router,
-//         ctx: &mut next_web_core::ApplicationContext,
-//     ) -> axum::Router {
-//         let auth_service =
-//             ctx.resolve_by_type::<std::sync::Arc<
-//                 dyn permission::service::authentication_service::AuthenticationService,
-//             >>();
-
-//         if let Some(service) = auth_service.last() {
-//             let web_security_configure = ctx.resolve_by_type::<Box<dyn crate::core::web_security_configure::WebSecurityConfigure>>();
-//             let http_security = web_security_configure
-//                 .last()
-//                 .map(|var| var.configure())
-//                 .expect("HttpSecurity not found");
-//             let user_authorization_manager =
-//                 permission::manager::user_authorization_manager::UserAuthenticationManager::new(
-//                     service.clone(),
-//                     http_security,
-//                 );
-//             router = router.layer(axum::middleware::from_fn_with_state(
-//                 user_authorization_manager,
-//                 permission::middleware::request_auth_middleware::request_auth_middleware,
-//             ));
-//         }
-//         router
-//     }
-// }
+    Ok(next.run(req).await)
+}

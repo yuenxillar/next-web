@@ -4,6 +4,8 @@ use next_web_core::async_trait;
 
 use crate::core::userdetails::user_details::UserDetails;
 
+use super::username_not_found_error::UsernameNotFoundError;
+
 #[async_trait]
 pub trait UserDetailsService
 where

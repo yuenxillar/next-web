@@ -1,10 +1,7 @@
-use axum::{extract::Request, middleware::Next, response::Response};
-
-
+use axum::{extract::Request,response::Response};
+use next_web_core::error::BoxError;
 
 pub trait Filter: Send + Sync {
     
-    fn do_filter(&self, req: & Request, res: & Response, next: Next);
-
-    fn destory(&mut self) {} 
+    fn do_filter(&self, req: &mut Request, res: &mut Response) -> Result<(), BoxError>;
 }
