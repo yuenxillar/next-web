@@ -1,11 +1,11 @@
-use std::any::Any;
+use std::{any::Any, fmt::Display};
 
 use crate::core::object::Object;
 
 pub trait AuthenticationToken
 where 
-Self: Send,
-Self: Any
+Self: Send + Sync,
+Self: Any + Display
 {
     fn get_principal(&self) -> & Object;
 

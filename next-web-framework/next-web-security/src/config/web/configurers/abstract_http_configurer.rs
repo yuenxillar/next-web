@@ -63,7 +63,7 @@ where
         &self.security_configurer_adapter
     }
 
-    fn get_object_mut(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, B> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, B> {
         &mut self.security_configurer_adapter
     }
 }

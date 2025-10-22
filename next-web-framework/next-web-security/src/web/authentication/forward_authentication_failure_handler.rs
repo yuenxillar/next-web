@@ -27,7 +27,7 @@ impl AuthenticationFailureHandler for ForwardAuthenticationFailureHandler {
         error: &crate::core::authentication_error::AuthenticationError,
     ) {
         if let Some(any_map) = request.extensions().get::<AnyMap>() {
-            any_map.set("NEXT_SECURITY_LAST_ERROR", error.clone());
+            any_map.set("NEXT_SECURITY_LAST_ERROR".to_string(), error.clone().into());
             request
                 .get_request_dispatcher(&self.forward_url)
                 .map(|dispatcher| dispatcher.forward(request, response));

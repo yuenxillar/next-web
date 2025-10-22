@@ -4,12 +4,15 @@ use std::collections::HashSet;
 use std::time::SystemTime;
 
 use next_web_core::traits::any_clone::AnyClone;
+use next_web_core::DynClone;
+
+use crate::core::object::AnyObject;
 
 /// 表示会话已失效或非法操作
 #[derive(Debug)]
 pub struct InvalidSessionError;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SessionId {
     /// 字符串 ID
     String(String),
@@ -18,7 +21,7 @@ pub enum SessionId {
     Number(u64),
 
     /// 其它 ID
-    Other(Box<dyn AnyClone>),
+    Other(Box<dyn AnyObject>),
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +37,7 @@ pub enum SessionValue {
 pub trait Session
 where
     Self: Send + Sync,
+    Self: DynClone
 {
     /// 唯一会话 ID（对应 Java 的 Serializable）
     /// 推荐使用 String、Uuid 或 u64
@@ -65,16 +69,19 @@ where
     fn attribute_keys(&self) -> Result<HashSet<String>, InvalidSessionError>;
 
     /// 获取指定 key 的属性值
-    fn get_attribute(&self, key: &str) -> Result<Option<SessionValue>, InvalidSessionError>;
+    fn get_attribute(&self, key: &str) -> Option<SessionValue>;
 
     /// 绑定属性（key-value）
     /// 若 value 为 None，等价于 remove_attribute
     fn set_attribute(
         &mut self,
         key: &str,
-        value: Option<SessionValue>,
+        value: SessionValue,
     ) -> Result<(), InvalidSessionError>;
 
     /// 移除指定 key 的属性
     fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, InvalidSessionError>;
 }
+
+
+next_web_core::clone_trait_object!(Session);

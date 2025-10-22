@@ -45,7 +45,7 @@ impl SimpleUrlAuthenticationFailureHandler {
             match request.extensions().get::<AnyMap>() {
                 Some(map) => {
                     map.set(
-                        "NEXT_SECURITY_LAST_ERROR",
+                        "NEXT_SECURITY_LAST_ERROR".to_string(),
                         AnyValue::Object(error.clone().into_boxed()),
                     ).await;
                 }
@@ -94,6 +94,7 @@ impl SimpleUrlAuthenticationFailureHandler {
     }
 }
 
+
 impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
     fn on_authentication_failure(
         &self,
@@ -107,7 +108,8 @@ impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
             *response.status_mut() = StatusCode::UNAUTHORIZED;
             *response.body_mut() = StatusCode::UNAUTHORIZED.as_str().to_string().into();
         } else {
-            self.save_error(request, error);
+            // TODO: Save error in session
+            // self.save_error(request, error).await;
 
             if self.forward_to_destination {
                 debug!(

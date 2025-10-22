@@ -37,7 +37,7 @@ impl Required<AbstractAuthenticationProcessingFilter> for UsernamePasswordAuthen
         todo!()
     }
 
-    fn get_object_mut(&mut self) -> &mut AbstractAuthenticationProcessingFilter {
+    fn get_mut_object(&mut self) -> &mut AbstractAuthenticationProcessingFilter {
         todo!()
     }
 }

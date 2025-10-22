@@ -56,7 +56,7 @@ impl Required<AbstractConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, 
         &self.abstract_configured_security_builder
     }
 
-    fn get_object_mut(
+    fn get_mut_object(
         &mut self,
     ) -> &mut AbstractConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self> {
         &mut self.abstract_configured_security_builder

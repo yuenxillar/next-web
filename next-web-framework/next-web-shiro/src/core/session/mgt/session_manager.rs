@@ -10,7 +10,7 @@ pub trait SessionManager
 where
     Self: Send + Sync,
 {
-    fn start(&self, context: &dyn SessionContext) -> Arc<dyn Session>;
+    fn start(&self, context: &dyn SessionContext) -> Box<dyn Session>;
 
     fn get_session(&self, id: SessionId) -> Result<Arc<dyn Session>, BoxError>;
 }

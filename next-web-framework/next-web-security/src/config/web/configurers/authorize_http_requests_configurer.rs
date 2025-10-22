@@ -115,7 +115,7 @@ H: SecurityBuilder<DefaultSecurityFilterChain>
         todo!()
     }
 
-    fn get_object_mut(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         todo!()
     }
 }

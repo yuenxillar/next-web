@@ -216,7 +216,7 @@ where
         &self.abstract_http_configurer
     }
 
-    fn get_object_mut(&mut self) -> &mut AbstractHttpConfigurer<T, B> {
+    fn get_mut_object(&mut self) -> &mut AbstractHttpConfigurer<T, B> {
         &mut self.abstract_http_configurer
     }
 }
@@ -234,7 +234,7 @@ where
         self.login_processing_url = Some(login_processing_url.into());
 
         let matcher = self.create_login_processing_url_matcher(login_processing_url);
-        self.auth_filter.get_object_mut().set_requires_authentication_request_matcher(matcher);
+        self.auth_filter.get_mut_object().set_requires_authentication_request_matcher(matcher);
     }
 
     fn login_page(&mut self, login_page: &str){

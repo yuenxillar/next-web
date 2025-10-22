@@ -6,5 +6,8 @@ edition = "2024"
 [dependencies]
 next-web-core.workspace = true
 
-serde.workspace = true
-axum.workspace  = true
+tokio.workspace     = true
+dashmap.workspace   = true
+tracing.workspace   = true
+serde.workspace     = true
+axum.workspace      = true

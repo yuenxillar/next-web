@@ -116,7 +116,7 @@ where
         &self.username_password_authentication_filter
     }
 
-    fn get_object_mut(&mut self) -> &mut UsernamePasswordAuthenticationFilter {
+    fn get_mut_object(&mut self) -> &mut UsernamePasswordAuthenticationFilter {
         &mut self.username_password_authentication_filter
     }
 }
@@ -144,7 +144,7 @@ where
         &self.abstract_authentication_filter_configurer
     }
 
-    fn get_object_mut(
+    fn get_mut_object(
         &mut self,
     ) -> &mut AbstractAuthenticationFilterConfigurer<
         H,
@@ -165,7 +165,7 @@ where
         &self.abstract_http_configurer
     }
 
-    fn get_object_mut(&mut self) -> &mut AbstractHttpConfigurer<FormLoginConfigurer<H>, H> {
+    fn get_mut_object(&mut self) -> &mut AbstractHttpConfigurer<FormLoginConfigurer<H>, H> {
         &mut self.abstract_http_configurer
     }
 }
@@ -244,7 +244,7 @@ H:  AuthenticationFilterConfigurer<H> + Clone
         todo!()
     }
 
-    fn get_object_mut(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         todo!()
     }
 }

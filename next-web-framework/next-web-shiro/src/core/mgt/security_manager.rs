@@ -1,3 +1,7 @@
+use std::fmt::Display;
+
+use next_web_core::error::BoxError;
+
 use crate::core::{
     authc::{authentication_error::AuthenticationError, authentication_token::AuthenticationToken, authenticator::Authenticator},
     authz::authorizer::Authorizer,
@@ -8,6 +12,7 @@ use crate::core::{
 pub trait SecurityManager
 where
     Self: Send + Sync,
+    Self: Display,
     Self: Authenticator + Authorizer + SessionManager,
 {
     fn login(
@@ -16,7 +21,7 @@ where
         authentication_token: &dyn AuthenticationToken,
     ) -> Result<Box<dyn Subject>, AuthenticationError>;
 
-    fn logout(&self, subject: &dyn Subject);
+    fn logout(&self, subject: &dyn Subject) -> Result<(), BoxError>;
 
     fn create_subject(&self, context: &dyn SubjectContext) -> &dyn Subject;
 }

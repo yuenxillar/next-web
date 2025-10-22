@@ -42,7 +42,7 @@ where
         todo!()
     }
 
-    fn get_object_mut(&mut self) -> &mut AbstractHttpConfigurer<LogoutConfigurer<H>, H> {
+    fn get_mut_object(&mut self) -> &mut AbstractHttpConfigurer<LogoutConfigurer<H>, H> {
         todo!()
     }
 }

@@ -4,6 +4,7 @@ pub mod support;
 
 use std::{any::Any, sync::Arc};
 
+use next_web_core::{error::{illegal_state_error::IllegalStateError, BoxError}, DynClone};
 use principal_collection::PrincipalCollection;
 
 use super::{
@@ -16,11 +17,12 @@ use super::{
 pub trait Subject
 where
     Self: Send + Sync,
+    Self: DynClone,
     Self: Any
 {
     // === 身份相关 ===
     fn get_principal(&self) -> Option<&Object>;
-    fn get_principals(&self) -> Option<Arc<dyn PrincipalCollection>>;
+    fn get_principals(&self) -> Option<&Arc<dyn PrincipalCollection>>;
 
     // === 认证状态 ===
     fn is_authenticated(&self) -> bool;
@@ -40,14 +42,17 @@ where
 
     // === 会话 ===
     fn get_session(&self) -> Option<&dyn Session>;
-    fn get_session_or_create(&self, create: bool) -> Option<Arc<dyn Session>>;
+    fn get_session_or_create(&mut self, create: bool) -> Option<&mut Box<dyn Session>>;
 
     // === 登录/登出 ===
     fn login(&mut self, token: &dyn AuthenticationToken) -> Result<(), AuthenticationError>;
-    fn logout(&mut self);
+    fn logout(&mut self)-> Result<(), BoxError>;
 
-    fn run_as(&mut self, principals: Vec<Object>) -> Result<(), String>;
+    fn run_as(&mut self, principals: &Arc<dyn PrincipalCollection>) -> Result<(), IllegalStateError>;
     fn is_run_as(&self) -> bool;
-    fn get_previous_principals(&self) -> Option<Vec<Object>>;
-    fn release_run_as(&mut self) -> Option<Vec<Object>>;
+    fn get_previous_principals(& self) -> Option<Arc<dyn PrincipalCollection>>;
+    fn release_run_as(&mut self) -> Option<&dyn PrincipalCollection>;
 }
+
+
+next_web_core::clone_trait_object!(Subject);

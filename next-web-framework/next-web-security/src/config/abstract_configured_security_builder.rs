@@ -54,7 +54,7 @@ where
         &self.abstract_security_builder
     }
 
-    fn get_object_mut(&mut self) -> &mut AbstractSecurityBuilder<O> {
+    fn get_mut_object(&mut self) -> &mut AbstractSecurityBuilder<O> {
         &mut self.abstract_security_builder
     }
 }
