@@ -1,3 +1,7 @@
+pub mod caching_security_manager;
+pub mod authenticating_security_manager;
+pub mod authorizing_security_manager;
+pub mod realm_security_manager;
 pub mod sessions_security_manager;
 pub mod subject_factory;
 pub mod subject_dao;

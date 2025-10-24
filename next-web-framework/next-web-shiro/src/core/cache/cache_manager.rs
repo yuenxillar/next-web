@@ -1,10 +1,11 @@
 use crate::core::object::Object;
 use next_web_core::anys::any_map::AnyMap;
-use std::{collections::HashMap, fmt::Display};
+use std::{any::Any, collections::HashMap, fmt::Display};
 
 pub trait CacheManager: Send + Sync
 where
     Self: Display,
+    Self: Any
 {
     fn get_cache(&self, name: &str) -> Option<&HashMap<String, Object>>;
 }

@@ -10,7 +10,9 @@ use crate::core::object::AnyObject;
 
 /// 表示会话已失效或非法操作
 #[derive(Debug)]
-pub struct InvalidSessionError;
+pub enum SessionError {
+    Invalid
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SessionId {
@@ -50,23 +52,23 @@ where
     fn last_access_time(&self) -> SystemTime;
 
     /// 获取超时时间（毫秒）。负值表示永不过期。
-    /// 返回 `Err(InvalidSessionError)` 表示会话已失效。
-    fn timeout(&self) -> Result<u64, InvalidSessionError>;
+    /// 返回 `Err(SessionError)` 表示会话已失效。
+    fn timeout(&self) -> Result<u64, SessionError>;
 
     /// 设置超时时间（毫秒）。负值表示永不过期。
-    fn set_timeout(&mut self, max_idle_time_in_millis: u64) -> Result<(), InvalidSessionError>;
+    fn set_timeout(&mut self, max_idle_time_in_millis: u64) -> Result<(), SessionError>;
 
     /// 客户端主机（IP 或 hostname），可能为 None
     fn host(&self) -> Option<&str>;
 
     /// 显式更新 last_access_time 为当前时间
-    fn touch(&mut self) -> Result<(), InvalidSessionError>;
+    fn touch(&mut self) -> Result<(), SessionError>;
 
     /// 显式停止（销毁）会话
-    fn stop(&mut self) -> Result<(), InvalidSessionError>;
+    fn stop(&mut self) -> Result<(), SessionError>;
 
     /// 获取所有属性的 key 集合
-    fn attribute_keys(&self) -> Result<HashSet<String>, InvalidSessionError>;
+    fn attribute_keys(&self) -> Result<HashSet<String>, SessionError>;
 
     /// 获取指定 key 的属性值
     fn get_attribute(&self, key: &str) -> Option<SessionValue>;
@@ -77,10 +79,10 @@ where
         &mut self,
         key: &str,
         value: SessionValue,
-    ) -> Result<(), InvalidSessionError>;
+    ) -> Result<(), SessionError>;
 
     /// 移除指定 key 的属性
-    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, InvalidSessionError>;
+    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError>;
 }
 
 

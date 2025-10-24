@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{any::Any, fmt::Display};
 
 use next_web_core::DynClone;
 
@@ -7,7 +7,7 @@ use crate::core::{object::Object, subject::principal_collection::PrincipalCollec
 pub trait AuthenticationInfo
 where
     Self: Send + Sync,
-    Self: Display,
+    Self: Display + Any,
     Self: DynClone
 {
 

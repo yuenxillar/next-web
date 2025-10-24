@@ -1,3 +1,4 @@
+pub mod event;
 pub mod cache;
 pub mod realm;
 pub mod util;

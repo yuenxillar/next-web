@@ -23,5 +23,5 @@ where
 
     fn logout(&self, subject: &dyn Subject) -> Result<(), BoxError>;
 
-    fn create_subject(&self, context: &dyn SubjectContext) -> &dyn Subject;
+    fn create_subject<C: SubjectContext>(&self, context: C) -> Box<dyn Subject>;
 }

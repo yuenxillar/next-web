@@ -96,8 +96,6 @@ impl CacheManagerAware for CachingRealm {
 }
 
 
-
-
 pub trait CachingRealmSupport: Send + Sync
 {
     fn after_cache_manager_set(&mut self);
