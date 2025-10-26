@@ -15,11 +15,15 @@ pub struct CachingSecurityManager<C, B = DefaultEventBus> {
 
 impl<C, B> CachingSecurityManager<C, B>
 where
-    C: CacheManager,
+    C: CacheManager + Clone,
     B: EventBus,
 {
     pub fn get_cache_manager(&self) -> Option<&C> {
         self.cache_manager.as_ref()
+    }
+
+    pub fn get_owned_cache_manager(&self) -> Option<C> {
+        self.cache_manager.as_ref().map(Clone::clone)
     }
 
     pub fn get_event_bus(&self) -> Option<&B> {

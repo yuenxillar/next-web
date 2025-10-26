@@ -1,4 +1,4 @@
-use crate::core::object::Object;
+use crate::core::util::object::Object;
 
 pub trait EventBus: Send + Sync 
 {

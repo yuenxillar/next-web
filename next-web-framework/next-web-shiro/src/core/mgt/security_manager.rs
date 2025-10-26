@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use next_web_core::error::BoxError;
 
@@ -23,5 +23,5 @@ where
 
     fn logout(&self, subject: &dyn Subject) -> Result<(), BoxError>;
 
-    fn create_subject<C: SubjectContext>(&self, context: C) -> Box<dyn Subject>;
+    fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject>;
 }

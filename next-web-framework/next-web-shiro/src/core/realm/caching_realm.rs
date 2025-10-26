@@ -10,20 +10,20 @@ use crate::core::{
         authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
         logout_aware::LogoutAware,
     },
-    cache::{cache_manager::CacheManager, cache_manager_aware::CacheManagerAware},
-    object::Object,
+    cache::{cache_manager::CacheManager, cache_manager_aware::CacheManagerAware, default_cache_manager::DefaultCacheManager},
+    util::object::Object,
     subject::principal_collection::PrincipalCollection,
     util::nameable::Nameable,
 };
 
 #[derive(Clone)]
-pub struct CachingRealm {
+pub struct CachingRealm<T = DefaultCacheManager> {
     name: String,
-    cache_manager: Option<Arc<dyn CacheManager>>,
+    cache_manager: Option<T>,
     caching_enabled: bool,
 }
 
-impl CachingRealm {
+impl<T> CachingRealm<T> {
     const INSTANCE_COUNT: AtomicU32 = AtomicU32::new(0);
 
     pub fn set_caching_enabled(&mut self, enabled: bool) {
@@ -38,8 +38,8 @@ impl CachingRealm {
         principals.is_empty()
     }
 
-    pub fn get_cache_manager(&self) -> Option<&dyn CacheManager> {
-        self.cache_manager.as_deref()
+    pub fn get_cache_manager(&self) -> Option<&T> {
+         self.cache_manager.as_ref()
     }
 
     pub fn get_name(&self) -> &str {
@@ -88,8 +88,11 @@ impl Nameable for CachingRealm {
     }
 }
 
-impl CacheManagerAware for CachingRealm {
-    fn set_cache_manager(&mut self, cache_manager: Arc<dyn CacheManager>) {
+impl<T> CacheManagerAware<T> for CachingRealm<T> 
+where 
+T: CacheManager
+{
+    fn set_cache_manager(&mut self, cache_manager: T) {
         self.cache_manager = Some(cache_manager);
         // self.after_cache_manager_set();
     }

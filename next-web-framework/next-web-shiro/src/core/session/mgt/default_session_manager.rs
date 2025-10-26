@@ -12,7 +12,7 @@ impl SessionManager for DefaultSessionManager {
         todo!()
     }
 
-    fn get_session(&self, id: SessionId) -> Result<std::sync::Arc<dyn Session>, SessionError> {
+    fn get_session(&self, id: &SessionId) -> Result<std::sync::Arc<dyn Session>, SessionError> {
         todo!()
     }
 }

@@ -1,6 +1,6 @@
-use crate::core::object::Object;
+use crate::core::util::object::Object;
 use next_web_core::anys::any_map::AnyMap;
-use std::{any::Any, collections::HashMap, fmt::Display};
+use std::{any::Any, collections::HashMap, fmt::Display, sync::Arc};
 
 pub trait CacheManager: Send + Sync
 where
@@ -16,3 +16,4 @@ where
 {
     fn get_cache_by_type<T>(&self, name: &str) -> Option<&AnyMap<T>>;
 }
+

@@ -13,5 +13,5 @@ where
 {
     fn start(&self, context: &dyn SessionContext) -> Result<Box<dyn Session>, AuthorizationError>;
 
-    fn get_session(&self, id: SessionId) -> Result<Arc<dyn Session>, SessionError>;
+    fn get_session(&self, id: & SessionId) -> Result<Arc<dyn Session>, SessionError>;
 }

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::core::session::{SessionId, SessionValue};
 
-use super::Session;
+use super::{Session, SessionError};
 
 #[derive(Clone)]
 pub struct ProxiedSession {
@@ -28,14 +28,14 @@ impl Session for ProxiedSession {
         self.delegate.last_access_time()
     }
 
-    fn timeout(&self) -> Result<u64, super::InvalidSessionError> {
+    fn timeout(&self) -> Result<u64, SessionError> {
         self.delegate.timeout()
     }
 
     fn set_timeout(
         &mut self,
         max_idle_time_in_millis: u64,
-    ) -> Result<(), super::InvalidSessionError> {
+    ) -> Result<(), SessionError> {
         self.delegate.set_timeout(max_idle_time_in_millis)
     }
 
@@ -43,15 +43,15 @@ impl Session for ProxiedSession {
         self.delegate.host()
     }
 
-    fn touch(&mut self) -> Result<(), super::InvalidSessionError> {
+    fn touch(&mut self) -> Result<(), SessionError> {
         self.delegate.touch()
     }
 
-    fn stop(&mut self) -> Result<(), super::InvalidSessionError> {
+    fn stop(&mut self) -> Result<(), SessionError> {
         self.delegate.stop()
     }
 
-    fn attribute_keys(&self) -> Result<HashSet<String>, super::InvalidSessionError> {
+    fn attribute_keys(&self) -> Result<HashSet<String>, SessionError> {
         self.delegate.attribute_keys()
     }
 
@@ -63,14 +63,14 @@ impl Session for ProxiedSession {
         &mut self,
         key: &str,
         value: SessionValue,
-    ) -> Result<(), super::InvalidSessionError> {
+    ) -> Result<(), SessionError> {
         self.delegate.set_attribute(key, value)
     }
 
     fn remove_attribute(
         &mut self,
         key: &str,
-    ) -> Result<Option<SessionValue>, super::InvalidSessionError> {
+    ) -> Result<Option<SessionValue>, SessionError> {
         self.delegate.remove_attribute(key)
     }
 }

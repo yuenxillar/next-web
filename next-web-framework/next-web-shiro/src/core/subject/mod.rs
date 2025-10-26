@@ -10,7 +10,7 @@ use principal_collection::PrincipalCollection;
 use super::{
     authc::{authentication_error::AuthenticationError, authentication_token::AuthenticationToken},
     authz::authorization_error::AuthorizationError,
-    object::Object,
+    util::object::Object,
     session::Session,
 };
 

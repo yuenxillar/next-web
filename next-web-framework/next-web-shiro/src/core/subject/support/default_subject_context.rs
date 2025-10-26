@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use crate::core::{
     authc::{authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken}, session::{Session, SessionId}, subject::{
@@ -8,6 +8,13 @@ use crate::core::{
 
 #[derive(Clone)]
 pub struct DefaultSubjectContext {}
+
+
+impl DefaultSubjectContext {
+    pub fn new(context: Arc<dyn SubjectContext>) -> Self {
+        Self {}
+    }
+}
 
 impl SubjectContext for DefaultSubjectContext {
     fn get_session_id(&self) -> &SessionId {
@@ -30,11 +37,11 @@ impl SubjectContext for DefaultSubjectContext {
         todo!()
     }
 
-    fn resolve_principals(&mut self) -> Box<dyn PrincipalCollection> {
+    fn resolve_principals(&mut self) -> Option<Arc<dyn PrincipalCollection>>{
         todo!()
     }
 
-    fn set_principals<T: PrincipalCollection>(&mut self, principals: T) {
+    fn set_principals(&mut self, principals: Arc<dyn PrincipalCollection>) {
         todo!()
     }
 
@@ -42,7 +49,7 @@ impl SubjectContext for DefaultSubjectContext {
         todo!()
     }
 
-    fn set_session(&mut self, session: Box<dyn Session>) {
+    fn set_session(&mut self, session: Arc<dyn Session>) {
         todo!()
     }
 
@@ -104,7 +111,15 @@ impl SubjectContext for DefaultSubjectContext {
         todo!()
     }
 
-    fn resolve_host(&mut self) -> String {
+    fn resolve_host(&mut self) -> Option<String> {
+        todo!()
+    }
+    
+    fn is_empty(&self) -> bool {
+        todo!()
+    }
+    
+    fn values(&self) -> Vec<(String, crate::core::util::object::Object)> {
         todo!()
     }
 }

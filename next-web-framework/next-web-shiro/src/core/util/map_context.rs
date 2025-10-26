@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::core::object::Object;
+use crate::core::util::object::Object;
 
 #[derive(Default, Clone)]
 pub struct MapContext {

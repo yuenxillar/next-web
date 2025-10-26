@@ -6,6 +6,13 @@ pub struct DefaultSubjectDAO {}
 
 
 impl SubjectDAO for DefaultSubjectDAO {
+    fn save(&self, subject: &dyn crate::core::subject::Subject) {
+        todo!()
+    }
+
+    fn delete(&self, subject: &dyn crate::core::subject::Subject) {
+        todo!()
+    }
 }
 
 

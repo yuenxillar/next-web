@@ -31,8 +31,11 @@ use crate::core::{
             wildcard_permission_resolver::WildcardPermissionResolver,
         },
     },
-    cache::{cache_manager::CacheManager, cache_manager_aware::CacheManagerAware},
-    object::Object,
+    cache::{
+        cache_manager::CacheManager, cache_manager_aware::CacheManagerAware,
+        default_cache_manager::DefaultCacheManager,
+    },
+    util::object::Object,
     realm::{
         authenticating_realm::{AuthenticatingRealm, AuthenticatingRealmSupport},
         caching_realm::CachingRealmSupport,
@@ -60,7 +63,7 @@ impl AuthorizingRealm {
     const INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
     pub fn new(
-        cache_manager: Option<Arc<dyn CacheManager>>,
+        cache_manager: Option<DefaultCacheManager>,
         matcher: Option<Arc<dyn CredentialsMatcher>>,
     ) -> Self {
         let mut authenticating_realm = AuthenticatingRealm::default();

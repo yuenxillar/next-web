@@ -8,7 +8,7 @@ pub struct DefaultCacheManager {}
 
 
 impl CacheManager for DefaultCacheManager {
-    fn get_cache(&self, name: &str) -> Option<&std::collections::HashMap<String, crate::core::object::Object>> {
+    fn get_cache(&self, name: &str) -> Option<&std::collections::HashMap<String, crate::core::util::object::Object>> {
         todo!()
     }
 }

@@ -10,5 +10,5 @@ where
     fn authenticate(
         &self,
         authentication_token: &dyn AuthenticationToken,
-    ) -> Result<&dyn AuthenticationInfo, AuthenticationError>;
+    ) -> Result<Box<dyn AuthenticationInfo>, AuthenticationError>;
 }

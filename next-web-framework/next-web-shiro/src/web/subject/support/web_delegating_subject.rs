@@ -9,13 +9,11 @@ use crate::{
             authentication_error::AuthenticationError, authentication_token::AuthenticationToken,
         },
         authz::authorization_error::AuthorizationError,
-        mgt::security_manager::SecurityManager,
-        object::Object,
-        session::{Session, mgt::session_context::SessionContext},
+        mgt::{default_security_manager::DefaultSecurityManager, security_manager::SecurityManager},
+        util::object::Object,
+        session::{mgt::session_context::SessionContext, Session},
         subject::{
-            Subject,
-            principal_collection::PrincipalCollection,
-            support::delegating_subject::{DelegatingSubject, DelegatingSubjectSupport},
+            principal_collection::PrincipalCollection, support::delegating_subject::{DelegatingSubject, DelegatingSubjectSupport}, Subject
         },
     },
     web::{
@@ -25,21 +23,23 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct WebDelegatingSubject
-where
-    Self: Required<DelegatingSubject>,
+pub struct WebDelegatingSubject<T = DefaultSecurityManager>
 {
-    delegating_subject: DelegatingSubject,
+    delegating_subject: DelegatingSubject<T>,
 }
 
-impl WebDelegatingSubject {
-    pub fn new(
+impl<T> WebDelegatingSubject<T> 
+where 
+T: SecurityManager + Clone,
+T: 'static
+{
+    pub fn new<S>(
         principals: Option<Arc<dyn PrincipalCollection>>,
         authenticated: bool,
         host: Option<String>,
         session: Option<Box<dyn Session>>,
-        security_manager: impl SecurityManager + 'static,
-    ) -> Self {
+        security_manager: T
+    ) -> Self  {
         let delegating_subject = DelegatingSubject::new(
             principals,
             authenticated,
@@ -84,7 +84,11 @@ impl DelegatingSubjectSupport for WebDelegatingSubject {
     }
 }
 
-impl Subject for WebDelegatingSubject {
+impl<T>  Subject for WebDelegatingSubject<T>  
+where 
+T: SecurityManager + Clone,
+T: 'static
+{
     fn get_principal(&self) -> Option<&Object> {
         self.delegating_subject.get_principal()
     }

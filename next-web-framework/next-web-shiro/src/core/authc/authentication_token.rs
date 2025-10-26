@@ -2,7 +2,7 @@ use std::{any::Any, fmt::Display};
 
 use next_web_core::DynClone;
 
-use crate::core::object::Object;
+use crate::core::util::object::Object;
 
 pub trait AuthenticationToken
 where 

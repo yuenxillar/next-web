@@ -9,10 +9,11 @@ use tracing::debug;
 use crate::core::{
     authc::{authentication_error::AuthenticationError, authentication_token::AuthenticationToken},
     authz::authorization_error::AuthorizationError,
-    mgt::security_manager::SecurityManager,
-    object::Object,
+    cache::cache_manager::CacheManager,
+    mgt::{default_security_manager::DefaultSecurityManager, security_manager::SecurityManager},
+    util::object::Object,
     session::{
-        InvalidSessionError, Session, SessionValue,
+        Session, SessionError, SessionValue,
         mgt::{default_session_context::DefaultSessionContext, session_context::SessionContext},
         proxied_session::ProxiedSession,
     },
@@ -26,40 +27,41 @@ use std::{
 };
 
 #[derive(Clone)]
-pub struct DelegatingSubject {
+pub struct DelegatingSubject<T = DefaultSecurityManager> {
     principals: Option<Arc<dyn PrincipalCollection>>,
     authenticated: bool,
     host: Option<String>,
     pub(crate) session: Option<Box<dyn Session>>,
     session_creation_enabled: bool,
-    security_manager: Arc<dyn SecurityManager>,
+    security_manager: T,
 }
 
-impl DelegatingSubject {
+impl<T> DelegatingSubject<T>
+where
+    T: SecurityManager,
+    T: Clone + 'static,
+{
     const RUN_AS_PRINCIPALS_SESSION_KEY: &str = stringify!(format!(
         "{}{}",
         std::any::type_name::<Self>(),
         ".RUN_AS_PRINCIPALS_SESSION_KEY"
     ));
 
-    pub fn new<T>(
+    pub fn new(
         principals: Option<Arc<dyn PrincipalCollection>>,
         authenticated: bool,
         host: Option<String>,
         session: Option<Box<dyn Session>>,
         session_creation_enabled: bool,
         security_manager: T,
-    ) -> Self
-    where
-        T: SecurityManager + 'static,
-    {
+    ) -> Self {
         let mut subject = Self {
             principals,
             authenticated,
             host,
             session_creation_enabled,
             session: None,
-            security_manager: Arc::new(security_manager) as Arc<dyn SecurityManager>,
+            security_manager,
         };
         if session.is_some() {}
         let session = match session {
@@ -76,8 +78,8 @@ impl DelegatingSubject {
         Box::new(session)
     }
 
-    pub fn get_security_manager(&self) -> &dyn SecurityManager {
-        self.security_manager.as_ref()
+    pub fn get_security_manager(&self) -> &T {
+        &self.security_manager
     }
 
     pub fn has_principals(&self) -> bool {
@@ -209,16 +211,21 @@ impl DelegatingSubject {
     }
 }
 
-impl<T> From<T> for DelegatingSubject
+impl<T> From<T> for DelegatingSubject<T>
 where
-    T: SecurityManager + 'static,
+    T: SecurityManager,
+    T: Clone + 'static,
 {
     fn from(security_manager: T) -> Self {
         Self::new(None, false, None, None, true, security_manager)
     }
 }
 
-impl Subject for DelegatingSubject {
+impl<T> Subject for DelegatingSubject<T>
+where
+    T: SecurityManager + Clone,
+    T: 'static,
+{
     fn get_principal(&self) -> Option<&Object> {
         self.get_primary_principal(self.get_principals().map(|pr| pr.as_ref()))
     }
@@ -448,7 +455,11 @@ impl Subject for DelegatingSubject {
     }
 }
 
-impl DelegatingSubject {
+impl<T> DelegatingSubject<T>
+where
+    T: SecurityManager + Clone,
+    T: 'static,
+{
     fn create_session_context(&self) -> impl SessionContext + 'static {
         let mut session_context = DefaultSessionContext::default();
         if let Some(host) = self.host.as_ref() {
@@ -469,11 +480,11 @@ impl DelegatingSubject {
         }
     }
 
-    fn clear_run_as_identities(&mut self) -> Result<Option<SessionValue>, InvalidSessionError> {
+    fn clear_run_as_identities(&mut self) -> Result<Option<SessionValue>, SessionError> {
         let session = self.get_session_or_create(false);
         match session {
             Some(session) => session.remove_attribute(Self::RUN_AS_PRINCIPALS_SESSION_KEY),
-            None => Err(InvalidSessionError),
+            None => Err(SessionError::Invalid),
         }
     }
 }
@@ -513,11 +524,11 @@ impl Session for StoppingAwareProxiedSession {
         self.proxied_session.last_access_time()
     }
 
-    fn timeout(&self) -> Result<u64, InvalidSessionError> {
+    fn timeout(&self) -> Result<u64, SessionError> {
         self.proxied_session.timeout()
     }
 
-    fn set_timeout(&mut self, max_idle_time_in_millis: u64) -> Result<(), InvalidSessionError> {
+    fn set_timeout(&mut self, max_idle_time_in_millis: u64) -> Result<(), SessionError> {
         self.proxied_session.set_timeout(max_idle_time_in_millis)
     }
 
@@ -525,15 +536,15 @@ impl Session for StoppingAwareProxiedSession {
         self.proxied_session.host()
     }
 
-    fn touch(&mut self) -> Result<(), InvalidSessionError> {
+    fn touch(&mut self) -> Result<(), SessionError> {
         self.proxied_session.touch()
     }
 
-    fn stop(&mut self) -> Result<(), InvalidSessionError> {
+    fn stop(&mut self) -> Result<(), SessionError> {
         self.proxied_session.stop()
     }
 
-    fn attribute_keys(&self) -> Result<std::collections::HashSet<String>, InvalidSessionError> {
+    fn attribute_keys(&self) -> Result<std::collections::HashSet<String>, SessionError> {
         self.proxied_session.attribute_keys()
     }
 
@@ -541,11 +552,11 @@ impl Session for StoppingAwareProxiedSession {
         self.proxied_session.get_attribute(key)
     }
 
-    fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), InvalidSessionError> {
+    fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), SessionError> {
         self.proxied_session.set_attribute(key, value)
     }
 
-    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, InvalidSessionError> {
+    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError> {
         self.proxied_session.remove_attribute(key)
     }
 }

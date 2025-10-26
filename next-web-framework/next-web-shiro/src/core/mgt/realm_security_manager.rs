@@ -56,14 +56,16 @@ where
     }
 
     pub fn apply_cache_manager_to_realms(&mut self) {
-        let cache_manager = self.get_cache_manager();
+        let cache_manager = match self.get_owned_cache_manager() {
+            Some(cache_manager) => cache_manager,
+            None => return,
+        };
+
         let realms = self.get_mut_realms();
 
-        if let Some(cache_manager) = cache_manager {
-            if !realms.is_empty() {
-                for realm in realms {
-                    realm.set_cache_manager(cache_manager.clone());
-                }
+        if !realms.is_empty() {
+            for realm in realms {
+                realm.set_cache_manager(cache_manager.to_owned());
             }
         }
     }
@@ -105,7 +107,7 @@ impl<R, C, B> Destroyable for RealmSecurityManager<R, C, B>
 where
     R: Realm,
     C: CacheManager,
-    B: Default + EventBus + Destroyable
+    B: Default + EventBus + Destroyable,
 {
     fn destroy(mut self) {
         self.realms.clear();

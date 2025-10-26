@@ -1,9 +1,10 @@
 use next_web_core::traits::required::Required;
 
 use crate::{
-    core::session::{mgt::{
-        default_session_context::DefaultSessionContext, session_context::SessionContext,
-    }, SessionId},
+    core::session::{
+        SessionId,
+        mgt::{default_session_context::DefaultSessionContext, session_context::SessionContext},
+    },
     web::session::mgt::web_session_context::WebSessionContext,
 };
 
@@ -23,17 +24,21 @@ impl SessionContext for DefaultWebSessionContext {
     fn set_host(&mut self, host: &str) {
         self.default_session_context.set_host(host)
     }
-    
+
     fn get_host(&self) -> Option<&str> {
         self.default_session_context.get_host()
     }
-    
+
     fn set_session_id(&mut self, session_id: SessionId) {
         self.default_session_context.set_session_id(session_id)
     }
- 
+
     fn get_session_id(&self) -> Option<&SessionId> {
         self.default_session_context.get_session_id()
+    }
+
+    fn put_all(&mut self, values: Vec<(String, crate::core::util::object::Object)>) {
+        todo!()
     }
 }
 
@@ -41,7 +46,7 @@ impl WebSessionContext for DefaultWebSessionContext {}
 
 impl Required<DefaultSessionContext> for DefaultWebSessionContext {
     fn get_object(&self) -> &DefaultSessionContext {
-        & self.default_session_context
+        &self.default_session_context
     }
 
     fn get_mut_object(&mut self) -> &mut DefaultSessionContext {

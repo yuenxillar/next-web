@@ -12,8 +12,8 @@ use crate::core::{
         authentication_token::AuthenticationToken,
         credential::credentials_matcher::CredentialsMatcher, logout_aware::LogoutAware,
     },
-    cache::{cache_manager::CacheManager, cache_manager_aware::CacheManagerAware},
-    object::Object,
+    cache::{cache_manager::CacheManager, cache_manager_aware::CacheManagerAware, default_cache_manager::DefaultCacheManager},
+    util::object::Object,
     realm::{caching_realm::{CachingRealm, CachingRealmSupport}, Realm},
     subject::principal_collection::PrincipalCollection,
     util::nameable::Nameable,
@@ -42,7 +42,7 @@ impl AuthenticatingRealm {
     const INSTANCE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
     pub fn new(
-        cache_manager: Option<Arc<dyn CacheManager>>,
+        cache_manager: Option<DefaultCacheManager>,
         credentials_matcher: Option<Arc<dyn CredentialsMatcher>>,
     ) -> Self {
         let instance_number = Self::INSTANCE_COUNT.fetch_add(1, Ordering::Relaxed);
@@ -308,11 +308,6 @@ impl AuthenticatingRealm {
     // }
 }
 
-impl<T: CacheManager + 'static> From<T> for AuthenticatingRealm {
-    fn from(value: T) -> Self {
-        Self::new(Some(Arc::new(value)), None)
-    }
-}
 
 impl Default for AuthenticatingRealm {
     fn default() -> Self {

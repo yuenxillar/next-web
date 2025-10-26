@@ -6,7 +6,7 @@ use std::time::SystemTime;
 use next_web_core::traits::any_clone::AnyClone;
 use next_web_core::DynClone;
 
-use crate::core::object::AnyObject;
+use crate::core::util::object::AnyObject;
 
 /// 表示会话已失效或非法操作
 #[derive(Debug)]
@@ -65,7 +65,7 @@ where
     fn touch(&mut self) -> Result<(), SessionError>;
 
     /// 显式停止（销毁）会话
-    fn stop(&mut self) -> Result<(), SessionError>;
+    fn stop(&self) -> Result<(), SessionError>;
 
     /// 获取所有属性的 key 集合
     fn attribute_keys(&self) -> Result<HashSet<String>, SessionError>;

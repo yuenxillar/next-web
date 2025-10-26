@@ -1,7 +1,7 @@
 use next_web_core::{traits::id::Id, DynClone};
 use std::{collections::HashSet, fmt::Display};
 
-use crate::core::object::Object;
+use crate::core::util::object::Object;
 
 pub trait PrincipalCollection
 where

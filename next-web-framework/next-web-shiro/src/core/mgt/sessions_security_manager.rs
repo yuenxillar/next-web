@@ -131,7 +131,7 @@ where
         self.session_manager.start(context)
     }
 
-    fn get_session(&self, id: SessionId) -> Result<Arc<dyn Session>, SessionError> {
+    fn get_session(&self, id: & SessionId) -> Result<Arc<dyn Session>, SessionError> {
         self.session_manager.get_session(id)
     }
 }

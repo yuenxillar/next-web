@@ -5,15 +5,15 @@ pub struct DefaultEventBus {}
 
 
 impl EventBus for DefaultEventBus {
-    fn publish(&self, event: crate::core::object::Object) {
+    fn publish(&self, event: crate::core::util::object::Object) {
         todo!()
     }
 
-    fn register(&mut self, event: crate::core::object::Object) {
+    fn register(&mut self, event: crate::core::util::object::Object) {
         todo!()
     }
 
-    fn unregister(&mut self, event: crate::core::object::Object) {
+    fn unregister(&mut self, event: crate::core::util::object::Object) {
         todo!()
     }
 }

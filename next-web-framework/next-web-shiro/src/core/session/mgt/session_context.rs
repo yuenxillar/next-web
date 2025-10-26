@@ -1,4 +1,4 @@
-use crate::core::session::SessionId;
+use crate::core::{util::object::Object, session::SessionId};
 
 
 
@@ -13,4 +13,6 @@ Self: Send + Sync
     fn set_session_id(&mut self, session_id: SessionId);
 
     fn get_session_id(&self) -> Option<&SessionId>;
+
+    fn put_all(&mut self, values: Vec<(String, Object)>);
 }

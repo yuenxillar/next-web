@@ -8,10 +8,16 @@ use crate::core::{
         authentication_token::AuthenticationToken, authenticator::Authenticator,
         pam::modular_realm_authenticator::ModularRealmAuthenticator,
     },
-    cache::{cache_manager::CacheManager, cache_manager_aware::CacheManagerAware, default_cache_manager::DefaultCacheManager},
-    event::{event_bus::EventBus, event_bus_aware::EventBusAware, support::default_event_bus::DefaultEventBus},
+    cache::{
+        cache_manager::CacheManager, cache_manager_aware::CacheManagerAware,
+        default_cache_manager::DefaultCacheManager,
+    },
+    event::{
+        event_bus::EventBus, event_bus_aware::EventBusAware,
+        support::default_event_bus::DefaultEventBus,
+    },
     mgt::realm_security_manager::RealmSecurityManager,
-    realm::{simple_account_realm::SimpleAccountRealm, Realm},
+    realm::{Realm, simple_account_realm::SimpleAccountRealm},
     util::destroyable::Destroyable,
 };
 
@@ -26,12 +32,12 @@ pub struct AuthenticatingSecurityManager<
     realm_security_manager: RealmSecurityManager<R, C, B>,
 }
 
-impl<T> AuthenticatingSecurityManager<T>
+impl<T, R, C, B> AuthenticatingSecurityManager<T, R, C, B>
 where
     T: Authenticator,
 {
     pub fn get_authenticator(&self) -> &T {
-        & self.authenticator
+        &self.authenticator
     }
 
     pub fn set_authenticator(&mut self, authenticator: T) {
@@ -49,11 +55,10 @@ where
     fn authenticate(
         &self,
         authentication_token: &dyn AuthenticationToken,
-    ) -> Result<&dyn AuthenticationInfo, AuthenticationError> {
+    ) -> Result<Box<dyn AuthenticationInfo>, AuthenticationError> {
         self.authenticator.authenticate(authentication_token)
     }
 }
-
 
 impl<T, R, C, B> AuthenticatingSecurityManager<T, R, C, B>
 where
@@ -79,7 +84,7 @@ where
     T: Authenticator + Destroyable,
     R: Realm,
     C: CacheManager,
-    B: Default + EventBus + Destroyable
+    B: Default + EventBus + Destroyable,
 {
     fn destroy(self) {
         self.authenticator.destroy();
@@ -87,8 +92,8 @@ where
     }
 }
 
-
-impl<T, R, C, B> Required<RealmSecurityManager<R, C, B>> for AuthenticatingSecurityManager<T, R, C, B>
+impl<T, R, C, B> Required<RealmSecurityManager<R, C, B>>
+    for AuthenticatingSecurityManager<T, R, C, B>
 where
     T: Authenticator,
     R: Realm + CacheManagerAware<C> + EventBusAware<B>,

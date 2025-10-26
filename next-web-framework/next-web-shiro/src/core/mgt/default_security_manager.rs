@@ -1,12 +1,13 @@
 use std::{fmt::Display, sync::Arc};
 
 use next_web_core::{clone_box, traits::required::Required};
+use tracing::{debug, info, trace, warn};
 
 use crate::core::{
     authc::{
         authentication_error::AuthenticationError, authentication_info::AuthenticationInfo,
         authentication_token::AuthenticationToken, authenticator::Authenticator,
-        pam::modular_realm_authenticator::ModularRealmAuthenticator,
+        logout_aware::LogoutAware, pam::modular_realm_authenticator::ModularRealmAuthenticator,
     },
     authz::{
         authorization_error::AuthorizationError, authorizer::Authorizer,
@@ -30,6 +31,7 @@ use crate::core::{
     session::{
         Session, SessionError, SessionId,
         mgt::{
+            default_session_context::DefaultSessionContext,
             default_session_manager::DefaultSessionManager, session_context::SessionContext,
             session_manager::SessionManager,
         },
@@ -98,7 +100,10 @@ impl From<Vec<SimpleAccountRealm>> for DefaultSecurityManager {
     }
 }
 
-impl<M, D, F, S, A, T, R, C, B> DefaultSecurityManager<M, D, F, S, A, T, R, C, B> {
+impl<M, D, F, S, A, T, R, C, B> DefaultSecurityManager<M, D, F, S, A, T, R, C, B>
+where
+    M: RememberMeManager,
+{
     pub fn get_subject_factory(&self) -> &F {
         &self.subject_factory
     }
@@ -109,6 +114,10 @@ impl<M, D, F, S, A, T, R, C, B> DefaultSecurityManager<M, D, F, S, A, T, R, C, B
 
     pub fn get_subject_dao(&self) -> &D {
         &self.subject_dao
+    }
+
+    pub fn get_mut_subject_dao(&mut self) -> &mut D {
+        &mut self.subject_dao
     }
 
     pub fn set_subject_dao(&mut self, subject_dao: D) {
@@ -127,20 +136,67 @@ impl<M, D, F, S, A, T, R, C, B> DefaultSecurityManager<M, D, F, S, A, T, R, C, B
         DefaultSubjectContext::default()
     }
 
+    pub fn remember_me_successful_login(
+        &self,
+        token: &dyn AuthenticationToken,
+        info: &dyn AuthenticationInfo,
+        subject: &dyn Subject,
+    ) {
+        if let Some(rmm) = self.get_remember_me_manager() {
+            rmm.on_successful_login(subject, token, info);
+        }
+    }
+
+    pub fn remember_me_failed_login(
+        &self,
+        token: &dyn AuthenticationToken,
+        ae: &AuthenticationError,
+        subject: &dyn Subject,
+    ) {
+        if let Some(rmm) = self.get_remember_me_manager() {
+            rmm.on_failed_login(subject, token, ae);
+        }
+    }
+
+    pub fn remember_me_logout(&self, subject: &dyn Subject) {
+        if let Some(rmm) = self.get_remember_me_manager() {
+            rmm.on_logout(subject);
+        }
+    }
+
     pub fn on_successful_login(
         &self,
         token: &dyn AuthenticationToken,
         info: &dyn AuthenticationInfo,
         subject: &dyn Subject,
     ) {
+        self.remember_me_successful_login(token, info, subject);
     }
 
     pub fn on_failed_login(
         &self,
         token: &dyn AuthenticationToken,
-        error: &AuthenticationError,
+        ae: &AuthenticationError,
         subject: &dyn Subject,
-    ) {
+    ) -> Result<(), AuthenticationError> {
+        self.remember_me_failed_login(token, ae, subject);
+        Ok(())
+    }
+
+    pub fn before_logout(&self, subject: &dyn Subject) {
+        self.remember_me_logout(subject);
+    }
+
+    pub fn ensure_security_manager(&self, _context: &dyn SubjectContext) {
+        // TODO set security manager in context
+    }
+
+    pub fn get_session_id<'a>(&'a self, context: &'a dyn SubjectContext) -> &'a SessionId {
+        context.get_session_id()
+    }
+
+    pub fn is_empty(&self, pc: &dyn PrincipalCollection) -> bool {
+        pc.is_empty()
     }
 }
 
@@ -151,7 +207,7 @@ where
     F: SubjectFactory,
     S: SessionManager,
     A: Authorizer,
-    T: Authenticator,
+    T: Authenticator + LogoutAware,
     R: Realm + CacheManagerAware<C> + EventBusAware<B>,
     R: Clone,
     C: CacheManager + EventBusAware<B>,
@@ -162,13 +218,115 @@ where
         &self,
         token: &dyn AuthenticationToken,
         info: &dyn AuthenticationInfo,
+        existing: Option<&dyn Subject>,
     ) -> Box<dyn Subject> {
         let mut context = self.create_subject_context();
         context.set_authenticated(true);
         context.set_authentication_token(clone_box(token));
         context.set_authentication_info(clone_box(info));
 
-        self.create_subject(context)
+        if let Some(subject) = existing {
+            context.set_subject(clone_box(subject));
+        }
+        self.create_subject(Arc::new(context))
+    }
+
+    pub fn resolve_session(&self, context: &mut dyn SubjectContext) {
+        let session = self.resolve_context_session(context);
+
+        match session {
+            Ok(session) => context.set_session(session),
+            Err(error) => debug!(
+                "Resolved SubjectContext context session is invalid.  Ignoring and creating an anonymous (session-less) Subject instance., error: {:?}",
+                error
+            ),
+        };
+    }
+
+    pub fn resolve_context_session(
+        &self,
+        context: &dyn SubjectContext,
+    ) -> Result<Arc<dyn Session>, SessionError> {
+        let session_id = self.get_session_id(context);
+        self.sessions_security_manager.get_session(&session_id)
+    }
+
+    pub fn resolve_principals(&self, context: &mut dyn SubjectContext) {
+        let principals = context.resolve_principals();
+        if let None = principals {
+            debug!(
+                "Found remembered PrincipalCollection.  Adding to the context to be used for subject construction by the SubjectFactory."
+            );
+
+            let principals = self.get_remembered_identity(context);
+
+            if let Some(principals) = principals {
+                if !principals.is_empty() {
+                    debug!(
+                        "Found remembered PrincipalCollection.  Adding to the context to be used for subject construction by the SubjectFactory."
+                    );
+
+                    context.set_principals(principals);
+                } else {
+                    trace!("No remembered identity found.  Returning original context.");
+                }
+            }
+        }
+    }
+
+    pub fn get_remembered_identity(
+        &self,
+        context: &dyn SubjectContext,
+    ) -> Option<Arc<dyn PrincipalCollection>> {
+        let rmm = self.get_remember_me_manager();
+        return match rmm {
+            Some(rmm) => rmm.get_remembered_principals(context),
+            None => {
+                warn!(
+                    "Delegate RememberMeManager instance of type [{}] threw an exception during getRememberedPrincipals().",
+                    "RememberMeManager"
+                );
+                None
+            }
+        };
+    }
+
+    pub fn do_create_subject(&self, context: &dyn SubjectContext) -> Box<dyn Subject> {
+        self.get_subject_factory().create_subject(context)
+    }
+
+    pub fn save(&self, subject: &dyn Subject) {
+        self.get_subject_dao().save(subject)
+    }
+
+    pub fn delete(&self, subject: &dyn Subject) {
+        self.get_subject_dao().delete(subject)
+    }
+
+    pub fn create_session_context(
+        &self,
+        subject_context: &mut dyn SubjectContext,
+    ) -> DefaultSessionContext {
+        let mut session_context = DefaultSessionContext::default();
+
+        if !subject_context.is_empty() {
+            session_context.put_all(subject_context.values());
+        }
+        session_context.set_session_id(subject_context.get_session_id().to_owned());
+
+        let host = subject_context.resolve_host();
+        if let Some(host) = host {
+            session_context.set_host(&host);
+        }
+
+        session_context
+    }
+
+    pub fn stop_session(&self, subject: &dyn Subject) {
+        let session = subject.get_session();
+        if let Some(session) = session {
+            session.stop();
+        }
     }
 }
 
@@ -348,7 +506,7 @@ where
     fn authenticate(
         &self,
         authentication_token: &dyn AuthenticationToken,
-    ) -> Result<&dyn AuthenticationInfo, AuthenticationError> {
+    ) -> Result<Box<dyn AuthenticationInfo>, AuthenticationError> {
         self.sessions_security_manager
             .get_object()
             .get_object()
@@ -372,7 +530,7 @@ where
         self.sessions_security_manager.start(context)
     }
 
-    fn get_session(&self, id: SessionId) -> Result<Arc<dyn Session>, SessionError> {
+    fn get_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError> {
         self.sessions_security_manager.get_session(id)
     }
 }
@@ -385,7 +543,7 @@ where
     F: SubjectFactory,
     S: SessionManager,
     A: Authorizer,
-    T: Authenticator,
+    T: Authenticator + LogoutAware,
     R: Realm + CacheManagerAware<C> + EventBusAware<B>,
     R: Clone,
     C: CacheManager + EventBusAware<B>,
@@ -400,24 +558,60 @@ where
         let info = match self.authenticate(token) {
             Ok(info) => info,
             Err(error) => {
-                if let Err(err) = self.on_failed_login(token, error, subject) {}
+                if let Err(err) = self.on_failed_login(token, &error, subject) {
+                    info!(
+                        "on_failed_login method threw an error.  Logging and propagating original AuthenticationError. error: {:?}",
+                        err
+                    );
+                }
                 return Err(error);
             }
         };
 
-        let logged_in = self._create_subject(token, info);
+        let logged_in = self._create_subject(token, info.as_ref(), Some(subject));
 
-        self.on_successful_login(token, info, logged_in.as_ref());
+        self.on_successful_login(token, info.as_ref(), logged_in.as_ref());
 
         Ok(logged_in)
     }
 
     fn logout(&self, subject: &dyn Subject) -> Result<(), next_web_core::error::BoxError> {
-        todo!()
+        self.before_logout(subject);
+        if let Some(principals) = subject.get_principals() {
+            if !principals.is_empty() {
+                debug!("Logging out subject with primary principal {}", "none");
+
+                let authc = self
+                    .sessions_security_manager
+                    .get_object()
+                    .get_object()
+                    .get_authenticator();
+
+                authc.on_logout(principals.as_ref());
+            }
+        }
+
+        self.delete(subject);
+
+        self.stop_session(subject);
+        Ok(())
     }
 
-    fn create_subject<CTX: SubjectContext>(&self, context: CTX) -> Box<dyn Subject> {
-        todo!()
+    fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
+        let mut context = DefaultSubjectContext::new(context);
+
+        // self.ensure_security_manager(&mut context);
+        self.resolve_session(&mut context);
+
+        self.resolve_principals(&mut context);
+
+        let subject = self.do_create_subject(&context);
+
+        if context.is_session_creation_enabled() {
+            self.save(subject.as_ref());
+        }
+
+        subject
     }
 }
 

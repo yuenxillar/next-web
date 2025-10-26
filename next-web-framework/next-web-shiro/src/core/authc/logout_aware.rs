@@ -1,7 +1,8 @@
 use crate::core::subject::principal_collection::PrincipalCollection;
 
-
-pub trait LogoutAware {
-    
-    fn on_logout(&mut self, principals: &dyn PrincipalCollection);
+pub trait LogoutAware
+where
+    Self: Send + Sync,
+{
+    fn on_logout(&self, principals: &dyn PrincipalCollection);
 }
