@@ -47,7 +47,7 @@ impl Session for ProxiedSession {
         self.delegate.touch()
     }
 
-    fn stop(&mut self) -> Result<(), SessionError> {
+    fn stop(&self) -> Result<(), SessionError> {
         self.delegate.stop()
     }
 

@@ -540,7 +540,7 @@ impl Session for StoppingAwareProxiedSession {
         self.proxied_session.touch()
     }
 
-    fn stop(&mut self) -> Result<(), SessionError> {
+    fn stop(&self) -> Result<(), SessionError> {
         self.proxied_session.stop()
     }
 

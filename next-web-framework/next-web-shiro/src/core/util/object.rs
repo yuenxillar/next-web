@@ -74,6 +74,7 @@ impl Clone for Box<dyn AnyObject> {
 pub enum Object {
     Str(String),
     Int(i64),
+    List(Vec<Object>),
     Obj(Box<dyn AnyObject>),
 }
 
@@ -88,6 +89,13 @@ impl Object {
     pub fn as_int(&self) -> Option<i64> {
         match self {
             Object::Int(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    pub fn as_list(&self) -> Option<&Vec<Object>> {
+        match self {
+            Object::List(l) => Some(l),
             _ => None,
         }
     }
@@ -113,6 +121,7 @@ impl Display for Object {
             Object::Str(s) => write!(f, "{}", s),
             Object::Int(i) => write!(f, "{}", i),
             Object::Obj(obj) => write!(f, "{:?}", obj),
+            Object::List(objects) => write!(f, "{}", "List[Object]"),
         }
     }
 }

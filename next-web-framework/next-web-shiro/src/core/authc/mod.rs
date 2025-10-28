@@ -1,3 +1,4 @@
+pub mod username_password_token;
 pub mod pam;
 pub mod credential;
 pub mod logout_aware;

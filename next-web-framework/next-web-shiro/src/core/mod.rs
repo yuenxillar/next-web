@@ -1,3 +1,4 @@
+pub mod configure;
 pub mod event;
 pub mod cache;
 pub mod realm;

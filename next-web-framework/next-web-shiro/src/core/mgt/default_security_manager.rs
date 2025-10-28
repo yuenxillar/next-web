@@ -219,7 +219,7 @@ where
         token: &dyn AuthenticationToken,
         info: &dyn AuthenticationInfo,
         existing: Option<&dyn Subject>,
-    ) -> Box<dyn Subject> {
+    ) -> Arc<dyn Subject> {
         let mut context = self.create_subject_context();
         context.set_authenticated(true);
         context.set_authentication_token(clone_box(token));
@@ -291,7 +291,7 @@ where
         };
     }
 
-    pub fn do_create_subject(&self, context: &dyn SubjectContext) -> Box<dyn Subject> {
+    pub fn do_create_subject(&self, context: &dyn SubjectContext) -> Arc<dyn Subject> {
         self.get_subject_factory().create_subject(context)
     }
 
@@ -554,7 +554,7 @@ where
         &self,
         subject: &dyn Subject,
         token: &dyn AuthenticationToken,
-    ) -> Result<Box<dyn Subject>, AuthenticationError> {
+    ) -> Result<Arc<dyn Subject>, AuthenticationError> {
         let info = match self.authenticate(token) {
             Ok(info) => info,
             Err(error) => {
@@ -597,7 +597,7 @@ where
         Ok(())
     }
 
-    fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
+    fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Arc<dyn Subject> {
         let mut context = DefaultSubjectContext::new(context);
 
         // self.ensure_security_manager(&mut context);

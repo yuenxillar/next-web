@@ -47,7 +47,7 @@ impl<T> CachingRealm<T> {
     }
 
     // 返回值 用于决定实现者的逻辑执行
-    pub fn clear_cache(&mut self, principals: &dyn PrincipalCollection) -> bool{
+    pub fn clear_cache(&self, principals: &dyn PrincipalCollection) -> bool{
         if !principals.is_empty() {
             trace!(
                 "Cleared cache entries for account with principals [{}]",
@@ -102,5 +102,5 @@ T: CacheManager
 pub trait CachingRealmSupport: Send + Sync
 {
     fn after_cache_manager_set(&mut self);
-    fn do_clear_cache(&mut self, principals: &dyn PrincipalCollection);
+    fn do_clear_cache(&self, principals: &dyn PrincipalCollection);
 }

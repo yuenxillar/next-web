@@ -19,7 +19,7 @@ where
         &self,
         subject: &dyn Subject,
         authentication_token: &dyn AuthenticationToken,
-    ) -> Result<Box<dyn Subject>, AuthenticationError>;
+    ) -> Result<Arc<dyn Subject>, AuthenticationError>;
 
     fn logout(&self, subject: &dyn Subject) -> Result<(), BoxError>;
 

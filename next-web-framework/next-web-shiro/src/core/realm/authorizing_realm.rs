@@ -144,7 +144,7 @@ impl AuthorizingRealm {
         self.permission_role_resolver = Some(Arc::new(resolver));
     }
 
-    fn clear_cached_authorization_info(&mut self, principals: &dyn PrincipalCollection) {
+    fn clear_cached_authorization_info(&self, principals: &dyn PrincipalCollection) {
         let cache = self.get_available_authorization_cache();
 
         if let Some(cache) = cache {
@@ -503,7 +503,7 @@ impl CachingRealmSupport for AuthorizingRealm {
         self.get_available_authorization_cache();
     }
 
-    fn do_clear_cache(&mut self, principals: &dyn PrincipalCollection) {
+    fn do_clear_cache(&self, principals: &dyn PrincipalCollection) {
         self.authenticating_realm.do_clear_cache(principals);
 
         self.clear_cached_authorization_info(principals);

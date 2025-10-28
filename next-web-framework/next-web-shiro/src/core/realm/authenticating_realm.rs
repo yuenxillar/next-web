@@ -291,7 +291,7 @@ impl AuthenticatingRealm {
         }
     }
 
-    pub fn clear_cached_authentication_info(&mut self, principals: &dyn PrincipalCollection) {
+    pub fn clear_cached_authentication_info(&self, principals: &dyn PrincipalCollection) {
         if !principals.is_empty() {
             let key = self.get_authentication_cache_key_from_principals(principals);
             match self.get_available_authentication_cache() {
@@ -375,7 +375,7 @@ impl Required<CachingRealm> for AuthenticatingRealm {
 }
 
 impl LogoutAware for AuthenticatingRealm {
-    fn on_logout(&mut self, principals: &dyn PrincipalCollection) {
+    fn on_logout(&self, principals: &dyn PrincipalCollection) {
         if self.caching_realm.clear_cache(principals) {
             self.do_clear_cache(principals);
         }
@@ -387,7 +387,7 @@ impl CachingRealmSupport for AuthenticatingRealm{
         self.get_available_authentication_cache();
     }
 
-    fn do_clear_cache(&mut self, principals: &dyn PrincipalCollection) {
+    fn do_clear_cache(&self, principals: &dyn PrincipalCollection) {
         self.clear_cached_authentication_info(principals);
     }
 }

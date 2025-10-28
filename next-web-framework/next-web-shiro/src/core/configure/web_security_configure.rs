@@ -1,0 +1,7 @@
+
+
+pub trait WebSecurityConfigure
+{
+    
+    
+}
