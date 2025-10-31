@@ -52,7 +52,7 @@ impl SimpleUrlAuthenticationFailureHandler {
                 None => {}
             }
         } else {
-            let session = request.get_session("sessionid");
+            let session = request.session("sessionid");
             if session.is_some() || self.allow_session_creation {
                 // Set Error in session
                 // session.unwrap().set("NEXT_SECURITY_LAST_ERROR", error.clone().into_boxed());
@@ -119,7 +119,7 @@ impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
                         .map(|s| s.as_ref())
                         .unwrap_or_default()
                 );
-                if let Some(dispatcher) = request.get_request_dispatcher(
+                if let Some(dispatcher) = request.request_dispatcher(
                     self.default_failure_url
                         .as_ref()
                         .map(|s| s.as_ref())

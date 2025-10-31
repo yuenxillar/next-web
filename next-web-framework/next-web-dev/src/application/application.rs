@@ -455,18 +455,14 @@ where
             }
         };
 
-        println!("\n========================================================================");
-
         #[rustfmt::skip]
-        println!("\nApplication Listening  on:  {}", format!("{}:{}", server_addr, server_port));
-
-        println!("Application Running    on:  {}", LocalDateTime::now());
-        println!("Application StartTime  on:  {:?}", time.elapsed());
-        println!("Application CurrentPid on:  {:?}\n", std::process::id());
+        println!("\nApplication Listening on:  {}", format!("{}:{}", server_addr, server_port));
+        println!("Application Started   at:  {}", LocalDateTime::now());
+        println!("Application Startup time:  {:?}", time.elapsed());
+        println!("Application Process   ID:  {:?}\n", std::process::id());
 
         // 10. Start server
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
-
         // Turn off signal monitoring
         #[cfg(not(feature = "tls-rustls"))]
         let shutdown_signal = async move {
@@ -548,7 +544,6 @@ where
 
         // Banner show
         Self::banner_show(next_application.application_resources());
-        println!("========================================================================\n");
 
         let allow_override = next_application
             .application_properties()
@@ -560,7 +555,7 @@ where
             .allow_override(allow_override)
             .auto_register();
 
-        info!("Init application context success!",);
+        info!("Init Application context success");
 
         let mut post_processors = ctx.resolve_by_type::<Box<dyn PropertiesPostProcessor>>();
         post_processors.sort_by_key(|item| item.order());
@@ -576,39 +571,41 @@ where
         let application = next_application.application();
 
         application.init_logging(properties);
-        info!("Init logging success!");
+        info!("Logging initialized");
 
         // Autowire properties
         application.autowire_properties(&mut ctx, properties).await;
-        info!("Autowire properties success!");
+        info!("Configuration properties loaded");
 
         // Register singleton
         application
             .register_singleton(&mut ctx, properties, args, resources)
             .await;
-        info!("Register singleton success!");
+        info!("Singleton services registered");
 
         // Init infrastructure
         application.init_infrastructure(&mut ctx, properties).await;
-        info!("Init infrastructure success!",);
+        info!("Infrastructure initialized",);
 
         // Init middleware
         application.init_middleware(properties).await;
-        info!("Init middleware success!");
+        info!("Middleware initialized");
 
         #[cfg(feature = "enable-grpc")]
         {
             application
                 .register_rpc_server(&mut ctx, properties, args, resources)
                 .await;
-            info!("Register grpc server success!");
+            info!("gRPC server started");
 
             application
                 .connect_rpc_client(&mut ctx, properties, args, resources)
                 .await;
-
-            info!("Connect grpc client success!",);
+            info!("gRPC client connected",);
         }
+
+        info!("Starting Async Runtime: [Tokio/1.44.1]");
+        info!("Starting HTTP  Server:  [Axum/0.8.4]");
 
         application
             .bind_tcp_server(ctx, properties, start_time)

@@ -26,7 +26,7 @@ impl AuthenticationSuccessHandler for ForwardAuthenticationSuccessHandler {
         response: &mut axum::response::Response,
         _authentication: &dyn crate::core::authentication::Authentication,
     ) {
-        if let Some(dispatcher) = request.get_request_dispatcher(&self.forward_url) {
+        if let Some(dispatcher) = request.request_dispatcher(&self.forward_url) {
             dispatcher.forward(request, response);
         }
     }

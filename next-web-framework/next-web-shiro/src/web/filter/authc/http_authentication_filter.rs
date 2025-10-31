@@ -129,17 +129,16 @@ impl HttpAuthenticationFilter {
         &self,
         authorization_header: &str,
         _request: &dyn HttpRequest,
-        http_authentication_filter_ext: &dyn HttpAuthenticationFilterExt,
     ) -> Option<Vec<String>> {
         let auth_tokens = authorization_header.split(" ").collect::<Vec<&str>>();
         if auth_tokens.len() < 2 {
             return None;
         }
 
-        Some(
-            http_authentication_filter_ext
-                .get_principals_and_credentials(auth_tokens[0], auth_tokens[1]),
-        )
+        match self.get_http_authentication_filter_ext() {
+            Some(ext) => Some(ext.get_principals_and_credentials(auth_tokens[0], auth_tokens[1])),
+            None => return None,
+        }
     }
 }
 
@@ -213,10 +212,13 @@ impl AuthenticatingFilterExt for HttpAuthenticationFilter {
         }
         debug!("Attempting to execute login with auth header");
 
-        let prin_cred = self.get_principals_and_credentials(&authz_header.unwrap(), request, todo!());
+        let prin_cred = self.get_principals_and_credentials(&authz_header.unwrap(), request);
 
         if prin_cred.is_none() || prin_cred.as_ref().map(|v| v.len() < 2).unwrap_or(true) {
-            let username = prin_cred.as_ref().map(|s| s[0].as_str()).unwrap_or_default();
+            let username = prin_cred
+                .as_ref()
+                .map(|s| s[0].as_str())
+                .unwrap_or_default();
             return self
                 .authenticating_filter
                 .create_token(username, "", request, response, self);
@@ -224,8 +226,8 @@ impl AuthenticatingFilterExt for HttpAuthenticationFilter {
 
         let prin_cred = prin_cred.unwrap();
 
-        let username = prin_cred[0];
-        let password = prin_cred[1];
+        let username = prin_cred.get(0).unwrap();
+        let password = prin_cred.get(1).unwrap();
 
         self.authenticating_filter
             .create_token(username, password, request, response, self)

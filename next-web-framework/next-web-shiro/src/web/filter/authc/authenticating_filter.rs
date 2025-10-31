@@ -9,11 +9,16 @@ use next_web_core::{
 use crate::{
     core::{
         authc::{
-            authentication_error::AuthenticationError, authentication_token::AuthenticationToken, username_password_token::UsernamePasswordToken,
+            authentication_error::AuthenticationError, authentication_token::AuthenticationToken,
+            username_password_token::UsernamePasswordToken,
         },
-        subject::{self, Subject}, util::object::Object,
+        subject::Subject,
+        util::object::Object,
     },
-    web::filter::{access_control_filter::AccessControlFilterExt, authc::authentication_filter::AuthenticationFilter},
+    web::filter::{
+        access_control_filter::AccessControlFilterExt,
+        authc::{authentication_filter::AuthenticationFilter, http_authentication_filter::HttpAuthenticationFilterExt},
+    },
 };
 
 #[derive(Clone)]
@@ -25,7 +30,7 @@ impl AuthenticatingFilter {
     const PERMISSIVE: &str = "permissive";
 
     pub async fn execute_login(
-        & self,
+        &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         authenticating_filter_ext: &dyn AuthenticatingFilterExt,
@@ -35,7 +40,7 @@ impl AuthenticatingFilter {
             .await;
         // let token = match authentication_token {
         //     Some(token) => token,
-        //     None => return Err("create_token method implementation returned none. A valid non-null AuthenticationToken 
+        //     None => return Err("create_token method implementation returned none. A valid non-null AuthenticationToken
         //             must be created in order to execute a login attempt.".into())
         // };
 
@@ -75,7 +80,12 @@ impl AuthenticatingFilter {
         authenticating_filter_ext: &dyn AuthenticatingFilterExt,
     ) -> Arc<dyn AuthenticationToken> {
         let host = self.get_host(request);
-        self.create_username_password_token(username.to_string(), password.to_string(), authenticating_filter_ext.is_remember_me(request), host)
+        self.create_username_password_token(
+            username.to_string(),
+            password.to_string(),
+            authenticating_filter_ext.is_remember_me(request),
+            host,
+        )
     }
 
     pub fn create_username_password_token(
@@ -85,12 +95,17 @@ impl AuthenticatingFilter {
         remember_me: bool,
         host: Option<&str>,
     ) -> Arc<dyn AuthenticationToken> {
-        Arc::new(UsernamePasswordToken::new(username, password, remember_me, host.map(ToString::to_string)))
+        Arc::new(UsernamePasswordToken::new(
+            username,
+            password,
+            remember_me,
+            host.map(ToString::to_string),
+        ))
     }
 
     pub fn is_permissive(&self, mapped_value: &Object) -> bool {
         if let Some(value) = mapped_value.as_object::<Vec<String>>() {
-            return value.contains(& Self::PERMISSIVE.to_string());
+            return value.contains(&Self::PERMISSIVE.to_string());
         }
 
         false
@@ -99,16 +114,20 @@ impl AuthenticatingFilter {
     // pub fn clean_up(&self, )
 }
 
-
 impl AccessControlFilterExt for AuthenticatingFilter {
-    fn is_access_allowed(&self, request: &dyn HttpRequest, response: &dyn HttpResponse, mapped_value: &Object) -> bool {
-        self.authentication_filter.is_access_allowed(request, response, mapped_value) || (!self.is_login_request(request, response) && 
-        self.is_permissive(mapped_value))
+    fn is_access_allowed(
+        &self,
+        request: &dyn HttpRequest,
+        response: &dyn HttpResponse,
+        mapped_value: &Object,
+    ) -> bool {
+        self.authentication_filter
+            .is_access_allowed(request, response, mapped_value)
+            || (!self.is_login_request(request, response) && self.is_permissive(mapped_value))
     }
 }
 #[async_trait]
-pub trait AuthenticatingFilterExt: Send + Sync
-{
+pub trait AuthenticatingFilterExt: Send + Sync {
     async fn create_token(
         &self,
         request: &mut dyn HttpRequest,
@@ -121,16 +140,23 @@ pub trait AuthenticatingFilterExt: Send + Sync
         subject: &mut dyn Subject,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    ) -> Result<bool, AuthenticationError> { Ok(true)}
- 
+    ) -> Result<bool, AuthenticationError> {
+        Ok(true)
+    }
+
     async fn on_login_failure(
         &self,
         token: &dyn AuthenticationToken,
         error: &AuthenticationError,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    ) -> bool { false}
+    ) -> bool {
+        false
+    }
 
+    fn is_remember_me(&self, request: &dyn HttpRequest) -> bool {
+        false
+    }
 
-    fn is_remember_me(&self, request: &dyn HttpRequest) -> bool { false }
+    fn get_http_authentication_filter_ext(&self) -> Option<&dyn HttpAuthenticationFilterExt> { None }
 }

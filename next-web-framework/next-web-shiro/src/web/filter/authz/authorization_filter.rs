@@ -18,8 +18,8 @@ impl AuthorizationFilter {
         self.unauthorized_url.as_deref()
     }
 
-    pub fn set_unauthorized_url(&mut self, unauthorized_url: Option<String>) {
-        self.unauthorized_url = unauthorized_url;
+    pub fn set_unauthorized_url(&mut self, unauthorized_url: impl ToString) {
+        self.unauthorized_url = Some(unauthorized_url.to_string());
     }
 }
 
@@ -34,7 +34,7 @@ impl AccessControlFilterExt for AuthorizationFilter {
     }
 }
 
-impl<T> From<Arc<dyn SecurityManager>> for AuthorizationFilter
+impl From<Arc<dyn SecurityManager>> for AuthorizationFilter
 {
     fn from(security_manager: Arc<dyn SecurityManager>) -> Self {
         Self {

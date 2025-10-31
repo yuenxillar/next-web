@@ -9,6 +9,7 @@ pub struct AuthenticationFilter {
 }
 
 impl AuthenticationFilter {
+    pub const DEFAULT_SUCCESS_URL: &'static str = "/";
     
     pub fn get_success_url(&self) -> &str {
         &self.success_url

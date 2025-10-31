@@ -1,6 +1,8 @@
-use crate::web::filter::{
+use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+
+use crate::{core::util::object::Object, web::filter::{
     access_control_filter::AccessControlFilterExt, authz::authorization_filter::AuthorizationFilter,
-};
+}};
 
 #[derive(Clone)]
 pub struct RolesAuthorizationFilter {
@@ -10,8 +12,9 @@ pub struct RolesAuthorizationFilter {
 impl AccessControlFilterExt for RolesAuthorizationFilter {
     fn is_access_allowed(
         &self,
-        request: &dyn next_web_core::traits::http::http_request::HttpRequest,
-        response: &dyn next_web_core::traits::http::http_response::HttpResponse,
+        request: &dyn HttpRequest,
+        response: &dyn HttpResponse,
+        mapped_value: &Object,
     ) -> bool {
         todo!()
     }

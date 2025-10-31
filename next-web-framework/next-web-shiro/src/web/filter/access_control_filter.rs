@@ -23,7 +23,7 @@ pub struct AccessControlFilter<T = AntPathMatcher> {
 }
 
 impl<T> AccessControlFilter<T> {
-    const DEFAULT_LOGIN_URL: &'static str = "/login";
+    pub const DEFAULT_LOGIN_URL: &'static str = "/login";
 
     pub fn get_login_url(&self) -> &str {
         &self.login_url

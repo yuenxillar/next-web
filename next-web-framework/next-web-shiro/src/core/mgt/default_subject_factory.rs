@@ -1,20 +1,19 @@
-use std::sync::Arc;
-
-use crate::core::mgt::subject_factory::SubjectFactory;
-
-
+use crate::core::{
+    mgt::subject_factory::SubjectFactory,
+    subject::{Subject, subject_context::SubjectContext},
+};
 
 #[derive(Clone)]
 pub struct DefaultSubjectFactory {}
 
 impl SubjectFactory for DefaultSubjectFactory {
-    fn create_subject(&self, context: &dyn crate::core::subject::subject_context::SubjectContext) -> Arc<dyn crate::core::subject::Subject> {
+    fn create_subject(&self, context: &dyn SubjectContext) -> Box<dyn Subject> {
         todo!()
     }
 }
 
 impl Default for DefaultSubjectFactory {
     fn default() -> Self {
-        Self {  }
+        Self {}
     }
 }
