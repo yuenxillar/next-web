@@ -19,6 +19,12 @@ where
 impl DefaultWebSessionContext {
     const REQUEST: &str = stringify!(format!("{}.REQUEST", std::any::type_name::<Self>()));
     const RESPONSE: &str = stringify!(format!("{}.RESPONSE", std::any::type_name::<Self>()));
+
+    pub fn new(default_session_context: DefaultSessionContext) -> Self {
+        Self {
+            default_session_context,
+        }
+    }
 }
 impl SessionContext for DefaultWebSessionContext {
     fn set_host(&mut self, host: &str) {

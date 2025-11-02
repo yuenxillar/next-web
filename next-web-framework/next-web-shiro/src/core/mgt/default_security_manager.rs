@@ -44,7 +44,6 @@ use crate::core::{
 
 #[derive(Clone)]
 pub struct DefaultSecurityManager<
-    M = (),
     D = DefaultSubjectDAO,
     F = DefaultSubjectFactory,
     S = DefaultSessionManager,
@@ -54,11 +53,11 @@ pub struct DefaultSecurityManager<
     C = DefaultCacheManager,
     B = DefaultEventBus,
 > {
-    remember_me_manager: Option<M>,
-    subject_dao: D,
-    subject_factory: F,
+    remember_me_manager: Option<Arc<dyn RememberMeManager>>,
+    pub(crate) subject_dao: D,
+    pub(crate) subject_factory: F,
 
-    sessions_security_manager: SessionsSecurityManager<S, A, T, R, C, B>,
+    pub(crate) sessions_security_manager: SessionsSecurityManager<S, A, T, R, C, B>,
 }
 
 impl From<SimpleAccountRealm> for DefaultSecurityManager {
@@ -100,10 +99,7 @@ impl From<Vec<SimpleAccountRealm>> for DefaultSecurityManager {
     }
 }
 
-impl<M, D, F, S, A, T, R, C, B> DefaultSecurityManager<M, D, F, S, A, T, R, C, B>
-where
-    M: RememberMeManager,
-{
+impl<D, F, S, A, T, R, C, B> DefaultSecurityManager<D, F, S, A, T, R, C, B> {
     pub fn get_subject_factory(&self) -> &F {
         &self.subject_factory
     }
@@ -115,7 +111,7 @@ where
     pub fn get_subject_dao(&self) -> &D {
         &self.subject_dao
     }
-
+    
     pub fn get_mut_subject_dao(&mut self) -> &mut D {
         &mut self.subject_dao
     }
@@ -124,12 +120,19 @@ where
         self.subject_dao = subject_dao;
     }
 
-    pub fn get_remember_me_manager(&self) -> Option<&M> {
-        self.remember_me_manager.as_ref()
+    pub fn get_remember_me_manager(&self) -> Option<&dyn RememberMeManager> {
+        self.remember_me_manager.as_deref()
     }
 
-    pub fn set_remember_me_manager(&mut self, remember_me_manager: M) {
-        self.remember_me_manager = Some(remember_me_manager);
+    pub fn get_owner_remember_me_manager(&self) -> Option<Arc<dyn RememberMeManager>> {
+        self.remember_me_manager.as_ref().cloned()
+    }
+
+    pub fn set_remember_me_manager<M: RememberMeManager + 'static>(
+        &mut self,
+        remember_me_manager: M,
+    ) {
+        self.remember_me_manager = Some(Arc::new(remember_me_manager));
     }
 
     pub fn create_subject_context(&self) -> DefaultSubjectContext {
@@ -200,9 +203,8 @@ where
     }
 }
 
-impl<M, D, F, S, A, T, R, C, B> DefaultSecurityManager<M, D, F, S, A, T, R, C, B>
+impl<D, F, S, A, T, R, C, B> DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
-    M: RememberMeManager,
     D: SubjectDAO,
     F: SubjectFactory,
     S: SessionManager,
@@ -330,9 +332,8 @@ where
     }
 }
 
-impl<M, D, F, S, A, T, R, C, B> Authorizer for DefaultSecurityManager<M, D, F, S, A, T, R, C, B>
+impl<D, F, S, A, T, R, C, B> Authorizer for DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
-    M: Send + Sync,
     D: Send + Sync,
     F: Send + Sync,
     S: Send + Sync,
@@ -490,9 +491,8 @@ where
     }
 }
 
-impl<M, D, F, S, A, T, R, C, B> Authenticator for DefaultSecurityManager<M, D, F, S, A, T, R, C, B>
+impl<D, F, S, A, T, R, C, B> Authenticator for DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
-    M: Send + Sync,
     D: Send + Sync,
     F: Send + Sync,
     S: Send + Sync,
@@ -514,9 +514,8 @@ where
     }
 }
 
-impl<M, D, F, S, A, T, R, C, B> SessionManager for DefaultSecurityManager<M, D, F, S, A, T, R, C, B>
+impl<D, F, S, A, T, R, C, B> SessionManager for DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
-    M: Send + Sync,
     D: Send + Sync,
     F: Send + Sync,
     S: SessionManager,
@@ -535,10 +534,8 @@ where
     }
 }
 
-impl<M, D, F, S, A, T, R, C, B> SecurityManager
-    for DefaultSecurityManager<M, D, F, S, A, T, R, C, B>
+impl<D, F, S, A, T, R, C, B> SecurityManager for DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
-    M: RememberMeManager,
     D: SubjectDAO,
     F: SubjectFactory,
     S: SessionManager,
@@ -625,9 +622,8 @@ impl Required<SessionsSecurityManager> for DefaultSecurityManager {
     }
 }
 
-impl<M, D, F, S, A, T, R, C, B> Default for DefaultSecurityManager<M, D, F, S, A, T, R, C, B>
+impl<D, F, S, A, T, R, C, B> Default for DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
-    M: Default,
     D: Default,
     F: Default,
     S: SessionManager + CacheManagerAware<C> + EventBusAware<B>,
@@ -652,7 +648,7 @@ where
     }
 }
 
-impl<M, D, F, S, A, T, R, C, B> Display for DefaultSecurityManager<M, D, F, S, A, T, R, C, B> {
+impl<D, F, S, A, T, R, C, B> Display for DefaultSecurityManager<D, F, S, A, T, R, C, B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "DefaultSecurityManager -> []")
     }

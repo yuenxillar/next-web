@@ -38,7 +38,7 @@ async fn req_transaction(
     FindSingleton(service): FindSingleton<DatabaseService>,
 ) -> impl axum::response::IntoResponse {
     match service
-        .execute_transaction(|rbs| async {
+        .execute_transaction(|_rbs| async {
             // insert
 
             // update

@@ -144,7 +144,7 @@ where
         self.delegating_subject.check_permissions(roles)
     }
 
-    fn get_session(&self) -> Option<&dyn Session> {
+    fn get_session(&self) -> Option<& dyn Session> {
         self.delegating_subject.get_session()
     }
 

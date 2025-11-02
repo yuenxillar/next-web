@@ -1,4 +1,4 @@
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
+use next_web_core::{async_trait, context::properties::ApplicationProperties};
 use next_web_dev::{
     application::Application,
     scheduler::{

@@ -62,7 +62,7 @@ where
     fn host(&self) -> Option<&str>;
 
     /// 显式更新 last_access_time 为当前时间
-    fn touch(&mut self) -> Result<(), SessionError>;
+    fn touch(&self) -> Result<(), SessionError>;
 
     /// 显式停止（销毁）会话
     fn stop(&self) -> Result<(), SessionError>;

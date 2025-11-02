@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 next-web-core.workspace = true
 
+indexmap.workspace  = true
 tokio.workspace     = true
 dashmap.workspace   = true
 tracing.workspace   = true
