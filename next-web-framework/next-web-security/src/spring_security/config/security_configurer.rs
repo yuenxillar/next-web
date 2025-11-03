@@ -5,7 +5,7 @@ where
     Self: Send + Sync,
     O: Send + Sync,
 {
-    fn init(&mut self, builer: &mut  B);
+    fn init(&mut self, builer: &mut B);
 
     fn configure(&mut self, builer: &mut B);
 }

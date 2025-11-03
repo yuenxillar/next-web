@@ -2,7 +2,6 @@ use std::sync::{atomic::AtomicBool, Arc};
 
 use crate::config::security_builder::SecurityBuilder;
 
-
 #[derive(Clone)]
 pub struct AbstractSecurityBuilder<O>
 where
@@ -13,9 +12,9 @@ where
     object: Option<O>,
 }
 
-impl<O>  AbstractSecurityBuilder<O>
+impl<O> AbstractSecurityBuilder<O>
 where
-    O: Send + Sync
+    O: Send + Sync,
 {
     pub fn new() -> Self {
         AbstractSecurityBuilder {
@@ -24,7 +23,6 @@ where
         }
     }
 }
-
 
 impl<O> SecurityBuilder<O> for AbstractSecurityBuilder<O>
 where

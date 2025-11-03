@@ -17,7 +17,6 @@ next-web-dev = { version = "0.1.6", path = "./next-web-dev"}
 next-web-core = { version = "0.1.4", path = "./next-web-core" }
 next-web-macros = { version = "0.1.0", path = "./next-web-macros"}
 
-next-web-shiro = { version = "0.1.0", path = "./next-web-shiro", optional = true }
 next-web-security = { version = "0.1.0", path = "./next-web-security", optional = true }
 next-web-ai = { version = "*", path = "./next-web-ai", optional = true }
 next-web-email = { version = "*", path = "./next-web-email"}

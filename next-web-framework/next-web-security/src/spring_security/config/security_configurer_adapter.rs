@@ -34,12 +34,14 @@ where
             .post_process(AnyValue::Object(Box::new(object)));
     }
 
-    
-    pub fn get_builder(&self) -> Option<B> 
-    where 
-    B: Clone
+    pub fn get_builder(&self) -> Option<B>
+    where
+        B: Clone,
     {
-        assert!(self.security_builder.is_some(), "security_builder cannot be null");
+        assert!(
+            self.security_builder.is_some(),
+            "security_builder cannot be null"
+        );
         self.security_builder.clone()
     }
 }
@@ -71,7 +73,7 @@ impl ObjectPostProcessor<AnyValue> for CompositeObjectPostProcessor {
 impl<O, B> SecurityConfigurer<O, B> for SecurityConfigurerAdapter<O, B>
 where
     B: SecurityBuilder<O>,
-    O: Send + Sync
+    O: Send + Sync,
 {
     fn init(&mut self, builer: &mut B) {}
 

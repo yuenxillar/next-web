@@ -3,9 +3,12 @@ use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc};
 use next_web_core::async_trait;
 
 use crate::{
-    access::hierarchicalroles::role_hierarchy::RoleHierarchy, authorization::{
-        authorities_authorization_manager::AuthoritiesAuthorizationManager, authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager
-    }, core::authentication::Authentication
+    access::hierarchicalroles::role_hierarchy::RoleHierarchy,
+    authorization::{
+        authorities_authorization_manager::AuthoritiesAuthorizationManager,
+        authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
+    },
+    core::authentication::Authentication,
 };
 
 pub struct AuthorityAuthorizationManager<T> {
@@ -39,10 +42,7 @@ impl<T> AuthorityAuthorizationManager<T> {
         Self::has_any_authority(Self::to_named_roles_array(role_prefix, roles))
     }
 
-
-    pub fn has_authority(
-        authority: &str,
-    )-> AuthorityAuthorizationManager<T> {
+    pub fn has_authority(authority: &str) -> AuthorityAuthorizationManager<T> {
         assert!(!authority.is_empty(), "authority cannot be null");
         AuthorityAuthorizationManager::new(HashSet::from_iter([authority.to_string()]))
     }

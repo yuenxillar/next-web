@@ -12,12 +12,19 @@ use crate::{
 #[async_trait]
 pub trait AuthorizationManager<T>
 where
-    Self:   Send + Sync,
-    T:      Send + Sync +  'static
+    Self: Send + Sync,
+    T: Send + Sync + 'static,
 {
-    async fn check(&self, authentication: Box<dyn Authentication>, object: T) -> Option<AuthorizationDecision>;
-    async fn verify(&self, authentication: Box<dyn Authentication>, object: T) -> Result<(), AccessDeniedError>
-    {
+    async fn check(
+        &self,
+        authentication: Box<dyn Authentication>,
+        object: T,
+    ) -> Option<AuthorizationDecision>;
+    async fn verify(
+        &self,
+        authentication: Box<dyn Authentication>,
+        object: T,
+    ) -> Result<(), AccessDeniedError> {
         let decision = self.check(authentication, object).await;
         if let Some(decision) = decision {
             if decision.is_granted() {
@@ -38,8 +45,7 @@ impl AuthorizationManager<RequestAuthorizationContext> for DefaultAuthorizationM
         &self,
         authentication: Box<dyn Authentication>,
         object: RequestAuthorizationContext,
-    ) -> Option<AuthorizationDecision>
-    {
+    ) -> Option<AuthorizationDecision> {
         Some(AuthorizationDecision::new(self.0))
     }
 }

@@ -109,7 +109,9 @@ struct FullyAuthenticatedAuthorizationStrategy {
 
 impl FullyAuthenticatedAuthorizationStrategy {
     pub fn new() -> Self {
-        Self { abstract_authorization_strategy: todo!() }
+        Self {
+            abstract_authorization_strategy: todo!(),
+        }
     }
 }
 
@@ -127,7 +129,9 @@ struct RememberMeAuthorizationStrategy {
 
 impl RememberMeAuthorizationStrategy {
     pub fn new() -> Self {
-        Self { abstract_authorization_strategy: todo!() }
+        Self {
+            abstract_authorization_strategy: todo!(),
+        }
     }
 }
 
@@ -145,7 +149,9 @@ struct AnonymousAuthorizationStrategy {
 
 impl AnonymousAuthorizationStrategy {
     pub fn new() -> Self {
-        Self { abstract_authorization_strategy: todo!() }
+        Self {
+            abstract_authorization_strategy: todo!(),
+        }
     }
 }
 

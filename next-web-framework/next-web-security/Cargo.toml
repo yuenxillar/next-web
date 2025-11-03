@@ -2,14 +2,22 @@
 name = "next-web-security"
 version = "0.1.0"
 edition = "2021"
+description = "A security framework for Next Web Framework"
 
 [dependencies]
-next-web-core = { workspace = true }
-rudi-dev = { workspace = true }
-axum = { workspace = true }
-tracing = { workspace = true }
+next-web-core.workspace = true
+rudi-dev.workspace      = true
 
-serde = {workspace = true}
+tokio.workspace     = true
+dashmap.workspace   = true
+tracing.workspace   = true
+serde.workspace     = true
+axum.workspace      = true
+bcrypt.workspace    = true
+matchit.workspace   = true
+indexmap.workspace  = true
 
-bcrypt  = { workspace = true }
-matchit = { workspace = true }
+[features]
+default = ["user-friendly"]
+user-friendly = []
+comprehensive = []
