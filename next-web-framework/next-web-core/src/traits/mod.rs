@@ -1,3 +1,4 @@
+pub mod named;
 pub mod filter;
 pub mod id;
 pub mod any_clone;

@@ -2,7 +2,10 @@ use std::any::Any;
 
 use async_trait::async_trait;
 
-use crate::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use crate::{
+    error::BoxError,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+};
 
 #[async_trait]
 pub trait HttpFilterChain
@@ -14,5 +17,5 @@ where
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    ) -> Result<(), String>;
+    ) -> Result<(), BoxError>;
 }

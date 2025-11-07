@@ -1,17 +1,16 @@
 pub mod mgt;
 pub mod proxied_session;
-use std::collections::HashSet;
-use std::time::SystemTime;
-
+use chrono::{DateTime, Utc};
 use next_web_core::traits::any_clone::AnyClone;
 use next_web_core::DynClone;
+use std::collections::HashSet;
 
 use crate::core::util::object::AnyObject;
 
 /// 表示会话已失效或非法操作
 #[derive(Debug)]
 pub enum SessionError {
-    Invalid
+    Invalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -39,17 +38,17 @@ pub enum SessionValue {
 pub trait Session
 where
     Self: Send + Sync,
-    Self: DynClone
+    Self: DynClone,
 {
     /// 唯一会话 ID（对应 Java 的 Serializable）
     /// 推荐使用 String、Uuid 或 u64
-    fn id(&self) -> SessionId;
+    fn id(&self) -> &SessionId;
 
     /// 会话创建时间
-    fn start_timestamp(&self) -> SystemTime;
+    fn start_timestamp(&self) -> &DateTime<Utc>;
 
     /// 上次访问时间（不因调用此方法而更新）
-    fn last_access_time(&self) -> SystemTime;
+    fn last_access_time(&self) -> &DateTime<Utc>;
 
     /// 获取超时时间（毫秒）。负值表示永不过期。
     /// 返回 `Err(SessionError)` 表示会话已失效。
@@ -75,15 +74,10 @@ where
 
     /// 绑定属性（key-value）
     /// 若 value 为 None，等价于 remove_attribute
-    fn set_attribute(
-        &mut self,
-        key: &str,
-        value: SessionValue,
-    ) -> Result<(), SessionError>;
+    fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), SessionError>;
 
     /// 移除指定 key 的属性
     fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError>;
 }
-
 
 next_web_core::clone_trait_object!(Session);

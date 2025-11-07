@@ -1,7 +1,8 @@
+use chrono::{DateTime, Utc};
 use next_web_core::{
     clone_box,
     convert::into_box::IntoBox,
-    error::{BoxError, illegal_state_error::IllegalStateError},
+    error::{illegal_state_error::IllegalStateError, BoxError},
     traits::required::Required,
 };
 use tracing::debug;
@@ -9,15 +10,14 @@ use tracing::debug;
 use crate::core::{
     authc::{authentication_error::AuthenticationError, authentication_token::AuthenticationToken},
     authz::authorization_error::AuthorizationError,
-    cache::cache_manager::CacheManager,
     mgt::{default_security_manager::DefaultSecurityManager, security_manager::SecurityManager},
-    util::object::Object,
     session::{
-        Session, SessionError, SessionValue,
         mgt::{default_session_context::DefaultSessionContext, session_context::SessionContext},
         proxied_session::ProxiedSession,
+        Session, SessionError, SessionValue,
     },
-    subject::{Subject, principal_collection::PrincipalCollection},
+    subject::{principal_collection::PrincipalCollection, Subject},
+    util::object::Object,
 };
 use std::{
     any::Any,
@@ -138,13 +138,13 @@ where
 
     pub fn assert_authz_check_possible(&self) -> Result<(), AuthorizationError> {
         if !self.has_principals() {
-            let msg = format!("This subject is anonymous - it does not have any identifying principals and 
+            let msg = format!("This subject is anonymous - it does not have any identifying principals and
                     authorization operations require an identity to check against.  A Subject instance will
-                    acquire these identifying principals automatically after a successful login is performed 
-                    be executing {}.login(AuthenticationToken) or when 'Remember Me' 
-                    functionality is enabled by the SecurityManager.  This exception can also occur when a 
-                    previously logged-in Subject has logged out which 
-                    makes it anonymous again.  Because an identity is currently not known due to any of these 
+                    acquire these identifying principals automatically after a successful login is performed
+                    be executing {}.login(AuthenticationToken) or when 'Remember Me'
+                    functionality is enabled by the SecurityManager.  This exception can also occur when a
+                    previously logged-in Subject has logged out which
+                    makes it anonymous again.  Because an identity is currently not known due to any of these
                     conditions, authorization is denied.", std::any::type_name::<dyn Subject>());
 
             return Err(AuthorizationError::Unauthorized(msg));
@@ -357,7 +357,7 @@ where
             None => true,
         } {
             return Err(AuthenticationError::Custom(
-                "Principals returned from security_manager.login( token ) returned a null or 
+                "Principals returned from security_manager.login( token ) returned a null or
             empty value.  This value must be non null and populated with one or more elements."
                     .to_string(),
             ));
@@ -410,8 +410,8 @@ where
     ) -> Result<(), IllegalStateError> {
         if !self.has_principals() {
             let msg = format!(
-                "This subject does not yet have an identity.  Assuming the identity of another 
-                Subject is only allowed for Subjects with an existing identity.  Try logging this subject in 
+                "This subject does not yet have an identity.  Assuming the identity of another
+                Subject is only allowed for Subjects with an existing identity.  Try logging this subject in
                 first, or using the {} to build ad hoc Subject instances with identities as necessary.",
                 std::any::type_name::<dyn Subject>(),
             );
@@ -512,15 +512,15 @@ impl StoppingAwareProxiedSession {
 }
 
 impl Session for StoppingAwareProxiedSession {
-    fn id(&self) -> crate::core::session::SessionId {
+    fn id(&self) -> &crate::core::session::SessionId {
         self.proxied_session.id()
     }
 
-    fn start_timestamp(&self) -> std::time::SystemTime {
+    fn start_timestamp(&self) -> &DateTime<Utc> {
         self.proxied_session.start_timestamp()
     }
 
-    fn last_access_time(&self) -> std::time::SystemTime {
+    fn last_access_time(&self) -> &DateTime<Utc> {
         self.proxied_session.last_access_time()
     }
 

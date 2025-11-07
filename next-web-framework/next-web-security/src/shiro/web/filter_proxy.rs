@@ -12,17 +12,18 @@ use crate::{
                 filter_chain_manager::FilterChainManager,
                 path_matching_filter_chain_resolver::PathMatchingFilterChainResolver,
             },
-        },
-        subject::support::web_delegating_subject::WebDelegatingSubject,
+        }, mgt::default_web_security_manager::DefaultWebSecurityManager, subject::support::web_delegating_subject::WebDelegatingSubject
     },
 };
 
 use indexmap::IndexMap;
 use next_web_core::{
     async_trait,
+    error::BoxError,
     traits::{
         filter::{http_filter::HttpFilter, http_filter_chain::HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
     },
 };
 use tracing::error;
@@ -256,14 +257,21 @@ impl FilterProxy {
             }
         }
     }
-    pub fn execute_chain(
+    pub async fn execute_chain(
         &self,
         req: &mut dyn HttpRequest,
         res: &mut dyn HttpResponse,
         orig_chain: &dyn HttpFilterChain,
-    ) {
+    ) -> Result<(), BoxError> {
         self.get_execution_chain(req, res, orig_chain)
-            .do_filter(req, res);
+            .do_filter(req, res)
+            .await
+    }
+}
+
+impl Named for FilterProxy {
+    fn name(&self) -> &str {
+        "FilterProxy"
     }
 }
 
@@ -274,12 +282,18 @@ impl HttpFilter for FilterProxy {
         req: &mut dyn HttpRequest,
         res: &mut dyn HttpResponse,
         orig_chain: &dyn HttpFilterChain,
-    ) -> Result<(), String> {
+    ) -> Result<(), BoxError> {
         let mut subject = self.create_subject();
 
         self.update_session_last_access_time(req, res, &mut subject);
-        self.execute_chain(req, res, orig_chain);
+        self.execute_chain(req, res, orig_chain).await?;
 
         Ok(())
+    }
+}
+
+impl Default for FilterProxy {
+    fn default() -> Self {
+        Self::new(DefaultWebSecurityManager::default())
     }
 }

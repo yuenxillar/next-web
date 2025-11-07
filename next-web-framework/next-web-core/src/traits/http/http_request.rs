@@ -24,6 +24,8 @@ where Self: Send
     fn host(&self) -> Option<&str>;
 
     fn scheme(&self) -> Option<&str>;
+
+    fn context_path(&self) -> Option<&str>;
 }
 
 impl HttpRequest for Request {
@@ -65,5 +67,9 @@ impl HttpRequest for Request {
     
     fn scheme(&self) -> Option<&str> {
         self.uri().scheme().map(|s| s.as_str())
+    }
+    
+    fn context_path(&self) -> Option<&str> {
+        None
     }
 }

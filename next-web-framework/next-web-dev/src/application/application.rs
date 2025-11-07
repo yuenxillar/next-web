@@ -1,4 +1,7 @@
+use axum::body::Body;
+use axum::extract::{Request, State};
 use axum::http::StatusCode;
+use axum::middleware::{from_fn_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::Router;
 
@@ -11,10 +14,12 @@ use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
 use next_web_core::context::properties::{ApplicationProperties, Properties};
+use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
 use next_web_core::state::application_state::ApplicationState;
 use next_web_core::traits::application::application_ready_event::ApplicationReadyEvent;
 use next_web_core::traits::apply_router::ApplyRouter;
 use next_web_core::traits::error_solver::ErrorSolver;
+use next_web_core::traits::filter::http_filter::HttpFilter;
 use next_web_core::traits::properties_post_processor::PropertiesPostProcessor;
 use next_web_core::traits::use_router::UseRouter;
 use next_web_core::AutoRegister;
@@ -413,7 +418,7 @@ where
                 None => {}
             };
 
-            // Middleware
+            // Layer
             app = app
                 // Cors
                 .layer(
@@ -429,6 +434,12 @@ where
                 )))
                 // Global panic handler
                 .layer(CatchPanicLayer::custom(Self::catch_panic));
+
+            // Filter
+            let filters = ctx.resolve_by_type::<Arc<dyn HttpFilter>>();
+            if !filters.is_empty() {
+                app = app.route_layer(from_fn_with_state(Arc::new(filters), http_filter_layer));
+            }
         }
 
         // 6. Trigger the ApplicationReadyEvent
@@ -611,4 +622,22 @@ where
             .bind_tcp_server(ctx, properties, start_time)
             .await;
     }
+}
+
+type FilterResult = Result<Response, Response>;
+async fn http_filter_layer(
+    State(filters): State<Arc<Vec<Arc<dyn HttpFilter>>>>,
+    mut req: Request,
+    next: Next,
+) -> FilterResult {
+    let filter_chain = ApplicationFilterChain::default();
+    let mut resp = Response::new(Body::empty());
+
+    for filter in filters.iter() {
+        if let Err(err) = filter.do_filter(&mut req, &mut resp, &filter_chain).await {
+            error!("The {} filter encountered an error: {}", filter.name(), err)
+        }
+    }
+
+    Ok(next.run(req).await)
 }

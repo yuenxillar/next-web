@@ -16,6 +16,8 @@ axum.workspace      = true
 bcrypt.workspace    = true
 matchit.workspace   = true
 indexmap.workspace  = true
+chrono.workspace    = true
+uuid.workspace      = true
 
 [features]
 default = ["user-friendly"]

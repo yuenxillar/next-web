@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use crate::core::session::{SessionId, SessionValue};
-
 use super::{Session, SessionError};
+use crate::core::session::{SessionId, SessionValue};
+use chrono::{DateTime, Utc};
 
 #[derive(Clone)]
 pub struct ProxiedSession {
@@ -16,15 +16,15 @@ impl ProxiedSession {
 }
 
 impl Session for ProxiedSession {
-    fn id(&self) -> SessionId {
+    fn id(&self) -> &SessionId {
         self.delegate.id()
     }
 
-    fn start_timestamp(&self) -> std::time::SystemTime {
+    fn start_timestamp(&self) -> &DateTime<Utc> {
         self.delegate.start_timestamp()
     }
 
-    fn last_access_time(&self) -> std::time::SystemTime {
+    fn last_access_time(&self) -> &DateTime<Utc> {
         self.delegate.last_access_time()
     }
 
@@ -32,10 +32,7 @@ impl Session for ProxiedSession {
         self.delegate.timeout()
     }
 
-    fn set_timeout(
-        &mut self,
-        max_idle_time_in_millis: u64,
-    ) -> Result<(), SessionError> {
+    fn set_timeout(&mut self, max_idle_time_in_millis: u64) -> Result<(), SessionError> {
         self.delegate.set_timeout(max_idle_time_in_millis)
     }
 
@@ -59,18 +56,11 @@ impl Session for ProxiedSession {
         self.delegate.get_attribute(key)
     }
 
-    fn set_attribute(
-        &mut self,
-        key: &str,
-        value: SessionValue,
-    ) -> Result<(), SessionError> {
+    fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), SessionError> {
         self.delegate.set_attribute(key, value)
     }
 
-    fn remove_attribute(
-        &mut self,
-        key: &str,
-    ) -> Result<Option<SessionValue>, SessionError> {
+    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError> {
         self.delegate.remove_attribute(key)
     }
 }
