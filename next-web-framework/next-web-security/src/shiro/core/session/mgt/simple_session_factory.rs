@@ -1,4 +1,4 @@
-use next_web_core::convert::into_box::IntoBox;
+use std::sync::Arc;
 
 use crate::core::session::mgt::simple_session::SimpleSession;
 use crate::core::session::{
@@ -10,15 +10,12 @@ use crate::core::session::{
 pub struct SimpleSessionFactory;
 
 impl SessionFactory for SimpleSessionFactory {
-    fn create_session(&self, ctx: Option<&dyn SessionContext>) -> Box<dyn Session> {
-        ctx.map(|context| {
-            context
-                .get_host()
+    fn create_session(&self, ctx: &dyn SessionContext) -> Arc<dyn Session> {
+        Arc::new(
+            ctx.get_host()
                 .map(|host| SimpleSession::new(host))
-                .unwrap_or_default()
-        })
-        .unwrap_or_default()
-        .into_boxed()
+                .unwrap_or_default(),
+        )
     }
 }
 

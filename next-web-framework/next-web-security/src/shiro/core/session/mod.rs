@@ -1,16 +1,24 @@
+pub mod expired_session_error;
 pub mod mgt;
 pub mod proxied_session;
-use chrono::{DateTime, Utc};
+pub mod session_listener;
+
 use next_web_core::traits::any_clone::AnyClone;
 use next_web_core::DynClone;
+use std::any::Any;
 use std::collections::HashSet;
+use std::error::Error;
+use std::fmt::Display;
+use std::fmt::Formatter;
 
+use crate::core::session::mgt::validating_session::ValidatingSession;
 use crate::core::util::object::AnyObject;
 
 /// 表示会话已失效或非法操作
 #[derive(Debug)]
 pub enum SessionError {
-    Invalid,
+    Invalid(Option<String>),
+    Expired,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -32,30 +40,31 @@ pub enum SessionValue {
     Boolean(bool),
     Bytes(Vec<u8>),
     Object(Box<dyn AnyClone>),
+    Null,
 }
 
 /// Shiro 风格的 Session trait（Rust 版）
 pub trait Session
 where
     Self: Send + Sync,
-    Self: DynClone,
+    Self: DynClone + Any,
+    Self: ValidatingSession,
 {
-    /// 唯一会话 ID（对应 Java 的 Serializable）
     /// 推荐使用 String、Uuid 或 u64
     fn id(&self) -> &SessionId;
 
     /// 会话创建时间
-    fn start_timestamp(&self) -> &DateTime<Utc>;
+    fn start_timestamp(&self) -> i64;
 
     /// 上次访问时间（不因调用此方法而更新）
-    fn last_access_time(&self) -> &DateTime<Utc>;
+    fn last_access_time(&self) -> Option<i64>;
 
     /// 获取超时时间（毫秒）。负值表示永不过期。
     /// 返回 `Err(SessionError)` 表示会话已失效。
-    fn timeout(&self) -> Result<u64, SessionError>;
+    fn timeout(&self) -> Result<i64, SessionError>;
 
     /// 设置超时时间（毫秒）。负值表示永不过期。
-    fn set_timeout(&mut self, max_idle_time_in_millis: u64) -> Result<(), SessionError>;
+    fn set_timeout(&mut self, max_idle_time_in_millis: i64) -> Result<(), SessionError>;
 
     /// 客户端主机（IP 或 hostname），可能为 None
     fn host(&self) -> Option<&str>;
@@ -70,7 +79,7 @@ where
     fn attribute_keys(&self) -> Result<HashSet<String>, SessionError>;
 
     /// 获取指定 key 的属性值
-    fn get_attribute(&self, key: &str) -> Option<SessionValue>;
+    fn get_attribute(&self, key: &str) -> Option<&SessionValue>;
 
     /// 绑定属性（key-value）
     /// 若 value 为 None，等价于 remove_attribute
@@ -81,3 +90,23 @@ where
 }
 
 next_web_core::clone_trait_object!(Session);
+
+impl Error for SessionError {}
+impl Display for SessionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SessionError::Expired => write!(f, "Session expired"),
+            SessionError::Invalid(msg) => write!(f, "Session invalid: {:?}", msg),
+        }
+    }
+}
+
+impl Display for SessionId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SessionId::String(id) => write!(f, "{}", id),
+            Self::Number(id) => write!(f, "{}", id),
+            SessionId::Other(id) => write!(f, "{:?}", id),
+        }
+    }
+}

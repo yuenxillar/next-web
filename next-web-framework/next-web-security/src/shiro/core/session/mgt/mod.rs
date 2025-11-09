@@ -1,8 +1,16 @@
+pub mod default_native_session_manager;
 pub mod default_session_context;
 pub mod default_session_manager;
+pub mod default_validating_session_manager;
+pub mod delegating_session;
 pub mod eis;
+pub mod immutable_proxied_session;
+pub mod native_session_manager;
 pub mod session_context;
 pub mod session_factory;
 pub mod session_manager;
+pub mod session_validation_scheduler;
 pub mod simple_session;
 pub mod simple_session_factory;
+pub mod validating_session;
+pub mod validating_session_manager;

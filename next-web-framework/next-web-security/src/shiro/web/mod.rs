@@ -28,9 +28,9 @@ pub trait Cookie: Send + Sync {
 
     fn set_domain(&mut self, domain: String);
 
-    fn get_max_age(&self) -> i64;
+    fn get_max_age(&self) -> i32;
 
-    fn set_max_age(&mut self, max_age: i64);
+    fn set_max_age(&mut self, max_age: i32);
 
     fn get_path(&self) -> Option<&str>;
 
@@ -56,7 +56,7 @@ pub trait Cookie: Send + Sync {
 
     fn remove_from(&self, req: &mut dyn HttpRequest, resp: &mut dyn HttpResponse);
 
-    fn read_value(&self, req: &dyn HttpRequest, resp: &mut dyn HttpResponse) -> Option<String>;
+    fn read_value(&self, req: &dyn HttpRequest, resp: &dyn HttpResponse) -> Option<String>;
 }
 
 #[derive(Debug, Clone, Default, Copy, PartialEq, Eq)]
@@ -84,7 +84,7 @@ pub struct SimpleCookie {
     comment: Option<String>,
     domain: Option<String>,
     path: Option<String>,
-    max_age: Option<i64>, // seconds; None = session cookie
+    max_age: Option<i32>, // seconds; None = session cookie
     version: Option<i32>,
     secure: bool,
     http_only: bool,
@@ -145,7 +145,7 @@ impl SimpleCookie {
         comment: Option<&str>,
         domain: &str,
         path: &str,
-        max_age: i64,
+        max_age: i32,
         version: i32,
         secure: bool,
         http_only: bool,
@@ -166,7 +166,7 @@ impl SimpleCookie {
         comment: Option<&str>,
         domain: &str,
         path: &str,
-        max_age: i64,
+        max_age: i32,
         version: i32,
         secure: bool,
         http_only: bool,
@@ -213,7 +213,7 @@ impl SimpleCookie {
         }
     }
 
-    fn append_expires(buffer: &mut String, max_age: i64) {
+    fn append_expires(buffer: &mut String, max_age: i32) {
         if max_age > 0 {
             write!(
                 buffer,
@@ -331,12 +331,12 @@ impl Cookie for SimpleCookie {
         self.domain = Some(domain);
     }
 
-    fn get_max_age(&self) -> i64 {
+    fn get_max_age(&self) -> i32 {
         self.max_age.unwrap_or_default()
     }
 
-    fn set_max_age(&mut self, max_age: i64) {
-        self.max_age = Some((Self::DEFAULT_MAX_AGE as i64).max(max_age));
+    fn set_max_age(&mut self, max_age: i32) {
+        self.max_age = Some((Self::DEFAULT_MAX_AGE).max(max_age));
     }
 
     fn get_path(&self) -> Option<&str> {
@@ -419,7 +419,7 @@ impl Cookie for SimpleCookie {
         );
     }
 
-    fn read_value(&self, req: &dyn HttpRequest, _resp: &mut dyn HttpResponse) -> Option<String> {
+    fn read_value(&self, req: &dyn HttpRequest, _resp: &dyn HttpResponse) -> Option<String> {
         let name = self.get_name().unwrap_or_default();
 
         let cookie = req.cookie();
@@ -452,6 +452,23 @@ impl Cookie for SimpleCookie {
         None
     }
 }
+
+impl From<&dyn Cookie> for SimpleCookie {
+    fn from(cookie: &dyn Cookie) -> Self {
+        Self {
+            name: cookie.get_name().map(ToString::to_string),
+            value: cookie.get_value().map(ToString::to_string),
+            comment: cookie.get_comment().map(ToString::to_string),
+            domain: cookie.get_domain().map(ToString::to_string),
+            path: cookie.get_path().map(ToString::to_string),
+            max_age: Some(cookie.get_max_age().max(Self::DEFAULT_MAX_AGE)),
+            version: Some(cookie.get_version().max(Self::DEFAULT_VERSION)),
+            secure: cookie.is_secure(),
+            http_only: cookie.is_http_only(),
+            same_site: cookie.get_same_site().map(Clone::clone),
+        }
+    }
+}
 impl Default for SimpleCookie {
     fn default() -> Self {
         Self {
@@ -460,8 +477,8 @@ impl Default for SimpleCookie {
             comment: Default::default(),
             domain: Default::default(),
             path: Default::default(),
-            max_age: Some(Self::DEFAULT_MAX_AGE as i64),
-            version: Some(Self::DEFAULT_VERSION as i32),
+            max_age: Some(Self::DEFAULT_MAX_AGE),
+            version: Some(Self::DEFAULT_VERSION),
             http_only: true,
             same_site: Some(Default::default()),
             secure: Default::default(),

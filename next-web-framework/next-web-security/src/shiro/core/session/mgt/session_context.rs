@@ -1,10 +1,8 @@
-use crate::core::{util::object::Object, session::SessionId};
-
-
+use crate::core::{session::SessionId, util::object::Object};
 
 pub trait SessionContext
-where 
-Self: Send + Sync
+where
+    Self: Send + Sync,
 {
     fn set_host(&mut self, host: &str);
 

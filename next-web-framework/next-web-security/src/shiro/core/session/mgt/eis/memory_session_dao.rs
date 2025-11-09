@@ -16,17 +16,17 @@ impl MemorySessionDAO {
 
 #[async_trait]
 impl SessionDAO for MemorySessionDAO {
-    async fn create(&mut self, session: Arc<dyn Session>) {}
+    async fn create(&self, session: Arc<dyn Session>) {}
 
     async fn read(&self, session_id: &SessionId) -> Option<&Arc<dyn Session>> {
         None
     }
 
-    async fn update(&mut self, session: Arc<dyn Session>) -> Result<(), &'static str> {
+    async fn update(&self, session: Arc<dyn Session>) -> Result<(), &'static str> {
         Ok(())
     }
 
-    async fn delete(&mut self, session: Arc<dyn Session>) {}
+    async fn delete(&self, session: &dyn Session) {}
 
     async fn get_active_sessions(&self) -> Vec<&Arc<dyn Session>> {
         vec![]

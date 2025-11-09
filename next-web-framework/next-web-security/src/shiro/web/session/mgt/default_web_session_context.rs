@@ -2,8 +2,8 @@ use next_web_core::traits::required::Required;
 
 use crate::{
     core::session::{
-        SessionId,
         mgt::{default_session_context::DefaultSessionContext, session_context::SessionContext},
+        SessionId,
     },
     web::session::mgt::web_session_context::WebSessionContext,
 };
@@ -26,6 +26,7 @@ impl DefaultWebSessionContext {
         }
     }
 }
+
 impl SessionContext for DefaultWebSessionContext {
     fn set_host(&mut self, host: &str) {
         self.default_session_context.set_host(host)

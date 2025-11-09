@@ -12,7 +12,9 @@ use crate::{
                 filter_chain_manager::FilterChainManager,
                 path_matching_filter_chain_resolver::PathMatchingFilterChainResolver,
             },
-        }, mgt::default_web_security_manager::DefaultWebSecurityManager, subject::support::web_delegating_subject::WebDelegatingSubject
+        },
+        mgt::default_web_security_manager::DefaultWebSecurityManager,
+        subject::support::web_delegating_subject::WebDelegatingSubject,
     },
 };
 
@@ -283,6 +285,8 @@ impl HttpFilter for FilterProxy {
         res: &mut dyn HttpResponse,
         orig_chain: &dyn HttpFilterChain,
     ) -> Result<(), BoxError> {
+        req.ready();
+
         let mut subject = self.create_subject();
 
         self.update_session_last_access_time(req, res, &mut subject);

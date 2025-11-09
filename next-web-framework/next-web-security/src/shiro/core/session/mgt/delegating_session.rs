@@ -1,65 +1,60 @@
-use std::collections::HashSet;
-
-use super::{Session, SessionError};
-use crate::core::session::{SessionId, SessionValue};
+use crate::core::session::{Session, SessionError, SessionId, SessionValue};
 
 #[derive(Clone)]
-pub struct ProxiedSession {
-    delegate: Box<dyn Session>,
-}
+pub struct DelegatingSession {}
 
-impl ProxiedSession {
-    pub fn new(delegate: Box<dyn Session>) -> Self {
-        Self { delegate }
+impl DelegatingSession {
+    pub fn new(id: SessionId) -> Self {
+        DelegatingSession {}
     }
 }
 
-impl Session for ProxiedSession {
+impl Session for DelegatingSession {
     fn id(&self) -> &SessionId {
-        self.delegate.id()
+        todo!()
     }
 
     fn start_timestamp(&self) -> i64 {
-        self.delegate.start_timestamp()
+        todo!()
     }
 
     fn last_access_time(&self) -> Option<i64> {
-        self.delegate.last_access_time()
+        todo!()
     }
 
     fn timeout(&self) -> Result<i64, SessionError> {
-        self.delegate.timeout()
+        todo!()
     }
 
     fn set_timeout(&mut self, timeout: i64) -> Result<(), SessionError> {
-        self.delegate.set_timeout(timeout)
+        todo!()
     }
 
     fn host(&self) -> Option<&str> {
-        self.delegate.host()
+        todo!()
     }
 
     fn touch(&self) -> Result<(), SessionError> {
-        self.delegate.touch()
+        todo!()
     }
 
     fn stop(&self) -> Result<(), SessionError> {
-        self.delegate.stop()
+        todo!()
     }
 
     fn attribute_keys(&self) -> Result<HashSet<String>, SessionError> {
-        self.delegate.attribute_keys()
+        todo!()
     }
 
     fn get_attribute(&self, key: &str) -> Option<&SessionValue> {
-        self.delegate.get_attribute(key)
+        todo!()
     }
 
     fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), SessionError> {
-        self.delegate.set_attribute(key, value)
+        todo!()
     }
 
     fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError> {
-        self.delegate.remove_attribute(key)
+        todo!()
     }
 }

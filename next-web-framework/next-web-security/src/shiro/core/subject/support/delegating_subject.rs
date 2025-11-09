@@ -125,6 +125,7 @@ where
         if let Some(session_value) = session.get_attribute(Self::RUN_AS_PRINCIPALS_SESSION_KEY) {
             if let SessionValue::Object(obj) = session_value {
                 if let Ok(principal_collections) = obj
+                    .clone()
                     .into_any()
                     .downcast::<Vec<Arc<dyn PrincipalCollection>>>()
                 {
@@ -484,7 +485,7 @@ where
         let session = self.get_session_or_create(false);
         match session {
             Some(session) => session.remove_attribute(Self::RUN_AS_PRINCIPALS_SESSION_KEY),
-            None => Err(SessionError::Invalid),
+            None => Err(SessionError::Invalid(None)),
         }
     }
 }
@@ -516,19 +517,19 @@ impl Session for StoppingAwareProxiedSession {
         self.proxied_session.id()
     }
 
-    fn start_timestamp(&self) -> &DateTime<Utc> {
+    fn start_timestamp(&self) -> i64 {
         self.proxied_session.start_timestamp()
     }
 
-    fn last_access_time(&self) -> &DateTime<Utc> {
+    fn last_access_time(&self) -> Option<i64> {
         self.proxied_session.last_access_time()
     }
 
-    fn timeout(&self) -> Result<u64, SessionError> {
+    fn timeout(&self) -> Result<i64, SessionError> {
         self.proxied_session.timeout()
     }
 
-    fn set_timeout(&mut self, max_idle_time_in_millis: u64) -> Result<(), SessionError> {
+    fn set_timeout(&mut self, max_idle_time_in_millis: i64) -> Result<(), SessionError> {
         self.proxied_session.set_timeout(max_idle_time_in_millis)
     }
 
@@ -548,7 +549,7 @@ impl Session for StoppingAwareProxiedSession {
         self.proxied_session.attribute_keys()
     }
 
-    fn get_attribute(&self, key: &str) -> Option<SessionValue> {
+    fn get_attribute(&self, key: &str) -> Option<&SessionValue> {
         self.proxied_session.get_attribute(key)
     }
 

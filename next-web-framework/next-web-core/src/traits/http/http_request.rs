@@ -1,12 +1,18 @@
-use std::str::FromStr;
-
 use axum::{extract::Request, http::Uri};
 use headers::{Cookie, HeaderMapExt};
+use sha2::digest::const_oid::Arc;
+use std::{collections::HashMap, str::FromStr};
 
-use crate::{traits::http::request_dispatcher::RequestDispatcher, util::http_method::HttpMethod};
+use crate::{
+    anys::{any_map::AnyMap, any_value::AnyValue},
+    traits::http::request_dispatcher::RequestDispatcher,
+    util::http_method::HttpMethod,
+};
+
 pub trait HttpRequest
-where Self: Send
- {
+where
+    Self: Send,
+{
     fn session(&self, name: &str) -> Option<String>;
 
     fn cookie(&self) -> Option<Cookie>;
@@ -19,6 +25,10 @@ where Self: Send
 
     fn uri(&self) -> &Uri;
 
+    fn query(&self) -> Option<&str>;
+
+    fn get_parameter(&self, name: &str) -> Option<&str>;
+
     fn path(&self) -> &str;
 
     fn host(&self) -> Option<&str>;
@@ -26,7 +36,15 @@ where Self: Send
     fn scheme(&self) -> Option<&str>;
 
     fn context_path(&self) -> Option<&str>;
+
+    fn remove_attribute(&mut self, name: &str);
+
+    fn set_attribute(&mut self, name: &str, value: AnyValue);
+
+    fn ready(&mut self);
 }
+
+pub type OneMap = HashMap<String, AnyValue>;
 
 impl HttpRequest for Request {
     fn session(&self, name: &str) -> Option<String> {
@@ -52,24 +70,52 @@ impl HttpRequest for Request {
             .get(header_name)
             .map(|value| value.to_str().ok().unwrap_or_default())
     }
-    
+
     fn uri(&self) -> &Uri {
         self.uri()
     }
-    
+
+    fn query(&self) -> Option<&str> {
+        self.uri().query()
+    }
+
+    fn get_parameter(&self, name: &str) -> Option<&str> {
+        self.query().and_then(|query| {
+            query
+                .split('&')
+                .find_map(|param| param.split('=').nth(1).filter(|value| *value == name))
+        })
+    }
+
     fn path(&self) -> &str {
         self.uri().path()
     }
-    
+
     fn host(&self) -> Option<&str> {
         self.uri().host()
     }
-    
+
     fn scheme(&self) -> Option<&str> {
         self.uri().scheme().map(|s| s.as_str())
     }
-    
+
     fn context_path(&self) -> Option<&str> {
         None
+    }
+
+    fn remove_attribute(&mut self, name: &str) {
+        if let Some(map) = self.extensions_mut().get_mut::<OneMap>() {
+            map.remove(name);
+        }
+    }
+
+    fn set_attribute(&mut self, name: &str, value: AnyValue) {
+        if let Some(map) = self.extensions_mut().get_mut::<OneMap>() {
+            map.insert(name.to_string(), value);
+        }
+    }
+
+    fn ready(&mut self) {
+        self.extensions_mut().insert(OneMap::new());
     }
 }
