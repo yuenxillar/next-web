@@ -1,11 +1,9 @@
-use axum::{extract::Request, http::Uri};
-use headers::{Cookie, HeaderMapExt};
-use sha2::digest::const_oid::Arc;
+use axum::{extract::Request, http::{Uri, uri::Scheme}};
+use headers::{Cookie, HeaderMapExt, Host};
 use std::{collections::HashMap, str::FromStr};
 
 use crate::{
-    anys::{any_map::AnyMap, any_value::AnyValue},
-    traits::http::request_dispatcher::RequestDispatcher,
+    anys::any_value::AnyValue, traits::http::request_dispatcher::RequestDispatcher,
     util::http_method::HttpMethod,
 };
 
@@ -35,13 +33,23 @@ where
 
     fn scheme(&self) -> Option<&str>;
 
-    fn context_path(&self) -> Option<&str>;
+    fn server_port(&self) -> Option<u16>;
+
+    fn server_name(&self) -> Option<String>;
+
+    fn context_path(&self) -> &str;
+
+    fn get_attribute(&self, name: &str) -> Option<&AnyValue>;
 
     fn remove_attribute(&mut self, name: &str);
 
     fn set_attribute(&mut self, name: &str, value: AnyValue);
 
     fn ready(&mut self);
+
+    fn clean_up(&mut self);
+
+    fn is_secure(&self) -> bool;
 }
 
 pub type OneMap = HashMap<String, AnyValue>;
@@ -99,8 +107,18 @@ impl HttpRequest for Request {
         self.uri().scheme().map(|s| s.as_str())
     }
 
-    fn context_path(&self) -> Option<&str> {
-        None
+    fn server_port(&self) -> Option<u16> {
+        self.uri().port_u16()
+    }
+
+    fn server_name(&self) -> Option<String> {
+        self.headers()
+            .typed_get::<Host>()
+            .map(|host| host.hostname().to_string())
+    }
+
+    fn context_path(&self) -> &str {
+        "/"
     }
 
     fn remove_attribute(&mut self, name: &str) {
@@ -115,7 +133,26 @@ impl HttpRequest for Request {
         }
     }
 
+    fn get_attribute(&self, name: &str) -> Option<&AnyValue> {
+        self.extensions()
+            .get::<OneMap>()
+            .map(|map| map.get(name))
+            .unwrap_or_default()
+    }
+
     fn ready(&mut self) {
         self.extensions_mut().insert(OneMap::new());
+    }
+
+    fn clean_up(&mut self) {
+        self.extensions_mut()
+            .get_mut::<OneMap>()
+            .map(|map| map.clear());
+
+        self.extensions_mut().remove::<OneMap>();
+    }
+
+    fn is_secure(&self) -> bool {
+        self.uri().scheme() == Some(&Scheme::HTTPS)
     }
 }

@@ -18,10 +18,8 @@ use crate::{
         },
         event::{event_bus_aware::EventBusAware, support::default_event_bus::DefaultEventBus},
         session::{
-            expired_session_error::ExpiredSessionError,
             mgt::{
                 default_session_manager::DefaultSessionManager,
-                delegating_session::DelegatingSession,
                 native_session_manager::NativeSessionManagerExt, session_context::SessionContext,
                 session_manager::SessionManager,
                 validating_session_manager::ValidatingSessionManagerExt,
@@ -122,7 +120,7 @@ impl DefaultWebSessionManager {
         Ok(())
     }
 
-    fn remove_session_id_cookie(&self, req: &mut dyn HttpRequest, resp: &mut dyn HttpResponse) {
+    fn remove_session_id_cookie(&self, req: &dyn HttpRequest, resp: &mut dyn HttpResponse) {
         self.get_session_id_cookie().remove_from(req, resp);
     }
 
@@ -177,26 +175,6 @@ impl DefaultWebSessionManager {
 
         // Return owned String (clone only if needed)
         Some(value.to_string())
-    }
-
-    pub fn on_start(
-        &self,
-        session: &mut dyn Session,
-        req: &mut dyn HttpRequest,
-        resp: &mut dyn HttpResponse,
-    ) {
-        if self.is_session_id_cookie_enabled() {
-            let session_id = session.id();
-            self.store_session_id(session_id, req, resp);
-        } else {
-            debug!(
-                "Session ID cookie is disabled.  No cookie has been set for new session with id {}",
-                session.id()
-            );
-        }
-
-        req.remove_attribute(Self::REFERENCED_SESSION_ID_SOURCE);
-        req.set_attribute(Self::REFERENCED_SESSION_IS_NEW, AnyValue::Boolean(true));
     }
 
     fn get_session_id_name(&self) -> &str {
@@ -279,26 +257,14 @@ impl DefaultWebSessionManager {
         req.remove_attribute(Self::REFERENCED_SESSION_ID_IS_VALID);
         self.remove_session_id_cookie(req, resp);
     }
-
-    pub fn create_exposed_session(&self, session: &dyn Session) -> DelegatingSession {
-        DelegatingSession::new(session.id().clone())
-    }
 }
 
 #[async_trait]
 impl ValidatingSessionManagerExt for DefaultWebSessionManager {
-    async fn do_create_session(
-        &self,
-        ctx: &dyn SessionContext,
-    ) -> Result<Arc<dyn Session>, AuthorizationError> {
-        // self.default_session_manager.do
-        todo!()
-    }
-
     async fn on_expiration(
         &self,
         session: &Arc<dyn Session>,
-        error: ExpiredSessionError,
+        error: SessionError,
         req: &mut dyn HttpRequest,
         resp: &mut dyn HttpResponse,
     ) {
@@ -308,11 +274,6 @@ impl ValidatingSessionManagerExt for DefaultWebSessionManager {
             .await;
         self._on_invalidation(req, resp);
     }
-
-    async fn after_expired(&self, session: &dyn Session) {
-        todo!()
-    }
-
     async fn on_invalidation(
         &self,
         session: &dyn Session,
@@ -326,24 +287,25 @@ impl ValidatingSessionManagerExt for DefaultWebSessionManager {
             .await;
         self._on_invalidation(req, resp);
     }
+
+    async fn get_active_sessions(&self) -> Vec<&Arc<dyn Session>> {
+        self.default_session_manager.get_active_sessions().await
+    }
 }
 
+#[async_trait]
 impl SessionManager for DefaultWebSessionManager {
-    fn start(&self, context: &dyn SessionContext) -> Result<Box<dyn Session>, AuthorizationError> {
-        let session = self.create_session(context)?;
-        self.apply_global_session_timeout(session.as_mut());
-        self.on_start(session, context);
-        self.notify_start(&session);
-        self.create_exposed_session(session);
+    async fn start(
+        &self,
+        context: &dyn SessionContext,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Result<Box<dyn Session>, AuthorizationError> {
+        self.default_session_manager.start(context, req, resp).await
     }
 
-    fn get_session(
-        &self,
-        id: &crate::core::session::SessionId,
-    ) -> Result<std::sync::Arc<dyn Session>, SessionError> {
-        self.default_session_manager
-            .validating_session_manager
-            .do_get_session(id)
+    async fn get_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError> {
+        self.default_session_manager.do_get_session(id).await
     }
 }
 
@@ -382,22 +344,14 @@ impl NativeSessionManagerExt for DefaultWebSessionManager {
         self.remove_session_id_cookie(req, resp);
     }
 
-    async fn after_stopped(&self, session: &mut dyn Session) {}
-
-    async fn on_change(&self, session: &Arc<dyn Session>) {}
-
-    fn do_get_session(
-        &self,
-        session_id: &SessionId,
-        ctx: &dyn SessionContext,
-    ) -> Result<Arc<dyn Session>, SessionError> {
-        todo!()
+    async fn on_change(&self, session: &Arc<dyn Session>) {
+        self.default_session_manager.on_change(session).await
     }
 }
 
 impl EventBusAware<DefaultEventBus> for DefaultWebSessionManager {
     fn set_event_bus(&mut self, event_bus: DefaultEventBus) {
-        todo!()
+        self.default_session_manager.set_event_bus(event_bus);
     }
 }
 

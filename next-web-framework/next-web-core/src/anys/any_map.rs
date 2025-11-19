@@ -58,10 +58,9 @@ where
     /// 示例
     ///
     /// ```
-    /// cache.set("my_key", "my_value", Some(Duration::from_secs(60)));
+    /// cache.insert("my_key", "my_value", Some(Duration::from_secs(60)));
     /// ```
-    pub async fn set(&self, key: K, value: V)
-    {
+    pub async fn insert(&self, key: K, value: V) {
         self.data.write().await.insert(key, value);
     }
 
@@ -98,8 +97,8 @@ where
     }
 
     /// 检查键是否存在
-    pub async fn exists<Q: ?Sized>(&self, key: &Q) -> bool 
-      where
+    pub async fn exists<Q: ?Sized>(&self, key: &Q) -> bool
+    where
         K: Borrow<Q>,
         Q: Hash + Eq,
     {
@@ -155,6 +154,19 @@ where
     }
 }
 
+impl<K, V> AnyMap<K, V>
+where
+    K: ToString,
+{
+    pub async fn keys(&self) -> Vec<String> {
+        self.data
+            .read()
+            .await
+            .keys()
+            .map(|k| k.to_string())
+            .collect()
+    }
+}
 /// 缓存对象包装器
 /// Cache object wrapper
 pub struct CacheObject<T>(pub T)

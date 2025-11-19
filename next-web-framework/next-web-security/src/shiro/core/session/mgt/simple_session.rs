@@ -2,12 +2,11 @@ use crate::core::session::{
     mgt::validating_session::ValidatingSession, Session, SessionError, SessionId, SessionValue,
 };
 use chrono::{DateTime, Utc};
+use next_web_core::anys::any_map::AnyMap;
+use next_web_core::async_trait;
 use next_web_core::error::BoxError;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{atomic::AtomicI64, Arc},
-};
+use std::sync::{atomic::AtomicI64, Arc};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -17,10 +16,10 @@ pub struct SimpleSession {
     start_time: Arc<AtomicI64>,
     stop_time: Arc<AtomicI64>,
     last_access_time: Arc<AtomicI64>,
-    timeout: i64,
+    timeout: Arc<AtomicI64>,
     expired: Arc<AtomicBool>,
     host: Option<String>,
-    attributes: Option<HashMap<String, SessionValue>>,
+    attributes: AnyMap<String, SessionValue>,
 }
 
 impl SimpleSession {
@@ -62,12 +61,12 @@ impl SimpleSession {
         self.host = Some(host.to_string());
     }
 
-    pub fn set_attributes(&mut self, attributes: HashMap<String, SessionValue>) {
-        self.attributes = Some(attributes);
+    pub fn set_attributes(&mut self, attributes: AnyMap<String, SessionValue>) {
+        self.attributes = attributes;
     }
 
-    pub fn attributes(&self) -> Option<&HashMap<String, SessionValue>> {
-        self.attributes.as_ref()
+    pub fn attributes(&self) -> &AnyMap<String, SessionValue> {
+        &self.attributes
     }
 
     pub fn is_stopped(&self) -> bool {
@@ -111,6 +110,7 @@ impl SimpleSession {
     }
 }
 
+#[async_trait]
 impl Session for SimpleSession {
     fn id(&self) -> &SessionId {
         &self.id
@@ -129,11 +129,11 @@ impl Session for SimpleSession {
     }
 
     fn timeout(&self) -> Result<i64, SessionError> {
-        Ok(self.timeout)
+        Ok(self.timeout.load(Ordering::Relaxed))
     }
 
-    fn set_timeout(&mut self, timeout: i64) -> Result<(), SessionError> {
-        self.timeout = timeout;
+    fn set_timeout(&self, timeout: i64) -> Result<(), SessionError> {
+        self.timeout.store(timeout, Ordering::Relaxed);
         Ok(())
     }
 
@@ -155,49 +155,27 @@ impl Session for SimpleSession {
         Ok(())
     }
 
-    fn attribute_keys(&self) -> Result<HashSet<String>, SessionError> {
-        Ok(self
-            .attributes()
-            .map(|attr| {
-                attr.keys()
-                    .map(ToString::to_string)
-                    .collect::<HashSet<String>>()
-            })
-            .unwrap_or_default())
+    async fn attribute_keys(&self) -> Result<Vec<String>, SessionError> {
+        Ok(self.attributes().keys().await)
     }
 
-    fn get_attribute(&self, key: &str) -> Option<&SessionValue> {
-        self.attributes()
-            .map(|attr| attr.get(key))
-            .unwrap_or_default()
+    async fn get_attribute(&self, key: &str) -> Option<SessionValue> {
+        self.attributes().get(key).await
     }
 
-    fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), SessionError> {
-        match self.attributes.as_mut() {
-            Some(attr) => {
-                if let SessionValue::Null = value {
-                    attr.remove(key);
-                } else {
-                    attr.insert(key.to_string(), value);
-                }
-            }
-            None => {
-                self.attributes = Some(HashMap::new());
-                self.attributes
-                    .as_mut()
-                    .unwrap()
-                    .insert(key.to_string(), value);
-            }
-        };
+    async fn set_attribute(&self, key: &str, value: SessionValue) -> Result<(), SessionError> {
+        let attr = self.attributes();
+        if let SessionValue::Null = value {
+            attr.remove(key).await;
+        } else {
+            attr.insert(key.to_string(), value).await;
+        }
 
         Ok(())
     }
 
-    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError> {
-        match self.attributes.as_mut() {
-            Some(attr) => Ok(attr.remove(key)),
-            None => Ok(None),
-        }
+    async fn remove_attribute(&self, key: &str) -> Result<Option<SessionValue>, SessionError> {
+        Ok(self.attributes().remove(key).await)
     }
 }
 
@@ -206,12 +184,12 @@ impl ValidatingSession for SimpleSession {
         !self.is_stopped() && !self.is_expired()
     }
 
-    fn validate(&self) -> Result<(), BoxError> {
+    fn validate(&self) -> Result<(), SessionError> {
         if self.is_stopped() {
-            return Err(format!("Session with id [{}]] has been explicitly stopped.  No further interaction under this session is allowed.", self.id).into());
+            return Err(SessionError::Stopped(format!("Session with id [{}]] has been explicitly stopped.  No further interaction under this session is allowed.", self.id).into()));
         }
 
-        if self.is_timeout()? {
+        if self.is_timeout().unwrap_or_default() {
             self.expire();
 
             let last_access_time = self.last_access_time();
@@ -226,7 +204,7 @@ impl ValidatingSession for SimpleSession {
                 timeout / Self::MILLIS_PER_SECOND,
                 timeout / Self::MILLIS_PER_MINUTE );
 
-            return Err(msg.into());
+            return Err(SessionError::Expired(Some(msg)));
         }
 
         Ok(())
@@ -238,13 +216,13 @@ impl Default for SimpleSession {
         let now = Utc::now().timestamp_millis();
         Self {
             id: SessionId::String(Uuid::new_v4().to_string()),
-            timeout: Self::DEFAULT_GLOBAL_SESSION_TIMEOUT,
+            timeout: Arc::new(AtomicI64::new(Self::DEFAULT_GLOBAL_SESSION_TIMEOUT)),
             start_time: Arc::new(AtomicI64::new(now)),
             stop_time: Arc::new(AtomicI64::new(0)),
             last_access_time: Arc::new(AtomicI64::new(now)),
             expired: Arc::new(AtomicBool::new(false)),
+            attributes: AnyMap::new(),
             host: None,
-            attributes: None,
         }
     }
 }

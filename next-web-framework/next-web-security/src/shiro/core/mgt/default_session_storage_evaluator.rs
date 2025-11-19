@@ -1,3 +1,5 @@
+use next_web_core::async_trait;
+
 use crate::core::mgt::session_storage_evaluator::SessionStorageEvaluator;
 
 #[derive(Clone)]
@@ -15,8 +17,12 @@ impl DefaultSessionStorageEvaluator {
     }
 }
 
+#[async_trait]
 impl SessionStorageEvaluator for DefaultSessionStorageEvaluator {
-    fn is_session_storage_enabled(&self, subject: &dyn crate::core::subject::Subject) -> bool {
+    async fn is_session_storage_enabled(
+        &self,
+        subject: &dyn crate::core::subject::Subject,
+    ) -> bool {
         subject.get_session().is_some() || self.is_session_storage_enabled()
     }
 }

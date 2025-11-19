@@ -1,6 +1,12 @@
 use std::{fmt::Display, sync::Arc};
 
-use next_web_core::{clone_box, traits::required::Required};
+use next_web_core::{
+    async_trait, clone_box,
+    traits::{
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        required::Required,
+    },
+};
 use tracing::{debug, info, trace, warn};
 
 use crate::core::{
@@ -27,18 +33,18 @@ use crate::core::{
         sessions_security_manager::SessionsSecurityManager, subject_dao::SubjectDAO,
         subject_factory::SubjectFactory,
     },
-    realm::{Realm, simple_account_realm::SimpleAccountRealm},
+    realm::{simple_account_realm::SimpleAccountRealm, Realm},
     session::{
-        Session, SessionError, SessionId,
         mgt::{
             default_session_context::DefaultSessionContext,
             default_session_manager::DefaultSessionManager, session_context::SessionContext,
             session_manager::SessionManager,
         },
+        Session, SessionError, SessionId,
     },
     subject::{
-        Subject, principal_collection::PrincipalCollection, subject_context::SubjectContext,
-        support::default_subject_context::DefaultSubjectContext,
+        principal_collection::PrincipalCollection, subject_context::SubjectContext,
+        support::default_subject_context::DefaultSubjectContext, Subject,
     },
 };
 
@@ -111,7 +117,7 @@ impl<D, F, S, A, T, R, C, B> DefaultSecurityManager<D, F, S, A, T, R, C, B> {
     pub fn get_subject_dao(&self) -> &D {
         &self.subject_dao
     }
-    
+
     pub fn get_mut_subject_dao(&mut self) -> &mut D {
         &mut self.subject_dao
     }
@@ -233,8 +239,8 @@ where
         self.create_subject(Arc::new(context))
     }
 
-    pub fn resolve_session(&self, context: &mut dyn SubjectContext) {
-        let session = self.resolve_context_session(context);
+    pub async fn resolve_session(&self, context: &mut dyn SubjectContext) {
+        let session = self.resolve_context_session(context).await;
 
         match session {
             Ok(session) => context.set_session(session),
@@ -245,12 +251,12 @@ where
         };
     }
 
-    pub fn resolve_context_session(
+    pub async fn resolve_context_session(
         &self,
         context: &dyn SubjectContext,
     ) -> Result<Arc<dyn Session>, SessionError> {
         let session_id = self.get_session_id(context);
-        self.sessions_security_manager.get_session(&session_id)
+        self.sessions_security_manager.get_session(&session_id).await
     }
 
     pub fn resolve_principals(&self, context: &mut dyn SubjectContext) {
@@ -514,6 +520,7 @@ where
     }
 }
 
+#[async_trait]
 impl<D, F, S, A, T, R, C, B> SessionManager for DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
     D: Send + Sync,
@@ -525,15 +532,23 @@ where
     C: Send + Sync,
     B: Send + Sync,
 {
-    fn start(&self, context: &dyn SessionContext) -> Result<Box<dyn Session>, AuthorizationError> {
-        self.sessions_security_manager.start(context)
+    async fn start(
+        &self,
+        context: &dyn SessionContext,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Result<Box<dyn Session>, AuthorizationError> {
+        self.sessions_security_manager
+            .start(context, req, resp)
+            .await
     }
-
-    fn get_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError> {
-        self.sessions_security_manager.get_session(id)
+    
+    async fn get_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError> {
+        self.sessions_security_manager.get_session(id).await
     }
 }
 
+#[async_trait]
 impl<D, F, S, A, T, R, C, B> SecurityManager for DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
     D: SubjectDAO,
@@ -547,7 +562,7 @@ where
     C: Clone,
     B: EventBus + Clone,
 {
-    fn login(
+    async fn login(
         &self,
         subject: &dyn Subject,
         token: &dyn AuthenticationToken,
@@ -572,9 +587,9 @@ where
         Ok(logged_in)
     }
 
-    fn logout(&self, subject: &dyn Subject) -> Result<(), next_web_core::error::BoxError> {
+    async fn logout(&self, subject: &dyn Subject) -> Result<(), next_web_core::error::BoxError> {
         self.before_logout(subject);
-        if let Some(principals) = subject.get_principals() {
+        if let Some(principals) = subject.get_principals().await {
             if !principals.is_empty() {
                 debug!("Logging out subject with primary principal {}", "none");
 

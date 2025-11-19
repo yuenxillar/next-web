@@ -3,17 +3,9 @@ use crate::core::event::event_bus_aware::EventBusAware;
 use crate::core::event::support::default_event_bus::DefaultEventBus;
 use crate::core::session::mgt::delegating_session::DelegatingSession;
 use crate::core::session::mgt::immutable_proxied_session::ImmutableProxiedSession;
-use crate::core::session::mgt::native_session_manager::NativeSessionManager;
 use crate::core::session::session_listener::SessionListener;
-use crate::core::{
-    authz::authorization_error::AuthorizationError,
-    session::{
-        mgt::{session_context::SessionContext, session_manager::SessionManager},
-        Session, SessionError, SessionId,
-    },
-    util::object::Object,
-};
-use std::{collections::HashSet, sync::Arc};
+use crate::core::{session::Session, util::object::Object};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct DefaultNativeSessionManager {
@@ -22,6 +14,8 @@ pub struct DefaultNativeSessionManager {
 }
 
 impl DefaultNativeSessionManager {
+    pub const DEFAULT_GLOBAL_SESSION_TIMEOUT: i32 = 1800000;
+
     pub fn set_session_listeners(&mut self, listeners: Vec<Arc<dyn SessionListener>>) {
         self.listeners = listeners;
     }
@@ -40,21 +34,21 @@ impl DefaultNativeSessionManager {
         }
     }
 
-    pub fn notify_start(&self, session: &Box<dyn Session>) {
+    pub fn notify_start(&self, session: &dyn Session) {
         for listener in self.listeners.iter() {
-            listener.on_start(session.as_ref());
+            listener.on_start(session);
         }
     }
 
-    pub fn notify_stop(&self, session: &Box<dyn Session>) {
-        let for_notification = self.before_invalid_notification(session.to_owned());
+    pub fn notify_stop(&self, session: Arc<dyn Session>) {
+        let for_notification = self.before_invalid_notification(session);
         for listener in self.listeners.iter() {
             listener.on_stop(&for_notification);
         }
     }
 
-    pub fn notify_expiration(&self, session: &Box<dyn Session>) {
-        let for_notification = self.before_invalid_notification(session.to_owned());
+    pub fn notify_expiration(&self, session: Arc<dyn Session>) {
+        let for_notification = self.before_invalid_notification(session);
         for listener in self.listeners.iter() {
             listener.on_expiration(&for_notification);
         }
@@ -62,85 +56,17 @@ impl DefaultNativeSessionManager {
 
     pub fn before_invalid_notification(
         &self,
-        session: Box<dyn Session>,
+        session: Arc<dyn Session>,
     ) -> ImmutableProxiedSession {
         ImmutableProxiedSession::new(session)
     }
 
-    fn lookup_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError> {
-        todo!()
-    }
-
-    pub fn apply_global_session_timeout(&self, session: &mut dyn Session) {
-        session.set_timeout(max_idle_time_in_millis);
-        self.on_change(session);
+    pub fn apply_global_session_timeout(&self, session: &dyn Session) {
+        session.set_timeout(Self::DEFAULT_GLOBAL_SESSION_TIMEOUT as i64).ok();
     }
 
     pub fn create_exposed_session(&self, session: &dyn Session) -> DelegatingSession {
         DelegatingSession::new(session.id().clone())
-    }
-}
-
-impl NativeSessionManager for DefaultNativeSessionManager {
-    fn start_time_stamp(&self, session_id: &SessionId) -> i64 {
-        todo!()
-    }
-
-    fn last_access_time(&self, session_id: &SessionId) -> i64 {
-        todo!()
-    }
-
-    fn is_valid(&self, session_id: &SessionId) -> bool {
-        todo!()
-    }
-
-    fn check_valid(&self, session_id: &SessionId) -> Result<(), SessionError> {
-        todo!()
-    }
-
-    fn timeout(&self, session_id: &SessionId) -> Result<i64, SessionError> {
-        todo!()
-    }
-
-    fn set_timeout(
-        &mut self,
-        session_id: &SessionId,
-        max_idle_time_in_millis: i64,
-    ) -> Result<(), SessionError> {
-        todo!()
-    }
-
-    fn touch(&self, session_id: &SessionId) -> Result<(), SessionError> {
-        todo!()
-    }
-
-    fn host(&self, session_id: &SessionId) -> Option<&str> {
-        todo!()
-    }
-
-    fn stop(&self, session_id: &SessionId) -> Result<(), SessionError> {
-        todo!()
-    }
-
-    fn attribute_keys(&self, session_id: &SessionId) -> Result<HashSet<String>, SessionError> {
-        todo!()
-    }
-
-    fn attribute(&self, session_id: &SessionId, key: &str) -> Result<Object, SessionError> {
-        todo!()
-    }
-
-    fn set_attribute(
-        &self,
-        session_id: &SessionId,
-        key: &str,
-        value: Object,
-    ) -> Result<(), SessionError> {
-        todo!()
-    }
-
-    fn remove_attribute(&self, session_id: &SessionId, key: &str) -> Result<Object, SessionError> {
-        todo!()
     }
 }
 

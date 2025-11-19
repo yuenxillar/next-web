@@ -17,11 +17,11 @@ use crate::{
 
 #[derive(Clone)]
 pub struct HttpAuthenticationFilter {
-    authc_scheme: String,
-    authz_scheme: String,
+    authc_scheme: Option<String>,
+    authz_scheme: Option<String>,
     application_name: String,
 
-    authenticating_filter: AuthenticatingFilter,
+    pub(crate) authenticating_filter: AuthenticatingFilter,
 }
 
 impl HttpAuthenticationFilter {
@@ -37,20 +37,20 @@ impl HttpAuthenticationFilter {
         self.application_name = application_name.to_string();
     }
 
-    pub fn get_authc_scheme(&self) -> &str {
-        &self.authc_scheme
+    pub fn get_authc_scheme(&self) -> Option<&str> {
+        self.authc_scheme.as_deref()
     }
 
     pub fn set_authc_scheme(&mut self, authc_scheme: impl ToString) {
-        self.authc_scheme = authc_scheme.to_string();
+        self.authc_scheme = Some(authc_scheme.to_string());
     }
 
-    pub fn get_authz_scheme(&self) -> &str {
-        &self.authz_scheme
+    pub fn get_authz_scheme(&self) -> Option<&str> {
+        self.authz_scheme.as_deref()
     }
 
     pub fn set_authz_scheme(&mut self, authz_scheme: impl ToString) {
-        self.authz_scheme = authz_scheme.to_string();
+        self.authz_scheme = Some(authz_scheme.to_string());
     }
 
     pub fn get_authenticating_filter(&self) -> &AuthenticatingFilter {
@@ -61,7 +61,7 @@ impl HttpAuthenticationFilter {
         self.authenticating_filter = authenticating_filter;
     }
 
-    fn http_methods_from_options(&self, options: Option<&Vec<String>>) -> Option<HashSet<String>> {
+    fn http_methods_from_options(&self, options: Option<Vec<&str>>) -> Option<HashSet<String>> {
         let options = match options {
             Some(options) => {
                 if options.is_empty() {
@@ -94,9 +94,12 @@ impl HttpAuthenticationFilter {
     ) -> bool {
         let authz_header = self.get_authz_header(request);
         match authz_header {
-            Some(h) => h
-                .to_ascii_lowercase()
-                .starts_with(&self.get_authz_scheme().to_ascii_lowercase()),
+            Some(h) => h.to_ascii_lowercase().starts_with(
+                &self
+                    .get_authz_scheme()
+                    .unwrap_or_default()
+                    .to_ascii_lowercase(),
+            ),
             None => false,
         }
     }
@@ -117,7 +120,7 @@ impl HttpAuthenticationFilter {
         response.set_status_code(StatusCode::UNAUTHORIZED);
         let authc_header = format!(
             "{} realm=\"{}\"",
-            self.get_authc_scheme(),
+            self.get_authc_scheme().unwrap_or_default(),
             self.get_application_name()
         );
         response.insert_header(Self::AUTHENTICATE_HEADER.as_bytes(), &authc_header);
@@ -144,15 +147,16 @@ impl HttpAuthenticationFilter {
 
 #[async_trait]
 impl AccessControlFilterExt for HttpAuthenticationFilter {
-    fn is_access_allowed(
+    async fn is_access_allowed(
         &self,
-        request: &dyn HttpRequest,
-        response: &dyn HttpResponse,
-        mapped_value: &Object,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        mapped_value: Option<Object>,
     ) -> bool {
         let http_method = request.method();
 
-        let methods = self.http_methods_from_options(mapped_value.as_object::<Vec<String>>());
+        let methods =
+            self.http_methods_from_options(mapped_value.as_ref().and_then(|v| v.as_list_str()));
 
         let mut authc_required = methods.as_ref().map(|x| x.len() == 0).unwrap_or_default();
 
@@ -168,6 +172,7 @@ impl AccessControlFilterExt for HttpAuthenticationFilter {
         if authc_required {
             self.authenticating_filter
                 .is_access_allowed(request, response, mapped_value)
+                .await
         } else {
             true
         }
@@ -177,6 +182,7 @@ impl AccessControlFilterExt for HttpAuthenticationFilter {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
+        _mapped_value: Option<Object>,
     ) -> bool {
         let mut logged_in = false;
         if self.is_login_attempt(request, response) {
@@ -231,6 +237,17 @@ impl AuthenticatingFilterExt for HttpAuthenticationFilter {
 
         self.authenticating_filter
             .create_token(username, password, request, response, self)
+    }
+}
+
+impl Default for HttpAuthenticationFilter {
+    fn default() -> Self {
+        Self {
+            authc_scheme: Default::default(),
+            authz_scheme: Default::default(),
+            application_name: String::from("application"),
+            authenticating_filter: Default::default(),
+        }
     }
 }
 

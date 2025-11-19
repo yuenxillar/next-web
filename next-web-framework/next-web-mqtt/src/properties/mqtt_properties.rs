@@ -1,4 +1,5 @@
-use rudi_dev::{Properties, Singleton};
+use next_web_macros::Properties;
+use rudi_dev::Singleton;
 
 /// MQTT Client Configuration Properties
 ///
@@ -161,10 +162,9 @@ impl MQTTClientProperties {
     }
 }
 
-
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
 
 pub struct Topic {
-    pub topic:  String,
-    pub qos:    Option<u8>,
+    pub topic: String,
+    pub qos: Option<u8>,
 }

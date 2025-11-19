@@ -20,20 +20,20 @@ pub mod util;
 
 pub use crate::extract::required_header::header_names;
 
-
 pub use axum::Router;
 pub use axum::{body, error_handling, handler, http, response, routing};
 
 pub use headers;
-pub use rand;
 pub use inventory::submit;
+pub use rand;
 
-pub use rudi_dev::{Properties, SingleOwner, Singleton, Transient};
+pub use rudi_dev::{SingleOwner, Singleton, Transient};
 
 pub use next_web_core::*;
 pub use next_web_macros::Idempotency;
 pub use next_web_macros::{
     AnyMapping, DeleteMapping, GetMapping, PatchMapping, PostMapping, PutMapping, RequestMapping,
+    Properties
 };
 
 pub use next_web_macros::Desensitized;

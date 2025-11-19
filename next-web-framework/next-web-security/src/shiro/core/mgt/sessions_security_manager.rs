@@ -1,6 +1,12 @@
 use std::sync::Arc;
 
-use next_web_core::traits::required::Required;
+use next_web_core::{
+    async_trait,
+    traits::{
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        required::Required,
+    },
+};
 
 use crate::core::{
     authc::{
@@ -19,13 +25,13 @@ use crate::core::{
         support::default_event_bus::DefaultEventBus,
     },
     mgt::authorizing_security_manager::AuthorizingSecurityManager,
-    realm::{Realm, simple_account_realm::SimpleAccountRealm},
+    realm::{simple_account_realm::SimpleAccountRealm, Realm},
     session::{
-        Session, SessionError, SessionId,
         mgt::{
             default_session_manager::DefaultSessionManager, session_context::SessionContext,
             session_manager::SessionManager,
         },
+        Session, SessionError, SessionId,
     },
     util::destroyable::Destroyable,
 };
@@ -118,6 +124,7 @@ where
     }
 }
 
+#[async_trait]
 impl<S, A, T, R, C, B> SessionManager for SessionsSecurityManager<S, A, T, R, C, B>
 where
     S: SessionManager,
@@ -127,12 +134,17 @@ where
     C: Send + Sync,
     B: Send + Sync,
 {
-    fn start(&self, context: &dyn SessionContext) -> Result<Box<dyn Session>, AuthorizationError> {
-        self.session_manager.start(context)
+    async fn start(
+        &self,
+        context: &dyn SessionContext,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Result<Box<dyn Session>, AuthorizationError> {
+        self.session_manager.start(context, req, resp).await
     }
 
-    fn get_session(&self, id: & SessionId) -> Result<Arc<dyn Session>, SessionError> {
-        self.session_manager.get_session(id)
+    async fn get_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError> {
+        self.session_manager.get_session(id).await
     }
 }
 

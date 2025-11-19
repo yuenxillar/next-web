@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use axum::{
-    extract::Path, extract::Request, response::IntoResponse, routing::post,
-};
+use axum::{extract::Path, extract::Request, response::IntoResponse, routing::post};
+use next_web_core::state::application_state::ApplicationState;
 #[allow(missing_docs)]
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
-use next_web_core::state::application_state::ApplicationState;
 use next_web_dev::{application::Application, traits::filter::http_filter::HttpFilter};
 use next_web_security::web::filter_proxy::FilterProxy;
 use tokio::sync::Mutex;
@@ -32,7 +30,10 @@ impl Application for TestApplication {
 
     async fn on_ready(&self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
-        ctx.insert_singleton_with_name::<Arc<dyn HttpFilter>, String>(Arc::new(FilterProxy::default()), "defaultFilterProxy".into());
+        ctx.insert_singleton_with_name::<Arc<dyn HttpFilter>, String>(
+            Arc::new(FilterProxy::default()),
+            "defaultFilterProxy".into(),
+        );
     }
 }
 

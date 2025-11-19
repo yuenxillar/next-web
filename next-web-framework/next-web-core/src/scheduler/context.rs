@@ -11,7 +11,7 @@ impl JobExecutionContext {
         K: Into<String>,
         V: Into<AnyValue>,
     {
-        self.data_map.set(key.into(), value.into()).await;
+        self.data_map.insert(key.into(), value.into()).await;
     }
 }
 impl Default for JobExecutionContext {

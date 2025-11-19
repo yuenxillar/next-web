@@ -1,3 +1,4 @@
+pub mod proxied_filter_chain;
 use std::fmt::Write;
 
 use chrono::Utc;
@@ -52,9 +53,9 @@ pub trait Cookie: Send + Sync {
 
     fn get_same_site(&self) -> Option<&SameSite>;
 
-    fn save_to(&self, req: &mut dyn HttpRequest, resp: &mut dyn HttpResponse);
+    fn save_to(&self, req: &dyn HttpRequest, resp: &mut dyn HttpResponse);
 
-    fn remove_from(&self, req: &mut dyn HttpRequest, resp: &mut dyn HttpResponse);
+    fn remove_from(&self, req: &dyn HttpRequest, resp: &mut dyn HttpResponse);
 
     fn read_value(&self, req: &dyn HttpRequest, resp: &dyn HttpResponse) -> Option<String>;
 }
@@ -285,14 +286,14 @@ impl SimpleCookie {
             .map(|s| s.trim())
             .map(|s| {
                 if s.is_empty() {
-                    req.context_path().map(str::trim)
+                    req.context_path().trim()
                 } else {
-                    Some(s)
+                    s
                 }
             })
-            .unwrap_or_default();
+            .unwrap_or(Self::ROOT_PATH);
 
-        path.unwrap_or(Self::ROOT_PATH)
+        path
     }
 }
 
@@ -382,7 +383,7 @@ impl Cookie for SimpleCookie {
         self.same_site.as_ref()
     }
 
-    fn save_to(&self, _req: &mut dyn HttpRequest, resp: &mut dyn HttpResponse) {
+    fn save_to(&self, _req: &dyn HttpRequest, resp: &mut dyn HttpResponse) {
         self.add_cookie_header(
             resp,
             self.get_name().unwrap_or_default(),
@@ -398,7 +399,7 @@ impl Cookie for SimpleCookie {
         );
     }
 
-    fn remove_from(&self, req: &mut dyn HttpRequest, resp: &mut dyn HttpResponse) {
+    fn remove_from(&self, req: &dyn HttpRequest, resp: &mut dyn HttpResponse) {
         self.add_cookie_header(
             resp,
             self.get_name().unwrap_or_default(),

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::core::authc::authentication_token::AuthenticationToken;
+use crate::core::{authc::authentication_token::AuthenticationToken, util::object::Object};
 
 #[derive(Clone, Debug)]
 pub struct UsernamePasswordToken {
@@ -27,11 +27,11 @@ impl UsernamePasswordToken {
 }
 
 impl AuthenticationToken for UsernamePasswordToken {
-    fn get_principal(&self) -> &crate::core::util::object::Object {
+    fn get_principal(&self) -> Object {
         todo!()
     }
 
-    fn get_credentials(&self) -> Option<&crate::core::util::object::Object> {
+    fn get_credentials(&self) -> Option<Object> {
         todo!()
     }
 }

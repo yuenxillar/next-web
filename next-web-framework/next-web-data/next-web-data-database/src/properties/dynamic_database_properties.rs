@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use rudi_dev::{Properties, Singleton};
+use next_web_macros::Properties;
+use rudi_dev::Singleton;
 
 use crate::properties::database_properties::DatabaseClientProperties;
 

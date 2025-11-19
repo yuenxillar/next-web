@@ -1,6 +1,5 @@
-use chrono::{DateTime, Utc};
 use next_web_core::{
-    clone_box,
+    async_trait,
     convert::into_box::IntoBox,
     error::{illegal_state_error::IllegalStateError, BoxError},
     traits::required::Required,
@@ -31,7 +30,7 @@ pub struct DelegatingSubject<T = DefaultSecurityManager> {
     principals: Option<Arc<dyn PrincipalCollection>>,
     authenticated: bool,
     host: Option<String>,
-    pub(crate) session: Option<Box<dyn Session>>,
+    pub(crate) session: Option<Arc<dyn Session>>,
     session_creation_enabled: bool,
     security_manager: T,
 }
@@ -51,7 +50,7 @@ where
         principals: Option<Arc<dyn PrincipalCollection>>,
         authenticated: bool,
         host: Option<String>,
-        session: Option<Box<dyn Session>>,
+        session: Option<Arc<dyn Session>>,
         session_creation_enabled: bool,
         security_manager: T,
     ) -> Self {
@@ -73,9 +72,9 @@ where
         subject
     }
 
-    pub fn decorate(&self, session: Box<dyn Session>) -> Box<dyn Session> {
+    pub fn decorate(&self, session: Arc<dyn Session>) -> Arc<dyn Session> {
         let session = StoppingAwareProxiedSession::new(session);
-        Box::new(session)
+        Arc::new(session)
     }
 
     pub fn get_security_manager(&self) -> &T {
@@ -114,7 +113,7 @@ where
         self.session = None;
     }
 
-    fn get_run_as_principals_stack(&self) -> Option<Vec<Arc<dyn PrincipalCollection>>> {
+    async fn get_run_as_principals_stack(&self) -> Option<Vec<Arc<dyn PrincipalCollection>>> {
         let session = self.get_session();
 
         let session = match session {
@@ -122,7 +121,10 @@ where
             None => return None,
         };
 
-        if let Some(session_value) = session.get_attribute(Self::RUN_AS_PRINCIPALS_SESSION_KEY) {
+        if let Some(session_value) = session
+            .get_attribute(Self::RUN_AS_PRINCIPALS_SESSION_KEY)
+            .await
+        {
             if let SessionValue::Object(obj) = session_value {
                 if let Ok(principal_collections) = obj
                     .clone()
@@ -154,7 +156,7 @@ where
         Ok(())
     }
 
-    fn push_identity(
+    async fn push_identity(
         &mut self,
         principals: &Arc<dyn PrincipalCollection>,
     ) -> Result<(), IllegalStateError> {
@@ -162,14 +164,14 @@ where
             return Err(IllegalStateError { msg: "Specified Subject principals cannot be null or empty for 'run as' functionality.".to_string() });
         }
 
-        let stack = self.get_run_as_principals_stack();
+        let stack = self.get_run_as_principals_stack().await;
         let mut stack = match stack {
             Some(stack) => stack,
             None => Default::default(),
         };
 
         stack.insert(0, principals.clone());
-        let session = self.get_session_or_create(false);
+        let session = self.get_session_or_create(false).await;
 
         if let Some(session) = session {
             session
@@ -177,15 +179,16 @@ where
                     Self::RUN_AS_PRINCIPALS_SESSION_KEY,
                     SessionValue::Object(Box::new(stack)),
                 )
+                .await
                 .unwrap();
         }
         Ok(())
     }
 
-    fn pop_identity(&mut self) -> Option<&dyn PrincipalCollection> {
+    async fn pop_identity(&mut self) -> Option<&dyn PrincipalCollection> {
         let popped = None;
 
-        let stack = self.get_run_as_principals_stack();
+        let stack = self.get_run_as_principals_stack().await;
 
         let mut stack = match stack {
             Some(stack) => stack,
@@ -195,17 +198,18 @@ where
             stack.remove(0);
 
             if !stack.is_empty() {
-                let session = self.get_session_or_create(false);
+                let session = self.get_session_or_create(false).await;
                 if let Some(session) = session {
                     session
                         .set_attribute(
                             Self::RUN_AS_PRINCIPALS_SESSION_KEY,
                             SessionValue::Object(stack.into_boxed()),
                         )
+                        .await
                         .unwrap();
                 }
             } else {
-                self.clear_run_as_identities().unwrap();
+                self.clear_run_as_identities().await.unwrap();
             }
         }
         popped
@@ -222,17 +226,18 @@ where
     }
 }
 
+#[async_trait]
 impl<T> Subject for DelegatingSubject<T>
 where
     T: SecurityManager + Clone,
     T: 'static,
 {
-    fn get_principal(&self) -> Option<&Object> {
-        self.get_primary_principal(self.get_principals().map(|pr| pr.as_ref()))
+    async fn get_principal(&self) -> Option<&Object> {
+        self.get_primary_principal(self.get_principals().await.map(|pr| pr.as_ref()))
     }
 
-    fn get_principals(&self) -> Option<&Arc<dyn PrincipalCollection>> {
-        let run_as_principals = self.get_run_as_principals_stack();
+    async fn get_principals(&self) -> Option<&Arc<dyn PrincipalCollection>> {
+        let run_as_principals = self.get_run_as_principals_stack().await;
         match run_as_principals {
             Some(principals) => {
                 if principals.is_empty() {
@@ -247,74 +252,81 @@ where
         }
     }
 
-    fn is_permitted(&self, permission: &str) -> bool {
+    async fn is_permitted(&self, permission: &str) -> bool {
         self.has_principals()
-            && self
-                .security_manager
-                .is_permitted_from_str(self.get_principals().map(|pr| pr.as_ref()), permission)
+            && self.security_manager.is_permitted_from_str(
+                self.get_principals().await.map(|pr| pr.as_ref()),
+                permission,
+            )
     }
 
-    fn is_authenticated(&self) -> bool {
+    async fn is_authenticated(&self) -> bool {
         self.authenticated && self.has_principals()
     }
 
-    fn is_remembered(&self) -> bool {
-        if let Some(val) = self.get_principals() {
-            return !val.is_empty() && !self.is_authenticated();
+    async fn is_remembered(&self) -> bool {
+        if let Some(val) = self.get_principals().await {
+            return !val.is_empty() && !self.is_authenticated().await;
         }
         false
     }
 
-    fn is_permitted_all(&self, permissions: &[&str]) -> bool {
+    async fn is_permitted_all(&self, permissions: &[&str]) -> bool {
+        self.has_principals()
+            && self.security_manager.is_permitted_all_from_str(
+                self.get_principals().await.map(|pr| pr.as_ref()),
+                permissions,
+            )
+    }
+
+    async fn check_permission(&self, permission: &str) -> Result<(), AuthorizationError> {
+        self.assert_authz_check_possible()?;
+        self.security_manager.check_permission_from_str(
+            self.get_principals().await.map(|pr| pr.as_ref()),
+            permission,
+        )
+    }
+
+    async fn check_permissions(&self, permissions: &[&str]) -> Result<(), AuthorizationError> {
+        self.assert_authz_check_possible()?;
+        self.security_manager.check_permissions_from_str(
+            self.get_principals().await.map(|pr| pr.as_ref()),
+            permissions,
+        )
+    }
+
+    async fn has_role(&self, role_identifier: &str) -> bool {
+        self.has_principals()
+            && self.security_manager.has_role(
+                self.get_principals().await.map(|pr| pr.as_ref()),
+                role_identifier,
+            )
+    }
+
+    async fn has_all_roles(&self, roles: &[&str]) -> bool {
         self.has_principals()
             && self
                 .security_manager
-                .is_permitted_all_from_str(self.get_principals().map(|pr| pr.as_ref()), permissions)
+                .has_all_roles(self.get_principals().await.map(|pr| pr.as_ref()), roles)
     }
 
-    fn check_permission(&self, permission: &str) -> Result<(), AuthorizationError> {
+    async fn check_role(&self, role: &str) -> Result<(), AuthorizationError> {
         self.assert_authz_check_possible()?;
         self.security_manager
-            .check_permission_from_str(self.get_principals().map(|pr| pr.as_ref()), permission)
+            .check_role(self.get_principals().await.map(|pr| pr.as_ref()), role)
     }
 
-    fn check_permissions(&self, permissions: &[&str]) -> Result<(), AuthorizationError> {
+    async fn check_roles(&self, roles: &[&str]) -> Result<(), AuthorizationError> {
         self.assert_authz_check_possible()?;
         self.security_manager
-            .check_permissions_from_str(self.get_principals().map(|pr| pr.as_ref()), permissions)
-    }
-
-    fn has_role(&self, role_identifier: &str) -> bool {
-        self.has_principals()
-            && self
-                .security_manager
-                .has_role(self.get_principals().map(|pr| pr.as_ref()), role_identifier)
-    }
-
-    fn has_all_roles(&self, roles: &[&str]) -> bool {
-        self.has_principals()
-            && self
-                .security_manager
-                .has_all_roles(self.get_principals().map(|pr| pr.as_ref()), roles)
-    }
-
-    fn check_role(&self, role: &str) -> Result<(), AuthorizationError> {
-        self.assert_authz_check_possible()?;
-        self.security_manager
-            .check_role(self.get_principals().map(|pr| pr.as_ref()), role)
-    }
-
-    fn check_roles(&self, roles: &[&str]) -> Result<(), AuthorizationError> {
-        self.assert_authz_check_possible()?;
-        self.security_manager
-            .check_roles(self.get_principals().map(|pr| pr.as_ref()), roles)
+            .check_roles(self.get_principals().await.map(|pr| pr.as_ref()), roles)
     }
 
     fn get_session(&self) -> Option<&dyn Session> {
         self.session.as_deref()
     }
 
-    fn get_session_or_create(&mut self, create: bool) -> Option<&mut Box<dyn Session>> {
+    async fn get_session_or_create(&mut self, create: bool) -> Option<Arc<dyn Session>> {
         if self.session.is_none() && create {
             if !self.is_session_creation_enabled() {
                 // String msg = "Session creation has been disabled for the current subject.  This exception indicates "
@@ -331,13 +343,13 @@ where
             // self.session = Some(self.decorate(session));
         }
 
-        self.session.as_mut()
+        self.session.clone()
     }
 
-    fn login(&mut self, token: &dyn AuthenticationToken) -> Result<(), AuthenticationError> {
+    async fn login(&mut self, token: &dyn AuthenticationToken) -> Result<(), AuthenticationError> {
         self.clear_run_as_identities_internal();
 
-        let mut subject = self.security_manager.login(self, token)?;
+        let mut subject = self.security_manager.login(self, token).await?;
 
         #[allow(unused_assignments)]
         let mut principals: Option<Arc<dyn PrincipalCollection>> = None;
@@ -350,7 +362,7 @@ where
             principals = delegating.principals.clone();
             host = delegating.host.as_deref();
         } else {
-            principals = subject.get_principals().map(|pr| pr.clone());
+            principals = subject.get_principals().await.map(|pr| pr.clone());
         }
 
         if match principals.as_ref() {
@@ -373,11 +385,11 @@ where
 
         self.host = host.map(|s| s.to_string());
 
-        let session = subject.get_session_or_create(false);
+        let session = subject.get_session_or_create(false).await;
 
         match session {
             Some(session) => {
-                self.session = Some(self.decorate(clone_box(session.as_ref())));
+                self.session = Some(self.decorate(session));
             }
             None => {
                 self.session = None;
@@ -386,9 +398,9 @@ where
         Ok(())
     }
 
-    fn logout(&mut self) -> Result<(), BoxError> {
+    async fn logout(&mut self) -> Result<(), BoxError> {
         self.clear_run_as_identities_internal();
-        if let Err(error) = self.security_manager.logout(self) {
+        if let Err(error) = self.security_manager.logout(self).await {
             debug!(
                 "Encountered session exception trying to log out subject.  This can generally safely be ignored. {:?}",
                 error
@@ -405,7 +417,7 @@ where
     // ======================================
     // 'Run As' support implementations
     // ======================================
-    fn run_as(
+    async fn run_as(
         &mut self,
         principals: &Arc<dyn PrincipalCollection>,
     ) -> Result<(), IllegalStateError> {
@@ -420,19 +432,20 @@ where
             return Err(IllegalStateError { msg });
         }
 
-        self.push_identity(principals)
+        self.push_identity(principals).await
     }
 
-    fn is_run_as(&self) -> bool {
+    async fn is_run_as(&self) -> bool {
         !self
             .get_run_as_principals_stack()
+            .await
             .map(|s| s.is_empty())
             .unwrap_or_default()
     }
 
-    fn get_previous_principals(&self) -> Option<Arc<dyn PrincipalCollection>> {
+    async fn get_previous_principals(&self) -> Option<Arc<dyn PrincipalCollection>> {
         let mut previous_principals = None;
-        let stack = self.get_run_as_principals_stack();
+        let stack = self.get_run_as_principals_stack().await;
 
         let mut stack = match stack {
             Some(stack) => stack,
@@ -451,8 +464,8 @@ where
         previous_principals
     }
 
-    fn release_run_as(&mut self) -> Option<&dyn PrincipalCollection> {
-        self.pop_identity()
+    async fn release_run_as(&mut self) -> Option<&dyn PrincipalCollection> {
+        self.pop_identity().await
     }
 }
 
@@ -472,8 +485,8 @@ where
         session_context
     }
 
-    fn clear_run_as_identities_internal(&mut self) {
-        if let Err(se) = self.clear_run_as_identities() {
+    async fn clear_run_as_identities_internal(&mut self) {
+        if let Err(se) = self.clear_run_as_identities().await {
             debug!(
                 "Encountered session exception trying to clear 'runAs' identities during logout.  This can generally safely be ignored. {:?}",
                 se
@@ -481,10 +494,14 @@ where
         }
     }
 
-    fn clear_run_as_identities(&mut self) -> Result<Option<SessionValue>, SessionError> {
-        let session = self.get_session_or_create(false);
+    async fn clear_run_as_identities(&mut self) -> Result<Option<SessionValue>, SessionError> {
+        let session = self.get_session_or_create(false).await;
         match session {
-            Some(session) => session.remove_attribute(Self::RUN_AS_PRINCIPALS_SESSION_KEY),
+            Some(session) => {
+                session
+                    .remove_attribute(Self::RUN_AS_PRINCIPALS_SESSION_KEY)
+                    .await
+            }
             None => Err(SessionError::Invalid(None)),
         }
     }
@@ -500,7 +517,7 @@ where
 }
 
 impl StoppingAwareProxiedSession {
-    fn new(target: Box<dyn Session>) -> Self {
+    fn new(target: Arc<dyn Session>) -> Self {
         let proxied_session = ProxiedSession::new(target);
 
         Self { proxied_session }
@@ -512,6 +529,7 @@ impl StoppingAwareProxiedSession {
     }
 }
 
+#[async_trait]
 impl Session for StoppingAwareProxiedSession {
     fn id(&self) -> &crate::core::session::SessionId {
         self.proxied_session.id()
@@ -529,7 +547,7 @@ impl Session for StoppingAwareProxiedSession {
         self.proxied_session.timeout()
     }
 
-    fn set_timeout(&mut self, max_idle_time_in_millis: i64) -> Result<(), SessionError> {
+    fn set_timeout(&self, max_idle_time_in_millis: i64) -> Result<(), SessionError> {
         self.proxied_session.set_timeout(max_idle_time_in_millis)
     }
 
@@ -545,20 +563,20 @@ impl Session for StoppingAwareProxiedSession {
         self.proxied_session.stop()
     }
 
-    fn attribute_keys(&self) -> Result<std::collections::HashSet<String>, SessionError> {
-        self.proxied_session.attribute_keys()
+    async fn attribute_keys(&self) -> Result<Vec<String>, SessionError> {
+        self.proxied_session.attribute_keys().await
     }
 
-    fn get_attribute(&self, key: &str) -> Option<&SessionValue> {
-        self.proxied_session.get_attribute(key)
+    async fn get_attribute(&self, key: &str) -> Option<SessionValue> {
+        self.proxied_session.get_attribute(key).await
     }
 
-    fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), SessionError> {
-        self.proxied_session.set_attribute(key, value)
+    async fn set_attribute(&self, key: &str, value: SessionValue) -> Result<(), SessionError> {
+        self.proxied_session.set_attribute(key, value).await
     }
 
-    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError> {
-        self.proxied_session.remove_attribute(key)
+    async fn remove_attribute(&self, key: &str) -> Result<Option<SessionValue>, SessionError> {
+        self.proxied_session.remove_attribute(key).await
     }
 }
 
@@ -592,8 +610,6 @@ where
     Self: Subject,
 {
     fn is_session_creation_enabled(&self) -> bool;
-
-    fn create_session_context(&self) -> impl SessionContext + 'static;
 }
 
 impl Display for DelegatingSubject {

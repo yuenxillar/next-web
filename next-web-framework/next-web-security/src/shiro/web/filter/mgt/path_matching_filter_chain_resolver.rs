@@ -26,7 +26,7 @@ impl PathMatchingFilterChainResolver {
         request: &dyn HttpRequest,
         _response: &dyn HttpResponse,
         original_chain: &dyn HttpFilterChain,
-    ) -> Option<&dyn HttpFilterChain> {
+    ) -> Option<Box<dyn HttpFilterChain>> {
         let filter_chain_manager = self.get_filter_chain_manager();
         if !filter_chain_manager.has_chains() {
             return None;
@@ -39,7 +39,7 @@ impl PathMatchingFilterChainResolver {
         // as the chain name for the FilterChainManager's requirements
         for mut path_pattern in filter_chain_manager.get_chain_names() {
             if self.path_matches(path_pattern, request_uri) {
-                return filter_chain_manager.proxy(original_chain, path_pattern);
+                return Some(filter_chain_manager.proxy(original_chain, path_pattern));
             } else {
                 // in spring web, the requestURI "/resource/menus" ---- "resource/menus/" both can access the resource
                 // but the pathPattern match "/resource/menus" can not match "resource/menus/"
@@ -47,7 +47,7 @@ impl PathMatchingFilterChainResolver {
 
                 path_pattern = self.remove_trailing_slash(path_pattern);
                 if self.path_matches(path_pattern, &request_urino_trailing_slash) {
-                    return filter_chain_manager.proxy(original_chain, path_pattern);
+                    return Some(filter_chain_manager.proxy(original_chain, path_pattern));
                 }
             }
         }

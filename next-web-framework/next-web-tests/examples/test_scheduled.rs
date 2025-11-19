@@ -1,13 +1,14 @@
 use next_web_core::{async_trait, context::properties::ApplicationProperties};
 use next_web_dev::{
     application::Application,
+    Scheduled,
     scheduler::{
         context::JobExecutionContext,
         schedule_type::{ScheduleType, WithArgs},
     },
     traits::schedule::scheduled_task::ScheduledTask,
     util::local_date_time::LocalDateTime,
-    Scheduled, Singleton,
+    Singleton,
 };
 
 use std::sync::{

@@ -5,8 +5,8 @@ use next_web_dev::retry::error::retry_error::RetryError;
 use next_web_dev::retry::retry_context::RetryContext;
 use next_web_dev::retry::retry_operations::RetryOperations;
 use next_web_dev::retry::support::retry_template::RetryTemplate;
-use next_web_dev::util::local_date_time::LocalDateTime;
 use next_web_dev::Retryable;
+use next_web_dev::util::local_date_time::LocalDateTime;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -59,10 +59,16 @@ async fn main() {
 
             if value < 4 {
                 if value > 0 {
-                    println!("Retry Count: {}, timestamp: {}", value, LocalDateTime::timestamp());
+                    println!(
+                        "Retry Count: {}, timestamp: {}",
+                        value,
+                        LocalDateTime::timestamp()
+                    );
                 }
                 ctx.set_attribute("retryCount", AnyValue::Number(value + 1));
-                return Err(RetryError::Any(Box::new(TestRetryError::Default("test retry error".to_string()))));
+                return Err(RetryError::Any(Box::new(TestRetryError::Default(
+                    "test retry error".to_string(),
+                ))));
             }
 
             Ok(())

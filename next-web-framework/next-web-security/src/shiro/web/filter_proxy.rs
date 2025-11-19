@@ -218,28 +218,23 @@ impl FilterProxy {
     pub fn get_filter_chain_resolver(&self) -> Option<&PathMatchingFilterChainResolver> {
         self.filter_chain_resolver.as_ref()
     }
-    pub fn get_execution_chain<'a>(
-        &'a self,
+    pub fn get_execution_chain(
+        &self,
         req: &dyn HttpRequest,
         res: &dyn HttpResponse,
-        orig_chain: &'a dyn HttpFilterChain,
-    ) -> &'a dyn HttpFilterChain {
+        orig_chain: &dyn HttpFilterChain,
+    ) -> Option<Box<dyn HttpFilterChain>> {
         let resolver = self.get_filter_chain_resolver();
         if resolver.is_none() {
-            return orig_chain;
+            return None;
         }
 
         let resolver = match resolver {
             Some(resolver) => resolver,
-            None => return orig_chain,
+            None => return None,
         };
 
-        let resolved = resolver.get_chain(req, res, orig_chain);
-
-        match resolved {
-            Some(resolved) => resolved,
-            None => orig_chain,
-        }
+        resolver.get_chain(req, res, orig_chain)
     }
 
     #[allow(unused_variables)]
@@ -259,15 +254,16 @@ impl FilterProxy {
             }
         }
     }
-    pub async fn execute_chain(
-        &self,
+    pub async fn execute_chain<'a>(
+        &'a self,
         req: &mut dyn HttpRequest,
         res: &mut dyn HttpResponse,
-        orig_chain: &dyn HttpFilterChain,
+        orig_chain: &'a dyn HttpFilterChain,
     ) -> Result<(), BoxError> {
-        self.get_execution_chain(req, res, orig_chain)
-            .do_filter(req, res)
-            .await
+        match self.get_execution_chain(req, res, orig_chain) {
+            Some(chain) => chain.do_filter(req, res).await,
+            None => orig_chain.do_filter(req, res).await,
+        }
     }
 }
 
@@ -292,6 +288,7 @@ impl HttpFilter for FilterProxy {
         self.update_session_last_access_time(req, res, &mut subject);
         self.execute_chain(req, res, orig_chain).await?;
 
+        req.clean_up();
         Ok(())
     }
 }

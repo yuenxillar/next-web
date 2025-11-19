@@ -1,4 +1,5 @@
-use rudi_dev::{Properties, Singleton};
+use next_web_macros::Properties;
+use rudi_dev::Singleton;
 
 /// WebSocket配置属性，用于配置WebSocket连接的相关参数
 /// 

@@ -1,5 +1,7 @@
 use std::any::Any;
 
+use next_web_core::async_trait;
+
 use crate::{
     core::{
         mgt::{
@@ -29,12 +31,13 @@ where
     }
 }
 
+#[async_trait]
 impl<S> SessionStorageEvaluator for DefaultWebSessionStorageEvaluator<S>
 where
     S: SessionManager + 'static,
     S: Clone
 {
-    fn is_session_storage_enabled(&self, subject: &dyn crate::core::subject::Subject) -> bool {
+    async fn is_session_storage_enabled(&self, subject: &dyn crate::core::subject::Subject) -> bool {
         if subject.get_session().is_some() {
             return true;
         }

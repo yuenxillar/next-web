@@ -1,24 +1,23 @@
-pub mod expired_session_error;
 pub mod mgt;
 pub mod proxied_session;
 pub mod session_listener;
 
+use next_web_core::async_trait;
 use next_web_core::traits::any_clone::AnyClone;
-use next_web_core::DynClone;
 use std::any::Any;
-use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
-use crate::core::session::mgt::validating_session::ValidatingSession;
 use crate::core::util::object::AnyObject;
 
 /// 表示会话已失效或非法操作
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SessionError {
     Invalid(Option<String>),
-    Expired,
+    Expired(Option<String>),
+    Stopped(String),
+    NotFound,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -43,12 +42,11 @@ pub enum SessionValue {
     Null,
 }
 
-/// Shiro 风格的 Session trait（Rust 版）
+#[async_trait]
 pub trait Session
 where
     Self: Send + Sync,
-    Self: DynClone + Any,
-    Self: ValidatingSession,
+    Self: Any,
 {
     /// 推荐使用 String、Uuid 或 u64
     fn id(&self) -> &SessionId;
@@ -64,7 +62,7 @@ where
     fn timeout(&self) -> Result<i64, SessionError>;
 
     /// 设置超时时间（毫秒）。负值表示永不过期。
-    fn set_timeout(&mut self, max_idle_time_in_millis: i64) -> Result<(), SessionError>;
+    fn set_timeout(&self, max_idle_time_in_millis: i64) -> Result<(), SessionError>;
 
     /// 客户端主机（IP 或 hostname），可能为 None
     fn host(&self) -> Option<&str>;
@@ -76,27 +74,28 @@ where
     fn stop(&self) -> Result<(), SessionError>;
 
     /// 获取所有属性的 key 集合
-    fn attribute_keys(&self) -> Result<HashSet<String>, SessionError>;
+    async fn attribute_keys(&self) -> Result<Vec<String>, SessionError>;
 
     /// 获取指定 key 的属性值
-    fn get_attribute(&self, key: &str) -> Option<&SessionValue>;
+    async fn get_attribute(&self, key: &str) -> Option<SessionValue>;
 
     /// 绑定属性（key-value）
     /// 若 value 为 None，等价于 remove_attribute
-    fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), SessionError>;
+    async fn set_attribute(&self, key: &str, value: SessionValue) -> Result<(), SessionError>;
 
     /// 移除指定 key 的属性
-    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError>;
+    async fn remove_attribute(&self, key: &str) -> Result<Option<SessionValue>, SessionError>;
 }
 
-next_web_core::clone_trait_object!(Session);
 
 impl Error for SessionError {}
 impl Display for SessionError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SessionError::Expired => write!(f, "Session expired"),
+            SessionError::Expired(msg)  => write!(f, "Session expired: {:?}", msg),
             SessionError::Invalid(msg) => write!(f, "Session invalid: {:?}", msg),
+            SessionError::NotFound => write!(f, "Session not found"),
+            SessionError::Stopped(msg) => write!(f, "Session stopped: {}", msg),
         }
     }
 }

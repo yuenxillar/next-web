@@ -2735,6 +2735,10 @@ impl SingleRegistry {
         Some(self.registry.get(key)?.as_single::<T>()?.get_ref())
     }
 
+    // pub(crate) fn get_mut<T: 'static>(&self, key: &Key) -> Option<&T> {
+    //     Some(self.registry.get_mut(key)?.as_single::<T>()?.get_())
+    // }
+
     pub(crate) fn contains(&self, key: &Key) -> bool {
         self.registry.contains_key(key)
     }
@@ -3737,6 +3741,10 @@ impl DynSingle {
     pub fn as_single<T: 'static>(&self) -> Option<&Single<T>> {
         self.origin.downcast_ref::<Single<T>>()
     }
+
+    // pub fn as_mut_single<T: 'static>(&self) -> Option<&mut Single<T>> {
+    //     self.origin.downcast_mut::<Single<T>>()
+    // }
 }
 
 impl<T: 'static + Send + Sync> From<Single<T>> for DynSingle {

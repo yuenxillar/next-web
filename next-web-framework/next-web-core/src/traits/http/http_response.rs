@@ -1,11 +1,14 @@
+use axum::http::header;
 use axum::{
-    body::{Body, Bytes}, http::{HeaderName, StatusCode, Version}, response::{IntoResponse, Response}
+    body::{Body, Bytes},
+    http::{HeaderName, StatusCode, Version},
+    response::{IntoResponse, Response},
 };
 
 pub trait HttpResponse
 where
     Self: IntoResponse,
-    Self: Send
+    Self: Send,
 {
     fn version(&self) -> Version;
 
@@ -23,11 +26,12 @@ where
 
     fn set_body(&mut self, body: Bytes);
 
+    fn set_redirect(&mut self, url: &str);
+
     // fn set_cookie(&mut self, cookie: Cookie);
 }
 
 impl HttpResponse for Response {
-
     fn version(&self) -> Version {
         self.version()
     }
@@ -46,8 +50,7 @@ impl HttpResponse for Response {
             .map(|value| value.to_str().ok().unwrap_or_default())
     }
 
-    fn append_header(&mut self, name: &[u8], value: &str) -> bool
-    {
+    fn append_header(&mut self, name: &[u8], value: &str) -> bool {
         let value = match value.parse() {
             Ok(s) => s,
             Err(_) => return false,
@@ -61,7 +64,7 @@ impl HttpResponse for Response {
     fn insert_header(&mut self, name: &[u8], value: &str) -> Option<String> {
         let name = match HeaderName::from_bytes(name) {
             Ok(name) => name,
-            Err(_) => return None
+            Err(_) => return None,
         };
 
         value.parse().ok().map(|value| {
@@ -79,8 +82,15 @@ impl HttpResponse for Response {
             .flatten()
             .map(|s| s.to_str().ok().map(ToString::to_string).unwrap_or_default())
     }
-    
+
     fn set_body(&mut self, body: Bytes) {
         *self.body_mut() = Body::from(body);
+    }
+
+    fn set_redirect(&mut self, url: &str) {
+        if let Ok(url) = header::HeaderValue::from_str(url) {
+            *self.status_mut() = StatusCode::SEE_OTHER;
+            self.headers_mut().insert(header::LOCATION, url);
+        }
     }
 }

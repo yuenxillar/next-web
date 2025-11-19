@@ -1,5 +1,6 @@
+use next_web_macros::Properties;
 use serde::Deserialize;
-use rudi_dev::{Properties, Singleton};
+use rudi_dev::Singleton;
 
 
 #[Singleton(default, binds=[Self::into_properties])]

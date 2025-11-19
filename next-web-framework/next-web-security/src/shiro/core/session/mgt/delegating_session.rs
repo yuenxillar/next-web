@@ -1,3 +1,5 @@
+use next_web_core::async_trait;
+
 use crate::core::session::{Session, SessionError, SessionId, SessionValue};
 
 #[derive(Clone)]
@@ -9,6 +11,7 @@ impl DelegatingSession {
     }
 }
 
+#[async_trait]
 impl Session for DelegatingSession {
     fn id(&self) -> &SessionId {
         todo!()
@@ -26,7 +29,7 @@ impl Session for DelegatingSession {
         todo!()
     }
 
-    fn set_timeout(&mut self, timeout: i64) -> Result<(), SessionError> {
+    fn set_timeout(&self, timeout: i64) -> Result<(), SessionError> {
         todo!()
     }
 
@@ -42,19 +45,19 @@ impl Session for DelegatingSession {
         todo!()
     }
 
-    fn attribute_keys(&self) -> Result<HashSet<String>, SessionError> {
+    async fn attribute_keys(&self) -> Result<Vec<String>, SessionError> {
         todo!()
     }
 
-    fn get_attribute(&self, key: &str) -> Option<&SessionValue> {
+    async fn get_attribute(&self, key: &str) -> Option<SessionValue> {
         todo!()
     }
 
-    fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), SessionError> {
+    async fn set_attribute(&self, key: &str, value: SessionValue) -> Result<(), SessionError> {
         todo!()
     }
 
-    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError> {
+    async fn remove_attribute(&self, key: &str) -> Result<Option<SessionValue>, SessionError> {
         todo!()
     }
 }

@@ -5,19 +5,11 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
-use crate::core::{
-    authz::authorization_error::AuthorizationError,
-    session::{
-        expired_session_error::ExpiredSessionError,
-        mgt::{session_context::SessionContext, session_manager::SessionManager},
-        Session, SessionError,
-    },
-};
+use crate::core::session::{Session, SessionError};
 
 pub trait ValidatingSessionManager
 where
     Self: Send + Sync,
-    Self: SessionManager,
 {
     fn validate_sessions(&self);
 }
@@ -27,20 +19,20 @@ pub trait ValidatingSessionManagerExt
 where
     Self: Send + Sync,
 {
-    async fn do_create_session(
-        &self,
-        ctx: &dyn SessionContext,
-    ) -> Result<Arc<dyn Session>, AuthorizationError>;
+    // async fn do_create_session(
+    //     &self,
+    //     ctx: &dyn SessionContext,
+    // ) -> Result<Arc<dyn Session>, AuthorizationError>;
+
+    // async fn after_expired(&self, session: &dyn Session);
 
     async fn on_expiration(
         &self,
         session: &Arc<dyn Session>,
-        error: ExpiredSessionError,
+        error: SessionError,
         req: &mut dyn HttpRequest,
         resp: &mut dyn HttpResponse,
     );
-
-    async fn after_expired(&self, session: &dyn Session);
 
     async fn on_invalidation(
         &self,
@@ -50,4 +42,6 @@ where
         resp: &mut dyn HttpResponse,
     ) {
     }
+
+    async fn get_active_sessions(&self) -> Vec<&Arc<dyn Session>>;
 }

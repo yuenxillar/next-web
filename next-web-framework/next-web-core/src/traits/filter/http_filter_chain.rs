@@ -1,6 +1,7 @@
 use std::any::Any;
 
 use async_trait::async_trait;
+use dyn_clone::DynClone;
 
 use crate::{
     error::BoxError,
@@ -11,7 +12,7 @@ use crate::{
 pub trait HttpFilterChain
 where
     Self: Send + Sync,
-    Self: Any,
+    Self: Any + DynClone
 {
     async fn do_filter(
         &self,
@@ -19,3 +20,5 @@ where
         response: &mut dyn HttpResponse,
     ) -> Result<(), BoxError>;
 }
+
+dyn_clone::clone_trait_object!(HttpFilterChain);

@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = { workspace = true }
 next-web-core = { workspace = true }
+next-web-macros = { workspace = true }
 rudi-dev = { workspace = true }
-tracing = { workspace = true}
 
+serde = { workspace = true }
+tracing = { workspace = true}
 
 minio-rsc = { workspace = true }

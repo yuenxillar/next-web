@@ -1,19 +1,22 @@
-use std::collections::HashSet;
+use std::sync::Arc;
+
+use next_web_core::async_trait;
 
 use super::{Session, SessionError};
 use crate::core::session::{SessionId, SessionValue};
 
 #[derive(Clone)]
 pub struct ProxiedSession {
-    delegate: Box<dyn Session>,
+    delegate: Arc<dyn Session>,
 }
 
 impl ProxiedSession {
-    pub fn new(delegate: Box<dyn Session>) -> Self {
+    pub fn new(delegate: Arc<dyn Session>) -> Self {
         Self { delegate }
     }
 }
 
+#[async_trait]
 impl Session for ProxiedSession {
     fn id(&self) -> &SessionId {
         self.delegate.id()
@@ -31,7 +34,7 @@ impl Session for ProxiedSession {
         self.delegate.timeout()
     }
 
-    fn set_timeout(&mut self, timeout: i64) -> Result<(), SessionError> {
+    fn set_timeout(&self, timeout: i64) -> Result<(), SessionError> {
         self.delegate.set_timeout(timeout)
     }
 
@@ -47,19 +50,29 @@ impl Session for ProxiedSession {
         self.delegate.stop()
     }
 
-    fn attribute_keys(&self) -> Result<HashSet<String>, SessionError> {
-        self.delegate.attribute_keys()
+    async fn attribute_keys(&self) -> Result<Vec<String>, SessionError> {
+        self.delegate.attribute_keys().await
     }
 
-    fn get_attribute(&self, key: &str) -> Option<&SessionValue> {
-        self.delegate.get_attribute(key)
+    async fn get_attribute(&self, key: &str) -> Option<SessionValue> {
+        self.delegate.get_attribute(key).await
     }
 
-    fn set_attribute(&mut self, key: &str, value: SessionValue) -> Result<(), SessionError> {
-        self.delegate.set_attribute(key, value)
+    async fn set_attribute(&self, key: &str, value: SessionValue) -> Result<(), SessionError> {
+        self.delegate.set_attribute(key, value).await
     }
 
-    fn remove_attribute(&mut self, key: &str) -> Result<Option<SessionValue>, SessionError> {
-        self.delegate.remove_attribute(key)
+    async fn remove_attribute(&self, key: &str) -> Result<Option<SessionValue>, SessionError> {
+        self.delegate.remove_attribute(key).await
     }
 }
+
+// impl ValidatingSession for ProxiedSession {
+//     fn is_valid(&self) -> bool {
+//         self.delegate.is_valid()
+//     }
+
+//     fn validate(&self) -> Result<(), BoxError> {
+//         self.delegate.validate()
+//     }
+// }

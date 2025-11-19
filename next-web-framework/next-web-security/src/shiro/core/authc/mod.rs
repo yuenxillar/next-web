@@ -1,3 +1,4 @@
+pub mod bearer_token;
 pub mod username_password_token;
 pub mod pam;
 pub mod credential;

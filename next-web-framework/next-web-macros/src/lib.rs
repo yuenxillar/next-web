@@ -6,13 +6,16 @@ use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
 use crate::web::idempotency::impl_macro_idempotency;
 use crate::web::pre_authorize::impl_macro_pre_authorize;
+use crate::web::properties::impl_macro_properties;
 use crate::web::retry::impl_macro_retry;
+use crate::web::scheduled::impl_macro_scheduled;
 
 use data::desensitized::impl_macro_desensitized;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 use syn::DeriveInput;
 use syn::ItemFn;
+use syn::ItemStruct;
 
 mod common;
 mod data;
@@ -280,7 +283,15 @@ pub fn desensitized(input: TokenStream) -> TokenStream {
     impl_macro_desensitized(&input)
 }
 
-// web
+// =============================== Web ===============================
+//
+#[doc = ""]
+#[allow(non_snake_case)]
+#[proc_macro_attribute]
+pub fn Properties(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as ItemStruct);
+    impl_macro_properties(attr, item)
+}
 
 #[doc = ""]
 #[proc_macro_attribute]
@@ -333,7 +344,7 @@ method_macro!(AnyMapping, Any);
          ```rust\n\
          #[Scheduled(cron = \"0 0 3 * * *\", timezone = \"UTC\")]\n\
          fn daily_cleanup() { /* ... */ }\n\n\
-         #[Scheduled(fixed_rate = 30, time_unit = \"s\", initial_delay = 5)]\n\
+         #[scheduled(fixed_rate = 30, time_unit = \"s\", initial_delay = 5)]\n\
          fn heartbeat() { /* ... */ }\n\n\
          #[Scheduled(one_shot = true, initial_delay = 10, time_unit = \"s\")]\n\
          fn delayed_init() { /* ... */ }\n\

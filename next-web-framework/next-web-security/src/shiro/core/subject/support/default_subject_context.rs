@@ -1,16 +1,22 @@
 use std::{fmt::Display, sync::Arc};
 
 use crate::core::{
-    authc::{authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken}, session::{Session, SessionId}, subject::{
-        principal_collection::PrincipalCollection, subject_context::SubjectContext, Subject
-    }
+    authc::{authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken},
+    session::{Session, SessionId},
+    subject::{
+        principal_collection::PrincipalCollection, subject_context::SubjectContext, Subject,
+    },
 };
 
 #[derive(Clone)]
 pub struct DefaultSubjectContext {}
 
-
 impl DefaultSubjectContext {
+    pub const SESSION_CREATION_ENABLED: &str = stringify!(format!(
+        "{}.SESSION_CREATION_ENABLED",
+        std::any::type_name::<Self>()
+    ));
+
     pub fn new(context: Arc<dyn SubjectContext>) -> Self {
         Self {}
     }
@@ -37,7 +43,7 @@ impl SubjectContext for DefaultSubjectContext {
         todo!()
     }
 
-    fn resolve_principals(&mut self) -> Option<Arc<dyn PrincipalCollection>>{
+    fn resolve_principals(&mut self) -> Option<Arc<dyn PrincipalCollection>> {
         todo!()
     }
 
@@ -77,29 +83,19 @@ impl SubjectContext for DefaultSubjectContext {
         todo!()
     }
 
-    fn get_authentication_info(
-        &self,
-    ) -> &dyn AuthenticationInfo {
+    fn get_authentication_info(&self) -> &dyn AuthenticationInfo {
         todo!()
     }
 
-    fn set_authentication_info(
-        &mut self,
-        info: Box<dyn AuthenticationInfo>,
-    ) {
+    fn set_authentication_info(&mut self, info: Box<dyn AuthenticationInfo>) {
         todo!()
     }
 
-    fn get_authentication_token(
-        &self,
-    ) -> &dyn AuthenticationToken {
+    fn get_authentication_token(&self) -> &dyn AuthenticationToken {
         todo!()
     }
 
-    fn set_authentication_token(
-        &mut self,
-        token: Box<dyn AuthenticationToken>,
-    ) {
+    fn set_authentication_token(&mut self, token: Box<dyn AuthenticationToken>) {
         todo!()
     }
 
@@ -114,16 +110,15 @@ impl SubjectContext for DefaultSubjectContext {
     fn resolve_host(&mut self) -> Option<String> {
         todo!()
     }
-    
+
     fn is_empty(&self) -> bool {
         todo!()
     }
-    
+
     fn values(&self) -> Vec<(String, crate::core::util::object::Object)> {
         todo!()
     }
 }
-
 
 impl Display for DefaultSubjectContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

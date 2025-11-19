@@ -1,16 +1,14 @@
-use std::sync::Arc;
-
 use next_web_core::{
     async_trait,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
-use crate::{core::mgt::security_manager::SecurityManager, web::filter::access_control_filter::{AccessControlFilter, AccessControlFilterExt}};
+use crate::{core::util::object::Object, web::filter::access_control_filter::{AccessControlFilter, AccessControlFilterExt}};
 
 #[derive(Clone)]
 pub struct AuthorizationFilter {
     unauthorized_url: Option<String>,
-    access_control_filter: AccessControlFilter,
+    pub(crate) access_control_filter: AccessControlFilter,
 }
 
 impl AuthorizationFilter {
@@ -29,17 +27,17 @@ impl AccessControlFilterExt for AuthorizationFilter {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
+        mapped_value: Option<Object>,
     ) -> bool {
         false
     }
 }
 
-impl From<Arc<dyn SecurityManager>> for AuthorizationFilter
-{
-    fn from(security_manager: Arc<dyn SecurityManager>) -> Self {
+impl Default for AuthorizationFilter {
+    fn default() -> Self {
         Self {
             unauthorized_url: Default::default(),
-            access_control_filter: AccessControlFilter::from(security_manager),
+            access_control_filter: Default::default(),
         }
     }
 }

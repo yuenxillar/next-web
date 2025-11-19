@@ -8,9 +8,11 @@ keywords = ["next-web", "database", "rbatis"]
 license.workspace = true
 
 [dependencies]
-serde = { workspace = true }
 next-web-core = { workspace = true }
+next-web-macros = { workspace = true }
 rudi-dev = { workspace = true }
+
+serde = { workspace = true }
 tracing = { workspace = true}
 
 rbs = { workspace = true }

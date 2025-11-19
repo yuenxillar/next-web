@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use axum::{extract::Request, response::Response};
-use next_web_core::{error::illegal_state_error::IllegalStateError, traits::required::Required};
+use next_web_core::{
+    async_trait, error::illegal_state_error::IllegalStateError, traits::required::Required,
+};
 
 use crate::{
     core::{
@@ -12,11 +13,11 @@ use crate::{
         mgt::{
             default_security_manager::DefaultSecurityManager, security_manager::SecurityManager,
         },
-        session::{Session, mgt::session_context::SessionContext},
+        session::{mgt::session_context::SessionContext, Session},
         subject::{
-            Subject,
             principal_collection::PrincipalCollection,
             support::delegating_subject::{DelegatingSubject, DelegatingSubjectSupport},
+            Subject,
         },
         util::object::Object,
     },
@@ -25,6 +26,8 @@ use crate::{
         subject::web_subject::WebSubject,
     },
 };
+
+pub const DEFAULT_WEB_DELEGATING_SUBJECT_KEY: &str = "DefaultWebDelegatingSubject";
 
 #[derive(Clone)]
 pub struct WebDelegatingSubject<T = DefaultSecurityManager> {
@@ -40,7 +43,7 @@ where
         principals: Option<Arc<dyn PrincipalCollection>>,
         authenticated: bool,
         host: Option<String>,
-        session: Option<Box<dyn Session>>,
+        session: Option<Arc<dyn Session>>,
         security_manager: T,
     ) -> Self {
         let delegating_subject = DelegatingSubject::new(
@@ -53,31 +56,9 @@ where
         );
         Self { delegating_subject }
     }
-}
 
-impl WebSubject for WebDelegatingSubject {
-    fn request(&self) -> &mut Request {
-        todo!()
-    }
-
-    fn response(&self) -> &mut Response {
-        todo!()
-    }
-}
-
-impl<T> DelegatingSubjectSupport for WebDelegatingSubject<T>
-where
-    T: SecurityManager + Clone,
-    T: 'static,
-{
-    fn is_session_creation_enabled(&self) -> bool {
-        self.delegating_subject.is_session_creation_enabled()
-    }
-
-    fn create_session_context(
-        &self,
-    ) -> impl crate::core::session::mgt::session_context::SessionContext + 'static {
-        let mut wsc = DefaultWebSessionContext::default();
+    pub fn create_session_context(&self) -> DefaultWebSessionContext {
+        let mut wsc = DefaultWebSessionContext::new(Default::default());
 
         let host = self.delegating_subject.get_host();
 
@@ -91,92 +72,105 @@ where
     }
 }
 
+impl WebSubject for WebDelegatingSubject {}
+
+impl<T> DelegatingSubjectSupport for WebDelegatingSubject<T>
+where
+    T: SecurityManager + Clone,
+    T: 'static,
+{
+    fn is_session_creation_enabled(&self) -> bool {
+        self.delegating_subject.is_session_creation_enabled()
+    }
+}
+
+#[async_trait]
 impl<T> Subject for WebDelegatingSubject<T>
 where
     T: SecurityManager + Clone,
     T: 'static,
 {
-    fn get_principal(&self) -> Option<&Object> {
-        self.delegating_subject.get_principal()
+    async fn get_principal(&self) -> Option<&Object> {
+        self.delegating_subject.get_principal().await
     }
 
-    fn get_principals(&self) -> Option<&Arc<dyn PrincipalCollection>> {
-        self.delegating_subject.get_principals()
+    async fn get_principals(&self) -> Option<&Arc<dyn PrincipalCollection>> {
+        self.delegating_subject.get_principals().await
     }
 
-    fn is_authenticated(&self) -> bool {
-        self.delegating_subject.is_authenticated()
+    async fn is_authenticated(&self) -> bool {
+        self.delegating_subject.is_authenticated().await
     }
 
-    fn is_remembered(&self) -> bool {
-        self.delegating_subject.is_remembered()
+    async fn is_remembered(&self) -> bool {
+        self.delegating_subject.is_remembered().await
     }
 
-    fn is_permitted(&self, permission: &str) -> bool {
-        self.delegating_subject.is_permitted(permission)
+    async fn is_permitted(&self, permission: &str) -> bool {
+        self.delegating_subject.is_permitted(permission).await
     }
 
-    fn is_permitted_all(&self, permissions: &[&str]) -> bool {
-        self.delegating_subject.is_permitted_all(permissions)
+    async fn is_permitted_all(&self, permissions: &[&str]) -> bool {
+        self.delegating_subject.is_permitted_all(permissions).await
     }
 
-    fn check_permission(&self, permission: &str) -> Result<(), AuthorizationError> {
-        self.delegating_subject.check_permission(permission)
+    async fn check_permission(&self, permission: &str) -> Result<(), AuthorizationError> {
+        self.delegating_subject.check_permission(permission).await
     }
 
-    fn check_permissions(&self, permissions: &[&str]) -> Result<(), AuthorizationError> {
-        self.delegating_subject.check_permissions(permissions)
+    async fn check_permissions(&self, permissions: &[&str]) -> Result<(), AuthorizationError> {
+        self.delegating_subject.check_permissions(permissions).await
     }
 
-    fn has_role(&self, role: &str) -> bool {
-        self.delegating_subject.has_role(role)
+    async fn has_role(&self, role: &str) -> bool {
+        self.delegating_subject.has_role(role).await
     }
 
-    fn has_all_roles(&self, roles: &[&str]) -> bool {
-        self.delegating_subject.has_all_roles(roles)
+    async fn has_all_roles(&self, roles: &[&str]) -> bool {
+        self.delegating_subject.has_all_roles(roles).await
     }
 
-    fn check_role(&self, role: &str) -> Result<(), AuthorizationError> {
-        self.delegating_subject.check_permission(role)
+    async fn check_role(&self, role: &str) -> Result<(), AuthorizationError> {
+        self.delegating_subject.check_permission(role).await
     }
 
-    fn check_roles(&self, roles: &[&str]) -> Result<(), AuthorizationError> {
-        self.delegating_subject.check_permissions(roles)
+    async fn check_roles(&self, roles: &[&str]) -> Result<(), AuthorizationError> {
+        self.delegating_subject.check_permissions(roles).await
     }
 
-    fn get_session(&self) -> Option<& dyn Session> {
+    fn get_session(&self) -> Option<&dyn Session> {
         self.delegating_subject.get_session()
     }
 
-    fn get_session_or_create(&mut self, create: bool) -> Option<&mut Box<dyn Session>> {
-        self.delegating_subject.get_session_or_create(create)
+    async fn get_session_or_create(&mut self, create: bool) -> Option<Arc<dyn Session>> {
+        self.delegating_subject.get_session_or_create(create).await
     }
 
-    fn login(&mut self, token: &dyn AuthenticationToken) -> Result<(), AuthenticationError> {
-        self.delegating_subject.login(token)
+    async fn login(&mut self, token: &dyn AuthenticationToken) -> Result<(), AuthenticationError> {
+        self.delegating_subject.login(token).await
     }
 
-    fn logout(&mut self) -> Result<(), next_web_core::error::BoxError> {
-        self.delegating_subject.logout()
+    async fn logout(&mut self) -> Result<(), next_web_core::error::BoxError> {
+        self.delegating_subject.logout().await
     }
 
-    fn run_as(
+    async fn run_as(
         &mut self,
         principals: &Arc<dyn PrincipalCollection>,
     ) -> Result<(), IllegalStateError> {
-        self.delegating_subject.run_as(principals)
+        self.delegating_subject.run_as(principals).await
     }
 
-    fn is_run_as(&self) -> bool {
-        self.delegating_subject.is_run_as()
+    async fn is_run_as(&self) -> bool {
+        self.delegating_subject.is_run_as().await
     }
 
-    fn get_previous_principals(&self) -> Option<Arc<dyn PrincipalCollection>> {
-        self.delegating_subject.get_previous_principals()
+    async fn get_previous_principals(&self) -> Option<Arc<dyn PrincipalCollection>> {
+        self.delegating_subject.get_previous_principals().await
     }
 
-    fn release_run_as(&mut self) -> Option<&dyn PrincipalCollection> {
-        self.delegating_subject.release_run_as()
+    async fn release_run_as(&mut self) -> Option<&dyn PrincipalCollection> {
+        self.delegating_subject.release_run_as().await
     }
 }
 

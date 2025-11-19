@@ -1,5 +1,10 @@
 use std::{any::Any, fmt::Display, sync::Arc};
 
+use next_web_core::{
+    async_trait,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+};
+
 use crate::{
     core::{
         authc::{
@@ -19,14 +24,11 @@ use crate::{
         },
         realm::simple_account_realm::SimpleAccountRealm,
         session::{
+            mgt::{session_context::SessionContext, session_manager::SessionManager},
             Session, SessionError, SessionId,
-            mgt::{
-                session_context::SessionContext,
-                session_manager::SessionManager,
-            },
         },
         subject::{
-            Subject, principal_collection::PrincipalCollection, subject_context::SubjectContext,
+            principal_collection::PrincipalCollection, subject_context::SubjectContext, Subject,
         },
     },
     web::{
@@ -138,9 +140,7 @@ impl DefaultWebSecurityManager {
         self.default_security_manager.before_logout(subject);
     }
 
-    pub fn get_execution_filters(&self) {
-
-    }
+    pub fn get_execution_filters(&self) {}
 }
 
 impl WebSecurityManager for DefaultWebSecurityManager {
@@ -149,18 +149,20 @@ impl WebSecurityManager for DefaultWebSecurityManager {
     }
 }
 
+#[async_trait]
 impl SecurityManager for DefaultWebSecurityManager {
-    fn login(
+    async fn login(
         &self,
         subject: &dyn Subject,
         authentication_token: &dyn AuthenticationToken,
     ) -> Result<Box<dyn Subject>, AuthenticationError> {
         self.default_security_manager
             .login(subject, authentication_token)
+            .await
     }
 
-    fn logout(&self, subject: &dyn Subject) -> Result<(), next_web_core::error::BoxError> {
-        self.default_security_manager.logout(subject)
+    async fn logout(&self, subject: &dyn Subject) -> Result<(), next_web_core::error::BoxError> {
+        self.default_security_manager.logout(subject).await
     }
 
     fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
@@ -309,13 +311,21 @@ impl Authorizer for DefaultWebSecurityManager {
     }
 }
 
+#[async_trait]
 impl SessionManager for DefaultWebSecurityManager {
-    fn start(&self, context: &dyn SessionContext) -> Result<Box<dyn Session>, AuthorizationError> {
-        self.default_security_manager.start(context)
+    async fn start(
+        &self,
+        context: &dyn SessionContext,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Result<Box<dyn Session>, AuthorizationError> {
+        self.default_security_manager
+            .start(context, req, resp)
+            .await
     }
 
-    fn get_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError> {
-        self.default_security_manager.get_session(id)
+    async fn get_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError> {
+        self.default_security_manager.get_session(id).await
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, env::consts::ARCH, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 
 use next_web_core::{
     async_trait,
@@ -79,17 +79,11 @@ where
         resp: &mut dyn HttpResponse,
     );
 
-    async fn after_stopped(&self, session: &mut dyn Session) {}
+    async fn after_stopped(&self, session: &dyn Session) {}
 
     async fn on_change(&self, session: &Arc<dyn Session>) {}
 
-    fn create_exposed_session(&self, session: &dyn Session) -> Arc<dyn Session> {
-        Arc::new(DelegatingSession::new(session.id().clone()))
+    fn create_exposed_session(&self, session: &dyn Session) -> DelegatingSession {
+        DelegatingSession::new(session.id().clone())
     }
-
-    fn do_get_session(
-        &self,
-        session_id: &SessionId,
-        ctx: &dyn SessionContext,
-    ) -> Result<Arc<dyn Session>, SessionError>;
 }

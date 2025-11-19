@@ -1,3 +1,9 @@
-pub mod authentication_filter;
+pub mod anonymous_filter;
 pub mod authenticating_filter;
+pub mod authentication_filter;
+pub mod basic_http_authentication_filter;
+pub mod bearer_http_authentication_filter;
+pub mod form_authentication_filter;
 pub mod http_authentication_filter;
+pub mod logout_filter;
+pub mod user_filter;

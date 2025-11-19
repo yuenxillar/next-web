@@ -1,4 +1,6 @@
-use std::collections::HashSet;
+use std::sync::Arc;
+
+use next_web_core::async_trait;
 
 use crate::core::session::{
     proxied_session::ProxiedSession, Session, SessionError, SessionId, SessionValue,
@@ -8,19 +10,20 @@ use crate::core::session::{
 pub struct ImmutableProxiedSession(pub(crate) ProxiedSession);
 
 impl ImmutableProxiedSession {
-    pub fn new(delegate: Box<dyn Session>) -> Self {
+    pub fn new(delegate: Arc<dyn Session>) -> Self {
         Self(ProxiedSession::new(delegate))
     }
 
     pub fn error<T>(&self) -> Result<T, SessionError> {
-        Err(SessionError::Invalid(
+        Err(SessionError::Invalid(Some(
             "This session is immutable and read-only - it cannot be altered.
             This is usually because the session has been stopped or expired already."
                 .to_string(),
-        ))
+        )))
     }
 }
 
+#[async_trait]
 impl Session for ImmutableProxiedSession {
     fn id(&self) -> &SessionId {
         self.0.id()
@@ -38,7 +41,7 @@ impl Session for ImmutableProxiedSession {
         self.0.timeout()
     }
 
-    fn set_timeout(&mut self, _timeout: i64) -> Result<(), SessionError> {
+    fn set_timeout(&self, _timeout: i64) -> Result<(), SessionError> {
         self.error()
     }
 
@@ -54,19 +57,29 @@ impl Session for ImmutableProxiedSession {
         self.error()
     }
 
-    fn attribute_keys(&self) -> Result<HashSet<String>, SessionError> {
-        self.0.attribute_keys()
+    async fn attribute_keys(&self) -> Result<Vec<String>, SessionError> {
+        self.0.attribute_keys().await
     }
 
-    fn get_attribute(&self, key: &str) -> Option<&SessionValue> {
-        self.0.get_attribute(key)
+    async fn get_attribute(&self, key: &str) -> Option<SessionValue> {
+        self.0.get_attribute(key).await
     }
 
-    fn set_attribute(&mut self, _key: &str, _value: SessionValue) -> Result<(), SessionError> {
+    async fn set_attribute(&self, _key: &str, _value: SessionValue) -> Result<(), SessionError> {
         self.error()
     }
 
-    fn remove_attribute(&mut self, _key: &str) -> Result<Option<SessionValue>, SessionError> {
+    async fn remove_attribute(&self, _key: &str) -> Result<Option<SessionValue>, SessionError> {
         self.error()
     }
 }
+
+// impl ValidatingSession for ImmutableProxiedSession {
+//     fn is_valid(&self) -> bool {
+//         self.0.is_valid()
+//     }
+
+//     fn validate(&self) -> Result<(), BoxError> {
+//         self.0.validate()
+//     }
+// }

@@ -8,17 +8,14 @@ use crate::{
     web::session::mgt::web_session_context::WebSessionContext,
 };
 
-#[derive(Clone)]
-pub struct DefaultWebSessionContext
-where
-    Self: Required<DefaultSessionContext>,
-{
+pub struct DefaultWebSessionContext {
     default_session_context: DefaultSessionContext,
 }
 
 impl DefaultWebSessionContext {
-    const REQUEST: &str = stringify!(format!("{}.REQUEST", std::any::type_name::<Self>()));
-    const RESPONSE: &str = stringify!(format!("{}.RESPONSE", std::any::type_name::<Self>()));
+    const REQUEST: &'static str = stringify!(format!("{}.REQUEST", std::any::type_name::<Self>()));
+    const RESPONSE: &'static str =
+        stringify!(format!("{}.RESPONSE", std::any::type_name::<Self>()));
 
     pub fn new(default_session_context: DefaultSessionContext) -> Self {
         Self {

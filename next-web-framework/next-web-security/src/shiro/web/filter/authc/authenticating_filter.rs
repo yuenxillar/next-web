@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::{
     async_trait,
@@ -17,7 +20,10 @@ use crate::{
     },
     web::filter::{
         access_control_filter::AccessControlFilterExt,
-        authc::{authentication_filter::AuthenticationFilter, http_authentication_filter::HttpAuthenticationFilterExt},
+        authc::{
+            authentication_filter::AuthenticationFilter,
+            http_authentication_filter::HttpAuthenticationFilterExt,
+        },
     },
 };
 
@@ -47,9 +53,9 @@ impl AuthenticatingFilter {
         let mut subject = self
             .authentication_filter
             .access_control_filter
-            .get_subject(request, response);
+            .get_subject(request);
 
-        if let Err(error) = subject.login(token.as_ref()) {
+        if let Err(error) = subject.login(token.as_ref()).await {
             return Ok(authenticating_filter_ext
                 .on_login_failure(token.as_ref(), &error, request, response)
                 .await);
@@ -103,9 +109,9 @@ impl AuthenticatingFilter {
         ))
     }
 
-    pub fn is_permissive(&self, mapped_value: &Object) -> bool {
-        if let Some(value) = mapped_value.as_object::<Vec<String>>() {
-            return value.contains(&Self::PERMISSIVE.to_string());
+    pub fn is_permissive(&self, mapped_value: Option<&Object>) -> bool {
+        if let Some(value) = mapped_value.and_then(|s| s.as_list_str()) {
+            return value.contains( & Self::PERMISSIVE);
         }
 
         false
@@ -114,18 +120,23 @@ impl AuthenticatingFilter {
     // pub fn clean_up(&self, )
 }
 
+#[async_trait]
 impl AccessControlFilterExt for AuthenticatingFilter {
-    fn is_access_allowed(
+    async fn is_access_allowed(
         &self,
-        request: &dyn HttpRequest,
-        response: &dyn HttpResponse,
-        mapped_value: &Object,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        mapped_value: Option<Object>,
     ) -> bool {
+        let is_permissive = self.is_permissive(mapped_value.as_ref());
         self.authentication_filter
             .is_access_allowed(request, response, mapped_value)
-            || (!self.is_login_request(request, response) && self.is_permissive(mapped_value))
+            .await
+            || (!self.is_login_request(request, response) && is_permissive)
     }
 }
+
+#[allow(unused_variables)]
 #[async_trait]
 pub trait AuthenticatingFilterExt: Send + Sync {
     async fn create_token(
@@ -158,5 +169,29 @@ pub trait AuthenticatingFilterExt: Send + Sync {
         false
     }
 
-    fn get_http_authentication_filter_ext(&self) -> Option<&dyn HttpAuthenticationFilterExt> { None }
+    fn get_http_authentication_filter_ext(&self) -> Option<&dyn HttpAuthenticationFilterExt> {
+        None
+    }
+}
+
+impl Deref for AuthenticatingFilter {
+    type Target = AuthenticationFilter;
+
+    fn deref(&self) -> &Self::Target {
+        &self.authentication_filter
+    }
+}
+
+impl DerefMut for AuthenticatingFilter {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.authentication_filter
+    }
+}
+
+impl Default for AuthenticatingFilter {
+    fn default() -> Self {
+        Self {
+            authentication_filter: Default::default(),
+        }
+    }
 }

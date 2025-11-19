@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use next_web_core::{async_trait, traits::http::{http_request::HttpRequest, http_response::HttpResponse}};
+
 use crate::core::{
     authz::authorization_error::AuthorizationError,
     session::{Session, SessionError, SessionId},
@@ -7,11 +9,17 @@ use crate::core::{
 
 use super::session_context::SessionContext;
 
+#[async_trait]
 pub trait SessionManager
 where
     Self: Send + Sync,
 {
-    fn start(&self, context: &dyn SessionContext) -> Result<Box<dyn Session>, AuthorizationError>;
+    async fn start(
+        &self,
+        context: &dyn SessionContext,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Result<Box<dyn Session>, AuthorizationError>;
 
-    fn get_session(&self, id: & SessionId) -> Result<Arc<dyn Session>, SessionError>;
+    async fn get_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError>;
 }

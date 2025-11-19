@@ -1,4 +1,5 @@
-use rudi_dev::{Properties, Singleton};
+use next_web_macros::Properties;
+use rudi_dev::Singleton;
 
 /// Properties for Elasticsearch client.
 #[Singleton(default, binds=[Self::into_properties])]

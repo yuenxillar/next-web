@@ -4,7 +4,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use next_web_core::{DynClone, clone_box};
+use next_web_core::{clone_box, DynClone};
 
 // 动态 Hasher 包装器
 pub struct DynHasher<'a>(&'a mut dyn Hasher);
@@ -76,6 +76,8 @@ pub enum Object {
     Int(i64),
     List(Vec<Object>),
     Obj(Box<dyn AnyObject>),
+    ListStr(Vec<String>),
+    Null,
 }
 
 impl Object {
@@ -107,6 +109,13 @@ impl Object {
         }
     }
 
+    pub fn as_list_str(&self) -> Option<Vec<&str>> {
+        match self {
+            Object::ListStr(obj) => Some(obj.iter().map(String::as_str).collect()),
+            _ => None,
+        }
+    }
+
     pub fn into_any_clone(self) -> Option<Box<dyn AnyObject>> {
         match self {
             Object::Obj(obj) => Some(obj),
@@ -121,7 +130,9 @@ impl Display for Object {
             Object::Str(s) => write!(f, "{}", s),
             Object::Int(i) => write!(f, "{}", i),
             Object::Obj(obj) => write!(f, "{:?}", obj),
-            Object::List(objects) => write!(f, "{}", "List[Object]"),
+            Object::List(_objects) => write!(f, "{}", "List[Object]"),
+            Object::ListStr(list_str) => write!(f, "{:?}", list_str),
+            Object::Null => write!(f, "{}", "Null"),
         }
     }
 }

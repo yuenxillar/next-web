@@ -14,7 +14,6 @@ use crate::util::logic::Logic;
 use super::attrs::request_mapping_attr::RequestMappingAttr;
 
 pub fn with_method(method: Option<Method>, attr: TokenStream, input: TokenStream) -> TokenStream {
-
     let item = parse_macro_input!(input as Item);
     let result = match item {
         Item::Fn(item_fn) => impl_item_fn(method, item_fn, attr),
@@ -45,7 +44,6 @@ fn impl_item_fn(
         Ok(attr) => attr,
         Err(error) => return Err(error),
     };
-
 
     let headers = headers.into_iter()
     .filter(|header| !header.value().trim().is_empty() )
@@ -108,8 +106,8 @@ fn impl_item_fn(
         .collect();
 
     let vis = &item_fn.vis;
-    let name     = &item_fn.sig.ident;
-    
+    let name = &item_fn.sig.ident;
+
     let stream = quote! {
         #(#doc_attributes)*
         #[allow(non_camel_case_types)]
@@ -117,7 +115,7 @@ fn impl_item_fn(
 
         impl ::next_web_dev::autoregister::handler_autoregister::HttpHandlerAutoRegister for #name {
             fn register<'a>(& self,
-                __router:           ::next_web_dev::Router, 
+                __router:           ::next_web_dev::Router,
                 __context:  &'a mut ::next_web_dev::configurer::http_method_handler_configurer::RouterContext
             ) -> ::next_web_dev::Router {
                 #block
@@ -339,7 +337,7 @@ fn generate_block(
                                                     &format!("__my_service{}", index),
                                                     Span::call_site(),
                                                 );
-                                                let single_name = Ident::new(&crate::util::single::field_name_to_singleton_name(&original_variable.to_string()), Span::call_site());
+                                                let single_name = Ident::new(&crate::util::name::field_name_to_singleton_name(&original_variable.to_string()), Span::call_site());
                                                 let stream = quote! {
                                                     let #original_variable = #variable.get_single_with_name::<#arg>(stringify!(#single_name)).await;
                                                 };
@@ -467,8 +465,8 @@ fn generate_block(
 
     item.sig.output = unified_return_type;
 
-    let sig  = &item.sig;
-    let block= &item.block.stmts;
+    let sig = &item.sig;
+    let block = &item.block.stmts;
     let vis = &item.vis;
 
     let token_stream = quote! {
@@ -498,8 +496,6 @@ fn generate_block(
 
     Ok(token_stream.into())
 }
-
-
 
 macro_rules! standard_method_type {
     (
@@ -594,4 +590,3 @@ impl ToTokens for Method {
         stream.append(ident);
     }
 }
-
