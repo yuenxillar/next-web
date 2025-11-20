@@ -1,11 +1,15 @@
-use crate::core::{
+use std::sync::Arc;
+
+use next_web_core::async_trait;
+
+use crate::{core::{
     authc::{authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken},
     session::{Session, SessionId},
     subject::{
         Subject, principal_collection::PrincipalCollection, subject_context::SubjectContext, support::default_subject_context::DefaultSubjectContext
     },
     util::object::Object,
-};
+}, web::mgt::web_security_manager::WebSecurityManager};
 
 #[derive(Clone)]
 pub struct DefaultWebSubjectContext {
@@ -27,6 +31,7 @@ impl DefaultWebSubjectContext {
     }
 }
 
+#[async_trait]
 impl SubjectContext for DefaultWebSubjectContext {
     fn get_session_id(&self) -> &SessionId {
         self.default_subject_context.get_session_id()
@@ -36,7 +41,7 @@ impl SubjectContext for DefaultWebSubjectContext {
         self.default_subject_context.set_session_id(session_id)
     }
 
-    fn get_subject(&self) -> &dyn Subject {
+    fn get_subject(&self) -> Option<&dyn Subject> {
         self.default_subject_context.get_subject()
     }
 
@@ -44,19 +49,24 @@ impl SubjectContext for DefaultWebSubjectContext {
         self.default_subject_context.set_subject(subject)
     }
 
-    fn get_principals(&self) -> &dyn PrincipalCollection {
+    fn get_principals(&self) -> Option<&Arc<dyn PrincipalCollection>> {
         self.default_subject_context.get_principals()
     }
 
-    fn resolve_principals(&mut self) -> Option<std::sync::Arc<dyn PrincipalCollection>> {
-        self.default_subject_context.resolve_principals()
+
+    async fn resolve_security_manager(&self) -> Option<&Arc<dyn WebSecurityManager>> {
+        self.default_subject_context.resolve_security_manager().await
+    }
+
+    async fn resolve_principals(&self) -> Option<&Arc<dyn PrincipalCollection>> {
+        self.default_subject_context.resolve_principals().await
     }
 
     fn set_principals(&mut self, principals: std::sync::Arc<dyn PrincipalCollection>) {
         self.default_subject_context.set_principals(principals)
     }
 
-    fn get_session(&self) -> &dyn Session {
+    fn get_session(&self) -> Option<&Arc<dyn Session>> {
         self.default_subject_context.get_session()
     }
 
@@ -64,7 +74,7 @@ impl SubjectContext for DefaultWebSubjectContext {
         self.default_subject_context.set_session(session)
     }
 
-    fn resolve_session(&mut self) -> Box<dyn Session> {
+    fn resolve_session(&self) -> Option<&Arc<dyn Session>> {
         self.default_subject_context.resolve_session()
     }
 
@@ -81,22 +91,23 @@ impl SubjectContext for DefaultWebSubjectContext {
     }
 
     fn set_session_creation_enabled(&mut self, enabled: bool) {
-        self.default_subject_context.set_session_creation_enabled(enabled)
+        self.default_subject_context
+            .set_session_creation_enabled(enabled)
     }
 
-    fn resolve_authenticated(&mut self) -> bool {
-        self.default_subject_context.resolve_authenticated()
+    async fn resolve_authenticated(&self) -> bool {
+        self.default_subject_context.resolve_authenticated().await
     }
 
-    fn get_authentication_info(&self) -> &dyn AuthenticationInfo {
-       self.default_subject_context.get_authentication_info()
+    fn get_authentication_info(&self) -> Option<&dyn AuthenticationInfo> {
+        self.default_subject_context.get_authentication_info()
     }
 
     fn set_authentication_info(&mut self, info: Box<dyn AuthenticationInfo>) {
         self.default_subject_context.set_authentication_info(info)
     }
 
-    fn get_authentication_token(&self) -> &dyn AuthenticationToken {
+    fn get_authentication_token(&self) -> Option<&dyn AuthenticationToken> {
         self.default_subject_context.get_authentication_token()
     }
 
@@ -112,8 +123,8 @@ impl SubjectContext for DefaultWebSubjectContext {
         self.default_subject_context.set_host(host)
     }
 
-    fn resolve_host(&mut self) -> Option<String> {
-        self.default_subject_context.resolve_host()
+    async fn resolve_host(&self) -> Option<String> {
+        self.default_subject_context.resolve_host().await
     }
 
     fn is_empty(&self) -> bool {

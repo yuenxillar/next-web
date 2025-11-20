@@ -1,3 +1,5 @@
+use next_web_core::async_trait;
+
 use crate::core::{
     mgt::subject_factory::SubjectFactory,
     subject::{Subject, subject_context::SubjectContext},
@@ -6,8 +8,9 @@ use crate::core::{
 #[derive(Clone)]
 pub struct DefaultSubjectFactory {}
 
+#[async_trait]
 impl SubjectFactory for DefaultSubjectFactory {
-    fn create_subject(&self, context: &dyn SubjectContext) -> Box<dyn Subject> {
+    async fn create_subject(&self, context: &dyn SubjectContext) -> Box<dyn Subject> {
         todo!()
     }
 }

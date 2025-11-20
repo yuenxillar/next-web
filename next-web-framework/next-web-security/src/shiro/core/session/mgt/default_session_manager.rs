@@ -240,7 +240,7 @@ impl DefaultSessionManager {
     ) -> Result<SessionValue, SessionError> {
         if let Some(s) = self._get_session(session_id).await {
             if let Some(value) = s.get_attribute(key).await {
-                return Ok(value);
+                return Ok(value.clone());
             }
         }
 

@@ -1,7 +1,10 @@
 use std::{any::Any, collections::HashMap, sync::Arc};
 
 use crate::{
-    core::{mgt::security_manager::SecurityManager, subject::Subject},
+    core::{
+        mgt::security_manager::SecurityManager,
+        subject::{Subject, support::default_subject_context::DefaultSubjectContext},
+    },
     web::{
         filter::{
             access_control_filter::AccessControlFilter,
@@ -13,8 +16,7 @@ use crate::{
                 path_matching_filter_chain_resolver::PathMatchingFilterChainResolver,
             },
         },
-        mgt::default_web_security_manager::DefaultWebSecurityManager,
-        subject::support::web_delegating_subject::WebDelegatingSubject,
+        mgt::{default_web_security_manager::DefaultWebSecurityManager, web_security_manager::WebSecurityManager},
     },
 };
 
@@ -32,7 +34,7 @@ use tracing::error;
 
 #[derive(Clone)]
 pub struct FilterProxy {
-    security_manager: Arc<dyn SecurityManager>,
+    security_manager: Arc<dyn WebSecurityManager>,
     filter_chain_resolver: Option<PathMatchingFilterChainResolver>,
     global_filters: Vec<String>,
 
@@ -45,7 +47,7 @@ pub struct FilterProxy {
 impl FilterProxy {
     pub fn new<S>(security_manager: S) -> Self
     where
-        S: SecurityManager + 'static,
+        S: WebSecurityManager + 'static,
     {
         let mut proxy = Self {
             filter_chain_resolver: None,
@@ -106,7 +108,7 @@ impl FilterProxy {
         self.unauthorized_url.as_deref()
     }
 
-    pub fn get_security_manager(&self) -> &Arc<dyn SecurityManager> {
+    pub fn get_security_manager(&self) -> &Arc<dyn WebSecurityManager> {
         &self.security_manager
     }
 
@@ -210,9 +212,10 @@ impl FilterProxy {
         }
     }
 
-    pub fn create_subject(&self) -> WebDelegatingSubject {
-        // WebDelegatingSubject::from(value)
-        todo!()
+    pub async fn create_subject(&self) -> Box<dyn Subject> {
+        self.security_manager.create_subject(Arc::new(
+            DefaultSubjectContext::from_security_manager(self.security_manager.clone()),
+        )).await
     }
 
     pub fn get_filter_chain_resolver(&self) -> Option<&PathMatchingFilterChainResolver> {
@@ -283,9 +286,9 @@ impl HttpFilter for FilterProxy {
     ) -> Result<(), BoxError> {
         req.ready();
 
-        let mut subject = self.create_subject();
+        let mut subject = self.create_subject().await;
 
-        self.update_session_last_access_time(req, res, &mut subject);
+        self.update_session_last_access_time(req, res, subject.as_mut());
         self.execute_chain(req, res, orig_chain).await?;
 
         req.clean_up();

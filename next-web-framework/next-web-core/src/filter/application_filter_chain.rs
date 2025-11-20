@@ -9,7 +9,10 @@ use crate::{
 };
 
 #[derive(Clone, Default)]
-pub struct ApplicationFilterChain {}
+pub struct ApplicationFilterChain {
+    pos: usize,
+    n: usize,
+}
 
 #[async_trait]
 impl HttpFilterChain for ApplicationFilterChain {
@@ -18,6 +21,11 @@ impl HttpFilterChain for ApplicationFilterChain {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
     ) -> Result<(), BoxError> {
+         // Call the next filter if there is one
+        if self.pos < self.n {
+            // self.
+        }
+
         Ok(())
     }
 }

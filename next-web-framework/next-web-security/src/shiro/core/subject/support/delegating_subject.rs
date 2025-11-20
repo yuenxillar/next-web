@@ -6,18 +6,16 @@ use next_web_core::{
 };
 use tracing::debug;
 
-use crate::core::{
+use crate::{core::{
     authc::{authentication_error::AuthenticationError, authentication_token::AuthenticationToken},
     authz::authorization_error::AuthorizationError,
-    mgt::{default_security_manager::DefaultSecurityManager, security_manager::SecurityManager},
+    mgt::security_manager::SecurityManager,
     session::{
-        mgt::{default_session_context::DefaultSessionContext, session_context::SessionContext},
-        proxied_session::ProxiedSession,
-        Session, SessionError, SessionValue,
+        Session, SessionError, SessionValue, mgt::{default_session_context::DefaultSessionContext, session_context::SessionContext}, proxied_session::ProxiedSession
     },
-    subject::{principal_collection::PrincipalCollection, Subject},
+    subject::{Subject, principal_collection::PrincipalCollection},
     util::object::Object,
-};
+}, web::mgt::web_security_manager::WebSecurityManager};
 use std::{
     any::Any,
     fmt::Display,
@@ -26,19 +24,16 @@ use std::{
 };
 
 #[derive(Clone)]
-pub struct DelegatingSubject<T = DefaultSecurityManager> {
+pub struct DelegatingSubject{
     principals: Option<Arc<dyn PrincipalCollection>>,
     authenticated: bool,
     host: Option<String>,
     pub(crate) session: Option<Arc<dyn Session>>,
     session_creation_enabled: bool,
-    security_manager: T,
+    security_manager: Arc<dyn WebSecurityManager>,
 }
 
-impl<T> DelegatingSubject<T>
-where
-    T: SecurityManager,
-    T: Clone + 'static,
+impl DelegatingSubject
 {
     const RUN_AS_PRINCIPALS_SESSION_KEY: &str = stringify!(format!(
         "{}{}",
@@ -52,7 +47,7 @@ where
         host: Option<String>,
         session: Option<Arc<dyn Session>>,
         session_creation_enabled: bool,
-        security_manager: T,
+        security_manager: Arc<dyn WebSecurityManager>,
     ) -> Self {
         let mut subject = Self {
             principals,
@@ -77,8 +72,9 @@ where
         Arc::new(session)
     }
 
-    pub fn get_security_manager(&self) -> &T {
-        &self.security_manager
+
+    pub fn get_security_manager(&self) -> &dyn WebSecurityManager {
+        self.security_manager.as_ref()
     }
 
     pub fn has_principals(&self) -> bool {
@@ -216,21 +212,8 @@ where
     }
 }
 
-impl<T> From<T> for DelegatingSubject<T>
-where
-    T: SecurityManager,
-    T: Clone + 'static,
-{
-    fn from(security_manager: T) -> Self {
-        Self::new(None, false, None, None, true, security_manager)
-    }
-}
-
 #[async_trait]
-impl<T> Subject for DelegatingSubject<T>
-where
-    T: SecurityManager + Clone,
-    T: 'static,
+impl Subject for DelegatingSubject
 {
     async fn get_principal(&self) -> Option<&Object> {
         self.get_primary_principal(self.get_principals().await.map(|pr| pr.as_ref()))
@@ -322,8 +305,8 @@ where
             .check_roles(self.get_principals().await.map(|pr| pr.as_ref()), roles)
     }
 
-    fn get_session(&self) -> Option<&dyn Session> {
-        self.session.as_deref()
+    fn get_session(&self) -> Option<&Arc<dyn Session>> {
+        self.session.as_ref()
     }
 
     async fn get_session_or_create(&mut self, create: bool) -> Option<Arc<dyn Session>> {
@@ -347,7 +330,7 @@ where
     }
 
     async fn login(&mut self, token: &dyn AuthenticationToken) -> Result<(), AuthenticationError> {
-        self.clear_run_as_identities_internal();
+        self.clear_run_as_identities_internal().await;
 
         let mut subject = self.security_manager.login(self, token).await?;
 
@@ -399,7 +382,7 @@ where
     }
 
     async fn logout(&mut self) -> Result<(), BoxError> {
-        self.clear_run_as_identities_internal();
+        self.clear_run_as_identities_internal().await;
         if let Err(error) = self.security_manager.logout(self).await {
             debug!(
                 "Encountered session exception trying to log out subject.  This can generally safely be ignored. {:?}",
@@ -469,10 +452,7 @@ where
     }
 }
 
-impl<T> DelegatingSubject<T>
-where
-    T: SecurityManager + Clone,
-    T: 'static,
+impl DelegatingSubject
 {
     fn create_session_context(&self) -> impl SessionContext + 'static {
         let mut session_context = DefaultSessionContext::default();
@@ -603,7 +583,6 @@ impl DerefMut for StoppingAwareProxiedSession {
         self.get_mut_object()
     }
 }
-
 pub trait DelegatingSubjectSupport
 where
     Self: Send + Sync,

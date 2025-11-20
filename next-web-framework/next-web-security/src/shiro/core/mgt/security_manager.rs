@@ -24,5 +24,5 @@ where
 
     async fn logout(&self, subject: &dyn Subject) -> Result<(), BoxError>;
 
-    fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject>;
+    async fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject>;
 }

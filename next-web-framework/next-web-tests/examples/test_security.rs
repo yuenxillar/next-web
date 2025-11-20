@@ -1,10 +1,17 @@
 use std::sync::Arc;
 
-use axum::{extract::Path, extract::Request, response::IntoResponse, routing::post};
+use axum::{
+    body::Body,
+    extract::{Path, Request, State},
+    response::{IntoResponse, Response},
+    routing::{get, post},
+};
 use next_web_core::state::application_state::ApplicationState;
-#[allow(missing_docs)]
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
-use next_web_dev::{application::Application, traits::filter::http_filter::HttpFilter};
+use next_web_dev::{
+    application::Application, filter::application_filter_chain::ApplicationFilterChain,
+};
+use next_web_core::traits::filter::http_filter::HttpFilter;
 use next_web_security::web::filter_proxy::FilterProxy;
 use tokio::sync::Mutex;
 
@@ -23,20 +30,38 @@ impl Application for TestApplication {
         axum::Router::new().nest(
             "/login",
             axum::Router::new()
+                .route("/hello", get(async || "Hello!"))
                 .route("/setToken/{token}", post(set_token))
-                .route("/auth", post(async || "Authorized")),
+                .route("/auth", post(async || "Authorized"))
+                .route_layer(axum::middleware::from_fn_with_state(
+                    Arc::new(FilterProxy::default()),
+                    security_middleware,
+                )),
         )
     }
 
     async fn on_ready(&self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
-        ctx.insert_singleton_with_name::<Arc<dyn HttpFilter>, String>(
-            Arc::new(FilterProxy::default()),
-            "defaultFilterProxy".into(),
-        );
     }
 }
 
+async fn security_middleware(
+    State(filter_proxy): State<Arc<FilterProxy>>,
+    mut req: Request,
+    next: axum::middleware::Next,
+) -> impl IntoResponse {
+
+    let mut resp = Response::builder().body(Body::empty()).unwrap();
+    let orig_chain = ApplicationFilterChain::default();
+    let result = filter_proxy.do_filter(&mut req, &mut resp, &orig_chain).await;
+    match result {
+        Ok(_) => next.run(req).await,
+        Err(error) => {
+            println!("FilterProxy execute_chain error: {}", error.to_string());
+            resp
+        }
+    }
+}
 async fn set_token(Path(token): Path<String>, req: Request) -> impl IntoResponse {
     if token.is_empty() {
         return "Error";

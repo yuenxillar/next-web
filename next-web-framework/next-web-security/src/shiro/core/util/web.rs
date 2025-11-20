@@ -115,7 +115,7 @@ impl WebUtils {
         false
     }
 
-    pub fn get_subject(request: &dyn HttpRequest) -> Box<dyn Subject> {
+    pub async fn get_subject(request: &mut dyn HttpRequest) -> Box<dyn Subject> {
         if let Some(subject) = request.get_attribute("NextSubject") {
             match subject {
                 AnyValue::Object(obj) => {
@@ -134,5 +134,6 @@ impl WebUtils {
             .as_object::<Arc<dyn SecurityManager>>()
             .unwrap()
             .create_subject(Arc::new(DefaultWebSubjectContext::default()))
+            .await
     }
 }

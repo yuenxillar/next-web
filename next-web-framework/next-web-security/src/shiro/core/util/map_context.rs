@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::core::util::object::Object;
+use crate::core::{subject::subject_context::SubjectContext, util::object::Object};
 
 #[derive(Default, Clone)]
 pub struct MapContext {
@@ -12,6 +12,14 @@ pub struct MapContext {
 
 impl MapContext {
     pub fn new(backing_map: HashMap<String, Object>) -> Self {
+        Self { backing_map }
+    }
+
+    pub fn from_context(context: &dyn SubjectContext) -> Self {
+        let mut backing_map = HashMap::new();
+        for (key, value) in context.values() {
+            backing_map.insert(key, value);
+        }
         Self { backing_map }
     }
 }

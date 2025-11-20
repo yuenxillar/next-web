@@ -20,49 +20,48 @@ impl<'a> Hasher for DynHasher<'a> {
 }
 
 pub trait AnyObject: Any + DynClone + Send + Sync {
-    fn equals(&self, other: &dyn AnyObject) -> bool;
+    // fn equals(&self, other: &dyn AnyObject) -> bool;
     fn object_type_id(&self) -> TypeId;
-    fn hash_object(&self, hasher: &mut dyn Hasher);
+    // fn hash_object(&self, hasher: &mut dyn Hasher);
 }
 
 impl<T> AnyObject for T
 where
     T: Any + DynClone,
     T: Send + Sync,
-    T: PartialEq + Hash,
 {
-    fn equals(&self, other: &dyn AnyObject) -> bool {
-        if let Some(other_value) = (other as &dyn Any).downcast_ref::<T>() {
-            self == other_value
-        } else {
-            false
-        }
-    }
+    // fn equals(&self, other: &dyn AnyObject) -> bool {
+    //     if let Some(other_value) = (other as &dyn Any).downcast_ref::<T>() {
+    //         self == other_value
+    //     } else {
+    //         false
+    //     }
+    // }
 
     fn object_type_id(&self) -> TypeId {
         TypeId::of::<T>()
     }
 
-    fn hash_object(&self, hasher: &mut dyn Hasher) {
-        let mut wrapper = DynHasher(hasher);
-        self.hash(&mut wrapper);
-    }
+    // fn hash_object(&self, hasher: &mut dyn Hasher) {
+    //     let mut wrapper = DynHasher(hasher);
+    //     self.hash(&mut wrapper);
+    // }
 }
 
-impl PartialEq for Box<dyn AnyObject> {
-    fn eq(&self, other: &Self) -> bool {
-        self.equals(&**other)
-    }
-}
+// impl PartialEq for Box<dyn AnyObject> {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.equals(&**other)
+//     }
+// }
 
-impl Eq for Box<dyn AnyObject> {}
+// impl Eq for Box<dyn AnyObject> {}
 
-impl Hash for Box<dyn AnyObject> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.object_type_id().hash(state);
-        self.hash_object(state);
-    }
-}
+// impl Hash for Box<dyn AnyObject> {
+//     fn hash<H: Hasher>(&self, state: &mut H) {
+//         self.object_type_id().hash(state);
+//         self.hash_object(state);
+//     }
+// }
 
 impl Clone for Box<dyn AnyObject> {
     fn clone(&self) -> Box<dyn AnyObject> {
@@ -70,10 +69,11 @@ impl Clone for Box<dyn AnyObject> {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Clone)]
 pub enum Object {
     Str(String),
     Int(i64),
+    Bool(bool),
     List(Vec<Object>),
     Obj(Box<dyn AnyObject>),
     ListStr(Vec<String>),
@@ -91,6 +91,13 @@ impl Object {
     pub fn as_int(&self) -> Option<i64> {
         match self {
             Object::Int(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Object::Bool(bool) => Some(*bool),
             _ => None,
         }
     }
@@ -129,6 +136,7 @@ impl Display for Object {
         match self {
             Object::Str(s) => write!(f, "{}", s),
             Object::Int(i) => write!(f, "{}", i),
+            Object::Bool(b) => write!(f, "{}", b),
             Object::Obj(obj) => write!(f, "{:?}", obj),
             Object::List(_objects) => write!(f, "{}", "List[Object]"),
             Object::ListStr(list_str) => write!(f, "{:?}", list_str),

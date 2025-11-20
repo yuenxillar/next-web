@@ -121,13 +121,14 @@ impl DefaultWebSecurityManager {
             .set_session_manager(session_manager);
     }
 
-    pub fn create_session_context(
+    pub async fn create_session_context(
         &self,
         subject_context: &mut dyn SubjectContext,
     ) -> DefaultWebSessionContext {
         let session_context = self
             .default_security_manager
-            .create_session_context(subject_context);
+            .create_session_context(subject_context)
+            .await;
 
         DefaultWebSessionContext::new(session_context)
     }
@@ -165,8 +166,8 @@ impl SecurityManager for DefaultWebSecurityManager {
         self.default_security_manager.logout(subject).await
     }
 
-    fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
-        self.default_security_manager.create_subject(context)
+    async fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
+        self.default_security_manager.create_subject(context).await
     }
 }
 

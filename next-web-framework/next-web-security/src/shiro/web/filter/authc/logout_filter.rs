@@ -77,7 +77,7 @@ impl AdviceFilterExt for LogoutFilter {
         response: &mut dyn HttpResponse,
         _ext: Option<&dyn PathMatchingFilterExt>,
     ) -> bool {
-        let mut subject = WebUtils::get_subject(request);
+        let mut subject = WebUtils::get_subject(request).await;
 
         // Check if POST only logout is enabled
         if self.is_post_only_logout() {

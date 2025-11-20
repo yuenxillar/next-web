@@ -27,9 +27,6 @@ pub enum SessionId {
 
     /// 数字 ID
     Number(u64),
-
-    /// 其它 ID
-    Other(Box<dyn AnyObject>),
 }
 
 #[derive(Debug, Clone)]
@@ -41,6 +38,26 @@ pub enum SessionValue {
     Object(Box<dyn AnyClone>),
     Null,
 }
+
+
+impl SessionValue {
+    pub fn as_object<T: AnyClone>(&self) -> Option<&T> {
+        if let SessionValue::Object(ref obj) = self {
+            (obj as &dyn Any).downcast_ref::<T>()
+        } else {
+            None
+        }
+    }
+
+    pub fn as_boolean(&self) -> Option<bool> {
+        if let SessionValue::Boolean(b) = self {
+            Some(*b)
+        } else {
+            None
+        }
+    }
+}
+
 
 #[async_trait]
 pub trait Session
@@ -105,7 +122,6 @@ impl Display for SessionId {
         match self {
             SessionId::String(id) => write!(f, "{}", id),
             Self::Number(id) => write!(f, "{}", id),
-            SessionId::Other(id) => write!(f, "{:?}", id),
         }
     }
 }

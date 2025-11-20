@@ -10,18 +10,15 @@ use crate::{
             authentication_error::AuthenticationError, authentication_token::AuthenticationToken,
         },
         authz::authorization_error::AuthorizationError,
-        mgt::{
-            default_security_manager::DefaultSecurityManager, security_manager::SecurityManager,
-        },
-        session::{mgt::session_context::SessionContext, Session},
+        mgt::security_manager::SecurityManager,
+        session::{Session, mgt::session_context::SessionContext},
         subject::{
-            principal_collection::PrincipalCollection,
-            support::delegating_subject::{DelegatingSubject, DelegatingSubjectSupport},
-            Subject,
+            Subject, principal_collection::PrincipalCollection, support::delegating_subject::{DelegatingSubject, DelegatingSubjectSupport}
         },
         util::object::Object,
     },
     web::{
+        mgt::{default_web_security_manager::DefaultWebSecurityManager, web_security_manager::WebSecurityManager},
         session::mgt::default_web_session_context::DefaultWebSessionContext,
         subject::web_subject::WebSubject,
     },
@@ -30,28 +27,26 @@ use crate::{
 pub const DEFAULT_WEB_DELEGATING_SUBJECT_KEY: &str = "DefaultWebDelegatingSubject";
 
 #[derive(Clone)]
-pub struct WebDelegatingSubject<T = DefaultSecurityManager> {
-    delegating_subject: DelegatingSubject<T>,
+pub struct WebDelegatingSubject {
+    delegating_subject: DelegatingSubject,
 }
 
-impl<T> WebDelegatingSubject<T>
-where
-    T: SecurityManager + Clone,
-    T: 'static,
+impl WebDelegatingSubject
 {
-    pub fn new<S>(
+    pub fn new(
         principals: Option<Arc<dyn PrincipalCollection>>,
         authenticated: bool,
         host: Option<String>,
         session: Option<Arc<dyn Session>>,
-        security_manager: T,
+        session_creation_enabled: bool,
+        security_manager: Arc<dyn WebSecurityManager>,
     ) -> Self {
         let delegating_subject = DelegatingSubject::new(
             principals,
             authenticated,
             host,
             session,
-            true,
+            session_creation_enabled,
             security_manager,
         );
         Self { delegating_subject }
@@ -74,10 +69,7 @@ where
 
 impl WebSubject for WebDelegatingSubject {}
 
-impl<T> DelegatingSubjectSupport for WebDelegatingSubject<T>
-where
-    T: SecurityManager + Clone,
-    T: 'static,
+impl DelegatingSubjectSupport for WebDelegatingSubject
 {
     fn is_session_creation_enabled(&self) -> bool {
         self.delegating_subject.is_session_creation_enabled()
@@ -85,10 +77,7 @@ where
 }
 
 #[async_trait]
-impl<T> Subject for WebDelegatingSubject<T>
-where
-    T: SecurityManager + Clone,
-    T: 'static,
+impl Subject for WebDelegatingSubject
 {
     async fn get_principal(&self) -> Option<&Object> {
         self.delegating_subject.get_principal().await
@@ -138,7 +127,7 @@ where
         self.delegating_subject.check_permissions(roles).await
     }
 
-    fn get_session(&self) -> Option<&dyn Session> {
+    fn get_session(&self) -> Option<&Arc<dyn Session>> {
         self.delegating_subject.get_session()
     }
 
@@ -174,7 +163,8 @@ where
     }
 }
 
-impl Required<DelegatingSubject> for WebDelegatingSubject {
+impl Required<DelegatingSubject> for WebDelegatingSubject
+{
     fn get_object(&self) -> &DelegatingSubject {
         &self.delegating_subject
     }

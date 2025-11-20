@@ -222,7 +222,7 @@ where
     C: Clone,
     B: EventBus + Clone,
 {
-    fn _create_subject(
+    async fn _create_subject(
         &self,
         token: &dyn AuthenticationToken,
         info: &dyn AuthenticationInfo,
@@ -232,11 +232,12 @@ where
         context.set_authenticated(true);
         context.set_authentication_token(clone_box(token));
         context.set_authentication_info(clone_box(info));
+        // context.set_security_manager(self.);
 
         if let Some(subject) = existing {
             context.set_subject(clone_box(subject));
         }
-        self.create_subject(Arc::new(context))
+        self.create_subject(Arc::new(context)).await
     }
 
     pub async fn resolve_session(&self, context: &mut dyn SubjectContext) {
@@ -256,11 +257,13 @@ where
         context: &dyn SubjectContext,
     ) -> Result<Arc<dyn Session>, SessionError> {
         let session_id = self.get_session_id(context);
-        self.sessions_security_manager.get_session(&session_id).await
+        self.sessions_security_manager
+            .get_session(&session_id)
+            .await
     }
 
-    pub fn resolve_principals(&self, context: &mut dyn SubjectContext) {
-        let principals = context.resolve_principals();
+    pub async fn resolve_principals(&self, context: &mut dyn SubjectContext) {
+        let principals = context.resolve_principals().await;
         if let None = principals {
             debug!(
                 "Found remembered PrincipalCollection.  Adding to the context to be used for subject construction by the SubjectFactory."
@@ -299,8 +302,8 @@ where
         };
     }
 
-    pub fn do_create_subject(&self, context: &dyn SubjectContext) -> Box<dyn Subject> {
-        self.get_subject_factory().create_subject(context)
+    pub async fn do_create_subject(&self, context: &dyn SubjectContext) -> Box<dyn Subject> {
+        self.get_subject_factory().create_subject(context).await
     }
 
     pub fn save(&self, subject: &dyn Subject) {
@@ -311,7 +314,7 @@ where
         self.get_subject_dao().delete(subject)
     }
 
-    pub fn create_session_context(
+    pub async fn create_session_context(
         &self,
         subject_context: &mut dyn SubjectContext,
     ) -> DefaultSessionContext {
@@ -322,7 +325,7 @@ where
         }
         session_context.set_session_id(subject_context.get_session_id().to_owned());
 
-        let host = subject_context.resolve_host();
+        let host = subject_context.resolve_host().await;
         if let Some(host) = host {
             session_context.set_host(&host);
         }
@@ -542,7 +545,7 @@ where
             .start(context, req, resp)
             .await
     }
-    
+
     async fn get_session(&self, id: &SessionId) -> Result<Arc<dyn Session>, SessionError> {
         self.sessions_security_manager.get_session(id).await
     }
@@ -580,7 +583,7 @@ where
             }
         };
 
-        let logged_in = self._create_subject(token, info.as_ref(), Some(subject));
+        let logged_in = self._create_subject(token, info.as_ref(), Some(subject)).await;
 
         self.on_successful_login(token, info.as_ref(), logged_in.as_ref());
 
@@ -609,15 +612,15 @@ where
         Ok(())
     }
 
-    fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
-        let mut context = DefaultSubjectContext::new(context);
+    async fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
+        let mut context = DefaultSubjectContext::new(context.as_ref());
 
         // self.ensure_security_manager(&mut context);
-        self.resolve_session(&mut context);
+        self.resolve_session(&mut context).await;
 
-        self.resolve_principals(&mut context);
+        self.resolve_principals(&mut context).await;
 
-        let subject = self.do_create_subject(&context);
+        let subject = self.do_create_subject(&context).await;
 
         if context.is_session_creation_enabled() {
             self.save(subject.as_ref());

@@ -44,7 +44,7 @@ use crate::core::{
     util::nameable::Nameable,
 };
 
-type AuthorizationCache = DashMap<Object, Box<dyn AuthorizationInfo>>;
+type AuthorizationCache = DashMap<String, Box<dyn AuthorizationInfo>>;
 
 pub struct AuthorizingRealm {
     authorization_caching_enabled: bool,
@@ -149,7 +149,7 @@ impl AuthorizingRealm {
 
         if let Some(cache) = cache {
             let key = self.get_authorization_cache_key(principals);
-            cache.remove(&Object::Str(key.id()));
+            cache.remove(key.id());
         }
     }
 
@@ -196,7 +196,7 @@ impl AuthorizingRealm {
                         .collect::<Vec<_>>()
                 }) {
                     for (key, value) in caches {
-                        authorization_cache.insert(Object::Str(key), value);
+                        authorization_cache.insert(key, value);
                     }
                 }
 
@@ -242,7 +242,7 @@ impl AuthorizingRealm {
         if let Some(cache) = self.get_available_authorization_cache() {
             trace!("Attempting to retrieve the AuthorizationInfo from cache.");
             info = cache
-                .get(&Object::Str(principals.id()))
+                .get(principals.id())
                 .map(|val| val.value().clone());
 
             if info.is_none() {
@@ -268,7 +268,7 @@ impl AuthorizingRealm {
                         "Caching authorization info for principals: [{}].",
                         principals
                     );
-                    cache.insert(Object::Str(principals.id()), info.clone());
+                    cache.insert(principals.id().to_string(), info.clone());
                 }
             }
         }

@@ -19,7 +19,7 @@ use crate::core::{
     util::nameable::Nameable,
 };
 
-type AuthenticationCache = DashMap<Object, Box<dyn AuthenticationInfo>>;
+type AuthenticationCache = DashMap<String, Box<dyn AuthenticationInfo>>;
 pub struct AuthenticatingRealm
 where
     Self: Required<CachingRealm>,
@@ -148,7 +148,7 @@ impl AuthenticatingRealm {
             trace!("Attempting to retrieve the AuthenticationInfo from cache.");
 
             let key = self.get_authentication_cache_key_from_token(token);
-            info = cache.get(&key).map(|a| a.value().clone());
+            info = cache.get("").map(|a| a.value().clone());
 
             if let Some(info) = info.as_deref() {
                 trace!("Found cached AuthenticationInfo for key [{}]", info);
@@ -182,12 +182,12 @@ impl AuthenticatingRealm {
         );
 
         if let Some(cache) = cache {
-            cache.insert(key, info);
+            cache.insert(todo!(), info);
         }
     }
 
     fn get_authentication_cache_key_from_token(&self, token: &dyn AuthenticationToken) -> Object {
-        token.get_principal().clone()
+        token.get_principal()
     }
 
     fn get_authentication_cache_key_from_principals(
@@ -242,7 +242,7 @@ impl AuthenticatingRealm {
                             .collect::<Vec<_>>()
                     }) {
                         for (key, value) in caches {
-                            authorization_cache.insert(Object::Str(key), value);
+                            authorization_cache.insert(key, value);
                         }
                     }
 
@@ -296,9 +296,9 @@ impl AuthenticatingRealm {
             let key = self.get_authentication_cache_key_from_principals(principals);
             match self.get_available_authentication_cache() {
                 Some(cache) => {
-                    cache.remove(&key);
+                    cache.remove("");
                 }
-                None => return,
+                None => return, 
             }
         }
     }

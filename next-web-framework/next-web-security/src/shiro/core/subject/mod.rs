@@ -43,7 +43,7 @@ where
     async fn check_roles(&self, roles: &[&str]) -> Result<(), AuthorizationError>;
 
     // === 会话 ===
-    fn get_session(&self) -> Option<&dyn Session>;
+    fn get_session(&self) -> Option<&Arc<dyn Session>>;
     async fn get_session_or_create(&mut self, create: bool) -> Option<Arc<dyn Session>>;
 
     // === 登录/登出 ===

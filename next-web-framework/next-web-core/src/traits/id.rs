@@ -1,5 +1,5 @@
 
 pub trait Id {
 
-    fn id(&self) -> String;
+    fn id(&self) -> &str;
 }

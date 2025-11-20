@@ -1,4 +1,4 @@
-use std::{any::Any, fmt::Display};
+use std::{any::Any, fmt::Display, sync::Arc};
 
 use next_web_core::DynClone;
 
@@ -11,7 +11,7 @@ where
     Self: DynClone
 {
 
-    fn get_principals(&self) -> Option<&dyn PrincipalCollection>;
+    fn get_principals(&self) -> Option<&Arc<dyn PrincipalCollection>>;
 
 
     fn get_credentials(&self) -> Option<& Object>;

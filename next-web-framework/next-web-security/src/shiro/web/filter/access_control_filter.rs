@@ -34,8 +34,8 @@ impl<T> AccessControlFilter<T> {
         self.login_url = login_url.to_string();
     }
 
-    pub fn get_subject(&self, request: &dyn HttpRequest) -> Box<dyn Subject> {
-        WebUtils::get_subject(request)
+    pub async fn get_subject(&self, request: &mut dyn HttpRequest) -> Box<dyn Subject> {
+        WebUtils::get_subject(request).await
     }
 
     pub fn save_request_and_redirect_to_login(

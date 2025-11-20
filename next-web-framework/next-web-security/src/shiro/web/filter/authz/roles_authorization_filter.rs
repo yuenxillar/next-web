@@ -46,7 +46,7 @@ impl AccessControlFilterExt for RolesAuthorizationFilter {
             return true;
         }
 
-        let subject = WebUtils::get_subject(request);
+        let subject = WebUtils::get_subject(request).await;
         subject.has_all_roles(&deduped_roles).await
     }
 }
