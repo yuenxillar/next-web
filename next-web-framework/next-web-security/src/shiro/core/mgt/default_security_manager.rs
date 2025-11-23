@@ -9,43 +9,48 @@ use next_web_core::{
 };
 use tracing::{debug, info, trace, warn};
 
-use crate::core::{
-    authc::{
-        authentication_error::AuthenticationError, authentication_info::AuthenticationInfo,
-        authentication_token::AuthenticationToken, authenticator::Authenticator,
-        logout_aware::LogoutAware, pam::modular_realm_authenticator::ModularRealmAuthenticator,
-    },
-    authz::{
-        authorization_error::AuthorizationError, authorizer::Authorizer,
-        modular_realm_authorizer::ModularRealmAuthorizer, permission::Permission,
-    },
-    cache::{
-        cache_manager::CacheManager, cache_manager_aware::CacheManagerAware,
-        default_cache_manager::DefaultCacheManager,
-    },
-    event::{
-        event_bus::EventBus, event_bus_aware::EventBusAware,
-        support::default_event_bus::DefaultEventBus,
-    },
-    mgt::{
-        default_subject_dao::DefaultSubjectDAO, default_subject_factory::DefaultSubjectFactory,
-        remember_me_manager::RememberMeManager, security_manager::SecurityManager,
-        sessions_security_manager::SessionsSecurityManager, subject_dao::SubjectDAO,
-        subject_factory::SubjectFactory,
-    },
-    realm::{simple_account_realm::SimpleAccountRealm, Realm},
-    session::{
-        mgt::{
-            default_session_context::DefaultSessionContext,
-            default_session_manager::DefaultSessionManager, session_context::SessionContext,
-            session_manager::SessionManager,
+#[cfg(feature = "web")]
+use crate::web::subject::{web_subject::WebSubject, web_subject_context::WebSubjectContext};
+use crate::{
+    core::{
+        authc::{
+            authentication_error::AuthenticationError, authentication_info::AuthenticationInfo,
+            authentication_token::AuthenticationToken, authenticator::Authenticator,
+            logout_aware::LogoutAware, pam::modular_realm_authenticator::ModularRealmAuthenticator,
         },
-        Session, SessionError, SessionId,
+        authz::{
+            authorization_error::AuthorizationError, authorizer::Authorizer,
+            modular_realm_authorizer::ModularRealmAuthorizer, permission::Permission,
+        },
+        cache::{
+            cache_manager::CacheManager, cache_manager_aware::CacheManagerAware,
+            default_cache_manager::DefaultCacheManager,
+        },
+        event::{
+            event_bus::EventBus, event_bus_aware::EventBusAware,
+            support::default_event_bus::DefaultEventBus,
+        },
+        mgt::{
+            default_subject_dao::DefaultSubjectDAO, default_subject_factory::DefaultSubjectFactory,
+            remember_me_manager::RememberMeManager, security_manager::SecurityManager,
+            sessions_security_manager::SessionsSecurityManager, subject_dao::SubjectDAO,
+            subject_factory::SubjectFactory,
+        },
+        realm::{simple_account_realm::SimpleAccountRealm, Realm},
+        session::{
+            mgt::{
+                default_session_context::DefaultSessionContext,
+                default_session_manager::DefaultSessionManager, session_context::SessionContext,
+                session_manager::SessionManager,
+            },
+            Session, SessionError, SessionId,
+        },
+        subject::{
+            principal_collection::PrincipalCollection, subject_context::SubjectContext,
+            support::default_subject_context::DefaultSubjectContext, Subject,
+        },
     },
-    subject::{
-        principal_collection::PrincipalCollection, subject_context::SubjectContext,
-        support::default_subject_context::DefaultSubjectContext, Subject,
-    },
+    web::subject::support::default_web_subject_context::DefaultWebSubjectContext,
 };
 
 #[derive(Clone)]
@@ -145,6 +150,7 @@ impl<D, F, S, A, T, R, C, B> DefaultSecurityManager<D, F, S, A, T, R, C, B> {
         DefaultSubjectContext::default()
     }
 
+    #[cfg(not(feature = "web"))]
     pub fn remember_me_successful_login(
         &self,
         token: &dyn AuthenticationToken,
@@ -156,6 +162,21 @@ impl<D, F, S, A, T, R, C, B> DefaultSecurityManager<D, F, S, A, T, R, C, B> {
         }
     }
 
+    #[cfg(feature = "web")]
+    pub fn remember_me_successful_login(
+        &self,
+        token: &dyn AuthenticationToken,
+        info: &dyn AuthenticationInfo,
+        subject: &dyn WebSubject,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) {
+        if let Some(rmm) = self.get_remember_me_manager() {
+            rmm.on_successful_login(subject, token, info, req, resp);
+        }
+    }
+
+    #[cfg(not(feature = "web"))]
     pub fn remember_me_failed_login(
         &self,
         token: &dyn AuthenticationToken,
@@ -167,9 +188,37 @@ impl<D, F, S, A, T, R, C, B> DefaultSecurityManager<D, F, S, A, T, R, C, B> {
         }
     }
 
+    #[cfg(feature = "web")]
+    pub fn remember_me_failed_login(
+        &self,
+        token: &dyn AuthenticationToken,
+        ae: &AuthenticationError,
+        subject: &dyn WebSubject,
+
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) {
+        if let Some(rmm) = self.get_remember_me_manager() {
+            rmm.on_failed_login(subject, token, ae, req, resp);
+        }
+    }
+
+    #[cfg(not(feature = "web"))]
     pub fn remember_me_logout(&self, subject: &dyn Subject) {
         if let Some(rmm) = self.get_remember_me_manager() {
             rmm.on_logout(subject);
+        }
+    }
+
+    #[cfg(feature = "web")]
+    pub fn remember_me_logout(
+        &self,
+        subject: &dyn WebSubject,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) {
+        if let Some(rmm) = self.get_remember_me_manager() {
+            rmm.on_logout(subject, req, resp);
         }
     }
 
@@ -177,30 +226,58 @@ impl<D, F, S, A, T, R, C, B> DefaultSecurityManager<D, F, S, A, T, R, C, B> {
         &self,
         token: &dyn AuthenticationToken,
         info: &dyn AuthenticationInfo,
-        subject: &dyn Subject,
+        #[cfg(not(feature = "web"))] subject: &dyn Subject,
+
+        #[cfg(feature = "web")] subject: &dyn WebSubject,
+        #[cfg(feature = "web")] req: &mut dyn HttpRequest,
+        #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
     ) {
+        #[cfg(not(feature = "web"))]
         self.remember_me_successful_login(token, info, subject);
+
+        #[cfg(feature = "web")]
+        self.remember_me_successful_login(token, info, subject, req, resp);
     }
 
     pub fn on_failed_login(
         &self,
         token: &dyn AuthenticationToken,
         ae: &AuthenticationError,
-        subject: &dyn Subject,
+        #[cfg(not(feature = "web"))] subject: &dyn Subject,
+
+        #[cfg(feature = "web")] subject: &dyn WebSubject,
+        #[cfg(feature = "web")] req: &mut dyn HttpRequest,
+        #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
     ) -> Result<(), AuthenticationError> {
+        #[cfg(not(feature = "web"))]
         self.remember_me_failed_login(token, ae, subject);
+
+        #[cfg(feature = "web")]
+        self.remember_me_failed_login(token, ae, subject, req, resp);
+
         Ok(())
     }
 
-    pub fn before_logout(&self, subject: &dyn Subject) {
+    pub fn before_logout(
+        &self,
+        #[cfg(not(feature = "web"))] subject: &dyn Subject,
+
+        #[cfg(feature = "web")] subject: &dyn WebSubject,
+        #[cfg(feature = "web")] req: &mut dyn HttpRequest,
+        #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
+    ) {
+        #[cfg(not(feature = "web"))]
         self.remember_me_logout(subject);
+
+        #[cfg(feature = "web")]
+        self.remember_me_logout(subject, req, resp);
     }
 
     pub fn ensure_security_manager(&self, _context: &dyn SubjectContext) {
         // TODO set security manager in context
     }
 
-    pub fn get_session_id<'a>(&'a self, context: &'a dyn SubjectContext) -> &'a SessionId {
+    pub fn get_session_id<'a>(&'a self, context: &'a dyn SubjectContext) -> Option<&'a SessionId> {
         context.get_session_id()
     }
 
@@ -212,7 +289,7 @@ impl<D, F, S, A, T, R, C, B> DefaultSecurityManager<D, F, S, A, T, R, C, B> {
 impl<D, F, S, A, T, R, C, B> DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
     D: SubjectDAO,
-    F: SubjectFactory,
+    F: SubjectFactory + Sync,
     S: SessionManager,
     A: Authorizer,
     T: Authenticator + LogoutAware,
@@ -227,7 +304,10 @@ where
         token: &dyn AuthenticationToken,
         info: &dyn AuthenticationInfo,
         existing: Option<&dyn Subject>,
-    ) -> Box<dyn Subject> {
+
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Box<dyn WebSubject> {
         let mut context = self.create_subject_context();
         context.set_authenticated(true);
         context.set_authentication_token(clone_box(token));
@@ -237,7 +317,7 @@ where
         if let Some(subject) = existing {
             context.set_subject(clone_box(subject));
         }
-        self.create_subject(Arc::new(context)).await
+        self.create_subject(Arc::new(context), req, resp).await
     }
 
     pub async fn resolve_session(&self, context: &mut dyn SubjectContext) {
@@ -246,7 +326,7 @@ where
         match session {
             Ok(session) => context.set_session(session),
             Err(error) => debug!(
-                "Resolved SubjectContext context session is invalid.  Ignoring and creating an anonymous (session-less) Subject instance., error: {:?}",
+                "Resolved SubjectContext context session is invalid.  Ignoring and creating an anonymous (session-less) Subject instance, error: {:?}",
                 error
             ),
         };
@@ -254,22 +334,30 @@ where
 
     pub async fn resolve_context_session(
         &self,
-        context: &dyn SubjectContext,
+        context: &mut dyn SubjectContext,
     ) -> Result<Arc<dyn Session>, SessionError> {
-        let session_id = self.get_session_id(context);
-        self.sessions_security_manager
-            .get_session(&session_id)
-            .await
+        if let Some(session_id) = self.get_session_id(context) {
+            return self.sessions_security_manager.get_session(session_id).await;
+        }
+
+        Err(SessionError::NotFound)
     }
 
-    pub async fn resolve_principals(&self, context: &mut dyn SubjectContext) {
-        let principals = context.resolve_principals().await;
+    pub async fn resolve_principals(
+        &self,
+        #[cfg(not(feature = "web"))] context: &mut dyn SubjectContext,
+
+        #[cfg(feature = "web")] context: &mut dyn WebSubjectContext,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) {
+        let principals: Option<&Arc<dyn PrincipalCollection>> = context.resolve_principals().await;
         if let None = principals {
             debug!(
                 "Found remembered PrincipalCollection.  Adding to the context to be used for subject construction by the SubjectFactory."
             );
 
-            let principals = self.get_remembered_identity(context);
+            let principals = self.get_remembered_identity(context, req, resp);
 
             if let Some(principals) = principals {
                 if !principals.is_empty() {
@@ -287,11 +375,21 @@ where
 
     pub fn get_remembered_identity(
         &self,
-        context: &dyn SubjectContext,
+        #[cfg(not(feature = "web"))] context: &dyn SubjectContext,
+
+        #[cfg(feature = "web")] context: &dyn WebSubjectContext,
+        #[cfg(feature = "web")] req: &mut dyn HttpRequest,
+        #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
     ) -> Option<Arc<dyn PrincipalCollection>> {
         let rmm = self.get_remember_me_manager();
         return match rmm {
-            Some(rmm) => rmm.get_remembered_principals(context),
+            Some(rmm) => {
+                // #[cfg(not(feature = "web"))]
+                // rmm.get_remembered_principals(context)
+
+                #[cfg(feature = "web")]
+                rmm.get_remembered_principals(context, req, resp)
+            }
             None => {
                 warn!(
                     "Delegate RememberMeManager instance of type [{}] threw an exception during getRememberedPrincipals().",
@@ -302,16 +400,28 @@ where
         };
     }
 
+    #[cfg(not(feature = "web"))]
     pub async fn do_create_subject(&self, context: &dyn SubjectContext) -> Box<dyn Subject> {
         self.get_subject_factory().create_subject(context).await
     }
 
-    pub fn save(&self, subject: &dyn Subject) {
-        self.get_subject_dao().save(subject)
+    #[cfg(feature = "web")]
+    pub async fn do_create_subject(
+        &self,
+        context: &dyn WebSubjectContext,
+        _req: &mut dyn HttpRequest,
+        _resp: &mut dyn HttpResponse,
+    ) -> Box<dyn WebSubject> {
+        self.get_subject_factory().create_subject(context).await
     }
 
-    pub fn delete(&self, subject: &dyn Subject) {
-        self.get_subject_dao().delete(subject)
+    #[cfg(feature = "web")]
+    pub async fn save(&self, subject: &dyn WebSubject) {
+        self.get_subject_dao().save(subject).await
+    }
+
+    pub async fn delete(&self, subject: &dyn WebSubject) {
+        self.get_subject_dao().delete(subject).await
     }
 
     pub async fn create_session_context(
@@ -323,7 +433,10 @@ where
         if !subject_context.is_empty() {
             session_context.put_all(subject_context.values());
         }
-        session_context.set_session_id(subject_context.get_session_id().to_owned());
+
+        if let Some(session_id) = self.get_session_id(subject_context) {
+            session_context.set_session_id(session_id.clone());
+        }
 
         let host = subject_context.resolve_host().await;
         if let Some(host) = host {
@@ -336,7 +449,7 @@ where
     pub fn stop_session(&self, subject: &dyn Subject) {
         let session = subject.get_session();
         if let Some(session) = session {
-            session.stop();
+            session.stop().ok();
         }
     }
 }
@@ -555,7 +668,7 @@ where
 impl<D, F, S, A, T, R, C, B> SecurityManager for DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
     D: SubjectDAO,
-    F: SubjectFactory,
+    F: SubjectFactory + Sync,
     S: SessionManager,
     A: Authorizer,
     T: Authenticator + LogoutAware,
@@ -567,13 +680,16 @@ where
 {
     async fn login(
         &self,
-        subject: &dyn Subject,
+        subject: &dyn WebSubject,
         token: &dyn AuthenticationToken,
+
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
     ) -> Result<Box<dyn Subject>, AuthenticationError> {
         let info = match self.authenticate(token) {
             Ok(info) => info,
             Err(error) => {
-                if let Err(err) = self.on_failed_login(token, &error, subject) {
+                if let Err(err) = self.on_failed_login(token, &error, subject, req, resp) {
                     info!(
                         "on_failed_login method threw an error.  Logging and propagating original AuthenticationError. error: {:?}",
                         err
@@ -583,15 +699,22 @@ where
             }
         };
 
-        let logged_in = self._create_subject(token, info.as_ref(), Some(subject)).await;
+        let mut logged_in = self
+            ._create_subject(token, info.as_ref(), Some(subject), req, resp)
+            .await;
 
-        self.on_successful_login(token, info.as_ref(), logged_in.as_ref());
+        self.on_successful_login(token, info.as_ref(), logged_in.as_mut(), req, resp);
 
         Ok(logged_in)
     }
 
-    async fn logout(&self, subject: &dyn Subject) -> Result<(), next_web_core::error::BoxError> {
-        self.before_logout(subject);
+    async fn logout(
+        &self,
+        subject: &dyn WebSubject,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Result<(), next_web_core::error::BoxError> {
+        self.before_logout(subject, req, resp);
         if let Some(principals) = subject.get_principals().await {
             if !principals.is_empty() {
                 debug!("Logging out subject with primary principal {}", "none");
@@ -606,24 +729,28 @@ where
             }
         }
 
-        self.delete(subject);
+        self.delete(subject).await;
 
         self.stop_session(subject);
         Ok(())
     }
 
-    async fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
-        let mut context = DefaultSubjectContext::new(context.as_ref());
+    async fn create_subject(
+        &self,
+        context: Arc<dyn SubjectContext>,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Box<dyn WebSubject> {
+        let mut context =
+            DefaultWebSubjectContext::new(DefaultSubjectContext::new(context.as_ref()).await);
 
-        // self.ensure_security_manager(&mut context);
         self.resolve_session(&mut context).await;
+        self.resolve_principals(&mut context, req, resp).await;
 
-        self.resolve_principals(&mut context).await;
-
-        let subject = self.do_create_subject(&context).await;
+        let subject = self.do_create_subject(&context, req, resp).await;
 
         if context.is_session_creation_enabled() {
-            self.save(subject.as_ref());
+            self.save(subject.as_ref()).await;
         }
 
         subject

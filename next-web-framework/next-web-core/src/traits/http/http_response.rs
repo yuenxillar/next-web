@@ -2,12 +2,11 @@ use axum::http::header;
 use axum::{
     body::{Body, Bytes},
     http::{HeaderName, StatusCode, Version},
-    response::{IntoResponse, Response},
+    response::Response,
 };
 
 pub trait HttpResponse
 where
-    Self: IntoResponse,
     Self: Send,
 {
     fn version(&self) -> Version;

@@ -1,26 +1,34 @@
-pub mod subject_context;
 pub mod principal_collection;
+pub mod subject_context;
 pub mod support;
 
 use std::{any::Any, sync::Arc};
 
-use next_web_core::{DynClone, async_trait, error::{BoxError, illegal_state_error::IllegalStateError}};
+#[cfg(feature = "web")]
+use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::{
+    async_trait,
+    error::{illegal_state_error::IllegalStateError, BoxError},
+    DynClone,
+};
 use principal_collection::PrincipalCollection;
+
+#[cfg(feature = "web")]
+use crate::web::subject::web_subject::WebSubject;
 
 use super::{
     authc::{authentication_error::AuthenticationError, authentication_token::AuthenticationToken},
     authz::authorization_error::AuthorizationError,
-    util::object::Object,
     session::Session,
+    util::object::Object,
 };
-
 
 #[async_trait]
 pub trait Subject
 where
     Self: Send + Sync,
     Self: DynClone,
-    Self: Any
+    Self: Any,
 {
     // === 身份相关 ===
     async fn get_principal(&self) -> Option<&Object>;
@@ -47,14 +55,25 @@ where
     async fn get_session_or_create(&mut self, create: bool) -> Option<Arc<dyn Session>>;
 
     // === 登录/登出 ===
-    async fn login(&mut self, token: &dyn AuthenticationToken) -> Result<(), AuthenticationError>;
-    async fn logout(&mut self)-> Result<(), BoxError>;
+    async fn login(
+        &mut self,
+        token: &dyn AuthenticationToken,
+        #[cfg(feature = "web")] req: &mut dyn HttpRequest,
+        #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
+    ) -> Result<(), AuthenticationError>;
+    async fn logout(
+        &mut self,
+        #[cfg(feature = "web")] req: &mut dyn HttpRequest,
+        #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
+    ) -> Result<(), BoxError>;
 
-    async fn run_as(&mut self, principals: &Arc<dyn PrincipalCollection>) -> Result<(), IllegalStateError>;
+    async fn run_as(
+        &mut self,
+        principals: &Arc<dyn PrincipalCollection>,
+    ) -> Result<(), IllegalStateError>;
     async fn is_run_as(&self) -> bool;
-    async fn get_previous_principals(& self) -> Option<Arc<dyn PrincipalCollection>>;
+    async fn get_previous_principals(&self) -> Option<Arc<dyn PrincipalCollection>>;
     async fn release_run_as(&mut self) -> Option<&dyn PrincipalCollection>;
 }
-
 
 next_web_core::clone_trait_object!(Subject);

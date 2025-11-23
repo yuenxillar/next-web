@@ -1,3 +1,8 @@
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
+
 use next_web_core::{
     async_trait,
     error::BoxError,
@@ -11,7 +16,7 @@ use next_web_core::{
 pub struct ProxiedFilterChain {
     orig: Box<dyn HttpFilterChain>,
     filters: Vec<Box<dyn HttpFilter>>,
-    index: usize,
+    index: Arc<AtomicUsize>,
 }
 
 impl ProxiedFilterChain {
@@ -19,7 +24,7 @@ impl ProxiedFilterChain {
         Self {
             orig,
             filters,
-            index: 0,
+            index: Arc::new(AtomicUsize::default()),
         }
     }
 }
@@ -31,10 +36,14 @@ impl HttpFilterChain for ProxiedFilterChain {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
     ) -> Result<(), BoxError> {
-        if self.filters.len() == self.index {
+        println!("index: {}", self.index.load(Ordering::Relaxed));
+
+        if self.filters.len() == self.index.load(Ordering::Relaxed) {
             self.orig.do_filter(request, response).await
         } else {
-            if let Some(filter) = self.filters.get(self.index) {
+            let index = self.index.fetch_add(1, Ordering::Relaxed);
+
+            if let Some(filter) = self.filters.get(index) {
                 return filter.do_filter(request, response, self).await;
             }
 

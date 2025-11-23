@@ -53,7 +53,7 @@ pub trait Cookie: Send + Sync {
 
     fn get_same_site(&self) -> Option<&SameSite>;
 
-    fn save_to(&self, req: &dyn HttpRequest, resp: &mut dyn HttpResponse);
+    fn save_to(&self, req: Option<&dyn HttpRequest>, resp: &mut dyn HttpResponse);
 
     fn remove_from(&self, req: &dyn HttpRequest, resp: &mut dyn HttpResponse);
 
@@ -111,8 +111,8 @@ impl SimpleCookie {
     const HTTP_ONLY_ATTRIBUTE_NAME: &str = "HttpOnly";
     const SAME_SITE_ATTRIBUTE_NAME: &str = "SameSite";
     const ROOT_PATH: &'static str = "/";
-    const DELETED_COOKIE_VALUE: &'static str = "deleteMe";
-    const ONE_YEAR: i32 = 60 * 60 * 24 * 365;
+    pub const DELETED_COOKIE_VALUE: &'static str = "deleteMe";
+    pub const ONE_YEAR: i32 = 60 * 60 * 24 * 365;
     pub fn new(name: impl Into<String>) -> Self {
         let name = name.into();
         if name.is_empty() {
@@ -224,7 +224,7 @@ impl SimpleCookie {
                 Self::NAME_VALUE_DELIMITER,
                 max_age,
                 Self::ATTRIBUTE_DELIMITER
-            );
+            ).unwrap();
 
             let expires = if max_age == 0 {
                 Utc::now() - chrono::Duration::milliseconds(Self::DAY_MILLIS)
@@ -238,7 +238,7 @@ impl SimpleCookie {
                 Self::EXPIRES_ATTRIBUTE_NAME,
                 Self::NAME_VALUE_DELIMITER,
                 expires.format(Self::COOKIE_DATE_FORMAT).to_string()
-            );
+            ).unwrap();
         }
     }
 
@@ -383,7 +383,7 @@ impl Cookie for SimpleCookie {
         self.same_site.as_ref()
     }
 
-    fn save_to(&self, _req: &dyn HttpRequest, resp: &mut dyn HttpResponse) {
+    fn save_to(&self, _req: Option<&dyn HttpRequest>, resp: &mut dyn HttpResponse) {
         self.add_cookie_header(
             resp,
             self.get_name().unwrap_or_default(),

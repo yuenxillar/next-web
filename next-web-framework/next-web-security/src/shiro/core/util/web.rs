@@ -115,8 +115,8 @@ impl WebUtils {
         false
     }
 
-    pub async fn get_subject(request: &mut dyn HttpRequest) -> Box<dyn Subject> {
-        if let Some(subject) = request.get_attribute("NextSubject") {
+    pub async fn get_subject(req: &mut dyn HttpRequest, resp: &mut dyn HttpResponse) -> Box<dyn Subject> {
+        if let Some(subject) = req.get_attribute("NextSubject") {
             match subject {
                 AnyValue::Object(obj) => {
                     if let Some(subject) = (obj as &dyn Any).downcast_ref::<WebDelegatingSubject>()
@@ -128,12 +128,12 @@ impl WebUtils {
             }
         }
 
-        request
+        req
             .get_attribute(DEFAULT_WEB_DELEGATING_SUBJECT_KEY)
             .unwrap()
             .as_object::<Arc<dyn SecurityManager>>()
             .unwrap()
-            .create_subject(Arc::new(DefaultWebSubjectContext::default()))
+            .create_subject(Arc::new(DefaultWebSubjectContext::default()), req, resp)
             .await
     }
 }

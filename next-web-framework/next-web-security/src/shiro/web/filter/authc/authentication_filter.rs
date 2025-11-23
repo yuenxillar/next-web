@@ -37,10 +37,10 @@ impl AccessControlFilterExt for AuthenticationFilter {
     async fn is_access_allowed(
         &self,
         request: &mut dyn HttpRequest,
-        _response: &mut dyn HttpResponse,
+        response: &mut dyn HttpResponse,
         _mapped_value: Option<Object>,
     ) -> bool {
-        let subject = self.access_control_filter.get_subject(request).await;
+        let subject = self.access_control_filter.get_subject(request, response).await;
         subject.is_authenticated().await && subject.get_principal().await.is_some()
     }
 }

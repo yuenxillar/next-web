@@ -28,7 +28,7 @@ impl AccessControlFilterExt for RolesAuthorizationFilter {
     async fn is_access_allowed(
         &self,
         request: &mut dyn HttpRequest,
-        _response: &mut dyn HttpResponse,
+        response: &mut dyn HttpResponse,
         mapped_value: Option<Object>,
     ) -> bool {
         let Some(value) = mapped_value else {
@@ -46,7 +46,7 @@ impl AccessControlFilterExt for RolesAuthorizationFilter {
             return true;
         }
 
-        let subject = WebUtils::get_subject(request).await;
+        let subject = WebUtils::get_subject(request, response).await;
         subject.has_all_roles(&deduped_roles).await
     }
 }
@@ -112,7 +112,7 @@ fn smart_deduplicate(mut roles: Vec<&str>) -> Vec<&str> {
             roles
                 .iter()
                 .filter(|role| seen.insert(*role))
-                .map(|s| s.clone())
+                .map(|s| *s)
                 .collect()
         }
         _ => {

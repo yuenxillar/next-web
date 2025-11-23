@@ -28,10 +28,10 @@ impl AccessControlFilterExt for PermissionsAuthorizationFilter {
     async fn is_access_allowed(
         &self,
         request: &mut dyn HttpRequest,
-        _response: &mut dyn HttpResponse,
+        response: &mut dyn HttpResponse,
         mapped_value: Option<Object>,
     ) -> bool {
-        let subject = WebUtils::get_subject(request).await;
+        let subject = WebUtils::get_subject(request, response).await;
 
         let mut is_permitted = true;
 

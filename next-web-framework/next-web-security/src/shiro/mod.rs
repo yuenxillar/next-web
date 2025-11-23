@@ -1,2 +1,3 @@
-pub mod web;
 pub mod core;
+#[cfg(feature = "web")]
+pub mod web;

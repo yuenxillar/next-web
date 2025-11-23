@@ -176,7 +176,7 @@ impl DefaultSessionManager {
         max_idle_time_in_millis: i64,
     ) -> Result<(), SessionError> {
         if let Some(s) = self._get_session(session_id).await {
-            s.set_timeout(max_idle_time_in_millis);
+            s.set_timeout(max_idle_time_in_millis)?;
             self.on_change(s).await;
             return Ok(());
         }
@@ -186,7 +186,7 @@ impl DefaultSessionManager {
 
     pub async fn touch(&self, session_id: &SessionId) -> Result<(), SessionError> {
         if let Some(s) = self._get_session(session_id).await {
-            s.touch();
+            s.touch()?;
             self.on_change(s).await;
             return Ok(());
         }
@@ -208,7 +208,7 @@ impl DefaultSessionManager {
         resp: &mut dyn HttpResponse,
     ) -> Result<(), SessionError> {
         if let Some(s) = self._get_session(session_id).await {
-            s.stop();
+            s.stop()?;
             self.on_stop(s, req, resp).await;
             self.notify_stop(s.clone());
             self.after_stopped(s.as_ref()).await;
@@ -285,8 +285,6 @@ impl DefaultSessionManager {
 
         Err(SessionError::NotFound)
     }
-
-    
 }
 
 #[async_trait]
@@ -337,7 +335,7 @@ impl NativeSessionManagerExt for DefaultSessionManager {
     }
 
     async fn on_change(&self, session: &Arc<dyn Session>) {
-        self.session_dao.update(session.clone()).await;
+        self.session_dao.update(session.clone()).await.ok();
     }
 }
 
@@ -356,7 +354,6 @@ impl ValidatingSessionManagerExt for DefaultSessionManager {
 
         self.on_change(session).await;
     }
-
 
     async fn get_active_sessions(&self) -> Vec<&Arc<dyn Session>> {
         self.session_dao.get_active_sessions().await

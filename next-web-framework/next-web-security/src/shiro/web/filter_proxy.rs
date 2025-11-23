@@ -1,25 +1,27 @@
 use std::{any::Any, collections::HashMap, sync::Arc};
 
 use crate::{
-    core::{
-        mgt::security_manager::SecurityManager,
-        subject::{Subject, support::default_subject_context::DefaultSubjectContext},
-    },
+    core::subject::{support::default_subject_context::DefaultSubjectContext, Subject},
     web::{
         filter::{
             access_control_filter::AccessControlFilter,
             authc::authentication_filter::AuthenticationFilter,
             authz::authorization_filter::AuthorizationFilter,
             mgt::{
+                default_filter::DefaultFilter,
                 default_filter_chain_manager::DefaultFilterChainManager,
                 filter_chain_manager::FilterChainManager,
                 path_matching_filter_chain_resolver::PathMatchingFilterChainResolver,
             },
         },
-        mgt::{default_web_security_manager::DefaultWebSecurityManager, web_security_manager::WebSecurityManager},
+        mgt::{
+            default_web_security_manager::DefaultWebSecurityManager,
+            web_security_manager::WebSecurityManager,
+        },
     },
 };
 
+use axum::http::header::PRAGMA;
 use indexmap::IndexMap;
 use next_web_core::{
     async_trait,
@@ -56,14 +58,12 @@ impl FilterProxy {
             login_url: Default::default(),
             success_url: Default::default(),
             unauthorized_url: Default::default(),
-            global_filters: Default::default(),
+            global_filters: vec![DefaultFilter::InvalidRequest.name().to_string()],
         };
         let manager = proxy.create_filter_chain_manager();
-        let mut filter_chain_resolver = PathMatchingFilterChainResolver::default();
-        filter_chain_resolver.set_filter_chain_manager(manager);
+        let filter_chain_resolver = PathMatchingFilterChainResolver::new(manager);
 
         proxy.filter_chain_resolver = Some(filter_chain_resolver);
-
         proxy
     }
 
@@ -126,6 +126,7 @@ impl FilterProxy {
 
     pub fn create_filter_chain_manager(&mut self) -> DefaultFilterChainManager {
         let mut manager = DefaultFilterChainManager::default();
+
         let default_filters = manager.get_filters();
         for (_, filter) in default_filters {
             self.apply_global_properties_if_necessary(filter.as_mut());
@@ -212,10 +213,20 @@ impl FilterProxy {
         }
     }
 
-    pub async fn create_subject(&self) -> Box<dyn Subject> {
-        self.security_manager.create_subject(Arc::new(
-            DefaultSubjectContext::from_security_manager(self.security_manager.clone()),
-        )).await
+    pub async fn create_subject(
+        &self,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Box<dyn Subject> {
+        self.security_manager
+            .create_subject(
+                Arc::new(DefaultSubjectContext::from_security_manager(
+                    self.security_manager.clone(),
+                )),
+                req,
+                resp,
+            )
+            .await
     }
 
     pub fn get_filter_chain_resolver(&self) -> Option<&PathMatchingFilterChainResolver> {
@@ -281,15 +292,15 @@ impl HttpFilter for FilterProxy {
     async fn do_filter(
         &self,
         req: &mut dyn HttpRequest,
-        res: &mut dyn HttpResponse,
+        resp: &mut dyn HttpResponse,
         orig_chain: &dyn HttpFilterChain,
     ) -> Result<(), BoxError> {
         req.ready();
 
-        let mut subject = self.create_subject().await;
+        let mut subject = self.create_subject(req, resp).await;
 
-        self.update_session_last_access_time(req, res, subject.as_mut());
-        self.execute_chain(req, res, orig_chain).await?;
+        self.update_session_last_access_time(req, resp, subject.as_mut());
+        self.execute_chain(req, resp, orig_chain).await?;
 
         req.clean_up();
         Ok(())

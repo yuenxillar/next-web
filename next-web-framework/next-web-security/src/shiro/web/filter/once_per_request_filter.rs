@@ -3,7 +3,10 @@ use next_web_core::{
     async_trait,
     error::BoxError,
     traits::{
-        filter::{http_filter::HttpFilter, http_filter_chain::HttpFilterChain}, http::{http_request::HttpRequest, http_response::HttpResponse}, named::Named, required::Required
+        filter::{http_filter::HttpFilter, http_filter_chain::HttpFilterChain},
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
+        required::Required,
     },
 };
 use tracing::{debug, trace};
@@ -77,10 +80,9 @@ pub trait OncePerRequestFilterExt: Send + Sync {
 pub struct HttpFilterWrapper<T>(pub T);
 
 impl<T: Named> Named for HttpFilterWrapper<T> {
-    
-     fn name(&self) -> &str {
+    fn name(&self) -> &str {
         self.0.name()
-     }
+    }
 }
 
 #[async_trait]
@@ -109,7 +111,7 @@ where
             );
 
             filter_chain.do_filter(request, response).await
-        } else if _self.is_enabled() {
+        } else if !_self.is_enabled() {
             debug!("Filter '{:?}' is not enabled for the current request.  Proceeding without invoking this filter.",
                     _self.get_name());
             filter_chain.do_filter(request, response).await
@@ -120,7 +122,8 @@ where
             );
 
             request.set_attribute(&already_filtered_attribute_name, AnyValue::Boolean(true));
-            self.0.do_filter_internal(request, response, filter_chain)
+            self.0
+                .do_filter_internal(request, response, filter_chain)
                 .await?;
 
             // Once the request has finished, we're done and we don't

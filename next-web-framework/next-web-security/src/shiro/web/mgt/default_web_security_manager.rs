@@ -42,6 +42,7 @@ use crate::{
             default_web_session_context::DefaultWebSessionContext,
             default_web_session_manager::DefaultWebSessionManager,
         },
+        subject::web_subject::WebSubject,
     },
 };
 
@@ -133,12 +134,18 @@ impl DefaultWebSecurityManager {
         DefaultWebSessionContext::new(session_context)
     }
 
-    pub fn get_session_key<'a>(&'a self, context: &'a dyn SubjectContext) -> &'a SessionId {
+    pub fn get_session_key<'a>(&'a self, context: &'a dyn SubjectContext) -> Option<&'a SessionId> {
         context.get_session_id()
     }
 
-    pub fn before_logout(&self, subject: &dyn Subject) {
-        self.default_security_manager.before_logout(subject);
+    pub fn before_logout(
+        &self,
+        subject: &dyn WebSubject,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) {
+        self.default_security_manager
+            .before_logout(subject, req, resp);
     }
 
     pub fn get_execution_filters(&self) {}
@@ -154,20 +161,36 @@ impl WebSecurityManager for DefaultWebSecurityManager {
 impl SecurityManager for DefaultWebSecurityManager {
     async fn login(
         &self,
-        subject: &dyn Subject,
+        subject: &dyn WebSubject,
         authentication_token: &dyn AuthenticationToken,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
     ) -> Result<Box<dyn Subject>, AuthenticationError> {
         self.default_security_manager
-            .login(subject, authentication_token)
+            .login(subject, authentication_token, req, resp)
             .await
     }
 
-    async fn logout(&self, subject: &dyn Subject) -> Result<(), next_web_core::error::BoxError> {
-        self.default_security_manager.logout(subject).await
+    async fn logout(
+        &self,
+        subject: &dyn WebSubject,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Result<(), next_web_core::error::BoxError> {
+        self.default_security_manager
+            .logout(subject, req, resp)
+            .await
     }
 
-    async fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
-        self.default_security_manager.create_subject(context).await
+    async fn create_subject(
+        &self,
+        context: Arc<dyn SubjectContext>,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Box<dyn WebSubject> {
+        self.default_security_manager
+            .create_subject(context, req, resp)
+            .await
     }
 }
 

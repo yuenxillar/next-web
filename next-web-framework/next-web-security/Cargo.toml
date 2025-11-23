@@ -23,5 +23,7 @@ urlencoding.workspace = true
 
 [features]
 default = ["user-friendly"]
-user-friendly = []
+user-friendly = ["web"]
 comprehensive = []
+
+web = []

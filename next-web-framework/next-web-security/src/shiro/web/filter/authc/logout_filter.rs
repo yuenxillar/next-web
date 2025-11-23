@@ -77,7 +77,7 @@ impl AdviceFilterExt for LogoutFilter {
         response: &mut dyn HttpResponse,
         _ext: Option<&dyn PathMatchingFilterExt>,
     ) -> bool {
-        let mut subject = WebUtils::get_subject(request).await;
+        let mut subject = WebUtils::get_subject(request, response).await;
 
         // Check if POST only logout is enabled
         if self.is_post_only_logout() {
@@ -90,7 +90,7 @@ impl AdviceFilterExt for LogoutFilter {
         let redirect_url = self.get_redirect_url();
         // added for SHIRO-298:
 
-        if let Err(ise) = subject.logout().await {
+        if let Err(ise) = subject.logout(request, response).await {
             error!("Encountered session errror during logout.  This can generally safely be ignored: {}", ise);
         }
 

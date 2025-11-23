@@ -2,14 +2,23 @@ use std::sync::Arc;
 
 use next_web_core::async_trait;
 
-use crate::{core::{
-    authc::{authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken},
-    session::{Session, SessionId},
-    subject::{
-        Subject, principal_collection::PrincipalCollection, subject_context::SubjectContext, support::default_subject_context::DefaultSubjectContext
+use crate::{
+    core::{
+        authc::{
+            authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
+        },
+        session::{Session, SessionId},
+        subject::{
+            principal_collection::PrincipalCollection, subject_context::SubjectContext,
+            support::default_subject_context::DefaultSubjectContext, Subject,
+        },
+        util::object::Object,
     },
-    util::object::Object,
-}, web::mgt::web_security_manager::WebSecurityManager};
+    web::{
+        mgt::web_security_manager::WebSecurityManager,
+        subject::web_subject_context::WebSubjectContext,
+    },
+};
 
 #[derive(Clone)]
 pub struct DefaultWebSubjectContext {
@@ -31,9 +40,11 @@ impl DefaultWebSubjectContext {
     }
 }
 
+impl WebSubjectContext for DefaultWebSubjectContext {}
+
 #[async_trait]
 impl SubjectContext for DefaultWebSubjectContext {
-    fn get_session_id(&self) -> &SessionId {
+    fn get_session_id(&self) -> Option<&SessionId> {
         self.default_subject_context.get_session_id()
     }
 
@@ -53,9 +64,10 @@ impl SubjectContext for DefaultWebSubjectContext {
         self.default_subject_context.get_principals()
     }
 
-
     async fn resolve_security_manager(&self) -> Option<&Arc<dyn WebSecurityManager>> {
-        self.default_subject_context.resolve_security_manager().await
+        self.default_subject_context
+            .resolve_security_manager()
+            .await
     }
 
     async fn resolve_principals(&self) -> Option<&Arc<dyn PrincipalCollection>> {

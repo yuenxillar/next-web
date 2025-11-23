@@ -1,6 +1,12 @@
 use std::fmt::Display;
 
-use crate::core::{authc::authentication_token::AuthenticationToken, util::object::Object};
+use crate::core::{
+    authc::{
+        authentication_token::AuthenticationToken,
+        remember_me_authentication_token::RememberMeAuthenticationToken,
+    },
+    util::object::Object,
+};
 
 #[derive(Clone, Debug)]
 pub struct UsernamePasswordToken {
@@ -36,6 +42,11 @@ impl AuthenticationToken for UsernamePasswordToken {
     }
 }
 
+impl RememberMeAuthenticationToken for UsernamePasswordToken {
+    fn is_remember_me(&self) -> bool {
+        self.remember_me
+    }
+}
 
 impl Display for UsernamePasswordToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

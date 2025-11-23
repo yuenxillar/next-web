@@ -53,10 +53,10 @@ impl AuthenticatingFilter {
         let mut subject = self
             .authentication_filter
             .access_control_filter
-            .get_subject(request)
+            .get_subject(request, response)
             .await;
 
-        if let Err(error) = subject.login(token.as_ref()).await {
+        if let Err(error) = subject.login(token.as_ref(),request, response).await {
             return Ok(authenticating_filter_ext
                 .on_login_failure(token.as_ref(), &error, request, response)
                 .await);

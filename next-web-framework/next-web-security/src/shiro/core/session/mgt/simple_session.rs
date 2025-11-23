@@ -74,7 +74,7 @@ impl SimpleSession {
     }
 
     pub fn expire(&self) {
-        self.stop();
+        self.stop().ok();
         self.expired.store(true, Ordering::Relaxed);
     }
 

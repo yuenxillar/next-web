@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+#[cfg(feature = "web")]
+use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 use next_web_core::{
     async_trait, error::illegal_state_error::IllegalStateError, traits::required::Required,
 };
@@ -10,15 +12,16 @@ use crate::{
             authentication_error::AuthenticationError, authentication_token::AuthenticationToken,
         },
         authz::authorization_error::AuthorizationError,
-        mgt::security_manager::SecurityManager,
-        session::{Session, mgt::session_context::SessionContext},
+        session::{mgt::session_context::SessionContext, Session},
         subject::{
-            Subject, principal_collection::PrincipalCollection, support::delegating_subject::{DelegatingSubject, DelegatingSubjectSupport}
+            principal_collection::PrincipalCollection,
+            support::delegating_subject::{DelegatingSubject, DelegatingSubjectSupport},
+            Subject,
         },
         util::object::Object,
     },
     web::{
-        mgt::{default_web_security_manager::DefaultWebSecurityManager, web_security_manager::WebSecurityManager},
+        mgt::web_security_manager::WebSecurityManager,
         session::mgt::default_web_session_context::DefaultWebSessionContext,
         subject::web_subject::WebSubject,
     },
@@ -31,8 +34,7 @@ pub struct WebDelegatingSubject {
     delegating_subject: DelegatingSubject,
 }
 
-impl WebDelegatingSubject
-{
+impl WebDelegatingSubject {
     pub fn new(
         principals: Option<Arc<dyn PrincipalCollection>>,
         authenticated: bool,
@@ -69,16 +71,14 @@ impl WebDelegatingSubject
 
 impl WebSubject for WebDelegatingSubject {}
 
-impl DelegatingSubjectSupport for WebDelegatingSubject
-{
+impl DelegatingSubjectSupport for WebDelegatingSubject {
     fn is_session_creation_enabled(&self) -> bool {
         self.delegating_subject.is_session_creation_enabled()
     }
 }
 
 #[async_trait]
-impl Subject for WebDelegatingSubject
-{
+impl Subject for WebDelegatingSubject {
     async fn get_principal(&self) -> Option<&Object> {
         self.delegating_subject.get_principal().await
     }
@@ -135,12 +135,34 @@ impl Subject for WebDelegatingSubject
         self.delegating_subject.get_session_or_create(create).await
     }
 
-    async fn login(&mut self, token: &dyn AuthenticationToken) -> Result<(), AuthenticationError> {
-        self.delegating_subject.login(token).await
+    async fn login(
+        &mut self,
+        token: &dyn AuthenticationToken,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Result<(), AuthenticationError> {
+        let subject = self
+            .delegating_subject
+            .security_manager
+            .login(self, token, req, resp)
+            .await?;
+        self.delegating_subject._login(subject).await
     }
 
-    async fn logout(&mut self) -> Result<(), next_web_core::error::BoxError> {
-        self.delegating_subject.logout().await
+    async fn logout(
+        &mut self,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Result<(), next_web_core::error::BoxError> {
+        self.delegating_subject
+            .clear_run_as_identities_internal()
+            .await;
+        self.delegating_subject
+            .security_manager
+            .logout(self, req, resp)
+            .await?;
+
+        self.delegating_subject._logout().await
     }
 
     async fn run_as(
@@ -163,8 +185,7 @@ impl Subject for WebDelegatingSubject
     }
 }
 
-impl Required<DelegatingSubject> for WebDelegatingSubject
-{
+impl Required<DelegatingSubject> for WebDelegatingSubject {
     fn get_object(&self) -> &DelegatingSubject {
         &self.delegating_subject
     }

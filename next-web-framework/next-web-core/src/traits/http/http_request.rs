@@ -1,4 +1,7 @@
-use axum::{extract::Request, http::{Uri, uri::Scheme}};
+use axum::{
+    extract::Request,
+    http::{uri::Scheme, Uri},
+};
 use headers::{Cookie, HeaderMapExt, Host};
 use std::{collections::HashMap, str::FromStr};
 
@@ -6,6 +9,11 @@ use crate::{
     anys::any_value::AnyValue, traits::http::request_dispatcher::RequestDispatcher,
     util::http_method::HttpMethod,
 };
+
+pub const IDENTITY_REMOVED_KEY: &str = stringify!(format!(
+    "{}_IDENTITY_REMOVED_KEY",
+    std::any::type_name::<HttpRequest>()
+));
 
 pub trait HttpRequest
 where

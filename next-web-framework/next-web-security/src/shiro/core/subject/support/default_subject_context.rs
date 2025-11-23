@@ -2,27 +2,34 @@ use std::{any::Any, fmt::Display, sync::Arc};
 
 use next_web_core::async_trait;
 
-use crate::{
-    core::{
-        authc::{
-            authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
-            bearer_token::BearerToken, host_authentication_token::HostAuthenticationToken,
-        },
-        session::{Session, SessionId},
-        subject::{
-            principal_collection::PrincipalCollection, subject_context::SubjectContext, Subject,
-        },
-        util::{
-            map_context::MapContext,
-            object::{AnyObject, Object},
-        },
+use crate::core::{
+    authc::{
+        authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
+        bearer_token::BearerToken, host_authentication_token::HostAuthenticationToken,
     },
-    web::mgt::web_security_manager::WebSecurityManager,
+    session::{Session, SessionId},
+    subject::{
+        principal_collection::PrincipalCollection, subject_context::SubjectContext, Subject,
+    },
+    util::{
+        map_context::MapContext,
+        object::{AnyObject, Object},
+    },
 };
+
+#[cfg(not(feature = "web"))]
+use crate::core::mgt::security_manager::SecurityManager;
+#[cfg(feature = "web")]
+use crate::web::mgt::web_security_manager::WebSecurityManager;
 
 #[derive(Clone)]
 pub struct DefaultSubjectContext {
     map_context: MapContext,
+
+    #[cfg(not(feature = "web"))]
+    security_manager: Option<Arc<dyn SecurityManager>>,
+
+    #[cfg(feature = "web")]
     security_manager: Option<Arc<dyn WebSecurityManager>>,
 }
 
@@ -70,13 +77,22 @@ impl DefaultSubjectContext {
 
     const HOST: &str = stringify!(format!("{}.HOST", std::any::type_name::<Self>()));
 
-    pub fn new(context: &dyn SubjectContext) -> Self {
+    pub async fn new(context: &dyn SubjectContext) -> Self {
         Self {
             map_context: MapContext::from_context(context),
-            security_manager: None,
+            security_manager: context.resolve_security_manager().await.map(Clone::clone),
         }
     }
 
+    #[cfg(not(feature = "web"))]
+    pub fn from_security_manager(manager: Arc<dyn SecurityManager>) -> Self {
+        Self {
+            map_context: Default::default(),
+            security_manager: Some(manager),
+        }
+    }
+
+    #[cfg(feature = "web")]
     pub fn from_security_manager(manager: Arc<dyn WebSecurityManager>) -> Self {
         Self {
             map_context: Default::default(),
@@ -94,6 +110,12 @@ impl DefaultSubjectContext {
         self.map_context.insert(key.to_string(), value);
     }
 
+    #[cfg(not(feature = "web"))]
+    pub fn set_security_manager(&mut self, manager: Arc<dyn SecurityManager>) {
+        self.security_manager = Some(manager);
+    }
+
+    #[cfg(feature = "web")]
     pub fn set_security_manager(&mut self, manager: Arc<dyn WebSecurityManager>) {
         self.security_manager = Some(manager);
     }
@@ -101,8 +123,8 @@ impl DefaultSubjectContext {
 
 #[async_trait]
 impl SubjectContext for DefaultSubjectContext {
-    fn get_session_id(&self) -> &SessionId {
-        self.get_type_value::<SessionId>(Self::SESSION_ID).unwrap()
+    fn get_session_id(&self) -> Option<&SessionId> {
+        self.get_type_value::<SessionId>(Self::SESSION_ID)
     }
 
     fn set_session_id(&mut self, session_id: SessionId) {
@@ -128,6 +150,12 @@ impl SubjectContext for DefaultSubjectContext {
         }
     }
 
+    #[cfg(not(feature = "web"))]
+    async fn resolve_security_manager(&self) -> Option<&Arc<dyn SecurityManager>> {
+        self.security_manager.as_ref()
+    }
+
+    #[cfg(feature = "web")]
     async fn resolve_security_manager(&self) -> Option<&Arc<dyn WebSecurityManager>> {
         self.security_manager.as_ref()
     }

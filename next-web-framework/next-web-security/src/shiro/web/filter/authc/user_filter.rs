@@ -34,7 +34,7 @@ impl AccessControlFilterExt for UserFilter {
         if self.is_login_request(request, response) {
             return true;
         } else {
-            let subject = WebUtils::get_subject(request).await;
+            let subject = WebUtils::get_subject(request, response).await;
 
             // If principal is not null, then the user is known and should be allowed access.
             return subject.get_principal().await.is_some();

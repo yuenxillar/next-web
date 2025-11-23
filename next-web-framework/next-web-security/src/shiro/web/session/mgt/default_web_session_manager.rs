@@ -103,14 +103,13 @@ impl DefaultWebSessionManager {
         if !match session_id {
             SessionId::String(s) => !s.is_empty(),
             SessionId::Number(n) => *n != 0,
-            _ => true,
         } {
             return Err("session_id cannot be null when persisting for subsequent requests.");
         }
 
         let mut cookie = SimpleCookie::from(self.session_id_cookie.as_ref());
         cookie.set_value(session_id.to_string());
-        cookie.save_to(req, resp);
+        cookie.save_to(None, resp);
 
         trace!(
             "Set session ID cookie for session with id {}",

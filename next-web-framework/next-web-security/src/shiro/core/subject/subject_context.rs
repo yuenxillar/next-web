@@ -7,14 +7,20 @@ use crate::{core::{
     session::{Session, SessionId},
     subject::{Subject, principal_collection::PrincipalCollection},
     util::object::Object,
-}, web::mgt::web_security_manager::WebSecurityManager};
+}};
+
+
+#[cfg(not(feature = "web"))]
+use crate::core::mgt::security_manager::SecurityManager;
+#[cfg(feature = "web")]
+use crate::web::mgt::web_security_manager::WebSecurityManager;
 
 #[async_trait]
 pub trait SubjectContext
 where
     Self: Send + Sync,
 {
-    fn get_session_id(&self) -> &SessionId;
+    fn get_session_id(&self) -> Option<&SessionId>;
 
     fn set_session_id(&mut self, session_id: SessionId);
 
@@ -24,6 +30,10 @@ where
 
     fn get_principals(&self) -> Option<&Arc<dyn PrincipalCollection>>;
 
+    #[cfg(not(feature = "web"))]
+    async fn resolve_security_manager(&self) -> Option<&Arc<dyn SecurityManager>>;
+
+    #[cfg(feature = "web")]
     async fn resolve_security_manager(&self) -> Option<&Arc<dyn WebSecurityManager>>;
 
     async fn resolve_principals(&self) -> Option<&Arc<dyn PrincipalCollection>>;

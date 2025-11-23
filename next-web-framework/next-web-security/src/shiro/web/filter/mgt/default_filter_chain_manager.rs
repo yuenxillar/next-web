@@ -1,6 +1,6 @@
 use std::vec;
 
-use indexmap::{IndexMap, map::Entry};
+use indexmap::{map::Entry, IndexMap};
 use next_web_core::traits::filter::{http_filter::HttpFilter, http_filter_chain::HttpFilterChain};
 use tracing::debug;
 
@@ -23,7 +23,6 @@ impl DefaultFilterChainManager {
     pub fn get_filter(&mut self, filter_name: &str) -> Option<&dyn HttpFilter> {
         self.filters.get(filter_name).map(|f| f.as_ref())
     }
-
 
     // pub fn get_mut_chain<'a>(&'a mut self, chain_name: &str) -> Option<&'a mut dyn NamedFilterList> {
     //     self.filter_chains.get_mut(chain_name).map(|s| s.as_mut())
@@ -55,21 +54,25 @@ impl DefaultFilterChainManager {
                 entry.insert(Box::new(chain)).as_mut()
             }
         }
-    }   
+    }
 
     fn split_chain_definition<'a>(&self, chain_definition: &'a str) -> Vec<&'a str> {
-        chain_definition.trim()
-        .split(",")
-        .map(|s| s.trim())
-        .collect()
+        chain_definition
+            .trim()
+            .split(",")
+            .map(|s| s.trim())
+            .collect()
     }
 
     fn to_name_config_pair(&self, token: &str) -> Vec<String> {
-
         let parts = token.splitn(2, '[').collect::<Vec<&str>>();
         let name = parts[0].trim();
 
-        assert!(!name.is_empty(), "Filter name not found for filter chain definition token: {}", token);
+        assert!(
+            !name.is_empty(),
+            "Filter name not found for filter chain definition token: {}",
+            token
+        );
         let mut config = "";
         if parts.len() == 2 {
             config = parts[1].trim();
@@ -86,18 +89,17 @@ impl DefaultFilterChainManager {
                 let mut stripped = &config[1..config.len() - 1];
                 stripped = stripped.trim();
 
-                 // if the stripped value does not have any internal quotes, we can assume that the entire config was
-                 // quoted and we can use the stripped value.
-                 if !stripped.is_empty() && stripped.find("\"").map(|_n| false).unwrap_or(true) {
+                // if the stripped value does not have any internal quotes, we can assume that the entire config was
+                // quoted and we can use the stripped value.
+                if !stripped.is_empty() && stripped.find("\"").map(|_n| false).unwrap_or(true) {
                     config = stripped;
-                 }
+                }
 
                 // else:
                 // the remaining config does have internal quotes, so we need to assume that each comma delimited
                 // pair might be quoted, in which case we need the leading and trailing quotes that we stripped
                 // So we ignore the stripped value.
-
-            } 
+            }
         }
 
         vec![name.to_string(), config.to_string()]
@@ -132,15 +134,24 @@ impl FilterChainManager for DefaultFilterChainManager {
     }
 
     fn create_chain(&mut self, chain_name: String, chain_definition: String) {
-        assert!(!chain_name.is_empty(), "chain_name cannot be null or empty.");
-        assert!(!chain_definition.is_empty(), "chain_definition cannot be null or empty.");
-        debug!("Creating chain [{}] with global filters  and from String definition [{:?}]", chain_name, self.global_filter_names);
+        assert!(
+            !chain_name.is_empty(),
+            "chain_name cannot be null or empty."
+        );
+        assert!(
+            !chain_definition.is_empty(),
+            "chain_definition cannot be null or empty."
+        );
+        debug!(
+            "Creating chain [{}] with global filters  and from String definition [{:?}]",
+            chain_name, self.global_filter_names
+        );
 
         // first add each of global filters
         if !self.global_filter_names.is_empty() {
             for filter_name in self.global_filter_names.clone() {
                 self.add_to_chain(&chain_name, filter_name, None);
-            } 
+            }
         }
 
         //parse the value by tokenizing it to get the resulting filter-specific config entries
@@ -155,7 +166,6 @@ impl FilterChainManager for DefaultFilterChainManager {
         //
         let filter_tokens = self.split_chain_definition(&chain_definition);
 
-
         // each token is specific to each filter.
         // strip the name and extract any filter-specific config between brackets [ ]
         for token in filter_tokens {
@@ -164,30 +174,39 @@ impl FilterChainManager for DefaultFilterChainManager {
             //now we have the filter name, path and (possibly null) path-specific config.  Let's apply them:
             let pair1 = name_config_pair.remove(0);
             let pair2 = name_config_pair.remove(0);
-            self.add_to_chain(&chain_name, pair1, Some(& pair2));
+            self.add_to_chain(&chain_name, pair1, Some(&pair2));
         }
     }
 
     fn create_default_chain(&mut self, chain_name: String) {
         // only create the defaultChain if we don't have a chain with this name already
         // (the global filters will already be in that chain)
-        if !self.get_chain_names().contains(& chain_name.as_str()) && !self.global_filter_names.is_empty() {
+        if !self.get_chain_names().contains(&chain_name.as_str())
+            && !self.global_filter_names.is_empty()
+        {
+            println!("global_filter_names: {:?}", self.global_filter_names);
             for filter_name in self.global_filter_names.clone() {
                 self.add_to_chain(&chain_name, filter_name, None);
             }
         }
     }
 
-    fn add_to_chain(&mut self, chain_name: &str, filter_name: String, chain_specific_filter_config: Option<&str>) {
+    fn add_to_chain(
+        &mut self,
+        chain_name: &str,
+        filter_name: String,
+        chain_specific_filter_config: Option<&str>,
+    ) {
         assert!(
             !chain_name.is_empty(),
             "chain_name cannot be null or empty."
         );
         match self._get_box_filter(&filter_name) {
-            None => panic!("There is no filter with name [{filter_name}] to apply to chain [{chain_name}] in the pool of available Filters.  Ensure a 
+            None => panic!("There is no filter with name [{filter_name}] to apply to chain [{chain_name}] in the pool of available Filters.  Ensure a
             filter with that name/path has first been registered with the addFilter method(s)."),
             Some(mut filter) => {
 
+                println!("found filter: {}", filter.name());
                 if let Some(config) = chain_specific_filter_config {
                     filter.process_path_config(chain_name, config);
                 }
@@ -195,7 +214,7 @@ impl FilterChainManager for DefaultFilterChainManager {
                 let chain = self.ensure_chain(chain_name);
                 chain.get_mut_object().push(filter);
             }
-            
+
         }
     }
 
@@ -205,7 +224,7 @@ impl FilterChainManager for DefaultFilterChainManager {
                 if self.filters.contains_key(&filter_name) {
                     self.global_filter_names.push(filter_name);
                 } else {
-                    panic!("There is no filter with name [{filter_name}] 
+                    panic!("There is no filter with name [{filter_name}]
                     to apply to the global filters in the pool of available Filters.  Ensure a
                     filter with that name/path has first been registered with the addFilter method(s).")
                 }
@@ -213,15 +232,15 @@ impl FilterChainManager for DefaultFilterChainManager {
         }
     }
 
-    fn proxy(
-        &self,
-        original: &dyn HttpFilterChain,
-        chain_name: &str,
-    ) -> Box<dyn HttpFilterChain> {
+    fn proxy(&self, original: &dyn HttpFilterChain, chain_name: &str) -> Box<dyn HttpFilterChain> {
         let chain = self.get_chain(chain_name);
+        println!("name: {}", chain_name);
         match chain {
             Some(configured) => configured.proxy(original),
-            None => panic!("There is no configured chain under the name/key [{}]", chain_name)
+            None => panic!(
+                "There is no configured chain under the name/key [{}]",
+                chain_name
+            ),
         }
     }
 }
@@ -239,7 +258,6 @@ impl Default for DefaultFilterChainManager {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::any::Any;
@@ -247,7 +265,6 @@ mod tests {
     use next_web_core::traits::filter::http_filter::HttpFilter;
 
     use crate::web::filter_proxy::FilterProxy;
-
 
     #[test]
     fn down() {
@@ -258,6 +275,5 @@ mod tests {
         if let Some(proxy) = (&f as &dyn Any).downcast_ref::<FilterProxy>() {
             println!("url: {:?}", proxy.get_login_url())
         }
-
     }
 }

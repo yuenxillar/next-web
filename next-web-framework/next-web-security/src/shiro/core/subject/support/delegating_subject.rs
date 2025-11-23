@@ -1,3 +1,5 @@
+#[cfg(feature = "web")]
+use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 use next_web_core::{
     async_trait,
     convert::into_box::IntoBox,
@@ -6,16 +8,25 @@ use next_web_core::{
 };
 use tracing::debug;
 
-use crate::{core::{
-    authc::{authentication_error::AuthenticationError, authentication_token::AuthenticationToken},
-    authz::authorization_error::AuthorizationError,
-    mgt::security_manager::SecurityManager,
-    session::{
-        Session, SessionError, SessionValue, mgt::{default_session_context::DefaultSessionContext, session_context::SessionContext}, proxied_session::ProxiedSession
+#[cfg(feature = "web")]
+use crate::{
+    core::{
+        authc::{
+            authentication_error::AuthenticationError, authentication_token::AuthenticationToken,
+        },
+        authz::authorization_error::AuthorizationError,
+        session::{
+            mgt::{
+                default_session_context::DefaultSessionContext, session_context::SessionContext,
+            },
+            proxied_session::ProxiedSession,
+            Session, SessionError, SessionValue,
+        },
+        subject::{principal_collection::PrincipalCollection, Subject},
+        util::object::Object,
     },
-    subject::{Subject, principal_collection::PrincipalCollection},
-    util::object::Object,
-}, web::mgt::web_security_manager::WebSecurityManager};
+    web::{mgt::web_security_manager::WebSecurityManager, subject::web_subject::WebSubject},
+};
 use std::{
     any::Any,
     fmt::Display,
@@ -24,17 +35,21 @@ use std::{
 };
 
 #[derive(Clone)]
-pub struct DelegatingSubject{
+pub struct DelegatingSubject {
     principals: Option<Arc<dyn PrincipalCollection>>,
     authenticated: bool,
     host: Option<String>,
     pub(crate) session: Option<Arc<dyn Session>>,
     session_creation_enabled: bool,
-    security_manager: Arc<dyn WebSecurityManager>,
+
+    #[cfg(not(feature = "web"))]
+    pub(crate) security_manager: Arc<dyn SecurityManager>,
+
+    #[cfg(feature = "web")]
+    pub(crate) security_manager: Arc<dyn WebSecurityManager>,
 }
 
-impl DelegatingSubject
-{
+impl DelegatingSubject {
     const RUN_AS_PRINCIPALS_SESSION_KEY: &str = stringify!(format!(
         "{}{}",
         std::any::type_name::<Self>(),
@@ -71,7 +86,6 @@ impl DelegatingSubject
         let session = StoppingAwareProxiedSession::new(session);
         Arc::new(session)
     }
-
 
     pub fn get_security_manager(&self) -> &dyn WebSecurityManager {
         self.security_manager.as_ref()
@@ -210,11 +224,71 @@ impl DelegatingSubject
         }
         popped
     }
+
+    pub(crate) async fn _logout(&mut self) -> Result<(), BoxError> {
+        self.session = None;
+        self.principals = None;
+        self.authenticated = false;
+
+        Ok(())
+    }
+
+    pub(crate) async fn _login(
+        &mut self,
+        mut subject: Box<dyn Subject>,
+    ) -> Result<(), AuthenticationError> {
+        self.clear_run_as_identities_internal().await;
+
+        #[allow(unused_assignments)]
+        let mut principals: Option<Arc<dyn PrincipalCollection>> = None;
+        let mut host: Option<&str> = None;
+
+        // let principal_collection: Option<Arc<dyn PrincipalCollection>> =
+        let any: &dyn Any = &(subject.clone());
+
+        if let Some(delegating) = any.downcast_ref::<Self>() {
+            principals = delegating.principals.clone();
+            host = delegating.host.as_deref();
+        } else {
+            principals = subject.get_principals().await.map(|pr| pr.clone());
+        }
+
+        if match principals.as_ref() {
+            Some(val) => val.is_empty(),
+            None => true,
+        } {
+            return Err(AuthenticationError::Custom(
+                "Principals returned from security_manager.login( token ) returned a null or
+            empty value.  This value must be non null and populated with one or more elements."
+                    .to_string(),
+            ));
+        }
+
+        self.principals = principals;
+        self.authenticated = true;
+
+        // if let Some(token) = (token as &dyn Any).downcast_ref::<HostAuthenticationToken>() {
+        //     host = token.get_host();
+        // }
+
+        self.host = host.map(|s| s.to_string());
+
+        let session = subject.get_session_or_create(false).await;
+
+        match session {
+            Some(session) => {
+                self.session = Some(self.decorate(session));
+            }
+            None => {
+                self.session = None;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
-impl Subject for DelegatingSubject
-{
+impl Subject for DelegatingSubject {
     async fn get_principal(&self) -> Option<&Object> {
         self.get_primary_principal(self.get_principals().await.map(|pr| pr.as_ref()))
     }
@@ -329,70 +403,36 @@ impl Subject for DelegatingSubject
         self.session.clone()
     }
 
-    async fn login(&mut self, token: &dyn AuthenticationToken) -> Result<(), AuthenticationError> {
-        self.clear_run_as_identities_internal().await;
+    #[allow(unused_variables)]
+    async fn login(
+        &mut self,
+        token: &dyn AuthenticationToken,
+        #[cfg(feature = "web")] req: &mut dyn HttpRequest,
+        #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
+    ) -> Result<(), AuthenticationError> {
+        #[cfg(not(feature = "web"))]
+        return self._login(token).await;
 
-        let mut subject = self.security_manager.login(self, token).await?;
-
-        #[allow(unused_assignments)]
-        let mut principals: Option<Arc<dyn PrincipalCollection>> = None;
-        let mut host: Option<&str> = None;
-
-        // let principal_collection: Option<Arc<dyn PrincipalCollection>> =
-        let any: &dyn Any = &(subject.clone());
-
-        if let Some(delegating) = any.downcast_ref::<Self>() {
-            principals = delegating.principals.clone();
-            host = delegating.host.as_deref();
-        } else {
-            principals = subject.get_principals().await.map(|pr| pr.clone());
-        }
-
-        if match principals.as_ref() {
-            Some(val) => val.is_empty(),
-            None => true,
-        } {
-            return Err(AuthenticationError::Custom(
-                "Principals returned from security_manager.login( token ) returned a null or
-            empty value.  This value must be non null and populated with one or more elements."
-                    .to_string(),
-            ));
-        }
-
-        self.principals = principals;
-        self.authenticated = true;
-
-        // if let Some(token) = (token as &dyn Any).downcast_ref::<HostAuthenticationToken>() {
-        //     host = token.get_host();
-        // }
-
-        self.host = host.map(|s| s.to_string());
-
-        let session = subject.get_session_or_create(false).await;
-
-        match session {
-            Some(session) => {
-                self.session = Some(self.decorate(session));
-            }
-            None => {
-                self.session = None;
-            }
-        }
         Ok(())
     }
 
-    async fn logout(&mut self) -> Result<(), BoxError> {
-        self.clear_run_as_identities_internal().await;
-        if let Err(error) = self.security_manager.logout(self).await {
-            debug!(
-                "Encountered session exception trying to log out subject.  This can generally safely be ignored. {:?}",
-                error
-            )
-        }
+    async fn logout(
+        &mut self,
+        #[cfg(feature = "web")] _req: &mut dyn HttpRequest,
+        #[cfg(feature = "web")] _resp: &mut dyn HttpResponse,
+    ) -> Result<(), BoxError> {
+        #[cfg(not(feature = "web"))]
+        {
+            self.clear_run_as_identities_internal().await;
+            if let Err(error) = self.security_manager.logout(subject).await {
+                debug!(
+                    "Encountered session exception trying to log out subject.  This can generally safely be ignored. {:?}",
+                    error
+                )
+            }
 
-        self.session = None;
-        self.principals = None;
-        self.authenticated = false;
+            return self._logout().await;
+        }
 
         Ok(())
     }
@@ -452,8 +492,7 @@ impl Subject for DelegatingSubject
     }
 }
 
-impl DelegatingSubject
-{
+impl DelegatingSubject {
     fn create_session_context(&self) -> impl SessionContext + 'static {
         let mut session_context = DefaultSessionContext::default();
         if let Some(host) = self.host.as_ref() {
@@ -465,7 +504,7 @@ impl DelegatingSubject
         session_context
     }
 
-    async fn clear_run_as_identities_internal(&mut self) {
+    pub(crate) async fn clear_run_as_identities_internal(&mut self) {
         if let Err(se) = self.clear_run_as_identities().await {
             debug!(
                 "Encountered session exception trying to clear 'runAs' identities during logout.  This can generally safely be ignored. {:?}",
