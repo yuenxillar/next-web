@@ -112,7 +112,7 @@ impl RedirectView {
 
         if self.context_relative && self.url.starts_with('/') {
             // Do not apply context path to relative URLs.
-            target_url.push_str(request.context_path());
+            target_url.push_str(request.context_path().unwrap_or_default());
         }
 
         target_url.push_str(&self.url);

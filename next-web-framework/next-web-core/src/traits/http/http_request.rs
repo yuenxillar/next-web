@@ -1,13 +1,13 @@
 use axum::{
     extract::Request,
-    http::{uri::Scheme, Uri},
+    http::{uri::Scheme, Uri, Version},
 };
 use headers::{Cookie, HeaderMapExt, Host};
 use std::{collections::HashMap, str::FromStr};
 
 use crate::{
-    anys::any_value::AnyValue, traits::http::request_dispatcher::RequestDispatcher,
-    util::http_method::HttpMethod,
+    anys::any_value::AnyValue, http::auth_type::AuthType,
+    traits::http::request_dispatcher::RequestDispatcher, util::http_method::HttpMethod,
 };
 
 pub const IDENTITY_REMOVED_KEY: &str = stringify!(format!(
@@ -21,11 +21,15 @@ where
 {
     fn session(&self, name: &str) -> Option<String>;
 
+    fn auth_type(&self) -> AuthType;
+
     fn cookie(&self) -> Option<Cookie>;
 
     fn request_dispatcher(&self, default_failure_url: &str) -> Option<&dyn RequestDispatcher>;
 
     fn method(&self) -> HttpMethod;
+
+    fn version(&self) -> Version;
 
     fn header(&self, header_name: &str) -> Option<&str>;
 
@@ -45,7 +49,7 @@ where
 
     fn server_name(&self) -> Option<String>;
 
-    fn context_path(&self) -> &str;
+    fn context_path(&self) -> Option<&str>;
 
     fn get_attribute(&self, name: &str) -> Option<&AnyValue>;
 
@@ -63,6 +67,10 @@ where
 pub type OneMap = HashMap<String, AnyValue>;
 
 impl HttpRequest for Request {
+    fn auth_type(&self) -> AuthType {
+        AuthType::from_request(self)
+    }
+
     fn session(&self, name: &str) -> Option<String> {
         self.cookie()
             .map(|cookie| cookie.get(name).map(ToString::to_string))
@@ -79,6 +87,10 @@ impl HttpRequest for Request {
 
     fn method(&self) -> HttpMethod {
         HttpMethod::from_str(self.method().as_str()).unwrap_or_default()
+    }
+
+    fn version(&self) -> Version {
+        self.version()
     }
 
     fn header(&self, header_name: &str) -> Option<&str> {
@@ -125,8 +137,10 @@ impl HttpRequest for Request {
             .map(|host| host.hostname().to_string())
     }
 
-    fn context_path(&self) -> &str {
-        "/"
+    fn context_path(&self) -> Option<&str> {
+        self.get_attribute("serverContextPath")
+            .map(|val| val.as_str())
+            .unwrap_or_default()
     }
 
     fn remove_attribute(&mut self, name: &str) {

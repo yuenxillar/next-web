@@ -1,19 +1,16 @@
-use reqwest::{Client, ClientBuilder, IntoUrl, Method, Response, Url};
-use serde::Serialize;
-use std::ops::Deref;
+use reqwest::{Client, ClientBuilder, Method, RequestBuilder, Url};
+use std::collections::HashSet;
 use std::time::Duration;
 
-/// 模仿 Spring RestTemplate 风格的 HTTP 客户端
 ///
 /// 提供高层级、易用的 HTTP 请求方法，支持链式配置和基础 URI。
-///
-/// # Spring-style REST Client
 ///
 /// Provides high-level, easy-to-use HTTP request methods with builder-style configuration
 /// and base URI support, inspired by Spring's RestTemplate.
 pub struct RestClient {
     client: Client,
     base_url: Option<String>,
+    default_headers: Option<Vec<(String, String)>>,
 }
 
 impl RestClient {
@@ -40,148 +37,31 @@ impl RestClient {
     ///
     /// A `RestClientBuilder` instance.
     pub fn builder() -> RestClientBuilder {
-        RestClientBuilder::new()
+        RestClientBuilder::default()
     }
 
-    /// 执行 GET 请求并返回响应体为字符串
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - 请求的 URL（可以是相对路径或完整 URL）
-    ///
-    /// # Returns
-    ///
-    /// 成功时返回响应体字符串，失败时返回 `reqwest::Error`。
-    ///
-    /// # Performs a GET request and returns the response body as a string
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - The request URL (can be relative path or full URL)
-    ///
-    /// # Returns
-    ///
-    /// The response body as a string on success, or `reqwest::Error` on failure.
-    pub async fn get_for_string(&self, url: &str) -> reqwest::Result<String> {
-        let full_url = self.resolve_url(url);
-        self.client.get(&full_url).send().await?.text().await
+    pub async fn get<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
+        self.request(Method::GET, url)
     }
 
-    /// 执行 GET 请求并将响应体反序列化为指定类型
-    ///
-    /// # Type Parameters
-    ///
-    /// * `T` - 目标类型，必须实现 `serde::de::DeserializeOwned`
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - 请求的 URL（可以是相对路径或完整 URL）
-    ///
-    /// # Returns
-    ///
-    /// 成功时返回反序列化后的对象，失败时返回 `reqwest::Error`。
-    ///
-    /// # Performs a GET request and deserializes the response body into the specified type
-    ///
-    /// # Type Parameters
-    ///
-    /// * `T` - The target type, must implement `serde::de::DeserializeOwned`
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - The request URL (can be relative path or full URL)
-    ///
-    /// # Returns
-    ///
-    /// The deserialized object on success, or `reqwest::Error` on failure.
-    pub async fn get_for_object<T: serde::de::DeserializeOwned>(
-        &self,
-        url: &str,
-    ) -> reqwest::Result<T> {
-        let full_url = self.resolve_url(url);
-        self.client.get(&full_url).send().await?.json::<T>().await
+    pub async fn post<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
+        self.request(Method::POST, url)
     }
 
-    /// 执行 POST 请求，发送 JSON 数据并返回响应体为字符串
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - 请求的 URL（可以是相对路径或完整 URL）
-    /// * `body` - 要序列化为 JSON 并发送的请求体
-    ///
-    /// # Returns
-    ///
-    /// 成功时返回响应体字符串，失败时返回 `reqwest::Error`。
-    ///
-    /// # Performs a POST request with JSON body and returns the response body as a string
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - The request URL (can be relative path or full URL)
-    /// * `body` - The request body to serialize as JSON
-    ///
-    /// # Returns
-    ///
-    /// The response body as a string on success, or `reqwest::Error` on failure.
-    pub async fn post_for_string<T: Serialize>(
-        &self,
-        url: &str,
-        body: &T,
-    ) -> reqwest::Result<String> {
-        let full_url = self.resolve_url(url);
-        self.client
-            .post(&full_url)
-            .json(body)
-            .send()
-            .await?
-            .text()
-            .await
+    pub async fn put<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
+        self.request(Method::PUT, url)
     }
 
-    /// 执行 POST 请求，发送 JSON 数据并返回反序列化后的对象
-    ///
-    /// # Type Parameters
-    ///
-    /// * `T` - 请求体类型，必须实现 `serde::Serialize`
-    /// * `U` - 响应体目标类型，必须实现 `serde::de::DeserializeOwned`
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - 请求的 URL（可以是相对路径或完整 URL）
-    /// * `body` - 要序列化为 JSON 并发送的请求体
-    ///
-    /// # Returns
-    ///
-    /// 成功时返回反序列化后的对象，失败时返回 `reqwest::Error`。
-    ///
-    /// # Performs a POST request with JSON body and deserializes the response
-    ///
-    /// # Type Parameters
-    ///
-    /// * `T` - The request body type, must implement `serde::Serialize`
-    /// * `U` - The response body target type, must implement `serde::de::DeserializeOwned`
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - The request URL (can be relative path or full URL)
-    /// * `body` - The request body to serialize as JSON
-    ///
-    /// # Returns
-    ///
-    /// The deserialized response object on success, or `reqwest::Error` on failure.
-    pub async fn post_for_object<T: Serialize, U: serde::de::DeserializeOwned>(
-        &self,
-        url: &str,
-        body: &T,
-    ) -> reqwest::Result<U> {
-        let full_url = self.resolve_url(url);
-        self.client
-            .post(&full_url)
-            .json(body)
-            .send()
-            .await?
-            .json::<U>()
-            .await
+    pub async fn delete<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
+        self.request(Method::DELETE, url)
+    }
+
+    pub async fn patch<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
+        self.request(Method::PATCH, url)
+    }
+
+    pub async fn head<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
+        self.request(Method::HEAD, url)
     }
 
     /// 执行通用 HTTP 请求
@@ -205,81 +85,12 @@ impl RestClient {
     /// # Returns
     ///
     /// Returns a `RequestBuilder` for further request configuration.
-    pub fn request<U>(&self, method: Method, url: U) -> reqwest::RequestBuilder
+    pub fn request<U>(&self, method: Method, url: U) -> RequestBuilder
     where
-        U: IntoUrl + AsRef<str>,
-        U: Clone,
+        U: AsRef<str>,
     {
-        let _url = url.clone();
-        let url = match _url.into_url() {
-            Ok(u) => u,
-            Err(_) => {
-                // 如果传入的是相对路径且有 base_url，则解析
-                if let Some(base) = &self.base_url {
-                    match Url::parse(base) {
-                        Ok(mut base_url) => {
-                            base_url.set_path(url.as_ref());
-                            base_url
-                        }
-                        Err(_) => return self.client.request(method, url), // 解析失败，直接使用原值
-                    }
-                } else {
-                    // 没有 base_url，直接使用原值
-                    return self.client.request(method, url);
-                }
-            }
-        };
-        self.client.request(method, url)
-    }
-
-    /// 执行 PUT 请求
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - 请求的 URL（可以是相对路径或完整 URL）
-    /// * `body` - 请求体
-    ///
-    /// # Returns
-    ///
-    /// `Response` 对象或错误。
-    ///
-    /// # Performs a PUT request
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - The request URL (can be relative path or full URL)
-    /// * `body` - The request body
-    ///
-    /// # Returns
-    ///
-    /// The `Response` object or an error.
-    pub async fn put<T: Serialize>(&self, url: &str, body: &T) -> reqwest::Result<Response> {
-        let full_url = self.resolve_url(url);
-        self.client.put(&full_url).json(body).send().await
-    }
-
-    /// 执行 DELETE 请求
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - 请求的 URL（可以是相对路径或完整 URL）
-    ///
-    /// # Returns
-    ///
-    /// `Response` 对象或错误。
-    ///
-    /// # Performs a DELETE request
-    ///
-    /// # Parameters
-    ///
-    /// * `url` - The request URL (can be relative path or full URL)
-    ///
-    /// # Returns
-    ///
-    /// The `Response` object or an error.
-    pub async fn delete(&self, url: &str) -> reqwest::Result<Response> {
-        let full_url = self.resolve_url(url);
-        self.client.delete(&full_url).send().await
+        let url = self.resolve_url(url.as_ref());
+        self.append_default_headers(self.client.request(method, url))
     }
 
     /// 解析 URL，结合 base_url（如果存在）
@@ -320,6 +131,15 @@ impl RestClient {
         }
     }
 
+    fn append_default_headers(&self, req_builder: RequestBuilder) -> RequestBuilder {
+        if let Some(headers) = self.default_headers.as_ref() {
+            return headers
+                .iter()
+                .fold(req_builder, |builder, (k, v)| builder.header(k, v));
+        }
+        req_builder
+    }
+
     /// 获取当前的 base_url
     ///
     /// # Returns
@@ -346,23 +166,10 @@ impl RestClient {
 pub struct RestClientBuilder {
     client_builder: ClientBuilder,
     base_url: Option<String>,
+    default_headers: Option<HashSet<(String, String)>>,
 }
 
 impl RestClientBuilder {
-    /// 创建一个新的 `RestClientBuilder`，使用默认设置
-    ///
-    /// # Creates a new `RestClientBuilder` with default settings
-    ///
-    /// # Returns
-    ///
-    /// A new `RestClientBuilder` instance.
-    fn new() -> Self {
-        Self {
-            client_builder: Client::builder(),
-            base_url: None,
-        }
-    }
-
     /// 设置客户端的默认超时时间
     ///
     /// # Parameters
@@ -507,7 +314,36 @@ impl RestClientBuilder {
     ///
     /// Self, for method chaining.
     pub fn base_url(mut self, base_url: &str) -> Self {
-        self.base_url = Some(base_url.to_string());
+        if !base_url.is_empty() {
+            if base_url.parse::<Url>().is_ok() {
+                self.base_url = Some(base_url.to_string());
+            }
+        }
+        self
+    }
+
+    /// 设置默认请求头
+    ///
+    /// 所有请求都会包含这些默认请求头。
+    ///
+    /// # Parameters
+    ///
+    /// * `default_headers` - 默认请求头
+    ///
+    /// # Returns
+    ///
+    /// Self, for method chaining.
+    pub fn default_headers<T, V>(mut self, default_headers: T) -> Self
+    where
+        T: IntoIterator<Item = (V, V)>,
+        V: Into<String>,
+    {
+        self.default_headers = Some(
+            default_headers
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        );
         self
     }
 
@@ -529,6 +365,9 @@ impl RestClientBuilder {
                 .build()
                 .expect("Failed to build reqwest client"),
             base_url: self.base_url,
+            default_headers: self
+                .default_headers
+                .map(|headers| headers.into_iter().collect::<Vec<_>>()),
         }
     }
 }
@@ -545,29 +384,38 @@ impl Clone for RestClient {
         Self {
             client: self.client.clone(),
             base_url: self.base_url.clone(),
+            default_headers: self.default_headers.clone(),
         }
     }
 }
 
-impl Deref for RestClient {
-    /// 允许直接通过 `RestClient` 实例访问 `reqwest::Client` 的方法
-    ///
-    /// # Allows direct access to `reqwest::Client` methods through `RestClient` instance
-    type Target = Client;
-
-    fn deref(&self) -> &Self::Target {
-        &self.client
+impl Default for RestClientBuilder {
+    fn default() -> Self {
+        Self {
+            client_builder: Client::builder(),
+            base_url: None,
+            default_headers: None,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use serde::Serialize;
+
     use super::*;
 
     #[tokio::test]
     async fn test_get_for_string() {
         let client = RestClient::new();
-        let result = client.get_for_string("https://httpbin.org/get").await;
+        let result = client
+            .get("https://httpbin.org/get")
+            .await
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await;
         assert!(result.is_ok());
         assert!(!result.unwrap().is_empty());
     }
@@ -581,8 +429,14 @@ mod tests {
 
         let client = RestClient::new();
         let data = serde_json::json!({"message": "Hello"});
-        let result: Result<Echo, _> = client
-            .post_for_object("https://httpbin.org/post", &data)
+        let result = client
+            .post("https://httpbin.org/post")
+            .await
+            .body(data.to_string())
+            .send()
+            .await
+            .unwrap()
+            .json::<Echo>()
             .await;
         assert!(result.is_ok());
         let echo = result.unwrap();
@@ -596,7 +450,7 @@ mod tests {
             .build();
 
         // 使用相对路径
-        let result = client.get_for_string("/get").await;
+        let result = client.get("/get").await.send().await.unwrap().text().await;
         assert!(result.is_ok());
 
         // 验证 base_url
@@ -610,11 +464,25 @@ mod tests {
             .build();
 
         // 相对路径会与 base_url 合并
-        let result1 = client.get_for_string("/users").await;
+        let result1 = client
+            .get("/users")
+            .await
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await;
         assert!(result1.is_ok());
 
         // 完整 URL 不受影响
-        let result2 = client.get_for_string("https://httpbin.org/get").await;
+        let result2 = client
+            .get("https://httpbin.org/get")
+            .await
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await;
         assert!(result2.is_ok());
     }
 }

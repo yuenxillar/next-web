@@ -224,7 +224,8 @@ impl SimpleCookie {
                 Self::NAME_VALUE_DELIMITER,
                 max_age,
                 Self::ATTRIBUTE_DELIMITER
-            ).unwrap();
+            )
+            .unwrap();
 
             let expires = if max_age == 0 {
                 Utc::now() - chrono::Duration::milliseconds(Self::DAY_MILLIS)
@@ -238,7 +239,8 @@ impl SimpleCookie {
                 Self::EXPIRES_ATTRIBUTE_NAME,
                 Self::NAME_VALUE_DELIMITER,
                 expires.format(Self::COOKIE_DATE_FORMAT).to_string()
-            ).unwrap();
+            )
+            .unwrap();
         }
     }
 
@@ -286,7 +288,7 @@ impl SimpleCookie {
             .map(|s| s.trim())
             .map(|s| {
                 if s.is_empty() {
-                    req.context_path().trim()
+                    req.context_path().unwrap_or(s)
                 } else {
                     s
                 }

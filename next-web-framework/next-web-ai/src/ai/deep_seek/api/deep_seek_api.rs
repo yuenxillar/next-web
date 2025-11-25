@@ -1,6 +1,6 @@
 use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
-use next_web_core::error::BoxError;
+use next_web_core::{client::rest_client::RestClient, error::BoxError};
 
 use crate::ai::deep_seek::chat_model::ChatModel;
 
@@ -10,31 +10,35 @@ const DONE: [u8; 12] = [100, 97, 116, 97, 58, 32, 91, 68, 79, 78, 69, 93];
 
 #[derive(Clone)]
 pub struct DeepSeekApi {
-    pub(crate) base_url: Box<str>,
     pub(crate) api_key: Box<str>,
 
     pub(crate) chat_model: ChatModel,
 
-    pub(crate) client: reqwest::Client,
+    pub(crate) client: RestClient,
 }
 
 impl DeepSeekApi {
     pub fn new(api_key: impl Into<Box<str>>, chat_model: ChatModel) -> Self {
-        let client = reqwest::Client::builder().build().unwrap();
+        let client = RestClient::builder()
+            .base_url("https://api.deepseek.com/chat/completions")
+            .default_headers([("Content-Type", "application/json")])
+            .build();
         let api_key = api_key.into();
         Self {
-            base_url: "https://api.deepseek.com/chat/completions".into(),
             api_key,
             chat_model,
             client,
         }
     }
 
-    pub async fn chat_completion_entity(&self, req: &ChatCompletionRequest) -> Result<ChatApiRespnose, BoxError> {
+    pub async fn chat_completion_entity(
+        &self,
+        req: &ChatCompletionRequest,
+    ) -> Result<ChatApiRespnose, BoxError> {
         let resp = self
             .client
-            .post(self.base_url.as_ref())
-            .header("Content-Type", "application/json")
+            .post("")
+            .await
             .bearer_auth(self.api_key.as_ref())
             .body(serde_json::to_string(req)?)
             .send()

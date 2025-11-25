@@ -59,7 +59,15 @@ impl AnyValue {
     /// Get string value
     pub fn as_string(&self) -> Option<String> {
         if let AnyValue::String(s) = self {
-            Some(s.to_owned())
+            Some(s.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        if let AnyValue::String(s) = self {
+            Some(s.as_str())
         } else {
             None
         }
