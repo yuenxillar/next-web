@@ -1,19 +1,21 @@
-use thiserror::Error;
-
-use super::read::meta_data::ReadMetaData;
-
 pub const XLS_HEADER: [u8; 8] = [208, 207, 17, 224, 161, 177, 26, 225];
 pub const XLSX_HEADER: [u8; 4] = [80, 75, 3, 4];
+pub const CSV_HEADER: [u8; 4] = [229, 167, 147, 229];
+
+pub const XLS_EXTENSION: &str = "xls";
+pub const XLSX_EXTENSION: &str = "xlsx";
+pub const CSV_EXTENSION: &str = "csv";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExcelType {
-    /// XLS  
-    /// header bytes: -48, -49, 17, -32, -95, -79, 26, -31
+    /// XLS
     Xls,
 
     /// XLSX
-    /// header bytes: 80, 75, 3, 4
     Xlsx,
+
+    /// CSV
+    Csv,
 }
 
 impl ExcelType {
@@ -31,7 +33,7 @@ impl ExcelType {
     //     }
     // }
 
-    pub fn from_meta_data(meta_data: &ReadMetaData) -> Result<Self, ExcelTypeError>  {
+    pub fn from_meta_data(meta_data: &ReadMetaData) -> Result<Self, ExcelTypeError> {
         match meta_data.extension.as_str() {
             "xlsx" => {
                 if meta_data.header == XLSX_HEADER.to_vec() {

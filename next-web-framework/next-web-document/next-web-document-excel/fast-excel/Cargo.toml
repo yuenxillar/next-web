@@ -1,0 +1,20 @@
+[package]
+name = "fast-excel"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+next-web-core = { workspace = true }
+
+tokio     = { workspace = true }
+thiserror = { workspace = true }
+
+
+# rust_xlsxwriter = { workspace = true }
+# umya-spreadsheet = { workspace = true }
+# calamine = { workspace = true }
+
+
+[features]
+default = ["async"]
+async   = []
