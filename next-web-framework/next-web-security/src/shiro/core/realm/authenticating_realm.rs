@@ -1,6 +1,10 @@
-use std::{any::Any, sync::{
-    atomic::{AtomicUsize, Ordering}, Arc
-}};
+use std::{
+    any::Any,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 
 use dashmap::DashMap;
 use next_web_core::{async_trait, traits::required::Required};
@@ -12,11 +16,16 @@ use crate::core::{
         authentication_token::AuthenticationToken,
         credential::credentials_matcher::CredentialsMatcher, logout_aware::LogoutAware,
     },
-    cache::{cache_manager::CacheManager, cache_manager_aware::CacheManagerAware, default_cache_manager::DefaultCacheManager},
-    util::object::Object,
-    realm::{caching_realm::{CachingRealm, CachingRealmSupport}, Realm},
+    cache::{
+        cache_manager::CacheManager, cache_manager_aware::CacheManagerAware,
+        default_cache_manager::DefaultCacheManager,
+    },
+    realm::{
+        caching_realm::{CachingRealm, CachingRealmSupport},
+        Realm,
+    },
     subject::principal_collection::PrincipalCollection,
-    util::nameable::Nameable,
+    util::object::Object,
 };
 
 type AuthenticationCache = DashMap<String, Box<dyn AuthenticationInfo>>;
@@ -137,7 +146,7 @@ impl AuthenticatingRealm {
                 format!("{}{}", name, Self::DEFAULT_AUTHENTICATION_CACHE_SUFFIX);
         }
     }
-   
+
     pub(crate) fn get_cached_authentication_info(
         &self,
         token: &dyn AuthenticationToken,
@@ -178,7 +187,8 @@ impl AuthenticatingRealm {
 
         trace!(
             "Cached AuthenticationInfo for continued authentication.  key=[{}], value=[{}].",
-            key, info
+            key,
+            info
         );
 
         if let Some(cache) = cache {
@@ -274,8 +284,8 @@ impl AuthenticatingRealm {
             }
         } else {
             return Err(AuthenticationError::Custom(
-                "A CredentialsMatcher must be configured in order to verify 
-                    credentials during authentication.  If you do not wish for credentials to be examined, you 
+                "A CredentialsMatcher must be configured in order to verify
+                    credentials during authentication.  If you do not wish for credentials to be examined, you
                     can configure an AllowAllCredentialsMatcher instance.".to_string() )
             );
         };
@@ -283,10 +293,13 @@ impl AuthenticatingRealm {
         Ok(())
     }
 
-    pub async fn init(&self, authenticating_realm_support:  Option<&mut dyn AuthenticatingRealmSupport>) {
+    pub async fn init(
+        &self,
+        authenticating_realm_support: Option<&mut dyn AuthenticatingRealmSupport>,
+    ) {
         self.get_available_authentication_cache();
 
-        if let Some(authenticating_realm_support) =  authenticating_realm_support {
+        if let Some(authenticating_realm_support) = authenticating_realm_support {
             authenticating_realm_support.on_init().await;
         }
     }
@@ -298,7 +311,7 @@ impl AuthenticatingRealm {
                 Some(cache) => {
                     cache.remove("");
                 }
-                None => return, 
+                None => return,
             }
         }
     }
@@ -307,7 +320,6 @@ impl AuthenticatingRealm {
     //     todo!()
     // }
 }
-
 
 impl Default for AuthenticatingRealm {
     fn default() -> Self {
@@ -338,7 +350,9 @@ impl Realm for AuthenticatingRealm {
             );
         } else {
             if let Some(authenticating_realm_support) = self.authenticating_realm_support {
-                info = authenticating_realm_support.do_get_authentication_info(token).await;
+                info = authenticating_realm_support
+                    .do_get_authentication_info(token)
+                    .await;
             }
             if let Some(info) = info.as_ref() {
                 debug!(
@@ -382,7 +396,7 @@ impl LogoutAware for AuthenticatingRealm {
     }
 }
 
-impl CachingRealmSupport for AuthenticatingRealm{
+impl CachingRealmSupport for AuthenticatingRealm {
     fn after_cache_manager_set(&mut self) {
         self.get_available_authentication_cache();
     }
@@ -394,9 +408,7 @@ impl CachingRealmSupport for AuthenticatingRealm{
 
 #[async_trait]
 pub trait AuthenticatingRealmSupport: Send + Sync {
-    async fn on_init(&self) {
-
-    }
+    async fn on_init(&self) {}
 
     async fn do_get_authentication_info(
         &self,

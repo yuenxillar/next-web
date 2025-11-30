@@ -167,10 +167,6 @@ impl HttpRequest for Request {
     }
 
     fn clean_up(&mut self) {
-        self.extensions_mut()
-            .get_mut::<OneMap>()
-            .map(|map| map.clear());
-
         self.extensions_mut().remove::<OneMap>();
     }
 

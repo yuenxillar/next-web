@@ -15,6 +15,7 @@ use crate::{
     web::filter::{
         access_control_filter::AccessControlFilterExt, advice_filter::AdviceFilterExt,
         authz::port_filter::PortFilter, once_per_request_filter::OncePerRequestFilter,
+        path_matching_filter::PathMatchingFilter,
     },
 };
 
@@ -79,8 +80,6 @@ impl Required<OncePerRequestFilter> for SslFilter {
         &self
             .port_filter
             .access_control_filter
-            .path_matching_filter
-            .advice_filter
             .once_per_request_filter
     }
 
@@ -88,9 +87,17 @@ impl Required<OncePerRequestFilter> for SslFilter {
         &mut self
             .port_filter
             .access_control_filter
-            .path_matching_filter
-            .advice_filter
             .once_per_request_filter
+    }
+}
+
+impl Required<PathMatchingFilter> for SslFilter {
+    fn get_object(&self) -> &PathMatchingFilter {
+        &self.port_filter.access_control_filter.path_matching_filter
+    }
+
+    fn get_mut_object(&mut self) -> &mut PathMatchingFilter {
+        &mut self.port_filter.access_control_filter.path_matching_filter
     }
 }
 

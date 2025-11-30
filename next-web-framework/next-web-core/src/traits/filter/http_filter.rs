@@ -8,7 +8,7 @@ use crate::{
     traits::{
         filter::http_filter_chain::HttpFilterChain,
         http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+        nameable::Nameable,
     },
 };
 
@@ -17,7 +17,7 @@ pub trait HttpFilter
 where
     Self: Send + Sync,
     Self: Any + DynClone,
-    Self: Named
+    Self: Nameable,
 {
     async fn do_filter(
         &self,
@@ -30,9 +30,6 @@ where
     fn supports(&self, name: &str) -> bool {
         false
     }
-
-    #[allow(unused_variables)]
-    fn process_path_config(&mut self, path: &str, config: &str) {}
 }
 
 clone_trait_object!(HttpFilter);

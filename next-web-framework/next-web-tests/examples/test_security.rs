@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::{fs::File, io::Read, sync::Arc};
 
 use axum::{
     body::Body,
     extract::{Path, Request, State},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
 use next_web_core::async_trait;
@@ -29,17 +29,31 @@ impl Application for TestApplication {
 
     // get the application router. (open api  and private api)
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
-        axum::Router::new().nest(
-            "/auth",
-            axum::Router::new()
-                .route("/hello", get(async || "Hello!"))
-                .route("/setToken/{token}", post(set_token))
-                .route("/get", post(async || "Authorized"))
-                .route_layer(axum::middleware::from_fn_with_state(
-                    Arc::new(FilterProxy::default()),
-                    security_middleware,
-                )),
-        )
+        axum::Router::new()
+            .route(
+                "/login.jsp",
+                get(|| async {
+                    let mut fs = File::open(format!(
+                        "{}/resources/login.html",
+                        std::env::var("CARGO_MANIFEST_DIR").unwrap()
+                    ))
+                    .unwrap();
+                    let mut buf = Vec::new();
+                    fs.read_to_end(&mut buf).unwrap();
+                    Html(buf)
+                }),
+            )
+            .nest(
+                "/auth",
+                axum::Router::new()
+                    .route("/hello", get(async || "Hello!"))
+                    .route("/setToken/{token}", post(set_token))
+                    .route("/get", post(async || "Authorized"))
+                    .route_layer(axum::middleware::from_fn_with_state(
+                        Arc::new(FilterProxy::default()),
+                        security_middleware,
+                    )),
+            )
     }
 
     async fn on_ready(&self, ctx: &mut ApplicationContext) {

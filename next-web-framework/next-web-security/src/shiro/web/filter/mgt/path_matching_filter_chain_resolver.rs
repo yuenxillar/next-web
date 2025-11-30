@@ -43,7 +43,6 @@ impl PathMatchingFilterChainResolver {
 
         let request_uri = request.path();
 
-        println!("{}", request_uri);
         let request_uri_no_trailing_slash = self.remove_trailing_slash(request_uri);
 
         // the 'chain names' in this implementation are actually path patterns defined by the user.  We just use them

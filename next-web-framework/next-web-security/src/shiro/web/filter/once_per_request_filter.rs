@@ -5,13 +5,16 @@ use next_web_core::{
     traits::{
         filter::{http_filter::HttpFilter, http_filter_chain::HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
+        nameable::Nameable,
         named::Named,
         required::Required,
     },
 };
 use tracing::{debug, trace};
 
-use crate::web::filter::advice_filter::AdviceFilterExt;
+use crate::web::filter::{
+    advice_filter::AdviceFilterExt, path_matching_filter::PathMatchingFilterExt,
+};
 
 #[derive(Clone)]
 pub struct OncePerRequestFilter {
@@ -79,9 +82,16 @@ pub trait OncePerRequestFilterExt: Send + Sync {
 #[derive(Clone)]
 pub struct HttpFilterWrapper<T>(pub T);
 
-impl<T: Named> Named for HttpFilterWrapper<T> {
+impl<T> Nameable for HttpFilterWrapper<T>
+where
+    T: Named + Required<OncePerRequestFilter>,
+{
     fn name(&self) -> &str {
         self.0.name()
+    }
+
+    fn set_name(&mut self, name: &str) {
+        self.0.get_mut_object().set_name(name)
     }
 }
 
@@ -91,6 +101,7 @@ where
     T: Clone + 'static,
     T: Required<OncePerRequestFilter> + Named,
     T: AdviceFilterExt,
+    T: PathMatchingFilterExt,
 {
     async fn do_filter(
         &self,
@@ -100,6 +111,11 @@ where
     ) -> Result<(), BoxError> {
         let _self = self.0.get_object();
         let already_filtered_attribute_name = _self.get_already_filtered_attribute_name();
+        println!(
+            "already_filtered_attribute_name: {}",
+            already_filtered_attribute_name
+        );
+
         if request
             .get_attribute(&already_filtered_attribute_name)
             .is_some()
@@ -138,7 +154,7 @@ where
 #[async_trait]
 impl<T> OncePerRequestFilterExt for T
 where
-    T: AdviceFilterExt,
+    T: AdviceFilterExt + PathMatchingFilterExt,
 {
     async fn do_filter_internal(
         &self,
@@ -146,12 +162,15 @@ where
         response: &mut dyn HttpResponse,
         chain: &dyn HttpFilterChain,
     ) -> Result<(), BoxError> {
-        let continue_chain = self.pre_handle(request, response, None).await;
+        let continue_chain = self.pre_handle(request, response, Some(self)).await;
+
+        if !continue_chain {
+            return Err("Advice filter pre-handle returned false.".into());
+        }
+        
         let mut error = None;
-        if continue_chain {
-            if let Err(err) = chain.do_filter(request, response).await {
-                error = Some(err);
-            }
+        if let Err(err) = chain.do_filter(request, response).await {
+            error = Some(err);
         }
 
         if let Err(err) = self.post_handle(request, response).await {

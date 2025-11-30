@@ -1,19 +1,17 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU32, Ordering},
-};
+use std::sync::atomic::{AtomicU32, Ordering};
 
-use tracing::{debug, trace};
+use next_web_core::async_trait;
+use tracing::trace;
 
 use crate::core::{
-    authc::{
-        authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
-        logout_aware::LogoutAware,
+    authc::{authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken},
+    cache::{
+        cache_manager::CacheManager, cache_manager_aware::CacheManagerAware,
+        default_cache_manager::DefaultCacheManager,
     },
-    cache::{cache_manager::CacheManager, cache_manager_aware::CacheManagerAware, default_cache_manager::DefaultCacheManager},
-    util::object::Object,
+    realm::Realm,
     subject::principal_collection::PrincipalCollection,
-    util::nameable::Nameable,
+    util::object::Object,
 };
 
 #[derive(Clone)]
@@ -30,6 +28,10 @@ impl<T> CachingRealm<T> {
         self.caching_enabled = enabled;
     }
 
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+
     pub fn is_caching_enabled(&self) -> bool {
         self.caching_enabled
     }
@@ -39,15 +41,11 @@ impl<T> CachingRealm<T> {
     }
 
     pub fn get_cache_manager(&self) -> Option<&T> {
-         self.cache_manager.as_ref()
-    }
-
-    pub fn get_name(&self) -> &str {
-        &self.name
+        self.cache_manager.as_ref()
     }
 
     // 返回值 用于决定实现者的逻辑执行
-    pub fn clear_cache(&self, principals: &dyn PrincipalCollection) -> bool{
+    pub fn clear_cache(&self, principals: &dyn PrincipalCollection) -> bool {
         if !principals.is_empty() {
             trace!(
                 "Cleared cache entries for account with principals [{}]",
@@ -68,6 +66,37 @@ impl<T> CachingRealm<T> {
     }
 }
 
+#[async_trait]
+impl<T> Realm for CachingRealm<T>
+where
+    T: Send + Sync,
+{
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn supports(&self, authentication_token: &dyn AuthenticationToken) -> bool {
+        todo!()
+    }
+
+    async fn get_authentication_info(
+        &self,
+        token: &dyn AuthenticationToken,
+    ) -> Option<Box<dyn AuthenticationInfo>> {
+        todo!()
+    }
+}
+
+impl<T> CacheManagerAware<T> for CachingRealm<T>
+where
+    T: CacheManager,
+{
+    fn set_cache_manager(&mut self, cache_manager: T) {
+        self.cache_manager = Some(cache_manager);
+        // self.after_cache_manager_set();
+    }
+}
+
 impl Default for CachingRealm {
     fn default() -> Self {
         Self {
@@ -82,25 +111,7 @@ impl Default for CachingRealm {
     }
 }
 
-impl Nameable for CachingRealm {
-    fn set_name(&mut self, name: &str) {
-        self.name = name.to_string();
-    }
-}
-
-impl<T> CacheManagerAware<T> for CachingRealm<T> 
-where 
-T: CacheManager
-{
-    fn set_cache_manager(&mut self, cache_manager: T) {
-        self.cache_manager = Some(cache_manager);
-        // self.after_cache_manager_set();
-    }
-}
-
-
-pub trait CachingRealmSupport: Send + Sync
-{
+pub trait CachingRealmSupport: Send + Sync {
     fn after_cache_manager_set(&mut self);
     fn do_clear_cache(&self, principals: &dyn PrincipalCollection);
 }

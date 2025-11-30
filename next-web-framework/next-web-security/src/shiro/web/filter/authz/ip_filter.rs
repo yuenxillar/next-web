@@ -22,6 +22,7 @@ use crate::{
             ip_address_matcher::IpAddressMatcher, ip_source::IpSource,
         },
         once_per_request_filter::OncePerRequestFilter,
+        path_matching_filter::PathMatchingFilter,
     },
 };
 
@@ -127,8 +128,17 @@ impl Required<OncePerRequestFilter> for IpFilter {
         &mut self
             .access_control_filter
             .path_matching_filter
-            .advice_filter
             .once_per_request_filter
+    }
+}
+
+impl Required<PathMatchingFilter> for IpFilter {
+    fn get_object(&self) -> &PathMatchingFilter {
+        &self.access_control_filter.path_matching_filter
+    }
+
+    fn get_mut_object(&mut self) -> &mut PathMatchingFilter {
+        &mut self.access_control_filter.path_matching_filter
     }
 }
 

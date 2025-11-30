@@ -36,8 +36,6 @@ impl HttpFilterChain for ProxiedFilterChain {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
     ) -> Result<(), BoxError> {
-        println!("index: {}", self.index.load(Ordering::Relaxed));
-
         if self.filters.len() == self.index.load(Ordering::Relaxed) {
             self.orig.do_filter(request, response).await
         } else {

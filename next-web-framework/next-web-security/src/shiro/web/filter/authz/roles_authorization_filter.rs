@@ -14,7 +14,7 @@ use crate::{
     web::filter::{
         access_control_filter::AccessControlFilterExt, advice_filter::AdviceFilterExt,
         authz::authorization_filter::AuthorizationFilter,
-        once_per_request_filter::OncePerRequestFilter,
+        once_per_request_filter::OncePerRequestFilter, path_matching_filter::PathMatchingFilter,
     },
 };
 
@@ -66,8 +66,23 @@ impl Required<OncePerRequestFilter> for RolesAuthorizationFilter {
         &mut self
             .authorization_filter
             .access_control_filter
-            .path_matching_filter
             .once_per_request_filter
+    }
+}
+
+impl Required<PathMatchingFilter> for RolesAuthorizationFilter {
+    fn get_object(&self) -> &PathMatchingFilter {
+        &self
+            .authorization_filter
+            .access_control_filter
+            .path_matching_filter
+    }
+
+    fn get_mut_object(&mut self) -> &mut PathMatchingFilter {
+        &mut self
+            .authorization_filter
+            .access_control_filter
+            .path_matching_filter
     }
 }
 

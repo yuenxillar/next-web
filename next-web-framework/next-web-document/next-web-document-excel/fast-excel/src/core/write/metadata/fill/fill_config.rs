@@ -1,4 +1,4 @@
-use crate::core::enums::write_direction::WriteDirection,
+use crate::core::enums::write_direction::WriteDirection;
 
 #[derive(Default)]
 pub struct FillConfig {

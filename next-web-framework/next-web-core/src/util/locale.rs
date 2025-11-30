@@ -499,3 +499,9 @@ impl Locale {
         ]
     }
 }
+
+impl Default for Locale {
+    fn default() -> Self {
+        Locale::EnUs
+    }
+}

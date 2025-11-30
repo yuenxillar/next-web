@@ -16,6 +16,7 @@ use crate::{
         access_control_filter::{AccessControlFilter, AccessControlFilterExt},
         advice_filter::AdviceFilterExt,
         once_per_request_filter::OncePerRequestFilter,
+        path_matching_filter::PathMatchingFilter,
     },
 };
 
@@ -196,19 +197,21 @@ impl AdviceFilterExt for InvalidRequestFilter {}
 
 impl Required<OncePerRequestFilter> for InvalidRequestFilter {
     fn get_object(&self) -> &OncePerRequestFilter {
-        &self
-            .access_control_filter
-            .path_matching_filter
-            .advice_filter
-            .once_per_request_filter
+        &self.access_control_filter.once_per_request_filter
     }
 
     fn get_mut_object(&mut self) -> &mut OncePerRequestFilter {
-        &mut self
-            .access_control_filter
-            .path_matching_filter
-            .advice_filter
-            .once_per_request_filter
+        &mut self.access_control_filter.advice_filter
+    }
+}
+
+impl Required<PathMatchingFilter> for InvalidRequestFilter {
+    fn get_object(&self) -> &PathMatchingFilter {
+        &self.access_control_filter.path_matching_filter
+    }
+
+    fn get_mut_object(&mut self) -> &mut PathMatchingFilter {
+        &mut self.access_control_filter.path_matching_filter
     }
 }
 

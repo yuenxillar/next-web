@@ -48,17 +48,21 @@ impl AdviceFilterExt for NoSessionCreationFilter {}
 
 impl Required<OncePerRequestFilter> for NoSessionCreationFilter {
     fn get_object(&self) -> &OncePerRequestFilter {
-        &self
-            .path_matching_filter
-            .advice_filter
-            .once_per_request_filter
+        &self.path_matching_filter.once_per_request_filter
     }
 
     fn get_mut_object(&mut self) -> &mut OncePerRequestFilter {
-        &mut self
-            .path_matching_filter
-            .advice_filter
-            .once_per_request_filter
+        &mut self.path_matching_filter.once_per_request_filter
+    }
+}
+
+impl Required<PathMatchingFilter> for NoSessionCreationFilter {
+    fn get_object(&self) -> &PathMatchingFilter {
+        &self.path_matching_filter
+    }
+
+    fn get_mut_object(&mut self) -> &mut PathMatchingFilter {
+        &mut self.path_matching_filter
     }
 }
 

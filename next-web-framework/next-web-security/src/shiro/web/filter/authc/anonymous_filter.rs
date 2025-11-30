@@ -34,6 +34,16 @@ impl Required<OncePerRequestFilter> for AnonymousFilter {
     }
 }
 
+impl Required<PathMatchingFilter> for AnonymousFilter {
+    fn get_object(&self) -> &PathMatchingFilter {
+        &self.path_matching_filter
+    }
+
+    fn get_mut_object(&mut self) -> &mut PathMatchingFilter {
+        &mut self.path_matching_filter
+    }
+}
+
 impl Named for AnonymousFilter {
     fn name(&self) -> &str {
         "AnonymousFilter"

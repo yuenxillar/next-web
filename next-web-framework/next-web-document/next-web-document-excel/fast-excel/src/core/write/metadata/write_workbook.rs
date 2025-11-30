@@ -39,8 +39,8 @@ impl WriteWorkbook {
         self.file.as_ref()
     }
 
-    pub fn set_file(&mut self, file: Option<File>) {
-        self.file = file;
+    pub fn set_file(&mut self, file: File) {
+        self.file = Some(file);
     }
 
     pub fn get_with_bom(&self) -> Option<bool> {
@@ -123,6 +123,7 @@ impl Default for WriteWorkbook {
         Self {
             excel_type: None,
             file: None,
+            template_file: None,
             with_bom: None,
             password: None,
             in_memory: None,

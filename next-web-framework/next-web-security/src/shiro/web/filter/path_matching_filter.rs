@@ -37,6 +37,8 @@ impl<T> PathMatchingFilter<T> {
                 .collect::<Vec<String>>();
             self.applied_paths
                 .insert(path.to_string(), Object::ListStr(values));
+        } else {
+            self.applied_paths.insert(path.to_string(), Object::Null);
         }
     }
 }

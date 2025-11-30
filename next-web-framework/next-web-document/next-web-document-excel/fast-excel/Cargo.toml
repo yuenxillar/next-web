@@ -8,6 +8,7 @@ next-web-core = { workspace = true }
 
 tokio     = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 
 # rust_xlsxwriter = { workspace = true }

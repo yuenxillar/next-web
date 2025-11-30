@@ -17,12 +17,14 @@ use tracing::debug;
 use crate::{
     core::authc::authentication_token::AuthenticationToken,
     web::filter::{
+        access_control_filter::AccessControlFilterExt,
         advice_filter::AdviceFilterExt,
         authc::{
             authenticating_filter::AuthenticatingFilterExt,
             http_authentication_filter::{HttpAuthenticationFilter, HttpAuthenticationFilterExt},
         },
         once_per_request_filter::OncePerRequestFilter,
+        path_matching_filter::PathMatchingFilter,
     },
 };
 
@@ -35,6 +37,9 @@ impl BasicHttpAuthenticationFilter {}
 
 #[async_trait]
 impl AdviceFilterExt for BasicHttpAuthenticationFilter {}
+
+#[async_trait]
+impl AccessControlFilterExt for BasicHttpAuthenticationFilter {}
 
 #[async_trait]
 impl AuthenticatingFilterExt for BasicHttpAuthenticationFilter {
@@ -95,22 +100,26 @@ impl HttpAuthenticationFilterExt for BasicHttpAuthenticationFilter {
 impl Required<OncePerRequestFilter> for BasicHttpAuthenticationFilter {
     fn get_object(&self) -> &OncePerRequestFilter {
         &self
-            .http_authentication_filter
             .authenticating_filter
-            .access_control_filter
             .path_matching_filter
-            .advice_filter
             .once_per_request_filter
     }
 
     fn get_mut_object(&mut self) -> &mut OncePerRequestFilter {
         &mut self
-            .http_authentication_filter
             .authenticating_filter
-            .access_control_filter
             .path_matching_filter
-            .advice_filter
             .once_per_request_filter
+    }
+}
+
+impl Required<PathMatchingFilter> for BasicHttpAuthenticationFilter {
+    fn get_object(&self) -> &PathMatchingFilter {
+        &self.authenticating_filter.path_matching_filter
+    }
+
+    fn get_mut_object(&mut self) -> &mut PathMatchingFilter {
+        &mut self.authenticating_filter.path_matching_filter
     }
 }
 

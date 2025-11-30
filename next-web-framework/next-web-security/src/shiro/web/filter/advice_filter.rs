@@ -6,7 +6,9 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
-use crate::web::filter::{once_per_request_filter::OncePerRequestFilter, path_matching_filter::PathMatchingFilterExt};
+use crate::web::filter::{
+    once_per_request_filter::OncePerRequestFilter, path_matching_filter::PathMatchingFilterExt,
+};
 
 #[derive(Clone)]
 pub struct AdviceFilter {
@@ -61,6 +63,14 @@ pub trait AdviceFilterExt: Send + Sync {
         response: &mut dyn HttpResponse,
         error: Option<BoxError>,
     ) -> Result<(), BoxError> {
-        Ok(())
+
+       match error {
+           Some(e) => {
+               Err(e)
+           },
+           None => {
+               Ok(())
+           }
+       }
     }
 }

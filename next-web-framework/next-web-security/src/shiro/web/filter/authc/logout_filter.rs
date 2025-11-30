@@ -15,6 +15,7 @@ use tracing::error;
 use crate::{
     core::util::web::WebUtils,
     web::filter::{
+        access_control_filter::AccessControlFilterExt,
         advice_filter::{AdviceFilter, AdviceFilterExt},
         once_per_request_filter::OncePerRequestFilter,
         path_matching_filter::PathMatchingFilterExt,
@@ -98,6 +99,9 @@ impl AdviceFilterExt for LogoutFilter {
         false
     }
 }
+
+#[async_trait]
+impl AccessControlFilterExt for LogoutFilter {}
 
 impl Required<OncePerRequestFilter> for LogoutFilter {
     fn get_object(&self) -> &OncePerRequestFilter {

@@ -35,12 +35,22 @@ impl DefaultFilterChainManager {
     pub fn add_filter(
         &mut self,
         name: impl ToString,
-        filter: Box<dyn HttpFilter>,
+        mut filter: Box<dyn HttpFilter>,
         overwrite: bool,
     ) {
         let name = name.to_string();
         if !self.filters.contains_key(&name) || overwrite {
+            filter.set_name(&name);
             self.filters.insert(name, filter);
+        }
+    }
+
+    pub(crate) fn add_necessary_filters(&mut self) {
+        for filter in DefaultFilter::values() {
+            if !self.filters.contains_key(filter.name()) {
+                self.filters
+                    .insert(filter.name().to_string(), filter.new_instance());
+            }
         }
     }
 
@@ -147,6 +157,10 @@ impl FilterChainManager for DefaultFilterChainManager {
             chain_name, self.global_filter_names
         );
 
+        println!(
+            "chain_name: {}, chain_definition: {}",
+            chain_name, chain_definition
+        );
         // first add each of global filters
         if !self.global_filter_names.is_empty() {
             for filter_name in self.global_filter_names.clone() {
@@ -174,6 +188,7 @@ impl FilterChainManager for DefaultFilterChainManager {
             //now we have the filter name, path and (possibly null) path-specific config.  Let's apply them:
             let pair1 = name_config_pair.remove(0);
             let pair2 = name_config_pair.remove(0);
+
             self.add_to_chain(&chain_name, pair1, Some(&pair2));
         }
     }
@@ -201,20 +216,32 @@ impl FilterChainManager for DefaultFilterChainManager {
             !chain_name.is_empty(),
             "chain_name cannot be null or empty."
         );
-        match self._get_box_filter(&filter_name) {
-            None => panic!("There is no filter with name [{filter_name}] to apply to chain [{chain_name}] in the pool of available Filters.  Ensure a
-            filter with that name/path has first been registered with the addFilter method(s)."),
-            Some(mut filter) => {
+        // match self._get_box_filter(&filter_name) {
+        //     None => panic!("There is no filter with name [{filter_name}] to apply to chain [{chain_name}] in the pool of available Filters.  Ensure a
+        //     filter with that name/path has first been registered with the addFilter method(s)."),
+        //     Some(mut filter) => {
+        //         println!("Found filter: {}", filter.name());
+        //         let chain = self.ensure_chain(chain_name);
+        //         chain.get_mut_object().push(filter);
+        //     }
+        // }
+        //
 
-                println!("found filter: {}", filter.name());
-                if let Some(config) = chain_specific_filter_config {
-                    filter.process_path_config(chain_name, config);
-                }
+        // println!("Found filter: {}", filter.name());
+        let mut filter = DefaultFilter::new_instance_and_process_path_config(
+            &filter_name,
+            chain_name,
+            chain_specific_filter_config,
+        )
+        .expect(&format!("There is no filter with name [{}] to apply to chain [{}] in the pool of available Filters.  Ensure a
+        filter with that name/path has first been registered with the addFilter method(s).", filter_name, chain_name));
 
-                let chain = self.ensure_chain(chain_name);
-                chain.get_mut_object().push(filter);
-            }
-
+        let name = filter_name.to_string();
+        if !self.filters.contains_key(&name) {
+            filter.set_name(&name);
+            self.filters.insert(name, filter.clone());
+            let chain = self.ensure_chain(chain_name);
+            chain.get_mut_object().push(filter);
         }
     }
 
@@ -247,33 +274,13 @@ impl FilterChainManager for DefaultFilterChainManager {
 
 impl Default for DefaultFilterChainManager {
     fn default() -> Self {
-        let mut manager = Self {
+        let manager = Self {
             filters: IndexMap::new(),
             filter_chains: IndexMap::new(),
             global_filter_names: Vec::new(),
         };
-        manager.add_default_filters();
+        // manager.add_default_filters();
 
         manager
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::any::Any;
-
-    use next_web_core::traits::filter::http_filter::HttpFilter;
-
-    use crate::web::filter_proxy::FilterProxy;
-
-    #[test]
-    fn down() {
-        let filter = FilterProxy::default();
-
-        let f = Box::new(filter) as Box<dyn HttpFilter>;
-
-        if let Some(proxy) = (&f as &dyn Any).downcast_ref::<FilterProxy>() {
-            println!("url: {:?}", proxy.get_login_url())
-        }
     }
 }

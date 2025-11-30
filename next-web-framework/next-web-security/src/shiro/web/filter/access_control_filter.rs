@@ -1,5 +1,5 @@
 use std::any::Any;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use crate::core::util::object::Object;
 use crate::web::subject::support::web_delegating_subject::WebDelegatingSubject;
@@ -22,7 +22,7 @@ pub struct AccessControlFilter<T = AntPathMatcher> {
 }
 
 impl<T> AccessControlFilter<T> {
-    pub const DEFAULT_LOGIN_URL: &'static str = "/login.html";
+    pub const DEFAULT_LOGIN_URL: &'static str = "/login.jsp";
     pub const GET_METHOD: &'static str = "GET";
     pub const POST_METHOD: &'static str = "POST";
 
@@ -53,7 +53,6 @@ impl<T> AccessControlFilter<T> {
                     if let Some(_subject) = (obj as &dyn Any).downcast_ref::<WebDelegatingSubject>()
                     {
                         debug!("Subject found in request attribute");
-                        // self.save_request(request, subject);
                     }
                 }
                 _ => {}
@@ -114,6 +113,13 @@ impl Deref for AccessControlFilter {
 
     fn deref(&self) -> &Self::Target {
         &self.path_matching_filter
+    }
+}
+
+impl DerefMut for AccessControlFilter {
+
+    fn deref_mut (&mut self) -> &mut Self::Target {
+        &mut self.path_matching_filter
     }
 }
 

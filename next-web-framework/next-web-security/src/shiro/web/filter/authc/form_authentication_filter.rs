@@ -25,6 +25,7 @@ use crate::{
         advice_filter::AdviceFilterExt,
         authc::authenticating_filter::{AuthenticatingFilter, AuthenticatingFilterExt},
         once_per_request_filter::OncePerRequestFilter,
+        path_matching_filter::{PathMatchingFilter, PathMatchingFilterExt},
     },
 };
 
@@ -127,15 +128,36 @@ impl FormAuthenticationFilter {
 }
 
 #[async_trait]
-impl AdviceFilterExt for FormAuthenticationFilter {}
+impl AdviceFilterExt for FormAuthenticationFilter {
+    async fn pre_handle(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        ext: Option<&dyn PathMatchingFilterExt>,
+    ) -> bool {
+        self.authenticating_filter
+            .pre_handle(request, response, ext)
+            .await
+    }
+}
 
 impl Required<OncePerRequestFilter> for FormAuthenticationFilter {
     fn get_object(&self) -> &OncePerRequestFilter {
-        todo!()
+        &self.authenticating_filter.once_per_request_filter
     }
 
     fn get_mut_object(&mut self) -> &mut OncePerRequestFilter {
-        todo!()
+        &mut self.authenticating_filter.once_per_request_filter
+    }
+}
+
+impl Required<PathMatchingFilter> for FormAuthenticationFilter {
+    fn get_object(&self) -> &PathMatchingFilter {
+        &self.authenticating_filter.path_matching_filter
+    }
+
+    fn get_mut_object(&mut self) -> &mut PathMatchingFilter {
+        &mut self.authenticating_filter.path_matching_filter
     }
 }
 
@@ -168,8 +190,7 @@ impl AccessControlFilterExt for FormAuthenticationFilter {
             }
         } else {
             trace!(
-                "Attempting to access a path which requires authentication.  
-            Forwarding to the Authentication url [{}]",
+                "Attempting to access a path which requires authentication. Forwarding to the Authentication url [{}]",
                 self.authenticating_filter.get_login_url()
             );
 

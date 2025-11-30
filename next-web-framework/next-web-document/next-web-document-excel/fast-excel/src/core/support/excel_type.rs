@@ -1,3 +1,8 @@
+use std::{io::Read, path::Path};
+
+use crate::core::read::metadata::read_workbook::ReadWorkbook;
+use next_web_core::error::BoxError;
+
 pub const XLS_HEADER: [u8; 8] = [208, 207, 17, 224, 161, 177, 26, 225];
 pub const XLSX_HEADER: [u8; 4] = [80, 75, 3, 4];
 pub const CSV_HEADER: [u8; 4] = [229, 167, 147, 229];
@@ -19,53 +24,60 @@ pub enum ExcelType {
 }
 
 impl ExcelType {
-    // pub fn extension(&self) -> &str {
-    //     match self {
-    //         ExcelType::Xls => "xls",
-    //         ExcelType::Xlsx => "xlsx",
-    //     }
-    // }
+    pub fn from_read_workbook(read_workbook: &ReadWorkbook) -> Result<Self, BoxError> {
+        match read_workbook.get_excel_type() {
+            Some(excel_type) => Ok(excel_type.clone()),
+            None => {
+                let path = match read_workbook.get_path() {
+                    Some(path) => Path::new(path),
+                    None => return Err("File mest be a no none".into()),
+                };
 
-    // pub fn header_bytes(&self) -> Vec<u8> {
-    //     match self {
-    //         ExcelType::Xls => XLS_HEADER.to_vec(),
-    //         ExcelType::Xlsx => XLSX_HEADER.to_vec(),
-    //     }
-    // }
+                if !path.exists() {
+                    return Err(format!("File {:?} not exists.", path.to_str()).into());
+                }
 
-    pub fn from_meta_data(meta_data: &ReadMetaData) -> Result<Self, ExcelTypeError> {
-        match meta_data.extension.as_str() {
-            "xlsx" => {
-                if meta_data.header == XLSX_HEADER.to_vec() {
-                    Ok(ExcelType::Xlsx)
-                } else {
-                    Err(ExcelTypeError::HeaderBytesMismatch)
+                // Use the name to determine the type
+                let file_name = path
+                    .file_name()
+                    .map(|s| s.to_str().unwrap_or_default())
+                    .unwrap_or_default();
+                if file_name.ends_with(XLSX_EXTENSION) {
+                    return Ok(ExcelType::Xlsx);
+                } else if file_name.ends_with(XLS_EXTENSION) {
+                    return Ok(ExcelType::Xls);
+                } else if file_name.ends_with(CSV_EXTENSION) {
+                    return Ok(ExcelType::Csv);
                 }
+
+                let mut file = match std::fs::File::open(path) {
+                    Ok(file) => file,
+                    Err(err) => return Err(format!("Failed to open file: {}", err).into()),
+                };
+
+                let mut buf = [0; 8];
+                file.read_exact(&mut buf)?;
+                return Ok(Self::matches(&buf));
             }
-            "xls" => {
-                if meta_data.header == XLS_HEADER.to_vec() {
-                    Ok(ExcelType::Xls)
-                } else {
-                    Err(ExcelTypeError::HeaderBytesMismatch)
-                }
-            }
-            _ => Err(ExcelTypeError::UnsupportedType),
         }
     }
 
-    pub fn index(extension: &str) -> usize {
-        match extension {
-            "xls" => XLS_HEADER.len(),
-            "xlsx" => XLSX_HEADER.len(),
-            _ => 0,
+    fn matches(data: &[u8]) -> Self {
+        if Self::find_magic(&XLSX_HEADER, data) {
+            Self::Xls
+        } else if Self::find_magic(&XLS_HEADER, data) {
+            Self::Xlsx
+        } else {
+            Self::Csv
         }
     }
-}
 
-#[derive(Debug, Error)]
-pub enum ExcelTypeError {
-    #[error("This file is an unsupported type")]
-    UnsupportedType,
-    #[error("The header bytes of this file do not match")]
-    HeaderBytesMismatch,
+    pub fn find_magic(expected: &[u8], actual: &[u8]) -> bool {
+        for (index, expected_byte) in expected.iter().enumerate() {
+            if &actual[index] != expected_byte && expected_byte != &b'?' {
+                return false;
+            }
+        }
+        true
+    }
 }

@@ -2,13 +2,16 @@ use std::{
     any::Any,
     collections::HashSet,
     sync::{
-        Arc,
         atomic::{AtomicUsize, Ordering},
+        Arc,
     },
 };
 
 use dashmap::DashMap;
-use next_web_core::{async_trait, traits::required::Required};
+use next_web_core::{
+    async_trait,
+    traits::{nameable::Nameable, required::Required},
+};
 use tracing::{debug, trace};
 
 use crate::core::{
@@ -24,24 +27,23 @@ use crate::core::{
         authorization_info::AuthorizationInfo,
         authorizer::Authorizer,
         permission::{
-            Permission, permission_resolver::PermissionResolver,
+            permission_resolver::PermissionResolver,
             permission_resolver_aware::PermissionResolverAware,
             role_permission_resolver::RolePermissionResolver,
             role_permission_resolver_aware::RolePermissionResolverAware,
-            wildcard_permission_resolver::WildcardPermissionResolver,
+            wildcard_permission_resolver::WildcardPermissionResolver, Permission,
         },
     },
     cache::{
         cache_manager::CacheManager, cache_manager_aware::CacheManagerAware,
         default_cache_manager::DefaultCacheManager,
     },
-    util::object::Object,
     realm::{
         authenticating_realm::{AuthenticatingRealm, AuthenticatingRealmSupport},
         caching_realm::CachingRealmSupport,
     },
     subject::principal_collection::PrincipalCollection,
-    util::nameable::Nameable,
+    util::object::Object,
 };
 
 type AuthorizationCache = DashMap<String, Box<dyn AuthorizationInfo>>;
@@ -144,6 +146,17 @@ impl AuthorizingRealm {
         self.permission_role_resolver = Some(Arc::new(resolver));
     }
 
+    pub fn set_name(&mut self, name: &str) {
+        self.authenticating_realm.set_name(name);
+        if self
+            .authorization_cache_name
+            .starts_with(std::any::type_name::<Self>())
+        {
+            self.authorization_cache_name =
+                format!("{}{}", name, Self::DEFAULT_AUTHORIZATION_CACHE_SUFFIX);
+        }
+    }
+
     fn clear_cached_authorization_info(&self, principals: &dyn PrincipalCollection) {
         let cache = self.get_available_authorization_cache();
 
@@ -241,9 +254,7 @@ impl AuthorizingRealm {
 
         if let Some(cache) = self.get_available_authorization_cache() {
             trace!("Attempting to retrieve the AuthorizationInfo from cache.");
-            info = cache
-                .get(principals.id())
-                .map(|val| val.value().clone());
+            info = cache.get(principals.id()).map(|val| val.value().clone());
 
             if info.is_none() {
                 trace!(
@@ -684,19 +695,6 @@ impl RolePermissionResolverAware for AuthorizingRealm {
         permission_role_resolver: impl RolePermissionResolver + 'static,
     ) {
         self.permission_role_resolver = Some(Arc::new(permission_role_resolver));
-    }
-}
-
-impl Nameable for AuthorizingRealm {
-    fn set_name(&mut self, name: &str) {
-        self.authenticating_realm.set_name(name);
-        if self
-            .authorization_cache_name
-            .starts_with(std::any::type_name::<Self>())
-        {
-            self.authorization_cache_name =
-                format!("{}{}", name, Self::DEFAULT_AUTHORIZATION_CACHE_SUFFIX);
-        }
     }
 }
 

@@ -88,6 +88,7 @@ impl HttpResponse for Response {
 
     fn set_redirect(&mut self, url: &str) {
         if let Ok(url) = header::HeaderValue::from_str(url) {
+            println!("set redirect");
             *self.status_mut() = StatusCode::SEE_OTHER;
             self.headers_mut().insert(header::LOCATION, url);
         }
