@@ -1,7 +1,7 @@
 use crate::core::context::analysis_context::AnalysisContext;
 
-pub trait XlsReadContext
+pub trait XlsReadContext<T>
 where
-    Self: AnalysisContext,
+    Self: AnalysisContext<T>,
 {
 }

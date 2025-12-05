@@ -11,6 +11,7 @@ pub mod excel_writer;
 pub mod fast_excel;
 pub mod fast_excel_factory;
 pub mod metadata;
+pub mod poi;
 pub mod read;
 pub mod support;
 pub mod util;

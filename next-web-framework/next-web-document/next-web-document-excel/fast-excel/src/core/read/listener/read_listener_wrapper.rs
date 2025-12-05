@@ -17,7 +17,11 @@ impl<T> ReadListener<T> for ReadListenerWrapper<T>
 where
     Self: ReadListener<T>,
 {
-    fn on_error(&self, error: BoxError, context: AnalysisContext) -> Result<(), BoxError> {
+    fn on_error(
+        &self,
+        error: BoxError,
+        context: &mut dyn AnalysisContext<T>,
+    ) -> Result<(), BoxError> {
         self.0.on_error(error, context)
     }
 }

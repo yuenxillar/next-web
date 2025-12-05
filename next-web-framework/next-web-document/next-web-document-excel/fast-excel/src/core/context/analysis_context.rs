@@ -6,7 +6,7 @@ use crate::core::read::metadata::{
     read_sheet::ReadSheet,
 };
 
-pub trait AnalysisContext {
+pub trait AnalysisContext<T> {
     /// Select the current table
     fn current_sheet(&self, read_sheet: &ReadSheet);
 
@@ -22,5 +22,5 @@ pub trait AnalysisContext {
     /// Row of currently operated cell
     fn read_row_holder(&mut self) -> &mut ReadRowHolder;
 
-    fn current_read_holder(&self) -> &dyn ReadHolder;
+    fn current_read_holder(&self) -> &dyn ReadHolder<T>;
 }

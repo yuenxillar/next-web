@@ -438,8 +438,29 @@ struct Person {
                         // 处理返回类型
                         let returnType = field.type;
 
+                        const num_values = [
+                            "u8",
+                            "u16",
+                            "u32",
+                            "u64",
+                            "u128",
+                            "usize",
+                            "i8",
+                            "i16",
+                            "i32",
+                            "i64",
+                            "i128",
+                            "isize",
+                            "f32",
+                            "f64",
+                            "bool",
+                        ];
+
+                        if (num_values.includes(returnType)) {
+                            returnType = `${returnType}`;
+                        }
                         // 处理 Option<String> -> Option<&str>
-                        if (returnType === "Option<String>") {
+                        else if (returnType === "Option<String>") {
                             returnType = "Option<&str>";
                         }
                         // 处理 Option<Type> -> Option<&Type>
@@ -448,7 +469,13 @@ struct Person {
                             returnType.endsWith(">")
                         ) {
                             const innerType = returnType.slice(7, -1);
-                            returnType = `Option<&${innerType}>`;
+
+
+                            if (num_values.includes(innerType)) {
+                                returnType = `Option<${innerType}>`;
+                            } else {
+                                returnType = `Option<&${innerType}>`;
+                            }
                         }
                         // 处理 String -> &str
                         else if (returnType === "String") {
@@ -462,17 +489,29 @@ struct Person {
                         result += `    pub fn ${methodName}(&self) -> ${returnType} {\n`;
 
                         // 生成方法体
-                        if (field.type === "Option<String>") {
+
+                         if (field.type === "Option<String>") {
                             result += `        self.${field.name}.as_deref()\n`;
                         } else if (
                             field.type.startsWith("Option<") &&
                             field.type.endsWith(">")
                         ) {
-                            result += `        self.${field.name}.as_ref()\n`;
+                            const innerType = returnType.slice(7, -1);
+
+                            if (num_values.includes(innerType)) {
+                                result += `        self.${field.name}\n`;
+                            } else {
+                                result += `        self.${field.name}.as_ref()\n`;
+                            }
                         } else if (field.type === "String") {
                             result += `        &self.${field.name}\n`;
                         } else {
-                            result += `        &self.${field.name}\n`;
+                            if (num_values.includes(field.type)) {
+                              result += `        self.${field.name}\n`;
+                            }
+                            else {
+                              result += `        &self.${field.name}\n`;
+                            }
                         }
 
                         result += `    }\n\n`;

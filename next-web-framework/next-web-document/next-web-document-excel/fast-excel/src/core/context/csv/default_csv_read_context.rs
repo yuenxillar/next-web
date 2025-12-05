@@ -22,18 +22,18 @@ use crate::core::{
     support::excel_type::ExcelType,
 };
 
-pub struct DefaultCsvReadContext {
-    analysis_context: AnalysisContextImpl,
+pub struct DefaultCsvReadContext<T> {
+    analysis_context: AnalysisContextImpl<T>,
 }
 
-impl DefaultCsvReadContext {
+impl<T> DefaultCsvReadContext<T> {
     pub fn new(read_workbook: ReadWorkbook, excel_type: ExcelType) -> Self {
         Self {
             analysis_context: AnalysisContextImpl::new(read_workbook, excel_type),
         }
     }
 }
-impl CsvReadContext for DefaultCsvReadContext {
+impl<T> CsvReadContext<T> for DefaultCsvReadContext<T> {
     fn csv_read_workbook_holder(&mut self) -> &mut CsvReadWorkbookHolder {
         todo!()
     }
@@ -44,7 +44,7 @@ impl CsvReadContext for DefaultCsvReadContext {
     }
 }
 
-impl AnalysisContext for DefaultCsvReadContext {
+impl<T> AnalysisContext<T> for DefaultCsvReadContext<T> {
     fn current_sheet(&self, read_sheet: &ReadSheet) {
         todo!()
     }
@@ -69,20 +69,20 @@ impl AnalysisContext for DefaultCsvReadContext {
         todo!()
     }
 
-    fn current_read_holder(&self) -> &dyn ReadHolder {
+    fn current_read_holder(&self) -> &dyn ReadHolder<T> {
         todo!()
     }
 }
 
-impl Deref for DefaultCsvReadContext {
-    type Target = AnalysisContextImpl;
+impl<T> Deref for DefaultCsvReadContext<T> {
+    type Target = AnalysisContextImpl<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.analysis_context
     }
 }
 
-impl DerefMut for DefaultCsvReadContext {
+impl<T> DerefMut for DefaultCsvReadContext<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.analysis_context
     }

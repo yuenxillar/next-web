@@ -9,7 +9,11 @@ where
 {
     /// All listeners receive this method when any one Listener does an error report. If an exception is thrown here, the
     /// entire read will terminate.
-    fn on_error(&self, error: BoxError, context: AnalysisContext) -> Result<(), BoxError>;
+    fn on_error(
+        &self,
+        error: BoxError,
+        context: &mut dyn AnalysisContext<T>,
+    ) -> Result<(), BoxError>;
 }
 
 clone_trait_object!(<T> ReadListener<T> where Self: Listener, Self: DynClone);

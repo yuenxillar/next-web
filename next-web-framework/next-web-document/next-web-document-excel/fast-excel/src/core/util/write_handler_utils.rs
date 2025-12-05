@@ -9,7 +9,7 @@ impl WriteHandlerUtils {
     pub fn create_workbook_write_handler_context<T: WriteContext>(
         write_context: &mut T,
     ) -> WorkbookWriteHandlerContext {
-        let context = WorkbookWriteHandlerContext::new(writeContext);
+        let context = WorkbookWriteHandlerContext::new(todo!());
 
         write_context
             .write_workbook_holder()

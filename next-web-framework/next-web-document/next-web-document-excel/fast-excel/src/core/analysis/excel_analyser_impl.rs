@@ -17,7 +17,7 @@ impl<C, E> ExcelAnalyserImpl<C, E> {
     pub fn new(read_workbook: ReadWorkbook) -> Self {
         Self {
             analysis_context: AnalysisContext::new(),
-            excel_read_executor: ExcelReadExecutor::new(readWorkbook),
+            excel_read_executor: ExcelReadExecutor::new(todo!()),
             finished: false,
         }
     }
@@ -30,7 +30,6 @@ impl<C, E> ExcelAnalyserImpl<C, E> {
             ExcelType::Xlsx => {}
             ExcelType::Csv => {
                 // Create a context and executor for processing CSV files
-                
             }
         };
     }

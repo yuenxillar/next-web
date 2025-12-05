@@ -1,7 +1,13 @@
+pub mod border_style;
+pub mod cell_data;
 pub mod cell_data_type;
 pub mod cell_extra_type;
+pub mod fill_pattern_type;
 pub mod head_kind;
 pub mod holder_type;
+pub mod horizontal_alignment;
+pub mod numeric_cell_type;
 pub mod read_default_return;
+pub mod vertical_alignment;
 pub mod write_direction;
 pub mod write_type;

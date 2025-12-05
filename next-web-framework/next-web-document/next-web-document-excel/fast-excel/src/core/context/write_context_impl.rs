@@ -41,7 +41,7 @@ impl WriteContextImpl {
         };
 
         let workbook_write_handler_context =
-            WriteHandlerUtils::create_workbook_write_handler_context(write_context);
+            WriteHandlerUtils::create_workbook_write_handler_context(todo!());
         WriteHandlerUtils::before_workbook_create();
 
         match WorkBookUtil::create_work_book(&mut ctx.write_workbook_holder) {
@@ -64,15 +64,15 @@ impl WriteContext for WriteContextImpl {
         todo!()
     }
 
-    fn write_workbook_holder(&self) -> &WriteWorkbookHolder {
+    fn write_workbook_holder(&mut self) -> &mut WriteWorkbookHolder {
         todo!()
     }
 
-    fn write_sheet_holder(&self) -> &WriteSheetHolder {
+    fn write_sheet_holder(&mut self) -> &mut WriteSheetHolder {
         todo!()
     }
 
-    fn write_table_holder(&self) -> &WriteTableHolder {
+    fn write_table_holder(&mut self) -> &mut WriteTableHolder {
         todo!()
     }
 

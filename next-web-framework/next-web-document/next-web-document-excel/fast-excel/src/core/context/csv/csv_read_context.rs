@@ -5,9 +5,9 @@ use crate::core::{
     },
 };
 
-pub trait CsvReadContext
+pub trait CsvReadContext<T>
 where
-    Self: AnalysisContext,
+    Self: AnalysisContext<T>,
 {
     /// All information about the workbook you are currently working on.
     fn csv_read_workbook_holder(&mut self) -> &mut CsvReadWorkbookHolder;
