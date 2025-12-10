@@ -1,0 +1,19 @@
+[package]
+name = "next-web-document-pdf"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+lopdf       = { version = "0.38.0" }
+rusttype    = { version = "0.9.3"  }
+image       = { version = "0.25.9" }
+pdf-extract = { version = "0.10.0" }
+
+tracing.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+rand.workspace = true
+
+[features]
+default = []
+async = ["lopdf/async"]

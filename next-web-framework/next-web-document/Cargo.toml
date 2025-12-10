@@ -5,11 +5,13 @@ edition = "2021"
 
 [dependencies]
 # calamine = { workspace = true, optional = true}
- next-web-document-excel = { version = "0.1.0", path = "./next-web-document-excel", optional = true }
-
+ # next-web-document-excel = { version = "0.1.0", path = "./next-web-document-excel", optional = true }
+next-web-document-pdf = { version = "0.1.0", path = "./next-web-document-pdf", optional = true }
 
 [features]
-default = ["excel"]
-excel = ["next-web-document-excel"]
+default = []
+# excel = ["next-web-document-excel"]
 # excel = ["rust_xlsxwriter", "calamine"]
+pdf = ["next-web-document-pdf"]
+
 docx = []

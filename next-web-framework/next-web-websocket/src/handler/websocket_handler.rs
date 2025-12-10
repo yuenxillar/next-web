@@ -160,7 +160,12 @@ pub(crate) async fn handle_socket(
         }
     };
 
-    let (msg_sender, msg_receiver) = flume::unbounded();
+    #[rustfmt::skip]
+    let (msg_sender, msg_receiver) = ctx
+        .properties()
+        .msg_channel_capacity()
+        .map(|cap| if cap != -1 { flume::bounded(cap as usize) } else { flume::unbounded() })
+        .unwrap_or(flume::bounded(128));
     let session = WebSocketSession::new(msg_sender, remote_address, header, path.to_owned());
 
     // 分离socket实现同时收发
