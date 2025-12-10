@@ -1,5 +1,9 @@
 pub mod basic_parameter;
+pub mod color;
 pub mod configuration_holder;
+pub mod csv;
+pub mod data;
+pub mod format;
 pub mod global_configuration;
 pub mod head;
 pub mod holder;

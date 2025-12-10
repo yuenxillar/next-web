@@ -1,8 +1,11 @@
-use std::{collections::BTreeMap, iter::Cloned, marker::PhantomData};
+use std::{collections::BTreeMap, marker::PhantomData};
 
 use tracing::debug;
 
-use crate::core::{enums::head_kind::HeadKind, metadata::head::Head};
+use crate::core::{
+    enums::head_kind::HeadKind,
+    metadata::{configuration_holder::ConfigurationHolder, head::Head},
+};
 
 #[derive(Debug, Clone)]
 pub struct ExcelHeadProperty<T> {
@@ -16,7 +19,7 @@ pub struct ExcelHeadProperty<T> {
 }
 
 impl<T> ExcelHeadProperty<T> {
-    pub fn new(configuration_holder: ConfigurationHolder, head: &[Vec<String>]) -> Self {
+    pub fn new<H: ConfigurationHolder>(configuration_holder: &H, head: &[Vec<String>]) -> Self {
         let mut property = Self {
             head_type: PhantomData,
             head_kind: HeadKind::None,
@@ -36,6 +39,7 @@ impl<T> ExcelHeadProperty<T> {
             property.head_kind = HeadKind::Sting;
         }
 
+        todo!();
         // convert headClazz to head
         property.init_column_properties();
 

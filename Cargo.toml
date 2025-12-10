@@ -65,6 +65,7 @@ printpdf = { version = "0.8.2" }
 wechat-pay-rust-sdk = { version = "0.2.18" }
 
 
+bigdecimal = { version = "0.4.9"}
 headers = { version = "0.4.1" }
 form_urlencoded = { version = "1.2.2" }
 validator = { version = "0.20.0" }
