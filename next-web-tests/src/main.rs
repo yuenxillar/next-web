@@ -1,21 +1,21 @@
-# Next Web
-A web framework focused on simple and easy development.
-
-For Example:
-
-```rust
 use std::{
     collections::HashSet,
     net::SocketAddr,
     sync::{atomic::AtomicU32, Arc},
 };
 
-use axum::{extract::ConnectInfo, response::IntoResponse};
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web::{
-    application::Application, middleware::find_singleton::FindSingleton,
+    application::Application, extract::find_singleton::FindSingleton,
     util::local_date_time::LocalDateTime, AnyMapping, GetMapping, PostMapping, RequestMapping,
     Singleton,
+};
+use next_web::{
+    async_trait, context::properties::ApplicationProperties, ApplicationContext, Idempotency,
+};
+use next_web::{extract::ConnectInfo, traits::store::idempotency_store::IdempotencyStore};
+use next_web::{
+    response::{Html, IntoResponse},
+    store::memory_idempotency_store::MemoryIdempotencyStore,
 };
 use tokio::sync::Mutex;
 use tracing::info;
@@ -26,17 +26,23 @@ pub struct TestApplication;
 
 #[async_trait]
 impl Application for TestApplication {
-    async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
+    type ErrorSolve = ();
 
-    async fn before_start(&mut self, ctx: &mut ApplicationContext) {
+    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+
+    async fn on_ready(&self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
 
         #[rustfmt::skip]
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(HashSet::<SocketAddr>::new())),"requestIps");
         ctx.insert_singleton_with_name(ApplicationStore::default(), "applicationStoreTwo");
+
+        ctx.insert_singleton_with_name(
+            Arc::new(MemoryIdempotencyStore::new()) as Arc<dyn IdempotencyStore<Value = ()>>,
+            "memoryIdempotencyStore",
+        );
     }
 }
-
 
 #[RequestMapping(method = "GET", path = "/timestamp")]
 pub async fn req_timestamp() -> impl IntoResponse {
@@ -50,27 +56,27 @@ pub async fn req_hello() -> impl IntoResponse {
 
 #[PostMapping(path = "/record")]
 pub async fn req_record(
-    FindSingleton(store): FindSingleton<ApplicationStore>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    FindSingleton(store): FindSingleton<ApplicationStore>,
 ) -> impl IntoResponse {
     store.add(addr).await;
     "Ok"
 }
 
 #[AnyMapping(
-    path = "/recordTwo", 
-    headers = ["Content-Type", "Authorization"],
-    consumes = "application/json",
-    produces = "application/json"
+    path = "/recordTwo",
+    headers  = ["ContentType", "Authorization"],
+    consume = "application/json",
+    produce = "application/json"
 )]
 pub async fn req_record_two(
     // Search for singleton using variable names
     #[find] FindSingleton(application_store_two): FindSingleton<ApplicationStore>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-) -> impl IntoResponse {
+) -> Result<&'static str, ()> {
     application_store_two.add(addr).await;
 
-    return "{\"message\": \"Ok\"}";
+    return Ok("{\"message\": \"Ok\"}");
 }
 
 #[allow(unused)]
@@ -78,17 +84,22 @@ struct TestUserRoutes;
 
 #[RequestMapping(path = "/user")]
 impl TestUserRoutes {
-
     // Request -> /user/login
     #[GetMapping(path = "/login")]
     async fn req_login() -> impl IntoResponse {
-        "Ok"
+        Html("<h1>Login Page</h1>")
     }
 
     // Request -> /user/logout
-    #[PostMapping(path = "/logout")]
+    #[Idempotency(
+        name = "memoryIdempotencyStore",
+        key = "Idempotency-Key",
+        cache_key_prefix = "test_key",
+        ttl = 10
+    )]
+    #[RequestMapping(method = "POST", path = "/logout")]
     async fn req_logout() -> impl IntoResponse {
-        "Ok"
+        Html("<h1>Logout Page</h1>")
     }
 }
 
@@ -130,4 +141,15 @@ async fn main() {
     TestApplication::run().await;
 }
 
-```
+#[cfg(test)]
+mod tests {
+    use next_web::util::aes::local_file_encrypt;
+
+    #[test]
+    fn test_local_file_encrypt() {
+        match local_file_encrypt("2025/10/16/test") {
+            Ok(_) => {}
+            Err(error) => println!("Error encrypting file, case: {error}"),
+        };
+    }
+}

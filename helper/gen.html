@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Rust Struct Getter/Setter Generator</title>
+        <style>
+            :root {
+                --primary-color: #e74c3c;
+                --secondary-color: #3498db;
+                --background-color: #f9f9f9;
+                --card-color: #ffffff;
+                --text-color: #333333;
+                --border-color: #dddddd;
+                --success-color: #2ecc71;
+                --warning-color: #f39c12;
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                line-height: 1.6;
+                color: var(--text-color);
+                background-color: var(--background-color);
+                padding: 20px;
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            header {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+
+            h1 {
+                color: var(--primary-color);
+                margin-bottom: 10px;
+            }
+
+            .description {
+                color: #666;
+                max-width: 800px;
+                margin: 0 auto 20px;
+            }
+
+            .app-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 20px;
+            }
+
+            .input-section,
+            .output-section {
+                flex: 1;
+                min-width: 300px;
+                background-color: var(--card-color);
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                padding: 20px;
+            }
+
+            .section-title {
+                font-size: 1.2rem;
+                margin-bottom: 15px;
+                color: var(--secondary-color);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            textarea {
+                width: 100%;
+                min-height: 300px;
+                padding: 15px;
+                border: 1px solid var(--border-color);
+                border-radius: 4px;
+                font-family: "Courier New", monospace;
+                font-size: 14px;
+                resize: vertical;
+                background-color: #f8f8f8;
+            }
+
+            .actions {
+                display: flex;
+                gap: 10px;
+                margin-top: 15px;
+            }
+
+            button {
+                padding: 10px 15px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: bold;
+                transition: background-color 0.3s;
+            }
+
+            .generate-btn {
+                background-color: var(--primary-color);
+                color: white;
+                flex: 1;
+            }
+
+            .generate-btn:hover {
+                background-color: #c0392b;
+            }
+
+            .copy-btn {
+                background-color: var(--secondary-color);
+                color: white;
+            }
+
+            .copy-btn:hover {
+                background-color: #2980b9;
+            }
+
+            .copy-btn.copied {
+                background-color: var(--success-color);
+            }
+
+            .output {
+                position: relative;
+            }
+
+            .output pre {
+                white-space: pre-wrap;
+                word-break: break-word;
+                background-color: #2d2d2d;
+                color: #f8f8f2;
+                padding: 15px;
+                border-radius: 4px;
+                overflow-x: auto;
+                min-height: 300px;
+                font-family: "Courier New", monospace;
+                font-size: 14px;
+            }
+
+            .examples {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 15px;
+                margin-top: 20px;
+            }
+
+            .example {
+                flex: 1;
+                min-width: 250px;
+                padding: 15px;
+                background-color: #f0f7ff;
+                border-left: 4px solid var(--secondary-color);
+                border-radius: 4px;
+            }
+
+            .example h3 {
+                margin-bottom: 10px;
+                color: var(--secondary-color);
+            }
+
+            .example code {
+                background-color: #e8f4ff;
+                padding: 2px 4px;
+                border-radius: 3px;
+                font-family: "Courier New", monospace;
+                display: block;
+                white-space: pre-wrap;
+                margin: 10px 0;
+            }
+
+            .example-btn {
+                background-color: var(--warning-color);
+                color: white;
+                padding: 5px 10px;
+                font-size: 0.8rem;
+                margin-top: 5px;
+            }
+
+            .example-btn:hover {
+                background-color: #e67e22;
+            }
+
+            .info-box {
+                margin-top: 20px;
+                padding: 15px;
+                background-color: #fff8e1;
+                border-left: 4px solid var(--warning-color);
+                border-radius: 4px;
+            }
+
+            @media (max-width: 768px) {
+                .app-container {
+                    flex-direction: column;
+                }
+
+                .examples {
+                    flex-direction: column;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>Rust Struct Getter/Setter Generator</h1>
+                <p class="description">
+                    Input your Rust struct definition, and the system will automatically generate corresponding getter and setter methods.
+                    Supports standard structs and structs with named fields, properly handles Option types.
+                </p>
+            </header>
+
+            <div class="app-container">
+                <div class="input-section">
+                    <div class="section-title">
+                        <span>Input Struct Definition</span>
+                    </div>
+                    <textarea
+                        id="structInput"
+                        placeholder="Example:
+struct Person {
+    name: String,
+    age: u32,
+    email: Option<String>,
+}"
+                    ></textarea>
+                    <div class="actions">
+                        <button id="generateBtn" class="generate-btn">
+                            Generate Getter/Setter
+                        </button>
+                    </div>
+
+                    <div class="examples">
+                        <div class="example">
+                            <h3>Example 1: Basic Types</h3>
+                            <code
+                                >struct User { id: u64, username: String,
+                                active: bool, }</code
+                            >
+                            <button class="example-btn" data-example="1">
+                                Use This Example
+                            </button>
+                        </div>
+
+                        <div class="example">
+                            <h3>Example 2: With Option Types</h3>
+                            <code
+                                >struct Person { name: String, age: u32, email:
+                                Option&lt;String&gt;, phone:
+                                Option&lt;String&gt;, }</code
+                            >
+                            <button class="example-btn" data-example="2">
+                                Use This Example
+                            </button>
+                        </div>
+
+                        <div class="example">
+                            <h3>Example 3: Complex Types</h3>
+                            <code
+                                >struct Product { id: u32, name: String, price:
+                                f64, category: Option&lt;String&gt;, tags:
+                                Vec&lt;String&gt;, }</code
+                            >
+                            <button class="example-btn" data-example="3">
+                                Use This Example
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h3>Features</h3>
+                        <ul>
+                            <li>Supports standard Rust struct syntax</li>
+                            <li>
+                                Properly handles Option&lt;String&gt; types, getter returns Option&lt;&str&gt;
+                            </li>
+                            <li>
+                                For Option types, setter accepts inner type instead of Option wrapper
+                            </li>
+                            <li>Generated code follows Rust naming conventions and best practices</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="output-section">
+                    <div class="section-title">
+                        <span>Generated Code</span>
+                        <button id="copyBtn" class="copy-btn">Copy Code</button>
+                    </div>
+                    <div class="output">
+                        <pre id="outputCode">Generated code will appear here...</pre>
+                    </div>
+
+                    <div class="info-box">
+                        <h3>Generation Rules</h3>
+                        <ul>
+                            <li>
+                                For <code>String</code> fields: getter returns <code
+                                    >&str</code
+                                >
+                            </li>
+                            <li>
+                                For <code>Option&lt;String&gt;</code> fields: getter returns <code
+                                    >Option&lt;&str&gt;</code
+                                >
+                            </li>
+                            <li>
+                                For <code>Option&lt;T&gt;</code> fields: setter accepts <code>T</code> type parameter
+                            </li>
+                            <li>
+                                All getter methods return references, setter methods accept ownership or references
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                const structInput = document.getElementById("structInput");
+                const generateBtn = document.getElementById("generateBtn");
+                const copyBtn = document.getElementById("copyBtn");
+                const outputCode = document.getElementById("outputCode");
+                const exampleBtns = document.querySelectorAll(".example-btn");
+
+                // Example structs
+                const examples = {
+                    1: `struct User {
+    id: u64,
+    username: String,
+    active: bool,
+}`,
+                    2: `struct Person {
+    name: String,
+    age: u32,
+    email: Option<String>,
+    phone: Option<String>,
+}`,
+                    3: `struct Product {
+    id: u32,
+    name: String,
+    price: f64,
+    category: Option<String>,
+    tags: Vec<String>,
+}`,
+                };
+
+                // Set initial example
+                structInput.value = examples[2];
+
+                // Example button events
+                exampleBtns.forEach((btn) => {
+                    btn.addEventListener("click", function () {
+                        const exampleId = this.getAttribute("data-example");
+                        structInput.value = examples[exampleId];
+                        generateBtn.click();
+                    });
+                });
+
+                // Generate getter/setter
+                generateBtn.addEventListener("click", function () {
+                    const input = structInput.value.trim();
+                    if (!input) {
+                        outputCode.textContent = "Please enter a valid Rust struct definition.";
+                        return;
+                    }
+
+                    try {
+                        const result = parseRustStruct(input);
+                        outputCode.textContent = result;
+                    } catch (error) {
+                        outputCode.textContent = `Error: ${error.message}`;
+                    }
+                });
+
+                // Copy code
+                copyBtn.addEventListener("click", function () {
+                    const text = outputCode.textContent;
+                    if (text && text !== "Generated code will appear here...") {
+                        navigator.clipboard.writeText(text).then(() => {
+                            copyBtn.textContent = "Copied!";
+                            copyBtn.classList.add("copied");
+                            setTimeout(() => {
+                                copyBtn.textContent = "Copy Code";
+                                copyBtn.classList.remove("copied");
+                            }, 2000);
+                        });
+                    }
+                });
+
+                // Parse Rust struct and generate getter/setter
+                function parseRustStruct(input) {
+                    // Remove comments
+                    let cleanedInput = input.replace(/\/\/.*$/gm, "");
+
+                    // Match struct definition
+                    const structMatch = cleanedInput.match(
+                        /struct\s+(\w+)\s*\{([^}]+)\}/,
+                    );
+                    if (!structMatch) {
+                        throw new Error("No valid struct definition found");
+                    }
+
+                    const structName = structMatch[1];
+                    const fieldsText = structMatch[2];
+
+                    // Parse fields
+                    const fieldRegex = /(\w+)\s*:\s*([^,]+)/g;
+                    const fields = [];
+                    let match;
+
+                    while ((match = fieldRegex.exec(fieldsText)) !== null) {
+                        fields.push({
+                            name: match[1],
+                            type: match[2].trim(),
+                        });
+                    }
+
+                    if (fields.length === 0) {
+                        throw new Error("No valid fields found");
+                    }
+
+                    // Generate code
+                    let result = `// Generated Getter/Setter methods for ${structName} struct\n\n`;
+                    result += `impl ${structName} {\n`;
+
+                    // Generate getter methods
+                    fields.forEach((field) => {
+                        // Method name: get_field_name
+                        const methodName = `get_${field.name}`;
+
+                        // Handle return type
+                        let returnType = field.type;
+
+                        const num_values = [
+                            "u8",
+                            "u16",
+                            "u32",
+                            "u64",
+                            "u128",
+                            "usize",
+                            "i8",
+                            "i16",
+                            "i32",
+                            "i64",
+                            "i128",
+                            "isize",
+                            "f32",
+                            "f64",
+                            "bool",
+                        ];
+
+                        if (num_values.includes(returnType)) {
+                            returnType = `${returnType}`;
+                        }
+                        // Handle Option<String> -> Option<&str>
+                        else if (returnType === "Option<String>") {
+                            returnType = "Option<&str>";
+                        }
+                        // Handle Option<Type> -> Option<&Type>
+                        else if (
+                            returnType.startsWith("Option<") &&
+                            returnType.endsWith(">")
+                        ) {
+                            const innerType = returnType.slice(7, -1);
+
+
+                            if (num_values.includes(innerType)) {
+                                returnType = `Option<${innerType}>`;
+                            } else {
+                                returnType = `Option<&${innerType}>`;
+                            }
+                        }
+                        // Handle String -> &str
+                        else if (returnType === "String") {
+                            returnType = "&str";
+                        }
+                        // Other types return reference
+                        else {
+                            returnType = `&${returnType}`;
+                        }
+
+                        result += `    pub fn ${methodName}(&self) -> ${returnType} {\n`;
+
+                        // Generate method body
+
+                         if (field.type === "Option<String>") {
+                            result += `        self.${field.name}.as_deref()\n`;
+                        } else if (
+                            field.type.startsWith("Option<") &&
+                            field.type.endsWith(">")
+                        ) {
+                            const innerType = returnType.slice(7, -1);
+
+                            if (num_values.includes(innerType)) {
+                                result += `        self.${field.name}\n`;
+                            } else {
+                                result += `        self.${field.name}.as_ref()\n`;
+                            }
+                        } else if (field.type === "String") {
+                            result += `        &self.${field.name}\n`;
+                        } else {
+                            if (num_values.includes(field.type)) {
+                              result += `        self.${field.name}\n`;
+                            }
+                            else {
+                              result += `        &self.${field.name}\n`;
+                            }
+                        }
+
+                        result += `    }\n\n`;
+                    });
+
+                    // Generate setter methods
+                    fields.forEach((field) => {
+                        // Method name: set_field_name
+                        const methodName = `set_${field.name}`;
+
+                        // Parameter type
+                        let paramType = field.type;
+
+                        // Handle Option<T> -> T
+                        if (
+                            paramType.startsWith("Option<") &&
+                            paramType.endsWith(">")
+                        ) {
+                            paramType = paramType.slice(7, -1);
+                        }
+
+                        result += `    pub fn ${methodName}(&mut self, ${field.name}: ${paramType}) {\n`;
+
+                        // Generate method body
+                        if (
+                            field.type.startsWith("Option<") &&
+                            field.type.endsWith(">")
+                        ) {
+                            result += `        self.${field.name} = Some(${field.name});\n`;
+                        } else {
+                            result += `        self.${field.name} = ${field.name};\n`;
+                        }
+
+                        result += `    }\n\n`;
+                    });
+
+                    // Generate convenience setters for Option types (set to None)
+                    fields.forEach((field) => {
+                        if (
+                            field.type.startsWith("Option<") &&
+                            field.type.endsWith(">")
+                        ) {
+                            const methodName = `clear_${field.name}`;
+                            result += `    pub fn ${methodName}(&mut self) {\n`;
+                            result += `        self.${field.name} = None;\n`;
+                            result += `    }\n\n`;
+                        }
+                    });
+
+                    result += "}";
+
+                    return result;
+                }
+
+                // Generate once on initial load
+                generateBtn.click();
+            });
+        </script>
+    </body>
+</html>
