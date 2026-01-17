@@ -235,7 +235,7 @@ impl AreaReference {
         let split_references = Self::split_area_references(reference);
         split_references
             .iter()
-            .map(|ref_str| Self::new(ref_str, Some(version)))
+            .map(|ref_str| Self::new(ref_str, Some(version)).unwrap())
             .collect()
     }
 
@@ -335,7 +335,11 @@ impl AreaReference {
 
     /// Checks if this is a whole column reference
     pub fn is_whole_column_reference(&self) -> bool {
-        Self::is_whole_column_reference(Some(self.version), &self.first_cell, &self.last_cell)
+        Self::is_whole_column_reference_with_params(
+            Some(self.version),
+            &self.first_cell,
+            &self.last_cell,
+        )
     }
 
     /// Returns true if this area reference involves only one cell

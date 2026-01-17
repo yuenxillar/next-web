@@ -1,4 +1,4 @@
-use std::{any::Any, fmt};
+use std::{any::Any, collections::HashMap, fmt};
 
 use crate::traits::any_clone::AnyClone;
 
@@ -8,6 +8,7 @@ pub enum AnyValue {
     Number(i64),
     Boolean(bool),
     Float(f64),
+    Map(HashMap<String, AnyValue>),
     List(Vec<AnyValue>),
     Object(Box<dyn AnyClone>),
     #[default]
@@ -16,46 +17,63 @@ pub enum AnyValue {
 
 impl AnyValue {
     /// 检查是否为数字类型
+    ///
     /// Check if the value is a number
     pub fn is_number(&self) -> bool {
         matches!(self, AnyValue::Number(_))
     }
 
     /// 检查是否为浮点数类型
+    ///
     /// Check if the value is a float
     pub fn is_float(&self) -> bool {
         matches!(self, AnyValue::Float(_))
     }
 
     /// 检查是否为字符串类型
+    ///
     /// Check if the value is a string
     pub fn is_string(&self) -> bool {
         matches!(self, AnyValue::String(_))
     }
 
     /// 检查是否为布尔类型
+    ///
     /// Check if the value is a boolean
     pub fn is_boolean(&self) -> bool {
         matches!(self, AnyValue::Boolean(_))
     }
 
     /// 检查是否为null
+    ///
     /// Check if the value is null
     pub fn is_null(&self) -> bool {
         matches!(self, AnyValue::Null)
     }
 
+    /// 检查是否为map类型
+    ///
+    /// Check if the value is a map
+    pub fn is_map(&self) -> bool {
+        matches!(self, AnyValue::Map(_))
+    }
+
     /// 检查是否为数组类型
+    ///
     /// Check if the value is an array
     pub fn is_list(&self) -> bool {
         matches!(self, AnyValue::List(_))
     }
 
+    /// 检查是否为对象类型
+    ///
+    /// Check if the value is an object
     pub fn is_object(&self) -> bool {
         matches!(self, AnyValue::Object(_))
     }
 
     /// 获取字符串值
+    ///
     /// Get string value
     pub fn as_string(&self) -> Option<String> {
         if let AnyValue::String(s) = self {
@@ -65,6 +83,9 @@ impl AnyValue {
         }
     }
 
+    /// 获取字符串值
+    ///
+    /// Get string value
     pub fn as_str(&self) -> Option<&str> {
         if let AnyValue::String(s) = self {
             Some(s.as_str())
@@ -74,6 +95,7 @@ impl AnyValue {
     }
 
     /// 获取数字值
+    ///
     /// Get number value
     pub fn as_number(&self) -> Option<i64> {
         if let AnyValue::Number(n) = self {
@@ -84,6 +106,7 @@ impl AnyValue {
     }
 
     /// 获取浮点数
+    ///
     /// Get float value
     pub fn as_float(&self) -> Option<f64> {
         if let AnyValue::Float(f) = self {
@@ -94,6 +117,7 @@ impl AnyValue {
     }
 
     /// 获取布尔值
+    ///
     /// Get boolean value
     pub fn as_boolean(&self) -> Option<bool> {
         if let AnyValue::Boolean(b) = self {
@@ -103,9 +127,21 @@ impl AnyValue {
         }
     }
 
+    /// 获取映射
+    ///
+    /// Get map value
+    pub fn as_map(&self) -> Option<&HashMap<String, AnyValue>> {
+        if let AnyValue::Map(m) = self {
+            Some(m)
+        } else {
+            None
+        }
+    }
+
     /// 获取数组引用
-    /// Get array reference
-    pub fn as_array(&self) -> Option<&Vec<AnyValue>> {
+    ///
+    /// Get list reference
+    pub fn as_list(&self) -> Option<&Vec<AnyValue>> {
         if let AnyValue::List(a) = self {
             Some(a)
         } else {
@@ -114,6 +150,7 @@ impl AnyValue {
     }
 
     /// 转换为字符串表示
+    ///
     /// Convert to string representation
     pub fn to_string(&self) -> String {
         match self {
@@ -207,6 +244,7 @@ impl fmt::Debug for AnyValue {
             AnyValue::Number(n) => write!(f, "Number({})", n),
             AnyValue::Boolean(b) => write!(f, "Boolean({})", b),
             AnyValue::Float(num) => write!(f, "Float({})", num),
+            AnyValue::Map(map) => write!(f, "Map({:?})", map),
             AnyValue::List(arr) => write!(f, "List({:?})", arr),
             AnyValue::Object(obj) => write!(f, "Object({:?})", obj),
             AnyValue::Null => write!(f, "Null"),

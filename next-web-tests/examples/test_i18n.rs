@@ -1,11 +1,11 @@
 use next_web::extract::find_singleton::FindSingleton;
 use next_web::extract::Path;
 use next_web::i18n::locale::accept_header_locale_resolver::AcceptHeaderLocaleResolver;
-use next_web::response::IntoResponse;
 use next_web::service::message_source_service::MessageSourceService;
 use next_web::traits::locale_resolver::LocaleResolver;
+use next_web::ApplicationContext;
 use next_web::{
-    application::Application, async_trait, context::properties::ApplicationProperties, GetMapping,
+    application::Application, async_trait, context::properties::ApplicationProperties, get_mapping,
 };
 
 #[derive(Clone, Default)]
@@ -15,10 +15,15 @@ pub struct TestApplication;
 impl Application for TestApplication {
     type ErrorSolve = ();
     /// initialize the middleware.
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 }
 
-#[GetMapping(path = "/message/{msg}")]
+#[get_mapping(path = "/message/{msg}")]
 async fn req_message(
     Path(msg): Path<String>,
     FindSingleton(message_source_service): FindSingleton<MessageSourceService>,

@@ -2,14 +2,14 @@ use std::str;
 
 use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
+use next_web::application::Application;
+use next_web::extract::find_singleton::FindSingleton;
+use next_web::Singleton;
 use next_web_core::context::properties::ApplicationProperties;
 use next_web_core::{async_trait, ApplicationContext};
 use next_web_data_redis::core::event::expired_keys_event::RedisExpiredKeysEvent;
 use next_web_data_redis::service::redis_service::RedisService;
 use next_web_data_redis::AsyncCommands;
-use next_web::application::Application;
-use next_web::extract::find_singleton::FindSingleton;
-use next_web::Singleton;
 
 #[Singleton(binds = [Self::into_expired_key_listener])]
 #[derive(Clone)]
@@ -46,7 +46,12 @@ struct TestApplication;
 #[async_trait]
 impl Application for TestApplication {
     type ErrorSolve = ();
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 
     // get the application router. (open api  and private api)
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {

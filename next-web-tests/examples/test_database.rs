@@ -1,11 +1,11 @@
+use next_web::application::Application;
 use next_web_core::async_trait;
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 use next_web_data_database::transactional::transactionl_executor::TransactionalExecutor;
-use next_web::application::Application;
 
 use axum::routing::{get, post};
-use next_web_data_database::service::database_service::DatabaseService;
 use next_web::extract::find_singleton::FindSingleton;
+use next_web_data_database::service::database_service::DatabaseService;
 
 /// Test application
 #[derive(Default, Clone)]
@@ -15,7 +15,12 @@ pub struct TestApplication;
 impl Application for TestApplication {
     type ErrorSolve = ();
     /// initialize the middleware.
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new()

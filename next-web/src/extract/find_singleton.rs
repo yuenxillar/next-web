@@ -4,10 +4,7 @@ use axum::{
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
 };
-use next_web_core::{
-    state::application_state::ApplicationState,
-    util::singleton::SingletonUtil,
-};
+use next_web_core::{state::application_state::ApplicationState, util::singleton::SingletonUtil};
 
 #[derive(Clone)]
 pub struct FindSingleton<T>(pub T);

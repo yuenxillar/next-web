@@ -16,13 +16,13 @@ use crate::core::poi::util::little_endian_output::LittleEndianOutput;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CellRangeAddress {
     /// Index of first row (zero-based)
-    first_row: u32,
+    first_row: i32,
     /// Index of last row (zero-based, inclusive)
-    last_row: u32,
+    last_row: i32,
     /// Index of first column (zero-based)
-    first_col: u32,
+    first_col: i32,
     /// Index of last column (zero-based, inclusive)
-    last_col: u32,
+    last_col: i32,
 }
 
 impl CellRangeAddress {
@@ -40,10 +40,10 @@ impl CellRangeAddress {
     /// # Panics
     /// Panics if `last_row < first_row || last_col < first_col`
     pub fn new(
-        first_row: u32,
-        last_row: u32,
-        first_col: u32,
-        last_col: u32,
+        first_row: i32,
+        last_row: i32,
+        first_col: i32,
+        last_col: i32,
     ) -> Result<Self, String> {
         if last_row < first_row || last_col < first_col {
             return Err(format!(
@@ -88,9 +88,7 @@ impl CellRangeAddress {
         let first_col = u16::from_le_bytes([data[4], data[5]]) as i32;
         let last_col = u16::from_le_bytes([data[6], data[7]]) as i32;
 
-        Ok(CellRangeAddress::new(
-            first_row, last_row, first_col, last_col,
-        ))
+        CellRangeAddress::new(first_row, last_row, first_col, last_col)
     }
 
     /// Creates a copy of this cell range address
@@ -127,13 +125,13 @@ impl CellRangeAddress {
             sb.push('!');
         }
 
-        let cell_ref_from = CellReference::new(
+        let cell_ref_from = CellReference::from_indices_with_abs(
             self.first_row,
             self.first_col,
             use_absolute_address,
             use_absolute_address,
         );
-        let cell_ref_to = CellReference::new(
+        let cell_ref_to = CellReference::from_indices_with_abs(
             self.last_row,
             self.last_col,
             use_absolute_address,
@@ -172,16 +170,16 @@ impl CellRangeAddress {
             let a_str = &ref_str[..sep];
             let b_str = &ref_str[sep + 1..];
 
-            let a = CellReference::from_string(a_str)
+            let a = CellReference::new(a_str)
                 .map_err(|e| format!("Invalid first cell reference '{}': {}", a_str, e))?;
-            let b = CellReference::from_string(b_str)
+            let b = CellReference::new(b_str)
                 .map_err(|e| format!("Invalid second cell reference '{}': {}", b_str, e))?;
 
-            Ok(CellRangeAddress::new(a.row, b.row, a.column, b.column))
+            CellRangeAddress::new(a.get_row(), b.get_row(), a.get_col(), b.get_col())
         } else {
-            let a = CellReference::from_string(ref_str)
+            let a = CellReference::new(ref_str)
                 .map_err(|e| format!("Invalid cell reference '{}': {}", ref_str, e))?;
-            Ok(CellRangeAddress::new(a.row, a.row, a.column, a.column))
+            CellRangeAddress::new(a.get_row(), a.get_row(), a.get_col(), a.get_col())
         }
     }
 
@@ -251,12 +249,13 @@ impl CellRangeAddress {
     /// Returns the intersection of this range with another range, if any
     pub fn intersection(&self, other: &CellRangeAddress) -> Option<Self> {
         if self.intersects(other) {
-            Some(CellRangeAddress::new(
+            CellRangeAddress::new(
                 self.first_row.max(other.first_row),
                 self.last_row.min(other.last_row),
                 self.first_col.max(other.first_col),
                 self.last_col.min(other.last_col),
-            ))
+            )
+            .ok()
         } else {
             None
         }
@@ -270,6 +269,7 @@ impl CellRangeAddress {
             self.first_col.min(other.first_col),
             self.last_col.max(other.last_col),
         )
+        .unwrap()
     }
 }
 

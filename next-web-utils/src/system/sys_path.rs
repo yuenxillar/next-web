@@ -1,4 +1,4 @@
-/// `SystemPathUtil` 是一个工具结构体，用于获取系统路径相关的信息。
+/// 用于获取系统路径相关的信息。
 pub struct SystemPathUtil;
 
 impl SystemPathUtil {

@@ -66,11 +66,11 @@ fn default_detect_xdb_file() -> String {
         }
     }
 
-    tracing::info!("若用户未设置db文件地址, 同时项目目录下不存在db文件, 则使用默认db文件");
+    tracing::info!("If the user has not set the db file address and there is no db file in the project directory,
+        the default db file will be used");
+
     // Err("default filepath not find the xdb file, so you must set xdb_filepath".into())
     format!("{}/{}", std::env!("CARGO_MANIFEST_DIR"), db_path)
-    
-        
 }
 
 #[inline]
@@ -97,10 +97,7 @@ fn load_file() -> Vec<u8> {
     let xdb_filepath =
         std::env::var(XDB_FILEPATH_ENV).unwrap_or_else(|_| default_detect_xdb_file());
     tracing::debug!("load xdb searcher file at {} ", xdb_filepath);
-    println!(
-        "load xdb searcher file at {:?} ",
-        xdb_filepath
-    );
+    println!("load xdb searcher file at {:?} ", xdb_filepath);
     let mut f = File::open(xdb_filepath).expect("file open error");
     let mut buffer = Vec::new();
     f.read_to_end(&mut buffer).expect("load file error");

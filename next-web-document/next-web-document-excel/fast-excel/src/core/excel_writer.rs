@@ -3,6 +3,7 @@ use next_web_core::error::BoxError;
 use crate::core::{
     Closeable,
     context::write_context::WriteContext,
+    error::excel_error::ExcelError,
     write::{
         excel_builder::ExcelBuilder,
         excel_builder_impl::ExcelBuilderImpl,
@@ -21,7 +22,7 @@ impl<E> ExcelWriter<E>
 where
     E: ExcelBuilder,
 {
-    pub fn write_data<T>(&mut self, data: T, write_sheet: WriteSheet) -> &mut Self
+    pub fn write_data<T>(&mut self, data: &[T], write_sheet: WriteSheet) -> &mut Self
     where
         T: AsRef<[u8]>,
     {
@@ -31,7 +32,7 @@ where
 
     pub fn write_data_with_table<T>(
         &mut self,
-        data: T,
+        data: &[T],
         write_sheet: WriteSheet,
         write_table: WriteTable,
     ) -> &mut Self
@@ -76,9 +77,9 @@ where
 }
 
 impl ExcelWriter {
-    pub fn new(write_workbook: WriteWorkbook) -> Self {
-        let excel_builder = ExcelBuilderImpl::new(write_workbook);
-        Self { excel_builder }
+    pub fn new(write_workbook: WriteWorkbook) -> Result<Self, ExcelError> {
+        let excel_builder = ExcelBuilderImpl::new(write_workbook)?;
+        Ok(Self { excel_builder })
     }
 }
 

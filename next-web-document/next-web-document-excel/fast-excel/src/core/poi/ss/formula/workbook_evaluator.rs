@@ -455,7 +455,7 @@ impl WorkbookEvaluator {
     ) -> Result<Arc<dyn ValueEval>, String> {
         if ptgs.len() == 1 {
             // Handle single PTG
-            return self.get_eval_for_ptg(ptgs[0].as_ref(), ec);
+            return self.get_eval_for_ptg(ptgs[0], ec);
         }
 
         // Create new context for formula evaluation

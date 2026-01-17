@@ -1,4 +1,5 @@
 pub mod area_reference;
+pub mod cell_address;
 pub mod cell_range_address;
 pub mod cell_range_address_base;
 pub mod cell_range_address_list;

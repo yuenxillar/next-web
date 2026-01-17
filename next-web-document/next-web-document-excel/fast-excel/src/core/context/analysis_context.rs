@@ -8,7 +8,7 @@ use crate::core::read::metadata::{
 
 pub trait AnalysisContext<T> {
     /// Select the current table
-    fn current_sheet(&self, read_sheet: &ReadSheet);
+    fn current_sheet(&self, read_sheet: &ReadSheet<T>);
 
     /// All information about the workbook you are currently working on
     fn read_workbook_holder(&mut self) -> &mut ReadWorkbookHolder;

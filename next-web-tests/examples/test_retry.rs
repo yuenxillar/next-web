@@ -1,12 +1,12 @@
 use std::error::Error;
 
-use next_web_core::anys::any_value::AnyValue;
 use next_web::retry::error::retry_error::RetryError;
 use next_web::retry::retry_context::RetryContext;
 use next_web::retry::retry_operations::RetryOperations;
 use next_web::retry::support::retry_template::RetryTemplate;
-use next_web::Retryable;
+use next_web::retryable;
 use next_web::util::local_date_time::LocalDateTime;
+use next_web_core::anys::any_value::AnyValue;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -15,7 +15,7 @@ enum TestMatch {
     B(u64),
 }
 
-#[Retryable(max_attempts = 4, delay = 1000, backoff = test_backoff, retry_for = [TestMatch::A, TestMatch::B(123)], multiplier = 2)]
+#[retryable(max_attempts = 4, delay = 1000, backoff = test_backoff, retry_for = [TestMatch::A, TestMatch::B(123)], multiplier = 2)]
 fn test_retry() -> Result<(), TestMatch> {
     let timestamp_sec = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

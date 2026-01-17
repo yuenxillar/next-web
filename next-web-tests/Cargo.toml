@@ -38,5 +38,6 @@ next-web-security = { path = "../next-web-security", version = "*" }
 next-web-data-redis = { path = "../next-web-data/next-web-data-redis", version = "*", features = ["expired-key-listener"]}
 next-web-data-database = { path = "../next-web-data/next-web-data-database", version = "*"}
 # next-web-retry = { path = "../next-web-retry", version = "*"}
+utoipa = { workspace = true }
 
 validator = { version = "0.20.0", features = ["derive"] }

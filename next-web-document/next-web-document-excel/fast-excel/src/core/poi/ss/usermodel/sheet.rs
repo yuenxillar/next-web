@@ -32,7 +32,7 @@ pub mod sheet_constants {
 
 pub trait Sheet {
     // Row operations
-    fn create_row(&mut self, row_num: u32) -> &dyn Row;
+    fn create_row(&mut self, row_num: u32) -> Box<dyn Row>;
     fn remove_row(&mut self, row: &dyn Row);
     fn get_row(&self, row_num: u32) -> Option<&dyn Row>;
     fn get_physical_number_of_rows(&self) -> u32;

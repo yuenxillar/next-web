@@ -7,31 +7,32 @@ pub struct SystemInfo(System);
 impl SystemInfo {
     /// 创建一个新的 `SystemInfo` 实例，并初始化所有系统信息。
     pub fn new() -> Self {
-        let sys = System::new_all(); // 初始化所有系统信息（CPU、内存、进程等)
+        let mut sys = System::new_all(); // 初始化所有系统信息（CPU、内存、进程等)
+        sys.refresh_cpu_all();
         Self(sys)
     }
 
     /// 获取全局 CPU 使用率（百分比）。
     pub fn get_cpu_usage(&mut self) -> f32 {
-        self.0.refresh_cpu_all(); // 刷新所有 CPU 信息
+        self.0.refresh_cpu_all();
         self.0.global_cpu_usage() // 返回全局 CPU 使用率
     }
 
     /// 获取逻辑 CPU 核心数量。
     pub fn get_cpu_count(&mut self) -> usize {
-        self.0.refresh_cpu_all(); // 刷新所有 CPU 信息
+        self.0.refresh_cpu_all();
         self.0.cpus().len() // 返回逻辑 CPU 核心数量
     }
 
     /// 获取所有 CPU 核心的信息。
     pub fn get_cpus(&mut self) -> &[sysinfo::Cpu] {
-        self.0.refresh_cpu_all(); // 刷新所有 CPU 信息
+        self.0.refresh_cpu_all();
         self.0.cpus() // 返回所有 CPU 核心的信息
     }
 
     /// 获取已使用的内存大小（单位：字节）。
     pub fn get_memory_usage(&mut self) -> u64 {
-        self.0.refresh_memory(); // 刷新内存信息
+        self.0.refresh_memory();
         self.0.used_memory() // 返回已使用的内存大小
     }
 
@@ -43,19 +44,19 @@ impl SystemInfo {
 
     /// 获取总内存大小（单位：字节）。
     pub fn get_total_memory(&mut self) -> u64 {
-        self.0.refresh_memory(); // 刷新内存信息
+        self.0.refresh_memory();
         self.0.total_memory() // 返回总内存大小
     }
 
     /// 获取已使用的交换空间大小（单位：字节）。
     pub fn get_swap_usage(&mut self) -> u64 {
-        self.0.refresh_memory(); // 刷新内存信息
+        self.0.refresh_memory();
         self.0.used_swap() // 返回已使用的交换空间大小
     }
 
     /// 获取总交换空间大小（单位：字节）。
     pub fn get_total_swap(&mut self) -> u64 {
-        self.0.refresh_memory(); // 刷新内存信息
+        self.0.refresh_memory();
         self.0.total_swap() // 返回总交换空间大小
     }
 

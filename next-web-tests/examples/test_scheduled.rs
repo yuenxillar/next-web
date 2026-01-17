@@ -1,15 +1,14 @@
-use next_web_core::{async_trait, context::properties::ApplicationProperties};
 use next_web::{
     application::Application,
-    Scheduled,
     scheduler::{
         context::JobExecutionContext,
         schedule_type::{ScheduleType, WithArgs},
     },
     traits::schedule::scheduled_task::ScheduledTask,
     util::local_date_time::LocalDateTime,
-    Singleton,
+    ApplicationContext, Scheduled, Singleton,
 };
+use next_web_core::{async_trait, context::properties::ApplicationProperties};
 
 use std::sync::{
     atomic::{AtomicI32, Ordering},
@@ -23,7 +22,12 @@ struct TestApplication;
 impl Application for TestApplication {
     type ErrorSolve = ();
 
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 }
 
 #[Singleton(binds=[Self::into_task])]

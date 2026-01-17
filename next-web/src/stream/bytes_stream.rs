@@ -16,9 +16,7 @@ pub struct BytesStream {
     file_name: Option<String>,
 }
 
-
 impl BytesStream {
-    
     pub fn new(body: Bytes, file_name: Option<String>) -> Self {
         Self { body, file_name }
     }
@@ -67,7 +65,7 @@ impl IntoRespnoseStream for BytesStream {
 
         let header_name = format!(
             "attachment;filename={}",
-            self.file_name.map(|s| s).unwrap_or(LocalDateTime::now())
+            self.file_name.unwrap_or(LocalDateTime::now())
         );
 
         Response::builder()

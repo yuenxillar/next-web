@@ -1,9 +1,9 @@
-use next_web_macros::Properties;
+use next_web_macros::properties;
 use rudi_dev::Singleton;
 
 /// Properties for Database client.
 #[Singleton(default, binds=[Self::into_properties])]
-#[Properties(prefix = "next.data.database")]
+#[properties(prefix = "next.data.database")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct DatabaseClientProperties {
     /// Unique identifier for the database client.
@@ -49,7 +49,6 @@ impl DatabaseClientProperties {
         self.password.as_deref()
     }
 
-    
     pub fn database(&self) -> &str {
         &self.database
     }

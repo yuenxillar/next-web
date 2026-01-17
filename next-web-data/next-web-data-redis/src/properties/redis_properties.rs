@@ -1,9 +1,9 @@
-use next_web_macros::Properties;
+use next_web_macros::properties;
 use rudi_dev::Singleton;
 
 /// Properties for Redis client.
 #[Singleton(default, binds=[Self::into_properties])]
-#[Properties(prefix = "next.data.redis")]
+#[properties(prefix = "next.data.redis")]
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct RedisClientProperties {
     host: Option<String>,

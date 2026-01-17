@@ -1,11 +1,11 @@
-use next_web_macros::Properties;
+use next_web_macros::properties;
 use rudi_dev::Singleton;
 
 /// WebSocket配置属性，用于配置WebSocket连接的相关参数
 ///
 /// WebSocket configuration properties, used to configure parameters related to WebSocket connections
 #[Singleton(default, binds=[Self::into_properties])]
-#[Properties(prefix = "next.ws")]
+#[properties(prefix = "next.ws")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct WebSocketProperties {
     /// 最大消息大小

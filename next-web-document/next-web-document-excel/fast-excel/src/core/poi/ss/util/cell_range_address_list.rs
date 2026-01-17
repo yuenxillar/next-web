@@ -31,7 +31,7 @@ impl CellRangeAddressList {
 
     /// Convenience constructor for creating a `CellRangeAddressList` with a single
     /// `CellRangeAddress`. Other `CellRangeAddress`es may be added later.
-    pub fn with_single_range(first_row: u32, last_row: u32, first_col: u32, last_col: u32) -> Self {
+    pub fn with_single_range(first_row: i32, last_row: i32, first_col: i32, last_col: i32) -> Self {
         let mut list = Self::new();
         list.add_cell_range_address(first_row, first_col, last_row, last_col);
         list
@@ -56,10 +56,10 @@ impl CellRangeAddressList {
     /// * `last_col` - the lower right hand corner's column
     pub fn add_cell_range_address(
         &mut self,
-        first_row: u32,
-        first_col: u32,
-        last_row: u32,
-        last_col: u32,
+        first_row: i32,
+        first_col: i32,
+        last_row: i32,
+        last_col: i32,
     ) {
         let region = CellRangeAddress::new(first_row, last_row, first_col, last_col).unwrap();
         self.add_cell_range_address_object(region);

@@ -25,7 +25,12 @@ impl Application for TestApplication {
     type ErrorSolve = ();
 
     /// initialize the middleware.
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 
     // get the application router. (open api  and private api)
     async fn application_router(&self, ctx: &mut ApplicationContext) -> axum::Router {

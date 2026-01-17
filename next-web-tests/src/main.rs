@@ -5,12 +5,11 @@ use std::{
 };
 
 use next_web::{
-    application::Application, extract::find_singleton::FindSingleton,
-    util::local_date_time::LocalDateTime, AnyMapping, GetMapping, PostMapping, RequestMapping,
-    Singleton,
+    any_mapping, application::Application, extract::find_singleton::FindSingleton, get_mapping,
+    post_mapping, request_mapping, util::local_date_time::LocalDateTime, Singleton,
 };
 use next_web::{
-    async_trait, context::properties::ApplicationProperties, ApplicationContext, Idempotency,
+    async_trait, context::properties::ApplicationProperties, idempotency, ApplicationContext,
 };
 use next_web::{extract::ConnectInfo, traits::store::idempotency_store::IdempotencyStore};
 use next_web::{
@@ -28,7 +27,12 @@ pub struct TestApplication;
 impl Application for TestApplication {
     type ErrorSolve = ();
 
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 
     async fn on_ready(&self, ctx: &mut ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
@@ -44,17 +48,17 @@ impl Application for TestApplication {
     }
 }
 
-#[RequestMapping(method = "GET", path = "/timestamp")]
+#[request_mapping(method = "GET", path = "/timestamp")]
 pub async fn req_timestamp() -> impl IntoResponse {
     LocalDateTime::now()
 }
 
-#[GetMapping(path = "/hello")]
-pub async fn req_hello() -> impl IntoResponse {
-    " Hello Axum! \n Hello Next Web!"
+#[get_mapping(path = "/hello")]
+pub async fn req_hello() -> String {
+    " Hello Axum! \n Hello Next Web!".to_string()
 }
 
-#[PostMapping(path = "/record")]
+#[post_mapping(path = "/record")]
 pub async fn req_record(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     FindSingleton(store): FindSingleton<ApplicationStore>,
@@ -63,7 +67,7 @@ pub async fn req_record(
     "Ok"
 }
 
-#[AnyMapping(
+#[any_mapping(
     path = "/recordTwo",
     headers  = ["ContentType", "Authorization"],
     consume = "application/json",
@@ -82,22 +86,22 @@ pub async fn req_record_two(
 #[allow(unused)]
 struct TestUserRoutes;
 
-#[RequestMapping(path = "/user")]
+#[request_mapping(path = "/user")]
 impl TestUserRoutes {
     // Request -> /user/login
-    #[GetMapping(path = "/login")]
+    #[get_mapping(path = "/login")]
     async fn req_login() -> impl IntoResponse {
         Html("<h1>Login Page</h1>")
     }
 
     // Request -> /user/logout
-    #[Idempotency(
+    #[idempotency(
         name = "memoryIdempotencyStore",
         key = "Idempotency-Key",
         cache_key_prefix = "test_key",
         ttl = 10
     )]
-    #[RequestMapping(method = "POST", path = "/logout")]
+    #[request_mapping(method = "POST", path = "/logout")]
     async fn req_logout() -> impl IntoResponse {
         Html("<h1>Logout Page</h1>")
     }

@@ -29,7 +29,7 @@ impl OperatorEnum {
     ///
     /// # Returns
     /// true if the comparison is valid
-    pub(crate) fn is_valid<T: PartialOrd + ToString>(
+    pub(crate) fn is_valid<T: ?Sized + PartialOrd + ToString>(
         &self,
         cell_value: &T,
         v1: Option<&T>,
@@ -101,14 +101,14 @@ impl OperatorEnum {
     ) -> bool {
         match self {
             OperatorEnum::NoComparison => false,
-            OperatorEnum::Between => Self::between(&cell_value, v1, v2),
-            OperatorEnum::NotBetween => Self::not_between(&cell_value, v1, v2),
-            OperatorEnum::Equal => Self::equal_check(&cell_value, v1, v2),
-            OperatorEnum::NotEqual => Self::not_equal(&cell_value, v1, v2),
-            OperatorEnum::GreaterThan => Self::greater_than(&cell_value, v1, v2),
-            OperatorEnum::LessThan => Self::less_than(&cell_value, v1, v2),
-            OperatorEnum::GreaterOrEqual => Self::greater_or_equal(&cell_value, v1, v2),
-            OperatorEnum::LessOrEqual => Self::less_or_equal(&cell_value, v1, v2),
+            OperatorEnum::Between => Self::between(cell_value, v1, v2),
+            OperatorEnum::NotBetween => Self::not_between(cell_value, v1, v2),
+            OperatorEnum::Equal => Self::equal_check(cell_value, v1, v2),
+            OperatorEnum::NotEqual => Self::not_equal(cell_value, v1, v2),
+            OperatorEnum::GreaterThan => Self::greater_than(cell_value, v1, v2),
+            OperatorEnum::LessThan => Self::less_than(cell_value, v1, v2),
+            OperatorEnum::GreaterOrEqual => Self::greater_or_equal(cell_value, v1, v2),
+            OperatorEnum::LessOrEqual => Self::less_or_equal(cell_value, v1, v2),
         }
     }
 
@@ -142,7 +142,7 @@ impl OperatorEnum {
 
     // Private comparison methods
 
-    fn no_comp<T: PartialOrd + ToString>(
+    fn no_comp<T: ?Sized + PartialOrd + ToString>(
         _cell_value: &T,
         _v1: Option<&T>,
         _v2: Option<&T>,
@@ -150,7 +150,11 @@ impl OperatorEnum {
         false
     }
 
-    fn between<T: PartialOrd + ToString>(cell_value: &T, v1: Option<&T>, v2: Option<&T>) -> bool {
+    fn between<T: ?Sized + PartialOrd + ToString>(
+        cell_value: &T,
+        v1: Option<&T>,
+        v2: Option<&T>,
+    ) -> bool {
         match (v1, v2) {
             (Some(v1), Some(v2)) => {
                 cell_value
@@ -175,7 +179,7 @@ impl OperatorEnum {
         }
     }
 
-    fn between_with_defaults<T: PartialOrd + ToString>(
+    fn between_with_defaults<T: ?Sized + PartialOrd + ToString>(
         cell_value: &T,
         v1: Option<&T>,
         v2: Option<&T>,
@@ -199,7 +203,7 @@ impl OperatorEnum {
         }
     }
 
-    fn not_between<T: PartialOrd + ToString>(
+    fn not_between<T: ?Sized + PartialOrd + ToString>(
         cell_value: &T,
         v1: Option<&T>,
         v2: Option<&T>,
@@ -219,7 +223,7 @@ impl OperatorEnum {
         }
     }
 
-    fn equal_check<T: PartialOrd + ToString>(
+    fn equal_check<T: ?Sized + PartialOrd + ToString>(
         cell_value: &T,
         v1: Option<&T>,
         _v2: Option<&T>,
@@ -240,7 +244,7 @@ impl OperatorEnum {
         }
     }
 
-    fn not_equal<T: PartialOrd + ToString>(
+    fn not_equal<T: ?Sized + PartialOrd + ToString>(
         cell_value: &T,
         v1: Option<&T>,
         _v2: Option<&T>,
@@ -258,7 +262,7 @@ impl OperatorEnum {
         }
     }
 
-    fn greater_than<T: PartialOrd + ToString>(
+    fn greater_than<T: ?Sized + PartialOrd + ToString>(
         cell_value: &T,
         v1: Option<&T>,
         _v2: Option<&T>,
@@ -276,7 +280,7 @@ impl OperatorEnum {
         }
     }
 
-    fn less_than<T: PartialOrd + ToString>(
+    fn less_than<T: ?Sized + PartialOrd + ToString>(
         cell_value: &T,
         v1: Option<&T>,
         _v2: Option<&T>,
@@ -292,7 +296,7 @@ impl OperatorEnum {
         }
     }
 
-    fn greater_or_equal<T: PartialOrd + ToString>(
+    fn greater_or_equal<T: ?Sized + PartialOrd + ToString>(
         cell_value: &T,
         v1: Option<&T>,
         _v2: Option<&T>,
@@ -308,7 +312,7 @@ impl OperatorEnum {
         }
     }
 
-    fn less_or_equal<T: PartialOrd + ToString>(
+    fn less_or_equal<T: ?Sized + PartialOrd + ToString>(
         cell_value: &T,
         v1: Option<&T>,
         _v2: Option<&T>,
@@ -326,7 +330,7 @@ impl OperatorEnum {
 
     // Helper methods for default value comparisons
 
-    fn greater_than_default<T: PartialOrd + ToString>(_cell_value: &T) -> bool {
+    fn greater_than_default<T: ?Sized + PartialOrd + ToString>(_cell_value: &T) -> bool {
         // Default implementation - actual behavior depends on type
         // For numbers: compare with 0
         // For strings: non-null string > empty string (true)
@@ -334,22 +338,22 @@ impl OperatorEnum {
         false
     }
 
-    fn less_than_default<T: PartialOrd + ToString>(_cell_value: &T) -> bool {
+    fn less_than_default<T: ?Sized + PartialOrd + ToString>(_cell_value: &T) -> bool {
         // Default implementation
         false
     }
 
-    fn greater_or_equal_default<T: PartialOrd + ToString>(_cell_value: &T) -> bool {
+    fn greater_or_equal_default<T: ?Sized + PartialOrd + ToString>(_cell_value: &T) -> bool {
         // Default implementation
         false
     }
 
-    fn less_or_equal_default<T: PartialOrd + ToString>(_cell_value: &T) -> bool {
+    fn less_or_equal_default<T: ?Sized + PartialOrd + ToString>(_cell_value: &T) -> bool {
         // Default implementation
         false
     }
 
-    fn as_string<T: ToString>(value: &T) -> Option<String> {
+    fn as_string<T: ?Sized + ToString>(value: &T) -> Option<String> {
         Some(value.to_string())
     }
 }

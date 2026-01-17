@@ -56,7 +56,7 @@ impl ConstantValueParser {
                 Self::EMPTY_REPRESENTATION
             }
             Self::TYPE_NUMBER => AnyValue::Number(in_.read_double() as i64),
-            Self::TYPE_STRING => AnyValue::String(StringUtil::read_unicode_string(in_)),
+            Self::TYPE_STRING => AnyValue::String(StringUtil::read_unicode_string(in_).unwrap()),
             Self::TYPE_BOOLEAN => Self::read_boolean(in_),
             Self::TYPE_ERROR_CODE => {
                 let err_code = in_.read_u_short();
@@ -138,7 +138,7 @@ impl ConstantValueParser {
                 out.write_byte(Self::TYPE_ERROR_CODE);
                 if let Some(error_val) = (obj as &dyn std::any::Any).downcast_ref::<ErrorConstant>()
                 {
-                    out.write_long(error_val.get_error_code() as i64);
+                    out.write_long(error_val.get_error_code() as u64);
                 } else {
                     warn!("Conversion 'ErrorConstant' failed ({:?})", obj);
                 }

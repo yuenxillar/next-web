@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::core::poi::ss::formula::evaluation_conditional_format_rule::EvaluationConditionalFormatRule;
+// use crate::core::poi::ss::formula::evaluation_conditional_format_rule::EvaluationConditionalFormatRule;
 use crate::core::poi::ss::formula::workbook_evaluator::WorkbookEvaluator;
 use crate::core::poi::ss::formula::workbook_evaluator_provider::WorkbookEvaluatorProvider;
 use crate::core::poi::ss::usermodel::cell::Cell;
@@ -17,9 +17,9 @@ use crate::core::poi::ss::util::cell_reference::CellReference;
 /// For performance reasons, this class keeps a cache of all previously evaluated rules and cells.
 /// Be sure to call `clear_all_cached_formats()` if any conditional formats are modified, added, or deleted,
 /// and `clear_all_cached_values()` whenever cell values change.
-pub struct ConditionalFormattingEvaluator<S> {
+pub struct ConditionalFormattingEvaluator<W> {
     workbook_evaluator: Arc<WorkbookEvaluator>,
-    workbook: Arc<dyn Workbook<S>>,
+    workbook: W,
 
     /// All the underlying structures, for both HSSF and XSSF, repeatedly go to the raw bytes/XML for the
     /// different pieces used in the ConditionalFormatting* structures.  That's highly inefficient,

@@ -45,12 +45,13 @@ fn impl_item_fn(
         Err(error) => return Err(error),
     };
 
-    let headers = headers.into_iter()
-    .filter(|header| !header.value().trim().is_empty() )
-    .enumerate()
+    let headers = headers
+        .into_iter()
+        .filter(|header| !header.value().trim().is_empty())
+        .enumerate()
         .map(|(index, header)| {
-            let header = Ident::new(& header.value().trim(), Span::call_site());
-            let var_name = Ident::new(& format!("__required_header_{}", index), Span::call_site());
+            let header = Ident::new(&header.value().trim(), Span::call_site());
+            let var_name = Ident::new(&format!("__required_header_{}", index), Span::call_site());
             quote! {
                 #var_name : ::next_web::extract::RequiredHeader<::next_web::header_names::#header>
             }
@@ -70,7 +71,7 @@ fn impl_item_fn(
             if method_.is_some() {
                 return Err(syn::Error::new_spanned(
                     method_,
-                    "Method should not be added to parameters other than RequestMapping",
+                    "Method should not be added to parameters other than request_mapping",
                 ));
             }
             method.to_ident()
@@ -108,6 +109,17 @@ fn impl_item_fn(
     let vis = &item_fn.vis;
     let name = &item_fn.sig.ident;
 
+    let api_doc_block = if cfg!(feature = "api-doc") {
+        quote! {
+            if let Some(mut __open_api) =  __context.open_api.take() {
+                __open_api = __open_api.routes( ::next_web::api_doc::routes!(#name));
+                __context.open_api.replace(__open_api);
+            };
+        }
+    } else {
+        quote! {}
+    };
+
     let stream = quote! {
         #(#doc_attributes)*
         #[allow(non_camel_case_types)]
@@ -119,6 +131,8 @@ fn impl_item_fn(
                 __context:  &'a mut ::next_web::configurer::http_method_handler_configurer::RouterContext
             ) -> ::next_web::Router {
                 #block
+
+                #api_doc_block
 
                 __router.route(#path, ::next_web::routing::#method(#name))
             }
@@ -474,6 +488,9 @@ fn generate_block(
         {
             #verify_content_type
 
+            #[allow(unused_imports)]
+            use ::next_web::response::IntoResponse;
+
             let result #return_type  =
             #async_
             {
@@ -510,13 +527,13 @@ macro_rules! standard_method_type {
         }
 
         impl Method {
-            fn as_str(&self) -> &'static str {
+            pub fn as_str(&self) -> &'static str {
                 match self {
                     $(Self::$variant => stringify!($variant),)+
                 }
             }
 
-            fn as_lowercase_str(&self) -> &'static str {
+            pub fn as_lowercase_str(&self) -> &'static str {
                 match self {
                     $(Self::$variant => stringify!($lower),)+
                 }
@@ -535,9 +552,22 @@ macro_rules! standard_method_type {
                 }
             }
 
-            fn values() -> Vec<&'static str> {
+            /// post_mapping -> post
+            /// request_mapping -> ???
+            pub fn parse_mapping(var: &str) -> Result<Self, String> {
+                let mapping = match var.split_once("_").map(|(s, _)| s.trim_end()) {
+                    Some(s) => s,
+                    None => var,
+                };
+                match mapping {
+                    $(stringify!($lower) => Ok(Self::$variant),)+
+                    _ => Err(format!("HTTP method must be uppercase: `{}`", mapping)),
+                }
+            }
+
+            pub fn values() -> Vec<&'static str> {
                 vec![
-                    "GetMapping", "PostMapping", "PutMapping", "DeleteMapping", "PatchMapping", "RequestMapping", "AnyMapping"
+                    "get_mapping", "post_mapping", "put_mapping", "delete_mapping", "patch_mapping", "request_mapping", "any_mapping"
                 ]
             }
 

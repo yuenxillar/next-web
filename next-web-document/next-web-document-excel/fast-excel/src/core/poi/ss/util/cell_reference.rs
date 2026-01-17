@@ -190,9 +190,9 @@ impl CellReference {
             }
 
             // Character is uppercase letter, find relative value to A
-            retval = (retval * 26) + (*ch as i32 - 'A' as i32 + 1);
+            retval = (retval * 26) + (*ch as u32 - 'A' as u32 + 1);
         }
-        retval - 1
+        (retval - 1) as i32
     }
 
     /// Classifies an identifier as either a simple (2D) cell reference or a named range name

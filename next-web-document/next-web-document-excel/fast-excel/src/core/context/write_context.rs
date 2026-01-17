@@ -1,5 +1,6 @@
 use crate::core::{
     enums::write_type::WriteType,
+    error::excel_error::ExcelError,
     write::metadata::{
         holder::{
             write_holder::WriteHolder, write_sheet_holder::WriteSheetHolder,
@@ -11,9 +12,13 @@ use crate::core::{
 };
 
 pub trait WriteContext {
-    fn current_sheet(&self, write_sheet: WriteSheet, write_type: WriteType);
+    fn current_sheet(
+        &self,
+        write_sheet: WriteSheet,
+        write_type: WriteType,
+    ) -> Result<(), ExcelError>;
 
-    fn current_table(&self, write_table: WriteTable);
+    fn current_table(&self, write_table: WriteTable) -> Result<(), ExcelError>;
 
     fn write_workbook_holder(&mut self) -> &mut WriteWorkbookHolder;
 
@@ -21,7 +26,7 @@ pub trait WriteContext {
 
     fn write_table_holder(&mut self) -> &mut WriteTableHolder;
 
-    fn current_write_holder<T: WriteHolder>(&self) -> &T;
+    fn current_write_holder(&self) -> &dyn WriteHolder;
 
     fn finish(&mut self, on_rror: bool);
 }

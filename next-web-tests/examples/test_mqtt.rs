@@ -1,9 +1,9 @@
 use axum::response::IntoResponse;
 use axum::Json;
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web::application::Application;
 use next_web::extract::find_singleton::FindSingleton;
 use next_web::Singleton;
+use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_mqtt::core::topic::base_topic::BaseTopic;
 use next_web_mqtt::service::mqtt_service::MQTTService;
 
@@ -15,7 +15,12 @@ impl Application for TestApplication {
     type ErrorSolve = ();
 
     /// initialize the middleware.
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 
     // get the application router. (open api  and private api)
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {

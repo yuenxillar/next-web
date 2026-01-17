@@ -2,7 +2,7 @@ use next_web_core::{traits::required::Required, util::locale::Locale};
 
 use crate::core::{converters::converter::Converter, metadata::basic_parameter::BasicParameter};
 
-pub trait ParameterBuilder<C>
+pub trait ParameterBuilder<T, C>
 where
     C: Required<BasicParameter>,
 {
@@ -11,7 +11,7 @@ where
         self
     }
 
-    fn register_converter<T: Converter>(&mut self, converter: T) -> &mut Self {
+    fn register_converter<V: Converter>(&mut self, converter: V) -> &mut Self {
         self.parameter()
             .get_mut_object()
             .push_custom_converter(converter);

@@ -10,4 +10,5 @@ pub mod numeric_cell_type;
 pub mod read_default_return;
 pub mod vertical_alignment;
 pub mod write_direction;
+pub mod write_last_row_type;
 pub mod write_type;

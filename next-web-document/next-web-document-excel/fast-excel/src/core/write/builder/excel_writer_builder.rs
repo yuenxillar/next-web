@@ -1,12 +1,7 @@
-use std::path::Path;
-
-#[cfg(feature = "async")]
-use tokio::fs::File;
-
-#[cfg(not(feature = "async"))]
-use std::fs::File;
+use std::{marker::PhantomData, path::Path};
 
 use crate::core::{
+    error::excel_error::ExcelError,
     excel_writer::ExcelWriter,
     metadata::parameter_builder::ParameterBuilder,
     support::excel_type::ExcelType,
@@ -20,11 +15,18 @@ use crate::core::{
 };
 use tracing::error;
 
-pub struct ExcelWriterBuilder {
+#[cfg(not(feature = "async"))]
+use std::{fs::File, io::Write};
+#[cfg(feature = "async")]
+use tokio::{fs::File, io::AsyncWrite as Write};
+
+pub struct ExcelWriterBuilder<T> {
     write_workbook: WriteWorkbook,
+
+    _marker: PhantomData<T>,
 }
 
-impl ExcelWriterBuilder {
+impl<T> ExcelWriterBuilder<T> {
     pub fn password<P>(&mut self, password: P) -> &mut Self
     where
         P: Into<Box<str>>,
@@ -48,18 +50,26 @@ impl ExcelWriterBuilder {
         self
     }
 
-    pub fn with_bom(&mut self, with_bom: bool) -> &mut Self {
+    pub fn with_bom(mut self, with_bom: bool) -> Self {
         self.write_workbook.set_with_bom(with_bom);
         self
     }
 
-    pub fn file(&mut self, file: File) -> &mut Self {
+    pub fn file(mut self, file: File) -> Self {
         self.write_workbook.set_file(file);
         self
     }
 
+    pub fn writer<W>(mut self, writer: W) -> Self
+    where
+        W: Write + 'static,
+    {
+        self.write_workbook.set_writer(Box::new(writer));
+        self
+    }
+
     #[cfg(feature = "async")]
-    pub async fn file_with_path<P>(&mut self, output_path_name: P) -> &mut Self
+    pub async fn file_with_path<P>(self, output_path_name: P) -> Self
     where
         P: AsRef<Path>,
     {
@@ -77,7 +87,7 @@ impl ExcelWriterBuilder {
     }
 
     #[cfg(not(feature = "async"))]
-    pub fn file_with_path<P>(&mut self, output_path_name: P) -> &mut Self
+    pub fn file_with_path<P>(mut self, output_path_name: P) -> Self
     where
         P: AsRef<Path>,
     {
@@ -133,36 +143,39 @@ impl ExcelWriterBuilder {
         }
     }
 
-    pub fn build(self) -> ExcelWriter {
-        ExcelWriter::new(self.write_workbook)
+    pub fn build(self) -> Result<ExcelWriter, ExcelError> {
+        Ok(ExcelWriter::new(self.write_workbook)?)
     }
 
-    pub fn sheet(self) -> ExcelWriterSheetBuilder {
-        self._sheet_with_no_and_name(None, None)
+    pub fn sheet(self) -> Result<ExcelWriterSheetBuilder, ExcelError> {
+        self._sheet_with_no_and_name::<&str>(None, None)
     }
 
-    pub fn sheet_with_no(self, sheet_no: u32) -> ExcelWriterSheetBuilder {
-        self._sheet_with_no_and_name(Some(sheet_no), None)
+    pub fn sheet_with_no(self, sheet_no: u32) -> Result<ExcelWriterSheetBuilder, ExcelError> {
+        self._sheet_with_no_and_name::<&str>(Some(sheet_no), None)
     }
 
-    pub fn sheet_with_name(self, sheet_name: &str) -> ExcelWriterSheetBuilder {
+    pub fn sheet_with_name<S: Into<String>>(
+        self,
+        sheet_name: S,
+    ) -> Result<ExcelWriterSheetBuilder, ExcelError> {
         self._sheet_with_no_and_name(None, Some(sheet_name))
     }
 
-    pub fn sheet_with_no_and_name(
+    pub fn sheet_with_no_and_name<S: Into<String>>(
         self,
         sheet_no: u32,
-        sheet_name: &str,
-    ) -> ExcelWriterSheetBuilder {
+        sheet_name: S,
+    ) -> Result<ExcelWriterSheetBuilder, ExcelError> {
         self._sheet_with_no_and_name(Some(sheet_no), Some(sheet_name))
     }
 
-    fn _sheet_with_no_and_name(
+    fn _sheet_with_no_and_name<S: Into<String>>(
         self,
         sheet_no: Option<u32>,
-        sheet_name: Option<&str>,
-    ) -> ExcelWriterSheetBuilder {
-        let excel_writer = self.build();
+        sheet_name: Option<S>,
+    ) -> Result<ExcelWriterSheetBuilder, ExcelError> {
+        let excel_writer = self.build()?;
 
         let mut excel_writer_sheet_builder = ExcelWriterSheetBuilder::new(excel_writer);
 
@@ -171,26 +184,27 @@ impl ExcelWriterBuilder {
         }
 
         if let Some(sheet_name) = sheet_name {
-            excel_writer_sheet_builder.set_sheet_name(sheet_name);
+            excel_writer_sheet_builder.set_sheet_name(sheet_name.into());
         }
 
-        excel_writer_sheet_builder
+        Ok(excel_writer_sheet_builder)
     }
 }
 
-impl ExcelWriterParameterBuilder<WriteWorkbook> for ExcelWriterBuilder {}
+impl<T> ExcelWriterParameterBuilder<T, WriteWorkbook> for ExcelWriterBuilder<T> {}
 
-impl ParameterBuilder<WriteWorkbook> for ExcelWriterBuilder {
+impl<T> ParameterBuilder<T, WriteWorkbook> for ExcelWriterBuilder<T> {
     fn parameter(&mut self) -> &mut WriteWorkbook {
         &mut self.write_workbook
     }
 }
 
-impl Default for ExcelWriterBuilder {
+impl<T> Default for ExcelWriterBuilder<T> {
     fn default() -> Self {
         Self {
             // Initialize fields
             write_workbook: Default::default(),
+            _marker: PhantomData,
         }
     }
 }

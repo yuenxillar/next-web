@@ -14,17 +14,25 @@ impl<T> ReadListenerWrapper<T> {
     }
 }
 
-impl<T, L> ReadListener<L> for ReadListenerWrapper<T>
+impl<T, T1> ReadListener<T1> for ReadListenerWrapper<T>
 where
-    T: ReadListener<L>,
+    T: ReadListener<T1>,
     T: Clone,
 {
     fn on_error(
         &self,
         error: BoxError,
-        context: &mut dyn AnalysisContext<L>,
+        context: &mut dyn AnalysisContext<T1>,
     ) -> Result<(), BoxError> {
         self.0.on_error(error, context)
+    }
+
+    fn invoke(&mut self, data: &T1, context: &mut dyn AnalysisContext<T1>) -> Result<(), BoxError> {
+        self.0.invoke(data, context)
+    }
+
+    fn do_after_all_analysed(&mut self, context: &mut dyn AnalysisContext<T1>) {
+        self.0.do_after_all_analysed(context)
     }
 }
 

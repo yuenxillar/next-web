@@ -30,10 +30,12 @@ pub use rand;
 pub use rudi_dev::{SingleOwner, Singleton, Transient};
 
 pub use next_web_core::*;
-pub use next_web_macros::Idempotency;
+pub use next_web_macros::api_doc;
+pub use next_web_macros::idempotency;
+pub use next_web_macros::properties;
 pub use next_web_macros::{
-    AnyMapping, DeleteMapping, GetMapping, PatchMapping, PostMapping, PutMapping, RequestMapping,
-    Properties
+    any_mapping, delete_mapping, get_mapping, patch_mapping, post_mapping, put_mapping,
+    request_mapping,
 };
 
 pub use next_web_macros::Desensitized;
@@ -46,14 +48,17 @@ pub mod state_machine;
 pub use next_web_macros::Scheduled;
 
 #[cfg(feature = "enable-web-security")]
-pub use next_web_macros::PreAuthorize;
+pub use next_web_macros::pre_authorize;
 #[cfg(feature = "enable-web-security")]
 pub use next_web_security as security;
 
 #[cfg(feature = "enable-retry")]
-pub use next_web_macros::Retryable;
+pub use next_web_macros::retryable;
 #[cfg(feature = "enable-retry")]
 pub use next_web_retry as retry;
+
+#[cfg(feature = "enable-api-doc")]
+pub use next_web_api_doc as api_doc;
 
 #[cfg(feature = "enable-i18n")]
 pub mod i18n;

@@ -18,8 +18,9 @@ next-web-core       = { workspace = true }
 next-web-macros     = { workspace = true }
 next-web-security   = { workspace = true, optional = true }
 next-web-retry      = { workspace = true, optional = true }
+next-web-api-doc    = { workspace = true, optional = true }
 
-tokio = { workspace = true, features = ["signal", "macros", "net", "fs"] }
+tokio = { workspace = true, features = ["sync", "signal","net", "fs"] }
 axum = { workspace = true, features = ["http2"] }
 axum-core = { workspace = true }
 axum-server = { version = "0.7.1", features = ["tls-rustls"], optional = true }
@@ -52,6 +53,8 @@ validator = { workspace = true}
 thiserror = { workspace = true }
 inventory = { workspace = true }
 
+utoipa = { workspace = true, optional = true }
+utoipa-swagger-ui  = { workspace = true, optional = true }
 
 rudi-dev = { workspace = true }
 
@@ -78,8 +81,8 @@ mimalloc = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = ["enable-i18n", "enable-state-machine", "decrypt-properties"]
-full = ["enable-scheduling", "enable-web-security", "enable-retry", "enable-i18n", "decrypt-properties"]
+default = ["enable-i18n", "enable-state-machine", "decrypt-properties", "enable-api-doc"]
+full = ["enable-scheduling", "enable-web-security", "enable-retry", "enable-i18n", "decrypt-properties", "enable-api-doc"]
 
 tls-rustls = ["axum-server"]
 
@@ -87,6 +90,7 @@ tls-rustls = ["axum-server"]
 enable-scheduling   = ["tokio-cron-scheduler"]
 enable-web-security = ["next-web-security"]
 enable-retry        = ["next-web-retry"]
+enable-api-doc      = ["next-web-api-doc", "utoipa", "utoipa-swagger-ui"]
 
 enable-grpc = []
 enable-prometheus = ["axum-prometheus"]

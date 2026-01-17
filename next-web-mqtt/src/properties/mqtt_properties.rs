@@ -1,11 +1,11 @@
-use next_web_macros::Properties;
+use next_web_macros::properties;
 use rudi_dev::Singleton;
 
 /// MQTT Client Configuration Properties
 ///
 /// MQTT客户端配置属性
 #[Singleton(default, binds=[Self::into_properties])]
-#[Properties(prefix = "next.mqtt")]
+#[properties(prefix = "next.mqtt")]
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
 pub struct MQTTClientProperties {
     /// Client identifier (optional)

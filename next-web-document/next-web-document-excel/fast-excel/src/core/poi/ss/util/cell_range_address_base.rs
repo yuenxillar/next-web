@@ -1,23 +1,26 @@
 use std::collections::HashSet;
 use std::fmt;
 
+use crate::core::poi::ss::spreadsheet_version::SpreadsheetVersion;
+use crate::core::poi::ss::util::cell_address::CellAddress;
+
 /// See OOO documentation: excelfileformat.pdf sec 2.5.14 - 'Cell Range Address'
 ///
 /// Common superclass of 8-bit and 16-bit versions
 pub struct CellRangeAddressBase {
-    /// First row index (0-based)
-    first_row: u32,
-    /// First column index (0-based)
-    first_col: u32,
-    /// Last row index (0-based, inclusive)
-    last_row: u32,
-    /// Last column index (0-based, inclusive)
-    last_col: u32,
+    /// First row index
+    first_row: i32,
+    /// First column index
+    first_col: i32,
+    /// Last row index
+    last_row: i32,
+    /// Last column index
+    last_col: i32,
 }
 
 impl CellRangeAddressBase {
     /// Creates a new cell range address base
-    pub fn new(first_row: u32, last_row: u32, first_col: u32, last_col: u32) -> Self {
+    pub fn new(first_row: i32, last_row: i32, first_col: i32, last_col: i32) -> Self {
         CellRangeAddressBase {
             first_row,
             last_row,
@@ -69,17 +72,13 @@ impl CellRangeAddressBase {
     /// Check if the range is a full column range
     pub fn is_full_column_range(&self) -> bool {
         // Excel 97 maximum rows
-        const EXCEL97_MAX_ROW: i32 = 65535;
-        (self.first_row == 0 && self.last_row == EXCEL97_MAX_ROW)
+        (self.first_row == 0 && self.last_row == SpreadsheetVersion::Excel97.last_row_index())
             || (self.first_row == -1 && self.last_row == -1)
     }
 
     /// Check if the range is a full row range
     pub fn is_full_row_range(&self) -> bool {
-        // Excel 97 maximum columns
-        const EXCEL97_MAX_COL: i32 = 255;
-        (self.first_col == 0 && self.last_col == EXCEL97_MAX_COL)
-            || (self.first_col == -1 && self.last_col == -1)
+        self.first_col == 0 && self.last_col == SpreadsheetVersion::Excel97.last_column_index()
     }
 
     /// Check if coordinates are within the range
@@ -271,26 +270,5 @@ impl Iterator for RowMajorCellAddressIterator {
         }
 
         Some(addr)
-    }
-}
-
-/// Simple cell address structure
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CellAddress {
-    row: i32,
-    column: i32,
-}
-
-impl CellAddress {
-    pub fn new(row: i32, column: i32) -> Self {
-        CellAddress { row, column }
-    }
-
-    pub fn get_row(&self) -> i32 {
-        self.row
-    }
-
-    pub fn get_column(&self) -> i32 {
-        self.column
     }
 }

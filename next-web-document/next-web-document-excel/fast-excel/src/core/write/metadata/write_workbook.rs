@@ -1,8 +1,13 @@
 #[cfg(feature = "async")]
 use tokio::fs::File;
+#[cfg(feature = "async")]
+use tokio::io::AsyncWrite as Write;
 
 #[cfg(not(feature = "async"))]
 use std::fs::File;
+#[cfg(not(feature = "async"))]
+use std::io::Write;
+
 use std::ops::{Deref, DerefMut};
 
 use next_web_core::traits::required::Required;
@@ -15,6 +20,8 @@ use crate::core::{
 pub struct WriteWorkbook {
     excel_type: Option<ExcelType>,
     file: Option<File>,
+
+    writer: Option<Box<dyn Write>>,
 
     with_bom: Option<bool>,
     template_file: Option<File>,
@@ -41,6 +48,14 @@ impl WriteWorkbook {
 
     pub fn set_file(&mut self, file: File) {
         self.file = Some(file);
+    }
+
+    pub fn get_writer(&self) -> Option<&dyn Write> {
+        self.writer.as_deref()
+    }
+
+    pub fn set_writer(&mut self, writer: Box<dyn Write>) {
+        self.writer = Some(writer);
     }
 
     pub fn get_with_bom(&self) -> Option<bool> {
@@ -124,6 +139,7 @@ impl Default for WriteWorkbook {
             excel_type: None,
             file: None,
             template_file: None,
+            writer: None,
             with_bom: None,
             password: None,
             in_memory: None,

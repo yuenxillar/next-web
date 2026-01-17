@@ -1,25 +1,20 @@
+#[cfg(feature = "enable-api-doc")]
+use next_web_api_doc::OpenApiRouter;
 
-pub struct HttpMethodHandlerConfigurer {
-}
-
-impl HttpMethodHandlerConfigurer {
- 
-}
+pub struct HttpMethodHandlerConfigurer;
 
 impl Default for HttpMethodHandlerConfigurer {
     fn default() -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 
-
-#[derive(Default)]
 pub struct RouterContext {
     pub(crate) state: RouteState,
     pub(crate) index: usize,
 
-    // pub(crate) has_idempotency: bool,
+    #[cfg(feature = "enable-api-doc")]
+    pub open_api: Option<OpenApiRouter>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -33,16 +28,19 @@ pub enum RouteState {
 }
 
 impl RouterContext {
+    #[cfg(feature = "enable-api-doc")]
+    pub fn with_openapi(openapi: utoipa::openapi::OpenApi) -> Self {
+        let mut ctx = Self::default();
+        ctx.open_api = Some(OpenApiRouter::with_openapi(openapi));
+        ctx
+    }
 }
 
 impl Iterator for RouterContext {
     type Item = RouteState;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let elements = [
-            RouteState::Default,
-            RouteState::End,
-        ];
+        let elements = [RouteState::Default, RouteState::End];
 
         if self.index >= elements.len() {
             return None;
@@ -54,5 +52,16 @@ impl Iterator for RouterContext {
         self.index += 1;
 
         result
+    }
+}
+
+impl Default for RouterContext {
+    fn default() -> Self {
+        Self {
+            state: RouteState::None,
+            index: 0,
+            #[cfg(feature = "enable-api-doc")]
+            open_api: None,
+        }
     }
 }

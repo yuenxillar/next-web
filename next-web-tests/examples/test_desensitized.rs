@@ -5,12 +5,12 @@ use axum::{
     http::{Response, StatusCode},
     response::IntoResponse,
 };
+use next_web::application::Application;
+use next_web::{Desensitized, GetSet};
 use next_web_core::{
     async_trait, context::properties::ApplicationProperties, traits::desensitized::Desensitized,
     ApplicationContext,
 };
-use next_web::application::Application;
-use next_web::{Desensitized, GetSet};
 
 #[derive(Clone, Default)]
 struct TestApplication;
@@ -19,7 +19,12 @@ struct TestApplication;
 impl Application for TestApplication {
     type ErrorSolve = ();
     /// initialize the middleware.
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 
     // get the application router. (open api  and private api)
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {

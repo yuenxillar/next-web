@@ -4,6 +4,7 @@ use tracing::debug;
 use crate::core::{
     context::write_context::WriteContext,
     enums::write_type::WriteType,
+    error::excel_error::ExcelError,
     util::{work_book_util::WorkBookUtil, write_handler_utils::WriteHandlerUtils},
     write::metadata::{
         holder::{
@@ -58,11 +59,15 @@ impl WriteContextImpl {
 }
 
 impl WriteContext for WriteContextImpl {
-    fn current_sheet(&self, write_sheet: WriteSheet, write_type: WriteType) {
+    fn current_sheet(
+        &self,
+        write_sheet: WriteSheet,
+        write_type: WriteType,
+    ) -> Result<(), ExcelError> {
         todo!()
     }
 
-    fn current_table(&self, write_table: WriteTable) {
+    fn current_table(&self, write_table: WriteTable) -> Result<(), ExcelError> {
         todo!()
     }
 

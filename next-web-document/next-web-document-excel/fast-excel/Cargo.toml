@@ -13,7 +13,7 @@ once_cell   = { workspace = true }
 regex       = { workspace = true }
 bigdecimal  = { workspace = true }
 indexmap    = { workspace = true }
-# encoding    = { workspace = true }
+encoding    = { workspace = true }
 byteorder   = { workspace = true }
 
 rust_decimal = { version = "1.39.0"}

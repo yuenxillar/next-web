@@ -28,7 +28,7 @@ pub struct DefaultXlsxReadContext<T> {
 }
 
 impl<T> DefaultXlsxReadContext<T> {
-    pub fn new(read_workbook: ReadWorkbook, actual_excel_type: ExcelType) -> Self {
+    pub fn new(read_workbook: ReadWorkbook<T>, actual_excel_type: ExcelType) -> Self {
         DefaultXlsxReadContext {
             analysis_context_impl: AnalysisContextImpl::new(read_workbook, actual_excel_type),
         }
@@ -48,7 +48,7 @@ impl<T> XlsxReadContext<T> for DefaultXlsxReadContext<T> {
 }
 
 impl<T> AnalysisContext<T> for DefaultXlsxReadContext<T> {
-    fn current_sheet(&self, read_sheet: &ReadSheet) {
+    fn current_sheet(&self, read_sheet: &ReadSheet<T>) {
         self.analysis_context_impl.current_sheet(read_sheet)
     }
 

@@ -16,6 +16,7 @@ from-attr = { workspace = true }
 inventory = { workspace = true }
 
 [features]
-default = ["data", "register"]
+default = ["data", "register", "api-doc"]
 data = []
 register = []
+api-doc = []

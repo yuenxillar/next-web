@@ -14,9 +14,9 @@ pub(crate) fn impl_macro_idempotency(attr: TokenStream, mut item_fn: ItemFn) -> 
 
         // Only allow Post requests to pass
         if !&item_fn.attrs.iter().all(|attri| {
-            attri.meta.path().is_ident("PostMapping")
+            attri.meta.path().is_ident("post_mapping")
             ||
-            if attri.meta.path().is_ident("RequestMapping") {
+            if attri.meta.path().is_ident("request_mapping") {
                 match &attri.meta {
                     syn::Meta::List(meta_list) => {
                         meta_list.parse_args_with(syn::punctuated::Punctuated::<syn::Meta, syn::token::Comma>::parse_terminated).map(

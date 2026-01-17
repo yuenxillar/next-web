@@ -4,9 +4,9 @@ use std::error::Error;
 use std::sync::Arc;
 
 use axum::extract::ws::CloseFrame;
-use next_web_core::context::properties::ApplicationProperties;
 use next_web::application::Application;
-use next_web::{async_trait, Singleton};
+use next_web::{async_trait, ApplicationContext, Singleton};
+use next_web_core::context::properties::ApplicationProperties;
 use next_web_websocket::handler::websocket_handler::{Result, WebSocketHandler};
 use next_web_websocket::model::session::WebSocketSession;
 use next_web_websocket::Message;
@@ -71,7 +71,12 @@ impl Application for TestWSApplication {
     type ErrorSolve = ();
 
     /// initialize the middleware.
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 }
 
 #[tokio::main]

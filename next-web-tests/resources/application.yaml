@@ -37,6 +37,6 @@ next:
 
   logging:
     format: "%Y-%m-%d %H:%M:%S%.3f"
-    level: trace
+    level: info
 windows:
   computername: ${COMPUTERNAME}

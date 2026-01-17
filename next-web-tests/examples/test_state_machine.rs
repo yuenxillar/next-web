@@ -1,9 +1,5 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use next_web_core::{
-    anys::any_value::AnyValue, async_trait, context::properties::ApplicationProperties,
-    ApplicationContext,
-};
 use next_web::{
     application::Application,
     state_machine::{
@@ -11,6 +7,10 @@ use next_web::{
         state_machine_context::StateContext, state_machine_generator::StateMachineGenerator,
         EventMessage, StateMachineAction, StateMachineListener, Transition,
     },
+};
+use next_web_core::{
+    anys::any_value::AnyValue, async_trait, context::properties::ApplicationProperties,
+    ApplicationContext,
 };
 
 #[derive(Clone)]
@@ -109,7 +109,12 @@ impl Application for TestApplication {
     type ErrorSolve = ();
 
     /// initialize the middleware.
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 
     // get the application router. (open api  and private api)
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {

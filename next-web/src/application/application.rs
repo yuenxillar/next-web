@@ -31,7 +31,7 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 #[allow(unused_imports)]
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::application::next_application::NextApplication;
 
@@ -70,7 +70,24 @@ where
     type ErrorSolve: ErrorSolver;
 
     /// Initialize the middleware.
-    async fn init_middleware(&self, properties: &ApplicationProperties);
+    async fn init_middleware(
+        &self,
+        ctx: &mut ApplicationContext,
+        properties: &ApplicationProperties,
+    );
+
+    /// Initialize the api doc.
+    #[cfg(feature = "enable-api-doc")]
+    #[allow(unused_variables)]
+    async fn api_doc(&self, ctx: &mut ApplicationContext) -> utoipa::openapi::OpenApi {
+        use utoipa::OpenApi;
+
+        #[derive(utoipa::OpenApi)]
+        #[openapi(info(title = "API Documentation", version = "0.1.0"))]
+        struct ApiDoc;
+
+        ApiDoc::openapi()
+    }
 
     /// Before starting the application
     #[allow(unused_variables)]
@@ -115,7 +132,7 @@ where
         } else if let Some(msg) = err.downcast_ref::<&str>() {
             msg.to_string()
         } else {
-            error!("Service panicked but `CatchPanic` was unable to downcast the panic info");
+            warn!("Service panicked but `CatchPanic` was unable to downcast the panic info");
             String::with_capacity(0)
         };
 
@@ -301,13 +318,19 @@ where
     // Get the application router.
     #[allow(unused_variables)]
     async fn application_router(&self, ctx: &mut ApplicationContext) -> Router {
-        let mut context = RouterContext::default();
+        let mut context = if cfg!(feature = "enable-api-doc") {
+            let openapi = self.api_doc(ctx).await;
+            RouterContext::with_openapi(openapi)
+        } else {
+            RouterContext::default()
+        };
 
         let iterator = inventory::iter::<&dyn HttpHandlerAutoRegister>
             .into_iter()
             .collect::<Vec<_>>();
 
         let mut router = Router::new();
+
         while let Some(state) = context.next() {
             let len = iterator.len();
 
@@ -321,6 +344,11 @@ where
                 }
             }
         }
+
+        // insert open_api
+        #[cfg(feature = "enable-api-doc")]
+        ctx.insert_singleton(context.open_api.unwrap());
+
         router
     }
 
@@ -451,11 +479,30 @@ where
         // 7. On Ready
         self.on_ready(&mut ctx).await;
 
-        // 8. Add State to [Context]
-        app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
+        #[cfg(feature = "enable-api-doc")]
+        let mut openapi_router = ctx
+            .get_single::<next_web_api_doc::OpenApiRouter>()
+            .to_owned();
 
-        // 9. Nest context path
-        let app = match context_path.is_empty() {
+        #[cfg(feature = "enable-api-doc")]
+        {
+            // Api Doc
+            app = app
+                .route("/api-docs/openapi.json", axum::routing::get(openapi))
+                .merge(
+                    utoipa_swagger_ui::SwaggerUi::new("/swagger-ui").config(
+                        utoipa_swagger_ui::Config::new([
+                            "http://127.0.0.1:11000/api-docs/openapi.json",
+                        ])
+                        .filter(true)
+                        .with_credentials(true)
+                        .persist_authorization(true),
+                    ),
+                );
+        }
+
+        // 8. Nest context path
+        let mut app = match context_path.is_empty() {
             true => app,
             _ => {
                 let router = Router::new();
@@ -463,9 +510,21 @@ where
                 #[cfg(feature = "trace-log")]
                 info!("Nest context path: {}", context_path);
 
+                #[cfg(feature = "enable-api-doc")]
+                {
+                    openapi_router =
+                        openapi_router.nest(context_path, next_web_api_doc::OpenApiRouter::new());
+                }
+
                 router.nest(context_path, app)
             }
         };
+
+        #[cfg(feature = "enable-api-doc")]
+        ctx.insert_singleton_with_default_name(openapi_router.to_openapi());
+
+        // 9. Add State to [Context]
+        app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
         #[rustfmt::skip]
         println!("\nApplication Listening on:  {}", format!("{}:{}", server_addr, server_port));
@@ -600,7 +659,7 @@ where
         info!("Infrastructure initialized",);
 
         // Init middleware
-        application.init_middleware(properties).await;
+        application.init_middleware(&mut ctx, properties).await;
         info!("Middleware initialized");
 
         #[cfg(feature = "enable-grpc")]
@@ -641,4 +700,14 @@ async fn http_filter_layer(
     }
 
     Ok(next.run(req).await)
+}
+
+#[cfg(feature = "enable-api-doc")]
+use crate::extract::find_singleton::FindSingleton;
+
+#[cfg(feature = "enable-api-doc")]
+async fn openapi(
+    FindSingleton(openapi): FindSingleton<utoipa::openapi::OpenApi>,
+) -> axum::Json<utoipa::openapi::OpenApi> {
+    axum::Json(openapi)
 }

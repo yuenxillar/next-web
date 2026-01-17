@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 use std::sync::Arc;
 use std::{borrow::Cow, fs, io, path::Path, time::SystemTime};
-use tracing::error;
+use tracing::{error, warn};
 
 use sha2::Digest;
 
@@ -25,10 +25,7 @@ pub struct ApplicationResources {
 impl ResourceLoader for ApplicationResources {
     fn load(&self, path: impl AsRef<str>) -> Option<&[u8]> {
         let path = path.as_ref().replace("\\", "/");
-        let source = match self.files.inner.get(path.as_str()) {
-            Some(source) => source,
-            None => return None,
-        };
+        let source = self.files.inner.get(path.as_str())?;
 
         Some(source.data.as_ref())
     }
@@ -106,14 +103,21 @@ struct Files {
 impl Files {
     fn load_file(config: &Config) -> Self {
         let mut inner = HashMap::new();
-        let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or(
+            std::env::current_dir()
+                .map(|dir| dir.to_str().map(ToString::to_string).unwrap_or_default())
+                .unwrap_or_default(),
+        );
 
         let path = Path::new(&dir).join(RESOURCES);
 
         if !path.exists() {
-            error!("Application resources directory not found!")
+            warn!(
+                "Application resources directory not found, using default resources, {}",
+                path.display()
+            );
         } else {
-            Self::read(&mut inner, &path, config)
+            Self::read_data(&mut inner, &path, config)
                 .map_err(|e| error!("Application resources loading error: {}", e))
                 .ok();
         }
@@ -121,7 +125,7 @@ impl Files {
         Self { inner }
     }
 
-    fn read(
+    fn read_data(
         map: &mut HashMap<Box<str>, ResourceFile>,
         path: &Path,
         config: &Config,
@@ -129,7 +133,7 @@ impl Files {
         if path.is_dir() {
             for entry in path.read_dir()? {
                 if let Ok(entry) = entry {
-                    Self::read(map, &entry.path(), config)?;
+                    Self::read_data(map, &entry.path(), config)?;
                 }
             }
         } else {

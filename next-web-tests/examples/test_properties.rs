@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
 use axum::response::IntoResponse;
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web::{
-    application::Application, extract::find_singleton::FindSingleton, Singleton,
-    Properties
+    application::Application, extract::find_singleton::FindSingleton, properties, Singleton,
 };
+use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 
 #[derive(Clone, Default)]
 struct TestApplication;
@@ -15,7 +14,12 @@ impl Application for TestApplication {
     type ErrorSolve = ();
 
     /// initialize the middleware.
-    async fn init_middleware(&self, _properties: &ApplicationProperties) {}
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
 
     // get the application router. (open api  and private api)
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
@@ -60,7 +64,7 @@ async fn req_redis_dynamic_properties(
 // 示例 用于获取配置文件的参数值
 // Example, used to obtain parameter values for configuration files
 #[Singleton(default, binds=[Self::into_properties])]
-#[Properties(prefix = "next.data.redis")]
+#[properties(prefix = "next.data.redis")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct TestRedisProperties {
     pub host: Option<String>,
@@ -70,7 +74,7 @@ pub struct TestRedisProperties {
 }
 
 #[Singleton(default, binds=[Self::into_properties])]
-#[Properties(prefix = "next.data.redis.dynamic", dynamic)]
+#[properties(prefix = "next.data.redis.dynamic", dynamic)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct TestDynamicRedisProperties {
     /// This is necessary, try not to change it as much as possible

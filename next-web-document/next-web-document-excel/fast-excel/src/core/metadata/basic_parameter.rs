@@ -2,7 +2,7 @@ use next_web_core::util::locale::Locale;
 
 use crate::core::converters::converter::Converter;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct BasicParameter {
     head: Option<Vec<Vec<Box<str>>>>,
     // _type: Option<String>,

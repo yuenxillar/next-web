@@ -311,8 +311,8 @@ impl GenericRecordUtil {
 
         // Process each pair
         let pairs = [
-            (val1, sup1),
-            (val2, sup2),
+            (Some(val1), Some(sup1)),
+            (Some(val2), Some(sup2)),
             (val3, sup3),
             (val4, sup4),
             (val5, sup5),
@@ -322,16 +322,22 @@ impl GenericRecordUtil {
             (val9, sup9),
         ];
 
-        for (key, supplier) in pairs {
+        for (key, value) in pairs {
             if let Some(k) = key {
                 if k == "base" {
-                    if let Some(s) = supplier {
-                        let base_map = s();
-                        // In Rust, we need type-safe handling here
-                        // This would require a more sophisticated approach
-                    }
-                } else if let Some(s) = supplier {
-                    map.insert(k.to_string(), s);
+                    let value = match value {
+                        Some(value) => value,
+                        None => continue,
+                    };
+
+                    let m = match value {
+                        AnyValue::Map(map) => map,
+                        _ => continue,
+                    };
+
+                    map.extend(m);
+                } else if let Some(value) = value {
+                    map.insert(k.to_string(), value);
                 }
             }
         }

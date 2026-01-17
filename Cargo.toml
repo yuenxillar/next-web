@@ -13,7 +13,10 @@ members = [
     "next-web-tests",
     "next-web-utils",
     "next-web-websocket",
-    "next-web-wechat"
+    "next-web-wechat",
+    "next-web-api-doc",
+    "next-web-actuator",
+    "next-web-pay",
 ]
 resolver = "2"
 
@@ -61,6 +64,7 @@ next-web-ai       = {  version = "0.1.0", path = "./next-web-ai" }
 # next-web-common = { version = "0.1.0" }
 next-web-core       = {  version = "0.1.4", path = "./next-web-core" }
 next-web = { version = "0.1.7", path = "./next-web" }
+next-web-api-doc = { version = "0.1.0", path = "./next-web-api-doc" }
 next-web-document = { version = "0.1.0", path = "./next-web-document" }
 next-web-email = { version = "0.1.0", path = "./next-web-email" }
 next-web-ip = { version = "0.1.0", path = "./next-web-ip" }
@@ -102,6 +106,7 @@ serde_path_to_error = { version = "0.1.17" }
 
 
 utoipa = { version =  "5.4.0" }
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "reqwest"] }
 
 # document
 calamine = { version = "0.26.1" }

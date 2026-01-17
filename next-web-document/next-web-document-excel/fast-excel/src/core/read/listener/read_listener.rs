@@ -12,8 +12,14 @@ where
     fn on_error(
         &self,
         error: BoxError,
-        context: &mut dyn AnalysisContext<T>,
-    ) -> Result<(), BoxError>;
+        _context: &mut dyn AnalysisContext<T>,
+    ) -> Result<(), BoxError> {
+        Err(error)
+    }
+
+    fn invoke(&mut self, data: &T, context: &mut dyn AnalysisContext<T>) -> Result<(), BoxError>;
+
+    fn do_after_all_analysed(&mut self, context: &mut dyn AnalysisContext<T>);
 }
 
 clone_trait_object!(<T> ReadListener<T> where Self: Listener, Self: DynClone);

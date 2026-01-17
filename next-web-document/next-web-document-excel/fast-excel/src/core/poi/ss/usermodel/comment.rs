@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::core::poi::ss::{
     usermodel::{client_anchor::ClientAnchor, rich_text_string::RichTextString},
-    util::cell_range_address_base::CellAddress,
+    util::cell_address::CellAddress,
 };
 
 /// Represents a cell comment in a spreadsheet.

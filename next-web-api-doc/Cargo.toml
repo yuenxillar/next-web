@@ -1,0 +1,20 @@
+[package]
+name = "next-web-api-doc"
+version = "0.1.0"
+edition = "2021"
+description = "Api Doc"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+utoipa = { workspace = true }
+
+paste = "1.0.15"
+
+[lints]
+workspace = true
+
+[features]
+default = []
+debug = ["utoipa/debug"]

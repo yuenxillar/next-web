@@ -51,22 +51,24 @@ impl AutoRegister for MQTTServiceAutoRegister {
 
         // 根据主题选择不同的路由方式
         // Select different routing methods based on the topic
-        base_topics.into_iter().for_each(|item| {
-            let topic = item.topic();
-            if topic.contains("#") || topic.contains("+") {
-                route.push(TopicRoute::new(topic, item));
-            } else {
-                // 遍历所有 `BaseTopic` 并将其主题名插入哈希表，此处为静态主题例如 /test
-                // Iterate over all `BaseTopic` and insert their topic names into the hash map, which is static topic such as /test
-                route_map.insert(topic.into(), item);
-            }
-        });
+        base_topics
+            .into_iter()
+            .filter(|item| !item.topic().is_empty())
+            .for_each(|item| {
+                let topic = item.topic();
+                if topic.contains("#") || topic.contains("+") {
+                    route.push(TopicRoute::new(topic, item));
+                } else {
+                    // 遍历所有 `BaseTopic` 并将其主题名插入哈希表，此处为静态主题例如 /test
+                    // Iterate over all `BaseTopic` and insert their topic names into the hash map, which is static topic such as /test
+                    route_map.insert(topic.into(), item);
+                }
+            });
 
         // 尝试从上下文中解析消息拦截器
         // Attempt to resolve a message interceptor from the context
         let var = ctx.resolve_option::<Box<dyn MessageInterceptor>>();
 
-        
         let interceptor = if let Some(var1) = var {
             // 如果解析成功，直接使用解析到的拦截器
             // If resolution succeeds, use the resolved interceptor directly

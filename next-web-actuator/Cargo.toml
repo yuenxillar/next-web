@@ -1,0 +1,17 @@
+[package]
+name = "next-web-actuator"
+rust-version.workspace = true
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+include.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

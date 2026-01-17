@@ -1,18 +1,16 @@
-use next_web_core::traits::required::Required;
-use std::ops::DerefMut;
-
 use crate::core::{
     metadata::{basic_parameter::BasicParameter, parameter_builder::ParameterBuilder},
     write::{
         handler::write_handler::WriteHandler, metadata::write_basic_parameter::WriteBasicParameter,
     },
 };
+use next_web_core::traits::required::Required;
 
-pub trait ExcelWriterParameterBuilder<C>
+pub trait ExcelWriterParameterBuilder<T, C>
 where
     C: Required<WriteBasicParameter>,
     C: Required<BasicParameter>,
-    Self: ParameterBuilder<C>,
+    Self: ParameterBuilder<T, C>,
 {
     fn relative_head_row_index(&mut self, relative_head_row_index: u32) -> &mut Self {
         let parameter: &mut WriteBasicParameter = self.parameter().get_mut_object();
@@ -27,7 +25,7 @@ where
         self
     }
 
-    fn register_write_handler<T: WriteHandler>(&mut self, write_handler: T) -> &mut Self {
+    fn register_write_handler<H: WriteHandler>(&mut self, write_handler: H) -> &mut Self {
         let parameter: &mut WriteBasicParameter = self.parameter().get_mut_object();
         parameter.push_custom_write_handler_list(write_handler);
         self

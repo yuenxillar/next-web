@@ -8,7 +8,6 @@ use crate::web::idempotency::impl_macro_idempotency;
 use crate::web::pre_authorize::impl_macro_pre_authorize;
 use crate::web::properties::impl_macro_properties;
 use crate::web::retry::impl_macro_retry;
-use crate::web::scheduled::impl_macro_scheduled;
 
 use data::desensitized::impl_macro_desensitized;
 use proc_macro::TokenStream;
@@ -284,11 +283,11 @@ pub fn desensitized(input: TokenStream) -> TokenStream {
 }
 
 // =============================== Web ===============================
-//
+
 #[doc = ""]
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
-pub fn Properties(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn properties(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as ItemStruct);
     impl_macro_properties(attr, item)
 }
@@ -296,7 +295,7 @@ pub fn Properties(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[doc = ""]
 #[proc_macro_attribute]
 #[allow(non_snake_case)]
-pub fn RequestMapping(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn request_mapping(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::routing::with_method(None, args, input)
 }
 
@@ -315,40 +314,53 @@ macro_rules! method_macro {
     };
 }
 
-method_macro!(GetMapping, Get);
-method_macro!(PostMapping, Post);
-method_macro!(PutMapping, Put);
-method_macro!(DeleteMapping, Delete);
-method_macro!(PatchMapping, Patch);
-method_macro!(AnyMapping, Any);
+method_macro!(get_mapping, Get);
+method_macro!(post_mapping, Post);
+method_macro!(put_mapping, Put);
+method_macro!(delete_mapping, Delete);
+method_macro!(patch_mapping, Patch);
+method_macro!(any_mapping, Any);
 
-#[doc = "A procedural macro attribute for defining scheduled tasks.\n\n\
-         This attribute can be applied to a function to register it as a scheduled job\n\
-         with configurable timing behavior. It supports three scheduling modes:\n\n\
-         - **Cron-based scheduling**: via the `cron` parameter (e.g., `\"0 0 2 * * *\"`).\n\
-         - **Fixed-rate execution**: via the `fixed_rate` parameter (executes repeatedly at fixed intervals).\n\
-         - **One-shot execution**: when `one_shot = true`, the task runs once after an optional `initial_delay`.\n\n\
-         # Parameters\n\n\
-         - `cron`: A cron expression in 6-field format (seconds, minutes, hours, day-of-month, month, day-of-week). \n\
-           Mutually exclusive with `fixed_rate`.\n\
-         - `fixed_rate`: Interval between executions (as a positive integer literal). \n\
-           Mutually exclusive with `cron`.\n\
-         - `initial_delay`: Delay before the first execution (in units specified by `time_unit`).\n\
-         - `timezone`: IANA time zone ID (e.g., `\"Asia/Shanghai\"`, `\"UTC\"`). \n\
-           If empty or omitted, the scheduler's default time zone is used.\n\
-         - `time_unit`: Time unit for `fixed_rate` and `initial_delay` (e.g., `\"ms\"`, `\"s\"`, `\"m\"`). \n\
-           Interpretation depends on the underlying scheduler.\n\
-         - `one_shot`: If `true`, the task runs exactly once (typically after `initial_delay`). \n\
-           In this mode, `cron` and `fixed_rate` are ignored.\n\n\
-         # Examples\n\n\
-         ```rust\n\
-         #[Scheduled(cron = \"0 0 3 * * *\", timezone = \"UTC\")]\n\
-         fn daily_cleanup() { /* ... */ }\n\n\
-         #[scheduled(fixed_rate = 30, time_unit = \"s\", initial_delay = 5)]\n\
-         fn heartbeat() { /* ... */ }\n\n\
-         #[Scheduled(one_shot = true, initial_delay = 10, time_unit = \"s\")]\n\
-         fn delayed_init() { /* ... */ }\n\
-         ```"]
+#[proc_macro_attribute]
+pub fn api_doc(args: TokenStream, input: TokenStream) -> TokenStream {
+    crate::web::api_doc::impl_macro_api_doc(args, input)
+}
+
+/// A procedural macro attribute for defining scheduled tasks.
+///
+/// This attribute can be applied to a function to register it as a scheduled job
+/// with configurable timing behavior. It supports three scheduling modes:
+///
+/// - **Cron-based scheduling**: via the `cron` parameter (e.g., `"0 0 2 * * *"`).
+/// - **Fixed-rate execution**: via the `fixed_rate` parameter (executes repeatedly at fixed intervals).
+/// - **One-shot execution**: when `one_shot = true`, the task runs once after an optional `initial_delay`.
+///
+/// # Parameters
+///
+/// - `cron`: A cron expression in 6-field format (seconds, minutes, hours, day-of-month, month, day-of-week).
+///   Mutually exclusive with `fixed_rate`.
+/// - `fixed_rate`: Interval between executions (as a positive integer literal).
+///   Mutually exclusive with `cron`.
+/// - `initial_delay`: Delay before the first execution (in units specified by `time_unit`).
+/// - `timezone`: IANA time zone ID (e.g., `"Asia/Shanghai"`, `"UTC"`).
+///   If empty or omitted, the scheduler's default time zone is used.
+/// - `time_unit`: Time unit for `fixed_rate` and `initial_delay` (e.g., `"ms"`, `"s"`, `"m"`).
+///   Interpretation depends on the underlying scheduler.
+/// - `one_shot`: If `true`, the task runs exactly once (typically after `initial_delay`).
+///   In this mode, `cron` and `fixed_rate` are ignored.
+///
+/// # Examples
+///
+/// ```rust
+/// #[Scheduled(cron = "0 0 3 * * *", timezone = "UTC")]
+/// fn daily_cleanup() { /* ... */ }
+///
+/// #[scheduled(fixed_rate = 30, time_unit = "s", initial_delay = 5)]
+/// fn heartbeat() { /* ... */ }
+///
+/// #[Scheduled(one_shot = true, initial_delay = 10, time_unit = "s")]
+/// fn delayed_init() { /* ... */ }
+/// ```
 #[proc_macro_attribute]
 #[allow(non_snake_case)]
 pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -392,7 +404,7 @@ pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// # Example
 /// ```rust
-/// #[Idempotency(name = "myIdempotencyStore", key = "Idempotency-key", cache_key_prefix = "test", ttl = 6)]
+/// #[idempotency(name = "myIdempotencyStore", key = "Idempotency-key", cache_key_prefix = "test", ttl = 6)]
 /// #[PostMapping(path = "/createOrder")]
 /// async fn create_order(order: String) -> impl IntoResponse {
 ///
@@ -402,7 +414,7 @@ pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
-pub fn Idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_idempotency(attr, item_fn)
 }
@@ -410,7 +422,7 @@ pub fn Idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[doc = ""]
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
-pub fn PreAuthorize(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn pre_authorize(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_pre_authorize(attr, item_fn)
 }
@@ -504,7 +516,7 @@ pub fn PreAuthorize(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 #[allow(non_snake_case)]
 #[proc_macro_attribute]
-pub fn Retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_retry(attr, item_fn)
 }
