@@ -16,4 +16,3 @@ tracing.workspace = true
 
 [features]
 default = []
-thread-pool = []

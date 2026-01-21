@@ -12,10 +12,7 @@ use next_web::{
     async_trait, context::properties::ApplicationProperties, idempotency, ApplicationContext,
 };
 use next_web::{extract::ConnectInfo, traits::store::idempotency_store::IdempotencyStore};
-use next_web::{
-    response::{Html, IntoResponse},
-    store::memory_idempotency_store::MemoryIdempotencyStore,
-};
+use next_web::{response::Html, store::memory_idempotency_store::MemoryIdempotencyStore};
 use tokio::sync::Mutex;
 use tracing::info;
 
@@ -53,17 +50,13 @@ pub async fn req_timestamp() -> impl IntoResponse {
     LocalDateTime::now()
 }
 
-#[get_mapping(path = "/hello")]
-pub async fn req_hello() -> String {
-    " Hello Axum! \n Hello Next Web!".to_string()
-}
-
 #[post_mapping(path = "/record")]
 pub async fn req_record(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     FindSingleton(store): FindSingleton<ApplicationStore>,
 ) -> impl IntoResponse {
     store.add(addr).await;
+
     "Ok"
 }
 
@@ -77,10 +70,10 @@ pub async fn req_record_two(
     // Search for singleton using variable names
     #[find] FindSingleton(application_store_two): FindSingleton<ApplicationStore>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-) -> Result<&'static str, ()> {
+) -> &'static str {
     application_store_two.add(addr).await;
 
-    return Ok("{\"message\": \"Ok\"}");
+    "Ok"
 }
 
 #[allow(unused)]

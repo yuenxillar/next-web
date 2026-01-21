@@ -28,7 +28,7 @@ authors = ["Listening <yuenxillar@163.com>"]
 keywords = ["http", "web", "framework"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-homepage = "https://github.com/yuenxillar/next-web"
+homepage = "https://crates.io/crates/next-web"
 repository = "https://github.com/yuenxillar/next-web"
 include = ["**/*.rs", "Cargo.toml"]
 

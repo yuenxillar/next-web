@@ -31,7 +31,7 @@ pub(crate) fn impl_macro_desensitized(input: &syn::DeriveInput) -> TokenStream {
                 Some(desens_type) => {
                     let de = desens_type.to_ident();
                     match desens_type {
-                        DesensitizationType::Generic(_start, _end) => todo!(),
+                        // DesensitizationType::Generic(_start, _end) => todo!(),
                         _ => {
                             if FieldType::is_option(&field.ty) {
                                 let is_string = is_string(&field.ty);
@@ -68,7 +68,7 @@ pub(crate) fn impl_macro_desensitized(input: &syn::DeriveInput) -> TokenStream {
     };
 
     // println!("expanded: {}", expanded.to_string());
-    
+
     expanded.into()
 }
 
@@ -96,7 +96,6 @@ enum DesensitizationType {
     BankCard,
     Address,
     Ip,
-    Generic(usize, usize),
 }
 
 impl DesensitizationType {
@@ -127,35 +126,11 @@ impl DesensitizationType {
             DesensitizationType::BankCard => "bank_card",
             DesensitizationType::Address => "address",
             DesensitizationType::Ip => "ip",
-            DesensitizationType::Generic(_, _) => "generic",
+            // DesensitizationType::Generic(_, _) => "generic",
         };
         Ident::new(s, Span::mixed_site())
     }
 }
-
-// fn get_partial_params(field: &Field) -> (usize, usize) {
-//     for attr in &field.attrs {
-//         if attr.path().is_ident("de") {
-//             let meta = attr.parse_meta().expect("Failed to parse attribute meta");
-//             if let syn::Meta::List(meta_list) = meta {
-//                 if let Some(syn::NestedMeta::Meta(syn::Meta::NameValue(name_value))) = meta_list.nested.first() {
-//                     if name_value.path.is_ident("partial") {
-//                         if let syn::Lit::Str(lit_str) = &name_value.lit {
-//                             let value = lit_str.value();
-//                             let parts: Vec<&str> = value.split(',').collect();
-//                             if parts.len() == 2 {
-//                                 let prefix = parts[0].trim().parse().unwrap_or(3);
-//                                 let suffix = parts[1].trim().parse().unwrap_or(4);
-//                                 return (prefix, suffix);
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//     }
-//     (3, 4) // 默认值
-// }
 
 fn is_string(ty: &syn::Type) -> bool {
     if let syn::Type::Path(type_path) = ty {

@@ -109,7 +109,11 @@ fn impl_item_fn(
     let vis = &item_fn.vis;
     let name = &item_fn.sig.ident;
 
-    let api_doc_block = if cfg!(feature = "api-doc") {
+    let has_api_doc = item_fn
+        .attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("api_doc"));
+    let api_doc_block = if has_api_doc && cfg!(feature = "api-doc") {
         quote! {
             if let Some(mut __open_api) =  __context.open_api.take() {
                 __open_api = __open_api.routes( ::next_web::api_doc::routes!(#name));
@@ -554,6 +558,7 @@ macro_rules! standard_method_type {
 
             /// post_mapping -> post
             /// request_mapping -> ???
+            #[allow(unused)]
             pub fn parse_mapping(var: &str) -> Result<Self, String> {
                 let mapping = match var.split_once("_").map(|(s, _)| s.trim_end()) {
                     Some(s) => s,

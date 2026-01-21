@@ -1,3 +1,20 @@
+## Api Doc
+
+A crate for integrating [utoipa](https://crates.io/crates/utoipa) with [next-web](https://crates.io/crates/next-web) Framework for automatic OpenAPI/Swagger documentation generation.
+
+The rules are consistent with utoipa
+
+## WARNING
+
+Due to the limitations of the utoipa, you must add utoipa to your Cargo.toml
+
+```shell
+cargo add utoipa
+```
+
+## Examples
+
+```rust
 use next_web::{
     api_doc, application::Application, async_trait, extract::find_singleton::FindSingleton,
     post_mapping, request_mapping,
@@ -40,3 +57,5 @@ async fn test() -> String {
 async fn main() {
     TestApplication::run().await;
 }
+
+```

@@ -87,10 +87,7 @@ pub(crate) fn impl_macro_api_doc(attr: TokenStream, item: TokenStream) -> TokenS
                             Some(method) => Ident::new(&method.to_lowercase(), Span::call_site())
                                 .to_token_stream(),
                             None => {
-                                return Err(syn::Error::new(
-                                    list.span(),
-                                    "Missing HTTP method: `method`",
-                                ))
+                                return Err(syn::Error::new(list.span(), "Missing HTTP method."))
                             }
                         }
                     }

@@ -2747,7 +2747,8 @@ impl SingleRegistry {
         self.registry.remove(key)
     }
 
-    pub(crate) fn keys(&self) -> Keys<Key, DynSingle> {
+    #[allow(unused)]
+    pub(crate) fn keys<'a>(&'a self) -> Keys<'a, Key, DynSingle> {
         self.registry.keys()
     }
 }

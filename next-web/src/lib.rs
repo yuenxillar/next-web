@@ -2,7 +2,7 @@ pub mod application;
 pub mod autoconfigure;
 pub mod autoregister;
 pub mod banner;
-pub mod common;
+
 pub mod configurer;
 pub mod converter;
 pub mod crypto;
@@ -27,10 +27,9 @@ pub use headers;
 pub use inventory::submit;
 pub use rand;
 
+pub use next_web_core::*;
 pub use rudi_dev::{SingleOwner, Singleton, Transient};
 
-pub use next_web_core::*;
-pub use next_web_macros::api_doc;
 pub use next_web_macros::idempotency;
 pub use next_web_macros::properties;
 pub use next_web_macros::{
@@ -45,7 +44,7 @@ pub use next_web_macros::{Builder, FieldName, GetSet, RequiredArgsConstructor};
 pub mod state_machine;
 
 #[cfg(feature = "enable-scheduling")]
-pub use next_web_macros::Scheduled;
+pub use next_web_macros::scheduled;
 
 #[cfg(feature = "enable-web-security")]
 pub use next_web_macros::pre_authorize;
@@ -59,9 +58,14 @@ pub use next_web_retry as retry;
 
 #[cfg(feature = "enable-api-doc")]
 pub use next_web_api_doc as api_doc;
+#[cfg(feature = "enable-api-doc")]
+pub use next_web_macros::api_doc;
 
 #[cfg(feature = "enable-i18n")]
 pub mod i18n;
+
+#[cfg(feature = "common")]
+pub mod common;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]

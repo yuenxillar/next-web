@@ -7,7 +7,6 @@ use crate::data::get_set::impl_macro_get_set;
 use crate::web::idempotency::impl_macro_idempotency;
 use crate::web::pre_authorize::impl_macro_pre_authorize;
 use crate::web::properties::impl_macro_properties;
-use crate::web::retry::impl_macro_retry;
 
 use data::desensitized::impl_macro_desensitized;
 use proc_macro::TokenStream;
@@ -16,10 +15,7 @@ use syn::DeriveInput;
 use syn::ItemFn;
 use syn::ItemStruct;
 
-mod common;
 mod data;
-mod database;
-mod singleton;
 mod util;
 mod web;
 
@@ -285,7 +281,6 @@ pub fn desensitized(input: TokenStream) -> TokenStream {
 // =============================== Web ===============================
 
 #[doc = ""]
-#[allow(non_snake_case)]
 #[proc_macro_attribute]
 pub fn properties(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as ItemStruct);
@@ -294,7 +289,6 @@ pub fn properties(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[doc = ""]
 #[proc_macro_attribute]
-#[allow(non_snake_case)]
 pub fn request_mapping(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::routing::with_method(None, args, input)
 }
@@ -303,7 +297,6 @@ macro_rules! method_macro {
     ($method:ident, $variant:ident) => {
         #[doc = ""]
         #[proc_macro_attribute]
-        #[allow(non_snake_case)]
         pub fn $method(args: TokenStream, input: TokenStream) -> TokenStream {
             crate::web::routing::with_method(
                 Some(crate::web::routing::Method::$variant),
@@ -321,6 +314,7 @@ method_macro!(delete_mapping, Delete);
 method_macro!(patch_mapping, Patch);
 method_macro!(any_mapping, Any);
 
+// #[cfg(feature = "api-doc")]
 #[proc_macro_attribute]
 pub fn api_doc(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::api_doc::impl_macro_api_doc(args, input)
@@ -362,8 +356,7 @@ pub fn api_doc(args: TokenStream, input: TokenStream) -> TokenStream {
 /// fn delayed_init() { /* ... */ }
 /// ```
 #[proc_macro_attribute]
-#[allow(non_snake_case)]
-pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::scheduled::impl_macro_scheduled(args, input)
 }
 
@@ -412,7 +405,6 @@ pub fn Scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 ///
 /// ```
-#[allow(non_snake_case)]
 #[proc_macro_attribute]
 pub fn idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
@@ -420,7 +412,6 @@ pub fn idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[doc = ""]
-#[allow(non_snake_case)]
 #[proc_macro_attribute]
 pub fn pre_authorize(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
@@ -514,9 +505,20 @@ pub fn pre_authorize(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///    println! ("function test_retry backoff: {:?}", error);
 /// }
 /// ```
-#[allow(non_snake_case)]
+// #[cfg(feature = "retry")]
 #[proc_macro_attribute]
 pub fn retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
+    use crate::web::retry::impl_macro_retry;
+
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_retry(attr, item_fn)
+}
+
+#[cfg(feature = "translation")]
+#[proc_macro_attribute]
+pub fn translation(attr: TokenStream, item: TokenStream) -> TokenStream {
+    use crate::web::translation::impl_macro_translation;
+
+    let item_fn = parse_macro_input!(item as ItemFn);
+    impl_macro_translation(attr, item_fn)
 }

@@ -53,7 +53,6 @@ validator = { workspace = true}
 thiserror = { workspace = true }
 inventory = { workspace = true }
 
-utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui  = { workspace = true, optional = true }
 
 rudi-dev = { workspace = true }
@@ -74,6 +73,9 @@ rand    = { workspace = true, optional = true }
 serde_path_to_error = { workspace = true }
 mime                = { workspace = true }
 
+
+num_cpus = { version = "1.17.0", optional = true }
+
 [target.'cfg(windows)'.dependencies]
 mimalloc = { workspace = true }
 
@@ -82,7 +84,15 @@ jemallocator = { workspace = true }
 
 [features]
 default = ["enable-i18n", "enable-state-machine", "decrypt-properties", "enable-api-doc"]
-full = ["enable-scheduling", "enable-web-security", "enable-retry", "enable-i18n", "decrypt-properties", "enable-api-doc"]
+full = [
+    "enable-scheduling",
+    "enable-web-security",
+    "enable-retry",
+    "enable-i18n",
+    "decrypt-properties",
+    "enable-api-doc",
+    "enable-thread-pool"
+]
 
 tls-rustls = ["axum-server"]
 
@@ -90,12 +100,15 @@ tls-rustls = ["axum-server"]
 enable-scheduling   = ["tokio-cron-scheduler"]
 enable-web-security = ["next-web-security"]
 enable-retry        = ["next-web-retry"]
-enable-api-doc      = ["next-web-api-doc", "utoipa", "utoipa-swagger-ui"]
+enable-api-doc      = ["next-web-api-doc", "utoipa-swagger-ui", "next-web-macros/api-doc"]
 
 enable-grpc = []
 enable-prometheus = ["axum-prometheus"]
 enable-i18n = []
 enable-state-machine = []
+enable-thread-pool   = ["num_cpus"]
+
+common = []
 
 digester = ["dep:md5", "dep:sha1", "dep:sha2"]
 decrypt-properties = ["aes-gcm", "dep:base64", "scrypt", "rand"]

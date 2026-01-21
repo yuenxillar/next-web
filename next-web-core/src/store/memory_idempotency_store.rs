@@ -41,7 +41,7 @@ where
     fn start_backend_task(store: Self) {
         let store = store;
         tokio::spawn(async move {
-            let next_time = 7000;
+            let next_time = 5000;
             let mut interval = tokio::time::interval(std::time::Duration::from_millis(next_time));
 
             loop {

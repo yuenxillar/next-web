@@ -1,12 +1,13 @@
 use next_web::{
     application::Application,
+    scheduled,
     scheduler::{
         context::JobExecutionContext,
         schedule_type::{ScheduleType, WithArgs},
     },
     traits::schedule::scheduled_task::ScheduledTask,
     util::local_date_time::LocalDateTime,
-    ApplicationContext, Scheduled, Singleton,
+    ApplicationContext, Singleton,
 };
 use next_web_core::{async_trait, context::properties::ApplicationProperties};
 
@@ -57,20 +58,20 @@ impl ScheduledTask for TestTask {
 
 // Cron Scheduled Task
 // Local or Utc or .....
-#[Scheduled(cron = "*/3 * * * * *", timezone = "Asia/Shanghai")]
+#[scheduled(cron = "*/3 * * * * *", timezone = "Asia/Shanghai")]
 async fn test_cron_scheduled() {
     println!("Cron Scheduled Task!       time: {}", LocalDateTime::now());
 }
 
 // Fixed Rate Scheduled Task
-#[Scheduled(fixed_rate = 2000, time_unit = "ms")]
+#[scheduled(fixed_rate = 2000, time_unit = "ms")]
 async fn test_fixed_rate_scheduled() {
     println!("Fixed Rate Scheduled Task! time: {}", LocalDateTime::now());
 }
 
 // One Shot Scheduled Task
 // time_unit   Milliseconds or ms
-#[Scheduled(one_shot, initial_delay = 5000, time_unit = "Milliseconds")]
+#[scheduled(one_shot, initial_delay = 5000, time_unit = "Milliseconds")]
 async fn test_one_shot_scheduled(test: TestTask) {
     test.number.fetch_add(1, Ordering::Relaxed);
     println!(

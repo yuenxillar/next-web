@@ -280,9 +280,8 @@ impl ThreadUtil {
     /// ```
     /// # async fn long_task() {
     /// for i in 0..1000 {
-    ///     // 做一些工作
     ///     if i % 100 == 0 {
-    ///         ThreadUtil::yield_now().await; // 让其他任务有机会运行
+    ///         ThreadUtil::yield_now().await;
     ///     }
     /// }
     /// # }

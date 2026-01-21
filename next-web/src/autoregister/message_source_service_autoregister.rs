@@ -1,10 +1,11 @@
-use crate::service::message_source_service::MessageSourceService;
 use next_web_core::{
     async_trait,
     context::{application_resources::ApplicationResources, properties::ApplicationProperties},
     util::singleton::SingletonUtil,
     ApplicationContext, AutoRegister,
 };
+
+use crate::i18n::message_source_service::MessageSourceService;
 
 use super::default_autoregister::DefaultAutoRegister;
 
@@ -24,13 +25,14 @@ impl AutoRegister for MessageSourceServiceAutoRegister {
         let message_source_properties = properties.next().messages().cloned().unwrap_or_default();
 
         // Retrieve the messages file from the resource
-        let application_resources =
-            ctx.get_single_with_name(SingletonUtil::name::<ApplicationResources>());
+        let application_resources = ctx
+            .get_single_with_default_name::<ApplicationResources>()
+            .unwrap();
 
         let message_source_service =
             MessageSourceService::from_resouces(message_source_properties, application_resources);
 
-        ctx.insert_singleton_with_name(message_source_service, "messageSourceService");
+        ctx.insert_singleton_with_default_name(message_source_service);
 
         Ok(())
     }

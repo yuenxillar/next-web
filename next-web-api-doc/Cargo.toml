@@ -6,6 +6,7 @@ description = "Api Doc"
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "README.md"
 
 [dependencies]
 utoipa = { workspace = true }

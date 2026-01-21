@@ -1,41 +1,9 @@
-//! A Rust implementation of the OpenAPI Specification (OAS) data model.
-//!
-//! This crate provides Rust structs that represent the OpenAPI 3.0.x and 3.1.x specification,
-//! enabling serialization, deserialization, and manipulation of OpenAPI documents in Rust.
-//!
-//! # Features
-//!
-//! - Full support for OpenAPI Specification 3.0.x and 3.1.x
-//! - Serialization and deserialization via Serde
-//! - Type-safe representation of all OpenAPI components
-//! - Extension support for custom fields
-//!
-//! # Examples
-//!
-//! ```
-//! use openapi_models::{OpenApi, Info, SpecVersion};
-//!
-//! // Create a minimal OpenAPI document
-//! let mut openapi = OpenApi {
-//!     info: Some(Info {
-//!         title: "My API".to_string(),
-//!         version: "1.0.0".to_string(),
-//!         ..Info::default()
-//!     }),
-//!     ..OpenApi::default()
-//! };
-//!
-//! // Set the specification version
-//! openapi.spec_version = SpecVersion::V31;
-//! openapi.openapi = "3.1.0".to_string();
-//! ```
-//!
-//! # Crate Organization
-//!
-//! The main struct is [`OpenApi`] which represents the root of an OpenAPI document.
-//! All other types are organized hierarchically under this main type.
+//! Rust implementation of Openapi Spec V3.1.
 
 pub use paste::paste;
+pub use utoipa::{
+    openapi, {OpenApi, Path, ToSchema},
+};
 
 /// Wrapper type for [`utoipa::openapi::path::Paths`] and [`axum::routing::MethodRouter`].
 ///

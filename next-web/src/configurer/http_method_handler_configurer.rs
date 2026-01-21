@@ -29,7 +29,7 @@ pub enum RouteState {
 
 impl RouterContext {
     #[cfg(feature = "enable-api-doc")]
-    pub fn with_openapi(openapi: utoipa::openapi::OpenApi) -> Self {
+    pub fn with_openapi(openapi: next_web_api_doc::openapi::OpenApi) -> Self {
         let mut ctx = Self::default();
         ctx.open_api = Some(OpenApiRouter::with_openapi(openapi));
         ctx

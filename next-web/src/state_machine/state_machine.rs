@@ -52,16 +52,21 @@ where
         }
     }
 
-    pub async fn start(mut self) -> Arc<Self>{
+    pub async fn start(mut self) -> Arc<Self> {
         // create manager
         let mut manager = StateMachineManager::<S, E>::new(self.id.clone());
 
         for configure in &self.transition_configure.inner {
-            manager.add_action((self.id().into(), configure.transition()), configure.action()).await;
+            manager
+                .add_action(
+                    (self.id().into(), configure.transition()),
+                    configure.action(),
+                )
+                .await;
         }
 
         let (sender, receiver) = tokio::sync::broadcast::channel::<EventMessage<E>>(100);
-        
+
         self.status = true;
         self.sender = Some(sender);
 
@@ -167,11 +172,11 @@ pub struct State<S, E> {
     pub event: E,
 }
 
-impl<S, E> Into<State<S, E>> for (S,  E) {
+impl<S, E> Into<State<S, E>> for (S, E) {
     fn into(self) -> State<S, E> {
         State {
             source: self.0,
-            event: self.1
+            event: self.1,
         }
     }
 }
@@ -190,12 +195,15 @@ pub struct EventMessage<E> {
 }
 
 impl<E> EventMessage<E> {
-    pub fn new(event: E, payload: Option<AnyValue>) -> Self {
-        Self { event, payload }
+    pub fn new(event: E, payload: AnyValue) -> Self {
+        Self {
+            event,
+            payload: Some(payload),
+        }
     }
 
-    pub fn payload(&self) -> &Option<AnyValue> {
-        &self.payload
+    pub fn payload(&self) -> Option<&AnyValue> {
+        self.payload.as_ref()
     }
 
     pub fn event(&self) -> &E {
@@ -210,5 +218,17 @@ impl<E> EventMessage<E> {
     pub fn set_event(mut self, event: E) -> Self {
         self.event = event;
         self
+    }
+}
+
+impl<E> Default for EventMessage<E>
+where
+    E: Default,
+{
+    fn default() -> Self {
+        Self {
+            event: Default::default(),
+            payload: None,
+        }
     }
 }

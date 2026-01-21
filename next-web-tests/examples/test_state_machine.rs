@@ -62,7 +62,7 @@ impl StateMachineAction<TestState, TestEvent> for TestAction {
         );
         context
             .state_machine()
-            .send_event(EventMessage::new(TestEvent::Close, Some(AnyValue::Null)))
+            .send_event(EventMessage::new(TestEvent::Close, AnyValue::Null))
             .await;
     }
 }
@@ -116,11 +116,6 @@ impl Application for TestApplication {
     ) {
     }
 
-    // get the application router. (open api  and private api)
-    async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
-        axum::Router::new().route("/", axum::routing::get(|| async move { "Ok" }))
-    }
-
     async fn on_ready(&self, _ctx: &mut ApplicationContext) {
         tokio::spawn(async move {
             let transition_configure = StateMachineTransitionConfigure::default()
@@ -144,10 +139,7 @@ impl Application for TestApplication {
 
             let machine = state_machie.start().await;
             machine
-                .send_event(EventMessage::new(
-                    TestEvent::Open,
-                    Some(AnyValue::Boolean(true)),
-                ))
+                .send_event(EventMessage::new(TestEvent::Open, AnyValue::Boolean(true)))
                 .await;
         });
     }

@@ -50,6 +50,9 @@ use next_web_core::traits::application::application_shutdown::ApplicationShutdow
 use next_web_core::traits::event::application_event_multicaster::ApplicationEventMulticaster;
 use next_web_core::traits::event::application_listener::ApplicationListener;
 
+#[cfg(feature = "enable-api-doc")]
+use next_web_api_doc::openapi::OpenApi;
+
 #[cfg(feature = "enable-scheduling")]
 use crate::autoregister::scheduler_autoregister::SchedulerAutoRegister;
 #[cfg(feature = "enable-scheduling")]
@@ -79,14 +82,43 @@ where
     /// Initialize the api doc.
     #[cfg(feature = "enable-api-doc")]
     #[allow(unused_variables)]
-    async fn api_doc(&self, ctx: &mut ApplicationContext) -> utoipa::openapi::OpenApi {
-        use utoipa::OpenApi;
+    async fn api_doc(&self, ctx: &mut ApplicationContext) -> OpenApi {
+        use next_web_api_doc::OpenApi;
 
-        #[derive(utoipa::OpenApi)]
-        #[openapi(info(title = "API Documentation", version = "0.1.0"))]
-        struct ApiDoc;
+        struct OpenApiDoc;
 
-        ApiDoc::openapi()
+        impl next_web_api_doc::OpenApi for OpenApiDoc {
+            fn openapi() -> next_web_api_doc::openapi::OpenApi {
+                next_web_api_doc::openapi::OpenApiBuilder::new()
+                    .info(
+                        next_web_api_doc::openapi::InfoBuilder::new()
+                            .title("API Documentation")
+                            .version("0.1.0")
+                            .description(Some(
+                                std::env::var("CARGO_PKG_DESCRIPTION")
+                                    .unwrap_or(String::from("Empty")),
+                            ))
+                            .license(Some(next_web_api_doc::openapi::License::new(
+                                "MIT or Apache-2.0",
+                            )))
+                            .contact(Some(
+                                next_web_api_doc::openapi::ContactBuilder::new()
+                                    .name(Some(
+                                        std::env::var("CARGO_PKG_AUTHORS")
+                                            .unwrap_or(String::from("Listeing")),
+                                    ))
+                                    .email(None::<String>)
+                                    .build(),
+                            ))
+                            .build(),
+                    )
+                    .paths(next_web_api_doc::openapi::path::Paths::new())
+                    .components(Some(next_web_api_doc::openapi::Components::new()))
+                    .build()
+            }
+        }
+
+        OpenApiDoc::openapi()
     }
 
     /// Before starting the application
@@ -706,8 +738,6 @@ async fn http_filter_layer(
 use crate::extract::find_singleton::FindSingleton;
 
 #[cfg(feature = "enable-api-doc")]
-async fn openapi(
-    FindSingleton(openapi): FindSingleton<utoipa::openapi::OpenApi>,
-) -> axum::Json<utoipa::openapi::OpenApi> {
+async fn openapi(FindSingleton(openapi): FindSingleton<OpenApi>) -> axum::Json<OpenApi> {
     axum::Json(openapi)
 }
