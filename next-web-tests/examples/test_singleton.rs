@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use axum::{response::IntoResponse, Router};
-use next_web::{application::Application, extract::find_singleton::FindSingleton, Singleton};
+use next_web::{
+    application::Application, extract::find_singleton::FindSingleton, macros::bind::singleton,
+};
 use next_web_core::{
     async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
     ApplicationContext,
@@ -64,15 +66,15 @@ where
 
 /// 多个实现者
 /// Multiple implementers
-#[Singleton(binds = [Self::into_test_singleton])]
+#[singleton(binds = [Self::into_test_singleton])]
 #[derive(Clone)]
 struct TestSingletonImplOne;
 
-#[Singleton(binds = [Self::into_test_singleton])]
+#[singleton(binds = [Self::into_test_singleton])]
 #[derive(Clone)]
 struct TestSingletonImplTwo;
 
-#[Singleton(binds = [Self::into_test_singleton])]
+#[singleton(binds = [Self::into_test_singleton])]
 #[derive(Clone)]
 struct TestSingletonImplThree;
 
@@ -99,7 +101,7 @@ impl TestSingletonImplThree {
 }
 /// 获取单例
 /// Get singleton
-#[Singleton]
+#[singleton]
 #[derive(Clone)]
 pub struct TestSingletonConsumer {
     #[resource(name = "testSingletonImplOne")]

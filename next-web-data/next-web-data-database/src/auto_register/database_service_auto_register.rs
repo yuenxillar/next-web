@@ -4,7 +4,7 @@ use next_web_core::{
     ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
     traits::singleton::Singleton,
 };
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 use crate::{
     interceptor::block_attack_inner_interceptor::BlockAttackInnerInterceptor,
@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Register the `DatabaseService` as a singleton with the `DatabaseServiceAutoRegister` type.
-#[Singleton(binds = [Self::into_auto_register])]
+#[singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
 pub struct DatabaseServiceAutoRegister(pub DatabaseClientProperties);
 

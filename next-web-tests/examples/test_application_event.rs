@@ -15,7 +15,7 @@ use next_web_core::{
 use next_web::{
     application::Application,
     event::default_application_event_publisher::DefaultApplicationEventPublisher,
-    util::local_date_time::LocalDateTime, Singleton,
+    macros::bind::singleton, util::local_date_time::LocalDateTime,
 };
 
 /// Test application
@@ -50,7 +50,7 @@ impl Application for TestApplication {
     }
 }
 
-#[Singleton(binds=[Self::into_listener])]
+#[singleton(binds=[Self::into_listener])]
 #[derive(Clone)]
 pub struct TestListener;
 
@@ -60,7 +60,7 @@ impl TestListener {
     }
 }
 
-#[Singleton]
+#[singleton]
 #[derive(Clone)]
 pub struct TestEvent(i64);
 

@@ -161,7 +161,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
 
         let struct_ident = &item_struct.ident;
 
-        // 检查是否有 #[Singleton(name = "")] 属性
+        // 检查是否有 #[singleton(name = "")] 属性
         let singleton_name = item_struct.attrs.iter().find_map(|attr| {
             if !attr.path().is_ident("Singleton") && !attr.path().is_ident("SingleOwner") {
                 return None;
@@ -190,7 +190,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                 Ok(())
             });
             if !binds_exist {
-                panic!("Singleton or SingleOwner macro must support binds `#[Singleton(binds = [Self::into_properties])]`");
+                panic!("Singleton or SingleOwner macro must support binds `#[singleton(binds = [Self::into_properties])]`");
             }
             name
         });

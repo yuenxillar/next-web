@@ -5,14 +5,14 @@ use std::sync::Arc;
 
 use axum::extract::ws::CloseFrame;
 use next_web::application::Application;
-use next_web::{async_trait, ApplicationContext, Singleton};
+use next_web::{async_trait, macros::bind::singleton, ApplicationContext};
 use next_web_core::context::properties::ApplicationProperties;
 use next_web_websocket::handler::websocket_handler::{Result, WebSocketHandler};
 use next_web_websocket::model::session::WebSocketSession;
 use next_web_websocket::Message;
 
 /// Test
-#[Singleton(binds = [Self::into_websocket_handler])]
+#[singleton(binds = [Self::into_websocket_handler])]
 #[derive(Clone)]
 pub struct TestWebSocket;
 

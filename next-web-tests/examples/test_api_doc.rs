@@ -1,6 +1,9 @@
 use next_web::{
-    api_doc, application::Application, async_trait, extract::find_singleton::FindSingleton,
-    post_mapping, request_mapping,
+    application::Application,
+    async_trait,
+    extract::find_singleton::FindSingleton,
+    macros::api_doc,
+    macros::bind::{post_mapping, request_mapping},
 };
 use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
 use utoipa::openapi::OpenApi;

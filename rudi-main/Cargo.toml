@@ -18,6 +18,7 @@ rudi-dev = { version = "0.8.3", path = "./rudi-dev", default-features = false }
 rudi-macro-dev = { version = "0.1.0", default-features = false }
 rudi-core = { version = "0.1.0" }
 
+
 # dependencies
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
@@ -32,6 +33,9 @@ poem = { version = "3", default-features = false }
 poem-openapi = { version = "5", default-features = false }
 
 leptos = { version = "0.7", default-features = false }
+
+serde = { version = "1.0.219", features = ["derive"] }
+tokio = { version = "1.44.1", features = ["rt-multi-thread", "macros"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

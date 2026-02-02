@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton, ApplicationContext, AutoRegister
+    async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
+    ApplicationContext, AutoRegister,
 };
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 use tracing::debug;
 
 use crate::{
@@ -12,7 +13,7 @@ use crate::{
 };
 
 /// Register the `DatabaseService` as a singleton with the `DatabaseServiceAutoRegister` type.
-#[Singleton(binds = [Self::into_auto_register])]
+#[singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
 pub struct MinioServiceAutoRegister(pub MongodbClientProperties);
 

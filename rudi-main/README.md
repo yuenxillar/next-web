@@ -75,7 +75,7 @@ use rudi::{Context, Singleton, Transient};
 
 // Register `async fn(cx) -> i32 { 42 }` as the constructor for `i32`,
 // and specify the name of the instance of this `i32` type as `"number"`.
-#[Singleton(name = "number")]
+#[singleton(name = "number")]
 async fn Number() -> i32 {
     42
 }
@@ -83,7 +83,7 @@ async fn Number() -> i32 {
 // Register `async fn(cx) -> Foo { Foo { number: cx.resolve_with_name_async("number").await } }`
 // as the constructor for `Foo`, and specify the name of the instance of this `Foo` type as `"foo"`.
 #[derive(Debug, Clone)]
-#[Singleton(async, name = "foo")]
+#[singleton(async, name = "foo")]
 struct Foo {
     #[di(name = "number")]
     number: i32,

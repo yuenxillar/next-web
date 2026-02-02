@@ -1,8 +1,8 @@
 use next_web_macros::Properties;
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 /// Properties for Mongod client.
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[Properties(prefix = "next.data.mongodb")]
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct MongodbClientProperties {
@@ -39,18 +39,17 @@ impl MongodbClientProperties {
     pub fn connect_timeout(&self) -> Option<u64> {
         self.connect_timeout
     }
-    
+
     pub fn zstd(&self) -> bool {
         self.zstd
     }
 }
 
-
 impl Default for MongodbClientProperties {
     fn default() -> Self {
         Self {
             username: Some("root".into()),
-            password: None, 
+            password: None,
             host: Some("localhost".into()),
             port: Some(27017),
             database: None,

@@ -5,8 +5,11 @@ use axum::{
     http::{Response, StatusCode},
     response::IntoResponse,
 };
-use next_web::{application::Application, get_mapping};
-use next_web::{Desensitized, GetSet};
+use next_web::application::Application;
+use next_web::macros::{
+    bind::get_mapping,
+    data::{Desensitized, GetSet},
+};
 use next_web_core::{
     async_trait, context::properties::ApplicationProperties, traits::desensitized::Desensitized,
     ApplicationContext,

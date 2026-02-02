@@ -1,7 +1,7 @@
 use next_web_macros::properties;
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[properties(prefix = "next.email")]
 #[derive(Debug, Default, Clone, serde::Deserialize)]
 pub struct EmailProperties {

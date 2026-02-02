@@ -1,13 +1,13 @@
 use next_web::{
     application::Application,
-    scheduled,
+    macros::{bind::singleton, scheduled},
     scheduler::{
         context::JobExecutionContext,
         schedule_type::{ScheduleType, WithArgs},
     },
     traits::schedule::scheduled_task::ScheduledTask,
     util::local_date_time::LocalDateTime,
-    ApplicationContext, Singleton,
+    ApplicationContext,
 };
 use next_web_core::{async_trait, context::properties::ApplicationProperties};
 
@@ -31,7 +31,7 @@ impl Application for TestApplication {
     }
 }
 
-#[Singleton(binds=[Self::into_task])]
+#[singleton(binds=[Self::into_task])]
 #[derive(Clone)]
 pub struct TestTask {
     #[resource(default)]

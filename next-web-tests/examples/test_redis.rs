@@ -4,14 +4,14 @@ use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
 use next_web::application::Application;
 use next_web::extract::find_singleton::FindSingleton;
-use next_web::Singleton;
+use next_web::macros::bind::singleton;
 use next_web_core::context::properties::ApplicationProperties;
 use next_web_core::{async_trait, ApplicationContext};
 use next_web_data_redis::core::event::expired_keys_event::RedisExpiredKeysEvent;
 use next_web_data_redis::service::redis_service::RedisService;
 use next_web_data_redis::AsyncCommands;
 
-#[Singleton(binds = [Self::into_expired_key_listener])]
+#[singleton(binds = [Self::into_expired_key_listener])]
 #[derive(Clone)]
 pub(crate) struct TestExpiredKeyListener {
     #[resource(name = "redisService")]

@@ -1,11 +1,11 @@
 [package]
 name = "next-web"
-version = "0.1.7"
+version = "0.2.1"
 edition = "2021"
 description = "Make everything simpler!"
 homepage = "https://crates.io/crates/next-web"
 keywords = ["http", "web", "framework"]
-readme = "README.md"
+readme = "../README.md"
 repository = "https://github.com/yuenxillar/next-web"
 license.workspace = true
 rust-version.workspace = true
@@ -83,7 +83,7 @@ mimalloc = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = ["enable-i18n", "enable-state-machine", "decrypt-properties", "enable-api-doc"]
+default = ["decrypt-properties", "enable-api-doc"]
 full = [
     "enable-scheduling",
     "enable-web-security",

@@ -1,4 +1,4 @@
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 use std::{panic, sync::Arc};
 
 use crate::properties::ws_properties::WebSocketProperties;
@@ -82,10 +82,10 @@ impl WebSocketContext {
     }
 }
 
-#[Singleton]
+#[singleton]
 impl WebSocketContext {
     #[resource]
-    pub fn constructor(#[resource] properties: WebSocketProperties) -> Self {
+    pub fn constructor(properties: WebSocketProperties) -> Self {
         Self {
             properties,
             handlers: matchit::Router::new(),

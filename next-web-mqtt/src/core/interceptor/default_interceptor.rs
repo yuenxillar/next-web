@@ -1,10 +1,10 @@
 use next_web_core::async_trait;
 
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 use super::message_interceptor::MessageInterceptor;
 
-#[Singleton(name = "defaultMQTTMessageInterceptor", binds = [Self::into_message_interceptor])]
+#[singleton(name = "defaultMQTTMessageInterceptor", binds = [Self::into_message_interceptor])]
 #[derive(Clone)]
 pub struct DefaultMessageInterceptor;
 

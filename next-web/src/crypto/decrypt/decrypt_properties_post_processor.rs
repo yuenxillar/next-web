@@ -3,10 +3,10 @@ use next_web_core::{
     context::application_args::ApplicationArgs,
     traits::{ordered::Ordered, properties_post_processor::PropertiesPostProcessor},
 };
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 use serde_yaml::Value;
 
-#[Singleton(binds = [Self::into_post_processor])]
+#[singleton(binds = [Self::into_post_processor])]
 #[derive(Clone)]
 pub struct DecryptPropertiesPostProcessor;
 
