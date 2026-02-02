@@ -1,103 +1,125 @@
-use flume::{Receiver, Sender};
-use tokio::sync::Mutex;
-use std::collections::HashMap;
 use next_web_core::{
-    async_trait, common::key::Key, traits::event::{
-        application_event::ApplicationEvent,
+    async_trait,
+    traits::event::{
+        application_event::{ApplicationEvent, EventId},
         application_event_multicaster::ApplicationEventMulticaster,
         application_listener::ApplicationListener,
-    }
+    },
 };
+use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 #[cfg(feature = "trace-log")]
 use tracing::debug;
 
+use crate::util::thread::ThreadUtil;
+
+type Listeners = Vec<Arc<dyn ApplicationListener>>;
 /// 默认的事件多播器实现
 ///
 /// Default implementation of event multicaster
 #[derive(Clone)]
 pub struct DefaultApplicationEventMulticaster {
-    // 使用 TypeId 存储不同类型事件的监听器
-    // Use TypeId to store listeners for different event types
-    listeners: Arc<Mutex<HashMap<Key, Sender<Box<dyn ApplicationEvent>>>>>,
+    // 使用 (id, type_id) 存储不同类型事件的监听器
+    //
+    // Use (id, type_id) to store listeners for different event types
+    application_listeners: Arc<Mutex<HashMap<EventId, Listeners>>>,
 
-    // 事件通道
-    // Event channel
-    event_channel: Option<Receiver<(String, Box<dyn ApplicationEvent>)>>,
+    /// 是否异步处理事件
+    ///
+    /// Whether to handle events asynchronously
+    is_async: bool,
 }
 
 impl DefaultApplicationEventMulticaster {
     /// 创建新的事件多播器实例
+    ///
     /// Create a new event multicaster instance
     pub fn new() -> Self {
         DefaultApplicationEventMulticaster {
-            listeners: Arc::new(Mutex::new(HashMap::new())),
-            event_channel: None,
+            application_listeners: Arc::new(Mutex::new(HashMap::with_capacity(64))),
+            is_async: true,
         }
     }
 
-    /// 设置事件通道
-    /// Set event channel
-    pub(crate) fn set_event_channel(
-        &mut self,
-        channel: Receiver<(String, Box<dyn ApplicationEvent>)>,
-    ) {
-        self.event_channel = Some(channel);
+    /// 创建新的事件多播器实例，指定容量
+    ///
+    /// Create a new event multicaster instance with specified capacity
+    pub fn with_capacity(capacity: usize) -> Self {
+        DefaultApplicationEventMulticaster {
+            application_listeners: Arc::new(Mutex::new(HashMap::with_capacity(capacity))),
+            is_async: true,
+        }
     }
 
-    /// 运行事件多播器
-    /// Run event multicaster
-    pub fn run(&self) {
-        let channel = self.event_channel.clone().unwrap();
-        let listeners = self.listeners.clone();
-        tokio::spawn(async move {
-            while let Ok(event) = channel.recv() {
-                if let Some(listeners) =
-                    listeners.lock().await.get(&Key::new(event.0, event.1.event_id()))
-                {
-                    let _ = listeners.send(event.1);
-                }
-            }
-        });
+    /// 设置是否异步处理事件
+    ///
+    /// Set whether to handle events asynchronously
+    pub fn set_async(&mut self, is_async: bool) {
+        self.is_async = is_async;
     }
 }
 
 #[async_trait]
 impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
-    async fn add_application_listener(&mut self, mut listener: Box<dyn ApplicationListener>) {
-        let tid = listener.event_id();
+    async fn add_application_listener(&mut self, listener: Arc<dyn ApplicationListener>) {
+        let event_id = listener.event_id();
 
-        let (sender, receiver) = flume::unbounded();
-        let key = Key::new(listener.id(), listener.event_id());
-        let mut listeners = self.listeners.lock().await;
-        if listeners.contains_key(&key) {
-            panic!(
-                "Listener already exists for event type: {:?}, key: {}",
-                tid, key
+        let mut application_listeners = self.application_listeners.lock().await;
+
+        let listeners = application_listeners.entry(event_id.clone()).or_default();
+        listeners.push(listener);
+
+        #[cfg(feature = "trace-log")]
+        {
+            debug!(
+                "Added listener for event type: {:?}, id: {}",
+                event_id.0, event_id.1
             );
-        }
-        if let None = listeners.insert(key, sender) {
-            tokio::spawn(async move {
-                while let Ok(event) = receiver.recv() {
-                    listener.on_application_event(&event).await;
-                    #[cfg(feature = "trace-log")]
-                    debug!("Received event: {:?}", event.source());
-                }
-            });
-            #[cfg(feature = "trace-log")]
-            {
-                let id = listener.id();
-                debug!("Added listener for event type: {:?}, id: {}", tid, id);
-            }
         }
     }
 
-    async fn remove_application_listener(&mut self, key: &Key) {
+    async fn remove_application_listener(&mut self, id: &EventId) {
         // 使用监听器的唯一ID进行匹配删除
         // Use listener's unique ID to match and remove
-        if let Some(_) = self.listeners.lock().await.remove(key) {
+        if let Some(_) = self.application_listeners.lock().await.remove(id) {
             #[cfg(feature = "trace-log")]
             debug!("Removed listener for event type: {}", key);
         };
+    }
+
+    /// 移除所有应用事件监听器
+    ///
+    /// Remove all application event listeners
+    async fn remove_all_listeners(&mut self) {
+        self.application_listeners.lock().await.clear();
+    }
+
+    /// 广播应用事件
+    ///
+    /// Multicast application event
+    async fn multicast_event(&self, event: Box<dyn ApplicationEvent>) {
+        let application_listeners = self.application_listeners.lock().await;
+
+        match application_listeners.get(&event.event_id()) {
+            Some(listeners) => {
+                if self.is_async {
+                    let listeners = listeners.clone();
+                    ThreadUtil::spawn(async move {
+                        for listener in listeners.iter() {
+                            listener.on_application_event(&event).await;
+                        }
+                    });
+                } else {
+                    for listener in listeners.iter() {
+                        listener.on_application_event(&event).await;
+                    }
+                }
+            }
+            None => {
+                #[cfg(feature = "trace-log")]
+                debug!("No listeners found for event type: {}", event.event_id());
+            }
+        }
     }
 }

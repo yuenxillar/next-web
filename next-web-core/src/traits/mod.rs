@@ -11,6 +11,7 @@ pub mod group;
 pub mod http;
 pub mod id;
 pub mod locale_resolver;
+pub mod message;
 pub mod nameable;
 pub mod named;
 pub mod ordered;

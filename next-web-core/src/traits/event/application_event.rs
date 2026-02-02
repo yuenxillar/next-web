@@ -1,12 +1,16 @@
 use std::any::{Any, TypeId};
 
-/// 应用事件  
-///   
+use dyn_clone::DynClone;
+
+pub type EventId = (String, TypeId);
+
+/// 应用事件
+///
 /// Application event
 pub trait ApplicationEvent
 where
-    Self: Send + Sync + 'static,
-    Self: Any,
+    Self: Send + Sync,
+    Self: Any + DynClone,
 {
     /// 获取事件时间戳
     ///
@@ -28,7 +32,11 @@ where
     /// 获取事件类型ID
     ///
     /// Get event type ID
-    fn event_id(&self) -> TypeId {
-        TypeId::of::<Self>()
+    fn event_id(&self) -> EventId {
+        (self.id(), TypeId::of::<Self>())
     }
+
+    fn id(&self) -> String;
 }
+
+dyn_clone::clone_trait_object!(ApplicationEvent);

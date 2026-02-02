@@ -1,7 +1,8 @@
+use crate::traits::event::application_event::EventId;
+
 use super::application_event::ApplicationEvent;
 use async_trait::async_trait;
 use dyn_clone::DynClone;
-use std::any::TypeId;
 
 /// 应用事件监听器
 ///
@@ -12,20 +13,15 @@ where
     Self: Send + Sync,
     Self: DynClone,
 {
-    /// 获取事件ID
-    ///
-    /// Get event ID
-    fn id(&self) -> &'static str;
-
     /// 获取事件类型
     ///
     /// Get event typeid
-    fn event_id(&self) -> TypeId;
+    fn event_id(&self) -> EventId;
 
     /// 处理应用事件
     ///
     /// Handle application event
-    async fn on_application_event(&mut self, event: &Box<dyn ApplicationEvent>);
+    async fn on_application_event(&self, event: &Box<dyn ApplicationEvent>);
 }
 
 dyn_clone::clone_trait_object!(ApplicationListener);

@@ -1,5 +1,7 @@
 use std::any::{Any, TypeId};
+use std::sync::Arc;
 
+use next_web::traits::event::application_event::EventId;
 use next_web_core::traits::event::application_event_publisher::ApplicationEventPublisher;
 use next_web_core::{
     async_trait,
@@ -32,22 +34,19 @@ impl Application for TestApplication {
     ) {
     }
 
-    // get the application router. (open api  and private api)
-    async fn application_router(&self, ctx: &mut ApplicationContext) -> axum::Router {
+    async fn on_ready(&self, ctx: &mut ApplicationContext) {
         let publisher = ctx
-            .get_single_with_name::<DefaultApplicationEventPublisher>(
-                "defaultApplicationEventPublisher",
-            )
+            .get_single_with_default_name::<DefaultApplicationEventPublisher>()
+            .unwrap()
             .to_owned();
         tokio::spawn(async move {
             loop {
                 let event = TestEvent(LocalDateTime::timestamp());
-                publisher.publish_event("", event).ok();
+                publisher.publish_event(event).await.ok();
 
                 tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
             }
         });
-        axum::Router::new().route("/", axum::routing::get(|| async move { "Hello, world!" }))
     }
 }
 
@@ -56,8 +55,8 @@ impl Application for TestApplication {
 pub struct TestListener;
 
 impl TestListener {
-    fn into_listener(self) -> Box<dyn ApplicationListener> {
-        Box::new(self)
+    fn into_listener(self) -> Arc<dyn ApplicationListener> {
+        Arc::new(self)
     }
 }
 
@@ -65,19 +64,19 @@ impl TestListener {
 #[derive(Clone)]
 pub struct TestEvent(i64);
 
-impl ApplicationEvent for TestEvent {}
+impl ApplicationEvent for TestEvent {
+    fn id(&self) -> String {
+        String::default()
+    }
+}
 
 #[async_trait]
 impl ApplicationListener for TestListener {
-    fn id(&self) -> &'static str {
-        ""
+    fn event_id(&self) -> EventId {
+        (String::default(), TypeId::of::<TestEvent>())
     }
 
-    fn event_id(&self) -> TypeId {
-        TypeId::of::<TestEvent>()
-    }
-
-    async fn on_application_event(&mut self, event: &Box<dyn ApplicationEvent>) {
+    async fn on_application_event(&self, event: &Box<dyn ApplicationEvent>) {
         let any: &dyn Any = event.as_ref();
         let e = any.downcast_ref::<TestEvent>().unwrap();
         println!("Time tick: {}", e.0)

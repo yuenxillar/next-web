@@ -6,6 +6,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Router;
 
 use next_web_core::async_trait;
+use next_web_core::autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES;
 use next_web_core::client::rest_client::RestClient;
 use next_web_core::constants::application_constants::{
     APPLICATION_BANNER, APPLICATION_DEFAULT_PORT,
@@ -307,19 +308,14 @@ where
         _application_properties: &ApplicationProperties,
     ) {
         // Register application event
-        let (tx, rx) = flume::unbounded();
-        let mut default_event_publisher = DefaultApplicationEventPublisher::new();
         let mut multicaster = DefaultApplicationEventMulticaster::new();
 
-        default_event_publisher.set_channel(Some(tx));
-        multicaster.set_event_channel(rx);
-
-        let listeners = ctx.resolve_by_type::<Box<dyn ApplicationListener>>();
+        let listeners = ctx.resolve_by_type::<Arc<dyn ApplicationListener>>();
         for listener in listeners.into_iter() {
             multicaster.add_application_listener(listener).await;
         }
 
-        multicaster.run();
+        let default_event_publisher = DefaultApplicationEventPublisher::new(multicaster.to_owned());
 
         // Register jobs
         #[cfg(feature = "enable-scheduling")]
@@ -665,6 +661,15 @@ where
 
         post_processors.into_iter().for_each(|mut item| {
             item.post_process_properties(next_application.application_properties.mapping_mut())
+        });
+
+        // Set global server properties
+        GLOBAL_SERVER_PROPERTIES.get_or_init(|| {
+            next_application
+                .application_properties()
+                .next()
+                .server()
+                .to_owned()
         });
 
         let properties = next_application.application_properties();

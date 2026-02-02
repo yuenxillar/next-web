@@ -1,7 +1,6 @@
 use next_web_core::{
     async_trait,
     context::{application_resources::ApplicationResources, properties::ApplicationProperties},
-    util::singleton::SingletonUtil,
     ApplicationContext, AutoRegister,
 };
 

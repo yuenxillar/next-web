@@ -5,7 +5,7 @@ use axum::{
     http::{Response, StatusCode},
     response::IntoResponse,
 };
-use next_web::application::Application;
+use next_web::{application::Application, get_mapping};
 use next_web::{Desensitized, GetSet};
 use next_web_core::{
     async_trait, context::properties::ApplicationProperties, traits::desensitized::Desensitized,
@@ -25,21 +25,17 @@ impl Application for TestApplication {
         _properties: &ApplicationProperties,
     ) {
     }
-
-    // get the application router. (open api  and private api)
-    async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
-        axum::Router::new().route("/desensitized", axum::routing::get(test))
-    }
 }
 
+#[get_mapping(path = "/desensitized")]
 async fn test() -> impl IntoResponse {
     ApiResult {
         code: 200,
         message: "Success".to_string(),
         data: Some(TestA {
-            email: "test_desensitized@163.com".into(),
-            phone: Some("17699935688".into()),
-            name: "zhangsan".into(),
+            email: "test_email@xxx.com".into(),
+            phone: Some("17600000000".into()),
+            name: "jack".into(),
         }),
     }
 }
@@ -51,17 +47,16 @@ struct ApiResult<T> {
     data: Option<T>,
 }
 
-impl<T: serde::Serialize> ApiResult<T> {}
-
 impl<T> IntoResponse for ApiResult<T>
 where
     T: serde::Serialize + Desensitized,
 {
     fn into_response(mut self) -> axum::response::Response {
         self.data.as_mut().map(|val| val.desensitize());
+
         Response::builder()
             .status(StatusCode::OK)
-            .body(Body::new(serde_json::to_string(&self).unwrap()))
+            .body(Body::new(serde_json::to_string(&self.data).unwrap()))
             .unwrap()
     }
 }

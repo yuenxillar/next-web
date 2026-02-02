@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+
 use crate::error::BoxError;
 
 use super::application_event::ApplicationEvent;
@@ -6,15 +8,15 @@ use super::application_event::ApplicationEvent;
 ///
 /// Application event publisher
 
+#[async_trait]
 pub trait ApplicationEventPublisher
 where
     Self: Send + Sync,
 {
     /// 发布事件
+    ///
     /// Publish event
-    fn publish_event(
-        &self,
-        id: impl ToString,
-        event: impl ApplicationEvent,
-    ) -> Result<(), BoxError>;
+    async fn publish_event<E>(&self, event: E) -> Result<(), BoxError>
+    where
+        E: ApplicationEvent;
 }

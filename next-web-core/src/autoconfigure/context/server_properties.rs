@@ -1,8 +1,13 @@
+use std::sync::OnceLock;
+
 use serde::Deserialize;
 
 use crate::constants::application_constants::APPLICATION_DEFAULT_PORT;
 
 use super::http_properties::HttpProperties;
+
+/// Global server properties
+pub static GLOBAL_SERVER_PROPERTIES: OnceLock<ServerProperties> = OnceLock::new();
 
 /// Application server register
 #[derive(Debug, Default, Deserialize, Clone)]

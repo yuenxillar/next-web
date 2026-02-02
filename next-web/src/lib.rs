@@ -3,6 +3,7 @@ pub mod autoconfigure;
 pub mod autoregister;
 pub mod banner;
 
+pub mod config;
 pub mod configurer;
 pub mod converter;
 pub mod crypto;
@@ -17,6 +18,8 @@ pub mod service;
 
 pub mod stream;
 pub mod util;
+
+pub use urlencoding;
 
 pub use crate::extract::required_header::header_names;
 

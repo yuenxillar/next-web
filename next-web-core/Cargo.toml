@@ -28,7 +28,7 @@ sha2 = { workspace = true }
 reqwest = { workspace = true, features = ["json", "gzip"]}
 sys-locale = { workspace = true }
 headers = { workspace = true, optional = true }
-
+urlencoding = { workspace = true }
 inventory = { workspace = true }
 
 tower-layer = "0.3.3"

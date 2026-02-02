@@ -699,7 +699,6 @@ impl PartialEq for ThreadPool {
     /// assert_eq!(a, a);
     /// assert_eq!(b, b);
     ///
-    /// # // TODO: change this to assert_ne in the future
     /// assert!(a != b);
     /// assert!(b != a);
     /// ```

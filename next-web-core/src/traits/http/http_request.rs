@@ -6,8 +6,9 @@ use headers::{Cookie, HeaderMapExt, Host};
 use std::{collections::HashMap, str::FromStr};
 
 use crate::{
-    anys::any_value::AnyValue, http::auth_type::AuthType,
-    traits::http::request_dispatcher::RequestDispatcher, util::http_method::HttpMethod,
+    anys::any_value::AnyValue, autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES,
+    http::auth_type::AuthType, traits::http::request_dispatcher::RequestDispatcher,
+    util::http_method::HttpMethod,
 };
 
 pub const IDENTITY_REMOVED_KEY: &str = stringify!(format!(
@@ -81,7 +82,39 @@ impl HttpRequest for Request {
         self.headers().typed_get::<Cookie>()
     }
 
-    fn request_dispatcher(&self, default_failure_url: &str) -> Option<&dyn RequestDispatcher> {
+    fn request_dispatcher(&self, mut path: &str) -> Option<&dyn RequestDispatcher> {
+        if path.is_empty() {
+            return None;
+        }
+
+        let fragment_pos = path.find('#');
+        if fragment_pos.is_some() {
+            if let Some(var) = path.get(0..fragment_pos.unwrap()) {
+                path = var;
+            }
+        }
+
+        // If the path is already context-relative, just pass it through
+        if path.starts_with('/') {
+            // return Some(());
+        }
+
+        let request_path = self.path();
+        let pos = request_path.rfind('/');
+        let mut relative = None;
+        if pos.is_some() {
+            if let Some(data) = request_path.get(0..pos.unwrap() + 1) {
+                let str1 = urlencoding::encode(data);
+                let mut str2 = String::from(str1);
+                str2.push_str(path);
+                relative = Some(str2);
+            }
+        } else {
+            relative = Some(String::from(urlencoding::encode(request_path)) + path);
+        }
+
+        // Validate the path argument
+
         None
     }
 
@@ -138,9 +171,9 @@ impl HttpRequest for Request {
     }
 
     fn context_path(&self) -> Option<&str> {
-        self.get_attribute("serverContextPath")
-            .map(|val| val.as_str())
-            .unwrap_or_default()
+        GLOBAL_SERVER_PROPERTIES
+            .get()
+            .map(|var| var.context_path())?
     }
 
     fn remove_attribute(&mut self, name: &str) {

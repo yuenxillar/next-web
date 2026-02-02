@@ -161,7 +161,7 @@ impl ThreadUtil {
     /// assert_eq!(result, 42);
     /// # }
     /// ```
-    pub async fn spawn<F>(future: F) -> JoinHandle<F::Output>
+    pub fn spawn<F>(future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -194,12 +194,12 @@ impl ThreadUtil {
     /// println!("Sum: {:?}", result);
     /// # }
     /// ```
-    pub async fn spawn_blocking<F, R>(f: F) -> Result<R, JoinError>
+    pub fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        tokio::task::spawn_blocking(f).await
+        tokio::task::spawn_blocking(f)
     }
 
     /// 在当前线程上启动一个不可跨越线程的 `Future`（仅限 `!Send` 类型）。
