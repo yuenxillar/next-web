@@ -45,13 +45,6 @@ use crate::event::default_application_event_multicaster::DefaultApplicationEvent
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::util::local_date_time::LocalDateTime;
 
-<<<<<<< HEAD
-use next_web_core::traits::event::application_event_multicaster::ApplicationEventMulticaster;
-use next_web_core::traits::event::application_listener::ApplicationListener;
-=======
-use next_web_core::traits::application::application_shutdown::ApplicationShutdown;
->>>>>>> v0.2.0
-
 #[cfg(feature = "enable-api-doc")]
 use next_web_api_doc::openapi::OpenApi;
 
@@ -388,16 +381,12 @@ where
         // 1. Read server configuration
         let config = application_properties.next().server();
         let context_path = config.context_path().unwrap_or("");
-<<<<<<< HEAD
-        let server_port = config.port().unwrap_or(APPLICATION_DEFAULT_PORT);
+        let server_port = config.port();
         let app_name = application_properties
             .next()
             .appliation()
             .map(|config| config.name().into())
             .unwrap_or("NextWebApplication".into());
-=======
-        let server_port = config.port();
->>>>>>> v0.2.0
 
         let server_addr = if let Some(addr) = config.address() {
             addr
