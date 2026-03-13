@@ -52,7 +52,7 @@ impl<A: Application + Default> NextApplication<A> {
             .next()
             .appliation()
             .map(|var| var.name())
-            .unwrap_or_default()
+            .unwrap_or("NextWebApplication")
     }
 
     /// Get the application context path.
@@ -71,8 +71,8 @@ impl<A: Application + Default> NextApplication<A> {
     }
 
     /// Get the application.
-    pub fn application(&self) -> & A {
-        & self.application
+    pub fn application(&self) -> &A {
+        &self.application
     }
 
     /// Set the application register.
@@ -84,7 +84,6 @@ impl<A: Application + Default> NextApplication<A> {
     pub fn set_configure_mappping(&mut self, mapping: serde_yaml::Value) {
         self.application_properties.set_mapping(mapping);
     }
-
 }
 
 impl<A: Application> Deref for NextApplication<A> {

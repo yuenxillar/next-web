@@ -72,6 +72,16 @@ impl AnyValue {
         matches!(self, AnyValue::Object(_))
     }
 
+    /// 检查是否为对象类型
+    pub fn is_object_type<T: Any>(&self) -> bool {
+        if let AnyValue::Object(obj) = self {
+            let any_obj: &dyn Any = obj;
+            return any_obj.downcast_ref::<T>().is_some();
+        }
+
+        false
+    }
+
     /// 获取字符串值
     ///
     /// Get string value
@@ -177,6 +187,15 @@ impl AnyValue {
         if let AnyValue::Object(obj) = self {
             let any_obj = obj.clone();
             any_obj.into_any().downcast().map(|obj| *obj).ok()
+        } else {
+            None
+        }
+    }
+
+    pub fn as_ref_object<T: Any>(&self) -> Option<&T> {
+        if let AnyValue::Object(obj) = self {
+            let any_obj: &dyn Any = obj;
+            any_obj.downcast_ref()
         } else {
             None
         }

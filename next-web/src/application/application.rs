@@ -17,7 +17,7 @@ use next_web_core::context::application_resources::{ApplicationResources, Resour
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
 use next_web_core::state::application_state::ApplicationState;
-use next_web_core::traits::application::application_ready_event::ApplicationReadyEvent;
+use next_web_core::traits::application::application_lifecycle::ApplicationLifecycle;
 use next_web_core::traits::apply_router::ApplyRouter;
 use next_web_core::traits::error_solver::ErrorSolver;
 use next_web_core::traits::filter::http_filter::HttpFilter;
@@ -45,8 +45,6 @@ use crate::configurer::http_method_handler_configurer::{RouteState, RouterContex
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::util::local_date_time::LocalDateTime;
-
-use next_web_core::traits::application::application_shutdown::ApplicationShutdown;
 
 use next_web_core::traits::event::application_event_multicaster::ApplicationEventMulticaster;
 use next_web_core::traits::event::application_listener::ApplicationListener;
@@ -181,7 +179,6 @@ where
     /// No matching route handler
     async fn fallback() -> Response {
         let mut resp = Self::ErrorSolve::solve_error(String::from("Not Found")).into_response();
-
         *resp.status_mut() = StatusCode::NOT_FOUND;
 
         resp
@@ -358,7 +355,6 @@ where
             .collect::<Vec<_>>();
 
         let mut router = Router::new();
-
         while let Some(state) = context.next() {
             let len = iterator.len();
 
@@ -385,12 +381,17 @@ where
         &self,
         mut ctx: ApplicationContext,
         application_properties: &ApplicationProperties,
-        time: std::time::Instant,
+        startup_time: std::time::Instant,
     ) {
         // 1. Read server configuration
         let config = application_properties.next().server();
         let context_path = config.context_path().unwrap_or("");
         let server_port = config.port().unwrap_or(APPLICATION_DEFAULT_PORT);
+        let app_name = application_properties
+            .next()
+            .appliation()
+            .map(|config| config.name().into())
+            .unwrap_or("NextWebApplication".into());
 
         let server_addr = if let Some(addr) = config.addr() {
             addr
@@ -438,11 +439,7 @@ where
                 .fold(axum::Router::new(), |acc, r| acc.merge(r)),
         );
 
-        // 4. Obtain necessary instances
-        #[cfg(not(feature = "tls-rustls"))]
-        let shutdowns = ctx.resolve_by_type::<Box<dyn ApplicationShutdown>>();
-
-        // 5. Add global middleware layer
+        // 4. Add global middleware layer
         {
             // Add prometheus layer
             #[cfg(feature = "enable-prometheus")]
@@ -499,14 +496,14 @@ where
             }
         }
 
-        // 6. Trigger the ApplicationReadyEvent
-        for ready_event in ctx.resolve_by_type::<Box<dyn ApplicationReadyEvent>>() {
-            ready_event.ready(&mut ctx).await;
-        }
-
-        // 7. On Ready
+        // 5. On Ready
         self.on_ready(&mut ctx).await;
 
+        // 6. Configure API documentation if feature is enabled
+        //
+        // This section sets up OpenAPI/Swagger documentation endpoints when the
+        // ["enable-api-doc"] feature is active. It provides both the OpenAPI JSON
+        // specification and the Swagger UI interface for API exploration.
         #[cfg(feature = "enable-api-doc")]
         let mut openapi_router = ctx
             .get_single::<next_web_api_doc::OpenApiRouter>()
@@ -529,7 +526,7 @@ where
                 );
         }
 
-        // 8. Nest context path
+        // 7. Nest context path
         let mut app = match context_path.is_empty() {
             true => app,
             _ => {
@@ -551,20 +548,41 @@ where
         #[cfg(feature = "enable-api-doc")]
         ctx.insert_singleton_with_default_name(openapi_router.to_openapi());
 
+        // 8. Trigger application 'on_start' event
+        let mut app_lifecycle = ctx.resolve_by_type::<Box<dyn ApplicationLifecycle>>();
+        app_lifecycle.sort_by(|a, b| a.order().cmp(&b.order()));
+
+        for lifecycle in app_lifecycle.iter_mut() {
+            lifecycle.on_start(&mut ctx).await.unwrap();
+        }
+
         // 9. Add State to [Context]
         app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
         #[rustfmt::skip]
         println!("\nApplication Listening on:  {}", format!("{}:{}", server_addr, server_port));
+        println!("Application name is:  {}", app_name);
         println!("Application Started   at:  {}", LocalDateTime::now());
-        println!("Application Startup time:  {:?}", time.elapsed());
+        println!("Application Startup time:  {:?}", startup_time.elapsed());
         println!("Application Process   ID:  {:?}\n", std::process::id());
 
-        // 10. Start server
+        // 10. build socket addr
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
-        // Turn off signal monitoring
-        #[cfg(not(feature = "tls-rustls"))]
+
+        // 11. Monitor application shutdown signal
+        #[cfg(not(feature = "rustls"))]
         let shutdown_signal = async move {
+            use next_web_core::traits::application::application_lifecycle::{
+                ShutdownContext, ShutdownReason,
+            };
+
+            let mut shutdown_ctx = ShutdownContext {
+                app_name,
+                uptime: std::time::Instant::now(),
+                exit_code: None,
+                reason: ShutdownReason::Normal,
+            };
+
             let ctrl_c = async {
                 tokio::signal::ctrl_c()
                     .await
@@ -582,18 +600,24 @@ where
             let terminate = std::future::pending::<()>();
 
             tokio::select! {
-                _ = ctrl_c => info!("Received Ctrl+C. Shutting down..."),
-                _ = terminate => info!("Received terminate signal. Shutting down..."),
+                _ = ctrl_c => {
+                    shutdown_ctx.reason = ShutdownReason::Signal("SIGINT".into());
+                    info!("Received Ctrl+C. Shutting down...")
+                },
+                _ = terminate => {
+                    shutdown_ctx.reason = ShutdownReason::Signal("SIGTERM".into());
+                    info!("Received terminate signal. Shutting down...")
+                },
             }
 
-            // Execute all shutdown hooks
-            for mut service in shutdowns {
-                service.shutdown().await;
+            // Trigger application 'on_shutdown' event
+            for mut lifecycle in app_lifecycle.into_iter() {
+                lifecycle.on_shutdown(&shutdown_ctx).await;
             }
         };
 
         // Configure certificate and private key used by https
-        #[cfg(feature = "tls-rustls")]
+        #[cfg(feature = "rustls")]
         {
             use axum_server::tls_rustls::RustlsConfig;
 
@@ -611,7 +635,7 @@ where
             server.serve(app.into_make_service()).await.unwrap();
         }
 
-        #[cfg(not(feature = "tls-rustls"))]
+        #[cfg(not(feature = "rustls"))]
         {
             let listener = tokio::net::TcpListener::bind(&socket_addr).await.unwrap();
 
@@ -631,7 +655,7 @@ where
         Self: Application + Default,
     {
         // Record application start time
-        let start_time = std::time::Instant::now();
+        let startup_time = std::time::Instant::now();
 
         // Get a base application instance
         let mut next_application: NextApplication<Self> = NextApplication::new();
@@ -716,7 +740,7 @@ where
         info!("Starting HTTP  Server:  [Axum/0.8.4]");
 
         application
-            .bind_tcp_server(ctx, properties, start_time)
+            .bind_tcp_server(ctx, properties, startup_time)
             .await;
     }
 }

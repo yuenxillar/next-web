@@ -1,7 +1,11 @@
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::SystemTime};
 
 use chrono::DateTime;
-use next_web_core::{async_trait, error::BoxError, traits::{service::Service, singleton::Singleton}};
+use next_web_core::{
+    async_trait,
+    error::BoxError,
+    traits::{service::Service, singleton::Singleton},
+};
 use once_cell::sync::Lazy;
 use reqwest::{
     header::{HeaderMap, HeaderName},
@@ -85,10 +89,8 @@ impl AliyunCloudSmsService {
     }
 }
 
-
-impl Singleton  for AliyunCloudSmsService {}
-impl Service    for AliyunCloudSmsService {}
-
+impl Singleton for AliyunCloudSmsService {}
+impl Service for AliyunCloudSmsService {}
 
 #[async_trait]
 impl SmsService for AliyunCloudSmsService {
@@ -421,7 +423,7 @@ impl SignService for AliyunCloudSmsService {
         if sign_name.is_empty() {
             return Err("sign_name cannot be empty!".into());
         }
-        
+
         if sign_type != 0 && sign_type != 1 {
             return Err("sign_type must be 0 or 1!".into());
         }
@@ -489,7 +491,11 @@ impl SignService for AliyunCloudSmsService {
         .await
     }
 
-    async fn query_sign<R>(&self, sign_id: &str, _expand_params: Option<BTreeMap<&str, Value>>) -> Result<R, BoxError>
+    async fn query_sign<R>(
+        &self,
+        sign_id: &str,
+        _expand_params: Option<BTreeMap<&str, Value>>,
+    ) -> Result<R, BoxError>
     where
         R: DeserializeOwned,
     {

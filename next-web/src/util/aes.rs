@@ -86,7 +86,7 @@ pub fn decrypt(encrypted_b64: &str, password: &str) -> Result<String, ConfigCryp
 /// - `Result<(), BoxError>`: 加密成功返回 `Ok(())`，失败返回错误信息
 ///
 pub fn local_file_encrypt(password: &str) -> Result<(), BoxError> {
-    let path = PathBuf::new().join(std::env::var("CARGO_MANIFEST_DIR")?);
+    let path = PathBuf::new().join(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default());
 
     let mut file = std::fs::File::open(path.join(".encrypt.txt"))?;
     let mut buf = String::new();

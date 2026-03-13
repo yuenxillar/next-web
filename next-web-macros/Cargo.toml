@@ -17,6 +17,8 @@ inventory = { workspace = true }
 
 [features]
 default = ["data", "translation"]
+
 data = []
 api-doc = []
 translation = []
+embed-resources = []

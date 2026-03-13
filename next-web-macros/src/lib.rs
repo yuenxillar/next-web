@@ -282,6 +282,15 @@ pub fn desensitized(input: TokenStream) -> TokenStream {
 
 #[doc = ""]
 #[proc_macro_attribute]
+pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
+    use crate::web::application::impl_macro_application;
+
+    let item_fn = parse_macro_input!(item as ItemFn);
+    impl_macro_application(attr, item_fn)
+}
+
+#[doc = ""]
+#[proc_macro_attribute]
 pub fn properties(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as ItemStruct);
     impl_macro_properties(attr, item)
