@@ -2,7 +2,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use next_web::application::Application;
 use next_web::extract::find_singleton::FindSingleton;
-use next_web::Singleton;
+use next_web::macros::bind::singleton;
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 use next_web_mqtt::core::topic::base_topic::BaseTopic;
 use next_web_mqtt::service::mqtt_service::MQTTService;
@@ -37,7 +37,7 @@ async fn publish_message(
     "Ok"
 }
 
-#[Singleton( binds = [Self::into_base_topic])]
+#[singleton( binds = [Self::into_base_topic])]
 #[derive(Clone)]
 pub(crate) struct TestOneBaseTopic;
 
@@ -47,7 +47,7 @@ impl TestOneBaseTopic {
     }
 }
 
-#[Singleton( binds = [Self::into_base_topic])]
+#[singleton( binds = [Self::into_base_topic])]
 #[derive(Clone)]
 pub(crate) struct TestTwoBaseTopic;
 

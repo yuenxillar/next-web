@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use axum::response::IntoResponse;
 use next_web::{
-    application::Application, extract::find_singleton::FindSingleton, properties, Singleton,
+    application::Application,
+    extract::find_singleton::FindSingleton,
+    macros::bind::{properties, singleton},
 };
 use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
 
@@ -63,7 +65,7 @@ async fn req_redis_dynamic_properties(
 
 // 示例 用于获取配置文件的参数值
 // Example, used to obtain parameter values for configuration files
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[properties(prefix = "next.data.redis")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct TestRedisProperties {
@@ -73,7 +75,7 @@ pub struct TestRedisProperties {
     pub database: Option<u8>,
 }
 
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[properties(prefix = "next.data.redis.dynamic", dynamic)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct TestDynamicRedisProperties {

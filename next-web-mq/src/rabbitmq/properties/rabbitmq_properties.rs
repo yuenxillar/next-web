@@ -1,9 +1,8 @@
 use next_web_macros::Properties;
+use rudi_dev::singleton;
 use serde::Deserialize;
-use rudi_dev::Singleton;
 
-
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[Properties(prefix = "next.rabbitmq")]
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct RabbitMQClientProperties {

@@ -5,13 +5,15 @@ use std::{
 };
 
 use next_web::{
-    any_mapping, application::Application, extract::find_singleton::FindSingleton, get_mapping,
-    post_mapping, request_mapping, util::local_date_time::LocalDateTime, Singleton,
+    application::Application,
+    async_trait,
+    context::properties::ApplicationProperties,
+    extract::{find_singleton::FindSingleton, ConnectInfo},
+    macros::{bind::*, idempotency},
+    traits::store::idempotency_store::IdempotencyStore,
+    util::local_date_time::LocalDateTime,
+    ApplicationContext,
 };
-use next_web::{
-    async_trait, context::properties::ApplicationProperties, idempotency, ApplicationContext,
-};
-use next_web::{extract::ConnectInfo, traits::store::idempotency_store::IdempotencyStore};
 use next_web::{response::Html, store::memory_idempotency_store::MemoryIdempotencyStore};
 use tokio::sync::Mutex;
 use tracing::info;
@@ -100,7 +102,7 @@ impl TestUserRoutes {
     }
 }
 
-#[Singleton(name = "applicationStore")]
+#[singleton(name = "applicationStore")]
 #[derive(Clone)]
 pub struct ApplicationStore {
     pub request_count: Arc<AtomicU32>,

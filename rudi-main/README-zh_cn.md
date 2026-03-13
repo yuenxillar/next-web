@@ -74,7 +74,7 @@ use std::{fmt::Debug, rc::Rc};
 use rudi::{Context, Singleton, Transient};
 
 // 将 `async fn(cx) -> i32 { 42 }` 注册为 `i32` 的构造函数，并将该 `i32` 类型的实例命名为 `"number"`
-#[Singleton(name = "number")]
+#[singleton(name = "number")]
 async fn Number() -> i32 {
     42
 }
@@ -82,7 +82,7 @@ async fn Number() -> i32 {
 // 注册 `async fn(cx) -> Foo { Foo { number: cx.resolve_with_name_async("number").await } }` 为 `Foo` 的构造函数，
 // 并将该 `Foo` 类型的实例命名为 `"foo"`
 #[derive(Debug, Clone)]
-#[Singleton(async, name = "foo")]
+#[singleton(async, name = "foo")]
 struct Foo {
     #[di(name = "number")]
     number: i32,

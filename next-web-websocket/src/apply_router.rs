@@ -8,7 +8,7 @@ use axum::{
     Router,
 };
 use next_web_core::{traits::apply_router::ApplyRouter, ApplicationContext};
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 use crate::{
     handler::websocket_handler::{handle_socket, WebSocketHandler},
@@ -22,7 +22,7 @@ use crate::{
 /// # 特性/Features
 /// - 自动将自身转换为`ApplyRouter` trait对象/Automatically converts itself into an `ApplyRouter` trait object
 /// - 使用`Singleton`注解确保全局唯一实例/Annotated with `Singleton` to ensure global uniqueness
-#[Singleton(binds = [Self::into_router])]
+#[singleton(binds = [Self::into_router])]
 #[derive(Clone)]
 pub(crate) struct WSApplyRouter;
 

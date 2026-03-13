@@ -1,12 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
 use next_web_core::{
-    ApplicationContext, AutoRegister, async_trait,
-    context::properties::ApplicationProperties,
+    ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
     traits::singleton::Singleton,
 };
 use redis::{Cmd, ConnectionLike};
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 use crate::{
     properties::redis_properties::RedisClientProperties, service::redis_service::RedisService,
@@ -16,7 +15,7 @@ use crate::{
 use crate::core::event::expired_keys_event::RedisExpiredKeysEvent;
 
 /// Register the `DatabaseService` as a singleton with the `DatabaseServiceAutoRegister` type.
-#[Singleton(binds = [Self::into_auto_register])]
+#[singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
 pub struct RedisServiceAutoRegister(pub RedisClientProperties);
 

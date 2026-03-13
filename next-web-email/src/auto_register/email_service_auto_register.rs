@@ -5,9 +5,9 @@ use next_web_core::{
     async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
     ApplicationContext, AutoRegister,
 };
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
-#[Singleton(binds = [Self::into_auto_register])]
+#[singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
 pub struct EmailServiceAutoRegister(pub EmailProperties);
 

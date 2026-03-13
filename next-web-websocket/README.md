@@ -18,7 +18,7 @@ use next_web_websocket::Message;
 use crate::models::session::WebSocketSession;
 
 /// Test
-#[Singleton(binds = [Self::into_websocket_handler])]
+#[singleton(binds = [Self::into_websocket_handler])]
 #[derive(Clone)]
 pub struct TestWebSocket;
 

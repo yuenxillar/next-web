@@ -2,7 +2,7 @@ use axum::{http::StatusCode, response::IntoResponse};
 use next_web::{
     application::Application,
     extract::{data::Data, validated::Validated},
-    Singleton,
+    macros::bind::singleton,
 };
 use next_web_core::{
     async_trait, context::properties::ApplicationProperties, traits::data_decoder::DataDecoder,
@@ -70,7 +70,7 @@ struct TestData {
 }
 
 // 现状是指定这个单例名称 暂时不要改动
-#[Singleton(name = "defaultDataDecoder", binds=[Self::into_decoder])]
+#[singleton(name = "defaultDataDecoder", binds=[Self::into_decoder])]
 #[derive(Clone)]
 pub struct TestDecoder;
 
