@@ -8,9 +8,7 @@ use axum::Router;
 use next_web_core::async_trait;
 use next_web_core::autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES;
 use next_web_core::client::rest_client::RestClient;
-use next_web_core::constants::application_constants::{
-    APPLICATION_BANNER, APPLICATION_DEFAULT_PORT,
-};
+use next_web_core::constants::application_constants::APPLICATION_BANNER;
 use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
@@ -37,8 +35,9 @@ use tracing::{error, info, warn};
 use crate::application::next_application::NextApplication;
 
 use crate::application::permitted_groups::PERMITTED_GROUPS;
+use crate::autoregister::application_event_autoregister::ApplicationEventAutoRegister;
 use crate::autoregister::default_autoregister::DefaultAutoRegister;
-use crate::autoregister::handler_autoregister::HttpHandlerAutoRegister;
+use crate::autoregister::http_handler_autoregister::HttpHandlerAutoRegister;
 
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::configurer::http_method_handler_configurer::{RouteState, RouterContext};
@@ -47,9 +46,6 @@ use crate::event::default_application_event_publisher::DefaultApplicationEventPu
 use crate::util::local_date_time::LocalDateTime;
 
 use next_web_core::traits::application::application_shutdown::ApplicationShutdown;
-
-use next_web_core::traits::event::application_event_multicaster::ApplicationEventMulticaster;
-use next_web_core::traits::event::application_listener::ApplicationListener;
 
 #[cfg(feature = "enable-api-doc")]
 use next_web_api_doc::openapi::OpenApi;
@@ -263,9 +259,11 @@ where
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
     ) {
-        let properties = ctx.resolve_by_type::<Box<dyn Properties>>();
-        for item in properties {
-            item.register(ctx, application_properties).await.unwrap();
+        for properties in ctx.resolve_by_type::<Box<dyn Properties>>() {
+            properties
+                .register(ctx, application_properties)
+                .await
+                .unwrap();
         }
     }
 
@@ -301,20 +299,17 @@ where
         }
     }
 
-    /// Initialize the application infrastructure
-    async fn init_infrastructure(
+    /// Initialize the context
+    async fn init_context(
         &self,
         ctx: &mut ApplicationContext,
         _application_properties: &ApplicationProperties,
     ) {
         // Register application event
-        let mut multicaster = DefaultApplicationEventMulticaster::new();
-
-        let listeners = ctx.resolve_by_type::<Arc<dyn ApplicationListener>>();
-        for listener in listeners.into_iter() {
-            multicaster.add_application_listener(listener).await;
+        let mut multicaster = DefaultApplicationEventMulticaster::default();
+        for event in inventory::iter::<&dyn ApplicationEventAutoRegister>.into_iter() {
+            event.register(ctx, &mut multicaster).await;
         }
-
         let default_event_publisher = DefaultApplicationEventPublisher::new(multicaster.to_owned());
 
         // Register jobs
@@ -390,23 +385,21 @@ where
         // 1. Read server configuration
         let config = application_properties.next().server();
         let context_path = config.context_path().unwrap_or("");
-        let server_port = config.port().unwrap_or(APPLICATION_DEFAULT_PORT);
+        let server_port = config.port();
 
-        let server_addr = if let Some(addr) = config.addr() {
+        let server_addr = if let Some(addr) = config.address() {
             addr
         } else {
-            if config.local().unwrap_or(true) {
+            if config.local() {
                 "127.0.0.1"
             } else {
                 "0.0.0.0"
             }
         };
 
-        let req_timeout = config.http().map(|http| {
-            http.request()
-                .map(|req| req.timeout().unwrap_or(5))
-                .unwrap_or(5)
-        });
+        let req_timeout = config
+            .http()
+            .map(|http| http.request().map(|req| req.timeout()).unwrap_or(5));
 
         // 2. Build basic routing
         let mut app = self
@@ -634,7 +627,7 @@ where
         let start_time = std::time::Instant::now();
 
         // Get a base application instance
-        let mut next_application: NextApplication<Self> = NextApplication::new();
+        let mut next_application: NextApplication<Self> = NextApplication::default();
 
         // Perform a series of processing on application properties before executing the next step
         next_application
@@ -691,9 +684,9 @@ where
             .await;
         info!("Singleton services registered");
 
-        // Init infrastructure
-        application.init_infrastructure(&mut ctx, properties).await;
-        info!("Infrastructure initialized",);
+        // Init context
+        application.init_context(&mut ctx, properties).await;
+        info!("Context initialized",);
 
         // Init middleware
         application.init_middleware(&mut ctx, properties).await;

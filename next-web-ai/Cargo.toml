@@ -7,13 +7,14 @@ keywords = ["next-web", "ai"]
 license.workspace = true
 
 [dependencies]
+next-web-core = { workspace = true }
+
 serde = { workspace = true }
 serde_json = { workspace = true }
-next-web-core = { workspace = true }
-bytes = { workspace = true }
+
+bytes = { workspace = true, features = ["serde"] }
 futures-core = { workspace = true}
 futures-util = { workspace = true}
-dashmap = { workspace = true}
 reqwest = { workspace = true, features = ["stream"]}
 tokio = { workspace = true, features = ["sync"]}
 anyhow = { workspace = true}

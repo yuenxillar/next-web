@@ -5,8 +5,8 @@ use rudi_core::{Color, Scope};
 use syn::ItemStruct;
 
 use crate::{
-    resource_attr::ResourceAttr,
     commons::{self, FieldResolveStmts, ResolvedFields},
+    resource_attr::ResourceAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
 
@@ -152,7 +152,7 @@ pub(crate) fn generate(
     let is_properties = item_struct
         .attrs
         .iter()
-        .any(|val| val.path().is_ident("Properties"));
+        .any(|val| val.path().is_ident("properties"));
 
     let default_name = {
         let singleton_name = name
@@ -201,6 +201,6 @@ pub(crate) fn generate(
     };
 
     // println!("expanded: {:?}", expand.to_string());
-    
+
     Ok(expand)
 }

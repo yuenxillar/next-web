@@ -11,11 +11,7 @@ use crate::properties::database_properties::DatabaseClientProperties;
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct DynamicDatabaseProperties {
     /// This is necessary and do not change the HashMap structure
-    base: HashMap<String, DatabaseClientProperties>,
+    dynamic: HashMap<String, DatabaseClientProperties>,
 }
 
-impl DynamicDatabaseProperties {
-    pub fn base(&self) -> &HashMap<String, DatabaseClientProperties> {
-        &self.base
-    }
-}
+impl DynamicDatabaseProperties {}

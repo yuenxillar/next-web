@@ -2,10 +2,7 @@ use next_web_core::DynClone;
 
 use crate::{
     chat::{model::chat_response::ChatResponse, prompt::prompt::Prompt},
-    model::{
-        model::Model, model_request::ModelRequest, model_response::ModelResponse,
-        model_result::ModelResult,
-    },
+    model::model::Model,
 };
 
 pub trait ChatModel

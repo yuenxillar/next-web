@@ -9,7 +9,7 @@ use crate::{
     web::attrs::retry_attr::RetryAttr,
 };
 
-pub(crate) fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
+pub fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
     let RetryAttr {
         max_attempts,
         delay,

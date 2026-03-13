@@ -18,6 +18,10 @@ pub mod data {
     pub use next_web_macros::{Builder, FieldName, GetSet, RequiredArgsConstructor};
 }
 
+pub mod event {
+    pub use next_web_macros::event_listener;
+}
+
 #[cfg(feature = "enable-scheduling")]
 pub use next_web_macros::scheduled;
 

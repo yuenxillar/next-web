@@ -41,7 +41,7 @@ impl Message for UserMessage {
         self.message_type.clone()
     }
 
-    fn text(&self) -> &str {
-        std::str::from_utf8(self.text_content.as_ref()).unwrap_or("")
+    fn text(&self) -> &[u8] {
+        self.text_content.as_ref()
     }
 }

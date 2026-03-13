@@ -15,7 +15,7 @@ use crate::{
         model::{chat_model::ChatModel, chat_response::ChatResponse},
         prompt::{chat_options::ChatOptions, prompt::Prompt},
     },
-    convert::converter::{Converter, StructuredOutputConverter},
+    convert::converter::StructuredOutputConverter,
     model::model_request::ModelRequest,
 };
 
@@ -109,7 +109,7 @@ impl DefaultCallResponseSpec {
         C: StructuredOutputConverter<T>,
     {
         let resp_content = Bytes::from_static(b"bytes");
-        let entity = output_converter.convert(resp_content);
+        let entity = output_converter.convert_owned(resp_content);
         ResponseEntity {
             response: todo!(),
             entity,

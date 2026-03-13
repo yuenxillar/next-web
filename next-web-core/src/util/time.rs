@@ -27,26 +27,24 @@ pub enum TimeUnit {
 }
 
 impl FromStr for TimeUnit {
-    
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.trim().to_lowercase().as_str() {
             "ns" | "nanoseconds" => Ok(TimeUnit::Nanoseconds),
             "us" | "microseconds" => Ok(TimeUnit::Microseconds),
             "ms" | "milliseconds" => Ok(TimeUnit::Milliseconds),
-            "s"  | "seconds" => Ok(TimeUnit::Seconds),
-            "m"  | "minutes" => Ok(TimeUnit::Minutes),
-            "h"  | "hours" => Ok(TimeUnit::Hours),
-            "d"  | "days" => Ok(TimeUnit::Days),
+            "s" | "seconds" => Ok(TimeUnit::Seconds),
+            "m" | "minutes" => Ok(TimeUnit::Minutes),
+            "h" | "hours" => Ok(TimeUnit::Hours),
+            "d" | "days" => Ok(TimeUnit::Days),
             _ => Err(format!("Invalid time unit string: '{}'", s)),
         }
     }
 }
 
-
 impl TimeUnit {
     pub fn to_duration(self, value: u64) -> std::time::Duration {
-         match self {
+        match self {
             TimeUnit::Nanoseconds => std::time::Duration::from_nanos(value),
             TimeUnit::Microseconds => std::time::Duration::from_micros(value),
             TimeUnit::Milliseconds => std::time::Duration::from_millis(value),

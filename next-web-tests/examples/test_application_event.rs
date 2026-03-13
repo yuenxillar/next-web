@@ -1,8 +1,9 @@
-use std::any::{Any, TypeId};
-use std::sync::Arc;
-
-use next_web::traits::event::application_event::EventId;
-use next_web_core::traits::event::application_event_publisher::ApplicationEventPublisher;
+use next_web::traits::event::application_event_publisher::ApplicationEventPublisher;
+use next_web::util::local_date_time::LocalDateTime;
+use next_web::{
+    event::default_application_event_publisher::DefaultApplicationEventPublisher,
+    macros::event::event_listener,
+};
 use next_web_core::{
     async_trait,
     context::properties::ApplicationProperties,
@@ -12,11 +13,7 @@ use next_web_core::{
     ApplicationContext,
 };
 
-use next_web::{
-    application::Application,
-    event::default_application_event_publisher::DefaultApplicationEventPublisher,
-    macros::bind::singleton, util::local_date_time::LocalDateTime,
-};
+use next_web::{application::Application, macros::bind::singleton};
 
 /// Test application
 #[derive(Default, Clone)]
@@ -35,51 +32,38 @@ impl Application for TestApplication {
     }
 
     async fn on_ready(&self, ctx: &mut ApplicationContext) {
-        let publisher = ctx
+        let event_publisher = ctx
             .get_single_with_default_name::<DefaultApplicationEventPublisher>()
             .unwrap()
             .to_owned();
+
         tokio::spawn(async move {
             loop {
-                let event = TestEvent(LocalDateTime::timestamp());
-                publisher.publish_event(event).await.ok();
+                event_publisher
+                    .publish_event(TestEvent(LocalDateTime::timestamp()))
+                    .await
+                    .unwrap();
 
-                tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
         });
     }
 }
 
-#[singleton(binds=[Self::into_listener])]
+#[singleton]
 #[derive(Clone)]
 pub struct TestListener;
-
-impl TestListener {
-    fn into_listener(self) -> Arc<dyn ApplicationListener> {
-        Arc::new(self)
-    }
-}
 
 #[singleton]
 #[derive(Clone)]
 pub struct TestEvent(i64);
-
-impl ApplicationEvent for TestEvent {
-    fn id(&self) -> String {
-        String::default()
-    }
-}
+impl ApplicationEvent for TestEvent {}
 
 #[async_trait]
-impl ApplicationListener for TestListener {
-    fn event_id(&self) -> EventId {
-        (String::default(), TypeId::of::<TestEvent>())
-    }
-
-    async fn on_application_event(&self, event: &Box<dyn ApplicationEvent>) {
-        let any: &dyn Any = event.as_ref();
-        let e = any.downcast_ref::<TestEvent>().unwrap();
-        println!("Time tick: {}", e.0)
+#[event_listener(id = "testListener")]
+impl ApplicationListener<TestEvent> for TestListener {
+    async fn on_application_event(&self, event: &TestEvent) {
+        println!("Time tick: {}", event.0)
     }
 }
 

@@ -28,16 +28,14 @@ impl<T> ApplicationEventPublisher for DefaultApplicationEventPublisher<T>
 where
     T: ApplicationEventMulticaster,
 {
-    /// 发布事件
-    ///
-    /// Publish event
     async fn publish_event<E>(&self, event: E) -> Result<(), BoxError>
     where
         E: ApplicationEvent,
     {
-        self.multicaster.multicast_event(Box::new(event)).await;
-
-        Ok(())
+        self.multicaster
+            .multicast_event(event)
+            .await
+            .map_err(Into::into)
     }
 }
 

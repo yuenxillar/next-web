@@ -1,7 +1,9 @@
 use bytes::Bytes;
 
 pub trait Converter<S, T> {
-    fn convert(&self, source: S) -> Option<T>;
+    fn convert(&self, source: S) -> Option<&T>;
+
+    fn convert_owned(self, source: S) -> Option<T>;
 }
 
 pub trait StructuredOutputConverter<T>: Converter<Bytes, T> {

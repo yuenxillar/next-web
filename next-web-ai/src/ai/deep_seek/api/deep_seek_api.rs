@@ -1,6 +1,8 @@
+use bytes::Bytes;
 use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
 use next_web_core::{client::rest_client::RestClient, error::BoxError};
+use serde::{Deserialize, Deserializer};
 
 use crate::ai::deep_seek::chat_model::ChatModel;
 
@@ -20,7 +22,7 @@ pub struct DeepSeekApi {
 impl DeepSeekApi {
     pub fn new(api_key: impl Into<Box<str>>, chat_model: ChatModel) -> Self {
         let client = RestClient::builder()
-            .base_url("https://api.deepseek.com/chat/completions")
+            .base_url("https://api.deepseek.com")
             .default_headers([("Content-Type", "application/json")])
             .build();
         let api_key = api_key.into();
@@ -35,12 +37,13 @@ impl DeepSeekApi {
         &self,
         req: &ChatCompletionRequest,
     ) -> Result<ChatApiRespnose, BoxError> {
+        let body = serde_json::to_string(req)?;
         let resp = self
             .client
             .post("")
             .await
             .bearer_auth(self.api_key.as_ref())
-            .body(serde_json::to_string(req)?)
+            .body(body)
             .send()
             .await?;
         if !req.stream {
@@ -114,17 +117,37 @@ impl ChatCompletionRequest {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ChatCompletionMessage {
     pub(crate) role: Box<str>,
-    pub(crate) content: Box<str>,
+
+    #[serde(deserialize_with = "deserialize_bytes")]
+    pub(crate) content: Bytes,
 }
 
 impl ChatCompletionMessage {
-    pub fn new(role: impl Into<Box<str>>, content: impl Into<Box<str>>) -> Self {
+    pub fn new(role: impl Into<Box<str>>, content: impl Into<Bytes>) -> Self {
         Self {
             role: role.into(),
             content: content.into(),
         }
     }
+
+    pub fn with_slice<S>(role: S, content: &[u8]) -> Self
+    where
+        S: Into<Box<str>>,
+    {
+        Self {
+            role: role.into(),
+            content: Bytes::copy_from_slice(content),
+        }
+    }
+
+    pub fn set_content<T>(&mut self, content: T)
+    where
+        T: Into<Bytes>,
+    {
+        self.content = content.into();
+    }
 }
+
 ///
 /// {
 ///  "id": "9710a6c0-1b51-427b-b95d-b6734ec46270",
@@ -194,7 +217,8 @@ pub struct Choice {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct DeltaContent {
-    pub content: Box<str>,
+    #[serde(deserialize_with = "deserialize_bytes")]
+    pub content: Bytes,
 }
 
 #[derive(Clone)]
@@ -212,4 +236,12 @@ impl crate::chat::meta_data::usage::Usage for DefaultUsage {
     fn get_completion_tokens(&self) -> u32 {
         self.completion_tokens
     }
+}
+
+pub(crate) fn deserialize_bytes<'de, D>(deserializer: D) -> Result<Bytes, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let vec: Vec<u8> = Vec::deserialize(deserializer)?;
+    Ok(Bytes::from(vec))
 }

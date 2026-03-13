@@ -8,26 +8,28 @@ use next_web_core::context::{
 use super::application::Application;
 use next_web_core::autoconfigure::context::server_properties::ServerProperties;
 
-#[derive(Default)]
-pub struct NextApplication<A: Application> {
+pub struct NextApplication<T: Application> {
     pub(crate) application_properties: ApplicationProperties,
     pub(crate) application_args: ApplicationArgs,
     pub(crate) application_resources: ApplicationResources,
-    pub(crate) application: A,
+    pub(crate) application: T,
 }
 
-impl<A: Application + Default> NextApplication<A> {
-    pub fn new() -> Self {
-        let application_args = ApplicationArgs::default();
-        let application_resources = ApplicationResources::default();
-        let application_properties =
-            ApplicationProperties::from((&application_args, &application_resources));
-
+impl<T> NextApplication<T>
+where
+    T: Application,
+{
+    pub fn new(
+        application_properties: ApplicationProperties,
+        application_args: ApplicationArgs,
+        application_resources: ApplicationResources,
+        application: T,
+    ) -> Self {
         Self {
             application_properties,
             application_args,
             application_resources,
-            application: A::default(),
+            application,
         }
     }
 
@@ -61,7 +63,7 @@ impl<A: Application + Default> NextApplication<A> {
     }
 
     /// Get the application server port.
-    pub fn server_port(&mut self) -> Option<u16> {
+    pub fn server_port(&mut self) -> u16 {
         self.server_properties().port()
     }
 
@@ -71,8 +73,8 @@ impl<A: Application + Default> NextApplication<A> {
     }
 
     /// Get the application.
-    pub fn application(&self) -> & A {
-        & self.application
+    pub fn application(&self) -> &T {
+        &self.application
     }
 
     /// Set the application register.
@@ -84,7 +86,6 @@ impl<A: Application + Default> NextApplication<A> {
     pub fn set_configure_mappping(&mut self, mapping: serde_yaml::Value) {
         self.application_properties.set_mapping(mapping);
     }
-
 }
 
 impl<A: Application> Deref for NextApplication<A> {
@@ -92,5 +93,24 @@ impl<A: Application> Deref for NextApplication<A> {
 
     fn deref(&self) -> &Self::Target {
         &self.application
+    }
+}
+
+impl<T> Default for NextApplication<T>
+where
+    T: Application + Default,
+{
+    fn default() -> Self {
+        let application_args = ApplicationArgs::default();
+        let application_resources = ApplicationResources::default();
+        let application_properties =
+            ApplicationProperties::from((&application_args, &application_resources));
+
+        Self {
+            application_properties,
+            application_args,
+            application_resources,
+            application: T::default(),
+        }
     }
 }

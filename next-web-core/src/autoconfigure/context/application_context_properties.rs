@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, serde::Deserialize)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppliationContextProperties {
     allow_override: bool,
 }

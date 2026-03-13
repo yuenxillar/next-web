@@ -101,17 +101,17 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                     // String 类型需要支持数字转字符串
                     quote! {
                         || -> Option<String> {
-                            // 优先尝试 one_value
-                            if let Some(s) = properties.one_value::<String>(#key_str) {
+                            // 优先尝试 get_value
+                            if let Some(s) = properties.get_value::<String>(#key_str) {
                                 return Some(s);
                             }
 
-                            match properties.one_value::<String>(#key_str) {
+                            match properties.get_value::<String>(#key_str) {
                                 Some(s) => Some(s),
                                 None => {
-                                    match properties.one_value::<i64>(#key_str) {
+                                    match properties.get_value::<i64>(#key_str) {
                                         Some(s) => Some(s.to_string()),
-                                        None => match properties.one_value::<f64>(#key_str) {
+                                        None => match properties.get_value::<f64>(#key_str) {
                                                 Some(s) => Some(s.to_string()),
                                                 None => None,
                                         }
@@ -121,9 +121,9 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                         }()
                     }
                 } else {
-                    // 非字符串类型：直接尝试 one_value
+                    // 非字符串类型：直接尝试 get_value
                     quote! {
-                        properties.one_value::<#inner_type>(#key_str)
+                        properties.get_value::<#inner_type>(#key_str)
                     }
                 };
 
@@ -146,7 +146,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
         // dynamic_field
         let dynamic_field = if dynamic {
             quote! {
-                base: if let Some(values) = properties.dynamic_value(#prefix_expr) { values } else { Default::default() },
+                dynamic: if let Some(values) = properties.get_dynamic_value(#prefix_expr) { values } else { Default::default() },
             }
         } else {
             quote! {}

@@ -1,10 +1,11 @@
 use next_web_core::AutoRegister;
 
 pub trait DefaultAutoRegister
-where 
-Self:   Send   + Sync + 'static,
-Self:   AutoRegister
-{}
+where
+    Self: Send + Sync + 'static,
+    Self: AutoRegister,
+{
+}
 
 inventory::collect!(&'static dyn DefaultAutoRegister);
 

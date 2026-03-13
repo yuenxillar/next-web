@@ -91,7 +91,8 @@ full = [
     "enable-i18n",
     "decrypt-properties",
     "enable-api-doc",
-    "enable-thread-pool"
+    "enable-thread-pool",
+    "trace-log"
 ]
 
 tls-rustls = ["axum-server"]
