@@ -20,6 +20,8 @@ use crate::AutoRegister;
 ///
 pub trait Properties: DynClone + AutoRegister {}
 
+dyn_clone::clone_trait_object!(Properties);
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ApplicationProperties {
     /// This Properties is Mapping data from the configuration file
@@ -45,9 +47,10 @@ impl ApplicationProperties {
     ///
     /// let mut props = ApplicationProperties::default();
     /// props.set_mapping(HashMap::from([("key1".to_string(), serde_yaml::Value::String("value1".to_string()))]));
-    /// assert_eq!(props.one_value::<String>("key1"), Some("value1".to_string()));
+    /// assert_eq!(props.get_value::<String>("key1"), Some("value1".to_string()));
     ///
-    pub fn one_value<T: serde::de::DeserializeOwned>(&self, key: &str) -> Option<T> {
+    pub fn get_value<T: serde::de::DeserializeOwned>(&self, key: impl AsRef<str>) -> Option<T> {
+        let key = key.as_ref();
         if key.is_empty() {
             return None;
         }
@@ -80,10 +83,11 @@ impl ApplicationProperties {
         None
     }
 
-    pub fn dynamic_value<T: serde::de::DeserializeOwned>(
+    pub fn get_dynamic_value<T: serde::de::DeserializeOwned>(
         &self,
-        key: &str,
+        key: impl AsRef<str>,
     ) -> Option<HashMap<String, T>> {
+        let key = key.as_ref();
         if key.is_empty() {
             return None;
         }
@@ -143,7 +147,7 @@ impl ApplicationProperties {
     /// Replace the placeholders in the properties.
     pub fn replace_placeholders(&mut self) {
         // Two situations
-        // ${author.name}  $${MY_ENV_VAR}
+        // ${author.name}   ${MY_ENV_VAR}
 
         let temporary = self.mapping.clone();
         self.mapping.as_mut().map(|mapping| {
@@ -223,62 +227,44 @@ fn helper(temporary: Option<&serde_yaml::Value>, value: &mut serde_yaml::Value) 
     };
 }
 
-impl Default for ApplicationProperties {
-    fn default() -> Self {
-        Self {
-            next: NextProperties::default(),
-            mapping: None,
-        }
-    }
-}
-
 fn into_application_properties(
     application_args: &ApplicationArgs,
     application_resources: &ApplicationResources,
 ) -> ApplicationProperties {
-    use serde_yaml::Value;
+    use serde_yaml::{from_str, Value};
 
-    let config_path: Option<String> = application_args.config_location.clone();
+    let config = if let Some(path) = application_args
+        .config_location
+        .as_ref()
+        .filter(|s| !s.is_empty())
+        .filter(|s| std::fs::exists(s).is_ok())
+    {
+        let mut file = std::fs::File::open(&path).unwrap();
+        let mut buffer = String::new();
+        let _ = file.read_to_string(&mut buffer);
 
-    let mut config = String::new();
-
-    if config_path.as_ref().map(|s| !s.is_empty()).unwrap_or(false) {
-        let path = config_path.unwrap();
-        if let Ok(_) = std::fs::exists(&path) {
-            let mut file = std::fs::File::open(&path).unwrap();
-            let mut _buffer = String::new();
-            file.read_to_string(&mut _buffer).unwrap();
-
-            if _buffer.is_empty() {
-                panic!(
-                    "The application configuration file is empty, file path: {}",
-                    &path
-                );
-            }
-
-            config = _buffer;
-        } else {
-            panic!(
-                "Please check if the configuration file of the application exists: {:?}",
-                &path
-            );
-        }
+        buffer
     } else {
-        if let Some(data) = application_resources.load(APPLICATION_CONFIG) {
-            config = String::from_utf8(data.to_vec()).unwrap();
-        }
+        application_resources
+            .load(APPLICATION_CONFIG)
+            .map(|data| String::from_utf8(data.to_vec()).unwrap_or_default())
+            .unwrap_or_default()
+    };
+
+    // check
+    if !config.is_empty() {
+        match from_str::<ApplicationProperties>(config.as_str()).map(|mut properties| {
+            from_str::<Value>(&config)
+                .map(|value| properties.set_mapping(value))
+                .unwrap_or_default();
+            properties
+        }) {
+            Ok(properties) => return properties,
+            Err(_) => (),
+        };
     }
 
-    // mapping value
-    let mapping = serde_yaml::from_str::<Value>(&config).unwrap();
-
-    // into application properties
-    let mut application_properties: ApplicationProperties =
-        serde_yaml::from_str(config.as_str()).unwrap_or_default();
-    application_properties.set_mapping(mapping);
-
-    // return
-    return application_properties;
+    return Default::default();
 }
 
 impl From<(&ApplicationArgs, &ApplicationResources)> for ApplicationProperties {
@@ -287,8 +273,16 @@ impl From<(&ApplicationArgs, &ApplicationResources)> for ApplicationProperties {
     }
 }
 
-impl Drop for ApplicationProperties {
-    fn drop(&mut self) {}
-}
+impl Default for ApplicationProperties {
+    fn default() -> Self {
+        use serde_yaml::{from_str, to_string, Value};
 
-dyn_clone::clone_trait_object!(Properties);
+        let next = Default::default();
+
+        let mapping = to_string(&next)
+            .map(|data| from_str::<Value>(&data).ok())
+            .unwrap_or_default();
+
+        Self { next, mapping }
+    }
+}

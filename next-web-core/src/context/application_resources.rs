@@ -1,4 +1,4 @@
-use hashbrown::HashMap;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::{borrow::Cow, fs, io, path::Path, time::SystemTime};
 use tracing::{error, warn};
@@ -18,8 +18,14 @@ pub trait ResourceLoader: Send + Sync {
 
 #[derive(Clone)]
 pub struct ApplicationResources {
-    config: Arc<Config>,
+    config: Config,
     files: Arc<Files>,
+}
+
+impl ApplicationResources {
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
 }
 
 impl ResourceLoader for ApplicationResources {
@@ -48,15 +54,16 @@ impl ResourceLoader for ApplicationResources {
 
 impl Default for ApplicationResources {
     fn default() -> Self {
-        let config = Arc::new(Config::default());
-        let files = Arc::new(Files::load_file(config.as_ref()));
+        let config = Config::default();
+        let files = Arc::new(Files::load_file(&config));
         Self { config, files }
     }
 }
 
-struct Config {
+#[derive(Debug, Clone)]
+pub struct Config {
     // pub(super) supported_types: Vec<SupportedTypes>,
-    pub(super) maximum_file_size: u64,
+    pub maximum_file_size: u64,
 }
 
 impl Default for Config {

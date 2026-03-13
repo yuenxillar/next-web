@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::autoconfigure::context::application_context_properties::AppliationContextProperties;
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppliationProperties {
     name: Option<String>,
     #[serde(default)]

@@ -47,7 +47,7 @@ async fn req_server_port(
 ) -> impl IntoResponse {
     format!(
         "Server port: {:?}",
-        properties.one_value::<u32>("next.server.port").unwrap()
+        properties.get_value::<u32>("next.server.port").unwrap()
     )
 }
 
@@ -81,7 +81,7 @@ pub struct TestRedisProperties {
 pub struct TestDynamicRedisProperties {
     /// This is necessary, try not to change it as much as possible
     /// 这是必要的，尽量不要改变它, 后面的字段可以自定义
-    pub base: HashMap<String, TestRedisProperties>,
+    pub dynamic: HashMap<String, TestRedisProperties>,
 }
 
 #[tokio::main]

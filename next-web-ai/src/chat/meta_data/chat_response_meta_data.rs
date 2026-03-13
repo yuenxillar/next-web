@@ -3,8 +3,8 @@ use crate::{chat::meta_data::usage::Usage, model::response_meta_data::ResponseMe
 #[derive(Clone)]
 pub struct ChatResponseMetadata {
     pub id: Box<str>,
-    pub model: Box<str>,
-    pub usage: Box<dyn Usage>,
+    pub model: String,
+    pub usage: Option<Box<dyn Usage>>,
 }
 
 impl ChatResponseMetadata {
@@ -16,10 +16,11 @@ impl ChatResponseMetadata {
         self.model.as_ref()
     }
 
-    pub fn usage(&self) -> &dyn Usage {
-        self.usage.as_ref()
+    pub fn usage(&self) -> Option<&dyn Usage> {
+        self.usage.as_deref()
     }
 }
+
 impl ResponseMetadata for ChatResponseMetadata {
     fn get<T>(&self, key: impl AsRef<str>) -> T {
         todo!()
@@ -31,5 +32,15 @@ impl ResponseMetadata for ChatResponseMetadata {
 
     fn is_empty(&self) -> bool {
         todo!()
+    }
+}
+
+impl Default for ChatResponseMetadata {
+    fn default() -> Self {
+        Self {
+            id: Default::default(),
+            model: Default::default(),
+            usage: Default::default(),
+        }
     }
 }

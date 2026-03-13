@@ -11,21 +11,24 @@ pub struct Key {
 }
 
 impl Key {
-    /// 创建新的事件键
     /// Create a new event key
+    ///
+    /// 创建新的事件键
     pub fn new(id: impl Into<Cow<'static, str>>, tid: TypeId) -> Self {
         Self { id: id.into(), tid }
     }
 
-    /// 获取事件键的ID
     /// Get the ID of the event key
+    ///
+    /// 获取事件键的ID
     pub fn id(&self) -> &str {
         &self.id
     }
 
-    /// 获取事件键的类型ID
     /// Get the type ID of the event key
-    pub fn tid(&self) -> TypeId {
+    ///
+    /// 获取事件键的类型ID
+    pub fn type_id(&self) -> TypeId {
         self.tid
     }
 }

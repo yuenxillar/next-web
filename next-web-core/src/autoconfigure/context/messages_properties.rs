@@ -1,4 +1,6 @@
-#[derive(Debug, serde::Deserialize, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessagesProperties {
     local: Option<String>,
     base_name: Option<String>,

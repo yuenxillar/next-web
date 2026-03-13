@@ -1,4 +1,6 @@
-#[derive(Debug, serde::Deserialize, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpProperties {
     request: Option<RequestProperties>,
     response: Option<ResponseProperties>,
@@ -20,27 +22,44 @@ impl HttpProperties {
     }
 }
 
-#[derive(Debug, serde::Deserialize, Clone)]
+impl Default for HttpProperties {
+    fn default() -> Self {
+        Self {
+            request: Some(Default::default()),
+            response: Some(Default::default()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestProperties {
-    // byte
+    /// byte
     max_file_size: Option<usize>,
-    // byte
+    /// byte
     max_request_size: Option<usize>,
-    trace: Option<bool>,
+    /// enable trace layer
+    trace: bool,
     location: Option<String>,
 
-    /// from_secs
-    timeout: Option<u64>,
+    /// http request timeout, from seconds
+    #[serde(default = "default_timeout")]
+    timeout: u64,
 }
 
 impl RequestProperties {
-    pub fn new() -> Self {
+    pub fn new(
+        max_file_size: usize,
+        max_request_size: usize,
+        trace: bool,
+        location: String,
+        timeout: u64,
+    ) -> Self {
         Self {
-            max_file_size: None,
-            max_request_size: None,
-            trace: Some(true),
-            location: None,
-            timeout: Some(5),
+            max_file_size: Some(max_file_size),
+            max_request_size: Some(max_request_size),
+            trace,
+            location: Some(location),
+            timeout,
         }
     }
 
@@ -53,10 +72,10 @@ impl RequestProperties {
     }
 
     pub fn trace(&self) -> bool {
-        self.trace.unwrap_or(false)
+        self.trace
     }
 
-    pub fn timeout(&self) -> Option<u64> {
+    pub fn timeout(&self) -> u64 {
         self.timeout
     }
 
@@ -65,7 +84,29 @@ impl RequestProperties {
     }
 }
 
-#[derive(Debug, serde::Deserialize, Clone)]
+fn default_timeout() -> u64 {
+    5
+}
+
+impl Default for RequestProperties {
+    fn default() -> Self {
+        Self {
+            max_file_size: None,
+            max_request_size: None,
+            trace: false,
+            location: None,
+            timeout: default_timeout(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResponseProperties {}
 
 impl ResponseProperties {}
+
+impl Default for ResponseProperties {
+    fn default() -> Self {
+        Self {}
+    }
+}

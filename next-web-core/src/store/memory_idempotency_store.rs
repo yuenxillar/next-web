@@ -1,8 +1,8 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::{http, response::IntoResponse};
-use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 

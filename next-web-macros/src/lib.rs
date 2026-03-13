@@ -13,6 +13,7 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 use syn::DeriveInput;
 use syn::ItemFn;
+use syn::ItemImpl;
 use syn::ItemStruct;
 
 mod data;
@@ -302,7 +303,7 @@ pub fn request_mapping(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::routing::with_method(None, args, input)
 }
 
-macro_rules! method_macro {
+macro_rules! http_method_macro {
     ($method:ident, $variant:ident) => {
         #[doc = ""]
         #[proc_macro_attribute]
@@ -316,12 +317,12 @@ macro_rules! method_macro {
     };
 }
 
-method_macro!(get_mapping, Get);
-method_macro!(post_mapping, Post);
-method_macro!(put_mapping, Put);
-method_macro!(delete_mapping, Delete);
-method_macro!(patch_mapping, Patch);
-method_macro!(any_mapping, Any);
+http_method_macro!(get_mapping, Get);
+http_method_macro!(post_mapping, Post);
+http_method_macro!(put_mapping, Put);
+http_method_macro!(delete_mapping, Delete);
+http_method_macro!(patch_mapping, Patch);
+http_method_macro!(any_mapping, Any);
 
 // #[cfg(feature = "api-doc")]
 #[proc_macro_attribute]
@@ -514,13 +515,20 @@ pub fn pre_authorize(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///    println! ("function test_retry backoff: {:?}", error);
 /// }
 /// ```
-// #[cfg(feature = "retry")]
 #[proc_macro_attribute]
 pub fn retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
     use crate::web::retry::impl_macro_retry;
 
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_retry(attr, item_fn)
+}
+
+#[proc_macro_attribute]
+pub fn event_listener(attr: TokenStream, item: TokenStream) -> TokenStream {
+    use crate::web::event::impl_macro_event_listener;
+
+    let item_impl = parse_macro_input!(item as ItemImpl);
+    impl_macro_event_listener(attr, item_impl)
 }
 
 #[cfg(feature = "translation")]
