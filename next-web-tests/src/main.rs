@@ -9,7 +9,7 @@ use next_web::{
     async_trait,
     context::properties::ApplicationProperties,
     extract::{find_singleton::FindSingleton, ConnectInfo},
-    macros::{bind::*, idempotency},
+    macros::{application::next_application, bind::*, idempotency},
     traits::store::idempotency_store::IdempotencyStore,
     util::local_date_time::LocalDateTime,
     ApplicationContext,
@@ -136,6 +136,7 @@ impl Default for ApplicationStore {
 }
 
 #[tokio::main]
+#[next_application]
 async fn main() {
     TestApplication::run().await;
 }

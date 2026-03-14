@@ -38,10 +38,16 @@ impl MessageSourceService {
 
         let base_name = properties.base_name().unwrap_or(MESSAGES);
 
+        resources
+            .iter()
+            .iter()
+            .for_each(|s| println!("resources: {}", s));
         let iters = resources.load_dir(I18N);
         iters
             .into_iter()
-            .filter(|s| s.starts_with(& format!("{}/{}", I18N, base_name)) && s.ends_with(PROPERTIES))
+            .filter(|s| {
+                s.starts_with(&format!("{}/{}", I18N, base_name)) && s.ends_with(PROPERTIES)
+            })
             .for_each(|path| {
                 // default
                 let locale: Option<Locale> =
@@ -49,7 +55,7 @@ impl MessageSourceService {
                         Some(Locale::locale())
                     } else {
                         let mut s1 = path
-                            .replace(& format!("{}/{}", I18N, base_name), "")
+                            .replace(&format!("{}/{}", I18N, base_name), "")
                             .replace(PROPERTIES, "")
                             .replace(".", "");
                         s1.remove(0);
@@ -60,7 +66,7 @@ impl MessageSourceService {
                 // println!("locale: {:?}", locale);
 
                 locale.map(|val| {
-                    resources.load(path).map(|data| {
+                    resources.load(path.as_ref()).map(|data| {
                         if let Ok(messages) = String::from_utf8(data.to_vec()) {
                             let source = messages.as_ref();
                             if let Ok(messages) = Self::analysis(source) {
@@ -105,16 +111,17 @@ impl MessageSourceService {
 
     pub fn message_or_default(&self, code: impl AsRef<str>, locale: Locale) -> String {
         let code = code.as_ref();
-        self.message(code, locale).or_else(|| {
-            self.message(
-                code,
-                self.properties
-                    .local()
-                    .map(|s| Locale::from_str(s).unwrap_or(Locale::locale()))
-                    .unwrap_or(Locale::locale()),
-            )
-        })
-        .unwrap_or(code.into())
+        self.message(code, locale)
+            .or_else(|| {
+                self.message(
+                    code,
+                    self.properties
+                        .local()
+                        .map(|s| Locale::from_str(s).unwrap_or(Locale::locale()))
+                        .unwrap_or(Locale::locale()),
+                )
+            })
+            .unwrap_or(code.into())
     }
 
     fn analysis(str: &str) -> Result<HashMap<Box<str>, Message>, &'static str> {
@@ -163,7 +170,7 @@ impl MessageSourceService {
 
         if let Some(indexes) = &message.indexs {
             for index in (0..args.len()).rev() {
-                 if let Some(&placeholder_pos) = indexes.get(index) {
+                if let Some(&placeholder_pos) = indexes.get(index) {
                     let start = placeholder_pos;
                     let end = placeholder_pos + 2;
                     if end <= text.len() {

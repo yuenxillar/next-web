@@ -27,3 +27,7 @@ pub use next_web_macros::scheduled;
 
 #[cfg(feature = "enable-api-doc")]
 pub use next_web_macros::api_doc;
+
+pub mod application {
+    pub use next_web_macros::next_application;
+}

@@ -50,6 +50,11 @@ pub use next_web_api_doc as api_doc;
 #[cfg(feature = "enable-i18n")]
 pub mod i18n;
 
+#[cfg(feature = "embed-resources")]
+pub mod embed {
+    pub use rust_embed::*;
+}
+
 #[cfg(feature = "common")]
 pub mod common;
 

@@ -1,15 +1,15 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{Error, FnArg, ItemFn};
 use syn::spanned::Spanned;
+use syn::{Error, FnArg, ItemFn};
 
 pub struct Logic;
 
 impl Logic {
-    pub fn generate<F>(mut logic: F) -> TokenStream
+    pub fn generate<F>(logic: F) -> TokenStream
     where
-        F: FnMut() -> Result<TokenStream2, Error>,
+        F: FnOnce() -> Result<TokenStream2, Error>,
     {
         match logic() {
             Ok(stream) => stream.into(),
@@ -46,7 +46,6 @@ impl Logic {
         Ok(())
     }
 
-
     pub fn add_args<A>(item_fn: &mut ItemFn, args: A)
     where
         A: Iterator<Item = proc_macro2::TokenStream>,
@@ -57,17 +56,15 @@ impl Logic {
         }
     }
 
-
     pub fn add_block(item_fn: &mut ItemFn, block: TokenStream2) {
         let default_block = item_fn.block.stmts.clone();
-        *item_fn.block = syn::parse2(
-            quote! {
-                {
-                    #block
+        *item_fn.block = syn::parse2(quote! {
+            {
+                #block
 
-                    #(#default_block)*
-                }
+                #(#default_block)*
             }
-        ).unwrap();
+        })
+        .unwrap();
     }
 }

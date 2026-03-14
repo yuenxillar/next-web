@@ -1,3 +1,4 @@
+pub mod application_attr;
 pub mod idempotency_attr;
 pub mod pre_authorize_attr;
 pub mod properties_attr;

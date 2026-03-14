@@ -42,8 +42,7 @@ pub type UtoipaMethodRouter = (
 /// # use utoipa_axum::router::OpenApiRouter;
 /// let _: OpenApiRouter = OpenApiRouter::default();
 /// ```
-#[derive(Clone)]
-#[cfg_attr(feature = "debug", derive(Debug))]
+#[derive(Debug, Clone)]
 pub struct OpenApiRouter(utoipa::openapi::OpenApi);
 
 impl OpenApiRouter {

@@ -7,56 +7,124 @@ use sha2::Digest;
 
 use crate::constants::application_constants::RESOURCES;
 
+#[cfg(feature = "embed-resources")]
+pub static RESOURCE_LOADER: std::sync::OnceLock<Arc<dyn ResourceLoader>> =
+    std::sync::OnceLock::new();
+
 /// Resource files that need to be embedded in binary files
-pub trait ResourceLoader: Send + Sync {
-    fn load(&self, path: impl AsRef<str>) -> Option<&[u8]>;
+pub trait ResourceLoader
+where
+    Self: Send + Sync,
+{
+    fn load(&self, path: &str) -> Option<Cow<'static, [u8]>>;
 
-    fn load_dir(&self, dir: impl AsRef<str>) -> impl Iterator<Item = &str> + '_;
+    fn load_dir(&self, dir: &str) -> Vec<Cow<'static, str>>;
 
-    fn iter(&self) -> impl Iterator<Item = &str> + '_;
+    fn iter(&self) -> Vec<Cow<'static, str>>;
 }
 
 #[derive(Clone)]
 pub struct ApplicationResources {
-    config: Config,
-    files: Arc<Files>,
+    config: Option<Arc<Config>>,
+    #[allow(unused)]
+    files: Option<Arc<Files>>,
 }
 
 impl ApplicationResources {
-    pub fn config(&self) -> &Config {
-        &self.config
+    pub fn config(&self) -> Option<&Config> {
+        self.config.as_deref()
     }
 }
 
 impl ResourceLoader for ApplicationResources {
-    fn load(&self, path: impl AsRef<str>) -> Option<&[u8]> {
-        let path = path.as_ref().replace("\\", "/");
-        let source = self.files.inner.get(path.as_str())?;
+    fn load(&self, path: &str) -> Option<Cow<'static, [u8]>> {
+        let path = path.replace("\\", "/");
 
-        Some(source.data.as_ref())
+        #[cfg(feature = "embed-resources")]
+        {
+            let resource_loader = RESOURCE_LOADER.get()?;
+            return resource_loader.load(&path);
+        }
+
+        #[cfg(not(feature = "embed-resources"))]
+        {
+            return self
+                .files
+                .as_ref()
+                .map(|fs| fs.inner.get(path.as_str()))?
+                .map(|f| f.data.clone());
+        }
     }
 
-    fn load_dir(&self, dir: impl AsRef<str>) -> impl Iterator<Item = &str> + '_ {
-        let s1 = dir.as_ref().replace("\\", "/");
-        self.files.inner.iter().filter_map(move |(s2, _)| {
-            if s2.starts_with(&s1) {
-                Some(s2.as_ref())
-            } else {
-                None
-            }
-        })
+    fn load_dir(&self, dir: &str) -> Vec<Cow<'static, str>> {
+        let s1 = dir.replace("\\", "/");
+
+        #[cfg(feature = "embed-resources")]
+        {
+            let resource_loader = match RESOURCE_LOADER.get() {
+                Some(resource_loader) => resource_loader,
+                None => return Default::default(),
+            };
+
+            return resource_loader.load_dir(&s1);
+        }
+
+        #[cfg(not(feature = "embed-resources"))]
+        {
+            return self
+                .files
+                .as_ref()
+                .map(|fs| {
+                    fs.inner
+                        .iter()
+                        .filter_map(|(s2, _)| s2.starts_with(&s1).then(|| s2.clone()))
+                        .collect()
+                })
+                .unwrap_or_default();
+        }
     }
 
-    fn iter(&self) -> impl Iterator<Item = &str> + '_ {
-        self.files.inner.iter().map(|(s, _)| s.as_ref())
+    fn iter(&self) -> Vec<Cow<'static, str>> {
+        #[cfg(feature = "embed-resources")]
+        {
+            let resource_loader = match RESOURCE_LOADER.get() {
+                Some(resource_loader) => resource_loader,
+                None => return Default::default(),
+            };
+
+            return resource_loader.iter();
+        }
+
+        #[cfg(not(feature = "embed-resources"))]
+        {
+            return self
+                .files
+                .as_ref()
+                .map(|fs| fs.inner.iter().map(|(s, _)| s.clone()).collect())
+                .unwrap_or_default();
+        }
     }
 }
 
 impl Default for ApplicationResources {
     fn default() -> Self {
-        let config = Config::default();
-        let files = Arc::new(Files::load_file(&config));
-        Self { config, files }
+        #[cfg(not(feature = "embed-resources"))]
+        {
+            let config = Arc::new(Config::default());
+            let files = Arc::new(Files::load_file(config.as_ref()));
+            Self {
+                config: Some(config),
+                files: Some(files),
+            }
+        }
+
+        #[cfg(feature = "embed-resources")]
+        {
+            Self {
+                config: None,
+                files: None,
+            }
+        }
     }
 }
 
@@ -103,11 +171,13 @@ impl From<&str> for SupportedTypes {
     }
 }
 
+#[allow(unused)]
 struct Files {
-    inner: HashMap<Box<str>, ResourceFile>,
+    inner: HashMap<Cow<'static, str>, ResourceFile>,
 }
 
 impl Files {
+    #[allow(unused)]
     fn load_file(config: &Config) -> Self {
         let mut inner = HashMap::new();
         let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or(
@@ -132,8 +202,9 @@ impl Files {
         Self { inner }
     }
 
+    #[allow(unused)]
     fn read_data(
-        map: &mut HashMap<Box<str>, ResourceFile>,
+        map: &mut HashMap<Cow<'static, str>, ResourceFile>,
         path: &Path,
         config: &Config,
     ) -> io::Result<()> {
@@ -153,12 +224,12 @@ impl Files {
                         if let Ok(source) = read_file_from_fs(&path, config) {
                             let file_path = path.to_str().unwrap_or_default();
                             if !file_path.is_empty() {
-                                // D:\resouces\index.html -> /index.html
-                                // /resouces/index.html -> /index.html
+                                // D:\resouces\index.html -> index.html
+                                // resouces/index.html -> index.html
                                 let s1 = file_path.replace("\\", "/");
                                 let key = s1.split(RESOURCES).last().unwrap_or(file_path);
 
-                                map.insert(key.into(), source);
+                                map.insert(Cow::Owned(key.into()), source);
                             }
                         }
                     }

@@ -11,12 +11,12 @@ readme.workspace = true
 
 
 [dependencies]
-tokio = { workspace = true, features= ["sync"]}
+tokio = { workspace = true, features = ["sync"]}
 serde = { workspace = true }
 serde_json = { workspace = true }
 next-web-ip = { path = "../next-web-ip", version = "0.1.0" }
 
-next-web = { path = "../next-web", version = "*", features = ["full"]}
+next-web = { path = "../next-web", version = "*", features = ["full", "embed-resources"]}
 next-web-core = { workspace = true }
 # next-web-data-database = { path = "../next-web-data-database", version = "0.1.0" }
 # next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "0.1.0" }
@@ -39,6 +39,5 @@ next-web-security = { path = "../next-web-security", version = "*" }
 next-web-data-redis = { path = "../next-web-data/next-web-data-redis", version = "*", features = ["expired-key-listener"]}
 next-web-data-database = { path = "../next-web-data/next-web-data-database", version = "*"}
 # next-web-retry = { path = "../next-web-retry", version = "*"}
-
 
 validator = { version = "0.20.0", features = ["derive"] }

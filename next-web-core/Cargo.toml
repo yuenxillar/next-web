@@ -39,4 +39,6 @@ tower-service = "0.3.3"
 default = ["trace-log", "http-request"]
 http-request = ["headers"]
 
+embed-resources = []
+
 trace-log = []

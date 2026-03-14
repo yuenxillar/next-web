@@ -34,7 +34,7 @@ tower-http = { workspace = true, features = [
 ] }
 http-body-util = { workspace = true }
 tokio-cron-scheduler = { workspace = true, optional = true }
-rust-embed = { workspace = true }
+rust-embed = { workspace = true, optional = true }
 
 serde = { workspace = true }
 serde_yaml = { workspace = true }
@@ -110,7 +110,7 @@ enable-i18n = []
 enable-state-machine = []
 enable-thread-pool   = ["num_cpus"]
 
-embed-resources = ["next-web-macros/embed-resources"]
+embed-resources = ["next-web-macros/embed-resources", "next-web-core/embed-resources", "dep:rust-embed"]
 
 common = []
 
