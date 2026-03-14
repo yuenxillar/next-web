@@ -17,6 +17,7 @@ members = [
     "next-web-api-doc",
     "next-web-actuator",
     "next-web-pay",
+    "next_web_smf_job",
 ]
 resolver = "2"
 
@@ -118,7 +119,7 @@ printpdf = { version = "0.8.2" }
 # pay
 wechat-pay-rust-sdk = { version = "0.2.18" }
 
-arc-swap = { "1.8.2" }
+arc-swap = {}
 byteorder = { version = "1.5.0" }
 encoding = { version = "0.2.33" }
 mime = { version = "0.3.17" }

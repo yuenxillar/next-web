@@ -37,11 +37,6 @@ impl MessageSourceService {
         let mut map: HashMap<Locale, HashMap<Box<str>, Message>> = HashMap::new();
 
         let base_name = properties.base_name().unwrap_or(MESSAGES);
-
-        resources
-            .iter()
-            .iter()
-            .for_each(|s| println!("resources: {}", s));
         let iters = resources.load_dir(I18N);
         iters
             .into_iter()

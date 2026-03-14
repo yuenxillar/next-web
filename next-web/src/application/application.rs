@@ -553,9 +553,8 @@ where
         app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
         println!("\nApplication Name      is:  {}", app_name);
-
         #[rustfmt::skip]
-        println!("\nApplication Listening on:  {}", format!("{}:{}", server_addr, server_port));
+        println!("Application Listening on:  {}", format!("{}:{}", server_addr, server_port));
         println!("Application Started   at:  {}", LocalDateTime::now());
         println!("Application Startup time:  {:?}", startup_time.elapsed());
         println!("Application Process   ID:  {:?}\n", std::process::id());

@@ -281,7 +281,47 @@ pub fn desensitized(input: TokenStream) -> TokenStream {
 
 // =============================== Web ===============================
 
-#[doc = ""]
+///
+/// Process macros used to extend the entry point of Next web applications
+///
+/// # Attributes
+/// * `resources` - Optional parameter specifying the folder containing embedded resources
+///                 Example: `#[next_application(resources = "static")]`
+///
+/// # Behavior
+/// - Transforms a function into a Next-web application entry point
+/// - If `resources` attribute is provided, enables resource embedding from the specified folder
+///
+/// # Example
+/// ```
+/// use next_web::macros::application::next_application;
+///
+/// /// Basic application without embedded resources
+/// #[tokio::main]
+/// #[next_application]
+/// async fn main() {
+///     // Application code here
+/// }
+///
+/// /// Application with embedded resources from "static/" folder
+/// #[tokio::main]
+/// #[next_application(resources = "static/")]
+/// async fn main() {
+///     // Access embedded resources via ApplicationResources
+/// }
+/// ```
+///
+/// 用于拓展 Next-web 应用入口点的过程宏
+///
+/// # 属性
+/// * `resources` - 可选参数，指定包含嵌入资源的文件夹
+///                 示例: `#[next_application(resources = "static/")]`
+///
+/// # 行为
+/// - 将函数转换为 Next-web 应用入口点
+/// - 如果提供了 `resources` 属性，启用从指定文件夹嵌入资源
+///
+/// ```
 #[proc_macro_attribute]
 pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
     use crate::web::application::impl_macro_application;
