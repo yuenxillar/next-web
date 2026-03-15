@@ -1,6 +1,7 @@
 use next_web_core::{
     async_trait,
     context::{application_resources::ApplicationResources, properties::ApplicationProperties},
+    error::BoxError,
     ApplicationContext, AutoRegister,
 };
 
@@ -20,7 +21,7 @@ impl AutoRegister for MessageSourceServiceAutoRegister {
         &self,
         ctx: &mut ApplicationContext,
         properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), BoxError> {
         let message_source_properties = properties.next().messages().cloned().unwrap_or_default();
 
         // Retrieve the messages file from the resource

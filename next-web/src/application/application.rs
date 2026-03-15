@@ -20,6 +20,7 @@ use next_web_core::traits::apply_router::ApplyRouter;
 use next_web_core::traits::error_solver::ErrorSolver;
 use next_web_core::traits::filter::http_filter::HttpFilter;
 use next_web_core::traits::properties_post_processor::PropertiesPostProcessor;
+use next_web_core::traits::service::background_service::BackgroundService;
 use next_web_core::traits::use_router::UseRouter;
 use next_web_core::AutoRegister;
 use std::net::SocketAddr;
@@ -43,6 +44,7 @@ use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::configurer::http_method_handler_configurer::{RouteState, RouterContext};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
+use crate::manager::background_service_manager::BackgroundServiceManager;
 use crate::util::local_date_time::LocalDateTime;
 
 #[cfg(feature = "enable-api-doc")]
@@ -338,12 +340,14 @@ where
     // Get the application router.
     #[allow(unused_variables)]
     async fn application_router(&self, ctx: &mut ApplicationContext) -> Router {
-        let mut context = if cfg!(feature = "enable-api-doc") {
+        #[cfg(feature = "enable-api-doc")]
+        let mut context = {
             let openapi = self.api_doc(ctx).await;
             RouterContext::with_openapi(openapi)
-        } else {
-            RouterContext::default()
         };
+
+        #[cfg(not(feature = "enable-api-doc"))]
+        let mut context = RouterContext::default();
 
         let iterator = inventory::iter::<&dyn HttpHandlerAutoRegister>
             .into_iter()
@@ -369,6 +373,33 @@ where
         ctx.insert_singleton(context.open_api.unwrap());
 
         router
+    }
+
+    /// Start all background services and register the service manager
+    async fn run_services(&self, ctx: &mut ApplicationContext) {
+        let manager = BackgroundServiceManager::default();
+        for service in ctx
+            .resolve_by_type::<Arc<dyn BackgroundService>>()
+            .into_iter()
+        {
+            manager.register(service).await.unwrap();
+        }
+
+        // If the backend service fails to start, print logs for alerting purposes
+        manager
+            .start_all()
+            .await
+            .into_iter()
+            .filter_map(|started_result| started_result.result.err())
+            .for_each(|#[allow(unused_variables)] started_result| {
+                #[cfg(feature = "trace-log")]
+                warn!(
+                    "Background Service Manager failed to start service, error: {:?}",
+                    started_result
+                )
+            });
+
+        ctx.insert_singleton_with_default_name(manager);
     }
 
     /// Bind tcp server.
@@ -549,6 +580,11 @@ where
             lifecycle.on_start(&mut ctx).await.unwrap();
         }
 
+        let background_service_manager = ctx
+            .get_single_with_default_name::<BackgroundServiceManager>()
+            .unwrap()
+            .to_owned();
+
         // 9. Add State to [Context]
         app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
@@ -559,10 +595,10 @@ where
         println!("Application Startup time:  {:?}", startup_time.elapsed());
         println!("Application Process   ID:  {:?}\n", std::process::id());
 
-        // 10. build socket addr
+        //  Build socket addr
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
 
-        // 11. Monitor application shutdown signal
+        // Monitor application shutdown signal
         #[cfg(not(feature = "rustls"))]
         let shutdown_signal = async move {
             use next_web_core::traits::application::application_lifecycle::{
@@ -607,6 +643,9 @@ where
             for mut lifecycle in app_lifecycle.into_iter() {
                 lifecycle.on_shutdown(&shutdown_ctx).await;
             }
+
+            // Stop background services
+            let _result = background_service_manager.shutdown_all().await;
         };
 
         // Configure certificate and private key used by https
@@ -669,7 +708,8 @@ where
             .unwrap_or(false);
         let mut ctx = ApplicationContext::options()
             .allow_override(allow_override)
-            .auto_register();
+            .auto_register_async()
+            .await;
 
         info!("Init Application context success");
 
@@ -728,6 +768,10 @@ where
                 .await;
             info!("gRPC client connected",);
         }
+
+        // Run all background service
+        application.run_services(&mut ctx).await;
+        info!("Run all background service");
 
         info!("Starting Async Runtime: [Tokio/1.44.1]");
         info!("Starting HTTP  Server:  [Axum/0.8.4]");

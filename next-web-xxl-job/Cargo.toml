@@ -1,0 +1,31 @@
+[package]
+name = "next-web-xxl-job"
+version = "0.1.0"
+keywords = ["scheduler"]
+homepage = ""
+repository = ""
+rust-version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+next-web-core.workspace     = true
+next-web-macros.workspace   = true
+
+axum.workspace              = true
+serde.workspace             = true
+serde_json.workspace        = true
+reqwest.workspace           = true
+tokio.workspace             = true
+tracing.workspace           = true
+
+rudi-dev.workspace          = true
+
+if-addrs = "0.13.3"
+
+[features]
+default = []
+
+ssl-mode = []
+trace-log = []

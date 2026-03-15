@@ -28,6 +28,11 @@ next:
           port: 6381
           password: nsp:Iu/BPHAkTTPmUf8PwpD6RtovUNqN6Q00/CZZr3CjMJ/dTrEudeesbNWc+7tbsOBSW0dra+2pwT5a8MiiBu6XDtMW8r8=
           database: 0
+  xxl_job:
+    server_address: "127.0.0.1:9000"
+    access_token: "null"
+    app_name: "NextWebApplication"
+    log_path: "/app/next/xxl_job"
 
   tests:
     version: "1.0.0"

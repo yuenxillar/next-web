@@ -1,15 +1,42 @@
 use next_web::{
+    ApplicationContext,
+    application::Application,
     async_trait,
+    context::properties::ApplicationProperties,
+    macros::bind::singleton,
     traits::{
         application::application_lifecycle::{ApplicationLifecycle, ShutdownContext},
         ordered::Ordered,
     },
-    ApplicationContext,
 };
+use tracing::info;
+
+#[derive(Clone, Default)]
+pub struct TestApplication;
+
+#[async_trait]
+impl Application for TestApplication {
+    type ErrorSolve = ();
+
+    /// initialize the middleware.
+    async fn init_middleware(
+        &self,
+        _ctx: &mut ApplicationContext,
+        _properties: &ApplicationProperties,
+    ) {
+    }
+}
 
 #[derive(Clone)]
 #[allow(unused)]
+#[singleton(binds = [Self::into_lifecycle])]
 struct TestApplicationLifecycle;
+
+impl TestApplicationLifecycle {
+    pub fn into_lifecycle(self: Self) -> Box<dyn ApplicationLifecycle> {
+        Box::new(self)
+    }
+}
 
 #[async_trait]
 impl ApplicationLifecycle for TestApplicationLifecycle {
@@ -17,13 +44,13 @@ impl ApplicationLifecycle for TestApplicationLifecycle {
         &mut self,
         _ctx: &mut ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Application Started");
+        info!("Application Started...");
 
         Ok(())
     }
 
     async fn on_shutdown(&mut self, ctx: &ShutdownContext) {
-        println!("Shutdown reason: {:?}", ctx.reason);
+        info!("Shutdown reason: {:?}", ctx.reason);
     }
 }
 
@@ -34,4 +61,6 @@ impl Ordered for TestApplicationLifecycle {
 }
 
 #[tokio::main]
-async fn main() {}
+async fn main() {
+    TestApplication::run().await;
+}

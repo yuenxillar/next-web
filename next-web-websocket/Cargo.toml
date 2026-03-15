@@ -8,18 +8,18 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-axum = { workspace = true, features = ["ws"] }
+axum            = { workspace = true, features = ["ws"] }
 
-serde = { workspace = true }
-rudi-dev = { workspace = true }
-tracing = { workspace = true }
-futures = { workspace = true }
-flume = { workspace = true }
-matchit = { workspace = true }
-tokio = { workspace = true }
-uuid = { workspace = true }
+serde           = { workspace = true }
+rudi-dev        = { workspace = true }
+tracing         = { workspace = true }
+futures         = { workspace = true }
+flume           = { workspace = true }
+matchit         = { workspace = true }
+tokio           = { workspace = true }
+uuid            = { workspace = true }
 
-next-web-core = { workspace = true }
+next-web-core   = { workspace = true }
 next-web-macros = { workspace = true }
 
 [lints]

@@ -26,7 +26,7 @@ impl WeatherService for OpenMeteoWeatherService {
         // query_params.api_key = Some(self.api_key.clone());
         let resp = self.client.get(url).send().await?;
 
-        println!("url: {}", resp.url());
+        // println!("url: {}", resp.url());
         Ok(resp.json().await?)
     }
 }
@@ -55,10 +55,7 @@ fn build_url(base_url: &str, params: WeatherQueryParams) -> Result<String, &'sta
 
     Ok(format!(
         "{}?latitude={}&longitude={}{}",
-        base_url,
-        latitude,
-        longitude,
-        &query
+        base_url, latitude, longitude, &query
     ))
 }
 

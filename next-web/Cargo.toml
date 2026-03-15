@@ -85,14 +85,14 @@ mimalloc = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = ["decrypt-properties", "enable-api-doc"]
+default = ["decrypt-properties"]
 full = [
     "enable-scheduling",
     "enable-web-security",
     "enable-retry",
     "enable-i18n",
     "decrypt-properties",
-    "enable-api-doc",
+    # "enable-api-doc",
     "enable-thread-pool",
     "trace-log"
 ]

@@ -8,7 +8,10 @@ use lettre::{
     transport::smtp::authentication::Credentials,
     AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
 };
-use next_web_core::traits::{service::Service, singleton::Singleton};
+use next_web_core::{
+    error::BoxError,
+    traits::{service::Service, singleton::Singleton},
+};
 
 use crate::{core::email_content::EmailContent, properties::email_properties::EmailProperties};
 
@@ -19,14 +22,12 @@ pub struct EmailService {
     transport: AsyncSmtpTransport<Tokio1Executor>,
 }
 
-
-impl Singleton  for EmailService {}
-impl Service    for EmailService {}
+impl Singleton for EmailService {}
+impl Service for EmailService {}
 
 impl EmailService {
-
     /// 创建新的邮件服务实例
-    pub fn new(properties: EmailProperties) -> Result<Self, Box<dyn Error>> {
+    pub fn new(properties: EmailProperties) -> Result<Self, BoxError> {
         let var = properties.clone();
 
         let mut transport = if properties.tls {

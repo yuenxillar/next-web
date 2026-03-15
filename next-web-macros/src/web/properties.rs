@@ -106,16 +106,12 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                                 return Some(s);
                             }
 
-                            match properties.get_value::<String>(#key_str) {
-                                Some(s) => Some(s),
-                                None => {
-                                    match properties.get_value::<i64>(#key_str) {
+
+                            match properties.get_value::<i64>(#key_str) {
+                                Some(s) => Some(s.to_string()),
+                                None => match properties.get_value::<f64>(#key_str) {
                                         Some(s) => Some(s.to_string()),
-                                        None => match properties.get_value::<f64>(#key_str) {
-                                                Some(s) => Some(s.to_string()),
-                                                None => None,
-                                        }
-                                    }
+                                        None => None,
                                 }
                             }
                         }()
@@ -163,7 +159,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
 
         // 检查是否有 #[singleton(name = "")] 属性
         let singleton_name = item_struct.attrs.iter().find_map(|attr| {
-            if !attr.path().is_ident("Singleton") && !attr.path().is_ident("SingleOwner") {
+            if !attr.path().is_ident("singleton") && !attr.path().is_ident("singleowner") {
                 return None;
             }
 
@@ -215,7 +211,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                     &self,
                     ctx: &mut ::next_web_core::context::application_context::ApplicationContext,
                     properties: & ::next_web_core::context::properties::ApplicationProperties,
-                ) -> ::std::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error>> {
+                ) -> ::std::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error + Send + Sync>> {
                     let mut noting = false;
 
                     let instance = Self {

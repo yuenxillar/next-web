@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::{
     ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
-    traits::singleton::Singleton,
+    error::BoxError, traits::singleton::Singleton,
 };
 use rudi_dev::singleton;
 
@@ -36,7 +36,7 @@ impl AutoRegister for DatabaseServiceAutoRegister {
         &self,
         ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), BoxError> {
         // Clone theconfiguration properties
         let client_properties = self.0.clone();
 

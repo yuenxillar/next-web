@@ -3,11 +3,12 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Rust Struct Getter/Setter Generator</title>
+        <title>Rust Struct Getter/Setter & Builder Generator</title>
         <style>
             :root {
                 --primary-color: #e74c3c;
                 --secondary-color: #3498db;
+                --accent-color: #9b59b6;
                 --background-color: #f9f9f9;
                 --card-color: #ffffff;
                 --text-color: #333333;
@@ -88,6 +89,36 @@
                 background-color: #f8f8f8;
             }
 
+            .options-panel {
+                background-color: #f0f0f0;
+                border-radius: 4px;
+                padding: 15px;
+                margin: 15px 0;
+            }
+
+            .option-group {
+                display: flex;
+                gap: 20px;
+                flex-wrap: wrap;
+            }
+
+            .option-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .option-item input[type="checkbox"] {
+                width: 18px;
+                height: 18px;
+                cursor: pointer;
+            }
+
+            .option-item label {
+                cursor: pointer;
+                font-weight: 500;
+            }
+
             .actions {
                 display: flex;
                 gap: 10px;
@@ -139,6 +170,7 @@
                 border-radius: 4px;
                 overflow-x: auto;
                 min-height: 300px;
+                max-height: 600px;
                 font-family: "Courier New", monospace;
                 font-size: 14px;
             }
@@ -172,6 +204,7 @@
                 display: block;
                 white-space: pre-wrap;
                 margin: 10px 0;
+                font-size: 12px;
             }
 
             .example-btn {
@@ -194,6 +227,16 @@
                 border-radius: 4px;
             }
 
+            .badge {
+                display: inline-block;
+                background-color: var(--accent-color);
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 0.7rem;
+                margin-left: 8px;
+            }
+
             @media (max-width: 768px) {
                 .app-container {
                     flex-direction: column;
@@ -208,10 +251,12 @@
     <body>
         <div class="container">
             <header>
-                <h1>Rust Struct Getter/Setter Generator</h1>
+                <h1>Rust Struct Getter/Setter & Builder Generator</h1>
                 <p class="description">
-                    Input your Rust struct definition, and the system will automatically generate corresponding getter and setter methods.
-                    Supports standard structs and structs with named fields, properly handles Option types.
+                    Input your Rust struct definition, and the system will
+                    automatically generate corresponding getter, setter, and
+                    builder pattern methods. Supports standard structs and
+                    structs with named fields, properly handles Option types.
                 </p>
             </header>
 
@@ -229,9 +274,45 @@ struct Person {
     email: Option<String>,
 }"
                     ></textarea>
+
+                    <div class="options-panel">
+                        <div class="section-title">
+                            <span>Generation Options</span>
+                        </div>
+                        <div class="option-group">
+                            <div class="option-item">
+                                <input
+                                    type="checkbox"
+                                    id="generateGetters"
+                                    checked
+                                />
+                                <label for="generateGetters"
+                                    >Generate Getters</label
+                                >
+                            </div>
+                            <div class="option-item">
+                                <input
+                                    type="checkbox"
+                                    id="generateSetters"
+                                    checked
+                                />
+                                <label for="generateSetters"
+                                    >Generate Setters</label
+                                >
+                            </div>
+                            <div class="option-item">
+                                <input type="checkbox" id="generateBuilder" />
+                                <label for="generateBuilder"
+                                    >Generate Builder Pattern
+                                    <span class="badge">New</span></label
+                                >
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="actions">
                         <button id="generateBtn" class="generate-btn">
-                            Generate Getter/Setter
+                            Generate Code
                         </button>
                     </div>
 
@@ -277,12 +358,21 @@ struct Person {
                         <ul>
                             <li>Supports standard Rust struct syntax</li>
                             <li>
-                                Properly handles Option&lt;String&gt; types, getter returns Option&lt;&str&gt;
+                                Properly handles Option&lt;String&gt; types,
+                                getter returns Option&lt;&str&gt;
                             </li>
                             <li>
-                                For Option types, setter accepts inner type instead of Option wrapper
+                                For Option types, setter accepts inner type
+                                instead of Option wrapper
                             </li>
-                            <li>Generated code follows Rust naming conventions and best practices</li>
+                            <li>
+                                <strong>NEW:</strong> Generate complete Builder
+                                pattern implementation
+                            </li>
+                            <li>
+                                Generated code follows Rust naming conventions
+                                and best practices
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -293,27 +383,31 @@ struct Person {
                         <button id="copyBtn" class="copy-btn">Copy Code</button>
                     </div>
                     <div class="output">
-                        <pre id="outputCode">Generated code will appear here...</pre>
+                        <pre id="outputCode">
+Generated code will appear here...</pre
+                        >
                     </div>
 
                     <div class="info-box">
                         <h3>Generation Rules</h3>
                         <ul>
                             <li>
-                                For <code>String</code> fields: getter returns <code
-                                    >&str</code
-                                >
+                                For <code>String</code> fields: getter returns
+                                <code>&str</code>
                             </li>
                             <li>
-                                For <code>Option&lt;String&gt;</code> fields: getter returns <code
-                                    >Option&lt;&str&gt;</code
-                                >
+                                For <code>Option&lt;String&gt;</code> fields:
+                                getter returns <code>Option&lt;&str&gt;</code>
                             </li>
                             <li>
-                                For <code>Option&lt;T&gt;</code> fields: setter accepts <code>T</code> type parameter
+                                For <code>Option&lt;T&gt;</code> fields: setter
+                                accepts <code>T</code> type parameter
                             </li>
                             <li>
-                                All getter methods return references, setter methods accept ownership or references
+                                <strong>Builder Pattern:</strong> Generates
+                                <code>struct StructNameBuilder</code> with
+                                <code>new()</code>, builder methods, and
+                                <code>build()</code>
                             </li>
                         </ul>
                     </div>
@@ -327,6 +421,12 @@ struct Person {
                 const generateBtn = document.getElementById("generateBtn");
                 const copyBtn = document.getElementById("copyBtn");
                 const outputCode = document.getElementById("outputCode");
+                const generateGetters =
+                    document.getElementById("generateGetters");
+                const generateSetters =
+                    document.getElementById("generateSetters");
+                const generateBuilder =
+                    document.getElementById("generateBuilder");
                 const exampleBtns = document.querySelectorAll(".example-btn");
 
                 // Example structs
@@ -363,11 +463,12 @@ struct Person {
                     });
                 });
 
-                // Generate getter/setter
+                // Generate code
                 generateBtn.addEventListener("click", function () {
                     const input = structInput.value.trim();
                     if (!input) {
-                        outputCode.textContent = "Please enter a valid Rust struct definition.";
+                        outputCode.textContent =
+                            "Please enter a valid Rust struct definition.";
                         return;
                     }
 
@@ -394,7 +495,7 @@ struct Person {
                     }
                 });
 
-                // Parse Rust struct and generate getter/setter
+                // Parse Rust struct and generate methods
                 function parseRustStruct(input) {
                     // Remove comments
                     let cleanedInput = input.replace(/\/\/.*$/gm, "");
@@ -426,142 +527,258 @@ struct Person {
                         throw new Error("No valid fields found");
                     }
 
-                    // Generate code
-                    let result = `// Generated Getter/Setter methods for ${structName} struct\n\n`;
+                    const num_values = [
+                        "u8",
+                        "u16",
+                        "u32",
+                        "u64",
+                        "u128",
+                        "usize",
+                        "i8",
+                        "i16",
+                        "i32",
+                        "i64",
+                        "i128",
+                        "isize",
+                        "f32",
+                        "f64",
+                        "bool",
+                        "char",
+                    ];
+
+                    let result = `// Generated methods for ${structName} struct\n`;
+                    result += `// Options: ${generateGetters.checked ? "Getters " : ""}${generateSetters.checked ? "Setters " : ""}${generateBuilder.checked ? "Builder" : ""}\n\n`;
+
+                    // Generate builder first if requested
+                    if (generateBuilder.checked) {
+                        result += generateBuilderPattern(
+                            structName,
+                            fields,
+                            num_values,
+                        );
+                        result += "\n";
+                    }
+
                     result += `impl ${structName} {\n`;
 
                     // Generate getter methods
-                    fields.forEach((field) => {
-                        // Method name: get_field_name
-                        const methodName = `get_${field.name}`;
+                    if (generateGetters.checked) {
+                        fields.forEach((field) => {
+                            const methodName = `get_${field.name}`;
+                            let returnType = field.type;
 
-                        // Handle return type
-                        let returnType = field.type;
-
-                        const num_values = [
-                            "u8",
-                            "u16",
-                            "u32",
-                            "u64",
-                            "u128",
-                            "usize",
-                            "i8",
-                            "i16",
-                            "i32",
-                            "i64",
-                            "i128",
-                            "isize",
-                            "f32",
-                            "f64",
-                            "bool",
-                        ];
-
-                        if (num_values.includes(returnType)) {
-                            returnType = `${returnType}`;
-                        }
-                        // Handle Option<String> -> Option<&str>
-                        else if (returnType === "Option<String>") {
-                            returnType = "Option<&str>";
-                        }
-                        // Handle Option<Type> -> Option<&Type>
-                        else if (
-                            returnType.startsWith("Option<") &&
-                            returnType.endsWith(">")
-                        ) {
-                            const innerType = returnType.slice(7, -1);
-
-
-                            if (num_values.includes(innerType)) {
-                                returnType = `Option<${innerType}>`;
+                            if (num_values.includes(returnType)) {
+                                returnType = `${returnType}`;
+                            } else if (returnType === "Option<String>") {
+                                returnType = "Option<&str>";
+                            } else if (
+                                returnType.startsWith("Option<") &&
+                                returnType.endsWith(">")
+                            ) {
+                                const innerType = returnType.slice(7, -1);
+                                if (num_values.includes(innerType)) {
+                                    returnType = `Option<${innerType}>`;
+                                } else {
+                                    returnType = `Option<&${innerType}>`;
+                                }
+                            } else if (returnType === "String") {
+                                returnType = "&str";
                             } else {
-                                returnType = `Option<&${innerType}>`;
+                                returnType = `&${returnType}`;
                             }
-                        }
-                        // Handle String -> &str
-                        else if (returnType === "String") {
-                            returnType = "&str";
-                        }
-                        // Other types return reference
-                        else {
-                            returnType = `&${returnType}`;
-                        }
 
-                        result += `    pub fn ${methodName}(&self) -> ${returnType} {\n`;
+                            result += `    pub fn ${methodName}(&self) -> ${returnType} {\n`;
 
-                        // Generate method body
-
-                         if (field.type === "Option<String>") {
-                            result += `        self.${field.name}.as_deref()\n`;
-                        } else if (
-                            field.type.startsWith("Option<") &&
-                            field.type.endsWith(">")
-                        ) {
-                            const innerType = returnType.slice(7, -1);
-
-                            if (num_values.includes(innerType)) {
-                                result += `        self.${field.name}\n`;
+                            if (field.type === "Option<String>") {
+                                result += `        self.${field.name}.as_deref()\n`;
+                            } else if (
+                                field.type.startsWith("Option<") &&
+                                field.type.endsWith(">")
+                            ) {
+                                const innerType = field.type.slice(7, -1);
+                                if (num_values.includes(innerType)) {
+                                    result += `        self.${field.name}\n`;
+                                } else {
+                                    result += `        self.${field.name}.as_ref()\n`;
+                                }
+                            } else if (field.type === "String") {
+                                result += `        &self.${field.name}\n`;
                             } else {
-                                result += `        self.${field.name}.as_ref()\n`;
+                                if (num_values.includes(field.type)) {
+                                    result += `        self.${field.name}\n`;
+                                } else {
+                                    result += `        &self.${field.name}\n`;
+                                }
                             }
-                        } else if (field.type === "String") {
-                            result += `        &self.${field.name}\n`;
-                        } else {
-                            if (num_values.includes(field.type)) {
-                              result += `        self.${field.name}\n`;
-                            }
-                            else {
-                              result += `        &self.${field.name}\n`;
-                            }
-                        }
 
-                        result += `    }\n\n`;
-                    });
+                            result += `    }\n\n`;
+                        });
+                    }
 
                     // Generate setter methods
+                    if (generateSetters.checked) {
+                        fields.forEach((field) => {
+                            const methodName = `set_${field.name}`;
+                            let paramType = field.type;
+
+                            if (
+                                paramType.startsWith("Option<") &&
+                                paramType.endsWith(">")
+                            ) {
+                                paramType = paramType.slice(7, -1);
+                            }
+
+                            result += `    pub fn ${methodName}(&mut self, ${field.name}: ${paramType}) {\n`;
+
+                            if (
+                                field.type.startsWith("Option<") &&
+                                field.type.endsWith(">")
+                            ) {
+                                result += `        self.${field.name} = Some(${field.name});\n`;
+                            } else {
+                                result += `        self.${field.name} = ${field.name};\n`;
+                            }
+
+                            result += `    }\n\n`;
+                        });
+
+                        // Generate convenience setters for Option types (set to None)
+                        fields.forEach((field) => {
+                            if (
+                                field.type.startsWith("Option<") &&
+                                field.type.endsWith(">")
+                            ) {
+                                const methodName = `clear_${field.name}`;
+                                result += `    pub fn ${methodName}(&mut self) {\n`;
+                                result += `        self.${field.name} = None;\n`;
+                                result += `    }\n\n`;
+                            }
+                        });
+                    }
+
+                    result += "}";
+
+                    return result;
+                }
+
+                // Generate Builder pattern
+                function generateBuilderPattern(
+                    structName,
+                    fields,
+                    num_values,
+                ) {
+                    let builderName = `${structName}Builder`;
+
+                    let result = `// Builder pattern for ${structName}\n`;
+                    result += `#[derive(Default)]\n`;
+                    result += `pub struct ${builderName} {\n`;
+
+                    // Builder fields (all optional)
                     fields.forEach((field) => {
-                        // Method name: set_field_name
-                        const methodName = `set_${field.name}`;
+                        let fieldType = field.type;
+                        if (
+                            fieldType.startsWith("Option<") &&
+                            fieldType.endsWith(">")
+                        ) {
+                            // Keep Option types as is
+                            result += `    ${field.name}: ${fieldType},\n`;
+                        } else {
+                            // Wrap non-Option types in Option
+                            result += `    ${field.name}: Option<${fieldType}>,\n`;
+                        }
+                    });
 
-                        // Parameter type
+                    result += `}\n\n`;
+
+                    // Builder implementation
+                    result += `impl ${builderName} {\n`;
+                    result += `    pub fn new() -> Self {\n`;
+                    result += `        Self::default()\n`;
+                    result += `    }\n\n`;
+
+                    // Builder methods for each field
+                    fields.forEach((field) => {
                         let paramType = field.type;
+                        let methodBody;
 
-                        // Handle Option<T> -> T
                         if (
                             paramType.startsWith("Option<") &&
                             paramType.endsWith(">")
                         ) {
-                            paramType = paramType.slice(7, -1);
-                        }
-
-                        result += `    pub fn ${methodName}(&mut self, ${field.name}: ${paramType}) {\n`;
-
-                        // Generate method body
-                        if (
-                            field.type.startsWith("Option<") &&
-                            field.type.endsWith(">")
-                        ) {
+                            // For Option fields, accept the inner type
+                            const innerType = paramType.slice(7, -1);
+                            result += `    pub fn ${field.name}(mut self, ${field.name}: ${innerType}) -> Self {\n`;
                             result += `        self.${field.name} = Some(${field.name});\n`;
+                            result += `        self\n`;
+                            result += `    }\n\n`;
                         } else {
-                            result += `        self.${field.name} = ${field.name};\n`;
+                            // For non-Option fields
+                            result += `    pub fn ${field.name}(mut self, ${field.name}: ${paramType}) -> Self {\n`;
+                            result += `        self.${field.name} = Some(${field.name});\n`;
+                            result += `        self\n`;
+                            result += `    }\n\n`;
                         }
-
-                        result += `    }\n\n`;
                     });
 
-                    // Generate convenience setters for Option types (set to None)
+                    // Build method
+                    result += `    pub fn build(self) -> Result<${structName}, String> {\n`;
+                    result += `        Ok(${structName} {\n`;
+
                     fields.forEach((field) => {
                         if (
                             field.type.startsWith("Option<") &&
                             field.type.endsWith(">")
                         ) {
-                            const methodName = `clear_${field.name}`;
-                            result += `    pub fn ${methodName}(&mut self) {\n`;
-                            result += `        self.${field.name} = None;\n`;
-                            result += `    }\n\n`;
+                            // Option fields can be None
+                            result += `            ${field.name}: self.${field.name},\n`;
+                        } else {
+                            // Required fields must be provided
+                            result += `            ${field.name}: self.${field.name}.ok_or_else(|| format!("{} is required", "${field.name}"))?,\n`;
                         }
                     });
 
-                    result += "}";
+                    result += `        })\n`;
+                    result += `    }\n`;
+                    result += `}\n\n`;
+
+                    // Convenience method on the original struct
+                    result += `impl ${structName} {\n`;
+                    result += `    pub fn builder() -> ${builderName} {\n`;
+                    result += `        ${builderName}::new()\n`;
+                    result += `    }\n`;
+                    result += `}\n\n`;
+
+                    // Example usage comment
+                    result += `/*\n`;
+                    result += `Example usage:\n`;
+                    result += `let instance = ${structName}::builder()\n`;
+
+                    fields.forEach((field, index) => {
+                        if (index < 2) {
+                            if (
+                                field.type.startsWith("Option<") &&
+                                field.type.endsWith(">")
+                            ) {
+                                result += `    .${field.name}(/* value */)\n`;
+                            } else {
+                                if (field.type.includes("String")) {
+                                    result += `    .${field.name}("value".to_string())\n`;
+                                } else if (
+                                    field.type.includes("u32") ||
+                                    field.type.includes("i32") ||
+                                    field.type.includes("u64")
+                                ) {
+                                    result += `    .${field.name}(0)\n`;
+                                } else if (field.type.includes("bool")) {
+                                    result += `    .${field.name}(true)\n`;
+                                } else {
+                                    result += `    .${field.name}(/* value */)\n`;
+                                }
+                            }
+                        }
+                    });
+                    result += `    .build()?;\n`;
+                    result += `*/\n`;
 
                     return result;
                 }

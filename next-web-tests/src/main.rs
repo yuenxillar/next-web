@@ -1,18 +1,18 @@
 use std::{
     collections::HashSet,
     net::SocketAddr,
-    sync::{atomic::AtomicU32, Arc},
+    sync::{Arc, atomic::AtomicU32},
 };
 
 use next_web::{
+    ApplicationContext,
     application::Application,
     async_trait,
     context::properties::ApplicationProperties,
-    extract::{find_singleton::FindSingleton, ConnectInfo},
+    extract::{ConnectInfo, find_singleton::FindSingleton},
     macros::{application::next_application, bind::*, idempotency},
     traits::store::idempotency_store::IdempotencyStore,
     util::local_date_time::LocalDateTime,
-    ApplicationContext,
 };
 use next_web::{response::Html, store::memory_idempotency_store::MemoryIdempotencyStore};
 use tokio::sync::Mutex;

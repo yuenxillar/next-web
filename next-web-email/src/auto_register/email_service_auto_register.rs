@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::{properties::email_properties::EmailProperties, service::email_service::EmailService};
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
-    ApplicationContext, AutoRegister,
+    async_trait, context::properties::ApplicationProperties, error::BoxError,
+    traits::singleton::Singleton, ApplicationContext, AutoRegister,
 };
 use rudi_dev::singleton;
 
@@ -27,7 +27,7 @@ impl AutoRegister for EmailServiceAutoRegister {
         &self,
         ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), BoxError> {
         let email_properties = self.0.clone();
 
         let email_service = EmailService::new(email_properties)?;

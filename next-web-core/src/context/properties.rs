@@ -128,7 +128,7 @@ impl ApplicationProperties {
                                                     Some((key, value))
                                                 })
                                                 .collect::<HashMap<_, _>>(),
-                                        )
+                                        );
                                     }
 
                                     None => return None,
@@ -190,10 +190,13 @@ fn helper(temporary: Option<&serde_yaml::Value>, value: &mut serde_yaml::Value) 
                     .all(|c| c.is_uppercase())
                 {
                     // My suggestion is to panic directly
-                    let var = match std::env::var(& key) {
-                                Ok(var) => var,
-                                Err(_) => panic!("In the configuration file, the environment variable [{}] cannot be obtained. Please check the environment configuration.", key),
-                            };
+                    let var = match std::env::var(&key) {
+                        Ok(var) => var,
+                        Err(_) => panic!(
+                            "In the configuration file, the environment variable [{}] cannot be obtained. Please check the environment configuration.",
+                            key
+                        ),
+                    };
                     *value = serde_yaml::Value::String(var);
                     return;
                 }
@@ -231,7 +234,7 @@ fn into_application_properties(
     application_args: &ApplicationArgs,
     application_resources: &ApplicationResources,
 ) -> ApplicationProperties {
-    use serde_yaml::{from_str, Value};
+    use serde_yaml::{Value, from_str};
 
     let config = if let Some(path) = application_args
         .config_location
@@ -275,7 +278,7 @@ impl From<(&ApplicationArgs, &ApplicationResources)> for ApplicationProperties {
 
 impl Default for ApplicationProperties {
     fn default() -> Self {
-        use serde_yaml::{from_str, to_string, Value};
+        use serde_yaml::{Value, from_str, to_string};
 
         let next = Default::default();
 
