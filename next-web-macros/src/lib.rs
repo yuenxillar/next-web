@@ -330,6 +330,14 @@ pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
     impl_macro_application(attr, item_fn)
 }
 
+#[proc_macro_attribute]
+pub fn auto_configuration(attr: TokenStream, item: TokenStream) -> TokenStream {
+    use crate::web::auto_configuration::impl_macro_auto_configuration;
+
+    let item_impl = parse_macro_input!(item as ItemImpl);
+    impl_macro_auto_configuration(attr, item_impl)
+}
+
 #[doc = ""]
 #[proc_macro_attribute]
 pub fn properties(attr: TokenStream, item: TokenStream) -> TokenStream {

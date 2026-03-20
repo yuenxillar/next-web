@@ -3,6 +3,8 @@ server_addr: 192.168.18.168
 next:
   server:
     port: 11000
+  application:
+    name: "NextWebApplication"
 
   messages:
     local: "zh_CN"
@@ -29,9 +31,9 @@ next:
           password: nsp:Iu/BPHAkTTPmUf8PwpD6RtovUNqN6Q00/CZZr3CjMJ/dTrEudeesbNWc+7tbsOBSW0dra+2pwT5a8MiiBu6XDtMW8r8=
           database: 0
   xxl_job:
-    server_address: "127.0.0.1:9000"
+    server_address: "127.0.0.1:11300"
     access_token: "null"
-    app_name: "NextWebApplication"
+    app_name: ${next.application.name}
     log_path: "/app/next/xxl_job"
 
   tests:
@@ -43,5 +45,8 @@ next:
   logging:
     format: "%Y-%m-%d %H:%M:%S%.3f"
     level: info
+
+  feature:
+    enabled: true
 windows:
   computername: ${COMPUTERNAME}

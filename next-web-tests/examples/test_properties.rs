@@ -4,9 +4,9 @@ use axum::response::IntoResponse;
 use next_web::{
     application::Application,
     extract::find_singleton::FindSingleton,
-    macros::bind::{properties, singleton},
+    macros::{autoconfigure::properties, bind::singleton},
 };
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
+use next_web_core::{ApplicationContext, async_trait, context::properties::ApplicationProperties};
 
 #[derive(Clone, Default)]
 struct TestApplication;

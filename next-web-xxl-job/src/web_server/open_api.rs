@@ -56,8 +56,6 @@ async fn run(
     State(state): State<Arc<XxlJobAppState>>,
     Json(param): Json<JobRunParam>,
 ) -> impl IntoResponse {
-    // let job_name = param.executor_handler.as_ref();
-
     if param
         .executor_handler
         .as_ref()

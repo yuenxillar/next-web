@@ -4,6 +4,7 @@ pub mod translation;
 
 pub mod application;
 mod attrs;
+pub mod auto_configuration;
 pub mod event;
 pub mod idempotency;
 pub mod pre_authorize;

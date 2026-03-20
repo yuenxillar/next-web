@@ -3,9 +3,9 @@ use proc_macro::TokenStream;
 #[cfg(feature = "embed-resources")]
 use proc_macro2::Span;
 use quote::quote;
+use syn::ItemFn;
 #[cfg(feature = "embed-resources")]
-use syn::LitStr;
-use syn::{spanned::Spanned, Block, Error, ItemFn};
+use syn::{spanned::Spanned, Block, Error, LitStr};
 
 use crate::{util::logic::Logic, web::attrs::application_attr::ApplicationAttr};
 
@@ -14,6 +14,7 @@ pub fn impl_macro_application(
     #[allow(unused_mut)] mut item_fn: ItemFn,
 ) -> TokenStream {
     let expanded = Logic::generate(move || {
+        #[allow(unused_variables)]
         let ApplicationAttr { resources } = match ApplicationAttr::from_tokens(attrs.into()) {
             Ok(attr) => attr,
             Err(error) => return Err(error),

@@ -162,8 +162,8 @@ impl BackgroundServiceManager {
 
         tracing::Span::current().record("services_count", service_names.len());
 
-        // 2. Start all services in parallel to avoid sequential blocking
-        // 并行启动所有服务（避免串行阻塞）
+        // 2. Start all services
+        // 并行启动所有服务
         let tasks: Vec<_> = service_names
             .iter()
             .map(|&name| async move {

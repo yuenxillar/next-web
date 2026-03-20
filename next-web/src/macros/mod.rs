@@ -9,7 +9,10 @@ pub mod bind {
         request_mapping,
     };
     pub use rudi_dev::{singleowner, singleton, transient};
+}
 
+pub mod autoconfigure {
+    pub use next_web_macros::auto_configuration;
     pub use next_web_macros::properties;
 }
 
