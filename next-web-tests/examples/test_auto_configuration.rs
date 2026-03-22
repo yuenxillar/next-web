@@ -38,7 +38,7 @@ impl AutoRegister for TestAutoRegister {
     async fn register(
         &self,
         ctx: &mut ApplicationContext,
-        properties: &ApplicationProperties,
+        _properties: &ApplicationProperties,
     ) -> Result<(), BoxError> {
         ctx.insert_singleton_with_name(String::from("value1"), "msg2");
         ctx.insert_singleton_with_name(String::from("value0"), "s3");
@@ -58,7 +58,7 @@ pub struct TestAutoConfiguation;
 
 #[auto_configuration]
 impl TestAutoConfiguation {
-    #[provider(name = "msg1", conditional = [test, TestAutoConfiguation::test1], order = 12)]
+    #[provider(name = "msg666", conditional = [Self::test1], order = 12)]
     fn msg1(
         #[autowired(name = "msg2")] s1: String,
         #[autowired(default)] s2: String,
@@ -81,12 +81,8 @@ impl TestAutoConfiguation {
         vec![msg1, msg2]
     }
 
-    fn test1() -> bool {
-        true
-    }
-
-    fn msg() -> String {
-        "msg".to_string()
+    fn test1(ctx: &ApplicationContext) -> bool {
+        ctx.contains_single_with_name::<String>("s2")
     }
 }
 

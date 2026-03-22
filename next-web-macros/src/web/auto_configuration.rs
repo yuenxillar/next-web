@@ -35,14 +35,19 @@ pub fn impl_macro_auto_configuration(_attrs: TokenStream, mut item_impl: ItemImp
         let cfn = attributes
             .iter_mut()
             .map(|(_index, _attr, fn_attr)| fn_attr.provider_attr.as_mut())
-            .map(|attr| {
-                attr.map(|a| a.conditional.take().unwrap_or_default())
-                    .unwrap_or_default()
-            })
-            .map(|attr| {
-                attr.iter()
+            .map(|attr| attr.map(|a| a.conditional.iter_mut()).unwrap_or_default())
+            .map(|expr_path| {
+                expr_path
+                    .map(|s| {
+                        if let Some(first) = s.path.segments.first_mut() {
+                            if first.ident == "Self" {
+                                first.ident = Ident::new(&path.ident.to_string(), first.span());
+                            }
+                        }
+                        s
+                    })
                     .filter_map(|expr| {
-                        let s = expr.path.to_token_stream().to_string();
+                        let s = expr.to_token_stream().to_string();
                         if !(s.contains("::")) {
                             Some(s)
                         } else {
@@ -59,24 +64,43 @@ pub fn impl_macro_auto_configuration(_attrs: TokenStream, mut item_impl: ItemImp
 
         let impl_blocks = gen_code(&item_impl.items, attributes)?;
 
-        let conditional_function = item_impl
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                ImplItem::Fn(impl_item_fn) => Some(impl_item_fn),
-                _ => None,
-            })
-            .filter_map(|s| {
-                if cfn.iter().any(|s1| &s.sig.ident == s1) {
-                    return Some(s);
+        let mut conditional_function = Vec::new();
+        for item_fn in item_impl.items.iter().filter_map(|item| match item {
+            ImplItem::Fn(impl_item_fn) => Some(impl_item_fn),
+            _ => None,
+        }) {
+            if cfn.iter().any(|s1| &item_fn.sig.ident == s1) {
+                match &item_fn.sig.output {
+                    ReturnType::Default => {
+                        return Err(Error::new(
+                            item_fn.span(),
+                            "The conditional function must specify the return type [boolean]",
+                        ))
+                    }
+                    ReturnType::Type(_, ty) => match ty.as_ref() {
+                        Type::Path(type_path) => {
+                            if !type_path.path.is_ident("bool") {
+                                return Err(Error::new(
+                                    item_fn.span(),
+                                    "The conditional function must return a boolean value",
+                                ));
+                            }
+                            conditional_function.push(item_fn);
+                        }
+                        _ => {
+                            return Err(Error::new(
+                                item_fn.span(),
+                                "The conditional function must return a boolean value",
+                            ))
+                        }
+                    },
                 }
-                None
-            })
-            .collect::<Vec<_>>();
-
-        println!("1");
+            }
+        }
 
         let expanded = quote! {
+
+            #item_impl
 
              struct #name;
 
@@ -97,9 +121,12 @@ pub fn impl_macro_auto_configuration(_attrs: TokenStream, mut item_impl: ItemImp
              }
 
              ::next_web_core::submit_default_auto_configure!(#name);
+
+
+
         };
 
-        println!("expanded: {}", expanded.to_string());
+        // println!("expanded: {}", expanded.to_string());
 
         Ok(expanded)
     })
@@ -191,6 +218,13 @@ fn attributes(items: &mut [ImplItem]) -> Vec<(usize, Vec<Option<AutowiredAttr>>,
         })
         .filter(|item| !matches!(item.sig.output, ReturnType::Default))
         .filter(|item_fn| supported_attributes(item_fn))
+        .map(|item_fn| {
+            item_fn
+                .attrs
+                .push(syn::parse_quote! { #[allow(dead_code)] });
+
+            item_fn
+        })
         .enumerate()
         .map(|(index, item_fn)| {
             (
@@ -231,7 +265,7 @@ fn gen_code(
                 ident,
                 _async,
                 sig,
-                provider_attr,
+                mut provider_attr,
                 conditional_on_property_attr,
             } = item_fn_attr;
 
@@ -245,25 +279,20 @@ fn gen_code(
             } else {
                 quote! {}
             };
-            let variable = quote! {
-                let var = #ident( #(#arg_names),* ) #_async ;
-            };
-
 
             let conditional = provider_attr
                 .as_ref()
                 .map(|attr| {
-                    attr.conditional
-                        .as_ref()
-                        .map(|conditionals| {
-                            quote! {
-                                #[allow(unused_parens)]
-                                if !( #(#conditionals())&&* )  {
-                                    break 'gen;
-                                }
+                    if attr.conditional.is_empty() {
+                        return quote! {};
+                    }
+                    let conditional = attr.conditional.iter();
+                        quote! {
+                            #[allow(unused_parens)]
+                            if !( #(#conditional(ctx))&&* )  {
+                                break 'gen;
                             }
-                        })
-                        .unwrap_or_default()
+                        }
                 })
                 .unwrap_or_default();
 
@@ -368,6 +397,16 @@ fn gen_code(
                     }
                 });
 
+
+            let instance = quote! {
+                let instance = #ident( #(#arg_names),* ) #_async ;
+            };
+
+            let singleton_name = provider_attr.as_mut().map(|attr| attr.name.take())
+                .unwrap_or_default()
+                .unwrap_or(LitStr::new(&item_fn.sig.ident.to_string(), Span::call_site()));
+            let register_singleton = quote! { ctx.insert_singleton_with_name(instance, #singleton_name); };
+
             quote! {
 
                 'gen: {
@@ -379,9 +418,8 @@ fn gen_code(
 
                     #(#args)*
 
-                    #variable
-
-                    // #insert_singleton
+                    #instance
+                    #register_singleton
                 }
             }
         })

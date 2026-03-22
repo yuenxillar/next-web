@@ -5,7 +5,7 @@ use syn::{ExprPath, LitInt, LitStr};
 #[attribute(idents = [provider])]
 pub(crate) struct ProviderAttr {
     pub name: Option<LitStr>,
-    pub conditional: Option<Vec<ExprPath>>,
+    pub conditional: Vec<ExprPath>,
     pub order: Option<LitInt>,
 }
 
@@ -21,4 +21,14 @@ pub(crate) struct ConditionalOnPropertyAttr {
 pub(crate) struct AutowiredAttr {
     pub name: Option<LitStr>,
     pub default: Option<bool>,
+}
+
+impl std::fmt::Debug for ProviderAttr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProviderAttr")
+            .field("name", &self.name)
+            .field("conditional", &self.conditional)
+            .field("order", &self.order)
+            .finish()
+    }
 }

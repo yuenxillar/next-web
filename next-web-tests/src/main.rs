@@ -153,7 +153,3 @@ mod tests {
         };
     }
 }
-
-pub fn test() {
-    pub fn test1() {}
-}
