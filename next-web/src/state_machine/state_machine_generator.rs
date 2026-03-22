@@ -1,4 +1,4 @@
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use crate::state_machine::{
     config::{
@@ -15,7 +15,7 @@ impl StateMachineGenerator {
     pub fn generate<S, E>(
         id: impl ToString,
         transition_configure: StateMachineTransitionConfigure<S, E>,
-    ) -> StateMachine<S, E>
+    ) -> Arc<dyn StateMachine<S, E>>
     where
         S: Default + Clone + Debug + Hash + Eq + PartialEq,
         S: Send + Sync + 'static,
@@ -23,12 +23,12 @@ impl StateMachineGenerator {
         E: Send + Sync + 'static,
     {
         let configure = StateMachineConfigure::<S, E>::default();
-        let state_configure = StateMachineStateConfigure::default();
+        // let state_configure = StateMachineStateConfigure::default();
 
-        let state_machie =
-            StateMachine::from_configure(configure, state_configure, transition_configure)
-                .set_id(id.to_string());
+        // let state_machie =
+        //     StateMachine::from_configure(configure, state_configure, transition_configure)
+        //         .set_id(id.to_string());
 
-        state_machie
+        unimplemented!()
     }
 }

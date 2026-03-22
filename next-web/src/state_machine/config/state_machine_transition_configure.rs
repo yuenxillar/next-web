@@ -1,4 +1,6 @@
-use crate::state_machine::{StateMachineAction, Transition};
+use std::sync::Arc;
+
+use crate::state_machine::{config::action::StateMachineAction, Transition};
 
 #[derive(Clone)]
 pub struct StateMachineTransitionConfigure<S, E> {
@@ -11,7 +13,7 @@ impl<S, E> StateMachineTransitionConfigure<S, E> {
         source: S,
         target: S,
         event: E,
-        action: Box<dyn StateMachineAction<S, E>>,
+        action: Arc<dyn StateMachineAction<S, E>>,
     ) -> Self {
         self.inner.push(ExternalTransitionConfigure {
             source,
@@ -28,19 +30,19 @@ pub struct ExternalTransitionConfigure<S, E> {
     pub source: S,
     pub target: S,
     pub event: E,
-    action: Box<dyn StateMachineAction<S, E>>,
+    action: Arc<dyn StateMachineAction<S, E>>,
 }
 
 impl<S, E> ExternalTransitionConfigure<S, E>
 where
     S: Clone,
-    E: Clone
+    E: Clone,
 {
-    pub fn transition(&self) -> Transition<S, E> {
-        self.action.transition()
-    }
+    // pub fn transition(&self) -> Transition<S, E> {
+    //     self.action.transition()
+    // }
 
-    pub fn action(&self) ->  Box<dyn StateMachineAction<S, E>> {
+    pub fn action(&self) -> Arc<dyn StateMachineAction<S, E>> {
         self.action.clone()
     }
 }

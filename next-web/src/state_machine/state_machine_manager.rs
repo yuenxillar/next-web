@@ -1,11 +1,8 @@
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
-use crate::state_machine::state_machine_context::StateContext;
+use crate::state_machine::{config::action::StateMachineAction, DefaultStateMachine};
 
-use super::{
-    state_machine_context::StateMachineKey, EventMessage, StateMachine, StateMachineAction,
-    Transition,
-};
+use super::{state_machine_context::StateMachineKey, EventMessage, StateMachine, Transition};
 use std::collections::{HashMap, HashSet};
 use tokio::sync::{broadcast::Receiver, RwLock};
 use tracing::error;
@@ -36,7 +33,11 @@ where
         }
     }
 
-    pub async fn add_action<K>(&mut self, key: K, action: Box<dyn StateMachineAction<S, E>>) -> &mut Self
+    pub async fn add_action<K>(
+        &mut self,
+        key: K,
+        action: Box<dyn StateMachineAction<S, E>>,
+    ) -> &mut Self
     where
         S: Hash + Eq + PartialEq,
         E: Hash + Eq + PartialEq,
@@ -53,16 +54,13 @@ where
             self.key.insert(k);
         }
 
-        self.action
-            .write()
-            .await
-            .insert(key, action);
+        self.action.write().await.insert(key, action);
         self
     }
 
     pub fn start_up(
         self,
-        state_machine: Arc<StateMachine<S, E>>,
+        state_machine: Arc<DefaultStateMachine<S, E>>,
         mut receiver: Receiver<EventMessage<E>>,
     ) {
         tokio::spawn(async move {
@@ -72,7 +70,9 @@ where
             loop {
                 match receiver.recv().await {
                     Ok(event_message) => {
-                        if !state_machine.status { continue; }
+                        if !state_machine.status {
+                            continue;
+                        }
                         let event = event_message.event();
                         if let Some(transition) = keys
                             .iter()
@@ -87,17 +87,17 @@ where
                                 event.to_owned(),
                             );
                             if let Some(action) = actions.write().await.get_mut(&key) {
-                                let context = StateContext {
-                                    message: event_message,
-                                    transition: action.transition(),
-                                    state_machine: state_machine.clone(),
-                                };
+                                // let context = StateContext {
+                                //     message: event_message,
+                                //     transition: action.transition(),
+                                //     state_machine: state_machine.clone(),
+                                // };
 
-                                action.execute(context).await;
+                                // action.execute(context).await;
 
-                                if let Some(lis) = &state_machine.listener {
-                                    lis.state_changed(key.1, key.2, key.3).await;
-                                }
+                                // if let Some(lis) = &state_machine.listener {
+                                //     lis.state_changed(key.1, key.2, key.3).await;
+                                // }
                             } else {
                                 if let Some(lis) = &state_machine.listener {
                                     lis.event_not_accepted(event_message).await;

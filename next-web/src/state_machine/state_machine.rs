@@ -1,35 +1,62 @@
+use std::any::Any;
 use std::{collections::HashSet, fmt::Debug, hash::Hash, sync::Arc};
 
+use futures::future::BoxFuture;
 use next_web_core::async_trait;
 use next_web_core::{anys::any_value::AnyValue, DynClone};
 use tokio::sync::broadcast::Sender;
 use tracing::error;
 
-use super::{
-    config::{
-        state_machine_configure::StateMachineConfigure,
-        state_machine_state_configure::StateMachineStateConfigure,
-        state_machine_transition_configure::{
-            ExternalTransitionConfigure, StateMachineTransitionConfigure,
-        },
-    },
-    state_machine_context::StateContext,
-    state_machine_manager::StateMachineManager,
+use crate::state_machine::access::state_machine_accessor::StateMachineAccessor;
+use crate::state_machine::config::state_machine_configure::StateMachineConfigure;
+use crate::state_machine::config::state_machine_state_configure::StateMachineStateConfigure;
+use crate::state_machine::config::state_machine_transition_configure::{
+    ExternalTransitionConfigure, StateMachineTransitionConfigure,
 };
+use crate::state_machine::extended_state::ExtendedState;
+use crate::state_machine::region::Region;
+use crate::state_machine::state::StateMachineState;
+use crate::state_machine::state_context::StateContext;
+use crate::state_machine::state_machine_manager::StateMachineManager;
 
-#[derive(Clone)]
-pub struct StateMachine<S, E> {
+pub type BoxedStateAction<S, E> =
+    Arc<dyn Fn(&dyn StateContext<S, E>) -> BoxFuture<'static, ()> + Send + Sync>;
+pub type BoxedStateGuard<S, E> =
+    Arc<dyn Fn(&dyn StateContext<S, E>) -> BoxFuture<'static, bool> + Send + Sync>;
+
+pub trait StateMachine<S, E>
+where
+    Self: Send + Sync,
+    Self: Any,
+    Self: Region<S, E>,
+{
+    /// Gets the initial state S.
+    fn initial_state(&self) -> &dyn StateMachineState<S, E>;
+
+    /// Gets the state machine extended state.
+    fn extended_state(&self) -> &dyn ExtendedState;
+
+    fn state_machine_accessor(&self) -> &dyn StateMachineAccessor<S, E>;
+
+    /// Sets the state machine error.
+    fn set_state_machine_error(&mut self, error: Box<dyn std::error::Error + Send>);
+
+    /// Checks for state machine error.
+    fn has_state_machine_error(&self) -> bool;
+}
+
+pub struct DefaultStateMachine<S, E> {
     pub(crate) id: String,
     // todo
     pub(crate) configure: StateMachineConfigure<S, E>,
     pub(crate) state_configure: StateMachineStateConfigure<S, E>,
     pub(crate) transition_configure: StateMachineTransitionConfigure<S, E>,
-    pub(crate) listener: Option<Box<dyn StateMachineListener<S, E>>>,
+    pub(crate) listener: Option<Box<dyn DefaultStateMachineListener<S, E>>>,
     pub(crate) sender: Option<Sender<EventMessage<E>>>,
     pub(crate) status: bool,
 }
 
-impl<S, E> StateMachine<S, E>
+impl<S, E> DefaultStateMachine<S, E>
 where
     E: Send + Sync + 'static,
     E: Clone + Debug + Hash + Eq,
@@ -56,14 +83,14 @@ where
         // create manager
         let mut manager = StateMachineManager::<S, E>::new(self.id.clone());
 
-        for configure in &self.transition_configure.inner {
-            manager
-                .add_action(
-                    (self.id().into(), configure.transition()),
-                    configure.action(),
-                )
-                .await;
-        }
+        // for configure in &self.transition_configure.inner {
+        //     manager
+        //         .add_action(
+        //             (self.id().into(), configure.transition()),
+        //             configure.action(),
+        //         )
+        //         .await;
+        // }
 
         let (sender, receiver) = tokio::sync::broadcast::channel::<EventMessage<E>>(100);
 
@@ -82,7 +109,11 @@ where
         }
         if let Some(sender) = self.sender.as_ref() {
             if let Err(e) = sender.send(message) {
-                error!("StateMachine [{}] send event error: {}", self.id(), e);
+                error!(
+                    "DefaultStateMachine [{}] send event error: {}",
+                    self.id(),
+                    e
+                );
                 sender.closed().await
             }
         }
@@ -115,7 +146,7 @@ where
 
     pub fn add_state_listener<L>(mut self, listener: L) -> Self
     where
-        L: StateMachineListener<S, E> + 'static,
+        L: DefaultStateMachineListener<S, E> + 'static,
     {
         self.listener = Some(Box::new(listener));
         self
@@ -126,7 +157,7 @@ where
     }
 }
 
-impl<S, E> Default for StateMachine<S, E>
+impl<S, E> Default for DefaultStateMachine<S, E>
 where
     S: Default,
     E: Default,
@@ -145,26 +176,13 @@ where
 }
 
 #[async_trait]
-pub trait StateMachineAction<S, E>: DynClone + Send + Sync
-where
-    S: Clone,
-    E: Clone,
-{
-    fn transition(&self) -> Transition<S, E>;
-
-    async fn execute(&mut self, context: StateContext<S, E>);
-}
-
-next_web_core::clone_trait_object!(<S, E> StateMachineAction<S, E> where S: Clone , E: Clone,);
-
-#[async_trait]
-pub trait StateMachineListener<S, E>: DynClone + Send + Sync {
+pub trait DefaultStateMachineListener<S, E>: DynClone + Send + Sync {
     async fn state_changed(&self, from: S, to: S, event: E);
 
     async fn event_not_accepted(&self, event: EventMessage<E>);
 }
 
-next_web_core::clone_trait_object!(<S, E> StateMachineListener<S, E> where S: Clone , E: Clone,);
+next_web_core::clone_trait_object!(<S, E> DefaultStateMachineListener<S, E> where S: Clone , E: Clone,);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct State<S, E> {
@@ -195,10 +213,10 @@ pub struct EventMessage<E> {
 }
 
 impl<E> EventMessage<E> {
-    pub fn new(event: E, payload: AnyValue) -> Self {
+    pub fn new(event: E) -> Self {
         Self {
             event,
-            payload: Some(payload),
+            payload: None,
         }
     }
 
@@ -210,12 +228,12 @@ impl<E> EventMessage<E> {
         &self.event
     }
 
-    pub fn set_payload(mut self, payload: AnyValue) -> Self {
+    pub fn with_payload(mut self, payload: AnyValue) -> Self {
         self.payload = Some(payload);
         self
     }
 
-    pub fn set_event(mut self, event: E) -> Self {
+    pub fn with_event(mut self, event: E) -> Self {
         self.event = event;
         self
     }
@@ -229,6 +247,24 @@ where
         Self {
             event: Default::default(),
             payload: None,
+        }
+    }
+}
+
+impl<S, E> Clone for DefaultStateMachine<S, E>
+where
+    S: Clone,
+    E: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            configure: self.configure.clone(),
+            state_configure: self.state_configure.clone(),
+            transition_configure: self.transition_configure.clone(),
+            listener: self.listener.clone(),
+            sender: self.sender.clone(),
+            status: self.status.clone(),
         }
     }
 }
