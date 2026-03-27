@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use pingora_limits::rate::Rate;
+use tracing::debug;
 
 use crate::properties::routes_properties::RoutesProperties;
 use crate::route::route_predicate_factory::RoutePredicateFactory;
@@ -31,12 +32,12 @@ pub enum RouteWork {
 
 impl Into<RouteWork> for &str {
     fn into(self) -> RouteWork {
-        if self.starts_with("http") {
+        if self.starts_with("https") {
+            return RouteWork::Https;
+        } else if self.starts_with("http") {
             return RouteWork::Http;
         } else if self.starts_with("lb") {
             return RouteWork::LB;
-        } else if self.starts_with("https") {
-            return RouteWork::Https;
         }
         return RouteWork::Http;
     }
@@ -73,7 +74,7 @@ impl From<RoutesProperties> for RoutePredicateService {
             .iter()
             .map(|s| DefaultGatewayFilter::from(s.as_ref()))
             .collect::<Vec<DefaultGatewayFilter>>();
-        println!("filters: {:#?}", filters);
+        debug!("route filters: {filters:#?}");
         // Sort filters by order
         // filters.sort_by(|a, b| match (a, b) {
         //     (GatewayFilter::CircuitBreaker(_), _) => std::cmp::Ordering::Less,

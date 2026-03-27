@@ -1,7 +1,11 @@
 use crate::core::{
-    authc::{authenticator::Authenticator, logout_aware::LogoutAware},
+    authc::{
+        authentication_error::AuthenticationError, authenticator::Authenticator,
+        logout_aware::LogoutAware,
+    },
     realm::Realm,
 };
+use tracing::warn;
 
 #[derive(Clone)]
 pub struct ModularRealmAuthenticator {
@@ -25,7 +29,9 @@ impl Authenticator for ModularRealmAuthenticator {
         Box<dyn crate::core::authc::authentication_info::AuthenticationInfo>,
         crate::core::authc::authentication_error::AuthenticationError,
     > {
-        todo!()
+        Err(AuthenticationError::NotImplemented(
+            "ModularRealmAuthenticator::authenticate is not implemented".to_string(),
+        ))
     }
 }
 
@@ -34,6 +40,7 @@ impl LogoutAware for ModularRealmAuthenticator {
         &self,
         principals: &dyn crate::core::subject::principal_collection::PrincipalCollection,
     ) {
-        todo!()
+        let _ = principals;
+        warn!("ModularRealmAuthenticator::on_logout is not implemented");
     }
 }

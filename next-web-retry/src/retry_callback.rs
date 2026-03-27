@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use next_web_core::async_trait;
 
 use crate::{error::retry_error::RetryError, retry_context::RetryContext};
@@ -9,17 +7,17 @@ pub trait RetryCallback<T>
 where
     Self: Send + Sync,
 {
-    async fn do_with_retry(&self, context: Arc<dyn RetryContext>) -> Result<T, RetryError>;
+    async fn do_with_retry(&self, context: &dyn RetryContext) -> Result<T, RetryError>;
 }
 
 #[async_trait]
 impl<F, Fut, R, T> RetryCallback<T> for F
 where
-    F: Fn(Arc<dyn RetryContext>) -> Fut + Send + Sync,
+    F: Fn(&dyn RetryContext) -> Fut + Send + Sync,
     R: Into<RetryError>,
     Fut: Future<Output = Result<T, R>> + Send,
 {
-    async fn do_with_retry(&self, context: Arc<dyn RetryContext>) -> Result<T, RetryError> {
+    async fn do_with_retry(&self, context: &dyn RetryContext) -> Result<T, RetryError> {
         self(context).await.map_err(Into::into)
     }
 }

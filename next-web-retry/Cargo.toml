@@ -12,3 +12,4 @@ serde = { workspace = true }
 tokio = { workspace = true, features = ["sync"]}
 tracing = { workspace = true }
 dashmap = {workspace = true}
+rand = { workspace = true }

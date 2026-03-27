@@ -1,34 +1,36 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{policy::retry_context_cache::RetryContextCache, retry_context::RetryContext};
 
-#[derive(Clone)]
-pub struct MapRetryContextCache {}
+#[derive(Clone, Default)]
+pub struct MapRetryContextCache {
+    contexts: HashMap<String, Arc<dyn RetryContext>>,
+}
 
 impl MapRetryContextCache {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 }
 
 impl RetryContextCache for MapRetryContextCache {
-    fn get(&self, key: &str) -> Option<&dyn crate::retry_context::RetryContext> {
-        todo!()
+    fn get(&self, key: &str) -> Option<&dyn RetryContext> {
+        self.contexts.get(key).map(|context| context.as_ref())
     }
 
-    fn get_mut(&self, key: &str) -> Option<&mut dyn RetryContext> {
+    fn get_mut(&self, _key: &str) -> Option<&mut dyn RetryContext> {
         None
     }
 
     fn put(&mut self, key: &str, value: Arc<dyn RetryContext>) {
-        todo!()
+        self.contexts.insert(key.to_string(), value);
     }
 
     fn remove(&mut self, key: &str) {
-        todo!()
+        self.contexts.remove(key);
     }
 
     fn contains_key(&self, key: &str) -> bool {
-        todo!()
+        self.contexts.contains_key(key)
     }
 }

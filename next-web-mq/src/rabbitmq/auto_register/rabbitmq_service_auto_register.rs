@@ -34,7 +34,7 @@ impl AutoRegister for RabbitmqServiceAutoRegister {
 
         let properties = self.0.clone();
 
-        let rabbitmq_service = RabbitmqService::new(properties, bind_exchange).await;
+        let rabbitmq_service = RabbitmqService::new(properties, bind_exchange).await?;
 
         let consumer: Vec<Box<dyn RabbitListener>> = ctx.resolve_by_type::<Box<dyn RabbitListener>>();
 

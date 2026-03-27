@@ -37,6 +37,26 @@ impl HostAuthenticationToken for BearerToken {
 
 impl std::fmt::Display for BearerToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "BearerToken [token: {}, host: {}]", self.token, self.host.as_deref().unwrap_or(""))
+        let visible_prefix = self.token.chars().take(4).collect::<String>();
+        let visible_suffix = self
+            .token
+            .chars()
+            .rev()
+            .take(4)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<String>();
+        let masked = if self.token.chars().count() <= 8 {
+            "***".to_string()
+        } else {
+            format!("{visible_prefix}***{visible_suffix}")
+        };
+        write!(
+            f,
+            "BearerToken [token: {}, host: {}]",
+            masked,
+            self.host.as_deref().unwrap_or("")
+        )
     }
 }

@@ -80,7 +80,7 @@ impl HttpAuthenticationFilter {
             }
         }
 
-        None
+        Some(methods)
     }
 
     pub fn is_login_request(&self, request: &dyn HttpRequest, response: &dyn HttpResponse) -> bool {

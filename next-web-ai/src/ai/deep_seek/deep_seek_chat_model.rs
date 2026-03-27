@@ -2,7 +2,12 @@ use bytes::Bytes;
 use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
 use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError};
-use next_web_retry::{retry_operations::RetryOperations, support::retry_template::RetryTemplate};
+use next_web_retry::{
+    retry_callback::RetryCallback,
+    retry_context::RetryContext,
+    retry_operations::RetryOperations,
+    support::retry_template::RetryTemplate,
+};
 
 use crate::{
     ai::deep_seek::{
@@ -39,6 +44,24 @@ use crate::{
 };
 
 use super::api::deep_seek_api::ChatApiRespnose;
+
+struct DeepSeekEntityRetryCallback<'a> {
+    deep_seek_api: &'a DeepSeekApi,
+    request: &'a ChatCompletionRequest,
+}
+
+#[async_trait]
+impl RetryCallback<ChatApiRespnose> for DeepSeekEntityRetryCallback<'_> {
+    async fn do_with_retry(
+        &self,
+        _context: &dyn RetryContext,
+    ) -> Result<ChatApiRespnose, next_web_retry::error::retry_error::RetryError> {
+        self.deep_seek_api
+            .chat_completion_entity(self.request)
+            .await
+            .map_err(Into::into)
+    }
+}
 
 #[derive(Clone)]
 pub struct DeepSeekChatModel<T = DefaultChatModelObservationConvention, R = NoopObservationRegistry>
@@ -87,7 +110,11 @@ impl DeepSeekChatModel {
         let system_message = system_messages.first();
 
         let request = ChatCompletionRequest {
-            messages: user_messages,
+            messages: system_message
+                .cloned()
+                .into_iter()
+                .chain(user_messages.into_iter())
+                .collect(),
             model: prompt.chat_options().get_model().into(),
             stream,
             temperature: None,
@@ -167,10 +194,10 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
             // execute
             let chat_respnose = self
                 .retry_template
-                .execute(
-                    #[allow(unused_variables)]
-                    |ctx| self.deep_seek_api.chat_completion_entity(&req),
-                )
+                .execute(DeepSeekEntityRetryCallback {
+                    deep_seek_api: &self.deep_seek_api,
+                    request: &req,
+                })
                 .await?;
 
             let chat_completion = match chat_respnose {
@@ -221,6 +248,9 @@ impl StreamingModel<Prompt, ChatResponse> for DeepSeekChatModel {
             let model = req.model.clone();
             async move {
                 let chat_completion = chat_completion?;
+                if chat_completion.is_empty() {
+                    return Ok(ChatResponse::new(ChatResponseMetadata::default(), Vec::new()));
+                }
 
                 let chat_response_meta_data = chat_completion
                     .last()

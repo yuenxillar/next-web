@@ -34,11 +34,11 @@ impl UsernamePasswordToken {
 
 impl AuthenticationToken for UsernamePasswordToken {
     fn get_principal(&self) -> Object {
-        todo!()
+        Object::Str(self.username.clone())
     }
 
     fn get_credentials(&self) -> Option<Object> {
-        todo!()
+        Some(Object::Str(self.password.clone()))
     }
 }
 
@@ -50,6 +50,12 @@ impl RememberMeAuthenticationToken for UsernamePasswordToken {
 
 impl Display for UsernamePasswordToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(
+            f,
+            "UsernamePasswordToken [username: {}, remember_me: {}, host: {}]",
+            self.username,
+            self.remember_me,
+            self.host.as_deref().unwrap_or("")
+        )
     }
 }

@@ -102,7 +102,7 @@ impl RetryTemplate {
                 // Reset the last exception, so if we are successful
                 // the close interceptors will not think we failed...
                 last_error = None;
-                let result = retry_callback.do_with_retry(context.clone()).await;
+                let result = retry_callback.do_with_retry(context.as_ref()).await;
                 match result {
                     Ok(result) => {
                         self.do_on_success_interceptors(context.as_ref(), &result);
@@ -325,14 +325,12 @@ impl RetryTemplate {
             return Ok(self.do_open_internal(retry_policy, state).await);
         }
 
-        match self.retry_context_cache.write().await.get_mut(key) {
+        match self.retry_context_cache.read().await.get(key) {
             Some(context) => {
                 context.remove_attribute(retry_context_constants::CLOSED);
                 context.remove_attribute(retry_context_constants::EXHAUSTED);
                 context.remove_attribute(retry_context_constants::RECOVERED);
-                // return Ok(Box::new(context));
-                // TODO
-                return Err(RetryError::Custom("todo".to_string()));
+                return Ok(Arc::from(next_web_core::clone_box(context)));
             }
 
             None => {
@@ -395,7 +393,7 @@ impl RetryTemplate {
             );
         }
 
-        let do_recover = context
+        let no_recovery = context
             .get_attribute(retry_context_constants::NO_RECOVERY)
             .map(|v| {
                 if v.is_boolean() {
@@ -406,7 +404,7 @@ impl RetryTemplate {
             })
             .unwrap_or_default();
         if let Some(recovery_callback) = recovery_callback {
-            if do_recover {
+            if !no_recovery {
                 let recovered = recovery_callback.recover(context);
 
                 match recovered {
@@ -428,11 +426,11 @@ impl RetryTemplate {
 
         if state.is_some() {
             debug!("Retry exhausted after last attempt with no recovery path.");
-            self.rethrow(
+            return Err(self.rethrow(
                 context,
                 "Retry exhausted after last attempt with no recovery path",
-                self.last_error_on_exhausted || !do_recover,
-            );
+                self.last_error_on_exhausted || no_recovery,
+            ));
         }
 
         Err(RetryError::Default(WithCauseError {

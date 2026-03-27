@@ -3,6 +3,7 @@ use super::circuit_state::CircuitState;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
+use tracing::debug;
 
 /// A circuit breaker that can be used to detect failures and encapsulate the logic of preventing a failure from constantly recurring.
 ///
@@ -132,7 +133,7 @@ impl CircuitBreakerController {
                     if last_failure_time.elapsed() >= self.wait_duration_in_open_state {
                         state.state = CircuitState::HalfOpen;
                         state.failures = 0;
-                        println!("Circuit is half-open count: {}", state.failures);
+                        debug!("circuit is half-open count: {}", state.failures);
                         if let Some(ref callback) = state.on_half_open {
                             callback();
                         }

@@ -3,6 +3,20 @@
 pub struct DesensitizedUtil;
 
 impl DesensitizedUtil {
+    fn mask_middle(value: &str, prefix_chars: usize, suffix_chars: usize, mask: &str) -> String {
+        let chars = value.chars().collect::<Vec<_>>();
+        if chars.len() <= prefix_chars + suffix_chars {
+            return value.to_string();
+        }
+
+        let prefix = chars.iter().take(prefix_chars).collect::<String>();
+        let suffix = chars
+            .iter()
+            .skip(chars.len().saturating_sub(suffix_chars))
+            .collect::<String>();
+
+        format!("{prefix}{mask}{suffix}")
+    }
     /// 脱敏身份证号码 / Desensitize ID card number
     ///
     /// # 参数 / Parameters
@@ -88,8 +102,8 @@ impl DesensitizedUtil {
     /// assert_eq!(DesensitizedUtil::desensitized_address("北京市朝阳区建国路100号"), "北京市朝****100号");
     /// ```
     pub fn desensitized_address(address: &str) -> String {
-        if address.len() >= 10 {
-            format!("{}{}{}", &address[..6], "****", &address[address.len()-4..])
+        if address.chars().count() >= 10 {
+            Self::mask_middle(address, 6, 4, "****")
         } else {
             address.to_string()
         }
@@ -157,8 +171,8 @@ impl DesensitizedUtil {
     /// assert_eq!(DesensitizedUtil::desensitized_license_plate("京AD12345"), "京*****45");
     /// ```
     pub fn desensitized_license_plate(plate: &str) -> String {
-        if plate.len() >= 7 {
-            format!("{}{}{}", &plate[..2], "*****", &plate[plate.len()-3..])
+        if plate.chars().count() >= 7 {
+            Self::mask_middle(plate, 2, 3, "*****")
         } else {
             plate.to_string()
         }

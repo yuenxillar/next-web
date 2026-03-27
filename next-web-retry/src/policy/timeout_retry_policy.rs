@@ -1,6 +1,9 @@
 use std::{any::Any, sync::Arc};
 
-use next_web_core::{async_trait, anys::{any_error::AnyError, any_value::AnyValue}};
+use next_web_core::{
+    anys::{any_error::AnyError, any_value::AnyValue},
+    async_trait,
+};
 
 use crate::{
     context::retry_context_support::RetryContextSupport,
@@ -44,21 +47,16 @@ impl RetryPolicy for TimeoutRetryPolicy {
         }
     }
 
-    fn open(&self, context: Option<&dyn RetryContext>) -> Arc<dyn RetryContext> {
+    fn open(&self, _context: Option<&dyn RetryContext>) -> Arc<dyn RetryContext> {
         Arc::new(TimeoutRetryContext::new(self.timeout))
     }
 
     fn close(&self, _context: &dyn RetryContext) {}
 
-    fn register_error(
-        &self,
-        context: &dyn RetryContext,
-        error: Option<&dyn AnyError>,
-    ) {
+    fn register_error(&self, context: &dyn RetryContext, error: Option<&dyn AnyError>) {
         let context: &dyn Any = context;
-        match context.downcast_ref::<RetryContextSupport>() {
-            Some(context) => context.register_error(error),
-            None => {}
+        if let Some(context) = context.downcast_ref::<TimeoutRetryContext>() {
+            context.context_support.register_error(error);
         }
     }
 }
@@ -67,6 +65,7 @@ impl RetryPolicy for TimeoutRetryPolicy {
 struct TimeoutRetryContext {
     timeout: u64,
     start: u64,
+    context_support: RetryContextSupport,
 }
 
 impl TimeoutRetryContext {
@@ -74,8 +73,10 @@ impl TimeoutRetryContext {
         Self {
             start: timestamp(),
             timeout,
+            context_support: RetryContextSupport::default(),
         }
     }
+
     fn is_alive(&self) -> bool {
         (timestamp() - self.start) <= self.timeout
     }
@@ -83,41 +84,41 @@ impl TimeoutRetryContext {
 
 impl SyncAttributeAccessor for TimeoutRetryContext {
     fn has_attribute(&self, name: &str) -> bool {
-        todo!()
+        self.context_support.has_attribute(name)
     }
 
     fn set_attribute(&self, name: &str, value: AnyValue) {
-        todo!()
+        self.context_support.set_attribute(name, value)
     }
 
     fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
-        todo!()
+        self.context_support.remove_attribute(name)
     }
 
     fn get_attribute(&self, name: &str) -> Option<AnyValue> {
-        todo!()
+        self.context_support.get_attribute(name)
     }
 }
 
 impl RetryContext for TimeoutRetryContext {
     fn set_exhausted_only(&self) {
-        todo!()
+        self.context_support.set_exhausted_only()
     }
 
     fn is_exhausted_only(&self) -> bool {
-        todo!()
+        self.context_support.is_exhausted_only()
     }
 
     fn get_parent(&self) -> Option<&dyn RetryContext> {
-        todo!()
+        self.context_support.get_parent()
     }
 
     fn get_retry_count(&self) -> u16 {
-        todo!()
+        self.context_support.get_retry_count()
     }
 
     fn get_last_error(&self) -> Option<RetryError> {
-        todo!()
+        self.context_support.get_last_error()
     }
 }
 
@@ -131,5 +132,5 @@ fn timestamp() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
-        .as_secs()
+        .as_millis() as u64
 }

@@ -5,20 +5,20 @@ mod gateway_tests {
         application::gateway_application::GatewayApplication,
         properties::gateway_properties::GatewayApplicationProperties,
     };
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     #[test]
     fn test_gateway() {
-        let config_file = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .join("application.yaml")
-            .to_str()
-            .unwrap()
-            .to_string();
-        if let Ok(config) = std::fs::read_to_string(Path::new(&config_file)) {
-            if let Ok(file) = serde_yaml::from_str::<GatewayApplicationProperties>(&config) {
-                println!("config file: {:?}", file);
-            }
-        }
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let config_file = std::env::var(GatewayApplicationProperties::CONFIG_ENV_VAR)
+            .unwrap_or_else(|_| PathBuf::from("application.yaml").display().to_string());
+        let file = runtime
+            .block_on(GatewayApplicationProperties::load_from_path(config_file))
+            .unwrap();
+        tracing::info!("config file: {:?}", file);
     }
 
     #[test]
@@ -39,6 +39,6 @@ mod gateway_tests {
                 return;
             }
         }
-        println!("matchit1");
+        tracing::info!("matchit1");
     }
 }

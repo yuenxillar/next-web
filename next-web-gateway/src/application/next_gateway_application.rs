@@ -6,6 +6,7 @@ use pingora::http::ResponseHeader;
 use pingora::prelude::*;
 use pingora::proxy::ProxyHttp;
 use pingora::upstreams::peer::HttpPeer;
+use tracing::warn;
 
 use crate::circuit_breaker::circuit_breaker_service_manager::CircuitBreakerServiceManager;
 use crate::circuit_breaker::circuit_state::CircuitState;
@@ -104,31 +105,30 @@ impl ProxyHttp for NextGatewayApplication {
                     }
                 };
 
-                client_metadata.map(|v| {
-                    v.map(|d| {
+                if let Some(metadata) = client_metadata {
+                    if let Some(client) = metadata {
                         set_request_timeout(
                             &mut http_peer,
-                            d.connect_timeout,
-                            d.read_timeout,
-                            d.write_timeout,
-                        )
-                    })
-                });
+                            client.connect_timeout,
+                            client.read_timeout,
+                            client.write_timeout,
+                        );
+                    }
+                }
                 return Ok(Box::new(http_peer));
             }
             &RouteWork::Https => {
-                // TODO: Implement HTTPS routing
-                let mut http_peer = HttpPeer::new(sevice_name, false, "".into());
-                client_metadata.map(|v| {
-                    v.map(|d| {
+                let mut http_peer = HttpPeer::new(sevice_name, true, "".into());
+                if let Some(metadata) = client_metadata {
+                    if let Some(client) = metadata {
                         set_request_timeout(
                             &mut http_peer,
-                            d.connect_timeout,
-                            d.read_timeout,
-                            d.write_timeout,
-                        )
-                    })
-                });
+                            client.connect_timeout,
+                            client.read_timeout,
+                            client.write_timeout,
+                        );
+                    }
+                }
 
                 return Ok(Box::new(http_peer));
             }
@@ -156,12 +156,13 @@ impl ProxyHttp for NextGatewayApplication {
     where
         Self::CTX: Send + Sync,
     {
-        // Success recored
-        ctx.fallback_id.as_ref().map(|id| {
-            self.circuit_breaker_service_manager
-                .as_ref()
-                .map(|m| m.services.get(id).map(|s| s.controller.process(true)))
-        });
+        if let Some(id) = ctx.fallback_id.as_ref() {
+            if let Some(manager) = self.circuit_breaker_service_manager.as_ref() {
+                if let Some(service) = manager.services.get(id) {
+                    service.controller.process(true).await;
+                }
+            }
+        }
 
         self.route_service_manager
             .filter(ctx, UpStream::from_response_header(upstream_response));
@@ -195,12 +196,15 @@ impl ProxyHttp for NextGatewayApplication {
         ctx: &mut Self::CTX,
         client_reused: bool,
     ) -> Box<Error> {
-        // Error record
-        ctx.fallback_id.as_ref().map(|id| {
-            self.circuit_breaker_service_manager
-                .as_ref()
-                .map(|m| m.services.get(id).map(|s| s.controller.process(false)))
-        });
+        if let Some(id) = ctx.fallback_id.clone() {
+            if let Some(manager) = self.circuit_breaker_service_manager.clone() {
+                tokio::spawn(async move {
+                    if let Some(service) = manager.services.get(&id) {
+                        service.controller.process(false).await;
+                    }
+                });
+            }
+        }
 
         let mut e = e.more_context(format!("Peer: {}", peer));
         // only reused client connections where retry buffer is not truncated
@@ -217,12 +221,17 @@ impl ProxyHttp for NextGatewayApplication {
         ctx: &mut Self::CTX,
         e: Box<Error>,
     ) -> Box<Error> {
-        // Error record
-        ctx.fallback_id.as_ref().map(|id| {
-            self.circuit_breaker_service_manager
-                .as_ref()
-                .map(|m| m.services.get(id).map(|s| s.controller.process(false)))
-        });
+        if let Some(id) = ctx.fallback_id.clone() {
+            if let Some(manager) = self.circuit_breaker_service_manager.clone() {
+                tokio::spawn(async move {
+                    if let Some(service) = manager.services.get(&id) {
+                        service.controller.process(false).await;
+                    }
+                });
+            }
+        } else {
+            warn!("fail_to_connect called without fallback id");
+        }
         e
     }
 }

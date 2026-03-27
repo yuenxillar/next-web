@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use pingora_limits::rate::Rate;
 
-pub static RATE_KEY: &str = "req";
-
 #[derive(Clone)]
 pub struct RateLimiter {
     pub limit: f64,
@@ -11,7 +9,8 @@ pub struct RateLimiter {
 }
 
 impl RateLimiter {
-    pub fn check_rate(&self) -> bool {
-        self.rate.rate(&RATE_KEY) >= self.limit
+    pub fn check_rate(&self, key: &str) -> bool {
+        self.rate.observe(key, 1);
+        self.rate.rate(key) > self.limit
     }
 }

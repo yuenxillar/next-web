@@ -1,4 +1,5 @@
 use hashbrown::HashMap;
+use tracing::info;
 
 use super::{circuit_breaker_service::CircuitBreakerService, fallback_provider::FallbackProvider};
 
@@ -12,12 +13,14 @@ impl CircuitBreakerServiceManager {
         &mut self,
         fallback_providers: Vec<Box<dyn FallbackProvider>>,
     ) {
-        for (service, provider) in self.services.iter().zip(fallback_providers.iter()) {
-            if service.0.eq(provider.id()) {
-                let var = &service.1.controller;
-                var.set_on_open(move || println!("打开了熔断器，请稍后再试！！"))
+        for provider in fallback_providers.iter() {
+            if let Some(service) = self.services.get(provider.id()) {
+                let controller = &service.controller;
+                controller
+                    .set_on_open(move || info!("circuit breaker opened"))
                     .await;
-                var.set_on_half_open(move || println!("打开了半开熔断器，请稍后再试！！"))
+                controller
+                    .set_on_half_open(move || info!("circuit breaker half-open"))
                     .await;
             }
         }

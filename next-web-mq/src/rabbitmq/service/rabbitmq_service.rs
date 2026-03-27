@@ -23,6 +23,7 @@ use crate::rabbitmq::properties::rabbitmq_properties::RabbitMQClientProperties;
 #[derive(Clone)]
 pub struct RabbitmqService {
     properties: RabbitMQClientProperties,
+    connection: Connection,
     channel: Channel,
 }
 
@@ -31,12 +32,16 @@ impl Singleton  for RabbitmqService {}
 impl Service    for RabbitmqService {}
 
 impl RabbitmqService {
-    pub async fn new(properties: RabbitMQClientProperties, binds: Vec<BindExchange>) -> Self {
-        let channel = Self::build_channel(&properties, &binds).await;
-        Self {
+    pub async fn new(
+        properties: RabbitMQClientProperties,
+        binds: Vec<BindExchange>,
+    ) -> Result<Self, amqprs::error::Error> {
+        let (connection, channel) = Self::build_channel(&properties, &binds).await?;
+        Ok(Self {
             properties,
+            connection,
             channel,
-        }
+        })
     }
 
     pub(crate) async fn spawn_consumer(&self, consumer: Vec<Box<dyn RabbitListener>>) {
@@ -56,7 +61,7 @@ impl RabbitmqService {
     async fn build_channel(
         options: &RabbitMQClientProperties,
         binds: &[BindExchange],
-    ) -> Channel {
+    ) -> Result<(Connection, Channel), amqprs::error::Error> {
         // open a connection to RabbitMQ server
         let mut properties = OpenConnectionArguments::new(
             options.host().unwrap_or("localhost"),
@@ -66,19 +71,13 @@ impl RabbitmqService {
         );
         properties.virtual_host(options.virtual_host().unwrap_or("/"));
 
-        let connection = Connection::open(&properties).await.unwrap();
-        connection
-            .register_callback(DefaultConnectionCallback)
-            .await
-            .unwrap();
+        let connection = Connection::open(&properties).await?;
+        connection.register_callback(DefaultConnectionCallback).await?;
 
         // open a channel on the connection
-        let channel = connection.open_channel(None).await.unwrap();
+        let channel = connection.open_channel(None).await?;
         for bind_exchange in binds.iter() {
-            channel
-                .register_callback(DefaultChannelCallback)
-                .await
-                .unwrap();
+            channel.register_callback(DefaultChannelCallback).await?;
 
             // Declare a queue
             match channel
@@ -118,7 +117,7 @@ impl RabbitmqService {
                 }
             }
         }
-        channel
+        Ok((connection, channel))
     }
 
     /// basic_publish
@@ -163,6 +162,10 @@ impl RabbitmqService {
 
     pub fn channel(&self) -> &Channel {
         &self.channel
+    }
+
+    pub fn connection(&self) -> &Connection {
+        &self.connection
     }
 
     pub fn properties(&self) -> &RabbitMQClientProperties {

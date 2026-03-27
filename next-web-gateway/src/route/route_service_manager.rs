@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use hashbrown::HashMap;
 use pingora::{
     http::{RequestHeader, ResponseHeader},
     proxy::Session,
@@ -8,35 +9,47 @@ use crate::{
     application::next_gateway_application::ApplicationContext,
     properties::routes_properties::RouteMetadata,
     service::route_service::{RoutePredicateService, RouteWork},
-    util::rate_limiter::RATE_KEY,
 };
 
 static DEFAULT_SERVICE_NAME: &str = "";
 
 #[derive(Clone)]
 pub struct RouteServiceManager {
-    services: Vec<RoutePredicateService>,
+    services: HashMap<String, RoutePredicateService>,
+    ordered_route_ids: Vec<String>,
 }
 
 impl RouteServiceManager {
     pub fn new(services: Vec<RoutePredicateService>) -> Self {
-        Self { services }
+        let ordered_route_ids = services.iter().map(|service| service.id.clone()).collect();
+        let services = services
+            .into_iter()
+            .map(|service| (service.id.clone(), service))
+            .collect();
+
+        Self {
+            services,
+            ordered_route_ids,
+        }
     }
 
     // var1: Predicate result
     // var2: Service name
     // var3: RouteWork
     pub fn predicate(&self, session: &mut Session) -> RoutepRedicateResult {
-        for service in self.services.iter() {
+        for route_id in &self.ordered_route_ids {
+            let Some(service) = self.services.get(route_id) else {
+                continue;
+            };
+
             let allowable = service
                 .route_predicate_factory
                 .iter()
-                .all(|f| f.matches(session));
+                .all(|factory| factory.matches(session));
 
             if allowable {
-                // Rate Limiter implementation
                 if let Some(rate_limiter) = &service.rate_limiter {
-                    if rate_limiter.check_rate() {
+                    if rate_limiter.check_rate(service.id.as_str()) {
                         return RoutepRedicateResult {
                             allowable: false,
                             service_name: DEFAULT_SERVICE_NAME,
@@ -45,10 +58,9 @@ impl RouteServiceManager {
                             route_id: DEFAULT_SERVICE_NAME,
                             metadata: &None,
                         };
-                    } else {
-                        rate_limiter.rate.observe(&RATE_KEY, 1);
                     }
                 }
+
                 return RoutepRedicateResult {
                     allowable,
                     service_name: &service.upstream,
@@ -72,19 +84,16 @@ impl RouteServiceManager {
 
     pub fn filter(&self, ctx: &mut ApplicationContext, mut upstream: UpStream) {
         if let Some(route_id) = &ctx.route_id {
-            self.services()
-                .iter()
-                .find(|s| s.id.eq(route_id))
-                .map(|sevice| {
-                    sevice
-                        .filters
-                        .iter()
-                        .for_each(|f| f.filter(ctx, &mut upstream))
-                });
+            if let Some(service) = self.services.get(route_id) {
+                service
+                    .filters
+                    .iter()
+                    .for_each(|filter| filter.filter(ctx, &mut upstream));
+            }
         }
     }
 
-    pub fn services(&self) -> &Vec<RoutePredicateService> {
+    pub fn services(&self) -> &HashMap<String, RoutePredicateService> {
         &self.services
     }
 }
@@ -149,7 +158,8 @@ pub struct RoutepRedicateResult<'a> {
 impl Default for RouteServiceManager {
     fn default() -> Self {
         Self {
-            services: Vec::new(),
+            services: HashMap::new(),
+            ordered_route_ids: Vec::new(),
         }
     }
 }

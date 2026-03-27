@@ -3,6 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use axum::{body::Bytes, extract::ws::WebSocket, http::HeaderMap};
 use futures::{stream::StreamExt, SinkExt};
+use tokio::sync::watch;
 use tracing::{debug, error, info};
 
 use axum::extract::ws::{CloseFrame, Message};
@@ -184,6 +185,9 @@ pub(crate) async fn handle_socket(
     // Call handler's on_open method for initialization
     if let Err(e) = handler.on_open(&session).await {
         error!("Event on_open processing failed: {e}, Client: {remote_address}, Path: {path}");
+        let _ = handler.on_error(&session, e).await;
+        let _ = handler.on_close(&session, None).await;
+        let _ = stream_sender.close().await;
         return;
     }
 
@@ -196,24 +200,30 @@ pub(crate) async fn handle_socket(
     // Send messages to client
     // Use tokio::spawn to create async task for message sending
     // Terminate loop if Close message is received
-    tokio::spawn(async move {
-        while let Ok(msg) = msg_receiver.recv_async().await {
-            let close = if let Message::Close(_) = &msg {
-                true
-            } else {
-                false
-            };
-            if let Err(e) = stream_sender.send(msg).await {
-                error!("Sending message to client failed: {e}, Client: {remote_address}");
-                break;
-            } else {
-                if close {
-                    break;
+    let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+    let sender_task = tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                changed = shutdown_rx.changed() => {
+                    if changed.is_ok() && *shutdown_rx.borrow() {
+                        break;
+                    }
+                }
+                result = msg_receiver.recv_async() => {
+                    let Ok(msg) = result else {
+                        break;
+                    };
+                    let close = matches!(&msg, Message::Close(_));
+                    if let Err(e) = stream_sender.send(msg).await {
+                        error!("Sending message to client failed: {e}, Client: {remote_address}");
+                        break;
+                    }
+                    if close {
+                        break;
+                    }
                 }
             }
         }
-
-        drop(msg_receiver);
     });
 
     // 接收客户端消息
@@ -223,9 +233,13 @@ pub(crate) async fn handle_socket(
     // Receive client messages
     // Loop to receive and process messages from client
     // Call on_error method if processing fails
+    let mut close_frame = None;
     while let Some(result) = stream_receiver.next().await {
         match result {
             Ok(msg) => {
+                if let Message::Close(frame) = &msg {
+                    close_frame = frame.clone();
+                }
                 if let Err(e) = handler.on_message(&session, msg).await {
                     error!("Failed to process client message: {e}, Client: {remote_address}");
                     if let Err(e) = handler.on_error(&session, e).await {
@@ -244,12 +258,15 @@ pub(crate) async fn handle_socket(
         }
     }
 
+    let _ = shutdown_tx.send(true);
+    let _ = sender_task.await;
+
     // 连接关闭处理
     // 调用处理器的on_close方法进行资源清理
     //
     // Handle connection closure
     // Call handler's on_close method for resource cleanup
-    if let Err(e) = handler.on_close(&session, None).await {
+    if let Err(e) = handler.on_close(&session, close_frame).await {
         error!("Failed to handle connection closure event: {e}, Client: {remote_address}");
     }
 }

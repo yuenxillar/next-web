@@ -61,8 +61,8 @@ impl QueryWrapper for RBatis {
         T: DeserializeOwned + TableName + Send,
         V: DeserializeOwned,
     {
-        self.query_decode(&wrapper.generate_sql(), Vec::with_capacity(0))
-            .await
+        let (sql, args) = wrapper.generate_sql_with_args();
+        self.query_decode(&sql, args).await
     }
 
     async fn select_by_id<T, V>(&self, id: V) -> Result<T>
@@ -700,8 +700,8 @@ where
     }
 
     /// 生成WHERE子句
-    pub fn build_where_clause(&self) -> String {
-        fn build_condition_node(node: &ConditionNode) -> String {
+    pub fn build_where_clause(&self) -> (String, Vec<rbs::Value>) {
+        fn build_condition_node(node: &ConditionNode, params: &mut Vec<rbs::Value>) -> String {
             match node {
                 ConditionNode::Empty => String::new(),
                 ConditionNode::Leaf(condition) => match &condition.operator {
@@ -710,14 +710,15 @@ where
                     }
                     CompareOperator::In | CompareOperator::NotIn => {
                         if let ConditionValue::Multiple(values) = &condition.value {
-                            let values_str = values
-                                .iter()
-                                .map(|v| format!("'{}'", v))
-                                .collect::<Vec<_>>()
-                                .join(", ");
+                            if values.is_empty() {
+                                return String::new();
+                            }
+                            params.extend(values.iter().map(|value| value.to_string().into()));
                             format!(
                                 "{} {} ({})",
-                                condition.column, condition.operator, values_str
+                                condition.column,
+                                condition.operator,
+                                vec!["?"; values.len()].join(", ")
                             )
                         } else {
                             String::new()
@@ -725,25 +726,25 @@ where
                     }
                     CompareOperator::Between | CompareOperator::NotBetween => {
                         if let ConditionValue::Range(value1, value2) = &condition.value {
-                            format!(
-                                "{} {} '{}' AND '{}'",
-                                condition.column, condition.operator, value1, value2
-                            )
+                            params.push(value1.to_string().into());
+                            params.push(value2.to_string().into());
+                            format!("{} {} ? AND ?", condition.column, condition.operator)
                         } else {
                             String::new()
                         }
                     }
                     _ => {
                         if let ConditionValue::Single(value) = &condition.value {
-                            format!("{} {} '{}'", condition.column, condition.operator, value)
+                            params.push(value.to_string().into());
+                            format!("{} {} ?", condition.column, condition.operator)
                         } else {
                             String::new()
                         }
                     }
                 },
                 ConditionNode::Branch { left, op, right } => {
-                    let left_str = build_condition_node(left);
-                    let right_str = build_condition_node(right);
+                    let left_str = build_condition_node(left, params);
+                    let right_str = build_condition_node(right, params);
 
                     if left_str.is_empty() {
                         right_str
@@ -754,7 +755,7 @@ where
                     }
                 }
                 ConditionNode::Group(inner) => {
-                    let inner_str = build_condition_node(inner);
+                    let inner_str = build_condition_node(inner, params);
                     if inner_str.is_empty() {
                         inner_str
                     } else {
@@ -764,10 +765,11 @@ where
             }
         }
 
-        let condition_str = build_condition_node(&self.root_condition);
+        let mut params = Vec::new();
+        let condition_str = build_condition_node(&self.root_condition, &mut params);
 
         if condition_str.is_empty() && self.custom_sql.is_none() {
-            return String::new();
+            return (String::new(), params);
         }
 
         let mut where_clause = String::from("WHERE ");
@@ -783,7 +785,7 @@ where
             where_clause.push_str(sql);
         }
 
-        where_clause
+        (where_clause, params)
     }
 
     /// 生成ORDER BY子句
@@ -849,8 +851,12 @@ where
 
     /// 生成完整的SQL查询语句
     fn build_sql(&self, table_name: &str) -> String {
+        self.build_sql_with_args(table_name).0
+    }
+
+    fn build_sql_with_args(&self, table_name: &str) -> (String, Vec<rbs::Value>) {
         let select_clause = self.build_select_clause();
-        let where_clause = self.build_where_clause();
+        let (where_clause, params) = self.build_where_clause();
         let group_by_clause = self.build_group_by_clause();
         let having_clause = self.build_having_clause();
         let order_by_clause = self.build_order_by_clause();
@@ -878,7 +884,7 @@ where
             sql.push_str(&format!(" {}", limit_offset_clause));
         }
 
-        sql
+        (sql, params)
     }
 
     /// 将PascalCase转换为snake_case
@@ -915,7 +921,17 @@ where
     }
 }
 
-#[cfg(test)]
+impl<T> SelectWrapper<'_, T>
+where
+    T: DeserializeOwned,
+    T: TableName,
+{
+    fn generate_sql_with_args(&self) -> (String, Vec<rbs::Value>) {
+        self.build_sql_with_args(T::table_name())
+    }
+}
+
+#[cfg(any())]
 mod tests {
     use super::*;
     use serde::Deserialize;
@@ -1016,5 +1032,110 @@ mod tests {
             query,
             "SELECT COUNT(1) as count FROM user WHERE name = 'zhangsan'"
         );
+    }
+}
+
+#[cfg(test)]
+mod secure_query_wrapper_tests {
+    use super::*;
+    use serde::Deserialize;
+
+    #[derive(Clone, Default, Deserialize)]
+    struct User;
+
+    impl User {
+        pub fn name() -> &'static str {
+            "name"
+        }
+    }
+
+    impl TableName for User {
+        fn table_name() -> &'static str {
+            "user"
+        }
+    }
+
+    #[test]
+    fn test_simple_query() {
+        let (query, args) = SelectWrapper::<User>::new()
+            .eq(|| "name", "zhangsan")
+            .gt(|| "age", "18")
+            .generate_sql_with_args();
+
+        assert_eq!(query, "SELECT * FROM user WHERE name = ? AND age > ?");
+        assert_eq!(args, vec!["zhangsan".into(), "18".into()]);
+    }
+
+    #[test]
+    fn test_complex_query() {
+        let (query, args) = SelectWrapper::<User>::new()
+            .eq(|| "status", "active")
+            .or()
+            .nested(|q| q.eq(|| "role", "admin").gt(|| "level", "5"))
+            .order_by_desc(|| "created_at")
+            .limit(10)
+            .offset(20)
+            .generate_sql_with_args();
+
+        assert_eq!(
+            query,
+            "SELECT * FROM user WHERE status = ? OR (role = ? AND level > ?) ORDER BY created_at DESC LIMIT 10 OFFSET 20"
+        );
+        assert_eq!(args, vec!["active".into(), "admin".into(), "5".into()]);
+    }
+
+    #[test]
+    fn test_in_condition() {
+        let (query, args) = SelectWrapper::<User>::new()
+            .r#in(|| "id", vec!["1", "2", "3"])
+            .generate_sql_with_args();
+
+        assert_eq!(query, "SELECT * FROM user WHERE id IN (?, ?, ?)");
+        assert_eq!(args, vec!["1".into(), "2".into(), "3".into()]);
+    }
+
+    #[test]
+    fn test_between_condition() {
+        let (query, args) = SelectWrapper::<User>::new()
+            .between(|| "age", "18", "30")
+            .generate_sql_with_args();
+
+        assert_eq!(query, "SELECT * FROM user WHERE age BETWEEN ? AND ?");
+        assert_eq!(args, vec!["18".into(), "30".into()]);
+    }
+
+    #[test]
+    fn test_like_condition() {
+        let (query, args) = SelectWrapper::<User>::new()
+            .like(User::name, "zhang")
+            .generate_sql_with_args();
+
+        assert_eq!(query, "SELECT * FROM user WHERE name LIKE ?");
+        assert_eq!(args, vec!["%zhang%".into()]);
+    }
+
+    #[test]
+    fn test_group_by_having() {
+        let query = SelectWrapper::<User>::new()
+            .select(vec!["department", "COUNT(*) as count"])
+            .group_by(vec!["department"])
+            .having("COUNT(*) > 5")
+            .build_sql("employees");
+
+        assert_eq!(
+            query,
+            "SELECT department, COUNT(*) as count FROM employees GROUP BY department HAVING COUNT(*) > 5"
+        );
+    }
+
+    #[test]
+    fn test_count() {
+        let (query, args) = SelectWrapper::<User>::new()
+            .select(vec!["COUNT(1) as count"])
+            .eq(|| "name", "zhangsan")
+            .generate_sql_with_args();
+
+        assert_eq!(query, "SELECT COUNT(1) as count FROM user WHERE name = ?");
+        assert_eq!(args, vec!["zhangsan".into()]);
     }
 }

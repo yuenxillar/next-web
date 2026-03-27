@@ -40,7 +40,7 @@ impl AutoRegister for DatabaseServiceAutoRegister {
         // Clone theconfiguration properties
         let client_properties = self.0.clone();
 
-        let mut database_service = DatabaseService::new(client_properties);
+        let mut database_service = DatabaseService::new(client_properties)?;
 
         let rbs = database_service.get_client_mut();
 

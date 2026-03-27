@@ -3,6 +3,8 @@ use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
 use next_web_core::{client::rest_client::RestClient, error::BoxError};
 use serde::{Deserialize, Deserializer};
+use std::time::Duration;
+use tracing::debug;
 
 use crate::ai::deep_seek::chat_model::ChatModel;
 
@@ -12,7 +14,7 @@ const DONE: [u8; 12] = [100, 97, 116, 97, 58, 32, 91, 68, 79, 78, 69, 93];
 
 #[derive(Clone)]
 pub struct DeepSeekApi {
-    pub(crate) api_key: Box<str>,
+    pub(crate) api_key: Option<Box<str>>,
 
     pub(crate) chat_model: ChatModel,
 
@@ -24,10 +26,26 @@ impl DeepSeekApi {
         let client = RestClient::builder()
             .base_url("https://api.deepseek.com")
             .default_headers([("Content-Type", "application/json")])
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(60))
             .build();
         let api_key = api_key.into();
         Self {
-            api_key,
+            api_key: Some(api_key),
+            chat_model,
+            client,
+        }
+    }
+
+    pub fn without_api_key(chat_model: ChatModel) -> Self {
+        let client = RestClient::builder()
+            .base_url("https://api.deepseek.com")
+            .default_headers([("Content-Type", "application/json")])
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(60))
+            .build();
+        Self {
+            api_key: None,
             chat_model,
             client,
         }
@@ -37,12 +55,16 @@ impl DeepSeekApi {
         &self,
         req: &ChatCompletionRequest,
     ) -> Result<ChatApiRespnose, BoxError> {
+        let api_key = self
+            .api_key
+            .as_deref()
+            .ok_or_else(|| "DEEPSEEK_API_KEY is not configured".to_string())?;
         let body = serde_json::to_string(req)?;
         let resp = self
             .client
             .post("")
             .await
-            .bearer_auth(self.api_key.as_ref())
+            .bearer_auth(api_key)
             .body(body)
             .send()
             .await?;
@@ -61,7 +83,7 @@ impl DeepSeekApi {
                 }
 
                 if data.starts_with(&DONE) {
-                    println!("\n\nEnd of stream\n\n")
+                    debug!("deepseek stream completed");
                 }
 
                 data.split(|&s| s == b'\n')
@@ -86,12 +108,13 @@ pub enum ChatApiRespnose {
 
 impl Default for DeepSeekApi {
     fn default() -> Self {
-        let api_key = std::env::var("DEEPSEEK_API_KEY").unwrap();
-        Self::new(api_key, ChatModel::Chat)
+        std::env::var("DEEPSEEK_API_KEY")
+            .map(|api_key| Self::new(api_key, ChatModel::Chat))
+            .unwrap_or_else(|_| Self::without_api_key(ChatModel::Chat))
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 pub struct ChatCompletionRequest {
     pub(crate) messages: Vec<ChatCompletionMessage>,
     pub(crate) model: Box<str>,
@@ -114,7 +137,7 @@ impl ChatCompletionRequest {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ChatCompletionMessage {
     pub(crate) role: Box<str>,
 

@@ -1,17 +1,18 @@
 use from_attr::FromAttr;
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use quote::quote;
 use syn::{spanned::Spanned, ItemFn};
 
 use crate::util::logic::Logic;
 
 use super::attrs::pre_authorize_attr::PreAuthorizeAttr;
 
-pub fn impl_macro_pre_authorize(attrs: TokenStream, item_fn: ItemFn) -> TokenStream {
-    let expanded = Logic::generate(|| {
+pub fn impl_macro_pre_authorize(macro_attrs: TokenStream, item_fn: ItemFn) -> TokenStream {
+    Logic::generate(|| {
         let vis = &item_fn.vis;
         let sig = &item_fn.sig;
-        let name = &sig.ident;
+        let attrs = &item_fn.attrs;
+        let block = &item_fn.block;
 
         if sig.asyncness.is_none() {
             return Err(syn::Error::new(
@@ -27,19 +28,20 @@ pub fn impl_macro_pre_authorize(attrs: TokenStream, item_fn: ItemFn) -> TokenStr
             ));
         }
 
-        let PreAuthorizeAttr {
-            role,
-            permission,
-            mode,
-            ignore,
-            basic,
-        } = match PreAuthorizeAttr::from_tokens(attrs.clone().into()) {
-            Ok(attr) => attr,
-            Err(error) => return Err(error),
-        };
+        let parsed = PreAuthorizeAttr::from_tokens(macro_attrs.clone().into())?;
+        if parsed.ignore.unwrap_or(false) {
+            return Ok(quote! { #(#attrs)* #vis #sig #block });
+        }
 
-        Ok(TokenStream2::new())
-    });
-
-    expanded
+        let warning_name = syn::Ident::new("__next_web_pre_authorize_warning", sig.ident.span());
+        Ok(quote! {
+            #(#attrs)*
+            #vis #sig {
+                #[deprecated(note = "#[pre_authorize] is parsed but not enforced yet; authorization checks are skipped")]
+                fn #warning_name() {}
+                #warning_name();
+                #block
+            }
+        })
+    })
 }

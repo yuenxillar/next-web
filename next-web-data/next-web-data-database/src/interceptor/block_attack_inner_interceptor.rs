@@ -22,18 +22,16 @@ impl Intercept for BlockAttackInnerInterceptor {
         _args: &mut Vec<Value>,
         _result: ResultType<&mut Result<ExecResult, Error>, &mut Result<Vec<Value>, Error>>,
     ) -> Result<Option<bool>, Error> {
+        let normalized_sql = _sql.trim().to_uppercase();
+
         // Check whether the full table is updated. If yes, exit without executing
-        if (_sql.starts_with("UPDATE") || _sql.starts_with("update"))
-            && (!_sql.contains("WHERE") && !_sql.contains("where"))
-        {
+        if normalized_sql.starts_with("UPDATE") && !normalized_sql.contains("WHERE") {
             warn!("Full table update detected, exit without executing");
             return Ok(Some(false));
         }
 
         // Check whether the full table is deleted. If yes, exit without executing
-        if (_sql.starts_with("DELETE") || _sql.starts_with("delete"))
-            && (!_sql.contains("WHERE") && !_sql.contains("where"))
-        {
+        if normalized_sql.starts_with("DELETE") && !normalized_sql.contains("WHERE") {
             warn!("Full table delete detected, exit without executing");
             return Ok(Some(false));
         }

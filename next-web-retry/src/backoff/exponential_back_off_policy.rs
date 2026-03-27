@@ -106,10 +106,10 @@ impl SleepingBackOffPolicy for ExponentialBackOffPolicy {
 impl Default for ExponentialBackOffPolicy {
     fn default() -> Self {
         Self {
-            initial_interval: Default::default(),
-            max_interval: Default::default(),
-            multiplier: Default::default(),
-            with_random: Default::default(),
+            initial_interval: 1000,
+            max_interval: 30000,
+            multiplier: 2.0,
+            with_random: false,
         }
     }
 }

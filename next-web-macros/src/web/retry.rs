@@ -101,7 +101,7 @@ pub fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
                 let max_attempts: u8 = #max_attempts;
                 let mut delay: u64 = #delay;
 
-                let mut attempt_count : u8 = 0;
+                let mut attempt_count : u8 = 1;
                 loop {
                     #(#clones)*
 
@@ -111,7 +111,7 @@ pub fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
                         Err(error) => {
                             #retry_for
 
-                            if attempt_count   >=  max_attempts - 1 {
+                            if attempt_count >= max_attempts {
                                 #backoff
                                 return Err(error);
                             }
@@ -120,7 +120,7 @@ pub fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
 
                             #multiplier
 
-                            attempt_count  += 1;
+                            attempt_count += 1;
                         }
                     }
                 }
@@ -134,7 +134,7 @@ pub fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
                 let max_attempts: u8 = #max_attempts;
                 let mut delay: u64 = #delay;
 
-                let mut attempt_count : u8 = 0;
+                let mut attempt_count : u8 = 1;
                 loop {
                     #(#clones)*
 
@@ -144,7 +144,7 @@ pub fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
                         Err(error) => {
                             #retry_for
 
-                           if attempt_count   >=  max_attempts - 1  {
+                           if attempt_count >= max_attempts  {
                                 #backoff
                                 return Err(error);
                             }
@@ -153,7 +153,7 @@ pub fn impl_macro_retry(attr: TokenStream, item: ItemFn) -> TokenStream {
 
                             #multiplier
 
-                            attempt_count  += 1;
+                            attempt_count += 1;
                         }
                     }
                 }

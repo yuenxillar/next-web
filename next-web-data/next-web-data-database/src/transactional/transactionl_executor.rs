@@ -1,4 +1,5 @@
 use rbatis::async_trait;
+use rbatis::executor::RBatisTxExecutor;
 use std::{error::Error, future::Future};
 use tracing::error;
 
@@ -10,7 +11,7 @@ pub trait TransactionalExecutor {
     ) -> Result<(), Box<dyn Error + Send + Sync>>
     where
         F: Send,
-        F: FnOnce(&rbatis::RBatis) -> Fut,
+        F: FnOnce(&RBatisTxExecutor) -> Fut,
         Fut: Future<Output = Result<(), Box<dyn Error + Send + Sync>>> + Send;
 }
 
@@ -22,11 +23,11 @@ impl TransactionalExecutor for rbatis::RBatis {
     ) -> Result<(), Box<dyn Error + Send + Sync>>
     where
         F: Send,
-        F: FnOnce(&rbatis::RBatis) -> Fut,
+        F: FnOnce(&RBatisTxExecutor) -> Fut,
         Fut: Future<Output = Result<(), Box<dyn Error + Send + Sync>>> + Send,
     {
         match self.acquire_begin().await {
-            Ok(tx) => match block(self).await {
+            Ok(tx) => match block(&tx).await {
                 Ok(_) => tx.commit().await.map_err(|err| {
                     error!("Transactional commit error: {:?}", err);
                     err.into()
@@ -46,12 +47,4 @@ impl TransactionalExecutor for rbatis::RBatis {
             }
         }
     }
-}
-
-async fn main() {
-    let rbs = rbatis::RBatis::new();
-
-    rbs.execute_transaction(|rb| async { Ok(()) })
-        .await
-        .unwrap();
 }

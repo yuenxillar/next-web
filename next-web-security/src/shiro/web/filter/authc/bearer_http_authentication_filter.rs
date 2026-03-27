@@ -69,9 +69,7 @@ impl AuthenticatingFilterExt for BearerHttpAuthenticationFilter {
             .http_authentication_filter
             .get_principals_and_credentials(&authz_header.unwrap(), request);
 
-        if prin_cred.is_none() || prin_cred.as_ref().map(|v| v.len() < 2).unwrap_or(true) {
-            // Create an authentication token with an empty password,
-            // since one hasn't been provided in the request.
+        if prin_cred.is_none() || prin_cred.as_ref().map(|v| v.is_empty()).unwrap_or(true) {
             return self.create_bearer_token("", request);
         }
 

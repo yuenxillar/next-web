@@ -11,7 +11,6 @@ use super::cache_value::CacheValue;
 
 /// A high-performance concurrent cache with expiration support
 /// 支持过期时间的高性能并发缓存
-#[derive(Clone)]
 pub struct BackCache {
     /// The underlying concurrent hash map storing cache items
     /// 存储缓存项的底层并发哈希表
@@ -24,6 +23,16 @@ pub struct BackCache {
     /// Signal to control the cleanup task's execution
     /// 控制清理任务执行的信号量
     task_signal: Arc<AtomicBool>,
+}
+
+impl Clone for BackCache {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            cleanup_task: self.cleanup_task.clone(),
+            task_signal: self.task_signal.clone(),
+        }
+    }
 }
 
 /// Internal representation of a cache item
@@ -194,9 +203,11 @@ impl BackCache {
     /// let results = cache.fuzzy_find("user");
     /// ```
     pub fn fuzzy_find(&self, pattern: &str) -> Vec<(String, CacheValue)> {
+        let now = Instant::now();
         self.data
             .iter()
             .filter(|item| item.key().contains(pattern))
+            .filter(|item| item.expires_at.map_or(true, |expiry| expiry > now))
             .map(|item| (item.key().to_string(), item.value.clone()))
             .collect()
     }
@@ -218,10 +229,12 @@ impl BackCache {
     /// ```
     pub fn fuzzy_find_regex(&self, regex: &str) -> Result<Vec<(String, CacheValue)>, regex::Error> {
         let re = Regex::new(regex)?;
+        let now = Instant::now();
         Ok(self
             .data
             .iter()
             .filter(|item| re.is_match(item.key()))
+            .filter(|item| item.expires_at.map_or(true, |expiry| expiry > now))
             .map(|item| (item.key().to_string(), item.value.clone()))
             .collect())
     }
@@ -269,7 +282,14 @@ impl Drop for BackCache {
     /// Stops the background cleanup task
     /// 停止后台清理任务
     fn drop(&mut self) {
-        self.task_signal.store(false, Ordering::Relaxed);
+        if Arc::strong_count(&self.task_signal) == 1 {
+            self.task_signal.store(false, Ordering::Relaxed);
+            if let Ok(mut task) = self.cleanup_task.lock() {
+                if let Some(handle) = task.take() {
+                    let _ = handle.join();
+                }
+            }
+        }
     }
 }
 

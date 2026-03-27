@@ -10,7 +10,8 @@ impl CredentialsMatcher for SimpleCredentialsMatcher {
         token: &dyn crate::core::authc::authentication_token::AuthenticationToken,
         info: &dyn crate::core::authc::authentication_info::AuthenticationInfo,
     ) -> bool {
-        todo!()
+        token.get_credentials().map(|value| value.to_string())
+            == info.get_credentials().map(ToString::to_string)
     }
 }
 

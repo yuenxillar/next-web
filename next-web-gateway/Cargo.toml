@@ -12,7 +12,7 @@ edition = "2021"
 pingora = { version = "0.6.0", features = ["lb", "proxy"] }
 pingora-limits = "0.6.0"
 
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["fs"] }
 
 serde = { workspace = true }
 serde_yaml = { workspace = true }

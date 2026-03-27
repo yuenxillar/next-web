@@ -13,7 +13,7 @@ pub(crate) fn impl_macro_idempotency(attr: TokenStream, mut item_fn: ItemFn) -> 
         Logic::valid_method_handler(&item_fn)?;
 
         // Only allow Post requests to pass
-        if !&item_fn.attrs.iter().all(|attri| {
+        if !item_fn.attrs.iter().any(|attri| {
             attri.meta.path().is_ident("post_mapping")
             ||
             if attri.meta.path().is_ident("request_mapping") {

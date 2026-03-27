@@ -10,6 +10,7 @@ use crate::{
 };
 
 use hashbrown::HashMap;
+use next_web_core::error::BoxError;
 use next_web_core::traits::{service::Service, singleton::Singleton};
 use rumqttc::{
     AsyncClient, ConnectReturnCode, Event, MqttOptions, NetworkOptions, Packet, QoS,
@@ -75,9 +76,9 @@ impl MQTTService {
         route_map: HashMap<String, Box<dyn BaseTopic>>,
         route: Vec<TopicRoute>,
         interceptor: Box<dyn MessageInterceptor>,
-    ) -> Self {
-        let client = Self::build_client(&properties, route_map, route, interceptor);
-        Self { properties, client }
+    ) -> Result<Self, BoxError> {
+        let client = Self::build_client(&properties, route_map, route, interceptor)?;
+        Ok(Self { properties, client })
     }
 
     /// Builds and configures the MQTT client
@@ -105,7 +106,7 @@ impl MQTTService {
         mut route_map: HashMap<String, Box<dyn BaseTopic>>,
         mut route: Vec<TopicRoute>,
         interceptor: Box<dyn MessageInterceptor>,
-    ) -> AsyncClient {
+    ) -> Result<AsyncClient, BoxError> {
         let mut options = MqttOptions::new(
             properties.client_id().unwrap_or_default(),
             properties.host().unwrap_or("127.0.0.1"),
@@ -145,7 +146,7 @@ impl MQTTService {
                 SubscribeFilter::new(t.topic.clone(), qos)
             })
             .collect::<Vec<_>>();
-        client.try_subscribe_many(need_subscribe_topics).unwrap();
+        client.try_subscribe_many(need_subscribe_topics)?;
 
         tokio::spawn(async move {
             loop {
@@ -168,17 +169,32 @@ impl MQTTService {
                                 }
 
                                 MacthType::Multilayer(index) => {
-                                    if topic[0..index].eq(&item.topic[0..index]) {
-                                        item.base_topic.consume(&topic, &message).await;
+                                    if let (Some(topic_prefix), Some(route_prefix)) =
+                                        (topic.get(..index), item.topic.get(..index))
+                                    {
+                                        if topic_prefix == route_prefix {
+                                            item.base_topic.consume(&topic, &message).await;
+                                        }
                                     }
                                 }
 
                                 MacthType::Singlelayer(left_index, right_index) => {
                                     let len = topic.len();
-                                    if topic[0..left_index].eq(&item.topic[0..left_index]) {
+                                    if let (Some(topic_prefix), Some(route_prefix)) =
+                                        (topic.get(..left_index), item.topic.get(..left_index))
+                                    {
+                                        if topic_prefix != route_prefix {
+                                            continue;
+                                        }
                                         if right_index != 0 {
-                                            if !topic[(len - right_index)..]
-                                                .eq(&item.topic[right_index..])
+                                            let topic_suffix =
+                                                topic.get(len.saturating_sub(right_index)..);
+                                            let route_suffix = item
+                                                .topic
+                                                .get(item.topic.len().saturating_sub(right_index)..);
+                                            if topic_suffix.is_none()
+                                                || route_suffix.is_none()
+                                                || topic_suffix != route_suffix
                                             {
                                                 continue;
                                             }
@@ -195,7 +211,20 @@ impl MQTTService {
                         match ack.code {
                             ConnectReturnCode::Success => {
                                 for t in topics.iter() {
-                                    client_1.subscribe(t.topic.clone(), rumqttc::qos(t.qos.unwrap_or(0)).unwrap_or(QoS::AtLeastOnce)).await.unwrap();
+                                    if let Err(err) = client_1
+                                        .subscribe(
+                                            t.topic.clone(),
+                                            rumqttc::qos(t.qos.unwrap_or(0))
+                                                .unwrap_or(QoS::AtLeastOnce),
+                                        )
+                                        .await
+                                    {
+                                        error!(
+                                            "Failed to resubscribe topic {} after reconnect: {:?}",
+                                            t.topic,
+                                            err
+                                        );
+                                    }
                                 }
                                 warn!("Client reconnection successful, try re subscribing to the themes")
                             }
@@ -215,7 +244,7 @@ impl MQTTService {
             }
         });
 
-        client
+        Ok(client)
     }
 
     /// Publishes a message to a topic with default QoS (AtLeastOnce)

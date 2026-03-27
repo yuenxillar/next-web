@@ -11,9 +11,11 @@ use next_web_core::{
     anys::{any_error::AnyError, any_value::AnyValue},
     async_trait,
 };
+use tokio::sync::Mutex;
 
 use crate::{
     classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier},
+    retry_context::AttributeAccessorSupport,
     error::retry_error::RetryError,
     retry_context::{RetryContext, SyncAttributeAccessor},
     retry_policy::RetryPolicy,
@@ -121,9 +123,9 @@ impl RetryPolicy for SimpleRetryPolicy {
         if (error.is_none() || self.retry_for_error(error.as_ref()).await)
             && context.get_retry_count() < self.get_max_attempts()
         {
-            false
-        } else {
             true
+        } else {
+            false
         }
     }
 
@@ -155,8 +157,9 @@ impl RetryPolicy for SimpleRetryPolicy {
 struct SimpleRetryContext {
     pub(crate) parent: Option<Arc<dyn RetryContext>>,
     count: Arc<AtomicU16>,
-    last_error: Option<RetryError>,
+    last_error: Arc<Mutex<Option<RetryError>>>,
     terminate: Arc<AtomicBool>,
+    attributes: AttributeAccessorSupport,
 }
 
 impl SimpleRetryContext {
@@ -167,17 +170,19 @@ impl SimpleRetryContext {
         Self {
             parent: Some(Arc::new(context)),
             count: Arc::new(AtomicU16::new(0)),
-            last_error: None,
+            last_error: Arc::new(Mutex::new(None)),
             terminate: Arc::new(AtomicBool::new(false)),
+            attributes: AttributeAccessorSupport::default(),
         }
     }
 
     pub fn register_error(&self, error: Option<Box<dyn AnyError>>) {
         if let Some(error) = error {
-            // TODO
-            // self.last_error.replace(Some(RetryError::Any(error)));
-            self.count
-                .store(self.count.load(Ordering::Relaxed), Ordering::Relaxed);
+            self.count.fetch_add(1, Ordering::Relaxed);
+            self.last_error
+                .try_lock()
+                .map(|mut last_error| last_error.replace(RetryError::Any(error)))
+                .ok();
         }
     }
 }
@@ -187,27 +192,28 @@ impl Default for SimpleRetryContext {
         Self {
             parent: None,
             count: Arc::new(AtomicU16::new(0)),
-            last_error: None,
+            last_error: Arc::new(Mutex::new(None)),
             terminate: Arc::new(AtomicBool::new(false)),
+            attributes: AttributeAccessorSupport::default(),
         }
     }
 }
 
 impl SyncAttributeAccessor for SimpleRetryContext {
     fn has_attribute(&self, name: &str) -> bool {
-        todo!()
+        self.attributes.has_attribute(name)
     }
 
     fn set_attribute(&self, name: &str, value: AnyValue) {
-        todo!()
+        self.attributes.set_attribute(name, value)
     }
 
     fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
-        todo!()
+        self.attributes.remove_attribute(name)
     }
 
     fn get_attribute(&self, name: &str) -> Option<AnyValue> {
-        todo!()
+        self.attributes.get_attribute(name)
     }
 }
 
@@ -229,7 +235,10 @@ impl RetryContext for SimpleRetryContext {
     }
 
     fn get_last_error(&self) -> Option<RetryError> {
-        self.last_error.clone()
+        self.last_error
+            .try_lock()
+            .map(|last_error| last_error.clone())
+            .unwrap_or_default()
     }
 }
 

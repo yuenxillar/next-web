@@ -51,7 +51,13 @@ pub trait GatewayApplication: Send + Sync {
         application.init_logging();
 
         // Retrieve configuration files and convert them into objects
-        let application_properties = GatewayApplicationProperties::default();
+        let application_properties = match GatewayApplicationProperties::load().await {
+            Ok(properties) => properties,
+            Err(error) => {
+                tracing::error!("failed to load gateway configuration: {error}");
+                return;
+            }
+        };
         let route_service_manager = application_properties.into_manager();
         let mut circuitbreaker_service_manager =
             application_properties.into_circuitbreaker_services();
