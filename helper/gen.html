@@ -1,574 +1,1720 @@
 <!doctype html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Rust Struct Getter/Setter Generator</title>
-        <style>
-            :root {
-                --primary-color: #e74c3c;
-                --secondary-color: #3498db;
-                --background-color: #f9f9f9;
-                --card-color: #ffffff;
-                --text-color: #333333;
-                --border-color: #dddddd;
-                --success-color: #2ecc71;
-                --warning-color: #f39c12;
-            }
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rust Helper Studio</title>
+  <style>
+    :root {
+      --bg: #f6efe3;
+      --paper: rgba(255, 251, 245, 0.94);
+      --panel: rgba(255, 255, 255, 0.84);
+      --line: #dac9b1;
+      --ink: #2e251d;
+      --muted: #6b6054;
+      --brand: #b45536;
+      --teal: #2c7572;
+      --code-bg: #16120f;
+      --code-fg: #f8e7c8;
+      --shadow: 0 24px 60px rgba(64, 48, 30, 0.12);
+      --mono: "Cascadia Code", Consolas, monospace;
+      --sans: "Avenir Next", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
 
-            * {
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
-            }
+    * { box-sizing: border-box; }
 
-            body {
-                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-                line-height: 1.6;
-                color: var(--text-color);
-                background-color: var(--background-color);
-                padding: 20px;
-            }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at top left, rgba(44, 117, 114, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(180, 85, 54, 0.14), transparent 24%),
+        linear-gradient(180deg, #f9f4ec 0%, #efe4d2 100%);
+    }
 
-            .container {
-                max-width: 1200px;
-                margin: 0 auto;
-            }
+    .page {
+      width: 100%;
+      max-width: none;
+      margin: 0 auto;
+      padding: 20px 24px 32px;
+    }
 
-            header {
-                text-align: center;
-                margin-bottom: 30px;
-            }
+    .hero,
+    .toolbar,
+    .panel {
+      border: 1px solid rgba(126, 97, 59, 0.16);
+      border-radius: 24px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
 
-            h1 {
-                color: var(--primary-color);
-                margin-bottom: 10px;
-            }
+    .hero,
+    .toolbar,
+    .panel-inner {
+      padding: 20px;
+    }
 
-            .description {
-                color: #666;
-                max-width: 800px;
-                margin: 0 auto 20px;
-            }
+    .hero,
+    .toolbar,
+    .stats {
+      margin-bottom: 14px;
+    }
 
-            .app-container {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 20px;
-            }
+    .eyebrow,
+    .badge,
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(126, 97, 59, 0.14);
+      background: rgba(255, 255, 255, 0.76);
+      font-size: 12px;
+    }
 
-            .input-section,
-            .output-section {
-                flex: 1;
-                min-width: 300px;
-                background-color: var(--card-color);
-                border-radius: 8px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                padding: 20px;
-            }
+    .eyebrow,
+    .badge {
+      color: var(--teal);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
 
-            .section-title {
-                font-size: 1.2rem;
-                margin-bottom: 15px;
-                color: var(--secondary-color);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-            }
+    .hero h1 {
+      margin: 10px 0 8px;
+      font-size: clamp(30px, 4.8vw, 50px);
+      line-height: 1;
+    }
 
-            textarea {
-                width: 100%;
-                min-height: 300px;
-                padding: 15px;
-                border: 1px solid var(--border-color);
-                border-radius: 4px;
-                font-family: "Courier New", monospace;
-                font-size: 14px;
-                resize: vertical;
-                background-color: #f8f8f8;
-            }
+    .hero p,
+    .subtle {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.75;
+    }
 
-            .actions {
-                display: flex;
-                gap: 10px;
-                margin-top: 15px;
-            }
+    .stats,
+    .grid-2,
+    .actions,
+    .stack,
+    .tool-layout {
+      display: grid;
+      gap: 14px;
+    }
 
-            button {
-                padding: 10px 15px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-weight: bold;
-                transition: background-color 0.3s;
-            }
+    .stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
 
-            .generate-btn {
-                background-color: var(--primary-color);
-                color: white;
-                flex: 1;
-            }
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
 
-            .generate-btn:hover {
-                background-color: #c0392b;
-            }
+    .tool-layout {
+      grid-template-columns: minmax(520px, 1fr) minmax(620px, 1.15fr);
+    }
 
-            .copy-btn {
-                background-color: var(--secondary-color);
-                color: white;
-            }
+    .actions {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 14px;
+    }
 
-            .copy-btn:hover {
-                background-color: #2980b9;
-            }
+    .tool-row {
+      display: grid;
+      gap: 14px;
+    }
 
-            .copy-btn.copied {
-                background-color: var(--success-color);
-            }
+    .tool-row.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
 
-            .output {
-                position: relative;
-            }
+    .stat,
+    .card,
+    .toggle {
+      padding: 14px 15px;
+      border-radius: 16px;
+      border: 1px solid rgba(126, 97, 59, 0.14);
+      background: var(--panel);
+    }
 
-            .output pre {
-                white-space: pre-wrap;
-                word-break: break-word;
-                background-color: #2d2d2d;
-                color: #f8f8f2;
-                padding: 15px;
-                border-radius: 4px;
-                overflow-x: auto;
-                min-height: 300px;
-                font-family: "Courier New", monospace;
-                font-size: 14px;
-            }
+    .stat .label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
 
-            .examples {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 15px;
-                margin-top: 20px;
-            }
+    .stat .value {
+      font-family: var(--mono);
+      font-size: 24px;
+      font-weight: 700;
+    }
 
-            .example {
-                flex: 1;
-                min-width: 250px;
-                padding: 15px;
-                background-color: #f0f7ff;
-                border-left: 4px solid var(--secondary-color);
-                border-radius: 4px;
-            }
+    .toolbar-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
 
-            .example h3 {
-                margin-bottom: 10px;
-                color: var(--secondary-color);
-            }
+    .tool-tab {
+      min-width: 180px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border: 1px solid rgba(126, 97, 59, 0.14);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+    }
 
-            .example code {
-                background-color: #e8f4ff;
-                padding: 2px 4px;
-                border-radius: 3px;
-                font-family: "Courier New", monospace;
-                display: block;
-                white-space: pre-wrap;
-                margin: 10px 0;
-            }
+    .tool-tab small {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 500;
+    }
 
-            .example-btn {
-                background-color: var(--warning-color);
-                color: white;
-                padding: 5px 10px;
-                font-size: 0.8rem;
-                margin-top: 5px;
-            }
+    .tool-tab.active {
+      background: linear-gradient(135deg, rgba(180, 85, 54, 0.12), rgba(44, 117, 114, 0.12));
+      box-shadow: 0 12px 24px rgba(64, 48, 30, 0.1);
+    }
 
-            .example-btn:hover {
-                background-color: #e67e22;
-            }
+    .tool-panel {
+      display: none;
+      animation: fade 0.22s ease;
+    }
 
-            .info-box {
-                margin-top: 20px;
-                padding: 15px;
-                background-color: #fff8e1;
-                border-left: 4px solid var(--warning-color);
-                border-radius: 4px;
-            }
+    .tool-panel.active {
+      display: block;
+    }
 
-            @media (max-width: 768px) {
-                .app-container {
-                    flex-direction: column;
-                }
+    .panel {
+      overflow: hidden;
+    }
 
-                .examples {
-                    flex-direction: column;
-                }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <header>
-                <h1>Rust Struct Getter/Setter Generator</h1>
-                <p class="description">
-                    Input your Rust struct definition, and the system will automatically generate corresponding getter and setter methods.
-                    Supports standard structs and structs with named fields, properly handles Option types.
-                </p>
-            </header>
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
 
-            <div class="app-container">
-                <div class="input-section">
-                    <div class="section-title">
-                        <span>Input Struct Definition</span>
-                    </div>
-                    <textarea
-                        id="structInput"
-                        placeholder="Example:
-struct Person {
-    name: String,
-    age: u32,
-    email: Option<String>,
-}"
-                    ></textarea>
-                    <div class="actions">
-                        <button id="generateBtn" class="generate-btn">
-                            Generate Getter/Setter
-                        </button>
-                    </div>
+    .panel-head h2 {
+      margin: 0;
+      font-size: 22px;
+    }
 
-                    <div class="examples">
-                        <div class="example">
-                            <h3>Example 1: Basic Types</h3>
-                            <code
-                                >struct User { id: u64, username: String,
-                                active: bool, }</code
-                            >
-                            <button class="example-btn" data-example="1">
-                                Use This Example
-                            </button>
-                        </div>
+    .panel-head p,
+    .card span,
+    .toggle span {
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 13px;
+    }
 
-                        <div class="example">
-                            <h3>Example 2: With Option Types</h3>
-                            <code
-                                >struct Person { name: String, age: u32, email:
-                                Option&lt;String&gt;, phone:
-                                Option&lt;String&gt;, }</code
-                            >
-                            <button class="example-btn" data-example="2">
-                                Use This Example
-                            </button>
-                        </div>
+    .field {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 10px;
+      min-width: 0;
+    }
 
-                        <div class="example">
-                            <h3>Example 3: Complex Types</h3>
-                            <code
-                                >struct Product { id: u32, name: String, price:
-                                f64, category: Option&lt;String&gt;, tags:
-                                Vec&lt;String&gt;, }</code
-                            >
-                            <button class="example-btn" data-example="3">
-                                Use This Example
-                            </button>
-                        </div>
-                    </div>
+    label,
+    .card strong,
+    .toggle strong,
+    .result-label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
 
-                    <div class="info-box">
-                        <h3>Features</h3>
-                        <ul>
-                            <li>Supports standard Rust struct syntax</li>
-                            <li>
-                                Properly handles Option&lt;String&gt; types, getter returns Option&lt;&str&gt;
-                            </li>
-                            <li>
-                                For Option types, setter accepts inner type instead of Option wrapper
-                            </li>
-                            <li>Generated code follows Rust naming conventions and best practices</li>
-                        </ul>
-                    </div>
+    textarea,
+    input[type="text"],
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--ink);
+      font: inherit;
+      padding: 14px 15px;
+    }
+
+    textarea {
+      min-height: 300px;
+      height: clamp(460px, 68vh, 920px);
+      resize: vertical;
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .short-area {
+      min-height: 170px;
+      height: 170px;
+    }
+
+    textarea:focus,
+    input[type="text"]:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--teal);
+      box-shadow: 0 0 0 4px rgba(44, 117, 114, 0.12);
+    }
+
+    .code-output {
+      min-height: 300px;
+      height: clamp(460px, 68vh, 920px);
+      overflow: auto;
+      border-radius: 16px;
+      border: 1px solid #2e241c;
+      background: linear-gradient(180deg, #15120f, #241d18);
+      color: var(--code-fg);
+      padding: 18px;
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.72;
+    }
+
+    .toggle {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .toggle input {
+      width: auto;
+      margin-top: 4px;
+      accent-color: var(--brand);
+    }
+
+    .mono {
+      font-family: var(--mono);
+    }
+
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .sample-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    button.action {
+      border: none;
+      border-radius: 999px;
+      padding: 13px 16px;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+    }
+
+    .primary {
+      background: linear-gradient(135deg, var(--brand), #cf7a43);
+      color: #fffaf4;
+    }
+
+    .secondary {
+      background: linear-gradient(135deg, var(--teal), #4f8a87);
+      color: #f3fffd;
+    }
+
+    .ghost {
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--ink);
+      border: 1px solid rgba(126, 97, 59, 0.14);
+    }
+
+    button.action:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      filter: saturate(0.7);
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 30;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(12px);
+      transition: all 0.22s ease;
+      padding: 12px 16px;
+      border-radius: 14px;
+      color: #fff;
+      background: rgba(33, 41, 48, 0.92);
+      box-shadow: 0 18px 40px rgba(30, 33, 38, 0.24);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.success {
+      background: rgba(47, 125, 86, 0.94);
+    }
+
+    .toast.error {
+      background: rgba(156, 50, 38, 0.95);
+    }
+
+    @keyframes fade {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1100px) {
+      .tool-layout,
+      .grid-2,
+      .tool-row.two {
+        grid-template-columns: 1fr;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .page { padding: 14px 10px 28px; }
+      .hero,
+      .toolbar,
+      .panel-inner { padding: 18px; }
+      .stats,
+      .actions { grid-template-columns: 1fr; }
+      .tool-tab { width: 100%; }
+      textarea,
+      .code-output { height: 420px; }
+      .short-area { height: 170px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="toolbar">
+      <div class="toolbar-nav">
+        <button class="tool-tab active" type="button" data-tool="struct">
+          <span>常用工具</span>
+          <small>Getter / Setter / Builder</small>
+        </button>
+        <button class="tool-tab" type="button" data-tool="json">
+          <span>JSON</span>
+          <small>Struct 转 JSON / JSON 转 Rust</small>
+        </button>
+        <button class="tool-tab" type="button" data-tool="crypto">
+          <span>加解密</span>
+          <small>Base64 / MD5 / SHA / URL</small>
+        </button>
+        <button class="tool-tab" type="button" data-tool="snake">
+          <span>文本工具</span>
+          <small>Snake Case / 文件名 / 模块名</small>
+        </button>
+      </div>
+      <div class="subtle" style="padding-top:8px">点击顶部标签切换功能区，不再需要滚动整页找工具。</div>
+    </section>
+
+    <section class="tool-panel active" data-tool-panel="struct">
+      <div class="tool-layout">
+        <div class="stack">
+          <article class="panel">
+            <div class="panel-inner">
+              <div class="panel-head">
+                <div>
+                  <h2>Struct Generator</h2>
+                  <p>生成 getter、setter、链式 setter、Option clear 和 builder 代码。</p>
                 </div>
+                <span class="badge">Code</span>
+              </div>
 
-                <div class="output-section">
-                    <div class="section-title">
-                        <span>Generated Code</span>
-                        <button id="copyBtn" class="copy-btn">Copy Code</button>
-                    </div>
-                    <div class="output">
-                        <pre id="outputCode">Generated code will appear here...</pre>
-                    </div>
-
-                    <div class="info-box">
-                        <h3>Generation Rules</h3>
-                        <ul>
-                            <li>
-                                For <code>String</code> fields: getter returns <code
-                                    >&str</code
-                                >
-                            </li>
-                            <li>
-                                For <code>Option&lt;String&gt;</code> fields: getter returns <code
-                                    >Option&lt;&str&gt;</code
-                                >
-                            </li>
-                            <li>
-                                For <code>Option&lt;T&gt;</code> fields: setter accepts <code>T</code> type parameter
-                            </li>
-                            <li>
-                                All getter methods return references, setter methods accept ownership or references
-                            </li>
-                        </ul>
-                    </div>
+              <div class="grid-2">
+                <div class="field">
+                  <label for="structInput">Struct 输入</label>
+                  <textarea id="structInput" spellcheck="false"></textarea>
                 </div>
+                <div class="field">
+                  <label for="structOutput">生成结果</label>
+                  <pre id="structOutput" class="code-output">等待生成结果...</pre>
+                </div>
+              </div>
+
+              <div class="grid-2" style="margin-top:14px">
+                <label class="toggle">
+                  <input type="checkbox" id="optionGetter" checked />
+                  <span><strong>生成 Getter</strong>输出 <code>get_xxx</code></span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="optionSetter" checked />
+                  <span><strong>生成 Setter</strong>输出 <code>set_xxx</code></span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="optionChain" checked />
+                  <span><strong>链式 Setter</strong>输出 <code>with_xxx</code></span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="optionClear" checked />
+                  <span><strong>Option Clear</strong>为 <code>Option&lt;T&gt;</code> 生成 <code>clear_xxx</code></span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="optionBuilder" checked />
+                  <span><strong>生成 Builder</strong>输出 <code>StructNameBuilder</code></span>
+                </label>
+              </div>
+
+              <div class="actions">
+                <button id="generateBtn" class="action primary" type="button">立即生成</button>
+                <button id="copyStructBtn" class="action secondary" type="button">复制代码</button>
+                <button id="sampleStructBtn" class="action ghost" type="button">切换示例</button>
+                <button id="clearStructBtn" class="action ghost" type="button">清空输入</button>
+              </div>
+
+              <div class="status-row">
+                <span class="pill mono" id="structStatus">状态: 等待输入</span>
+                <span class="pill mono" id="fieldSummary">字段: 0</span>
+                <span class="pill mono" id="optionSummary">选项: getter / setter / chain / clear / builder</span>
+              </div>
             </div>
+          </article>
         </div>
 
-        <script>
-            document.addEventListener("DOMContentLoaded", function () {
-                const structInput = document.getElementById("structInput");
-                const generateBtn = document.getElementById("generateBtn");
-                const copyBtn = document.getElementById("copyBtn");
-                const outputCode = document.getElementById("outputCode");
-                const exampleBtns = document.querySelectorAll(".example-btn");
+        <div class="stack">
+          <article class="panel">
+            <div class="panel-inner">
+              <div class="panel-head">
+                <div>
+                  <h2>示例 Struct</h2>
+                  <p>快速填入不同风格的 Rust struct。</p>
+                </div>
+              </div>
+              <div class="sample-list">
+                <button class="action ghost struct-sample" type="button" data-key="person">用户资料</button>
+                <button class="action ghost struct-sample" type="button" data-key="order">订单快照</button>
+                <button class="action ghost struct-sample" type="button" data-key="generic">泛型封装</button>
+              </div>
+            </div>
+          </article>
 
-                // Example structs
-                const examples = {
-                    1: `struct User {
-    id: u64,
-    username: String,
-    active: bool,
+          <article class="panel">
+            <div class="panel-inner">
+              <div class="panel-head">
+                <div>
+                  <h2>说明</h2>
+                  <p>这里的 builder 会为非 Option 字段做必填校验，Option 字段默认允许留空。</p>
+                </div>
+              </div>
+              <div class="card">
+                <strong>报错根因</strong>
+                <span>之前脚本在刷新统计信息时直接访问了 <code>statStructName</code>、<code>statFieldCount</code>、<code>statMethodCount</code>、<code>statSnakeValue</code>，但页面不完整时这些节点不存在，所以一执行就触发 <code>Cannot set properties of null</code>。</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="tool-panel" data-tool-panel="json">
+      <div class="tool-row two">
+        <article class="panel">
+          <div class="panel-inner">
+            <div class="panel-head">
+              <div>
+                <h2>Struct To JSON</h2>
+                <p>把 Rust struct 字段转换成 JSON 模板，可选插入 mock 数据。</p>
+              </div>
+              <span class="badge">JSON</span>
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <label for="jsonStructInput">Struct 输入</label>
+                <textarea id="jsonStructInput" spellcheck="false"></textarea>
+              </div>
+              <div class="field">
+                <label for="jsonOutput">JSON 输出</label>
+                <pre id="jsonOutput" class="code-output">等待生成 JSON...</pre>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-top:14px">
+              <label class="toggle">
+                <input type="checkbox" id="jsonMock" checked />
+                <span><strong>插入 Mock 数据</strong>字符串、数字、布尔值和数组会填入示例值</span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="jsonPretty" checked />
+                <span><strong>格式化输出</strong>输出带缩进的 JSON</span>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button id="generateJsonBtn" class="action primary" type="button">生成 JSON</button>
+              <button id="copyJsonBtn" class="action secondary" type="button">复制 JSON</button>
+              <button id="syncStructBtn" class="action ghost" type="button">从 Struct 同步</button>
+              <button id="sampleJsonBtn" class="action ghost" type="button">填入示例</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-inner">
+            <div class="panel-head">
+              <div>
+                <h2>JSON To Rust Struct</h2>
+                <p>从 JSON 反推 Rust struct，默认自动补全 serde 序列化和反序列化宏。</p>
+              </div>
+              <span class="badge">Serde</span>
+            </div>
+
+            <div class="field" style="margin-bottom:14px">
+              <label for="jsonRootName">根结构体名</label>
+              <input id="jsonRootName" type="text" value="AutoGenerated" />
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <label for="jsonToStructInput">JSON 输入</label>
+                <textarea id="jsonToStructInput" spellcheck="false"></textarea>
+              </div>
+              <div class="field">
+                <label for="jsonRustOutput">Rust 输出</label>
+                <pre id="jsonRustOutput" class="code-output">等待 JSON 转换结果...</pre>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-top:14px">
+              <label class="toggle">
+                <input type="checkbox" id="jsonSerde" checked disabled />
+                <span><strong>固定启用 Serde 宏</strong>输出 <code>use serde::{Deserialize, Serialize};</code> 与序列化/反序列化 derive</span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="jsonRename" checked />
+                <span><strong>添加 Rename</strong>当 JSON key 与 Rust 字段名不同步时生成 <code>#[serde(rename = "...")]</code></span>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button id="generateRustBtn" class="action primary" type="button">生成 Rust</button>
+              <button id="copyRustBtn" class="action secondary" type="button">复制 Rust</button>
+              <button id="sampleJsonToRustBtn" class="action ghost" type="button">填入示例 JSON</button>
+              <button id="clearJsonToRustBtn" class="action ghost" type="button">清空 JSON</button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="tool-panel" data-tool-panel="crypto">
+      <div class="tool-row two">
+        <article class="panel">
+          <div class="panel-inner">
+            <div class="panel-head">
+              <div>
+                <h2>加解密工具</h2>
+                <p>支持 Base64、MD5、SHA-1、SHA-256、URL 编码。哈希算法只能生成摘要，不能反向解密。</p>
+              </div>
+              <span class="badge">Crypto</span>
+            </div>
+
+            <div class="field" style="margin-bottom:14px">
+              <label for="cryptoMode">算法</label>
+              <select id="cryptoMode">
+                <option value="base64">Base64</option>
+                <option value="md5">MD5</option>
+                <option value="sha1">SHA-1</option>
+                <option value="sha256">SHA-256</option>
+                <option value="url">URL Encode</option>
+              </select>
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <label for="cryptoInput">输入文本</label>
+                <textarea id="cryptoInput" spellcheck="false"></textarea>
+              </div>
+              <div class="field">
+                <label for="cryptoOutput">输出结果</label>
+                <pre id="cryptoOutput" class="code-output">等待加密或解密...</pre>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="encryptBtn" class="action primary" type="button">加密 / 编码</button>
+              <button id="decryptBtn" class="action secondary" type="button">解密 / 还原</button>
+              <button id="copyCryptoBtn" class="action ghost" type="button">复制结果</button>
+              <button id="clearCryptoBtn" class="action ghost" type="button">清空</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-inner">
+            <div class="panel-head">
+              <div>
+                <h2>快速示例</h2>
+                <p>切换算法后可直接尝试同一段文本，也可以手动输入任意内容。</p>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div class="card">
+                <strong>默认示例</strong>
+                <span id="cryptoHint">Base64 和 URL 支持双向转换；MD5、SHA-1、SHA-256 只支持摘要生成。</span>
+              </div>
+              <div class="sample-list">
+                <button id="sampleCryptoTextBtn" class="action ghost" type="button">填入示例文本</button>
+                <button id="sampleCryptoBase64Btn" class="action ghost" type="button">填入 Base64 示例</button>
+                <button id="sampleCryptoUrlBtn" class="action ghost" type="button">填入 URL 示例</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="tool-panel" data-tool-panel="snake">
+      <div class="tool-row two">
+        <article class="panel">
+          <div class="panel-inner">
+            <div class="panel-head">
+              <div>
+                <h2>Snake Case 工具</h2>
+                <p>把标题、模块名、路径名统一转换成 Rust 常用命名。</p>
+              </div>
+              <span class="badge">Text</span>
+            </div>
+
+            <div class="field">
+              <label for="snakeInput">输入文本</label>
+              <textarea id="snakeInput" class="short-area" spellcheck="false"></textarea>
+            </div>
+
+            <div class="actions">
+              <button id="copySnakeBtn" class="action secondary" type="button">复制 Snake</button>
+              <button id="sampleSnakeBtn" class="action ghost" type="button">示例文本</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-inner">
+            <div class="panel-head">
+              <div>
+                <h2>转换结果</h2>
+                <p>同步给出字段名、文件名、模块声明和路径片段。</p>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div class="card">
+                <strong class="result-label">snake_case</strong>
+                <div id="snakeResult" class="mono">snake_case</div>
+              </div>
+              <div class="card">
+                <strong class="result-label">文件名</strong>
+                <div id="fileResult" class="mono">snake_case.rs</div>
+              </div>
+              <div class="card">
+                <strong class="result-label">模块声明</strong>
+                <div id="moduleResult" class="mono">pub mod snake_case;</div>
+              </div>
+              <div class="card">
+                <strong class="result-label">路径片段</strong>
+                <div id="segmentResult" class="mono">snake/case</div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const samples = {
+      struct: {
+        person: `pub struct Person {
+    pub id: u64,
+    pub user_name: String,
+    pub active: bool,
+    pub nick_name: Option<String>,
+    pub tags: Vec<String>,
 }`,
-                    2: `struct Person {
-    name: String,
-    age: u32,
-    email: Option<String>,
-    phone: Option<String>,
+        order: `pub struct OrderSnapshot {
+    pub order_id: String,
+    pub total_amount: f64,
+    pub paid: bool,
+    pub remark: Option<String>,
+    pub items: Vec<String>,
 }`,
-                    3: `struct Product {
-    id: u32,
-    name: String,
-    price: f64,
-    category: Option<String>,
-    tags: Vec<String>,
+        generic: `pub struct ApiEnvelope<T> {
+    pub code: i32,
+    pub message: String,
+    pub data: T,
+    pub trace_id: Option<String>,
+}`
+      },
+      json: `{
+  "userId": 1,
+  "userName": "alice",
+  "active": true,
+  "profile": {
+    "avatarUrl": "https://example.com/avatar.png",
+    "age": 18
+  },
+  "tags": ["rust", "serde"]
 }`,
-                };
+      snake: "User Profile Cache Key",
+      cryptoText: "hello rust helper",
+      cryptoBase64: "aGVsbG8gcnVzdCBoZWxwZXI=",
+      cryptoUrl: "https%3A%2F%2Fexample.com%2Fapi%3Fuser%3Dalice%26page%3D1"
+    };
 
-                // Set initial example
-                structInput.value = examples[2];
+    const rustKeywords = new Set([
+      "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn",
+      "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
+      "ref", "return", "self", "Self", "static", "struct", "super", "trait", "true", "type",
+      "unsafe", "use", "where", "while", "async", "await", "dyn"
+    ]);
 
-                // Example button events
-                exampleBtns.forEach((btn) => {
-                    btn.addEventListener("click", function () {
-                        const exampleId = this.getAttribute("data-example");
-                        structInput.value = examples[exampleId];
-                        generateBtn.click();
-                    });
-                });
+    let toastTimer = null;
+    let sampleIndex = 0;
 
-                // Generate getter/setter
-                generateBtn.addEventListener("click", function () {
-                    const input = structInput.value.trim();
-                    if (!input) {
-                        outputCode.textContent = "Please enter a valid Rust struct definition.";
-                        return;
-                    }
+    function $(id) {
+      return document.getElementById(id);
+    }
 
-                    try {
-                        const result = parseRustStruct(input);
-                        outputCode.textContent = result;
-                    } catch (error) {
-                        outputCode.textContent = `Error: ${error.message}`;
-                    }
-                });
+    function setText(id, value) {
+      const node = $(id);
+      if (node) {
+        node.textContent = value;
+      }
+    }
 
-                // Copy code
-                copyBtn.addEventListener("click", function () {
-                    const text = outputCode.textContent;
-                    if (text && text !== "Generated code will appear here...") {
-                        navigator.clipboard.writeText(text).then(() => {
-                            copyBtn.textContent = "Copied!";
-                            copyBtn.classList.add("copied");
-                            setTimeout(() => {
-                                copyBtn.textContent = "Copy Code";
-                                copyBtn.classList.remove("copied");
-                            }, 2000);
-                        });
-                    }
-                });
+    function setCode(id, value) {
+      const node = $(id);
+      if (node) {
+        node.textContent = value;
+      }
+    }
 
-                // Parse Rust struct and generate getter/setter
-                function parseRustStruct(input) {
-                    // Remove comments
-                    let cleanedInput = input.replace(/\/\/.*$/gm, "");
+    function showToast(message, type = "success") {
+      const toast = $("toast");
+      if (!toast) {
+        return;
+      }
+      toast.textContent = message;
+      toast.className = `toast show ${type}`;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.className = "toast";
+      }, 1800);
+    }
 
-                    // Match struct definition
-                    const structMatch = cleanedInput.match(
-                        /struct\s+(\w+)\s*\{([^}]+)\}/,
-                    );
-                    if (!structMatch) {
-                        throw new Error("No valid struct definition found");
-                    }
+    async function copyText(text, successText) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const helper = document.createElement("textarea");
+          helper.value = text;
+          document.body.appendChild(helper);
+          helper.select();
+          document.execCommand("copy");
+          helper.remove();
+        }
+        showToast(successText);
+      } catch (error) {
+        showToast(`复制失败: ${error.message}`, "error");
+      }
+    }
 
-                    const structName = structMatch[1];
-                    const fieldsText = structMatch[2];
+    function activateTab(name) {
+      document.querySelectorAll(".tool-tab").forEach((button) => {
+        button.classList.toggle("active", button.dataset.tool === name);
+      });
+      document.querySelectorAll(".tool-panel").forEach((panel) => {
+        panel.classList.toggle("active", panel.dataset.toolPanel === name);
+      });
+    }
 
-                    // Parse fields
-                    const fieldRegex = /(\w+)\s*:\s*([^,]+)/g;
-                    const fields = [];
-                    let match;
+    function toSnakeCase(input) {
+      const raw = String(input || "").trim();
+      if (!raw) {
+        return "snake_case";
+      }
 
-                    while ((match = fieldRegex.exec(fieldsText)) !== null) {
-                        fields.push({
-                            name: match[1],
-                            type: match[2].trim(),
-                        });
-                    }
+      const normalized = raw
+        .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+        .replace(/['"`]/g, "")
+        .replace(/[^A-Za-z0-9]+/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .toLowerCase();
 
-                    if (fields.length === 0) {
-                        throw new Error("No valid fields found");
-                    }
+      if (!normalized) {
+        return "snake_case";
+      }
 
-                    // Generate code
-                    let result = `// Generated Getter/Setter methods for ${structName} struct\n\n`;
-                    result += `impl ${structName} {\n`;
+      const safe = /^[0-9]/.test(normalized) ? `field_${normalized}` : normalized;
+      return rustKeywords.has(safe) ? `${safe}_field` : safe;
+    }
 
-                    // Generate getter methods
-                    fields.forEach((field) => {
-                        // Method name: get_field_name
-                        const methodName = `get_${field.name}`;
+    function toPascalCase(input) {
+      const snake = toSnakeCase(input);
+      return snake
+        .split("_")
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join("") || "AutoGenerated";
+    }
 
-                        // Handle return type
-                        let returnType = field.type;
+    function isPlainObject(value) {
+      return Object.prototype.toString.call(value) === "[object Object]";
+    }
 
-                        const num_values = [
-                            "u8",
-                            "u16",
-                            "u32",
-                            "u64",
-                            "u128",
-                            "usize",
-                            "i8",
-                            "i16",
-                            "i32",
-                            "i64",
-                            "i128",
-                            "isize",
-                            "f32",
-                            "f64",
-                            "bool",
-                        ];
+    function extractOptionInner(typeText) {
+      const trimmed = typeText.trim();
+      const match = trimmed.match(/^Option\s*<\s*(.+)\s*>$/);
+      return match ? match[1].trim() : null;
+    }
 
-                        if (num_values.includes(returnType)) {
-                            returnType = `${returnType}`;
-                        }
-                        // Handle Option<String> -> Option<&str>
-                        else if (returnType === "Option<String>") {
-                            returnType = "Option<&str>";
-                        }
-                        // Handle Option<Type> -> Option<&Type>
-                        else if (
-                            returnType.startsWith("Option<") &&
-                            returnType.endsWith(">")
-                        ) {
-                            const innerType = returnType.slice(7, -1);
+    function splitStructBodyFields(body) {
+      return body
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\/\/.*$/, "").trim())
+        .filter(Boolean);
+    }
 
+    function parseRustStruct(source) {
+      const match = source.match(/(?:pub\s+)?struct\s+([A-Za-z_][A-Za-z0-9_]*)(\s*<[^>{]+>)?\s*\{([\s\S]*?)\}/m);
+      if (!match) {
+        throw new Error("未识别到 Rust struct，请确认输入格式正确。");
+      }
 
-                            if (num_values.includes(innerType)) {
-                                returnType = `Option<${innerType}>`;
-                            } else {
-                                returnType = `Option<&${innerType}>`;
-                            }
-                        }
-                        // Handle String -> &str
-                        else if (returnType === "String") {
-                            returnType = "&str";
-                        }
-                        // Other types return reference
-                        else {
-                            returnType = `&${returnType}`;
-                        }
+      const name = match[1];
+      const generics = (match[2] || "").trim();
+      const body = match[3];
+      const lines = splitStructBodyFields(body);
+      const fields = [];
+      let attrs = [];
 
-                        result += `    pub fn ${methodName}(&self) -> ${returnType} {\n`;
+      lines.forEach((line) => {
+        if (line.startsWith("#[")) {
+          attrs.push(line);
+          return;
+        }
 
-                        // Generate method body
+        const normalizedLine = line.endsWith(",") ? line.slice(0, -1).trim() : line;
+        const fieldMatch = normalizedLine.match(/^(?:pub\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+)$/);
+        if (!fieldMatch) {
+          return;
+        }
 
-                         if (field.type === "Option<String>") {
-                            result += `        self.${field.name}.as_deref()\n`;
-                        } else if (
-                            field.type.startsWith("Option<") &&
-                            field.type.endsWith(">")
-                        ) {
-                            const innerType = returnType.slice(7, -1);
+        fields.push({
+          name: fieldMatch[1],
+          type: fieldMatch[2].trim(),
+          attrs: attrs.slice()
+        });
+        attrs = [];
+      });
 
-                            if (num_values.includes(innerType)) {
-                                result += `        self.${field.name}\n`;
-                            } else {
-                                result += `        self.${field.name}.as_ref()\n`;
-                            }
-                        } else if (field.type === "String") {
-                            result += `        &self.${field.name}\n`;
-                        } else {
-                            if (num_values.includes(field.type)) {
-                              result += `        self.${field.name}\n`;
-                            }
-                            else {
-                              result += `        &self.${field.name}\n`;
-                            }
-                        }
+      if (!fields.length) {
+        throw new Error("识别到了 struct，但没有解析到字段。");
+      }
 
-                        result += `    }\n\n`;
-                    });
+      return {
+        name,
+        generics,
+        typeName: `${name}${generics}`,
+        implGenerics: generics || "",
+        builderTypeName: `${name}Builder${generics}`,
+        fields
+      };
+    }
 
-                    // Generate setter methods
-                    fields.forEach((field) => {
-                        // Method name: set_field_name
-                        const methodName = `set_${field.name}`;
+    function generateStructCode(parsed, options) {
+      const blocks = [];
+      const implHeader = `impl${parsed.implGenerics} ${parsed.typeName} {`;
+      const implLines = [];
 
-                        // Parameter type
-                        let paramType = field.type;
+      if (options.getter) {
+        parsed.fields.forEach((field) => {
+          implLines.push(
+            `    pub fn get_${field.name}(&self) -> &${field.type} {`,
+            `        &self.${field.name}`,
+            "    }",
+            ""
+          );
+        });
+      }
 
-                        // Handle Option<T> -> T
-                        if (
-                            paramType.startsWith("Option<") &&
-                            paramType.endsWith(">")
-                        ) {
-                            paramType = paramType.slice(7, -1);
-                        }
+      if (options.setter) {
+        parsed.fields.forEach((field) => {
+          implLines.push(
+            `    pub fn set_${field.name}(&mut self, value: ${field.type}) {`,
+            `        self.${field.name} = value;`,
+            "    }",
+            ""
+          );
+        });
+      }
 
-                        result += `    pub fn ${methodName}(&mut self, ${field.name}: ${paramType}) {\n`;
+      if (options.chain) {
+        parsed.fields.forEach((field) => {
+          implLines.push(
+            `    pub fn with_${field.name}(&mut self, value: ${field.type}) -> &mut Self {`,
+            `        self.${field.name} = value;`,
+            "        self",
+            "    }",
+            ""
+          );
+        });
+      }
 
-                        // Generate method body
-                        if (
-                            field.type.startsWith("Option<") &&
-                            field.type.endsWith(">")
-                        ) {
-                            result += `        self.${field.name} = Some(${field.name});\n`;
-                        } else {
-                            result += `        self.${field.name} = ${field.name};\n`;
-                        }
+      if (options.clear) {
+        parsed.fields.forEach((field) => {
+          if (extractOptionInner(field.type)) {
+            implLines.push(
+              `    pub fn clear_${field.name}(&mut self) {`,
+              `        self.${field.name} = None;`,
+              "    }",
+              ""
+            );
+          }
+        });
+      }
 
-                        result += `    }\n\n`;
-                    });
+      if (options.builder) {
+        implLines.push(
+          `    pub fn builder() -> ${parsed.builderTypeName} {`,
+          `        ${parsed.builderTypeName}::new()`,
+          "    }",
+          ""
+        );
+      }
 
-                    // Generate convenience setters for Option types (set to None)
-                    fields.forEach((field) => {
-                        if (
-                            field.type.startsWith("Option<") &&
-                            field.type.endsWith(">")
-                        ) {
-                            const methodName = `clear_${field.name}`;
-                            result += `    pub fn ${methodName}(&mut self) {\n`;
-                            result += `        self.${field.name} = None;\n`;
-                            result += `    }\n\n`;
-                        }
-                    });
+      if (implLines.length) {
+        blocks.push(implHeader, ...implLines, "}");
+      }
 
-                    result += "}";
+      if (options.builder) {
+        const builderFields = parsed.fields.map((field) => {
+          const inner = extractOptionInner(field.type);
+          const builderFieldType = inner ? `Option<${inner}>` : `Option<${field.type}>`;
+          return `    ${field.name}: ${builderFieldType},`;
+        });
 
-                    return result;
-                }
+        const builderSetters = parsed.fields.flatMap((field) => {
+          const inner = extractOptionInner(field.type);
+          const argType = inner || field.type;
+          return [
+            `    pub fn ${field.name}(mut self, value: ${argType}) -> Self {`,
+            `        self.${field.name} = Some(value);`,
+            "        self",
+            "    }",
+            ""
+          ];
+        });
 
-                // Generate once on initial load
-                generateBtn.click();
-            });
-        </script>
-    </body>
+        const buildFields = parsed.fields.map((field) => {
+          if (extractOptionInner(field.type)) {
+            return `            ${field.name}: self.${field.name},`;
+          }
+          return `            ${field.name}: self.${field.name}.ok_or_else(|| "field \`${field.name}\` is required".to_string())?,`;
+        });
+
+        blocks.push(
+          "",
+          "#[derive(Debug, Default, Clone)]",
+          `pub struct ${parsed.builderTypeName} {`,
+          ...builderFields,
+          "}",
+          "",
+          `impl${parsed.implGenerics} ${parsed.builderTypeName} {`,
+          "    pub fn new() -> Self {",
+          "        Self::default()",
+          "    }",
+          "",
+          ...builderSetters,
+          `    pub fn build(self) -> Result<${parsed.typeName}, String> {`,
+          `        Ok(${parsed.typeName} {`,
+          ...buildFields,
+          "        })",
+          "    }",
+          "}"
+        );
+      }
+
+      return blocks.join("\n").trim() || "// 当前未选择任何生成功能";
+    }
+
+    function primitiveMockValue(typeName, includeMock) {
+      const raw = typeName.replace(/\s+/g, "");
+      if (/^(String|&str|str)$/.test(raw)) {
+        return includeMock ? "mock_text" : "";
+      }
+      if (/^(char)$/.test(raw)) {
+        return includeMock ? "a" : "";
+      }
+      if (/^(bool)$/.test(raw)) {
+        return includeMock ? true : false;
+      }
+      if (/^(u|i)(8|16|32|64|128|size)$/.test(raw)) {
+        return includeMock ? 1 : 0;
+      }
+      if (/^(f32|f64)$/.test(raw)) {
+        return includeMock ? 1.0 : 0.0;
+      }
+      return null;
+    }
+
+    function mockValueForType(typeName, includeMock) {
+      const optional = extractOptionInner(typeName);
+      if (optional) {
+        return includeMock ? mockValueForType(optional, true) : null;
+      }
+
+      const primitive = primitiveMockValue(typeName, includeMock);
+      if (primitive !== null) {
+        return primitive;
+      }
+
+      const vecMatch = typeName.match(/^Vec\s*<\s*(.+)\s*>$/);
+      if (vecMatch) {
+        return includeMock ? [mockValueForType(vecMatch[1].trim(), true)] : [];
+      }
+
+      if (/^(HashMap|BTreeMap)\s*</.test(typeName.trim())) {
+        return includeMock ? { key: "value" } : {};
+      }
+
+      return includeMock ? { note: typeName.trim() } : {};
+    }
+
+    function buildStructJson(parsed, includeMock) {
+      const result = {};
+      parsed.fields.forEach((field) => {
+        result[field.name] = mockValueForType(field.type, includeMock);
+      });
+      return result;
+    }
+
+    function mergeObjectArray(items) {
+      const merged = {};
+      items.forEach((item) => {
+        Object.entries(item).forEach(([key, value]) => {
+          if (!(key in merged) || merged[key] === null) {
+            merged[key] = value;
+          }
+        });
+      });
+      return merged;
+    }
+
+    function inferPrimitiveRustType(value) {
+      if (typeof value === "string") {
+        return "String";
+      }
+      if (typeof value === "boolean") {
+        return "bool";
+      }
+      if (typeof value === "number") {
+        return Number.isInteger(value) ? "i64" : "f64";
+      }
+      return "serde_json::Value";
+    }
+
+    function buildRustFromJson(data, rootName, options) {
+      const definitions = [];
+      const usedNames = new Set();
+
+      function nextName(base) {
+        const seed = toPascalCase(base || "AutoGenerated");
+        let candidate = seed;
+        let index = 2;
+        while (usedNames.has(candidate)) {
+          candidate = `${seed}${index}`;
+          index += 1;
+        }
+        usedNames.add(candidate);
+        return candidate;
+      }
+
+      function inferType(value, hint) {
+        if (value === null) {
+          return "Option<serde_json::Value>";
+        }
+
+        if (Array.isArray(value)) {
+          if (!value.length) {
+            return "Vec<serde_json::Value>";
+          }
+
+          const nonNull = value.filter((item) => item !== null);
+          if (!nonNull.length) {
+            return "Vec<Option<serde_json::Value>>";
+          }
+
+          if (nonNull.every(isPlainObject)) {
+            const merged = mergeObjectArray(nonNull);
+            const itemName = defineStruct(merged, `${hint}Item`);
+            return `Vec<${itemName}>`;
+          }
+
+          const primitiveKinds = new Set(nonNull.map((item) => Array.isArray(item) ? "array" : typeof item));
+          if (primitiveKinds.size === 1 && !primitiveKinds.has("object") && !primitiveKinds.has("array")) {
+            let arrayType = inferPrimitiveRustType(nonNull[0]);
+            if (primitiveKinds.has("number") && nonNull.some((item) => !Number.isInteger(item))) {
+              arrayType = "f64";
+            }
+            return `Vec<${arrayType}>`;
+          }
+
+          return "Vec<serde_json::Value>";
+        }
+
+        if (isPlainObject(value)) {
+          return defineStruct(value, hint);
+        }
+
+        return inferPrimitiveRustType(value);
+      }
+
+      function defineStruct(objectValue, preferredName) {
+        const structName = nextName(preferredName);
+        const fields = Object.entries(objectValue).map(([originalKey, value]) => {
+          const fieldName = toSnakeCase(originalKey);
+          return {
+            originalKey,
+            fieldName,
+            rustType: inferType(value, `${structName}${toPascalCase(originalKey)}`)
+          };
+        });
+        definitions.push({ name: structName, fields });
+        return structName;
+      }
+
+      let rootAlias = "";
+      if (isPlainObject(data)) {
+        defineStruct(data, rootName);
+      } else if (Array.isArray(data)) {
+        const aliasName = nextName(rootName);
+        rootAlias = `pub type ${aliasName} = ${inferType(data, `${aliasName}Item`)};`;
+      } else {
+        const aliasName = nextName(rootName);
+        rootAlias = `pub type ${aliasName} = ${inferType(data, aliasName)};`;
+      }
+
+      const lines = [];
+      if (options.serde) {
+        lines.push("use serde::{Deserialize, Serialize};", "");
+      }
+
+      definitions.forEach((definition) => {
+        lines.push(options.serde ? "#[derive(Debug, Clone, Serialize, Deserialize)]" : "#[derive(Debug, Clone)]");
+        lines.push(`pub struct ${definition.name} {`);
+        definition.fields.forEach((field) => {
+          if (options.serde && options.rename && field.originalKey !== field.fieldName) {
+            lines.push(`    #[serde(rename = "${field.originalKey}")]`);
+          }
+          lines.push(`    pub ${field.fieldName}: ${field.rustType},`);
+        });
+        lines.push("}", "");
+      });
+
+      if (rootAlias) {
+        lines.push(rootAlias);
+      }
+
+      return lines.join("\n").trim();
+    }
+
+    function utf8ToBase64(input) {
+      const bytes = new TextEncoder().encode(input);
+      let binary = "";
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary);
+    }
+
+    function base64ToUtf8(input) {
+      const binary = atob(input);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+
+    function md5(input) {
+      function rotateLeft(value, shift) {
+        return (value << shift) | (value >>> (32 - shift));
+      }
+
+      function addUnsigned(x, y) {
+        const x4 = x & 0x40000000;
+        const y4 = y & 0x40000000;
+        const x8 = x & 0x80000000;
+        const y8 = y & 0x80000000;
+        const result = (x & 0x3fffffff) + (y & 0x3fffffff);
+        if (x4 & y4) {
+          return result ^ 0x80000000 ^ x8 ^ y8;
+        }
+        if (x4 | y4) {
+          if (result & 0x40000000) {
+            return result ^ 0xc0000000 ^ x8 ^ y8;
+          }
+          return result ^ 0x40000000 ^ x8 ^ y8;
+        }
+        return result ^ x8 ^ y8;
+      }
+
+      function f(x, y, z) { return (x & y) | (~x & z); }
+      function g(x, y, z) { return (x & z) | (y & ~z); }
+      function h(x, y, z) { return x ^ y ^ z; }
+      function i(x, y, z) { return y ^ (x | ~z); }
+
+      function ff(a, b, c, d, x, s, ac) {
+        a = addUnsigned(a, addUnsigned(addUnsigned(f(b, c, d), x), ac));
+        return addUnsigned(rotateLeft(a, s), b);
+      }
+
+      function gg(a, b, c, d, x, s, ac) {
+        a = addUnsigned(a, addUnsigned(addUnsigned(g(b, c, d), x), ac));
+        return addUnsigned(rotateLeft(a, s), b);
+      }
+
+      function hh(a, b, c, d, x, s, ac) {
+        a = addUnsigned(a, addUnsigned(addUnsigned(h(b, c, d), x), ac));
+        return addUnsigned(rotateLeft(a, s), b);
+      }
+
+      function ii(a, b, c, d, x, s, ac) {
+        a = addUnsigned(a, addUnsigned(addUnsigned(i(b, c, d), x), ac));
+        return addUnsigned(rotateLeft(a, s), b);
+      }
+
+      function convertToWordArray(text) {
+        const bytes = new TextEncoder().encode(text);
+        const wordCount = (((bytes.length + 8) >>> 6) + 1) * 16;
+        const words = new Array(wordCount).fill(0);
+        let index;
+        for (index = 0; index < bytes.length; index += 1) {
+          words[index >>> 2] |= bytes[index] << ((index % 4) * 8);
+        }
+        words[index >>> 2] |= 0x80 << ((index % 4) * 8);
+        const bitLength = bytes.length * 8;
+        words[wordCount - 2] = bitLength & 0xffffffff;
+        words[wordCount - 1] = (bitLength >>> 29) & 0xffffffff;
+        return words;
+      }
+
+      function wordToHex(value) {
+        let output = "";
+        for (let index = 0; index <= 3; index += 1) {
+          output += (`0${((value >>> (index * 8)) & 255).toString(16)}`).slice(-2);
+        }
+        return output;
+      }
+
+      const words = convertToWordArray(input);
+      let a = 0x67452301;
+      let b = 0xefcdab89;
+      let c = 0x98badcfe;
+      let d = 0x10325476;
+
+      for (let offset = 0; offset < words.length; offset += 16) {
+        const aa = a;
+        const bb = b;
+        const cc = c;
+        const dd = d;
+
+        a = ff(a, b, c, d, words[offset + 0], 7, 0xd76aa478);
+        d = ff(d, a, b, c, words[offset + 1], 12, 0xe8c7b756);
+        c = ff(c, d, a, b, words[offset + 2], 17, 0x242070db);
+        b = ff(b, c, d, a, words[offset + 3], 22, 0xc1bdceee);
+        a = ff(a, b, c, d, words[offset + 4], 7, 0xf57c0faf);
+        d = ff(d, a, b, c, words[offset + 5], 12, 0x4787c62a);
+        c = ff(c, d, a, b, words[offset + 6], 17, 0xa8304613);
+        b = ff(b, c, d, a, words[offset + 7], 22, 0xfd469501);
+        a = ff(a, b, c, d, words[offset + 8], 7, 0x698098d8);
+        d = ff(d, a, b, c, words[offset + 9], 12, 0x8b44f7af);
+        c = ff(c, d, a, b, words[offset + 10], 17, 0xffff5bb1);
+        b = ff(b, c, d, a, words[offset + 11], 22, 0x895cd7be);
+        a = ff(a, b, c, d, words[offset + 12], 7, 0x6b901122);
+        d = ff(d, a, b, c, words[offset + 13], 12, 0xfd987193);
+        c = ff(c, d, a, b, words[offset + 14], 17, 0xa679438e);
+        b = ff(b, c, d, a, words[offset + 15], 22, 0x49b40821);
+
+        a = gg(a, b, c, d, words[offset + 1], 5, 0xf61e2562);
+        d = gg(d, a, b, c, words[offset + 6], 9, 0xc040b340);
+        c = gg(c, d, a, b, words[offset + 11], 14, 0x265e5a51);
+        b = gg(b, c, d, a, words[offset + 0], 20, 0xe9b6c7aa);
+        a = gg(a, b, c, d, words[offset + 5], 5, 0xd62f105d);
+        d = gg(d, a, b, c, words[offset + 10], 9, 0x02441453);
+        c = gg(c, d, a, b, words[offset + 15], 14, 0xd8a1e681);
+        b = gg(b, c, d, a, words[offset + 4], 20, 0xe7d3fbc8);
+        a = gg(a, b, c, d, words[offset + 9], 5, 0x21e1cde6);
+        d = gg(d, a, b, c, words[offset + 14], 9, 0xc33707d6);
+        c = gg(c, d, a, b, words[offset + 3], 14, 0xf4d50d87);
+        b = gg(b, c, d, a, words[offset + 8], 20, 0x455a14ed);
+        a = gg(a, b, c, d, words[offset + 13], 5, 0xa9e3e905);
+        d = gg(d, a, b, c, words[offset + 2], 9, 0xfcefa3f8);
+        c = gg(c, d, a, b, words[offset + 7], 14, 0x676f02d9);
+        b = gg(b, c, d, a, words[offset + 12], 20, 0x8d2a4c8a);
+
+        a = hh(a, b, c, d, words[offset + 5], 4, 0xfffa3942);
+        d = hh(d, a, b, c, words[offset + 8], 11, 0x8771f681);
+        c = hh(c, d, a, b, words[offset + 11], 16, 0x6d9d6122);
+        b = hh(b, c, d, a, words[offset + 14], 23, 0xfde5380c);
+        a = hh(a, b, c, d, words[offset + 1], 4, 0xa4beea44);
+        d = hh(d, a, b, c, words[offset + 4], 11, 0x4bdecfa9);
+        c = hh(c, d, a, b, words[offset + 7], 16, 0xf6bb4b60);
+        b = hh(b, c, d, a, words[offset + 10], 23, 0xbebfbc70);
+        a = hh(a, b, c, d, words[offset + 13], 4, 0x289b7ec6);
+        d = hh(d, a, b, c, words[offset + 0], 11, 0xeaa127fa);
+        c = hh(c, d, a, b, words[offset + 3], 16, 0xd4ef3085);
+        b = hh(b, c, d, a, words[offset + 6], 23, 0x04881d05);
+        a = hh(a, b, c, d, words[offset + 9], 4, 0xd9d4d039);
+        d = hh(d, a, b, c, words[offset + 12], 11, 0xe6db99e5);
+        c = hh(c, d, a, b, words[offset + 15], 16, 0x1fa27cf8);
+        b = hh(b, c, d, a, words[offset + 2], 23, 0xc4ac5665);
+
+        a = ii(a, b, c, d, words[offset + 0], 6, 0xf4292244);
+        d = ii(d, a, b, c, words[offset + 7], 10, 0x432aff97);
+        c = ii(c, d, a, b, words[offset + 14], 15, 0xab9423a7);
+        b = ii(b, c, d, a, words[offset + 5], 21, 0xfc93a039);
+        a = ii(a, b, c, d, words[offset + 12], 6, 0x655b59c3);
+        d = ii(d, a, b, c, words[offset + 3], 10, 0x8f0ccc92);
+        c = ii(c, d, a, b, words[offset + 10], 15, 0xffeff47d);
+        b = ii(b, c, d, a, words[offset + 1], 21, 0x85845dd1);
+        a = ii(a, b, c, d, words[offset + 8], 6, 0x6fa87e4f);
+        d = ii(d, a, b, c, words[offset + 15], 10, 0xfe2ce6e0);
+        c = ii(c, d, a, b, words[offset + 6], 15, 0xa3014314);
+        b = ii(b, c, d, a, words[offset + 13], 21, 0x4e0811a1);
+        a = ii(a, b, c, d, words[offset + 4], 6, 0xf7537e82);
+        d = ii(d, a, b, c, words[offset + 11], 10, 0xbd3af235);
+        c = ii(c, d, a, b, words[offset + 2], 15, 0x2ad7d2bb);
+        b = ii(b, c, d, a, words[offset + 9], 21, 0xeb86d391);
+
+        a = addUnsigned(a, aa);
+        b = addUnsigned(b, bb);
+        c = addUnsigned(c, cc);
+        d = addUnsigned(d, dd);
+      }
+
+      return `${wordToHex(a)}${wordToHex(b)}${wordToHex(c)}${wordToHex(d)}`;
+    }
+
+    async function digestText(algorithm, input) {
+      const encoded = new TextEncoder().encode(input);
+      const hashBuffer = await crypto.subtle.digest(algorithm, encoded);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    function updateCryptoHint() {
+      const mode = $("cryptoMode").value;
+      const hints = {
+        base64: "Base64 支持编码和解码，适合可逆文本传输。",
+        md5: "MD5 是摘要算法，只能生成摘要，不能解密还原。",
+        sha1: "SHA-1 是摘要算法，只能生成摘要，不能解密还原。",
+        sha256: "SHA-256 是摘要算法，只能生成摘要，不能解密还原。",
+        url: "URL 编码支持 encode/decode，适合查询串和路径片段。"
+      };
+      setText("cryptoHint", hints[mode] || "");
+      $("decryptBtn").disabled = mode === "md5" || mode === "sha1" || mode === "sha256";
+    }
+
+    async function executeCrypto(action) {
+      try {
+        const mode = $("cryptoMode").value;
+        const input = $("cryptoInput").value;
+        let output = "";
+
+        if (!input) {
+          throw new Error("请先输入文本。");
+        }
+
+        if (mode === "base64") {
+          output = action === "encrypt" ? utf8ToBase64(input) : base64ToUtf8(input);
+        } else if (mode === "url") {
+          output = action === "encrypt" ? encodeURIComponent(input) : decodeURIComponent(input);
+        } else if (action === "decrypt") {
+          throw new Error(`${mode.toUpperCase()} 属于摘要算法，不能解密。`);
+        } else if (mode === "md5") {
+          output = md5(input);
+        } else if (mode === "sha1") {
+          output = await digestText("SHA-1", input);
+        } else if (mode === "sha256") {
+          output = await digestText("SHA-256", input);
+        } else {
+          throw new Error("暂不支持当前算法。");
+        }
+
+        setCode("cryptoOutput", output);
+        showToast(action === "encrypt" ? "结果已生成" : "结果已还原");
+      } catch (error) {
+        setCode("cryptoOutput", `Error: ${error.message}`);
+        showToast(error.message, "error");
+      }
+    }
+
+    function refreshStructMeta() {
+      const source = $("structInput").value.trim();
+      const options = {
+        getter: $("optionGetter").checked,
+        setter: $("optionSetter").checked,
+        chain: $("optionChain").checked,
+        clear: $("optionClear").checked,
+        builder: $("optionBuilder").checked
+      };
+
+      const selected = Object.entries(options)
+        .filter(([, enabled]) => enabled)
+        .map(([key]) => key);
+
+      setText("optionSummary", `选项: ${selected.length ? selected.join(" / ") : "无"}`);
+
+      if (!source) {
+        setText("statStructName", "未识别");
+        setText("statFieldCount", "0");
+        setText("statMethodCount", "0 / 0 / 0");
+        setText("structStatus", "状态: 等待输入");
+        setText("fieldSummary", "字段: 0");
+        return;
+      }
+
+      try {
+        const parsed = parseRustStruct(source);
+        const optionFields = parsed.fields.filter((field) => extractOptionInner(field.type)).length;
+        const getterCount = options.getter ? parsed.fields.length : 0;
+        const setterCount =
+          (options.setter ? parsed.fields.length : 0) +
+          (options.chain ? parsed.fields.length : 0) +
+          (options.clear ? optionFields : 0);
+        const builderCount = options.builder ? 1 : 0;
+
+        setText("statStructName", parsed.name);
+        setText("statFieldCount", String(parsed.fields.length));
+        setText("statMethodCount", `${getterCount} / ${setterCount} / ${builderCount}`);
+        setText("structStatus", `状态: 已识别 ${parsed.name}`);
+        setText("fieldSummary", `字段: ${parsed.fields.length}，Option: ${optionFields}`);
+      } catch (error) {
+        setText("statStructName", "未识别");
+        setText("statFieldCount", "0");
+        setText("statMethodCount", "0 / 0 / 0");
+        setText("structStatus", `状态: ${error.message}`);
+        setText("fieldSummary", "字段: 0");
+      }
+    }
+
+    function refreshSnake() {
+      const input = $("snakeInput").value.trim();
+      const snake = toSnakeCase(input);
+      const tokens = snake.split("_").filter(Boolean);
+
+      setText("statSnakeValue", snake);
+      setText("snakeResult", snake);
+      setText("fileResult", `${snake}.rs`);
+      setText("moduleResult", `pub mod ${snake};`);
+      setText("segmentResult", tokens.length > 1 ? tokens.join("/") : snake);
+    }
+
+    function generateStruct() {
+      try {
+        const parsed = parseRustStruct($("structInput").value);
+        const code = generateStructCode(parsed, {
+          getter: $("optionGetter").checked,
+          setter: $("optionSetter").checked,
+          chain: $("optionChain").checked,
+          clear: $("optionClear").checked,
+          builder: $("optionBuilder").checked
+        });
+        setCode("structOutput", code);
+        refreshStructMeta();
+        showToast("Struct 代码已生成");
+      } catch (error) {
+        setCode("structOutput", `Error: ${error.message}`);
+        refreshStructMeta();
+        showToast(error.message, "error");
+      }
+    }
+
+    function generateJsonFromStruct() {
+      try {
+        const parsed = parseRustStruct($("jsonStructInput").value);
+        const payload = buildStructJson(parsed, $("jsonMock").checked);
+        const space = $("jsonPretty").checked ? 2 : 0;
+        setCode("jsonOutput", JSON.stringify(payload, null, space));
+        showToast("JSON 已生成");
+      } catch (error) {
+        setCode("jsonOutput", `Error: ${error.message}`);
+        showToast(error.message, "error");
+      }
+    }
+
+    function generateRustFromJson() {
+      try {
+        const raw = $("jsonToStructInput").value.trim();
+        if (!raw) {
+          throw new Error("请先输入 JSON。");
+        }
+
+        const data = JSON.parse(raw);
+        const rootName = toPascalCase($("jsonRootName").value || "AutoGenerated");
+        const rust = buildRustFromJson(data, rootName, {
+          serde: $("jsonSerde").checked,
+          rename: $("jsonRename").checked
+        });
+        setCode("jsonRustOutput", rust);
+        showToast("Rust struct 已生成");
+      } catch (error) {
+        setCode("jsonRustOutput", `Error: ${error.message}`);
+        showToast(error.message, "error");
+      }
+    }
+
+    function applyStructSample(key) {
+      $("structInput").value = samples.struct[key];
+      refreshStructMeta();
+      generateStruct();
+    }
+
+    document.querySelectorAll(".tool-tab").forEach((button) => {
+      button.addEventListener("click", () => activateTab(button.dataset.tool));
+    });
+
+    document.querySelectorAll(".struct-sample").forEach((button) => {
+      button.addEventListener("click", () => applyStructSample(button.dataset.key));
+    });
+
+    $("sampleStructBtn").addEventListener("click", () => {
+      const keys = Object.keys(samples.struct);
+      const key = keys[sampleIndex % keys.length];
+      sampleIndex += 1;
+      applyStructSample(key);
+    });
+
+    $("clearStructBtn").addEventListener("click", () => {
+      $("structInput").value = "";
+      setCode("structOutput", "等待生成结果...");
+      refreshStructMeta();
+    });
+
+    $("generateBtn").addEventListener("click", generateStruct);
+    $("copyStructBtn").addEventListener("click", () => copyText($("structOutput").textContent, "Struct 代码已复制"));
+
+    ["structInput", "optionGetter", "optionSetter", "optionChain", "optionClear", "optionBuilder"].forEach((id) => {
+      $(id).addEventListener("input", refreshStructMeta);
+      $(id).addEventListener("change", refreshStructMeta);
+    });
+
+    $("syncStructBtn").addEventListener("click", () => {
+      $("jsonStructInput").value = $("structInput").value;
+      activateTab("json");
+      generateJsonFromStruct();
+      showToast("Struct 已同步到 JSON 工具");
+    });
+
+    $("sampleJsonBtn").addEventListener("click", () => {
+      $("jsonStructInput").value = samples.struct.person;
+      generateJsonFromStruct();
+    });
+
+    $("generateJsonBtn").addEventListener("click", generateJsonFromStruct);
+    $("copyJsonBtn").addEventListener("click", () => copyText($("jsonOutput").textContent, "JSON 已复制"));
+
+    $("sampleJsonToRustBtn").addEventListener("click", () => {
+      $("jsonToStructInput").value = samples.json;
+      generateRustFromJson();
+    });
+
+    $("clearJsonToRustBtn").addEventListener("click", () => {
+      $("jsonToStructInput").value = "";
+      setCode("jsonRustOutput", "等待 JSON 转换结果...");
+    });
+
+    $("generateRustBtn").addEventListener("click", generateRustFromJson);
+    $("copyRustBtn").addEventListener("click", () => copyText($("jsonRustOutput").textContent, "Rust 代码已复制"));
+
+    $("encryptBtn").addEventListener("click", () => executeCrypto("encrypt"));
+    $("decryptBtn").addEventListener("click", () => executeCrypto("decrypt"));
+    $("copyCryptoBtn").addEventListener("click", () => copyText($("cryptoOutput").textContent, "加解密结果已复制"));
+    $("clearCryptoBtn").addEventListener("click", () => {
+      $("cryptoInput").value = "";
+      setCode("cryptoOutput", "等待加密或解密...");
+    });
+    $("cryptoMode").addEventListener("change", updateCryptoHint);
+    $("sampleCryptoTextBtn").addEventListener("click", () => {
+      $("cryptoMode").value = "base64";
+      $("cryptoInput").value = samples.cryptoText;
+      updateCryptoHint();
+      executeCrypto("encrypt");
+    });
+    $("sampleCryptoBase64Btn").addEventListener("click", () => {
+      $("cryptoMode").value = "base64";
+      $("cryptoInput").value = samples.cryptoBase64;
+      updateCryptoHint();
+      executeCrypto("decrypt");
+    });
+    $("sampleCryptoUrlBtn").addEventListener("click", () => {
+      $("cryptoMode").value = "url";
+      $("cryptoInput").value = samples.cryptoUrl;
+      updateCryptoHint();
+      executeCrypto("decrypt");
+    });
+
+    $("snakeInput").addEventListener("input", refreshSnake);
+    $("sampleSnakeBtn").addEventListener("click", () => {
+      $("snakeInput").value = samples.snake;
+      refreshSnake();
+    });
+    $("copySnakeBtn").addEventListener("click", () => copyText($("snakeResult").textContent, "Snake 结果已复制"));
+
+    $("jsonMock").addEventListener("change", generateJsonFromStruct);
+    $("jsonPretty").addEventListener("change", generateJsonFromStruct);
+    $("jsonSerde").addEventListener("change", generateRustFromJson);
+    $("jsonRename").addEventListener("change", generateRustFromJson);
+    $("jsonRootName").addEventListener("input", () => {
+      if ($("jsonToStructInput").value.trim()) {
+        generateRustFromJson();
+      }
+    });
+
+    $("structInput").value = samples.struct.person;
+    $("jsonStructInput").value = samples.struct.person;
+    $("jsonToStructInput").value = samples.json;
+    $("cryptoInput").value = samples.cryptoText;
+    $("snakeInput").value = samples.snake;
+
+    refreshStructMeta();
+    updateCryptoHint();
+    refreshSnake();
+    generateStruct();
+    generateJsonFromStruct();
+    generateRustFromJson();
+  </script>
+</body>
 </html>

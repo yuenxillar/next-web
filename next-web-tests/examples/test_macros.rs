@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use next_web_core::traits::desensitized::Desensitized;
 use next_web::{Builder, Desensitized, FieldName, GetSet};
+use next_web_core::traits::desensitized::Desensitized;
 
 /// This is a test macro
 #[allow(unused)]
@@ -48,7 +48,6 @@ fn main() {
     test_a.get_s4();
     test_a.set_s4(None);
 
-
     // Field name
     assert_eq!(TestA::field_s2(), "s2");
     assert_eq!(TestA::field_s5(), "s5");
@@ -56,10 +55,8 @@ fn main() {
     assert_eq!(TestA::field_s8(), "s8");
     assert_eq!(TestA::field_s9(), "s9");
 
-
     // Desensitized
     test_a.desensitize();
-    
 
     // Builder
     let test = TestMacroBuilder::builder()

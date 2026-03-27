@@ -14,11 +14,12 @@ rust-version.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
-next-web-core       = { workspace = true }
-next-web-macros     = { workspace = true }
-next-web-security   = { workspace = true, optional = true }
-next-web-retry      = { workspace = true, optional = true }
-next-web-api-doc    = { workspace = true, optional = true }
+next-web-core           = { workspace = true }
+next-web-macros         = { workspace = true }
+next-web-security       = { workspace = true, optional = true }
+next-web-retry          = { workspace = true, optional = true }
+next-web-api-doc        = { workspace = true, optional = true }
+next-web-state-machine  = { workspace = true, optional = true }
 
 tokio = { workspace = true, features = ["sync", "signal","net", "fs"] }
 axum = { workspace = true, features = ["http2"] }
@@ -108,7 +109,7 @@ enable-api-doc      = ["next-web-api-doc", "utoipa-swagger-ui", "next-web-macros
 enable-grpc = []
 enable-prometheus = ["axum-prometheus"]
 enable-i18n = []
-enable-state-machine = []
+enable-state-machine = ["next-web-state-machine"]
 enable-thread-pool   = ["num_cpus"]
 
 embed-resources = ["next-web-macros/embed-resources"]

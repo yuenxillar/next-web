@@ -1,12 +1,14 @@
 use std::{any::Any, fmt};
 
-
 /// 可克隆的任意类型trait
 /// Cloneable any type trait
-pub trait AnyClone: Any + Send + Sync {
-
+pub trait AnyClone
+where
+    Self: Any,
+    Self: Send + Sync
+{
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
-    
+
     fn clone_box(&self) -> Box<dyn AnyClone>;
 }
 
@@ -14,8 +16,8 @@ pub trait AnyClone: Any + Send + Sync {
 /// Implement AnyClone for all types that implement Clone+Send+Sync
 impl<T> AnyClone for T
 where
-    T: Any + Clone,
-    T: Send + Sync,
+    Self: Any + Clone,
+    Self: Send + Sync
 {
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self

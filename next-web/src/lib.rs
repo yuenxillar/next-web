@@ -44,7 +44,7 @@ pub use next_web_macros::Desensitized;
 pub use next_web_macros::{Builder, FieldName, GetSet, RequiredArgsConstructor};
 
 #[cfg(feature = "enable-state-machine")]
-pub mod state_machine;
+pub use next_web_state_machine as state_machine;
 
 #[cfg(feature = "enable-scheduling")]
 pub use next_web_macros::scheduled;

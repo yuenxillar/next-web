@@ -10,6 +10,13 @@ impl<T> GenericMessage<T> {
     pub fn new(payload: Option<T>, headers: MessageHeaders) -> Self {
         GenericMessage { payload, headers }
     }
+
+    pub fn with_payload(payload: T) -> Self {
+        Self {
+            payload: Some(payload),
+            headers: MessageHeaders::default(),
+        }
+    }
 }
 
 impl<T> Message<T> for GenericMessage<T>
