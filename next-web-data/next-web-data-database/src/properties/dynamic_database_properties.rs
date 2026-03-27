@@ -1,21 +1,17 @@
 use std::collections::HashMap;
 
 use next_web_macros::properties;
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 use crate::properties::database_properties::DatabaseClientProperties;
 
 /// Properties for Dynamic Database client.
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[properties(prefix = "next.data.database.dynamic", dynamic)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct DynamicDatabaseProperties {
     /// This is necessary and do not change the HashMap structure
-    base: HashMap<String, DatabaseClientProperties>,
+    dynamic: HashMap<String, DatabaseClientProperties>,
 }
 
-impl DynamicDatabaseProperties {
-    pub fn base(&self) -> &HashMap<String, DatabaseClientProperties> {
-        &self.base
-    }
-}
+impl DynamicDatabaseProperties {}

@@ -583,7 +583,7 @@ impl ApplicationContext {
     /// struct A;
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(eager_create)]
+    /// #[singleton(eager_create)]
     /// struct B;
     ///
     /// # fn main() {
@@ -730,7 +730,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
-    /// #[Singleton(name = "a")]
+    /// #[singleton(name = "a")]
     /// struct A;
     ///
     /// # fn main() {
@@ -815,7 +815,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
-    /// #[Singleton(name = "a")]
+    /// #[singleton(name = "a")]
     /// struct A;
     ///
     /// # fn main() {
@@ -934,7 +934,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(name = "a")]
+    /// #[singleton(name = "a")]
     /// struct A;
     ///
     /// # fn main() {
@@ -1021,7 +1021,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(name = "a")]
+    /// #[singleton(name = "a")]
     /// struct A;
     ///
     /// #[Transient(name = "b")]
@@ -1071,7 +1071,7 @@ impl ApplicationContext {
     /// ```rust
     /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
-    /// #[Singleton(name = "one")]
+    /// #[singleton(name = "one")]
     /// fn One() -> i32 {
     ///     1
     /// }
@@ -1326,7 +1326,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(async)]
+    /// #[singleton(async)]
     /// struct A;
     ///
     /// #[tokio::main]
@@ -1355,7 +1355,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(async, name = "a")]
+    /// #[singleton(async, name = "a")]
     /// struct A;
     ///
     /// #[tokio::main]
@@ -1397,7 +1397,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(async)]
+    /// #[singleton(async)]
     /// struct A;
     ///
     /// #[Transient(async)]
@@ -1433,7 +1433,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(async, name = "a")]
+    /// #[singleton(async, name = "a")]
     /// struct A;
     ///
     /// #[Transient(async, name = "b")]
@@ -1480,7 +1480,7 @@ impl ApplicationContext {
     /// ```rust
     /// use rudi::{ApplicationContext, Singleton, Transient};
     ///
-    /// #[Singleton(name = "one")]
+    /// #[singleton(name = "one")]
     /// async fn One() -> i32 {
     ///     1
     /// }
@@ -1546,7 +1546,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(name = "a")]
+    /// #[singleton(name = "a")]
     /// struct A;
     ///
     /// # fn main() {
@@ -1644,7 +1644,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(eager_create)]
+    /// #[singleton(eager_create)]
     /// struct A;
     ///
     /// # fn main() {
@@ -1664,7 +1664,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone)]
-    /// #[Singleton(eager_create, name = "a")]
+    /// #[singleton(eager_create, name = "a")]
     /// struct A;
     ///
     /// # fn main() {
@@ -1692,7 +1692,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
-    /// #[Singleton(eager_create)]
+    /// #[singleton(eager_create)]
     /// struct A;
     ///
     /// # fn main() {
@@ -1718,7 +1718,7 @@ impl ApplicationContext {
     ///
     ///
     /// #[derive(Clone, Debug)]
-    /// #[Singleton(eager_create, name = "a")]
+    /// #[singleton(eager_create, name = "a")]
     /// struct A;
     ///
     /// # fn main() {
@@ -1750,7 +1750,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
-    /// #[Singleton(eager_create)]
+    /// #[singleton(eager_create)]
     /// struct A;
     ///
     /// # fn main() {
@@ -1770,7 +1770,7 @@ impl ApplicationContext {
     /// use rudi::{ApplicationContext, Singleton};
     ///
     /// #[derive(Clone, Debug)]
-    /// #[Singleton(eager_create, name = "a")]
+    /// #[singleton(eager_create, name = "a")]
     /// struct A;
     ///
     /// # fn main() {
@@ -1793,12 +1793,12 @@ impl ApplicationContext {
     /// ```rust
     /// use rudi::{ApplicationContext, Singleton};
     ///
-    /// #[Singleton(eager_create, name = "a")]
+    /// #[singleton(eager_create, name = "a")]
     /// fn A() -> i32 {
     ///     1
     /// }
     ///
-    /// #[Singleton(eager_create, name = "b")]
+    /// #[singleton(eager_create, name = "b")]
     /// fn B() -> i32 {
     ///     2
     /// }
@@ -2061,7 +2061,7 @@ please use instead:
 
 please check all the references to the above type, there are 3 scenarios that will be referenced:
 1. use `ApplicationContext::resolve_xxx::<Type>(cx)` to get instances of the type, change to `ApplicationContext::resolve_xxx_async::<Type>(cx).await`.
-2. use `yyy: Type` as a field of a struct, or a field of a variant of a enum, use `#[Singleton(async)]`, `#[Transient(async)]` or `#[SingleOwner(async)]` on the struct or enum.
+2. use `yyy: Type` as a field of a struct, or a field of a variant of a enum, use `#[singleton(async)]`, `#[Transient(async)]` or `#[SingleOwner(async)]` on the struct or enum.
 3. use `zzz: Type` as a argument of a function, add the `async` keyword to the function.
 ",
                     definition

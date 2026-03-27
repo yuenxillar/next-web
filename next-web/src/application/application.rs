@@ -7,10 +7,9 @@ use axum::Router;
 
 use next_web_core::async_trait;
 use next_web_core::autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES;
+use next_web_core::autoconfigure::default_auto_configure::DefaultAutoConfigure;
 use next_web_core::client::rest_client::RestClient;
-use next_web_core::constants::application_constants::{
-    APPLICATION_BANNER, APPLICATION_DEFAULT_PORT,
-};
+use next_web_core::constants::application_constants::APPLICATION_BANNER;
 use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
@@ -22,6 +21,7 @@ use next_web_core::traits::apply_router::ApplyRouter;
 use next_web_core::traits::error_solver::ErrorSolver;
 use next_web_core::traits::filter::http_filter::HttpFilter;
 use next_web_core::traits::properties_post_processor::PropertiesPostProcessor;
+use next_web_core::traits::service::background_service::BackgroundService;
 use next_web_core::traits::use_router::UseRouter;
 use next_web_core::AutoRegister;
 use std::net::SocketAddr;
@@ -37,17 +37,16 @@ use tracing::{error, info, warn};
 use crate::application::next_application::NextApplication;
 
 use crate::application::permitted_groups::PERMITTED_GROUPS;
+use crate::autoregister::application_event_autoregister::ApplicationEventAutoRegister;
 use crate::autoregister::default_autoregister::DefaultAutoRegister;
-use crate::autoregister::handler_autoregister::HttpHandlerAutoRegister;
+use crate::autoregister::http_handler_autoregister::HttpHandlerAutoRegister;
 
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::configurer::http_method_handler_configurer::{RouteState, RouterContext};
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
+use crate::manager::background_service_manager::BackgroundServiceManager;
 use crate::util::local_date_time::LocalDateTime;
-
-use next_web_core::traits::event::application_event_multicaster::ApplicationEventMulticaster;
-use next_web_core::traits::event::application_listener::ApplicationListener;
 
 #[cfg(feature = "enable-api-doc")]
 use next_web_api_doc::openapi::OpenApi;
@@ -67,7 +66,6 @@ where
     Self: 'static,
 {
     /// The error solver for the application.
-    ///
     /// Apply it to the `catch_panic` function
     type ErrorSolve: ErrorSolver;
 
@@ -77,52 +75,6 @@ where
         ctx: &mut ApplicationContext,
         properties: &ApplicationProperties,
     );
-
-    /// Initialize the api doc.
-    #[cfg(feature = "enable-api-doc")]
-    #[allow(unused_variables)]
-    async fn api_doc(&self, ctx: &mut ApplicationContext) -> OpenApi {
-        use next_web_api_doc::OpenApi;
-
-        struct OpenApiDoc;
-
-        impl next_web_api_doc::OpenApi for OpenApiDoc {
-            fn openapi() -> next_web_api_doc::openapi::OpenApi {
-                next_web_api_doc::openapi::OpenApiBuilder::new()
-                    .info(
-                        next_web_api_doc::openapi::InfoBuilder::new()
-                            .title("API Documentation")
-                            .version("0.1.0")
-                            .description(Some(
-                                std::env::var("CARGO_PKG_DESCRIPTION")
-                                    .unwrap_or(String::from("Empty")),
-                            ))
-                            .license(Some(next_web_api_doc::openapi::License::new(
-                                "MIT or Apache-2.0",
-                            )))
-                            .contact(Some(
-                                next_web_api_doc::openapi::ContactBuilder::new()
-                                    .name(Some(
-                                        std::env::var("CARGO_PKG_AUTHORS")
-                                            .unwrap_or(String::from("Listeing")),
-                                    ))
-                                    .email(None::<String>)
-                                    .build(),
-                            ))
-                            .build(),
-                    )
-                    .paths(next_web_api_doc::openapi::path::Paths::new())
-                    .components(Some(next_web_api_doc::openapi::Components::new()))
-                    .build()
-            }
-        }
-
-        OpenApiDoc::openapi()
-    }
-
-    /// Before starting the application
-    #[allow(unused_variables)]
-    async fn on_ready(&self, ctx: &mut ApplicationContext) {}
 
     /// Register the rpc server.
     #[cfg(feature = "enable-grpc")]
@@ -154,34 +106,6 @@ where
         };
 
         TopBanner::show(DEFAULT_TOP_BANNER);
-    }
-
-    /// Suitable for capturing panic in application
-    fn catch_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
-        let error = if let Some(msg) = err.downcast_ref::<String>() {
-            msg.to_string()
-        } else if let Some(msg) = err.downcast_ref::<&str>() {
-            msg.to_string()
-        } else {
-            warn!("Service panicked but `CatchPanic` was unable to downcast the panic info");
-            String::with_capacity(0)
-        };
-
-        error!("Service panicked: {}", &error);
-
-        let mut resp = Self::ErrorSolve::solve_error(error).into_response();
-
-        *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-
-        resp
-    }
-
-    /// No matching route handler
-    async fn fallback() -> Response {
-        let mut resp = Self::ErrorSolve::solve_error(String::from("Not Found")).into_response();
-        *resp.status_mut() = StatusCode::NOT_FOUND;
-
-        resp
     }
 
     /// Initialize the logging.
@@ -254,15 +178,97 @@ where
         }
     }
 
+    /// Before starting the application
+    #[allow(unused_variables)]
+    async fn on_ready(&self, ctx: &mut ApplicationContext) {}
+
+    /// Suitable for capturing panic in application
+    fn catch_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
+        let error = if let Some(msg) = err.downcast_ref::<String>() {
+            msg.to_string()
+        } else if let Some(msg) = err.downcast_ref::<&str>() {
+            msg.to_string()
+        } else {
+            warn!("Service panicked but `CatchPanic` was unable to downcast the panic info");
+            String::with_capacity(0)
+        };
+
+        error!("Service panicked: {}", &error);
+
+        let mut resp = Self::ErrorSolve::solve_error(error).into_response();
+
+        *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+
+        resp
+    }
+
+    /// No matching route handler
+    async fn fallback() -> Response {
+        let mut resp = Self::ErrorSolve::solve_error(String::from("Not Found")).into_response();
+        *resp.status_mut() = StatusCode::NOT_FOUND;
+
+        resp
+    }
+
+    /// Initialize the api doc.
+    #[cfg(feature = "enable-api-doc")]
+    #[allow(unused_variables)]
+    async fn api_doc(&self, ctx: &mut ApplicationContext) -> OpenApi {
+        use next_web_api_doc::OpenApi;
+
+        struct OpenApiDoc;
+
+        impl next_web_api_doc::OpenApi for OpenApiDoc {
+            fn openapi() -> next_web_api_doc::openapi::OpenApi {
+                next_web_api_doc::openapi::OpenApiBuilder::new()
+                    .info(
+                        next_web_api_doc::openapi::InfoBuilder::new()
+                            .title("API Documentation")
+                            .version("0.1.0")
+                            .description(Some(
+                                std::env::var("CARGO_PKG_DESCRIPTION")
+                                    .unwrap_or(String::from("Empty")),
+                            ))
+                            .license(Some(next_web_api_doc::openapi::License::new(
+                                "MIT or Apache-2.0",
+                            )))
+                            .contact(Some(
+                                next_web_api_doc::openapi::ContactBuilder::new()
+                                    .name(Some(
+                                        std::env::var("CARGO_PKG_AUTHORS")
+                                            .unwrap_or(String::from("Listeing")),
+                                    ))
+                                    .email(None::<String>)
+                                    .build(),
+                            ))
+                            .build(),
+                    )
+                    .paths(next_web_api_doc::openapi::path::Paths::new())
+                    .components(Some(next_web_api_doc::openapi::Components::new()))
+                    .build()
+            }
+        }
+
+        OpenApiDoc::openapi()
+    }
+
     /// Autowire properties
     async fn autowire_properties(
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
     ) {
-        let properties = ctx.resolve_by_type::<Box<dyn Properties>>();
-        for item in properties {
-            item.register(ctx, application_properties).await.unwrap();
+        for properties in ctx.resolve_by_type::<Box<dyn Properties>>() {
+            properties
+                .register(ctx, application_properties)
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn auto_configuration(&self, ctx: &mut ApplicationContext) {
+        for item in inventory::iter::<&dyn DefaultAutoConfigure>.into_iter() {
+            item.auto_configure(ctx).await;
         }
     }
 
@@ -298,20 +304,17 @@ where
         }
     }
 
-    /// Initialize the application infrastructure
-    async fn init_infrastructure(
+    /// Initialize the context
+    async fn init_context(
         &self,
         ctx: &mut ApplicationContext,
         _application_properties: &ApplicationProperties,
     ) {
         // Register application event
-        let mut multicaster = DefaultApplicationEventMulticaster::new();
-
-        let listeners = ctx.resolve_by_type::<Arc<dyn ApplicationListener>>();
-        for listener in listeners.into_iter() {
-            multicaster.add_application_listener(listener).await;
+        let mut multicaster = DefaultApplicationEventMulticaster::default();
+        for event in inventory::iter::<&dyn ApplicationEventAutoRegister>.into_iter() {
+            event.register(ctx, &mut multicaster).await;
         }
-
         let default_event_publisher = DefaultApplicationEventPublisher::new(multicaster.to_owned());
 
         // Register jobs
@@ -340,15 +343,44 @@ where
         ctx.insert_singleton_with_default_name(rest_client);
     }
 
-    // Get the application router.
+    /// Start all background services and register the service manager
+    async fn run_services(&self, ctx: &mut ApplicationContext) {
+        let manager = BackgroundServiceManager::default();
+        for service in ctx
+            .resolve_by_type::<Arc<dyn BackgroundService>>()
+            .into_iter()
+        {
+            manager.register(service).await.unwrap();
+        }
+
+        // If the backend service fails to start, print logs for alerting purposes
+        manager
+            .start_all()
+            .await
+            .into_iter()
+            .filter_map(|started_result| started_result.result.err())
+            .for_each(|#[allow(unused_variables)] started_result| {
+                #[cfg(feature = "trace-log")]
+                warn!(
+                    "Background Service Manager failed to start service, error: {:?}",
+                    started_result
+                )
+            });
+
+        ctx.insert_singleton_with_default_name(manager);
+    }
+
+    /// Get the application router.
     #[allow(unused_variables)]
     async fn application_router(&self, ctx: &mut ApplicationContext) -> Router {
-        let mut context = if cfg!(feature = "enable-api-doc") {
+        #[cfg(feature = "enable-api-doc")]
+        let mut context = {
             let openapi = self.api_doc(ctx).await;
             RouterContext::with_openapi(openapi)
-        } else {
-            RouterContext::default()
         };
+
+        #[cfg(not(feature = "enable-api-doc"))]
+        let mut context = RouterContext::default();
 
         let iterator = inventory::iter::<&dyn HttpHandlerAutoRegister>
             .into_iter()
@@ -386,28 +418,26 @@ where
         // 1. Read server configuration
         let config = application_properties.next().server();
         let context_path = config.context_path().unwrap_or("");
-        let server_port = config.port().unwrap_or(APPLICATION_DEFAULT_PORT);
+        let server_port = config.port();
         let app_name = application_properties
             .next()
             .appliation()
             .map(|config| config.name().into())
             .unwrap_or("NextWebApplication".into());
 
-        let server_addr = if let Some(addr) = config.addr() {
+        let server_addr = if let Some(addr) = config.address() {
             addr
         } else {
-            if config.local().unwrap_or(true) {
+            if config.local() {
                 "127.0.0.1"
             } else {
                 "0.0.0.0"
             }
         };
 
-        let req_timeout = config.http().map(|http| {
-            http.request()
-                .map(|req| req.timeout().unwrap_or(5))
-                .unwrap_or(5)
-        });
+        let req_timeout = config
+            .http()
+            .map(|http| http.request().map(|req| req.timeout()).unwrap_or(5));
 
         // 2. Build basic routing
         let mut app = self
@@ -556,20 +586,25 @@ where
             lifecycle.on_start(&mut ctx).await.unwrap();
         }
 
+        let background_service_manager = ctx
+            .get_single_with_default_name::<BackgroundServiceManager>()
+            .unwrap()
+            .to_owned();
+
         // 9. Add State to [Context]
         app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
+        println!("\nApplication Name      is:  {}", app_name);
         #[rustfmt::skip]
-        println!("\nApplication Listening on:  {}", format!("{}:{}", server_addr, server_port));
-        println!("Application name is:  {}", app_name);
+        println!("Application Listening on:  {}", format!("{}:{}", server_addr, server_port));
         println!("Application Started   at:  {}", LocalDateTime::now());
         println!("Application Startup time:  {:?}", startup_time.elapsed());
         println!("Application Process   ID:  {:?}\n", std::process::id());
 
-        // 10. build socket addr
+        //  Build socket addr
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
 
-        // 11. Monitor application shutdown signal
+        // Monitor application shutdown signal
         #[cfg(not(feature = "rustls"))]
         let shutdown_signal = async move {
             use next_web_core::traits::application::application_lifecycle::{
@@ -614,6 +649,9 @@ where
             for mut lifecycle in app_lifecycle.into_iter() {
                 lifecycle.on_shutdown(&shutdown_ctx).await;
             }
+
+            // Stop background services
+            let _result = background_service_manager.shutdown_all().await;
         };
 
         // Configure certificate and private key used by https
@@ -658,7 +696,7 @@ where
         let startup_time = std::time::Instant::now();
 
         // Get a base application instance
-        let mut next_application: NextApplication<Self> = NextApplication::new();
+        let mut next_application: NextApplication<Self> = NextApplication::default();
 
         // Perform a series of processing on application properties before executing the next step
         next_application
@@ -676,16 +714,18 @@ where
             .unwrap_or(false);
         let mut ctx = ApplicationContext::options()
             .allow_override(allow_override)
-            .auto_register();
+            .auto_register_async()
+            .await;
 
         info!("Init Application context success");
 
         let mut post_processors = ctx.resolve_by_type::<Box<dyn PropertiesPostProcessor>>();
         post_processors.sort_by_key(|item| item.order());
 
-        post_processors.into_iter().for_each(|mut item| {
-            item.post_process_properties(next_application.application_properties.mapping_mut())
-        });
+        #[rustfmt::skip]
+        post_processors
+            .into_iter()
+            .for_each(|mut item| item.post_process_properties(next_application.application_properties.mapping_mut()));
 
         // Set global server properties
         GLOBAL_SERVER_PROPERTIES.get_or_init(|| {
@@ -713,11 +753,15 @@ where
         application
             .register_singleton(&mut ctx, properties, args, resources)
             .await;
-        info!("Singleton services registered");
+        info!("Singleton  registered");
 
-        // Init infrastructure
-        application.init_infrastructure(&mut ctx, properties).await;
-        info!("Infrastructure initialized",);
+        // Init context
+        application.init_context(&mut ctx, properties).await;
+        info!("Context initialized",);
+
+        // AutoConfiguration
+        application.auto_configuration(&mut ctx).await;
+        info!("AutoConfiguration Ends");
 
         // Init middleware
         application.init_middleware(&mut ctx, properties).await;
@@ -735,6 +779,10 @@ where
                 .await;
             info!("gRPC client connected",);
         }
+
+        // Run all background service
+        application.run_services(&mut ctx).await;
+        info!("Run all background service");
 
         info!("Starting Async Runtime: [Tokio/1.44.1]");
         info!("Starting HTTP  Server:  [Axum/0.8.4]");

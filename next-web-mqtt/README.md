@@ -66,7 +66,7 @@ async fn publish_message(
     "Ok"
 }
 
-#[Singleton( binds = [Self::into_base_topic])]
+#[singleton( binds = [Self::into_base_topic])]
 #[derive(Clone)]
 pub(crate) struct TestOneBaseTopic;
 
@@ -76,7 +76,7 @@ impl TestOneBaseTopic {
     }
 }
 
-#[Singleton( binds = [Self::into_base_topic])]
+#[singleton( binds = [Self::into_base_topic])]
 #[derive(Clone)]
 pub(crate) struct TestTwoBaseTopic;
 

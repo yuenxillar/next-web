@@ -24,6 +24,7 @@ use next_web_state_machine::{
 };
 
 #[derive(Clone, Default)]
+#[allow(unused)]
 struct TestApplication;
 
 #[async_trait]
@@ -37,7 +38,6 @@ impl Application for TestApplication {
         _properties: &ApplicationProperties,
     ) {
     }
-
     async fn on_ready(&self, _ctx: &mut ApplicationContext) {}
 }
 

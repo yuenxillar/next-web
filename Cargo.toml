@@ -17,13 +17,14 @@ members = [
     "next-web-api-doc",
     "next-web-actuator",
     "next-web-pay",
+    "next-web-xxl-job",
     "next-web-state-machine",
 ]
 resolver = "2"
 
 [workspace.package]
 rust-version = "1.92.0"
-edition = "2021"
+edition = "2024"
 version = "0.1.0"
 authors = ["Listening <yuenxillar@163.com>"]
 keywords = ["http", "web", "framework"]
@@ -60,28 +61,30 @@ todo = "warn"
 
 [workspace.dependencies]
 # next dependencies
-next-web-ai       = {  version = "0.1.0", path = "./next-web-ai" }
-# next-web-common = { version = "0.1.0" }
-next-web-core       = {  version = "0.1.4", path = "./next-web-core" }
-next-web = { version = "0.1.7", path = "./next-web" }
-next-web-state-machine = { version = "0.1.0", path = "./next-web-state-machine" }
-next-web-api-doc = { version = "0.1.0", path = "./next-web-api-doc" }
-next-web-document = { version = "0.1.0", path = "./next-web-document" }
-next-web-email = { version = "0.1.0", path = "./next-web-email" }
-next-web-ip = { version = "0.1.0", path = "./next-web-ip" }
-next-web-macros     = {  version = "0.1.0", path = "./next-web-macros" }
-# next-web-mq = {  version = "0.1.0", path = "./next-web-mq"}
-next-web-mqtt = { version = "0.1.4", path = "./next-web-mqtt" }
-next-web-open-api     = {  version = "0.1.0", path = "./next-web-open-api" }
-next-web-retry      = {  version = "0.1.0", path = "./next-web-retry"}
-next-web-security   = {  version = "0.1.0", path = "./next-web-security" }
-next-web-sms   = {  version = "0.1.0", path = "./next-web-sms" }
-next-web-tests   = {  version = "0.1.0", path = "./next-web-tests" }
-next-web-utils   = {  version = "0.1.0", path = "./next-web-utils" }
-next-web-websocket   = {  version = "0.1.2", path = "./next-web-websocket" }
-next-web-wechat   = {  version = "0.1.0", path = "./next-web-wechat" }
+next-web-ai             = { version = "0.1.0", path = "./next-web-ai" }
+next-web-core           = { version = "0.1.5", path = "./next-web-core" }
+next-web                = { version = "0.1.7", path = "./next-web" }
+next-web-api-doc        = { version = "0.1.0", path = "./next-web-api-doc" }
+next-web-document       = { version = "0.1.0", path = "./next-web-document" }
+next-web-email          = { version = "0.1.0", path = "./next-web-email" }
+next-web-ip             = { version = "0.1.0", path = "./next-web-ip" }
+next-web-macros         = { version = "0.2.0", path = "./next-web-macros" }
+next-web-mqtt           = { version = "0.1.4", path = "./next-web-mqtt" }
+next-web-open-api       = { version = "0.1.0", path = "./next-web-open-api" }
+next-web-retry          = { version = "0.1.0", path = "./next-web-retry"}
+next-web-security       = { version = "0.1.0", path = "./next-web-security" }
+next-web-sms            = { version = "0.1.0", path = "./next-web-sms" }
+next-web-tests          = { version = "0.1.0", path = "./next-web-tests" }
+next-web-utils          = { version = "0.1.0", path = "./next-web-utils" }
+next-web-websocket      = { version = "0.1.2", path = "./next-web-websocket" }
+next-web-wechat         = { version = "0.1.0", path = "./next-web-wechat" }
+next-web-xxl-job        = { version = "0.1.0", path = "./next-web-xxl-job" }
+next-web-state-machine  = { version = "0.1.0", path = "./next-web-state-machine" }
 
-rudi-dev = { version = "0.8.6", path = "./rudi-main/rudi-dev" }
+# next-web-common = { version = "0.1.0" }
+# next-web-mq = {  version = "0.1.0", path = "./next-web-mq"}
+
+rudi-dev = { version = "0.8.7", path = "./rudi-main/rudi-dev" }
 
 # main dependencies
 tokio = { version = "1.44.1", features = ["rt-multi-thread", "macros"] }
@@ -101,10 +104,10 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = { version = "0.9.34" }
 serde_json = { version = "1.0.133" }
 serde_repr = { version = "0.1.20" }
+serde_with = { version = "3.17.0" }
+serde_path_to_error = { version = "0.1.17" }
 quick-xml = { version = "0.37.4", features = ["serialize"] }
 strum = { version = "0.27", features = ["derive"] }
-serde_path_to_error = { version = "0.1.17" }
-
 
 utoipa = { version =  "5.4.0" }
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "reqwest"] }
@@ -135,7 +138,7 @@ chrono-tz = { version = "0.10.4" }
 hashbrown = { version = "0.15.2", features = ["serde"] }
 regex = { version = "1.11.1" }
 jsonwebtoken = { version = "9.3.0" }
-rust-embed = { version = "8.11.0" }
+rust-embed = { version = "8.11.0", features = ["include-exclude"] }
 clap = { version = "4.5.37", features = ["derive"] }
 matchit = { version = "0.8.4" }
 bcrypt = { version = "0.16.0" }

@@ -22,10 +22,7 @@ async fn main() {
         std_in.read(&mut buf).await.unwrap();
 
         let req = ChatCompletionRequest::new(
-            vec![ChatCompletionMessage::new(
-                "user",
-                String::from_utf8_lossy(&buf),
-            )],
+            vec![ChatCompletionMessage::with_slice("user", &buf)],
             ChatModel::Chat.get_name(),
             true,
         );
@@ -45,7 +42,8 @@ async fn main() {
                                     .map(|choice| choice
                                         .delta
                                         .as_ref()
-                                        .map(|s| s.content.as_ref())
+                                        .map(|s| std::str::from_utf8(s.content.as_ref())
+                                            .unwrap_or_default())
                                         .unwrap_or_default())
                                     .collect::<Vec<&str>>()
                                     .join("")

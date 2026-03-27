@@ -1,9 +1,11 @@
+use serde::{Deserialize, Serialize};
+
 use crate::autoconfigure::context::application_properties::AppliationProperties;
 use crate::autoconfigure::context::logging_properties::LoggingProperties;
 use crate::autoconfigure::context::messages_properties::MessagesProperties;
 use crate::autoconfigure::context::server_properties::ServerProperties;
 
-#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct NextProperties {
     server: ServerProperties,
     appliation: Option<AppliationProperties>,

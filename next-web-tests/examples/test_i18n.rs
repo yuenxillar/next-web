@@ -5,7 +5,8 @@ use next_web::i18n::message_source_service::MessageSourceService;
 use next_web::traits::locale_resolver::LocaleResolver;
 use next_web::ApplicationContext;
 use next_web::{
-    application::Application, async_trait, context::properties::ApplicationProperties, get_mapping,
+    application::Application, async_trait, context::properties::ApplicationProperties,
+    macros::bind::get_mapping,
 };
 
 #[derive(Clone, Default)]

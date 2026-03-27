@@ -129,7 +129,7 @@ fn impl_item_fn(
         #[allow(non_camel_case_types)]
         #vis struct #name;
 
-        impl ::next_web::autoregister::handler_autoregister::HttpHandlerAutoRegister for #name {
+        impl ::next_web::autoregister::http_handler_autoregister::HttpHandlerAutoRegister for #name {
             fn register<'a>(& self,
                 __router:           ::next_web::Router,
                 __context:  &'a mut ::next_web::configurer::http_method_handler_configurer::RouterContext

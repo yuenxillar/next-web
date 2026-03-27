@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 /// 日志配置属性
 ///
 /// 包含控制日志功能行为的各项可选设置。
@@ -5,7 +7,7 @@
 /// # Logging Properties
 ///
 /// Contains optional settings to control the behavior of the logging functionality.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingProperties {
     /// 是否写入日志文件
     ///
@@ -45,9 +47,9 @@ pub struct LoggingProperties {
     additional_date: Option<bool>,
 
     /// 日志格式
-    /// 
+    ///
     /// # Log Format
-    /// 
+    ///
     /// The format of the log messages.
     format: Option<String>,
 }

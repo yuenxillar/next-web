@@ -68,7 +68,7 @@ fn main() {
 
 - name
   - type: any expression that implements `Into<Cow<'static, str>>`.
-  - example: `#[Singleton(name = "abc")]` / `#[Transient(name = a::b::NAME)]` / `#[SingleOwner(name = nth(42))]`
+  - example: `#[singleton(name = "abc")]` / `#[Transient(name = a::b::NAME)]` / `#[SingleOwner(name = nth(42))]`
   - optional: true
   - default: **""**
   - description: Specifies the name of the defined `Provider`.
@@ -82,7 +82,7 @@ fn main() {
 
 - eager_create
   - type: bool
-  - example: `#[Singleton(eager_create)]` / `#[Transient(eager_create = true)]` / `#[SingleOwner(eager_create = false)]`
+  - example: `#[singleton(eager_create)]` / `#[Transient(eager_create = true)]` / `#[SingleOwner(eager_create = false)]`
   - optional: true
   - default: **false**
   - description: Specifies whether the defined `Provider` is eager to create.
@@ -96,7 +96,7 @@ fn main() {
 
 - condition
   - type: a closure or an expression path of type `fn(&Context) -> bool`.
-  - example: `#[Singleton(condition = |_cx| true)]` / `#[SingleOwner(condition = path::to::expr)]`
+  - example: `#[singleton(condition = |_cx| true)]` / `#[SingleOwner(condition = path::to::expr)]`
   - optional: true
   - default: **None**
   - description: Specifies whether or not to insert the defined `Provider` into the `Context` based on the condition.
@@ -110,7 +110,7 @@ fn main() {
 
 - binds
   - type: array of paths to functions of type `fn(T) -> R`, where `T` is current struct type or current function return type and `R` can be any type.
-  - example: `#[Singleton(binds = [Rc::new, Box::new])]`
+  - example: `#[singleton(binds = [Rc::new, Box::new])]`
   - optional: true
   - default: **Vec::new()**
   - description: Specifies the field `binding_providers` and `binding_definitions` of the defined `Provider`.
@@ -125,7 +125,7 @@ fn main() {
 - auto_register
   - **available only when the `auto-register` feature flag is enabled**
   - type: bool
-  - example: `#[Singleton(auto_register)]` / `#[Transient(auto_register = true)]` / `#[SingleOwner(auto_register = false)]`
+  - example: `#[singleton(auto_register)]` / `#[Transient(auto_register = true)]` / `#[SingleOwner(auto_register = false)]`
   - optional: true
   - default: **true**
   - description: Specifies whether a defined `Provider` should be auto-registered to [`AutoRegisterModule`]. When the `auto-register` feature is enabled (which is enabled by default), this argument can be used if auto-registration is not desired, or if auto-registration is not possible due to the presence of generics.
@@ -134,7 +134,7 @@ fn main() {
 
 - async
   - type: bool
-  - example: `#[Singleton(async)]`
+  - example: `#[singleton(async)]`
   - optional: true
   - default: **false**
   - description: Specifies whether the constructor method of a defined `Provider` is asynchronous. Only valid when used on `struct` and `enum`, for `impl block` and `fn` cases use `async fn`.
@@ -344,12 +344,12 @@ fn Two() -> i8 {
 
 // eager_create
 
-#[Singleton(name = "3")]
+#[singleton(name = "3")]
 fn Three() -> i16 {
     3
 }
 
-#[Singleton(name = "4", eager_create)]
+#[singleton(name = "4", eager_create)]
 fn Four() -> i16 {
     4
 }
@@ -360,12 +360,12 @@ fn _5_condition(cx: &Context) -> bool {
     !cx.contains_single_with_name::<i32>("5")
 }
 
-#[Singleton(name = "5", condition = _5_condition)]
+#[singleton(name = "5", condition = _5_condition)]
 fn Five() -> i32 {
     5
 }
 
-#[Singleton(name = "6", condition = |_cx| false)]
+#[singleton(name = "6", condition = |_cx| false)]
 fn Six() -> i32 {
     6
 }
@@ -376,24 +376,24 @@ fn transform<T: Debug + 'static>(t: T) -> Rc<dyn Debug> {
     Rc::new(t)
 }
 
-#[Singleton(name = "7")]
+#[singleton(name = "7")]
 fn Seven() -> i64 {
     7
 }
 
-#[Singleton(name = "8", binds = [transform])]
+#[singleton(name = "8", binds = [transform])]
 fn Eight() -> i64 {
     8
 }
 
 // auto_register
 
-#[Singleton(name = "9")]
+#[singleton(name = "9")]
 fn Nine() -> i128 {
     9
 }
 
-#[Singleton(name = "10", auto_register = false)]
+#[singleton(name = "10", auto_register = false)]
 fn Ten() -> i128 {
     10
 }
@@ -474,7 +474,7 @@ fn One() -> i8 {
     1
 }
 
-#[Singleton(name = "2")]
+#[singleton(name = "2")]
 fn Two() -> i8 {
     2
 }
@@ -518,7 +518,7 @@ fn Five() -> Vec<i64> {
     vec![5]
 }
 
-#[Singleton(eager_create)]
+#[singleton(eager_create)]
 fn Six() -> i64 {
     6
 }
@@ -544,7 +544,7 @@ fn Run(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H) {
     assert_eq!(h.0[0], 6);
 }
 
-#[Singleton(name = "ref")]
+#[singleton(name = "ref")]
 fn Run2(
     #[di(ref)] one: &i8,
     #[di(ref, name = "2")] two: &i8,
@@ -584,7 +584,7 @@ mod alias {
     type Five<'a> = &'a Vec<i64>;
     type Six<'a> = Vec<&'a i64>;
 
-    #[Singleton(name = "ref alias")]
+    #[singleton(name = "ref alias")]
     fn Run3(
         #[di(ref = i8)] one: OneAndTwo<'_>,
         #[di(ref = i8, name = "2")] two: OneAndTwo<'_>,

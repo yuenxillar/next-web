@@ -1,6 +1,6 @@
 [package]
 name = "next-web-core"
-version = "0.1.4"
+version = "0.1.5"
 edition.workspace = true
 description = "Core library for the Next Web framework, providing essential web server and middleware abstractions."
 license.workspace = true
@@ -9,14 +9,13 @@ license.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
-axum = { workspace = true}
+axum = { workspace = true }
 tokio =  { workspace = true, features = ["sync"]}
 
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 
 thiserror = { workspace = true }
-hashbrown = { workspace = true }
 dyn-clone = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }
@@ -39,5 +38,7 @@ tower-service = "0.3.3"
 [features]
 default = ["trace-log", "http-request"]
 http-request = ["headers"]
+
+embed-resources = []
 
 trace-log = []

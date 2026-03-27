@@ -1,11 +1,11 @@
 [package]
 name = "next-web"
-version = "0.1.7"
+version = "0.2.1"
 edition = "2021"
 description = "Make everything simpler!"
 homepage = "https://crates.io/crates/next-web"
 keywords = ["http", "web", "framework"]
-readme = "README.md"
+readme = "../README.md"
 repository = "https://github.com/yuenxillar/next-web"
 license.workspace = true
 rust-version.workspace = true
@@ -35,7 +35,7 @@ tower-http = { workspace = true, features = [
 ] }
 http-body-util = { workspace = true }
 tokio-cron-scheduler = { workspace = true, optional = true }
-rust-embed = { workspace = true }
+rust-embed = { workspace = true, optional = true }
 
 serde = { workspace = true }
 serde_yaml = { workspace = true }
@@ -88,15 +88,16 @@ mimalloc = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = ["enable-i18n", "enable-state-machine", "decrypt-properties", "enable-api-doc"]
+default = ["decrypt-properties"]
 full = [
     "enable-scheduling",
     "enable-web-security",
     "enable-retry",
     "enable-i18n",
     "decrypt-properties",
-    "enable-api-doc",
-    "enable-thread-pool"
+    # "enable-api-doc",
+    "enable-thread-pool",
+    "trace-log"
 ]
 
 rustls = ["axum-server"]
@@ -112,7 +113,7 @@ enable-i18n = []
 enable-state-machine = ["next-web-state-machine"]
 enable-thread-pool   = ["num_cpus"]
 
-embed-resources = ["next-web-macros/embed-resources"]
+embed-resources = ["next-web-macros/embed-resources", "next-web-core/embed-resources", "dep:rust-embed"]
 
 common = []
 

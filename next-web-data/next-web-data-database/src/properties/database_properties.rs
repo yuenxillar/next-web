@@ -1,8 +1,8 @@
 use next_web_macros::properties;
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 /// Properties for Database client.
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[properties(prefix = "next.data.database")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct DatabaseClientProperties {

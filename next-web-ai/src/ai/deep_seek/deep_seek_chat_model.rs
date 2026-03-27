@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
 use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError};
@@ -68,11 +69,12 @@ impl DeepSeekChatModel {
     ) -> Result<ChatCompletionRequest, &'static str> {
         let (system_messages, user_messages) = prompt.instructions().iter().fold(
             (Vec::new(), Vec::new()),
-            |(mut sys, mut user), s| {
-                let msg = ChatCompletionMessage::new(s.message_type().as_ref(), s.text());
-                match s.message_type() {
-                    MessageType::System => sys.push(msg),
-                    _ => user.push(msg),
+            |(mut sys, mut user), msg| {
+                let chat_completion_message =
+                    ChatCompletionMessage::with_slice(msg.message_type().as_ref(), msg.text());
+                match msg.message_type() {
+                    MessageType::System => sys.push(chat_completion_message),
+                    _ => user.push(chat_completion_message),
                 }
                 (sys, user)
             },
@@ -116,11 +118,12 @@ impl DeepSeekChatModel {
     }
 
     fn to_metadata(chat_completion: &ChatCompletion, model: &str) -> ChatResponseMetadata {
-        let usage: Box<dyn Usage> = chat_completion
+        let usage = chat_completion
             .usage
             .as_ref()
             .map(|u| Self::default_usage(u).into_boxed() as Box<dyn Usage>)
-            .unwrap_or_else(|| EmptyUsage.into_boxed());
+            .unwrap_or_else(|| EmptyUsage.into_boxed())
+            .into();
 
         ChatResponseMetadata {
             id: chat_completion.id.to_owned(),
@@ -179,8 +182,7 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
                 .choices
                 .first()
                 .and_then(|s| s.message.as_ref().and_then(|s1| Some(s1.content.clone())))
-                .unwrap_or_default()
-                .to_string();
+                .unwrap_or_default();
 
             let assistant_message = AssistantMessage {
                 text_content,
@@ -220,23 +222,24 @@ impl StreamingModel<Prompt, ChatResponse> for DeepSeekChatModel {
             async move {
                 let chat_completion = chat_completion?;
 
+                let chat_response_meta_data = chat_completion
+                    .last()
+                    .map(|chat_completion| Self::to_metadata(chat_completion, model.as_ref()))
+                    .unwrap_or_default();
                 let generations: Vec<Generation> = chat_completion
                     .iter()
                     .flat_map(|response| &response.choices)
                     .filter_map(|choice| choice.delta.as_ref())
                     .map(|delta| {
                         Generation::new(AssistantMessage {
-                            text_content: delta.content.to_string(),
+                            text_content: delta.content.clone(),
                             metadata: None,
                             message_type: MessageType::Assistant,
                         })
                     })
                     .collect();
 
-                Ok(ChatResponse::new(
-                    Self::to_metadata(chat_completion.last().unwrap(), &model),
-                    generations,
-                ))
+                Ok(ChatResponse::new(chat_response_meta_data, generations))
             }
         });
 

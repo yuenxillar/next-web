@@ -9,22 +9,10 @@ use syn::{
 
 use crate::{
     commons::{self, ArgumentResolveStmts},
-    resource_attr::ResourceAttr,
     impl_fn_or_enum_variant_attr::ImplFnOrEnumVariantAttr,
+    resource_attr::ResourceAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
-
-// struct A {
-//     a: i32,
-// }
-
-// #[Singleton]
-// impl A {
-//     #[resource]
-//     fn new(#[resource(name = "hello")] a:i32) -> Self {
-//         Self { a }
-//     }
-// }
 
 pub(crate) fn generate(
     attr: StructOrFunctionAttr,
@@ -136,7 +124,7 @@ fn generate_default_provider_impl<'a>(
         async_: _,
         #[cfg(feature = "auto-register")]
         auto_register,
-        default
+        default,
     } = attr;
 
     #[cfg(feature = "auto-register")]

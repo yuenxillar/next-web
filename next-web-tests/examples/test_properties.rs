@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use axum::response::IntoResponse;
 use next_web::{
-    application::Application, extract::find_singleton::FindSingleton, properties, Singleton,
+    application::Application,
+    extract::find_singleton::FindSingleton,
+    macros::{autoconfigure::properties, bind::singleton},
 };
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
+use next_web_core::{ApplicationContext, async_trait, context::properties::ApplicationProperties};
 
 #[derive(Clone, Default)]
 struct TestApplication;
@@ -45,7 +47,7 @@ async fn req_server_port(
 ) -> impl IntoResponse {
     format!(
         "Server port: {:?}",
-        properties.one_value::<u32>("next.server.port").unwrap()
+        properties.get_value::<u32>("next.server.port").unwrap()
     )
 }
 
@@ -63,7 +65,7 @@ async fn req_redis_dynamic_properties(
 
 // 示例 用于获取配置文件的参数值
 // Example, used to obtain parameter values for configuration files
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[properties(prefix = "next.data.redis")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct TestRedisProperties {
@@ -73,13 +75,13 @@ pub struct TestRedisProperties {
     pub database: Option<u8>,
 }
 
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[properties(prefix = "next.data.redis.dynamic", dynamic)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct TestDynamicRedisProperties {
     /// This is necessary, try not to change it as much as possible
     /// 这是必要的，尽量不要改变它, 后面的字段可以自定义
-    pub base: HashMap<String, TestRedisProperties>,
+    pub dynamic: HashMap<String, TestRedisProperties>,
 }
 
 #[tokio::main]

@@ -1,4 +1,4 @@
-use next_web::{Builder, FieldName, GetSet, RequiredArgsConstructor};
+use next_web::macros::data::{Builder, FieldName, GetSet, RequiredArgsConstructor};
 
 #[derive(Debug, PartialEq, Eq, Builder, RequiredArgsConstructor, GetSet, FieldName)]
 pub struct TestData {

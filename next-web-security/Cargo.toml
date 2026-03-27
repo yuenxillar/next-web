@@ -3,6 +3,7 @@ name = "next-web-security"
 version = "0.1.0"
 edition = "2021"
 description = "A security framework for Next Web Framework"
+license.workspace = true
 
 [dependencies]
 next-web-core.workspace = true
@@ -22,8 +23,8 @@ base64.workspace    = true
 urlencoding.workspace = true
 
 [features]
-default = ["user-friendly"]
-user-friendly = ["web"]
-comprehensive = []
+default = ["T1"]
+T1 = ["web"]
+T2 = []
 
 web = []

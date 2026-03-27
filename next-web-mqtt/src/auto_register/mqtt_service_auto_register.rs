@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use hashbrown::HashMap;
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
-    ApplicationContext, AutoRegister,
+    async_trait, context::properties::ApplicationProperties, error::BoxError,
+    traits::singleton::Singleton, ApplicationContext, AutoRegister,
 };
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 use crate::{
     core::{
@@ -16,7 +16,7 @@ use crate::{
     service::mqtt_service::MQTTService,
 };
 
-#[Singleton(binds = [Self::into_auto_register])]
+#[singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
 pub struct MQTTServiceAutoRegister(pub MQTTClientProperties);
 
@@ -36,7 +36,7 @@ impl AutoRegister for MQTTServiceAutoRegister {
         &self,
         ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), BoxError> {
         let mqtt_properties = self.0.clone();
 
         if mqtt_properties == MQTTClientProperties::default() {

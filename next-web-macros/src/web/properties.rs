@@ -101,29 +101,25 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                     // String 类型需要支持数字转字符串
                     quote! {
                         || -> Option<String> {
-                            // 优先尝试 one_value
-                            if let Some(s) = properties.one_value::<String>(#key_str) {
+                            // 优先尝试 get_value
+                            if let Some(s) = properties.get_value::<String>(#key_str) {
                                 return Some(s);
                             }
 
-                            match properties.one_value::<String>(#key_str) {
-                                Some(s) => Some(s),
-                                None => {
-                                    match properties.one_value::<i64>(#key_str) {
+
+                            match properties.get_value::<i64>(#key_str) {
+                                Some(s) => Some(s.to_string()),
+                                None => match properties.get_value::<f64>(#key_str) {
                                         Some(s) => Some(s.to_string()),
-                                        None => match properties.one_value::<f64>(#key_str) {
-                                                Some(s) => Some(s.to_string()),
-                                                None => None,
-                                        }
-                                    }
+                                        None => None,
                                 }
                             }
                         }()
                     }
                 } else {
-                    // 非字符串类型：直接尝试 one_value
+                    // 非字符串类型：直接尝试 get_value
                     quote! {
-                        properties.one_value::<#inner_type>(#key_str)
+                        properties.get_value::<#inner_type>(#key_str)
                     }
                 };
 
@@ -146,7 +142,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
         // dynamic_field
         let dynamic_field = if dynamic {
             quote! {
-                base: if let Some(values) = properties.dynamic_value(#prefix_expr) { values } else { Default::default() },
+                dynamic: if let Some(values) = properties.get_dynamic_value(#prefix_expr) { values } else { Default::default() },
             }
         } else {
             quote! {}
@@ -161,9 +157,9 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
 
         let struct_ident = &item_struct.ident;
 
-        // 检查是否有 #[Singleton(name = "")] 属性
+        // 检查是否有 #[singleton(name = "")] 属性
         let singleton_name = item_struct.attrs.iter().find_map(|attr| {
-            if !attr.path().is_ident("Singleton") && !attr.path().is_ident("SingleOwner") {
+            if !attr.path().is_ident("singleton") && !attr.path().is_ident("singleowner") {
                 return None;
             }
 
@@ -190,7 +186,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                 Ok(())
             });
             if !binds_exist {
-                panic!("Singleton or SingleOwner macro must support binds `#[Singleton(binds = [Self::into_properties])]`");
+                panic!("Singleton or SingleOwner macro must support binds `#[singleton(binds = [Self::into_properties])]`");
             }
             name
         });
@@ -215,7 +211,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                     &self,
                     ctx: &mut ::next_web_core::context::application_context::ApplicationContext,
                     properties: & ::next_web_core::context::properties::ApplicationProperties,
-                ) -> ::std::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error>> {
+                ) -> ::std::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error + Send + Sync>> {
                     let mut noting = false;
 
                     let instance = Self {

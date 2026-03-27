@@ -9,18 +9,18 @@ repository.workspace = true
 include.workspace = true
 readme.workspace = true
 
-
 [dependencies]
-tokio = { workspace = true, features= ["sync"]}
+next-web-core           = { workspace = true }
+
+next-web-ip             = { path = "../next-web-ip", version = "0.1.0" }
+next-web                = { path = "../next-web", version = "*", features = ["full"]}
+next-web-document       = { path = "../next-web-document", version = "0.1.0", features = [] }
+
+
+tokio = { workspace = true, features = ["sync"]}
 serde = { workspace = true }
 serde_json = { workspace = true }
-next-web-ip = { path = "../next-web-ip", version = "0.1.0" }
 
-next-web = { path = "../next-web", version = "*", features = ["full"]}
-next-web-core = { workspace = true }
-# next-web-data-database = { path = "../next-web-data-database", version = "0.1.0" }
-# next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "0.1.0" }
-next-web-document = { path = "../next-web-document", version = "0.1.0", features = [] }
 
 rust_xlsxwriter = { workspace = true }
 axum = { version = "0.8.4", features = ["default", "multipart", "query"] }
@@ -31,15 +31,24 @@ tracing ={ workspace = true}
 
 utoipa = { workspace = true }
 
+# next-web-data-database = { path = "../next-web-data-database", version = "0.1.0" }
+# next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "0.1.0" }
+
 [dev-dependencies]
-next-web-mqtt = { path = "../next-web-mqtt", version = "*" }
-next-web-ai = { path = "../next-web-ai", version = "*", features = ["deep-seek"]}
-next-web-websocket = { path = "../next-web-websocket", version = "*" }
-next-web-security = { path = "../next-web-security", version = "*" }
-next-web-data-redis = { path = "../next-web-data/next-web-data-redis", version = "*", features = ["expired-key-listener"]}
-next-web-data-database = { path = "../next-web-data/next-web-data-database", version = "*" }
+next-web-mqtt           = { path = "../next-web-mqtt", version = "*" }
+next-web-ai             = { path = "../next-web-ai", version = "*", features = ["deep-seek"]}
+next-web-websocket      = { path = "../next-web-websocket", version = "*" }
+next-web-security       = { path = "../next-web-security", version = "*" }
+next-web-data-redis     = { path = "../next-web-data/next-web-data-redis", version = "*", features = ["expired-key-listener"]}
+next-web-data-database  = { path = "../next-web-data/next-web-data-database", version = "*" }
 next-web-state-machine = { path = "../next-web-state-machine", version = "*" }
+next-web-xxl-job        = { path = "../next-web-xxl-job", version = "*" }
+
 # next-web-retry = { path = "../next-web-retry", version = "*"}
 
-
 validator = { version = "0.20.0", features = ["derive"] }
+
+
+[features]
+
+enable-api-doc = ["next-web/enable-api-doc"]

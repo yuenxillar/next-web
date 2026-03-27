@@ -63,7 +63,7 @@ fn generate(attr: TokenStream, item: TokenStream, scope: Scope) -> TokenStream {
 /// ```rust
 /// use std::sync::Arc;
 ///
-/// #[Singleton(
+/// #[singleton(
 ///     name = "myDataImpl",
 ///     condition = test_condition,
 ///     binds = [Self::into_data],
@@ -121,7 +121,7 @@ fn generate(attr: TokenStream, item: TokenStream, scope: Scope) -> TokenStream {
 /// ```rust
 /// use std::sync::Arc;
 ///
-/// #[Singleton(
+/// #[singleton(
 ///     name = "myDataImpl",
 ///     condition = test_condition,
 ///     binds = [Self::into_data],
@@ -156,8 +156,7 @@ fn generate(attr: TokenStream, item: TokenStream, scope: Scope) -> TokenStream {
 /// ```
 #[doc = include_str!("./docs/attribute_macro.md")]
 #[proc_macro_attribute]
-#[allow(non_snake_case)]
-pub fn Singleton(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn singleton(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate(attr, item, Scope::Singleton)
 }
 
@@ -165,8 +164,7 @@ pub fn Singleton(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[doc = ""]
 #[doc = include_str!("./docs/attribute_macro.md")]
 #[proc_macro_attribute]
-#[allow(non_snake_case)]
-pub fn Transient(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn transient(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate(attr, item, Scope::Transient)
 }
 
@@ -174,15 +172,6 @@ pub fn Transient(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[doc = ""]
 #[doc = include_str!("./docs/attribute_macro.md")]
 #[proc_macro_attribute]
-#[allow(non_snake_case)]
-pub fn SingleOwner(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn singleowner(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate(attr, item, Scope::SingleOwner)
 }
-
-// #[doc = ""]
-// #[doc = include_str!("./docs/attribute_macro.md")]
-// #[proc_macro_attribute]
-// #[allow(non_snake_case)]
-// pub fn Properties(attr: TokenStream, item: TokenStream) -> TokenStream {
-//     generate_from_properties(attr, item)
-// }

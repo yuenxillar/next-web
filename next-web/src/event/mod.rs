@@ -1,3 +1,2 @@
-pub mod default_application_event_publisher;
 pub mod default_application_event_multicaster;
-
+pub mod default_application_event_publisher;

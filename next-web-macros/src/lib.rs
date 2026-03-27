@@ -13,6 +13,7 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 use syn::DeriveInput;
 use syn::ItemFn;
+use syn::ItemImpl;
 use syn::ItemStruct;
 
 mod data;
@@ -280,13 +281,61 @@ pub fn desensitized(input: TokenStream) -> TokenStream {
 
 // =============================== Web ===============================
 
-#[doc = ""]
+///
+/// Process macros used to extend the entry point of Next web applications
+///
+/// # Attributes
+/// * `resources` - Optional parameter specifying the folder containing embedded resources
+///                 Example: `#[next_application(resources = "static")]`
+///
+/// # Behavior
+/// - Transforms a function into a Next-web application entry point
+/// - If `resources` attribute is provided, enables resource embedding from the specified folder
+///
+/// # Example
+/// ```
+/// use next_web::macros::application::next_application;
+///
+/// /// Basic application without embedded resources
+/// #[tokio::main]
+/// #[next_application]
+/// async fn main() {
+///     // Application code here
+/// }
+///
+/// /// Application with embedded resources from "static/" folder
+/// #[tokio::main]
+/// #[next_application(resources = "static/")]
+/// async fn main() {
+///     // Access embedded resources via ApplicationResources
+/// }
+/// ```
+///
+/// 用于拓展 Next-web 应用入口点的过程宏
+///
+/// # 属性
+/// * `resources` - 可选参数，指定包含嵌入资源的文件夹
+///                 示例: `#[next_application(resources = "static/")]`
+///
+/// # 行为
+/// - 将函数转换为 Next-web 应用入口点
+/// - 如果提供了 `resources` 属性，启用从指定文件夹嵌入资源
+///
+/// ```
 #[proc_macro_attribute]
 pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
     use crate::web::application::impl_macro_application;
 
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_application(attr, item_fn)
+}
+
+#[proc_macro_attribute]
+pub fn auto_configuration(attr: TokenStream, item: TokenStream) -> TokenStream {
+    use crate::web::auto_configuration::impl_macro_auto_configuration;
+
+    let item_impl = parse_macro_input!(item as ItemImpl);
+    impl_macro_auto_configuration(attr, item_impl)
 }
 
 #[doc = ""]
@@ -302,7 +351,7 @@ pub fn request_mapping(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::routing::with_method(None, args, input)
 }
 
-macro_rules! method_macro {
+macro_rules! http_method_macro {
     ($method:ident, $variant:ident) => {
         #[doc = ""]
         #[proc_macro_attribute]
@@ -316,12 +365,12 @@ macro_rules! method_macro {
     };
 }
 
-method_macro!(get_mapping, Get);
-method_macro!(post_mapping, Post);
-method_macro!(put_mapping, Put);
-method_macro!(delete_mapping, Delete);
-method_macro!(patch_mapping, Patch);
-method_macro!(any_mapping, Any);
+http_method_macro!(get_mapping, Get);
+http_method_macro!(post_mapping, Post);
+http_method_macro!(put_mapping, Put);
+http_method_macro!(delete_mapping, Delete);
+http_method_macro!(patch_mapping, Patch);
+http_method_macro!(any_mapping, Any);
 
 // #[cfg(feature = "api-doc")]
 #[proc_macro_attribute]
@@ -514,13 +563,20 @@ pub fn pre_authorize(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///    println! ("function test_retry backoff: {:?}", error);
 /// }
 /// ```
-// #[cfg(feature = "retry")]
 #[proc_macro_attribute]
 pub fn retryable(attr: TokenStream, item: TokenStream) -> TokenStream {
     use crate::web::retry::impl_macro_retry;
 
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_retry(attr, item_fn)
+}
+
+#[proc_macro_attribute]
+pub fn event_listener(attr: TokenStream, item: TokenStream) -> TokenStream {
+    use crate::web::event::impl_macro_event_listener;
+
+    let item_impl = parse_macro_input!(item as ItemImpl);
+    impl_macro_event_listener(attr, item_impl)
 }
 
 #[cfg(feature = "translation")]

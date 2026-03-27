@@ -50,7 +50,6 @@ pub(crate) fn is_option(ty: &syn::Type) -> bool {
 }
 
 pub(crate) fn extract_option_inner_type(ty: &syn::Type) -> Option<syn::Type> {
-    // 检查是否为 Option 类型
     // Check if it is of Option type
     if let syn::Type::Path(type_path) = ty {
         if let Some(segment) = type_path.path.segments.last() {
@@ -69,10 +68,8 @@ pub(crate) fn extract_option_inner_type(ty: &syn::Type) -> Option<syn::Type> {
     None
 }
 
-
-// 判断类型是否为 String（或 Option<String> 的 inner）
 // Determine whether the type is String (or inner of Option<String>)
-pub(crate)  fn is_string(ty: &syn::Type) -> bool {
+pub(crate) fn is_string(ty: &syn::Type) -> bool {
     if let syn::Type::Path(path) = ty {
         if path.path.segments.len() == 1 {
             return path.path.segments[0].ident == "String";

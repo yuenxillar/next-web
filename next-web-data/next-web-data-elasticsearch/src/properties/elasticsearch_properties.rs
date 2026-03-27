@@ -1,8 +1,8 @@
 use next_web_macros::Properties;
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 /// Properties for Elasticsearch client.
-#[Singleton(default, binds=[Self::into_properties])]
+#[singleton(default, binds=[Self::into_properties])]
 #[Properties(prefix = "next.data.elasticsearch")]
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ElasticsearchClientProperties {

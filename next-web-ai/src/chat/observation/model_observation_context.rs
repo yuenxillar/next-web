@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use next_web_core::anys::any_value::AnyValue;
 
@@ -13,7 +13,7 @@ pub struct ModelObservationContext<Q, R> {
     pub(crate) response: Option<R>,
 
     /// impl context
-    pub(crate) map: dashmap::DashMap<String, AnyValue>,
+    pub(crate) map: HashMap<String, AnyValue>,
     pub(crate) name: Option<String>,
     pub(crate) contextual_name: Option<String>,
 
@@ -70,18 +70,18 @@ impl<Q, R> ModelObservationContext<Q, R> {
         self.contextual_name = Some(contextual_name.into());
     }
 
-    pub fn put(&self, key: impl Into<String>, value: impl Into<AnyValue>) {
+    pub fn put(&mut self, key: impl Into<String>, value: impl Into<AnyValue>) {
         self.map.insert(key.into(), value.into());
     }
 
-    pub fn get(&self, key: impl AsRef<str>) -> Option<AnyValue> {
-        self.map.get(key.as_ref()).map(|v| v.value().clone())
+    pub fn get(&self, key: impl AsRef<str>) -> Option<&AnyValue> {
+        self.map.get(key.as_ref())
     }
 
     pub fn get_or_default(&self, key: impl AsRef<str>, default: impl Into<AnyValue>) -> AnyValue {
         self.map
             .get(key.as_ref())
-            .map(|v| v.value().clone())
+            .map(|v| v.clone())
             .unwrap_or(default.into())
     }
 
@@ -89,11 +89,11 @@ impl<Q, R> ModelObservationContext<Q, R> {
         self.map.contains_key(key.as_ref())
     }
 
-    pub fn remove(&self, key: impl AsRef<str>) -> Option<(String, AnyValue)> {
+    pub fn remove(&mut self, key: impl AsRef<str>) -> Option<AnyValue> {
         self.map.remove(key.as_ref())
     }
 
-    pub fn clear(&self) {
+    pub fn clear(&mut self) {
         self.map.clear()
     }
 }

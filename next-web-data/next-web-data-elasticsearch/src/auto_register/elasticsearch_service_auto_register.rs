@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use next_web_core::{
-    ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
-    traits::singleton::Singleton,
+    async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
+    ApplicationContext, AutoRegister,
 };
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 use crate::{
     properties::elasticsearch_properties::ElasticsearchClientProperties,
@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Register the `ElasticsearchService` as a singleton with the `ElasticsearchServiceAutoRegister` type.
-#[Singleton(binds = [Self::into_auto_register])]
+#[singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
 pub struct ElasticsearchServiceAutoRegister(pub ElasticsearchClientProperties);
 

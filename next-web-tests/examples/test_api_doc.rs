@@ -1,8 +1,10 @@
 use next_web::{
-    api_doc, application::Application, async_trait, extract::find_singleton::FindSingleton,
-    post_mapping, request_mapping,
+    application::Application,
+    async_trait,
+    extract::find_singleton::FindSingleton,
+    macros::bind::{post_mapping, request_mapping},
 };
-use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
+use next_web_core::{ApplicationContext, context::properties::ApplicationProperties};
 use utoipa::openapi::OpenApi;
 
 #[derive(Default, Clone)]
@@ -20,17 +22,17 @@ impl Application for TestApplication {
     }
 }
 
-#[api_doc(
-    responses(
-        (status = 200, description = "JSON file", body = ())
-    )
-)]
+// #[api_doc(
+//     responses(
+//         (status = 200, description = "JSON file", body = ())
+//     )
+// )]
 #[request_mapping(method = "GET", path = "/test")]
 async fn openapi(FindSingleton(open_api): FindSingleton<OpenApi>) -> String {
     open_api.to_pretty_json().unwrap()
 }
 
-#[api_doc]
+// #[api_doc]
 #[post_mapping(path = "/test1")]
 async fn test() -> String {
     String::from("Hello world!")

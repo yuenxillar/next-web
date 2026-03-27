@@ -27,27 +27,12 @@ pub use axum::Router;
 pub use axum::{body, error_handling, handler, http, response, routing};
 
 pub use headers;
-pub use inventory::submit;
 pub use rand;
 
 pub use next_web_core::*;
-pub use rudi_dev::{SingleOwner, Singleton, Transient};
-
-pub use next_web_macros::idempotency;
-pub use next_web_macros::properties;
-pub use next_web_macros::{
-    any_mapping, delete_mapping, get_mapping, patch_mapping, post_mapping, put_mapping,
-    request_mapping,
-};
-
-pub use next_web_macros::Desensitized;
-pub use next_web_macros::{Builder, FieldName, GetSet, RequiredArgsConstructor};
 
 #[cfg(feature = "enable-state-machine")]
 pub use next_web_state_machine as state_machine;
-
-#[cfg(feature = "enable-scheduling")]
-pub use next_web_macros::scheduled;
 
 #[cfg(feature = "enable-web-security")]
 pub use next_web_macros::pre_authorize;
@@ -61,11 +46,14 @@ pub use next_web_retry as retry;
 
 #[cfg(feature = "enable-api-doc")]
 pub use next_web_api_doc as api_doc;
-#[cfg(feature = "enable-api-doc")]
-pub use next_web_macros::api_doc;
 
 #[cfg(feature = "enable-i18n")]
 pub mod i18n;
+
+#[cfg(feature = "embed-resources")]
+pub mod embed {
+    pub use rust_embed::*;
+}
 
 #[cfg(feature = "common")]
 pub mod common;

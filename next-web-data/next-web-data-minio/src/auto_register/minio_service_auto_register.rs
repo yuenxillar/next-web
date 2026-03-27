@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use next_web_core::{
-    ApplicationContext, AutoRegister, async_trait, context::properties::ApplicationProperties,
-    traits::singleton::Singleton,
+    async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
+    ApplicationContext, AutoRegister,
 };
-use rudi_dev::Singleton;
+use rudi_dev::singleton;
 
 use crate::{
     properties::minio_properties::MinioClientProperties, service::minio_service::MinioService,
 };
 
 /// Register the `DatabaseService` as a singleton with the `DatabaseServiceAutoRegister` type.
-#[Singleton(binds = [Self::into_auto_register])]
+#[singleton(binds = [Self::into_auto_register])]
 #[derive(Clone)]
 pub struct MinioServiceAutoRegister(pub MinioClientProperties);
 

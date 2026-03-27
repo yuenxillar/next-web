@@ -19,7 +19,7 @@ where
     R: Into<RetryError>,
     Fut: Future<Output = Result<T, R>> + Send,
 {
-    async fn do_with_retry(& self, context: Arc<dyn RetryContext>) -> Result<T, RetryError> {
+    async fn do_with_retry(&self, context: Arc<dyn RetryContext>) -> Result<T, RetryError> {
         self(context).await.map_err(Into::into)
     }
 }

@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 
-use crate::context::{application_context::ApplicationContext, properties::ApplicationProperties};
+use crate::{
+    context::{application_context::ApplicationContext, properties::ApplicationProperties},
+    error::BoxError,
+};
 
 ///
 /// AutoRegister trait
@@ -37,7 +40,7 @@ pub trait AutoRegister: Sync + Send {
         &self,
         ctx: &mut ApplicationContext,
         properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn std::error::Error>>;
+    ) -> Result<(), BoxError>;
 }
 
 #[doc(hidden)]

@@ -9,6 +9,7 @@ pub mod convert;
 pub mod error;
 pub mod filter;
 pub mod http;
+pub mod macros;
 pub mod messaging;
 pub mod proxy;
 pub mod scheduler;
@@ -16,6 +17,7 @@ pub mod state;
 pub mod store;
 pub mod traits;
 pub mod util;
+pub mod wrapper;
 
 pub use self::autoregister::auto_register::*;
 pub use self::context::application_context::*;

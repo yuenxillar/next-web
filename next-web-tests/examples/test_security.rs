@@ -101,7 +101,7 @@ async fn set_token(Path(token): Path<String>, req: Request) -> impl IntoResponse
     "Ok"
 }
 
-// #[Singleton(binds = [Self::into_authentication_service])]
+// #[singleton(binds = [Self::into_authentication_service])]
 // #[derive(Clone)]
 // struct TestAuthenticationService {
 //     #[resource(name = "tokenStore")]
@@ -154,7 +154,7 @@ async fn set_token(Path(token): Path<String>, req: Request) -> impl IntoResponse
 //     }
 // }
 
-// #[Singleton(binds = [Self::into_web_security_configure])]
+// #[singleton(binds = [Self::into_web_security_configure])]
 // #[derive(Clone)]
 // struct TestWebSecurityConfigure;
 
