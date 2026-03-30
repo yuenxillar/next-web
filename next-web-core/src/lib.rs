@@ -18,11 +18,13 @@ pub mod store;
 pub mod traits;
 pub mod util;
 pub mod wrapper;
+pub mod server;
+pub mod mime_type;
 
 pub use self::autoregister::auto_register::*;
 pub use self::context::application_context::*;
 pub use async_trait::async_trait;
-pub use dyn_clone::{clone_box, clone_trait_object, DynClone};
+pub use dyn_clone::{DynClone, clone_box, clone_trait_object};
 
 #[cfg(feature = "http-request")]
 pub extern crate headers;

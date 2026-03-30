@@ -14,4 +14,4 @@ excel = []
 # excel = ["next-web-document-excel"]
 pdf = ["next-web-document-pdf"]
 
-docx = []
+docx = ["pdf", "next-web-document-pdf/word-convert"]

@@ -8,12 +8,24 @@ lopdf       = { version = "0.38.0" }
 rusttype    = { version = "0.9.3"  }
 image       = { version = "0.25.9" }
 pdf-extract = { version = "0.10.0" }
+chrono.workspace = true
+hex.workspace = true
+quick-xml = { workspace = true, optional = true }
+zip = { version = "3.0.0", optional = true }
 
 tracing.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 rand.workspace = true
+pdfium-render = { version = "0.8.37", optional = true }
 
 [features]
 default = []
 async = ["lopdf/async"]
+render = ["dep:pdfium-render"]
+ocr = ["render"]
+digital-signature = []
+word-convert = ["dep:quick-xml", "dep:zip"]
+
+[dev-dependencies]
+zip = { version = "3.0.0" }

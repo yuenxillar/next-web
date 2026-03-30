@@ -1,7 +1,6 @@
 use crate::scheduler::{context::JobExecutionContext, schedule_type::ScheduleType};
 use async_trait::async_trait;
 
-
 /// ScheduledTask is a trait that defines the behavior of an application job.
 #[async_trait]
 pub trait ScheduledTask

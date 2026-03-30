@@ -19,7 +19,7 @@ impl ApplicationState {
         &self.context
     }
 
-    pub fn context_mut(&mut self) -> &mut Arc<RwLock<ApplicationContext>> {
+    pub fn mut_context(&mut self) -> &mut Arc<RwLock<ApplicationContext>> {
         &mut self.context
     }
 

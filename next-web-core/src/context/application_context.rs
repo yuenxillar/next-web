@@ -1974,10 +1974,10 @@ please use instead:
 
         match (definition.scope, behaviour) {
             (Scope::Transient, Behaviour::JustCreateSingletonOrSingleOwner) => {
-                return Ok(Resolved::NotSingletonOrSingleOwner(definition.clone()))
+                return Ok(Resolved::NotSingletonOrSingleOwner(definition.clone()));
             }
             (Scope::SingleOwner, Behaviour::CreateThenReturnSingletonOrTransient) => {
-                return Ok(Resolved::NotSingletonOrTransient(definition.clone()))
+                return Ok(Resolved::NotSingletonOrTransient(definition.clone()));
             }
             _ => {}
         }
@@ -3307,8 +3307,8 @@ where
     Arc::new(constructor)
 }
 
-fn sync_eager_create_function<T: 'static + Send + Sync>(
-) -> fn(&mut ApplicationContext, Cow<'static, str>) {
+fn sync_eager_create_function<T: 'static + Send + Sync>()
+-> fn(&mut ApplicationContext, Cow<'static, str>) {
     |cx, name| {
         cx.just_create::<T>(name);
     }
@@ -3325,8 +3325,8 @@ fn create_async<T: 'static + Send + Sync>(
     })
 }
 
-fn async_eager_create_function<T: 'static + Send + Sync>(
-) -> fn(&mut ApplicationContext, Cow<'static, str>) -> BoxFuture<'static, ()> {
+fn async_eager_create_function<T: 'static + Send + Sync>()
+-> fn(&mut ApplicationContext, Cow<'static, str>) -> BoxFuture<'static, ()> {
     create_async::<T>
 }
 

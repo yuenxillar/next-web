@@ -462,7 +462,7 @@
               <div class="grid-2" style="margin-top:14px">
                 <label class="toggle">
                   <input type="checkbox" id="optionGetter" checked />
-                  <span><strong>生成 Getter</strong>输出 <code>get_xxx</code></span>
+                  <span><strong>生成 Getter</strong>输出 <code>field_name()</code></span>
                 </label>
                 <label class="toggle">
                   <input type="checkbox" id="optionSetter" checked />
@@ -900,6 +900,66 @@
       return match ? match[1].trim() : null;
     }
 
+    function normalizeRustType(typeText) {
+      return typeText.replace(/\s+/g, "");
+    }
+
+    function isCopyScalarType(typeText) {
+      return /^(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64|bool|char)$/.test(normalizeRustType(typeText));
+    }
+
+    function isReferenceType(typeText) {
+      return normalizeRustType(typeText).startsWith("&");
+    }
+
+    function isStringType(typeText) {
+      return normalizeRustType(typeText) === "String";
+    }
+
+    function resolveGetterSpec(field) {
+      const optionInner = extractOptionInner(field.type);
+
+      if (optionInner) {
+        if (isStringType(optionInner)) {
+          return {
+            returnType: "Option<&str>",
+            body: `self.${field.name}.as_deref()`
+          };
+        }
+
+        if (isCopyScalarType(optionInner) || isReferenceType(optionInner)) {
+          return {
+            returnType: `Option<${optionInner}>`,
+            body: `self.${field.name}`
+          };
+        }
+
+        return {
+          returnType: `Option<&${optionInner}>`,
+          body: `self.${field.name}.as_ref()`
+        };
+      }
+
+      if (isStringType(field.type)) {
+        return {
+          returnType: "&str",
+          body: `self.${field.name}.as_str()`
+        };
+      }
+
+      if (isCopyScalarType(field.type) || isReferenceType(field.type)) {
+        return {
+          returnType: field.type,
+          body: `self.${field.name}`
+        };
+      }
+
+      return {
+        returnType: `&${field.type}`,
+        body: `&self.${field.name}`
+      };
+    }
+
     function splitStructBodyFields(body) {
       return body
         .split(/\r?\n/)
@@ -958,12 +1018,15 @@
       const blocks = [];
       const implHeader = `impl${parsed.implGenerics} ${parsed.typeName} {`;
       const implLines = [];
+      const docLines = (indent, text) => text.split("\n").map((line) => `${indent}/// ${line}`);
 
       if (options.getter) {
         parsed.fields.forEach((field) => {
+          const getter = resolveGetterSpec(field);
           implLines.push(
-            `    pub fn get_${field.name}(&self) -> &${field.type} {`,
-            `        &self.${field.name}`,
+            ...docLines("    ", `Returns the \`${field.name}\` field.`),
+            `    pub fn ${field.name}(&self) -> ${getter.returnType} {`,
+            `        ${getter.body}`,
             "    }",
             ""
           );
@@ -972,9 +1035,21 @@
 
       if (options.setter) {
         parsed.fields.forEach((field) => {
+          const optionInner = extractOptionInner(field.type);
           implLines.push(
-            `    pub fn set_${field.name}(&mut self, value: ${field.type}) {`,
-            `        self.${field.name} = value;`,
+            ...docLines("    ", `Sets the \`${field.name}\` field.`),
+            ...(optionInner
+              ? [
+                  `    pub fn set_${field.name}<V>(&mut self, value: V)`,
+                  "    where",
+                  `        V: Into<Option<${optionInner}>>,`,
+                  "    {",
+                  `        self.${field.name} = value.into();`
+                ]
+              : [
+                  `    pub fn set_${field.name}(&mut self, value: ${field.type}) {`,
+                  `        self.${field.name} = value;`
+                ]),
             "    }",
             ""
           );
@@ -984,6 +1059,7 @@
       if (options.chain) {
         parsed.fields.forEach((field) => {
           implLines.push(
+            ...docLines("    ", `Sets the \`${field.name}\` field and returns the updated instance.`),
             `    pub fn with_${field.name}(&mut self, value: ${field.type}) -> &mut Self {`,
             `        self.${field.name} = value;`,
             "        self",
@@ -997,6 +1073,7 @@
         parsed.fields.forEach((field) => {
           if (extractOptionInner(field.type)) {
             implLines.push(
+              ...docLines("    ", `Clears the \`${field.name}\` field.`),
               `    pub fn clear_${field.name}(&mut self) {`,
               `        self.${field.name} = None;`,
               "    }",
@@ -1008,6 +1085,7 @@
 
       if (options.builder) {
         implLines.push(
+          ...docLines("    ", `Creates a new \`${parsed.builderTypeName}\`.`),
           `    pub fn builder() -> ${parsed.builderTypeName} {`,
           `        ${parsed.builderTypeName}::new()`,
           "    }",
@@ -1030,6 +1108,7 @@
           const inner = extractOptionInner(field.type);
           const argType = inner || field.type;
           return [
+            ...docLines("    ", `Sets the \`${field.name}\` field on the builder.`),
             `    pub fn ${field.name}(mut self, value: ${argType}) -> Self {`,
             `        self.${field.name} = Some(value);`,
             "        self",
@@ -1053,11 +1132,13 @@
           "}",
           "",
           `impl${parsed.implGenerics} ${parsed.builderTypeName} {`,
+          ...docLines("    ", "Creates a new builder instance."),
           "    pub fn new() -> Self {",
           "        Self::default()",
           "    }",
           "",
           ...builderSetters,
+          ...docLines("    ", `Builds a \`${parsed.typeName}\` instance.`),
           `    pub fn build(self) -> Result<${parsed.typeName}, String> {`,
           `        Ok(${parsed.typeName} {`,
           ...buildFields,

@@ -27,7 +27,7 @@ impl MinioServiceAutoRegister {
 #[async_trait]
 impl AutoRegister for MinioServiceAutoRegister {
     /// Return the singleton name to identify the service
-    fn registered_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         ""
     }
 

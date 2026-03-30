@@ -2,9 +2,9 @@ use std::future::Future;
 
 use next_web_core::{scheduler::schedule_type::ScheduleType, ApplicationContext};
 
-
 pub trait SchedulerAutoRegister
-where Self: Send + Sync +'static
+where
+    Self: Send + Sync + 'static,
 {
     fn register(&self, __ctx: &mut ApplicationContext) -> AnJob;
 }
@@ -20,10 +20,11 @@ macro_rules! submit_scheduler {
     };
 }
 
-
-type JobFuture =    Box<dyn Fn() -> std::pin::Pin<Box<dyn Future<Output = ()> + Send + Sync>> + Send + Sync + 'static>;
-type JobFunction =  Box<dyn Fn() + Send + Sync + 'static>;
+type JobFuture = Box<
+    dyn Fn() -> std::pin::Pin<Box<dyn Future<Output = ()> + Send + Sync>> + Send + Sync + 'static,
+>;
+type JobFunction = Box<dyn Fn() + Send + Sync + 'static>;
 pub enum AnJob {
-    Async((ScheduleType,    JobFuture)),
-    Sync((ScheduleType,     JobFunction)),
+    Async((ScheduleType, JobFuture)),
+    Sync((ScheduleType, JobFunction)),
 }

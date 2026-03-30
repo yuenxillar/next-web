@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use next_web::retry::error::retry_error::RetryError;
-use next_web::retry::retry_context::RetryContext;
+use next_web::retry::retry_callback::with_fn;
 use next_web::retry::retry_operations::RetryOperations;
 use next_web::retry::support::retry_template::RetryTemplate;
 use next_web::retryable;
@@ -51,28 +51,30 @@ async fn main() {
         .max_attempts(4)
         .exponential_backoff(1000, 6000, 2.0, false)
         .build()
-        .execute(|ctx: std::sync::Arc<dyn RetryContext>| async move {
-            let retry_count = ctx.get_attribute("retryCount");
-            let value = retry_count
-                .map(|s| s.as_number().unwrap_or_default())
-                .unwrap_or_default();
+        .execute(with_fn(|ctx| {
+            Box::pin(async move {
+                let retry_count = ctx.get_attribute("retryCount");
+                let value = retry_count
+                    .map(|s| s.as_number().unwrap_or_default())
+                    .unwrap_or_default();
 
-            if value < 4 {
-                if value > 0 {
-                    println!(
-                        "Retry Count: {}, timestamp: {}",
-                        value,
-                        LocalDateTime::timestamp()
-                    );
+                if value < 4 {
+                    if value > 0 {
+                        println!(
+                            "Retry Count: {}, timestamp: {}",
+                            value,
+                            LocalDateTime::timestamp()
+                        );
+                    }
+                    ctx.set_attribute("retryCount", AnyValue::Number(value + 1));
+                    return Err(RetryError::Any(Box::new(TestRetryError::Default(
+                        "test retry error".to_string(),
+                    ))));
                 }
-                ctx.set_attribute("retryCount", AnyValue::Number(value + 1));
-                return Err(RetryError::Any(Box::new(TestRetryError::Default(
-                    "test retry error".to_string(),
-                ))));
-            }
 
-            Ok(())
-        })
+                Ok(())
+            })
+        }))
         .await;
     println!("result: {:?}", result);
 }

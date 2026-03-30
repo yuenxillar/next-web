@@ -1,7 +1,7 @@
 /// 非法状态错误
-#[derive( Debug)]
+#[derive(Debug)]
 pub struct IllegalStateError {
-   pub msg: String,
+    pub msg: String,
 }
 
 impl std::fmt::Display for IllegalStateError {

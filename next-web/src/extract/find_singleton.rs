@@ -52,7 +52,7 @@ where
                     None => {
                         drop(reader);
                         match state
-                            .context_mut()
+                            .mut_context()
                             .write()
                             .await
                             .resolve_option_with_name_async::<T>(singleton_name)

@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     fmt::{self},
     sync::Arc,
 };
@@ -154,7 +155,7 @@ pub struct JobHandlerValue {
     pub name: Arc<String>,
     pub is_running: bool,
     pub last_run_id: u64,
-    pub block_jobs: Vec<JobContext>,
+    pub block_jobs: VecDeque<JobContext>,
 }
 
 #[derive(Clone)]
@@ -170,7 +171,7 @@ impl JobHandlerValue {
             name,
             is_running: false,
             last_run_id: 0,
-            block_jobs: Vec::with_capacity(2),
+            block_jobs: VecDeque::with_capacity(2),
         }
     }
     pub fn push_block_job(&mut self, job: JobContext) -> Option<JobContext> {
@@ -178,21 +179,17 @@ impl JobHandlerValue {
             return None;
         }
         if self.block_jobs.len() >= 10 {
-            let remove = self.block_jobs.remove(0);
-            self.block_jobs.push(job);
-            Some(remove)
+            let remove = self.block_jobs.pop_front();
+            self.block_jobs.push_back(job);
+            remove
         } else {
-            self.block_jobs.push(job);
+            self.block_jobs.push_back(job);
             None
         }
     }
 
     pub fn pop_block_job(&mut self) -> Option<JobContext> {
-        if self.block_jobs.is_empty() {
-            None
-        } else {
-            Some(self.block_jobs.remove(0))
-        }
+        self.block_jobs.pop_front()
     }
 
     pub fn build_run_param(&self) -> JobHandlerRunParam {

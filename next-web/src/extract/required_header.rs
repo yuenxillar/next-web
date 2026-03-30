@@ -1,6 +1,8 @@
-use axum::{extract::FromRequestParts, http::{request::Parts, HeaderName}};
+use axum::{
+    extract::FromRequestParts,
+    http::{request::Parts, HeaderName},
+};
 use reqwest::StatusCode;
-
 
 /// 这个最主要的作用是当请求没有指定的请求时,则返回 400
 #[derive(Debug, Clone)]
@@ -20,7 +22,7 @@ where
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let name = T::to_header_name();
         let is_exists = parts.headers.contains_key(&name);
-        
+
         if !is_exists {
             #[cfg(feature = "trace-log")]
             tracing::debug!("Required header {} not found in request", name.as_str());
@@ -52,7 +54,10 @@ pub mod header_names {
         (AcceptEncoding, ACCEPT_ENCODING),
         (AcceptLanguage, ACCEPT_LANGUAGE),
         (AcceptRanges, ACCEPT_RANGES),
-        (AccessControlAllowCredentials, ACCESS_CONTROL_ALLOW_CREDENTIALS),
+        (
+            AccessControlAllowCredentials,
+            ACCESS_CONTROL_ALLOW_CREDENTIALS
+        ),
         (AccessControlAllowHeaders, ACCESS_CONTROL_ALLOW_HEADERS),
         (AccessControlAllowMethods, ACCESS_CONTROL_ALLOW_METHODS),
         (AccessControlAllowOrigin, ACCESS_CONTROL_ALLOW_ORIGIN),
@@ -75,7 +80,10 @@ pub mod header_names {
         (ContentLocation, CONTENT_LOCATION),
         (ContentRange, CONTENT_RANGE),
         (ContentSecurityPolicy, CONTENT_SECURITY_POLICY),
-        (ContentSecurityPolicyReportOnly, CONTENT_SECURITY_POLICY_REPORT_ONLY),
+        (
+            ContentSecurityPolicyReportOnly,
+            CONTENT_SECURITY_POLICY_REPORT_ONLY
+        ),
         (ContentType, CONTENT_TYPE),
         (Cookie, COOKIE),
         (Date, DATE),

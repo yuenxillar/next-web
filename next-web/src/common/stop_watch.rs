@@ -1,5 +1,5 @@
-use std::time::{Duration, Instant};
 use std::fmt;
+use std::time::{Duration, Instant};
 
 /// 高性能秒表实现，支持启动、停止、重置、分段计时等功能
 ///
@@ -216,19 +216,19 @@ mod tests {
     #[test]
     fn test_basic_operations() {
         let mut sw = Stopwatch::new();
-        
+
         // 测试开始
         sw.start();
         sleep(Duration::from_millis(50));
         assert!(sw.elapsed_millis() >= 50);
         assert!(sw.is_running());
-        
+
         // 测试停止
         sw.stop();
         let elapsed = sw.elapsed_millis();
         sleep(Duration::from_millis(50));
         assert_eq!(sw.elapsed_millis(), elapsed); // 停止后时间不应增加
-        
+
         // 测试重置
         sw.reset();
         assert_eq!(sw.elapsed_millis(), 0);
@@ -239,14 +239,14 @@ mod tests {
     fn test_lap_timing() {
         let mut sw = Stopwatch::start_new();
         sleep(Duration::from_millis(10));
-        
+
         let lap1 = sw.lap();
         assert!(lap1.as_millis() >= 10);
-        
+
         sleep(Duration::from_millis(20));
         let lap2 = sw.lap();
         assert!(lap2.as_millis() >= 20);
-        
+
         assert_eq!(sw.laps().len(), 2);
         assert!(sw.average_lap().unwrap().as_millis() >= 15);
     }
@@ -257,7 +257,7 @@ mod tests {
             sleep(Duration::from_millis(30));
             42
         });
-        
+
         assert_eq!(result, 42);
         assert!(duration.as_millis() >= 30);
     }
@@ -266,7 +266,7 @@ mod tests {
     fn test_restart() {
         let mut sw = Stopwatch::start_new();
         sleep(Duration::from_millis(25));
-        
+
         let previous_elapsed = sw.restart();
         assert!(previous_elapsed.as_millis() >= 25);
         assert!(sw.is_running());
@@ -279,7 +279,7 @@ mod tests {
         sw.start();
         sleep(Duration::from_millis(100));
         sw.stop();
-        
+
         let display_str = format!("{}", sw);
         assert!(display_str.contains("0.1")); // 应该显示约0.1秒
     }

@@ -1,11 +1,12 @@
 [package]
 name = "next-web-data-database"
 version = "0.1.0"
-edition = "2024"
 description = "Next Web Data Database"
 readme = "README.md"
 keywords = ["next-web", "database", "rbatis"]
+
 license.workspace = true
+edition.workspace = true
 
 [dependencies]
 next-web-core = { workspace = true }
@@ -25,5 +26,6 @@ rbdc-pool-fast = { workspace = true, optional = true }
 
 [features]
 default = ["rbdc-pool-fast", "enable_mysql"]
+
 enable_mysql = ["rbdc-mysql"]
 enable_postgres = ["rbdc-pg"]

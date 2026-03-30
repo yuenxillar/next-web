@@ -21,7 +21,7 @@ impl RabbitmqServiceAutoRegister {
 
 #[async_trait]
 impl AutoRegister for RabbitmqServiceAutoRegister {
-    fn registered_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         ""
     }
 

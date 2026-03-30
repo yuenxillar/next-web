@@ -2,75 +2,37 @@ use std::ops::Deref;
 
 use crate::{
     core::{
-        interceptor::message_interceptor::MessageInterceptor,
-        route::{MacthType, TopicRoute},
+        interceptor::message_interceptor::MessageInterceptor, route::TopicRoute,
         topic::base_topic::BaseTopic,
     },
     properties::mqtt_properties::MQTTClientProperties,
 };
 
 use hashbrown::HashMap;
-use next_web_core::error::BoxError;
-use next_web_core::traits::{service::Service, singleton::Singleton};
+use next_web_core::{error::BoxError, impl_service};
 use rumqttc::{
     AsyncClient, ConnectReturnCode, Event, MqttOptions, NetworkOptions, Packet, QoS,
     SubscribeFilter,
 };
 use tracing::{error, warn};
 
-/// MQTT Service
-/// This struct provides MQTT client functionality including:
-/// - Connection management
-/// - Topic subscription
-/// - Message publishing
-/// - Message routing
-/// - Interception handling
+/// MQTT service.
 ///
-/// MQTT 服务
-/// 这个结构体提供MQTT客户端功能，包括:
-/// - 连接管理
-/// - 主题订阅
-/// - 消息发布
-/// - 消息路由
-/// - 拦截处理
+/// This service is responsible for:
+/// - configuring the MQTT client
+/// - subscribing configured topics
+/// - dispatching published messages to exact routes and wildcard routes
+/// - invoking message interceptors before consumption
 #[derive(Clone)]
 pub struct MQTTService {
-    /// MQTT client configuration properties
-    ///
-    /// MQTT客户端配置属性
+    /// MQTT client configuration properties.
     properties: MQTTClientProperties,
-
-    /// Async MQTT client instance
-    ///
-    /// 异步MQTT客户端实例
+    /// Async MQTT client instance.
     client: AsyncClient,
 }
 
-impl Singleton  for MQTTService {}
-impl Service    for MQTTService {}
-
 impl MQTTService {
-    /// Creates a new MQTTService instance
-    ///
-    /// # Arguments
-    /// - `properties`: MQTT client configuration
-    /// - `route_map`: Topic consumer map
-    /// - `route`: Topic route
-    /// - `interceptor`: Message interceptor
-    ///
-    /// # Returns
-    /// Self
-    ///
-    /// 创建新的MQTTService实例
-    ///
-    /// # 参数
-    /// - `properties`: MQTT客户端配置
-    /// - `router_map`: 主题路由映射
-    /// - `router`: 主题路由
-    /// - `interceptor`: 消息拦截器
-    ///
-    /// # 返回值
-    /// Self
+    /// Creates a new `MQTTService`.
     pub fn new(
         properties: MQTTClientProperties,
         route_map: HashMap<String, Box<dyn BaseTopic>>,
@@ -81,26 +43,7 @@ impl MQTTService {
         Ok(Self { properties, client })
     }
 
-    /// Builds and configures the MQTT client
-    ///
-    /// # Arguments
-    /// - `Connection options`
-    /// - `Topic subscription`
-    /// - `Message event loop`
-    ///
-    /// # Returns
-    /// Async MQTT client instance
-    ///
-    /// 构建并配置MQTT客户端
-    ///
-    /// # 参数
-    /// - `Connection options` 连接选项
-    /// - `Topic subscription` 主题订阅
-    /// - `Message event loop` 消息事件循环
-    ///
-    /// # 返回值
-    /// 异步MQTT客户端实例
-    ///
+    /// Builds and configures the MQTT client, subscriptions and event loop.
     fn build_client(
         properties: &MQTTClientProperties,
         mut route_map: HashMap<String, Box<dyn BaseTopic>>,
@@ -115,14 +58,14 @@ impl MQTTService {
 
         options
             .set_keep_alive(std::time::Duration::from_millis(
-                properties.keep_alive().unwrap_or(60000),
+                properties.keep_alive().unwrap_or(60_000),
             ))
             .set_clean_session(properties.clean_session().unwrap_or(true))
             .set_credentials(
                 properties.username().unwrap_or_default(),
                 properties.password().unwrap_or_default(),
             );
-        
+
         let (client, mut eventloop) = AsyncClient::new(options, 999);
 
         let mut network_options = NetworkOptions::new();
@@ -130,23 +73,16 @@ impl MQTTService {
         eventloop.set_network_options(network_options);
 
         let topics = properties.topics();
-        let client_1 = client.clone();
+        let reconnect_client = client.clone();
 
-        // subscribe topics
-        let need_subscribe_topics = topics
+        let subscribe_filters = topics
             .iter()
-            .map(|t| {
-                let qos: QoS = t.qos.as_ref().map(|q|  match *q {
-                    0 => QoS::AtMostOnce,
-                    1=> QoS::AtLeastOnce,
-                    2 => QoS::ExactlyOnce,
-                    _ => QoS::AtLeastOnce,
-                }).unwrap_or(QoS::AtLeastOnce);
-                
-                SubscribeFilter::new(t.topic.clone(), qos)
+            .map(|topic| {
+                let qos = topic.qos.map(resolve_qos).unwrap_or(QoS::AtLeastOnce);
+                SubscribeFilter::new(topic.topic.clone(), qos)
             })
             .collect::<Vec<_>>();
-        client.try_subscribe_many(need_subscribe_topics)?;
+        client.try_subscribe_many(subscribe_filters)?;
 
         tokio::spawn(async move {
             loop {
@@ -154,91 +90,51 @@ impl MQTTService {
                     Ok(Event::Incoming(Packet::Publish(packet))) => {
                         let message = packet.payload;
                         let topic = packet.topic;
+
                         if !interceptor.message_entry(&topic, &message).await {
                             continue;
                         }
 
-                        if let Some(basic) = route_map.get_mut(&topic) {
-                            basic.consume(&topic, &message).await;
+                        if let Some(exact_topic) = route_map.get_mut(&topic) {
+                            exact_topic.consume(&topic, &message).await;
                         }
 
-                        for item in route.iter_mut() {
-                            match item.match_type {
-                                MacthType::Anything => {
-                                    item.base_topic.consume(&topic, &message).await;
-                                }
-
-                                MacthType::Multilayer(index) => {
-                                    if let (Some(topic_prefix), Some(route_prefix)) =
-                                        (topic.get(..index), item.topic.get(..index))
-                                    {
-                                        if topic_prefix == route_prefix {
-                                            item.base_topic.consume(&topic, &message).await;
-                                        }
-                                    }
-                                }
-
-                                MacthType::Singlelayer(left_index, right_index) => {
-                                    let len = topic.len();
-                                    if let (Some(topic_prefix), Some(route_prefix)) =
-                                        (topic.get(..left_index), item.topic.get(..left_index))
-                                    {
-                                        if topic_prefix != route_prefix {
-                                            continue;
-                                        }
-                                        if right_index != 0 {
-                                            let topic_suffix =
-                                                topic.get(len.saturating_sub(right_index)..);
-                                            let route_suffix = item
-                                                .topic
-                                                .get(item.topic.len().saturating_sub(right_index)..);
-                                            if topic_suffix.is_none()
-                                                || route_suffix.is_none()
-                                                || topic_suffix != route_suffix
-                                            {
-                                                continue;
-                                            }
-                                        }
-                                        item.base_topic.consume(&topic, &message).await;
-                                    }
-                                }
+                        for wildcard_route in route.iter_mut() {
+                            if wildcard_route.matches(&topic) {
+                                wildcard_route.base_topic.consume(&topic, &message).await;
                             }
                         }
                     }
 
                     Ok(Event::Incoming(Packet::ConnAck(ack))) => {
-                        // This generally refers to the need to receive ack information and re subscribe to the topic after reconnection
-                        match ack.code {
-                            ConnectReturnCode::Success => {
-                                for t in topics.iter() {
-                                    if let Err(err) = client_1
-                                        .subscribe(
-                                            t.topic.clone(),
-                                            rumqttc::qos(t.qos.unwrap_or(0))
-                                                .unwrap_or(QoS::AtLeastOnce),
-                                        )
-                                        .await
-                                    {
-                                        error!(
-                                            "Failed to resubscribe topic {} after reconnect: {:?}",
-                                            t.topic,
-                                            err
-                                        );
-                                    }
+                        if ack.code == ConnectReturnCode::Success {
+                            for topic in topics.iter() {
+                                if let Err(err) = reconnect_client
+                                    .subscribe(
+                                        topic.topic.clone(),
+                                        topic.qos.map(resolve_qos).unwrap_or(QoS::AtLeastOnce),
+                                    )
+                                    .await
+                                {
+                                    error!(
+                                        "Failed to resubscribe topic {} after reconnect: {:?}",
+                                        topic.topic, err
+                                    );
                                 }
-                                warn!("Client reconnection successful, try re subscribing to the themes")
                             }
-                            _ => {}
+                            warn!(
+                                "Client reconnected successfully, resubscribed configured topics"
+                            );
                         }
                     }
 
-                    Err(e) => {
-                        error!("Mqtt eventloop error, connection error case: {:?}", e);
+                    Err(err) => {
+                        error!("MQTT eventloop error: {:?}", err);
                         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                     }
 
                     _ => {
-                        // TODO -> Outgoing
+                        // Ignore other incoming or outgoing events for now.
                     }
                 }
             }
@@ -247,24 +143,7 @@ impl MQTTService {
         Ok(client)
     }
 
-    /// Publishes a message to a topic with default QoS (AtLeastOnce)
-    ///
-    /// # Arguments
-    /// - `topic`: Target topic
-    /// - `message`: Message content
-    ///
-    /// # Returns
-    /// Asynchronous response result obtained from publishing operation
-    ///
-    ///
-    /// 使用默认QoS(AtLeastOnce)向主题发布消息
-    ///
-    /// # 参数
-    /// - `topic`: 目标主题
-    /// - `message`: 消息内容
-    ///
-    /// # 返回值
-    /// 发布操作得到的异步响应结果
+    /// Publishes a message with default QoS `AtLeastOnce`.
     pub async fn publish<S, V>(&self, topic: S, message: V) -> Result<(), rumqttc::ClientError>
     where
         S: Into<String>,
@@ -275,26 +154,7 @@ impl MQTTService {
             .await
     }
 
-    /// Publishes a message with custom QoS level
-    ///
-    /// # Arguments
-    ///
-    /// - `topic`: Target topic
-    /// - `q`: QoS level (0 1 2)
-    /// - `message`: Message content
-    ///
-    /// # Returns
-    /// Asynchronous response result obtained from publishing operation
-    ///
-    /// 使用自定义QoS级别发布消息
-    ///
-    /// # 参数
-    /// - `topic`:  目标主题
-    /// - `q`:  QoS级别(0 1 2)
-    /// - `message`: 消息内容
-    ///
-    /// # 返回值
-    /// 发布操作得到的异步响应结果
+    /// Publishes a message with a custom QoS level.
     pub async fn publish_with_qos<S, V>(
         &self,
         topic: S,
@@ -305,32 +165,12 @@ impl MQTTService {
         S: Into<String>,
         V: Into<Vec<u8>>,
     {
-        let qos = rumqttc::qos(q).unwrap_or(QoS::AtLeastOnce);
-        self.client.publish(topic, qos, false, message).await
+        self.client
+            .publish(topic, resolve_qos(q), false, message)
+            .await
     }
 
-    /// Publish messages with custom QoS levels and whether to Retain
-    ///
-    /// # Arguments
-    ///
-    /// - `topic`: Target topic
-    /// - `q`: QoS level (0 1 2)
-    /// - `retain`: Whether to retain
-    /// - `message`: Message content
-    ///
-    /// # Returns
-    /// Asynchronous response result obtained from publishing operation
-    ///
-    /// 发布具有自定义QoS级别的消息以及是否保留
-    ///
-    /// # 参数
-    /// - `topic`:  目标主题
-    /// - `q`:  QoS级别(0 1 2)
-    /// - `retain`: 是否保留
-    /// - `message`: 消息内容
-    ///
-    /// # 返回值
-    /// 发布操作得到的异步响应结果
+    /// Publishes a message with a custom QoS level and retain flag.
     pub async fn publish_with_retain<S, V>(
         &self,
         topic: S,
@@ -342,20 +182,17 @@ impl MQTTService {
         S: Into<String>,
         V: Into<Vec<u8>>,
     {
-        let qos = rumqttc::qos(q).unwrap_or(QoS::AtLeastOnce);
-        self.client.publish(topic, qos, retain, message).await
+        self.client
+            .publish(topic, resolve_qos(q), retain, message)
+            .await
     }
 
-    /// Returns a reference to the MQTT client
-    ///
-    /// 返回MQTT客户端的引用
+    /// Returns a reference to the MQTT client.
     pub fn get_client(&self) -> &AsyncClient {
         &self.client
     }
 
-    /// Returns a reference to the MQTT properties
-    ///
-    /// 返回MQTT配置属性的引用
+    /// Returns a reference to the MQTT properties.
     pub fn properties(&self) -> &MQTTClientProperties {
         &self.properties
     }
@@ -368,3 +205,9 @@ impl Deref for MQTTService {
         &self.client
     }
 }
+
+fn resolve_qos(qos: u8) -> QoS {
+    rumqttc::qos(qos).unwrap_or(QoS::AtLeastOnce)
+}
+
+impl_service!(MQTTService);

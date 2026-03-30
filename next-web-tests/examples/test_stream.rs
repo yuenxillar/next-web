@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
-use axum::{body::Bytes, response::IntoResponse};
+use axum::{body::Bytes, extract::Query, response::IntoResponse};
 use next_web::{
     application::Application,
     stream::{
         bytes_stream::BytesStream, local_file_stream::LocalFileStream,
         network_file_stream::NetworkFileStream, response_stream::ResponseStream,
     },
+    util::local_date_time::LocalDateTime,
 };
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
+use next_web_core::{ApplicationContext, async_trait, context::properties::ApplicationProperties};
 
 #[derive(Clone, Default)]
 struct TestApplication;
@@ -34,22 +35,29 @@ impl Application for TestApplication {
     }
 }
 
-async fn download_file() -> impl IntoResponse {
-    ResponseStream::new(LocalFileStream(
-        "Please enter your large file address here. /  请在此处输入您的文件地址".into(),
-    ))
+async fn download_file(Query(file_path): Query<String>) -> impl IntoResponse {
+    // 1MB/s
+    ResponseStream::with_response(LocalFileStream(file_path)).target_rate(1024 * 1024)
 }
 
 async fn download_bytes() -> impl IntoResponse {
     // 10MB
-    let bytes = Bytes::from(vec![0x01; 1024 * 1024 * 10]);
+    let bytes = Bytes::from(vec![0x97; 1024 * 1024 * 10]);
+
     // 10KB/s
-    ResponseStream::new(BytesStream::new(bytes, Some("test.txt".into()))).target_rate(1024 * 1024)
+    ResponseStream::with_response(
+        BytesStream::builder()
+            .body(bytes)
+            .file_name(LocalDateTime::now())
+            .build()
+            .unwrap(),
+    )
+    .target_rate(1024 * 10)
 }
 
 async fn download_network_file() -> impl IntoResponse {
     // 3KB/s
-    ResponseStream::new(NetworkFileStream::new(
+    ResponseStream::with_response(NetworkFileStream::new(
         "http://127.0.0.1:11000/bytes",
         "GET",
         Some(HashMap::from_iter(vec![(
@@ -57,7 +65,7 @@ async fn download_network_file() -> impl IntoResponse {
             "test".into(),
         )])),
     ))
-    .target_rate(1024 * 7)
+    .target_rate(1024 * 6)
 }
 
 #[tokio::main]

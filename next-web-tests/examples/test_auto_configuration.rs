@@ -31,7 +31,7 @@ pub struct TestAutoRegister;
 
 #[async_trait]
 impl AutoRegister for TestAutoRegister {
-    fn registered_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         ""
     }
 
@@ -54,6 +54,8 @@ impl TestAutoRegister {
         Arc::new(self)
     }
 }
+
+#[derive(Clone)]
 pub struct TestAutoConfiguation;
 
 #[auto_configuration]

@@ -1,0 +1,17 @@
+[package]
+name = "next-web-mail"
+description = "Email support for Next Web"
+keywords = ["next-web", "mail"]
+version = "0.1.0"
+
+edition.workspace = true
+
+[dependencies]
+next-web-core   = { workspace = true }
+next-web-macros = { workspace = true }
+rudi-dev        = { workspace = true }
+
+lettre          = { workspace = true }
+serde           = { workspace = true }
+chrono          = { workspace = true, features = ["serde"]}
+thiserror       = { workspace = true }

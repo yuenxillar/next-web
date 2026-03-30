@@ -1,6 +1,6 @@
 use axum::{
     extract::Request,
-    http::{uri::Scheme, Uri, Version},
+    http::{Uri, Version, uri::Scheme},
 };
 use headers::{Cookie, HeaderMapExt, Host};
 use std::{collections::HashMap, str::FromStr};

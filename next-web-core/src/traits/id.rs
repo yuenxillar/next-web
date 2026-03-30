@@ -1,3 +1,3 @@
 pub trait Id {
-    fn id(&self) -> & str;
+    fn id(&self) -> &str;
 }

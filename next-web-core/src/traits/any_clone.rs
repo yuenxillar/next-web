@@ -5,7 +5,7 @@ use std::{any::Any, fmt};
 pub trait AnyClone
 where
     Self: Any,
-    Self: Send + Sync
+    Self: Send + Sync,
 {
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 
@@ -17,7 +17,7 @@ where
 impl<T> AnyClone for T
 where
     Self: Any + Clone,
-    Self: Send + Sync
+    Self: Send + Sync,
 {
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self

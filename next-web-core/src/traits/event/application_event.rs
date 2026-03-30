@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use dyn_clone::{clone_trait_object, DynClone};
+use dyn_clone::{DynClone, clone_trait_object};
 
 pub trait ApplicationEvent
 where

@@ -12,7 +12,7 @@ use next_web_core::models::any_value::AnyValue;
 use next_web::util::local_date_time::LocalDateTime;
 
 use next_web_retry::{
-    error::retry_error::RetryError, retry_context::RetryContext, retry_operations::RetryOperations,
+    error::retry_error::RetryError, retry_callback::retry_callback_fn, retry_context::RetryContext, retry_operations::RetryOperations,
     support::retry_template::RetryTemplate,
 };
 
@@ -36,22 +36,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_attempts(4)
         .exponential_backoff(1000, 6000, 2.0, false)
         .build()
-        .execute(|ctx: std::sync::Arc<dyn RetryContext>| async move {
-            let retry_count = ctx.get_attribute("retryCount");
-            let value = retry_count
-                .map(|s| s.as_number().unwrap_or_default())
-                .unwrap_or_default();
+        .execute(retry_callback_fn(|ctx: &dyn RetryContext| {
+            Box::pin(async move {
+                let retry_count = ctx.get_attribute("retryCount");
+                let value = retry_count
+                    .map(|s| s.as_number().unwrap_or_default())
+                    .unwrap_or_default();
 
-            if value < 4 {
-                if value > 0 {
-                    println!("Retry Count: {}, timestamp: {}", value, LocalDateTime::timestamp());
+                if value < 4 {
+                    if value > 0 {
+                        println!("Retry Count: {}, timestamp: {}", value, LocalDateTime::timestamp());
+                    }
+                    ctx.set_attribute("retryCount", AnyValue::Number(value + 1));
+                    return Err(RetryError::Any(Box::new(TestRetryError::Default("test retry error".to_string()))));
                 }
-                ctx.set_attribute("retryCount", AnyValue::Number(value + 1));
-                return Err(RetryError::Any(Box::new(TestRetryError::Default("test retry error".to_string()))));
-            }
 
-            Ok(())
-        })
+                Ok(())
+            })
+        }))
         .await;
     println!("result: {:?}", result);
 

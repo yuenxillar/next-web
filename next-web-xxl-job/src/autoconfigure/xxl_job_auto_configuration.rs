@@ -26,7 +26,7 @@ impl XxlJobAutoConfiguration {
 
 #[async_trait]
 impl AutoRegister for XxlJobAutoConfiguration {
-    fn registered_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         ""
     }
 

@@ -1,13 +1,66 @@
 use from_attr::FromAttr;
 use proc_macro::TokenStream;
-use proc_macro2::Span;
-use quote::{quote, ToTokens};
-use syn::{Fields, ItemStruct, LitStr};
+use quote::{format_ident, quote, ToTokens};
+use syn::{
+    parse_quote,
+    punctuated::Punctuated,
+    Expr, Field, Fields, ItemStruct, LitStr, Meta, Token,
+};
 
 use crate::{
     util::{extract_type::extract_option_inner_type, field_type::FieldType, logic::Logic},
     web::attrs::properties_attr::PropertiesAttr,
 };
+
+fn is_into_properties_bind(expr: &Expr) -> bool {
+    expr.to_token_stream().to_string().replace(' ', "") == "Self::into_properties"
+}
+
+fn ensure_properties_bind(attr: &mut syn::Attribute) -> syn::Result<Option<String>> {
+    if !attr.path().is_ident("singleton") && !attr.path().is_ident("singleowner") {
+        return Ok(None);
+    }
+
+    let attr_path = attr.path().clone();
+    let mut metas = attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    let mut singleton_name = None;
+    let mut has_binds = false;
+
+    for meta in &mut metas {
+        match meta {
+            Meta::NameValue(name_value) if name_value.path.is_ident("name") => {
+                if let Expr::Lit(expr_lit) = &name_value.value {
+                    if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+                        singleton_name = Some(lit_str.value());
+                    }
+                }
+            }
+            Meta::NameValue(name_value) if name_value.path.is_ident("binds") => {
+                has_binds = true;
+
+                let Expr::Array(array) = &mut name_value.value else {
+                    return Err(syn::Error::new_spanned(
+                        &name_value.value,
+                        "The `binds` attribute must be an array expression",
+                    ));
+                };
+
+                if !array.elems.iter().any(is_into_properties_bind) {
+                    array.elems.push(parse_quote!(Self::into_properties));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if !has_binds {
+        metas.push(parse_quote!(binds = [Self::into_properties]));
+    }
+
+    *attr = parse_quote!(#[#attr_path(#metas)]);
+
+    Ok(singleton_name)
+}
 
 pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> TokenStream {
     let expanded = Logic::generate(|| {
@@ -36,6 +89,8 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
 
         let prefix = prefix_expr.to_token_stream().to_string().replace("\"", "");
         let dynamic = attr.dynamic;
+        let struct_ident = item_struct.ident.clone();
+        let dynamic_struct_ident = format_ident!("_Dynamic{}", struct_ident);
 
         let fields = match &item_struct.fields {
             Fields::Named(fields_named) => &fields_named.named,
@@ -47,28 +102,21 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
             }
         };
 
-        // 生成字段访问和赋值代码
-        // Generate field access and assignment code
+        // Generate field access and assignment code.
         let common_fields = fields
             .iter()
-            .enumerate()
-            .filter(|(_, field)| field.ident.is_some())
-            .filter_map(|(index, field)| {
-                // （如果是 dynamic） 跳过第一个字段
-                if dynamic && index == 0 {
-                    return None;
-                }
-
+            .filter(|field| field.ident.is_some())
+            .filter_map(|field| {
                 let field_name = field.ident.as_ref()?;
                 let field_type = &field.ty;
 
-                // 检查是否为 Option<T>
+                // Check whether the field type is Option<T>.
                 let (is_option, inner_type) = match extract_option_inner_type(field_type) {
                     Some(ty) => (true, ty),
                     None => (false, field_type.clone()),
                 };
 
-                // 获取 key 属性或使用字段名
+                // Read the key attribute or fall back to the field name.
                 let key_name = field
                     .attrs
                     .iter()
@@ -85,7 +133,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                     })
                     .unwrap_or_else(|| field_name.to_string());
 
-                // 构建最终 key
+                // Build the final property key.
                 let key = if prefix.is_empty() {
                     key_name
                 } else {
@@ -93,37 +141,36 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                 };
                 let key_str = LitStr::new(&key, field_name.span());
 
-                // 判断是否为 String 类型（考虑 Option<String>）
+                // Detect String-like fields, including Option<String>.
                 let is_string_type = FieldType::is_string(&inner_type);
 
-                // 生成核心表达式：从 properties 中提取值
+                // Generate the expression that reads the value from properties.
                 let extract_value_expr = if is_string_type {
-                    // String 类型需要支持数字转字符串
+                    // String fields also accept numeric property values.
                     quote! {
                         || -> Option<String> {
-                            // 优先尝试 get_value
+                            // Try the string value first.
                             if let Some(s) = properties.get_value::<String>(#key_str) {
                                 return Some(s);
                             }
 
-
                             match properties.get_value::<i64>(#key_str) {
                                 Some(s) => Some(s.to_string()),
                                 None => match properties.get_value::<f64>(#key_str) {
-                                        Some(s) => Some(s.to_string()),
-                                        None => None,
+                                    Some(s) => Some(s.to_string()),
+                                    None => None,
                                 }
                             }
                         }()
                     }
                 } else {
-                    // 非字符串类型：直接尝试 get_value
+                    // Non-string fields read directly via get_value.
                     quote! {
                         properties.get_value::<#inner_type>(#key_str)
                     }
                 };
 
-                // 根据 Option<T> 和 T 生成最终字段赋值
+                // Generate the final field initialization for Option<T> or T.
                 let field_init = if is_option {
                     quote! { #field_name: #extract_value_expr, }
                 } else {
@@ -139,71 +186,82 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
             })
             .collect::<Vec<_>>();
 
-        // dynamic_field
         let dynamic_field = if dynamic {
             quote! {
-                dynamic: if let Some(values) = properties.get_dynamic_value(#prefix_expr) { values } else { Default::default() },
+                _dynamic: properties
+                    .get_dynamic_value::<#struct_ident>(#prefix_expr)
+                    .map(#dynamic_struct_ident),
             }
         } else {
             quote! {}
         };
 
-        // 生成代码后，删除字段上的 key 属性
+        // Remove field-level key attributes from the generated struct.
         if let Fields::Named(fields_named) = &mut item_struct.fields {
             for field in &mut fields_named.named {
                 field.attrs.retain(|attr| !attr.path().is_ident("key"));
             }
-        }
 
+            if dynamic {
+                if fields_named
+                    .named
+                    .iter()
+                    .filter_map(|field| field.ident.as_ref())
+                    .any(|ident| ident == "_dynamic")
+                {
+                    return Err(syn::Error::new(
+                        struct_ident.span(),
+                        "The `_dynamic` field is generated automatically for dynamic properties",
+                    ));
+                }
+
+                let dynamic_field: Field =
+                    parse_quote!(#[serde(skip)] _dynamic: Option<#dynamic_struct_ident>);
+                fields_named.named.push(dynamic_field);
+            }
+        }
         let struct_ident = &item_struct.ident;
 
-        // 检查是否有 #[singleton(name = "")] 属性
-        let singleton_name = item_struct.attrs.iter().find_map(|attr| {
-            if !attr.path().is_ident("singleton") && !attr.path().is_ident("singleowner") {
-                return None;
+        // Ensure singleton and singleowner attributes contain the required binds.
+        let mut singleton_name = None;
+        for attr in &mut item_struct.attrs {
+            if let Some(name) = ensure_properties_bind(attr)? {
+                singleton_name = Some(name);
             }
+        }
 
-            // 使用 parse_nested_meta 进行更安全的解析
-            let mut name = None;
-            let mut binds_exist = false;
-            let _ = attr.parse_nested_meta(|meta| {
-                if meta.path.is_ident("name") {
-                    let value = meta.value()?;
-                    let string_value = value.parse::<syn::LitStr>()?;
-                    name = Some(string_value.value());
-                    return Ok(());
-                }
-
-                if meta.path.is_ident("binds") {
-                    binds_exist = true;
-                    let value = meta.value()?;
-                    let bind_array = value.parse::<syn::ExprArray>()?;
-                    let binds = bind_array.to_token_stream().to_string();
-                    if !binds.contains("into_properties") {
-                        return Err(syn::Error::new(Span::call_site(), "Singleton or SingleOwner macro must contain ::into_properties"));
-                    }
-                }
-                Ok(())
-            });
-            if !binds_exist {
-                panic!("Singleton or SingleOwner macro must support binds `#[singleton(binds = [Self::into_properties])]`");
-            }
-            name
-        });
-
-        // 如果没有找到 Singleton 属性或者 name 参数，生成默认名称
-
+        // Fall back to the default singleton name when no explicit name is present.
         let singleton_name = if let Some(name) = singleton_name {
             name
         } else {
-            // default_name
             crate::util::name::singleton_name(&struct_ident.to_string())
         };
 
         let singleton_name = LitStr::new(&singleton_name, struct_ident.span());
 
+        let dynamic_support = if dynamic {
+            quote! {
+                #[derive(Debug, Clone)]
+                struct #dynamic_struct_ident(pub ::std::collections::HashMap<String, #struct_ident>);
+            }
+        } else {
+            quote! {}
+        };
+
+        let dynamic_properties_fn = if dynamic {
+            quote! {
+                pub fn dynamic_properties(&self) -> Option<&::std::collections::HashMap<String, Self>> {
+                    self._dynamic.as_ref().map(|var| &var.0)
+                }
+            }
+        } else {
+            quote! {}
+        };
+
         let expanded = quote! {
             #item_struct
+
+            #dynamic_support
 
             #[next_web_core::async_trait]
             impl ::next_web_core::AutoRegister for #struct_ident {
@@ -228,7 +286,7 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
                     Ok(())
                 }
 
-                fn registered_name(&self) -> &'static str {
+                fn name(&self) -> &'static str {
                     #singleton_name
                 }
             }
@@ -236,13 +294,13 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
             impl ::next_web_core::context::properties::Properties for #struct_ident {}
 
             impl #struct_ident {
+                #dynamic_properties_fn
+
                 fn into_properties(self) -> ::std::boxed::Box<dyn ::next_web_core::context::properties::Properties> {
                     ::std::boxed::Box::new(self)
                 }
             }
         };
-
-        // println!("expanded: {}", expanded);
 
         Ok(expanded.into())
     });

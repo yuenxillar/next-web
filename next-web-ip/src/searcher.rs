@@ -3,8 +3,7 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-
-use once_cell::sync::OnceCell;
+use std::sync::OnceLock;
 
 use crate::ToUIntIP;
 
@@ -16,7 +15,7 @@ const VECTOR_INDEX_LENGTH: usize = 512 * 1024;
 
 const XDB_FILEPATH_ENV: &str = "XDB_FILEPATH";
 
-static CACHE: OnceCell<Vec<u8>> = OnceCell::new();
+static CACHE: OnceLock<Vec<u8>> = OnceLock::new();
 
 /// check https://mp.weixin.qq.com/s/ndjzu0BgaeBmDOCw5aqHUg for details
 pub fn search_by_ip<T>(ip: T) -> Result<String, Box<dyn Error>>

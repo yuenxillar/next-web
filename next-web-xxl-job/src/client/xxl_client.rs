@@ -5,7 +5,7 @@ use next_web_core::error::BoxError;
 use crate::{
     executor::{
         context::job_context::{JobHandler, JobHandlerValue},
-        models::{ExecutorActorReq, ExecutorActorResult},
+        model::{ExecutorActorReq, ExecutorActorResult},
     },
     web_server::state::XxlJobAppState,
 };

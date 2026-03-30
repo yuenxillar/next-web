@@ -2,42 +2,27 @@ use std::borrow::Cow;
 
 use super::topic::base_topic::BaseTopic;
 
-/// MQTT涓婚璺敱鍣?
-/// 璐熻矗鏍规嵁涓婚鍖归厤瑙勫垯璺敱娑堟伅
+/// MQTT topic router entry.
 ///
-/// MQTT Topic Router
-/// Responsible for routing messages based on topic matching rules
+/// It stores one subscription filter plus the consumer that should receive a
+/// published message when the filter matches the incoming topic name.
 pub struct TopicRoute {
-    /// 涓婚
-    ///
-    /// Topic
+    /// Subscription filter, for example `sensor/+/temperature` or `test/#`.
     pub topic: Cow<'static, str>,
-    /// 鍖归厤绫诲瀷
-    ///
-    /// Match type
+    /// Pre-classified match type for quick inspection and debugging.
     pub match_type: MacthType,
-    /// 涓婚娑堣垂鑰?
-    ///
-    /// topic consumer
+    /// Topic consumer.
     pub base_topic: Box<dyn BaseTopic>,
 }
 
-/// 涓婚鍖归厤绫诲瀷
-///
-/// Topic match type
-#[derive(Debug, Clone)]
+/// MQTT topic filter kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MacthType {
-    /// 澶氬眰閫氶厤绗﹀尮閰?璧峰绱㈠紩)
-    ///
-    /// Multi-level wildcard match (start index)
-    Multilayer(usize),
-    /// 鍗曞眰閫氶厤绗﹀尮閰?璧峰绱㈠紩,缁撴潫绱㈠紩)
-    ///
-    /// Single-level wildcard match (start index, end index)
-    Singlelayer(usize, usize),
-    /// 浠绘剰鍖归厤
-    ///
-    /// Match anything
+    /// Multi-level wildcard filter containing `#`.
+    Multilayer,
+    /// Single-level wildcard filter containing `+` but no `#`.
+    Singlelayer,
+    /// `#`, which matches any non-system topic.
     Anything,
 }
 
@@ -47,32 +32,165 @@ impl TopicRoute {
         base_topic: Box<dyn BaseTopic>,
     ) -> Result<Self, String> {
         let topic = topic.into();
-
-        let match_type = if topic.contains('#') {
-            if topic.len() == 1 {
-                MacthType::Anything
-            } else if let Some(index) = topic.find('#') {
-                MacthType::Multilayer(index)
-            } else {
-                return Err("invalid multi-level MQTT topic pattern".to_string());
-            }
-        } else if topic.contains('+') {
-            let index: Vec<&str> = topic.split('+').collect();
-            if index.len() == 2 {
-                MacthType::Singlelayer(index[0].len(), index[1].len())
-            } else {
-                return Err(format!("unsupported single-level MQTT topic pattern: {topic}"));
-            }
-        } else {
-            return Err(format!(
-                "topic '{topic}' does not contain a supported wildcard pattern"
-            ));
-        };
+        let match_type = classify_filter(&topic)?;
 
         Ok(Self {
             topic,
             match_type,
             base_topic,
         })
+    }
+
+    /// Returns `true` when the MQTT topic filter matches the published topic.
+    pub fn matches(&self, incoming_topic: &str) -> bool {
+        mqtt_filter_matches(&self.topic, incoming_topic)
+    }
+}
+
+fn classify_filter(filter: &str) -> Result<MacthType, String> {
+    validate_filter(filter)?;
+
+    if filter == "#" {
+        Ok(MacthType::Anything)
+    } else if filter.contains('#') {
+        Ok(MacthType::Multilayer)
+    } else if filter.contains('+') {
+        Ok(MacthType::Singlelayer)
+    } else {
+        Err(format!(
+            "topic '{filter}' does not contain a supported wildcard pattern"
+        ))
+    }
+}
+
+fn validate_filter(filter: &str) -> Result<(), String> {
+    if filter.is_empty() {
+        return Err("topic filter cannot be empty".to_string());
+    }
+
+    let levels: Vec<&str> = filter.split('/').collect();
+    let mut has_wildcard = false;
+
+    for (index, level) in levels.iter().enumerate() {
+        if level.contains('#') {
+            has_wildcard = true;
+            if *level != "#" {
+                return Err(format!(
+                    "invalid multi-level MQTT topic pattern '{filter}': '#' must occupy an entire level"
+                ));
+            }
+            if index + 1 != levels.len() {
+                return Err(format!(
+                    "invalid multi-level MQTT topic pattern '{filter}': '#' must be the last level"
+                ));
+            }
+        }
+
+        if level.contains('+') {
+            has_wildcard = true;
+            if *level != "+" {
+                return Err(format!(
+                    "invalid single-level MQTT topic pattern '{filter}': '+' must occupy an entire level"
+                ));
+            }
+        }
+    }
+
+    if !has_wildcard {
+        return Err(format!(
+            "topic '{filter}' does not contain a supported wildcard pattern"
+        ));
+    }
+
+    Ok(())
+}
+
+fn mqtt_filter_matches(filter: &str, topic: &str) -> bool {
+    if topic.is_empty() {
+        return false;
+    }
+
+    // MQTT reserves `$`-prefixed topics for the server. Wildcard subscriptions
+    // that start with `#` or `+` must not match them.
+    if topic.starts_with('$') && (filter.starts_with('#') || filter.starts_with('+')) {
+        return false;
+    }
+
+    let filter_levels: Vec<&str> = filter.split('/').collect();
+    let topic_levels: Vec<&str> = topic.split('/').collect();
+    let mut topic_index = 0usize;
+
+    for filter_level in &filter_levels {
+        match *filter_level {
+            "#" => return true,
+            "+" => {
+                if topic_index >= topic_levels.len() {
+                    return false;
+                }
+                topic_index += 1;
+            }
+            literal => {
+                if topic_levels.get(topic_index).copied() != Some(literal) {
+                    return false;
+                }
+                topic_index += 1;
+            }
+        }
+    }
+
+    topic_index == topic_levels.len()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MacthType, TopicRoute, mqtt_filter_matches};
+    use crate::core::topic::base_topic::BaseTopic;
+    use next_web_core::async_trait;
+
+    #[derive(Clone)]
+    struct DummyTopic;
+
+    #[async_trait]
+    impl BaseTopic for DummyTopic {
+        fn topic(&self) -> &'static str {
+            "#"
+        }
+
+        async fn consume(&self, _topic: &str, _message: &[u8]) {}
+    }
+
+    #[test]
+    fn rejects_invalid_wildcard_positions() {
+        assert!(TopicRoute::new("sensor/#/temp", Box::new(DummyTopic)).is_err());
+        assert!(TopicRoute::new("sensor+temp", Box::new(DummyTopic)).is_err());
+        assert!(TopicRoute::new("sensor/room", Box::new(DummyTopic)).is_err());
+    }
+
+    #[test]
+    fn classifies_anything_route() {
+        let route = TopicRoute::new("#", Box::new(DummyTopic)).unwrap();
+        assert_eq!(route.match_type, MacthType::Anything);
+    }
+
+    #[test]
+    fn matches_multilevel_wildcard() {
+        assert!(mqtt_filter_matches("sport/#", "sport"));
+        assert!(mqtt_filter_matches("sport/#", "sport/tennis/player1"));
+        assert!(!mqtt_filter_matches("sport/#", "finance/stock"));
+    }
+
+    #[test]
+    fn matches_singlelevel_wildcard() {
+        assert!(mqtt_filter_matches("sport/+/player1", "sport/tennis/player1"));
+        assert!(mqtt_filter_matches("sport/+", "sport/"));
+        assert!(!mqtt_filter_matches("sport/+", "sport"));
+        assert!(!mqtt_filter_matches("sport/+/player1", "sport/tennis/player1/ranking"));
+    }
+
+    #[test]
+    fn system_topics_do_not_match_root_wildcards() {
+        assert!(!mqtt_filter_matches("#", "$SYS/broker/uptime"));
+        assert!(!mqtt_filter_matches("+/broker/uptime", "$SYS/broker/uptime"));
+        assert!(mqtt_filter_matches("$SYS/#", "$SYS/broker/uptime"));
     }
 }

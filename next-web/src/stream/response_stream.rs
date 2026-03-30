@@ -10,7 +10,7 @@ impl<T> ResponseStream<T>
 where
     T: IntoRespnoseStream,
 {
-    pub fn new(stream: T) -> Self {
+    pub fn with_response(stream: T) -> Self {
         Self {
             target_rate: 2048,
             stream,
@@ -28,7 +28,6 @@ where
     T: IntoRespnoseStream,
 {
     fn into_response(self) -> axum::response::Response {
-        // 凡事留一线 日后好相见！
         let target_rate = if self.target_rate < 1024 {
             1024
         } else {

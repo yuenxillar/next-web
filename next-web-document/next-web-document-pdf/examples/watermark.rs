@@ -8,20 +8,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = format!("{}/assets", std::env::var("CARGO_MANIFEST_DIR")?);
     let operation = PdfWatermarkOperation {
         content: WatermarkType::Text {
-            content: "Hello World".into(),
-
+            content: "Watermark6666".into(),
             font_name: Some("Helvetica".into()),
-            font_size: 22.0,
-            color_rgb: (0.5, 0.5, 0.5),
+            font_path: None,
+            font_size: 48.0,
+            color_rgb: (1.0, 0.35, 0.35),
         },
-        layout: WatermarkLayout::Tile {
-            gap_x: 10.0,
-            gap_y: 10.0,
-            stagger: true,
-        },
+        layout: WatermarkLayout::centered(),
         angle: -45.0,
-        opacity: 0.3,
-        offset: (-30.0, 0.0),
+        opacity: 0.18,
+        offset: (0.0, 0.0),
     };
     let mut doc = Document::load(format!("{}/end.pdf", path))?;
     operation.execute(&mut doc)?;

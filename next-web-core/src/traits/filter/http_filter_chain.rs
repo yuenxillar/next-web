@@ -12,7 +12,7 @@ use crate::{
 pub trait HttpFilterChain
 where
     Self: Send + Sync,
-    Self: Any + DynClone
+    Self: Any + DynClone,
 {
     async fn do_filter(
         &self,

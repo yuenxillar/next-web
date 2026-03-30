@@ -2,10 +2,13 @@
 
 use std::convert::Infallible;
 
-use headers::{Header, HeaderMapExt};
 use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use axum::http::{HeaderName, StatusCode};
-use axum::{http::request::Parts, response::{IntoResponse, IntoResponseParts, Response, ResponseParts}};
+use axum::{
+    http::request::Parts,
+    response::{IntoResponse, IntoResponseParts, Response, ResponseParts},
+};
+use headers::{Header, HeaderMapExt};
 use next_web_core::headers;
 
 /// Extractor and response that works with typed header values from [`headers`].

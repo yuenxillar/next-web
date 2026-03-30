@@ -2,73 +2,46 @@ use axum::{
     body::Body,
     http::{header, StatusCode},
     response::{IntoResponse, Response},
+    BoxError,
 };
 use futures::StreamExt;
 use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
-use std::{
-    path::Path,
-    time::{Duration, Instant},
-};
+use std::path::Path;
+use tokio_util::io::ReaderStream;
 
-use crate::stream::DEFAULT_CHUNK_SIZE;
+use crate::{stream::DEFAULT_CHUNK_SIZE, util::stream_throttle::throttle_byte_stream};
 
-pub struct LocalFileStream(pub String);
+pub struct LocalFileStream<T: AsRef<Path>>(pub T);
 
-impl IntoRespnoseStream for LocalFileStream {
+impl<T> IntoRespnoseStream for LocalFileStream<T>
+where
+    T: Send,
+    T: AsRef<Path>,
+{
     fn into_response_stream(self, target_rate: usize) -> axum::response::Response {
-        let file_path = Path::new(self.0.as_str());
+        let file_path = self.0.as_ref();
 
         if !file_path.exists() {
             return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response();
         }
 
-        if let Ok(metadata) = std::fs::metadata(file_path) {
-            if (metadata.len() as usize) < DEFAULT_CHUNK_SIZE * 2 {
-                return match std::fs::read(file_path) {
-                    Ok(data) => (StatusCode::OK, data.into_response()).into_response(),
-                    Err(_) => {
-                        (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
-                    }
-                };
+        let metadata = match std::fs::metadata(file_path) {
+            Ok(metadata) => metadata,
+            Err(_) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
             }
-        }
+        };
 
-        let std_file = std::fs::File::open(file_path);
+        let std_file = match std::fs::File::open(file_path) {
+            Ok(file) => file,
+            Err(error) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+            }
+        };
 
-        if let Err(error) = std_file {
-            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response();
-        }
-
-        let async_file = tokio::fs::File::from_std(std_file.unwrap());
-
-        let start_time = Instant::now();
-        let mut bytes_sent = 0;
-
-        let stream = tokio_util::io::ReaderStream::with_capacity(async_file, DEFAULT_CHUNK_SIZE)
-            .then(move |chunk| {
-                let chunk_len = chunk.as_ref().map(|s| s.len()).unwrap_or_default();
-                let now = Instant::now();
-                let elapsed = now.duration_since(start_time);
-                let expected_time = Duration::from_secs_f64(bytes_sent as f64 / target_rate as f64);
-
-                let delay = if expected_time > elapsed {
-                    expected_time - elapsed
-                } else {
-                    Duration::from_secs(0)
-                };
-
-                bytes_sent += chunk_len;
-
-                async move {
-                    if !delay.is_zero() {
-                        tokio::time::sleep(delay).await;
-                    }
-
-                    let result: Result<axum::body::Bytes, axum::BoxError> =
-                        chunk.map_err(Into::into);
-                    result
-                }
-            });
+        let async_file = tokio::fs::File::from_std(std_file);
+        let stream = ReaderStream::with_capacity(async_file, DEFAULT_CHUNK_SIZE)
+            .map(|chunk| chunk.map_err(|error| -> BoxError { Box::new(error) }));
 
         let header_name = format!(
             "attachment;filename={}",
@@ -78,11 +51,13 @@ impl IntoRespnoseStream for LocalFileStream {
                 .map(|s| s.to_string())
                 .unwrap_or_default()
         );
+
         Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/octet-stream")
             .header(header::CONTENT_DISPOSITION, header_name)
-            .body(Body::from_stream(stream))
+            .header(header::CONTENT_LENGTH, metadata.len().to_string())
+            .body(Body::from_stream(throttle_byte_stream(stream, target_rate)))
             .unwrap()
     }
 }

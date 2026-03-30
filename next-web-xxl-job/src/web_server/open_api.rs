@@ -5,7 +5,7 @@ use axum::{Json, Router, extract::State, response::IntoResponse, routing::post};
 use crate::{
     executor::{
         context::job_context::JobContext,
-        models::{ExecutorActorReq, ExecutorActorResult},
+        model::{ExecutorActorReq, ExecutorActorResult},
     },
     web_server::{
         middleware::verify_token::verify_token_middleware,

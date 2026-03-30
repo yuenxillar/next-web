@@ -21,7 +21,7 @@ impl HttpFilterChain for ApplicationFilterChain {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
     ) -> Result<(), BoxError> {
-         // Call the next filter if there is one
+        // Call the next filter if there is one
         if self.pos < self.n {
             // self.
         }

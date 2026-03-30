@@ -1,9 +1,9 @@
-use rbatis::async_trait;
+use rbatis::{Action, async_trait};
 use rbatis::{
+    Error,
     executor::Executor,
     intercept::{Intercept, ResultType},
     rbdc::db::ExecResult,
-    Error,
 };
 use rbs::Value;
 use tracing::warn;
@@ -20,22 +20,22 @@ impl Intercept for BlockAttackInnerInterceptor {
         _rb: &dyn Executor,
         _sql: &mut String,
         _args: &mut Vec<Value>,
-        _result: ResultType<&mut Result<ExecResult, Error>, &mut Result<Vec<Value>, Error>>,
-    ) -> Result<Option<bool>, Error> {
+        _result: ResultType<&mut Result<ExecResult, Error>, &mut Result<Value, Error>>,
+    ) -> Result<Action, Error> {
         let normalized_sql = _sql.trim().to_uppercase();
 
         // Check whether the full table is updated. If yes, exit without executing
         if normalized_sql.starts_with("UPDATE") && !normalized_sql.contains("WHERE") {
             warn!("Full table update detected, exit without executing");
-            return Ok(Some(false));
+            return Ok(Action::Return);
         }
 
         // Check whether the full table is deleted. If yes, exit without executing
         if normalized_sql.starts_with("DELETE") && !normalized_sql.contains("WHERE") {
             warn!("Full table delete detected, exit without executing");
-            return Ok(Some(false));
+            return Ok(Action::Return);
         }
-        Ok(Some(true))
+        Ok(Action::Next)
     }
 
     /// task_id maybe is conn_id or tx_id,
@@ -47,8 +47,8 @@ impl Intercept for BlockAttackInnerInterceptor {
         _rb: &dyn Executor,
         _sql: &mut String,
         _args: &mut Vec<Value>,
-        _result: ResultType<&mut Result<ExecResult, Error>, &mut Result<Vec<Value>, Error>>,
-    ) -> Result<Option<bool>, Error> {
-        Ok(Some(true))
+        _result: ResultType<&mut Result<ExecResult, Error>, &mut Result<Value, Error>>,
+    ) -> Result<Action, Error> {
+        Ok(Action::Next)
     }
 }

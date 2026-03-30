@@ -173,6 +173,17 @@ impl AnyValue {
         }
     }
 
+    /// Get own object
+    ///
+    /// 获取对象所有权
+    pub fn as_own_object<T: Any>(self) -> Option<T> {
+        if let AnyValue::Object(any_obj) = self {
+            any_obj.into_any().downcast().map(|obj| *obj).ok()
+        } else {
+            None
+        }
+    }
+
     pub fn to_string(&self) -> String {
         match self {
             AnyValue::String(s) => s.clone(),

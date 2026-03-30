@@ -102,13 +102,18 @@ pub fn impl_macro_auto_configuration(_attrs: TokenStream, mut item_impl: ItemImp
 
             #item_impl
 
+            #[derive(Clone)]
              struct #name;
 
-             impl ::next_web_core::autoconfigure::default_auto_configure::DefaultAutoConfigure for #name {
-                 fn auto_configure<'life_a>(
-                     &'life_a self,
-                     ctx: &'life_a mut ApplicationContext,
-                 ) -> core::pin::Pin<std::boxed::Box<dyn Future<Output = ()> + Send + 'life_a>>
+             impl ::next_web_core::autoregister::auto_configuration_autoregister::DefaultAutoConfigurationAutoregister for #name {
+                fn configuration<'life0, 'life1, 'async_trait>(&'life0 mut self, ctx: &'life1 mut ApplicationContext)
+                -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = Result<(), ::next_web_core::error::BoxError>>
+                    + ::core::marker::Send + 'async_trait>>
+
+                where
+                    'life0: 'async_trait,
+                    'life1: 'async_trait,
+                    Self: 'async_trait,
                  {
                       ::std::boxed::Box::pin(async {
 
@@ -116,14 +121,12 @@ pub fn impl_macro_auto_configuration(_attrs: TokenStream, mut item_impl: ItemImp
 
                           #(#impl_blocks);*
 
+                          Ok(())
                       })
                  }
              }
 
              ::next_web_core::submit_default_auto_configure!(#name);
-
-
-
         };
 
         // println!("expanded: {}", expanded.to_string());

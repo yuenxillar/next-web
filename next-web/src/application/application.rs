@@ -7,7 +7,6 @@ use axum::Router;
 
 use next_web_core::async_trait;
 use next_web_core::autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES;
-use next_web_core::autoconfigure::default_auto_configure::DefaultAutoConfigure;
 use next_web_core::client::rest_client::RestClient;
 use next_web_core::constants::application_constants::APPLICATION_BANNER;
 use next_web_core::context::application_args::ApplicationArgs;
@@ -18,6 +17,7 @@ use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
 use next_web_core::state::application_state::ApplicationState;
 use next_web_core::traits::application::application_lifecycle::ApplicationLifecycle;
 use next_web_core::traits::apply_router::ApplyRouter;
+use next_web_core::traits::config::auto_configuration::AutoConfiguration;
 use next_web_core::traits::error_solver::ErrorSolver;
 use next_web_core::traits::filter::http_filter::HttpFilter;
 use next_web_core::traits::properties_post_processor::PropertiesPostProcessor;
@@ -266,9 +266,14 @@ where
         }
     }
 
+    /// Auto configuration
     async fn auto_configuration(&self, ctx: &mut ApplicationContext) {
-        for item in inventory::iter::<&dyn DefaultAutoConfigure>.into_iter() {
-            item.auto_configure(ctx).await;
+        for auto_configuration in ctx
+            .resolve_by_type::<Box<dyn AutoConfiguration>>()
+            .iter_mut()
+            .map(|s| s.as_mut())
+        {
+            auto_configuration.configuration(ctx).await.unwrap();
         }
     }
 
@@ -286,17 +291,16 @@ where
         ctx.insert_singleton_with_default_name(application_args.to_owned());
         ctx.insert_singleton_with_default_name(application_resources.to_owned());
 
-        // If a declarative macro is used for submission, it should not be found in the Application Context
-        for default_auto_register in inventory::iter::<&dyn DefaultAutoRegister>.into_iter() {
-            default_auto_register
-                .register(ctx, application_properties)
-                .await
-                .unwrap();
-        }
-
         // Resove autoRegister
-        let auto_registers = ctx.resolve_by_type::<Arc<dyn AutoRegister>>();
-        for auto_register in auto_registers.iter() {
+        for auto_register in inventory::iter::<&dyn DefaultAutoRegister>
+            .into_iter()
+            .map(|&var| var as &dyn AutoRegister)
+            .chain(
+                ctx.resolve_by_type::<Arc<dyn AutoRegister>>()
+                    .iter()
+                    .map(|s| s.as_ref()),
+            )
+        {
             auto_register
                 .register(ctx, application_properties)
                 .await
@@ -464,7 +468,7 @@ where
         app = app.merge(
             apply_routers
                 .into_iter()
-                .map(|val| val.router(&mut ctx))
+                .map(|mut val| val.apply(&mut ctx))
                 .filter(|val| val.has_routes())
                 .fold(axum::Router::new(), |acc, r| acc.merge(r)),
         );

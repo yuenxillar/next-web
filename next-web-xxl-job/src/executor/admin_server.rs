@@ -1,7 +1,7 @@
 use axum::BoxError;
 
 use crate::client::admin_client::AdminClient;
-use crate::executor::models::{ServerAccessActorReq, ServerAccessActorResult};
+use crate::executor::model::{ServerAccessActorReq, ServerAccessActorResult};
 use crate::utils::now_millis_i64;
 use crate::web_server::config::client_config::ClientConfig;
 use crate::web_server::models::admin_req::CallbackParam;

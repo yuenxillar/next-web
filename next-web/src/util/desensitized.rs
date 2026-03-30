@@ -220,7 +220,7 @@ impl DesensitizedUtil {
         if parts.len() != 4 {
             return ip.to_string(); // 如果不是标准IPv4格式，直接返回原字符串
         }
-    
+
         format!("{}.*.*.{}", parts[0], parts[3])
     }
 

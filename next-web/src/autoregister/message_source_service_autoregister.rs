@@ -13,7 +13,7 @@ pub struct MessageSourceServiceAutoRegister;
 
 #[async_trait]
 impl AutoRegister for MessageSourceServiceAutoRegister {
-    fn registered_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         ""
     }
 

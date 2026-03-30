@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::time::Duration;
 
 use axum::body::Bytes;
 use axum::http::{HeaderMap, HeaderName};
@@ -11,26 +10,30 @@ use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
 use once_cell::sync::Lazy;
 use reqwest::{header, Client};
 use reqwest::{Method, StatusCode};
-use tokio::time::Instant;
 use tracing::error;
 
-use crate::util::local_date_time::LocalDateTime;
+use crate::util::{local_date_time::LocalDateTime, stream_throttle::throttle_byte_stream};
 
-pub static GLOBAL_CLIENT: Lazy<Client> = Lazy::new(|| Client::new());
+pub static GLOBAL_CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
 pub struct NetworkFileStream {
     url: String,
-    method: String,
+    method: Box<str>,
     headers: Option<HashMap<String, String>>,
 }
 
 impl NetworkFileStream {
-    pub fn new<T>(url: T, method: T, headers: Option<HashMap<String, String>>) -> Self
+    pub fn new<S, S1>(url: S, method: S1, headers: Option<HashMap<String, String>>) -> Self
     where
-        T: ToString,
+        S: Into<String>,
+        S1: Into<Box<str>>,
     {
-        let url = url.to_string();
-        let method = method.to_string();
+        let url = url.into();
+        let method = method.into();
+
+        assert!(method.as_ref() == "GET" || method.as_ref() == "POST");
+        assert!(url.starts_with("http://") || url.starts_with("https://"));
+
         Self {
             url,
             method,
@@ -41,12 +44,7 @@ impl NetworkFileStream {
 
 impl IntoRespnoseStream for NetworkFileStream {
     fn into_response_stream(self, target_rate: usize) -> Response {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<Result<Bytes, BoxError>>(100);
         let url = self.url.clone();
-
-        if !(url.starts_with("http://") || url.starts_with("https://")) {
-            panic!("Invalid url: {}", url);
-        }
 
         let mut headers = HeaderMap::new();
         if let Some(header_map) = self.headers {
@@ -55,7 +53,7 @@ impl IntoRespnoseStream for NetworkFileStream {
             });
         }
 
-        tokio::spawn(async move {
+        let source = async_stream::stream! {
             let resp = match GLOBAL_CLIENT
                 .request(
                     Method::from_bytes(self.method.as_bytes()).unwrap_or(Method::GET),
@@ -64,62 +62,36 @@ impl IntoRespnoseStream for NetworkFileStream {
                 .headers(headers)
                 .send()
                 .await
-                .map_err(|e| {
-                    error!("Error sending request: {}", e.to_string());
-                    e
+                .map_err(|error| {
+                    error!("Error sending request: {}", error);
+                    error
                 }) {
                 Ok(resp) => resp,
-                Err(e) => {
-                    tx.send(Err(Box::new(e))).await.ok();
+                Err(error) => {
+                    yield Err::<Bytes, BoxError>(Box::new(error));
                     return;
                 }
             };
+
             if !resp.status().is_success() {
-                tx.send(Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Http status error: {}", resp.status()),
-                ))))
-                .await
-                .ok();
+                yield Err::<Bytes, BoxError>(Box::new(std::io::Error::other(format!(
+                    "Http status error: {}",
+                    resp.status()
+                ))));
                 return;
             }
 
             let mut stream = resp.bytes_stream();
-            let mut token_bucket = TokenBucket::new(target_rate);
             while let Some(item) = stream.next().await {
                 match item {
-                    Ok(chunk) => {
-                        let mut remaining = chunk.len();
-                        let mut offset = 0;
-
-                        // 处理可能超过配额的大块数据
-                        while remaining > 0 {
-                            let allowed = token_bucket.available();
-                            let to_send = remaining.min(allowed);
-
-                            if to_send > 0 {
-                                let slice = chunk.slice(offset..offset + to_send);
-                                if tx.send(Ok(slice)).await.is_err() {
-                                    break;
-                                }
-                                offset += to_send;
-                                remaining -= to_send;
-                                token_bucket.consume(to_send);
-                            }
-
-                            // 等待新的令牌
-                            if remaining > 0 {
-                                token_bucket.refill().await;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(Err(Box::new(e))).await;
-                        break;
+                    Ok(chunk) => yield Ok::<Bytes, BoxError>(chunk),
+                    Err(error) => {
+                        yield Err::<Bytes, BoxError>(Box::new(error));
+                        return;
                     }
                 }
             }
-        });
+        };
 
         let header_name = format!(
             "attachment; filename=\"{}\"",
@@ -128,58 +100,71 @@ impl IntoRespnoseStream for NetworkFileStream {
                 .unwrap_or(LocalDateTime::now().as_str())
         );
 
-        let stream = async_stream::stream! {
-            while let Some(item) = rx.recv().await {
-                 yield item;
-            }
-        };
-
         Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/octet-stream")
             .header(header::CONTENT_DISPOSITION, header_name)
-            .body(Body::from_stream(stream))
+            .body(Body::from_stream(throttle_byte_stream(source, target_rate)))
             .unwrap()
     }
 }
 
-struct TokenBucket {
-    capacity: usize,
-    tokens: usize,
-    last_refill: Instant,
-    refill_interval: Duration,
+impl NetworkFileStream {
+    /// Creates a new `NetworkFileStreamBuilder`.
+    pub fn builder() -> NetworkFileStreamBuilder {
+        NetworkFileStreamBuilder::default()
+    }
 }
 
-impl TokenBucket {
-    fn new(rate_per_second: usize) -> Self {
-        Self {
-            capacity: rate_per_second,
-            tokens: rate_per_second, // 初始满桶
-            last_refill: Instant::now(),
-            refill_interval: Duration::from_secs(1),
-        }
+#[derive(Default)]
+pub struct NetworkFileStreamBuilder {
+    url: Option<String>,
+    method: Option<Box<str>>,
+    headers: Option<HashMap<String, String>>,
+}
+
+impl NetworkFileStreamBuilder {
+    /// Sets the `url` field on the builder.
+    pub fn url<T>(mut self, value: T) -> Self
+    where
+        T: Into<String>,
+    {
+        self.url = Some(value.into());
+        self
     }
 
-    fn available(&self) -> usize {
-        self.tokens
+    /// Sets the `method` field on the builder.
+    pub fn method<T>(mut self, value: T) -> Self
+    where
+        T: Into<Box<str>>,
+    {
+        self.method = Some(value.into());
+        self
     }
 
-    fn consume(&mut self, amount: usize) {
-        self.tokens = self.tokens.saturating_sub(amount);
+    /// Sets the `headers` field on the builder.
+    pub fn headers(mut self, value: HashMap<String, String>) -> Self {
+        self.headers = Some(value);
+        self
     }
 
-    async fn refill(&mut self) {
-        let now = Instant::now();
-        let elapsed = now.duration_since(self.last_refill);
+    /// Builds a `NetworkFileStream` instance.
+    pub fn build(self) -> Result<NetworkFileStream, String> {
+        self.url
+            .as_ref()
+            .map(|url| assert!(url.starts_with("http://") || url.starts_with("https://")));
+        self.method
+            .as_ref()
+            .map(|method| assert!(method.as_ref() == "GET" || method.as_ref() == "POST"));
 
-        if elapsed >= self.refill_interval {
-            self.tokens = self.capacity;
-            self.last_refill = now;
-        } else {
-            let remaining = self.refill_interval - elapsed;
-            tokio::time::sleep(remaining).await;
-            self.tokens = self.capacity;
-            self.last_refill = Instant::now();
-        }
+        Ok(NetworkFileStream {
+            url: self
+                .url
+                .ok_or_else(|| "field `url` is required".to_string())?,
+            method: self
+                .method
+                .ok_or_else(|| "field `method` is required".to_string())?,
+            headers: self.headers,
+        })
     }
 }

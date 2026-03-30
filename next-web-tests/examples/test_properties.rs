@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use axum::response::IntoResponse;
 use next_web::{
     application::Application,
@@ -15,7 +13,6 @@ struct TestApplication;
 impl Application for TestApplication {
     type ErrorSolve = ();
 
-    /// initialize the middleware.
     async fn init_middleware(
         &self,
         _ctx: &mut ApplicationContext,
@@ -23,7 +20,6 @@ impl Application for TestApplication {
     ) {
     }
 
-    // get the application router. (open api  and private api)
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
         axum::Router::new()
             .route("/properties", axum::routing::get(req_properties))
@@ -63,8 +59,6 @@ async fn req_redis_dynamic_properties(
     format!("{:?}", properties)
 }
 
-// 示例 用于获取配置文件的参数值
-// Example, used to obtain parameter values for configuration files
 #[singleton(default, binds=[Self::into_properties])]
 #[properties(prefix = "next.data.redis")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -78,11 +72,7 @@ pub struct TestRedisProperties {
 #[singleton(default, binds=[Self::into_properties])]
 #[properties(prefix = "next.data.redis.dynamic", dynamic)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
-pub struct TestDynamicRedisProperties {
-    /// This is necessary, try not to change it as much as possible
-    /// 这是必要的，尽量不要改变它, 后面的字段可以自定义
-    pub dynamic: HashMap<String, TestRedisProperties>,
-}
+pub struct TestDynamicRedisProperties {}
 
 #[tokio::main]
 async fn main() {

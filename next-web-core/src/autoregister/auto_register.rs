@@ -29,7 +29,7 @@ pub trait AutoRegister: Sync + Send {
     ///
     /// This method is used to obtain the name of the registration instance.
     ///
-    fn registered_name(&self) -> &'static str;
+    fn name(&self) -> &'static str;
 
     ///
     /// Register the singleton to the application context.

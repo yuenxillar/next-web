@@ -28,7 +28,7 @@ impl MQTTServiceAutoRegister {
 
 #[async_trait]
 impl AutoRegister for MQTTServiceAutoRegister {
-    fn registered_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         ""
     }
 

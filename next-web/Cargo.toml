@@ -94,9 +94,12 @@ full = [
     "enable-web-security",
     "enable-retry",
     "enable-i18n",
+    "enable-thread-pool",
+
+    "common",
+    
     "decrypt-properties",
     # "enable-api-doc",
-    "enable-thread-pool",
     "trace-log"
 ]
 

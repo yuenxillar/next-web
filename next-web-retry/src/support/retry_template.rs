@@ -1,13 +1,11 @@
 use std::{any::Any, sync::Arc, time::Duration};
 
 use crate::{
-    backoff::{
+    Predicate, backoff::{
         back_off_context::BackOffContext, back_off_policy::BackOffPolicy, exponential_back_off_policy::ExponentialBackOffPolicy,  fixed_back_off_policy::FixedBackOffPolicy, no_back_off_policy::NoBackOffPolicy, uniform_random_back_off_policy::UniformRandomBackOffPolicy
-    }, classifier::{binary_error_classifier::BinaryErrorClassifier, binary_error_classifier_builder::BinaryErrorClassifierBuilder}, error::{
-        retry_error::{RetryError, WithCauseError},
-    }, policy::{
+    }, classifier::{binary_error_classifier::BinaryErrorClassifier, binary_error_classifier_builder::BinaryErrorClassifierBuilder}, error::retry_error::{RetryError, WithCauseError}, policy::{
         always_retry_policy::AlwaysRetryPolicy, binary_error_classifier_retry_policy::BinaryErrorClassifierRetryPolicy, composite_retry_policy::CompositeRetryPolicy, map_retry_context_cache::MapRetryContextCache, max_attempts_retry_policy::MaxAttemptsRetryPolicy, predicate_retry_policy::PredicateRetryPolicy, retry_context_cache::RetryContextCache, simple_retry_policy::SimpleRetryPolicy, timeout_retry_policy::TimeoutRetryPolicy
-    }, recovery_callback::RecoveryCallback, retry_callback::RetryCallback, retry_context::{retry_context_constants, RetryContext}, retry_listener::{DefaultRetryListener, RetryListener}, retry_operations::RetryOperations, retry_policy::RetryPolicy, retry_state::RetryState, Predicate
+    }, recovery_callback::RecoveryCallback, retry_callback::RetryCallback, retry_context::{RetryContext, retry_context_constants}, retry_listener::{DefaultRetryListener, RetryListener}, retry_operations::RetryOperations, retry_policy::RetryPolicy, retry_state::RetryState
 };
 use next_web_core::{async_trait, anys::{any_error::AnyError, any_value::AnyValue}};
 use tokio::sync::RwLock;

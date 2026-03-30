@@ -1,3 +1,4 @@
+use dyn_clone::DynClone;
 use next_web_core::async_trait;
 
 /// MQTT主题处理基础trait
@@ -6,7 +7,11 @@ use next_web_core::async_trait;
 /// 定义MQTT消息处理的基本接口，实现该trait的类型可以处理特定主题的消息
 /// Defines the basic interface for MQTT message processing, types implementing this trait can handle messages for specific topics
 #[async_trait]
-pub trait BaseTopic: dyn_clone::DynClone + Send + Sync {
+pub trait BaseTopic
+where
+    Self: DynClone,
+    Self: Send + Sync,
+{
     /// 获取当前处理器订阅的主题
     /// Get the topic that this handler subscribes to
     ///
