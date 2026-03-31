@@ -1,5 +1,3 @@
-
-
 #[cfg(feature = "pdf")]
 pub use next_web_document_pdf;
 

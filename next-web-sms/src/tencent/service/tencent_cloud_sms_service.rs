@@ -1,10 +1,14 @@
 use std::{collections::BTreeMap, str::FromStr, sync::Arc};
 
-use next_web_core::{async_trait, error::BoxError, traits::{service::Service, singleton::Singleton}};
+use next_web_core::{
+    async_trait,
+    error::BoxError,
+    traits::{service::Service, singleton::Singleton},
+};
 use once_cell::sync::Lazy;
 use reqwest::{
-    header::{HeaderMap, HeaderName},
     Method,
+    header::{HeaderMap, HeaderName},
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -106,8 +110,8 @@ impl TencentCloudSmsService {
     }
 }
 
-impl Singleton  for TencentCloudSmsService {}
-impl Service    for TencentCloudSmsService {}
+impl Singleton for TencentCloudSmsService {}
+impl Service for TencentCloudSmsService {}
 
 #[async_trait]
 impl SmsService for TencentCloudSmsService {
@@ -559,10 +563,7 @@ impl SignService for TencentCloudSmsService {
         }
         let action = "DeleteSmsSign";
         let mut params: BTreeMap<&str, Value> = BTreeMap::new();
-        params.insert(
-            "SignId",
-            Value::Number(sign_id.parse::<u64>()?.into()),
-        );
+        params.insert("SignId", Value::Number(sign_id.parse::<u64>()?.into()));
 
         let common_req_headers = self.common_req_headers();
 
@@ -697,7 +698,9 @@ impl SignService for TencentCloudSmsService {
         } else {
             if let Ok(num) = sign_id.parse::<u64>() {
                 vec![Value::Number(num.into())]
-            }else { vec![] }
+            } else {
+                vec![]
+            }
         };
 
         let mut params: BTreeMap<&str, Value> = BTreeMap::new();

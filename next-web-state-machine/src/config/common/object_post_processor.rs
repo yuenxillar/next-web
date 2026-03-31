@@ -1,4 +1,4 @@
-use next_web_core::{anys::any_value::AnyValue, clone_trait_object, DynClone};
+use next_web_core::{DynClone, anys::any_value::AnyValue, clone_trait_object};
 
 /// A trait for post-processing objects
 pub trait ObjectPostProcessor<T = AnyValue>

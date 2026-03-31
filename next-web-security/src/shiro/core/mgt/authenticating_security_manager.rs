@@ -17,7 +17,7 @@ use crate::core::{
         support::default_event_bus::DefaultEventBus,
     },
     mgt::realm_security_manager::RealmSecurityManager,
-    realm::{Realm, simple_account_realm::SimpleAccountRealm},
+    realm::{simple_account_realm::SimpleAccountRealm, Realm},
     util::destroyable::Destroyable,
 };
 

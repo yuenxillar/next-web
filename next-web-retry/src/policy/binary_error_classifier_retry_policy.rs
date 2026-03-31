@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::{async_trait, anys::any_error::AnyError};
+use next_web_core::{anys::any_error::AnyError, async_trait};
 
 use crate::{
     classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier},
@@ -20,7 +20,6 @@ impl BinaryErrorClassifierRetryPolicy {
     }
 }
 
-
 #[async_trait]
 impl RetryPolicy for BinaryErrorClassifierRetryPolicy {
     async fn can_retry(&self, context: &dyn RetryContext) -> bool {
@@ -36,7 +35,7 @@ impl RetryPolicy for BinaryErrorClassifierRetryPolicy {
     fn close(&self, _context: &dyn RetryContext) {}
 
     fn register_error(&self, context: &dyn RetryContext, error: Option<&dyn AnyError>) {
-        let any: & dyn std::any::Any = context;
+        let any: &dyn std::any::Any = context;
         if let Some(support) = any.downcast_ref::<RetryContextSupport>() {
             support.register_error(error);
         }

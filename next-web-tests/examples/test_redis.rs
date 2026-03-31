@@ -6,15 +6,15 @@ use next_web::application::Application;
 use next_web::extract::find_singleton::FindSingleton;
 use next_web::macros::bind::singleton;
 use next_web_core::context::properties::ApplicationProperties;
-use next_web_core::{async_trait, ApplicationContext};
+use next_web_core::{ApplicationContext, async_trait};
+use next_web_data_redis::AsyncCommands;
 use next_web_data_redis::core::event::expired_keys_event::RedisExpiredKeysEvent;
 use next_web_data_redis::service::redis_service::RedisService;
-use next_web_data_redis::AsyncCommands;
 
 #[singleton(binds = [Self::into_expired_key_listener])]
 #[derive(Clone)]
 pub(crate) struct TestExpiredKeyListener {
-    #[resource(name = "redisService")]
+    #[autowired(name = "redisService")]
     pub redis_service: RedisService,
 }
 

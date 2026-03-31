@@ -5,9 +5,8 @@ use rand::{thread_rng, Rng};
 pub struct StringUtil;
 
 impl StringUtil {
-
     /// 空字符串。
-    /// 
+    ///
     pub const EMPTY: &'static str = "";
 
     /// 生成指定长度的随机字母数字字符串 <button class="citation-flag" data-index="1">。
@@ -199,7 +198,6 @@ impl StringUtil {
     pub fn contains_whitespace(s: &str) -> bool {
         s.chars().any(|c| c.is_whitespace())
     }
-
 
     /// 移除字符串中的指定前缀和后缀。
     ///

@@ -1,6 +1,10 @@
-use crate::core::{authc::{
-    authentication_token::AuthenticationToken, host_authentication_token::HostAuthenticationToken,
-}, util::object::Object};
+use crate::core::{
+    authc::{
+        authentication_token::AuthenticationToken,
+        host_authentication_token::HostAuthenticationToken,
+    },
+    util::object::Object,
+};
 
 #[derive(Clone)]
 pub struct BearerToken {
@@ -9,7 +13,6 @@ pub struct BearerToken {
 }
 
 impl BearerToken {
-    
     pub fn new(token: String, host: Option<String>) -> Self {
         Self { token, host }
     }

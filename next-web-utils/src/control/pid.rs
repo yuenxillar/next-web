@@ -1,9 +1,9 @@
 //! A proportional-integral-derivative (PID) controller implementation
-//! 
+//!
 //! This module provides a basic PID controller with optional anti-windup protection
 //! and derivative filtering.
 
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 /// A proportional-integral-derivative (PID) controller
 #[derive(Debug, Clone, Copy)]
@@ -34,7 +34,7 @@ pub struct PidController {
 
 impl PidController {
     /// Creates a new PID controller with default parameters
-    /// 
+    ///
     /// # Arguments
     /// * `kp` - Proportional gain
     /// * `ki` - Integral gain
@@ -76,7 +76,7 @@ impl PidController {
     }
 
     /// Enables derivative filtering with the given coefficient
-    /// 
+    ///
     /// # Arguments
     /// * `alpha` - Filter coefficient (0.0 to 1.0), where 0.0 is no filtering
     pub fn set_derivative_filter(&mut self, alpha: f64) {
@@ -84,7 +84,7 @@ impl PidController {
     }
 
     /// Enables or disables derivative-on-measurement mode
-    /// 
+    ///
     /// When true, derivative is calculated from the process variable instead of error
     pub fn set_derivative_on_measurement(&mut self, enabled: bool) {
         self.derivative_on_measurement = enabled;
@@ -99,7 +99,7 @@ impl PidController {
     }
 
     /// Updates the PID controller with the current process variable and returns the control output
-    /// 
+    ///
     /// # Arguments
     /// * `process_var` - Current measured value of the process
     pub fn update(&mut self, process_var: f64) -> f64 {

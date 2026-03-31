@@ -3,9 +3,9 @@ use next_web_core::async_trait;
 use next_web_core::traits::message::Message;
 use std::any::Any;
 
+use crate::StateMachine;
 use crate::state::StateMachineState;
 use crate::transition::StateMachineTransition;
-use crate::StateMachine;
 
 /// Interface for publishing state machine based application events.
 ///

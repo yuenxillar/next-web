@@ -1,4 +1,6 @@
-use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc, FixedOffset};
+use chrono::{
+    DateTime, Datelike, Duration, FixedOffset, Local, NaiveDate, NaiveDateTime, TimeZone, Utc,
+};
 
 /// 日期时间工具，提供全面的日期时间操作
 pub struct DateTimeUtil;
@@ -79,7 +81,7 @@ impl DateTimeUtil {
         } else {
             NaiveDate::from_ymd_opt(year, month + 1, 1)
         };
-        
+
         first_of_next_month.map(|d| d.pred_opt().unwrap())
     }
 
@@ -115,12 +117,13 @@ impl DateTimeUtil {
     pub fn calculate_age(birth_date: &NaiveDate) -> u32 {
         let today = Local::now().naive_local().date();
         let age = today.year() - birth_date.year();
-        
-        if today.month() < birth_date.month() || 
-           (today.month() == birth_date.month() && today.day() < birth_date.day()) {
+
+        if today.month() < birth_date.month()
+            || (today.month() == birth_date.month() && today.day() < birth_date.day())
+        {
             return (age - 1) as u32;
         }
-        
+
         age as u32
     }
 }

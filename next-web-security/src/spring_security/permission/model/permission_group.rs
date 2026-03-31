@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub enum CombinationMode {
     #[default]
@@ -94,16 +93,16 @@ impl PermissionGroup {
                 return var4 == var5;
             }
             CombinationMode::Or => {
-      
-                if (var11 == 0)  && (var12 == 0) {
+                if (var11 == 0) && (var12 == 0) {
                     return true;
                 }
 
-                return var1.map(|s| {
-                    s.iter().any(|s| {
-                        var2.map(|s2| s2.contains(s)).unwrap_or_default()
+                return var1
+                    .map(|s| {
+                        s.iter()
+                            .any(|s| var2.map(|s2| s2.contains(s)).unwrap_or_default())
                     })
-                }).unwrap_or_default()
+                    .unwrap_or_default();
             }
         }
     }

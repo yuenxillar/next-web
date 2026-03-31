@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use next_web_core::{async_trait, anys::any_error::AnyError, DynClone};
+use next_web_core::{DynClone, anys::any_error::AnyError, async_trait};
 
 use crate::retry_context::RetryContext;
-
 
 pub const NO_MAXIMUM_ATTEMPTS_SET: u16 = 0;
 
@@ -15,7 +14,7 @@ where
 {
     async fn can_retry(&self, context: &dyn RetryContext) -> bool;
 
-    fn open(&self, context:  Option<&dyn RetryContext>) -> Arc<dyn RetryContext>;
+    fn open(&self, context: Option<&dyn RetryContext>) -> Arc<dyn RetryContext>;
 
     fn close(&self, context: &dyn RetryContext);
 

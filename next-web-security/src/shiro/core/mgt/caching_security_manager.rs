@@ -73,7 +73,7 @@ impl<C, B> Destroyable for CachingSecurityManager<C, B>
 where
     C: CacheManager,
     B: EventBus + Default,
-    B: Destroyable
+    B: Destroyable,
 {
     fn destroy(mut self) {
         self.cache_manager = None;
@@ -100,7 +100,7 @@ where
 impl<C, B> Default for CachingSecurityManager<C, B>
 where
     C: CacheManager + EventBusAware<B>,
-    B: Default + Clone + EventBus
+    B: Default + Clone + EventBus,
 {
     fn default() -> Self {
         let mut manager = Self {

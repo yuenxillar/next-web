@@ -61,7 +61,7 @@ where
     async fn create_subject(
         &self,
         context: Arc<dyn SubjectContext>,
-        req:  &mut dyn HttpRequest,
+        req: &mut dyn HttpRequest,
         resp: &mut dyn HttpResponse,
     ) -> Box<dyn WebSubject>;
 }

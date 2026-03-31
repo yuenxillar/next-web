@@ -12,8 +12,7 @@ pub struct TencentCloudSigner<'a> {
     pub(crate) service: &'a str,
 }
 
-impl <'a> TencentCloudSigner<'a> {
-    
+impl<'a> TencentCloudSigner<'a> {
     pub fn new(service: &'a str) -> Self {
         Self { service }
     }

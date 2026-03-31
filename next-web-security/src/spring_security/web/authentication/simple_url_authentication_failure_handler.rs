@@ -47,7 +47,8 @@ impl SimpleUrlAuthenticationFailureHandler {
                     map.set(
                         "NEXT_SECURITY_LAST_ERROR".to_string(),
                         AnyValue::Object(error.clone().into_boxed()),
-                    ).await;
+                    )
+                    .await;
                 }
                 None => {}
             }
@@ -93,7 +94,6 @@ impl SimpleUrlAuthenticationFailureHandler {
         self.allow_session_creation = allow_session_creation;
     }
 }
-
 
 impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
     fn on_authentication_failure(

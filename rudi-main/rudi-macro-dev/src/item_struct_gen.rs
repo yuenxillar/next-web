@@ -1,6 +1,6 @@
 use from_attr::{AttrsValue, FromAttr, PathValue};
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use rudi_core::{Color, Scope};
 use syn::ItemStruct;
 

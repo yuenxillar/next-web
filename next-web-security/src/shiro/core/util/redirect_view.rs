@@ -180,7 +180,6 @@ impl RedirectView {
 
     /// 发送重定向回 HTTP 客户端
     fn send_redirect(&self, target_url: &str, response: &mut dyn HttpResponse) {
-
         // 在 Rust 中，我们假设 URL 已经正确编码
         let encoded_redirect_url = target_url.to_string();
 

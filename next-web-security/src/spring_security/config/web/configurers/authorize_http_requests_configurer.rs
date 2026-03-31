@@ -39,25 +39,21 @@ pub struct AuthorizeHttpRequestsConfigurer<H> {
     registry: AuthorizationManagerRequestMatcherRegistry,
     publisher: Arc<dyn AuthorizationEventPublisher>,
     role_hierarchy: Arc<dyn Fn() -> Arc<dyn RoleHierarchy> + Send + Sync>,
-
     // security_configurer_adapter: SecurityConfigurerAdapter<(), ()>,
 }
 
 impl<H> AuthorizeHttpRequestsConfigurer<H> {
     pub fn open(&self) -> () {}
- 
-    pub fn new(
-        context: &ApplicationContext
-    ) -> Self {
+
+    pub fn new(context: &ApplicationContext) -> Self {
         Self {
             _marker: todo!(),
-            registry:todo!(),
+            registry: todo!(),
             publisher: todo!(),
             role_hierarchy: todo!(),
             // security_configurer_adapter: (),
         }
     }
-
 
     pub fn get_registry(&self) -> AuthorizationManagerRequestMatcherRegistry {
         self.registry.clone()
@@ -84,11 +80,12 @@ impl<H> AuthorizeHttpRequestsConfigurer<H> {
     }
 }
 
-impl<H> SecurityConfigurer<AuthorizeHttpRequestsConfigurer<H>, H> for AuthorizeHttpRequestsConfigurer<H>
+impl<H> SecurityConfigurer<AuthorizeHttpRequestsConfigurer<H>, H>
+    for AuthorizeHttpRequestsConfigurer<H>
 where
     H: Send + Sync,
     H: HttpSecurityBuilder<H>,
-    H: SecurityBuilder<AuthorizeHttpRequestsConfigurer<H>>
+    H: SecurityBuilder<AuthorizeHttpRequestsConfigurer<H>>,
 {
     fn init(&mut self, _http: &mut H) {}
 
@@ -106,12 +103,12 @@ where
     }
 }
 
-
-impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>> for  AuthorizeHttpRequestsConfigurer<H> 
-where 
-H: SecurityBuilder<DefaultSecurityFilterChain>
+impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>>
+    for AuthorizeHttpRequestsConfigurer<H>
+where
+    H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
-    fn get_object(&self) -> & SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         todo!()
     }
 

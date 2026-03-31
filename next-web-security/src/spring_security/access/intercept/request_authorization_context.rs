@@ -1,5 +1,1 @@
-
-
-pub struct RequestAuthorizationContext {
-    
-}
+pub struct RequestAuthorizationContext {}

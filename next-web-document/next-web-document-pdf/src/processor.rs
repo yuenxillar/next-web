@@ -4,6 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(feature = "word-convert")]
+use crate::operations::{
+    pdf_to_word::{PdfToWordOperation, PdfToWordOptions, WordDocument},
+    word_to_pdf::{WordToPdfOperation, WordToPdfOptions},
+};
 use crate::{
     PdfResult,
     operation::{PdfOperation, PdfQuery},
@@ -21,11 +26,6 @@ use crate::{
         split::{PdfSplitOperation, SplitType},
         watermark::{PdfWatermarkOperation, WatermarkLayout, WatermarkType},
     },
-};
-#[cfg(feature = "word-convert")]
-use crate::operations::{
-    pdf_to_word::{PdfToWordOperation, PdfToWordOptions, WordDocument},
-    word_to_pdf::{WordToPdfOperation, WordToPdfOptions},
 };
 
 /// 以后所有功能都挂在这里的最终高层入口

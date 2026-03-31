@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use axum::{response::IntoResponse, Router};
+use axum::{Router, response::IntoResponse};
 use next_web::{
     application::Application, extract::find_singleton::FindSingleton, macros::bind::singleton,
 };
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
-    ApplicationContext,
+    ApplicationContext, async_trait, context::properties::ApplicationProperties,
+    traits::singleton::Singleton,
 };
 
 #[derive(Clone, Default)]
@@ -104,17 +104,17 @@ impl TestSingletonImplThree {
 #[singleton]
 #[derive(Clone)]
 pub struct TestSingletonConsumer {
-    #[resource(name = "testSingletonImplOne")]
+    #[autowired(name = "testSingletonImplOne")]
     pub single: Arc<dyn TestSingleton>,
 
-    #[resource(vec)]
+    #[autowired(vec)]
     pub single_vec: Vec<Arc<dyn TestSingleton>>,
 
     // 这里 V 的泛型需要实现 Singleton trait 然后单例名称为 K
-    #[resource(map)]
+    #[autowired(map)]
     pub single_map: std::collections::HashMap<String, Arc<dyn TestSingleton>>,
 
-    #[resource(name = "testSingletonImplThree", option)]
+    #[autowired(name = "testSingletonImplThree", option)]
     pub single_option: Option<Arc<dyn TestSingleton>>,
 }
 

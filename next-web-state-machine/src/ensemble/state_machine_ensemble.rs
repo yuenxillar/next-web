@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    ensemble::ensemble_listener::EnsembleListener, state_machine_context::StateMachineContext,
-    StateMachine,
+    StateMachine, ensemble::ensemble_listener::EnsembleListener,
+    state_machine_context::StateMachineContext,
 };
 
 /// `StateMachineEnsemble` is a contract between a `StateMachine` and

@@ -1,7 +1,7 @@
 //! Support and helper module for base state machine implementation.
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use futures::future::BoxFuture;
@@ -9,6 +9,7 @@ use next_web_core::anys::any_value::AnyValue;
 use next_web_core::traits::message::Message;
 use tracing::error;
 
+use crate::StateMachine;
 use crate::event::state_machine_event_publisher::StateMachineEventPublisher;
 use crate::listener::composite_state_machine_listener::CompositeStateMachineListener;
 use crate::listener::state_machine_listener::StateMachineListener;
@@ -20,7 +21,6 @@ use crate::state_context::StateContext;
 use crate::support::lifecycle_object_support::LifecycleObjectSupport;
 use crate::support::state_machine_interceptor_list::StateMachineInterceptorList;
 use crate::transition::StateMachineTransition;
-use crate::StateMachine;
 
 /// Support and helper class for base state machine implementation.
 ///

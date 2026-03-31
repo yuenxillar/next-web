@@ -3,14 +3,14 @@ use std::sync::Arc;
 use next_web_core::async_trait;
 
 use crate::{
+    BoxedStateAction, BoxedStateGuard,
     security::security_rule::SecurityRule,
-    state::{action_listener::ActionListener, StateMachineState},
+    state::{StateMachineState, action_listener::ActionListener},
     state_context::StateContext,
     transition::{
-        base_transition::BaseTransition, transition_kind::TransitionKind, StateMachineTransition,
+        StateMachineTransition, base_transition::BaseTransition, transition_kind::TransitionKind,
     },
     trigger::Trigger,
-    BoxedStateAction, BoxedStateGuard,
 };
 
 /// A transition used during state machine initialization.

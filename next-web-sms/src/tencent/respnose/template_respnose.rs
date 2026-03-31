@@ -2,13 +2,11 @@ use serde::Deserialize;
 
 use crate::tencent::respnose::sms_respnose::ErrorRespnose;
 
-
 #[derive(Debug, Deserialize)]
 pub struct TencentCloudTemplateResponse {
     #[serde(rename = "Response")]
     pub response: TemplateResponse,
 }
-
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]

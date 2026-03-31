@@ -2,7 +2,7 @@ use std::{cmp::Ordering, marker::PhantomData};
 
 use crate::{
     support::state_machine_utils::StateMachineUtils,
-    transition::{transition_conflict_policy::TransitionConflictPolicy, StateMachineTransition},
+    transition::{StateMachineTransition, transition_conflict_policy::TransitionConflictPolicy},
 };
 
 #[derive(Debug, Clone)]

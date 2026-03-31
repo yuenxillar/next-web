@@ -6,7 +6,11 @@ use next_web_core::error::BoxError;
 use crate::core::filter::Filter;
 
 use super::{
-    firewall::{http_firewall::HttpFirewall, http_status_request_rejected_handler::HttpStatusRequestRejectedHandler, request_rejected_handler::RequestRejectedHandler, strict_http_firewall::StrictHttpFirewall},
+    firewall::{
+        http_firewall::HttpFirewall,
+        http_status_request_rejected_handler::HttpStatusRequestRejectedHandler,
+        request_rejected_handler::RequestRejectedHandler, strict_http_firewall::StrictHttpFirewall,
+    },
     security_filter_chain::SecurityFilterChain,
 };
 
@@ -31,7 +35,6 @@ impl FilterChainProxy {
 
 impl Filter for FilterChainProxy {
     fn do_filter(&self, req: &mut Request, res: &mut Response) -> Result<(), BoxError> {
-        
         Ok(())
     }
 }

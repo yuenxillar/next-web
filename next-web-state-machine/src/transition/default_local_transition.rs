@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
+    BoxedStateAction, BoxedStateGuard,
     security::security_rule::SecurityRule,
     state::StateMachineState,
     transition::{base_transition::BaseTransition, transition_kind::TransitionKind},
     trigger::Trigger,
-    BoxedStateAction, BoxedStateGuard,
 };
 
 /// Represents a default local transition implementation.

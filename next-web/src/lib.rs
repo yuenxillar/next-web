@@ -35,12 +35,11 @@ pub use next_web_core::*;
 pub use next_web_state_machine as state_machine;
 
 #[cfg(feature = "enable-web-security")]
-pub use next_web_macros::pre_authorize;
-#[cfg(feature = "enable-web-security")]
 pub use next_web_security as security;
 
-#[cfg(feature = "enable-retry")]
-pub use next_web_macros::retryable;
+#[cfg(feature = "enable-websocket")]
+pub use next_web_websocket as ws;
+
 #[cfg(feature = "enable-retry")]
 pub use next_web_retry as retry;
 

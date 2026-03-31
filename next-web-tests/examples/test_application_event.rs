@@ -5,12 +5,11 @@ use next_web::{
     macros::event::event_listener,
 };
 use next_web_core::{
-    async_trait,
+    ApplicationContext, async_trait,
     context::properties::ApplicationProperties,
     traits::event::{
         application_event::ApplicationEvent, application_listener::ApplicationListener,
     },
-    ApplicationContext,
 };
 
 use next_web::{application::Application, macros::bind::singleton};

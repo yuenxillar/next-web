@@ -117,8 +117,7 @@ impl Deref for AccessControlFilter {
 }
 
 impl DerefMut for AccessControlFilter {
-
-    fn deref_mut (&mut self) -> &mut Self::Target {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.path_matching_filter
     }
 }

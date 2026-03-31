@@ -4,8 +4,9 @@ use next_web_core::error::BoxError;
 use uuid::Uuid;
 
 use crate::{
+    BoxedStateAction, StateMachine,
     config::{
-        action::{actions::Actions, StateMachineAction},
+        action::{StateMachineAction, actions::Actions},
         builders::{
             state_machine_state_builder::StateMachineStateBuilder,
             state_machine_state_configurer::StateMachineStateConfigurer,
@@ -21,7 +22,6 @@ use crate::{
         state_machine_factory::StateMachineFactory,
     },
     state::pseudo_state_kind::PseudoStateKind,
-    BoxedStateAction, StateMachine,
 };
 
 /// Default implementation of StateConfigurer

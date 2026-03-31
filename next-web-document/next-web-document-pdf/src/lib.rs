@@ -9,12 +9,12 @@ pub mod watermark;
 pub type PdfResult<T> = std::result::Result<T, crate::error::pdf_error::PdfError>;
 
 pub use operation::{PdfOperation, PdfQuery};
-pub use processor::PdfProcessor;
 #[cfg(feature = "word-convert")]
 pub use operations::{
     pdf_to_word::{EmptyPageBehavior, PdfToWordOptions, WordDocument},
     word_to_pdf::{PdfPageSize, WordInputFormat, WordToPdfOptions},
 };
+pub use processor::PdfProcessor;
 
 // fn main() -> anyhow::Result<()> {
 //     let mut pdf = PdfProcessor::from_file("input.pdf")?;

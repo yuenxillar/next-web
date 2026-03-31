@@ -45,8 +45,19 @@ impl UserAgentInfo {
 
     fn extract_browser(info: &mut UserAgentInfo, ua_lower: &str) {
         let browsers = [
-            "firefox", "chrome", "safari", "opera", "msie", "trident", "edge", "edg",
-            "netscape", "maxthon", "konqueror", "lynx", "ucbrowser",
+            "firefox",
+            "chrome",
+            "safari",
+            "opera",
+            "msie",
+            "trident",
+            "edge",
+            "edg",
+            "netscape",
+            "maxthon",
+            "konqueror",
+            "lynx",
+            "ucbrowser",
         ];
 
         for browser in browsers {
@@ -106,8 +117,19 @@ impl UserAgentInfo {
 
     fn extract_device(info: &mut UserAgentInfo, ua_lower: &str) {
         let devices = [
-            "iphone", "ipad", "ipod", "blackberry", "htc", "samsung", "nokia", "nexus",
-            "kindle", "playbook", "xbox", "playstation", "smart-tv",
+            "iphone",
+            "ipad",
+            "ipod",
+            "blackberry",
+            "htc",
+            "samsung",
+            "nokia",
+            "nexus",
+            "kindle",
+            "playbook",
+            "xbox",
+            "playstation",
+            "smart-tv",
         ];
 
         for device in devices {
@@ -119,9 +141,7 @@ impl UserAgentInfo {
     }
 
     fn extract_engine(info: &mut UserAgentInfo, ua_lower: &str) {
-        let engines = [
-            "webkit", "gecko", "trident", "presto", "blink", "khtml"
-        ];
+        let engines = ["webkit", "gecko", "trident", "presto", "blink", "khtml"];
 
         for engine in engines {
             if let Some(pos) = ua_lower.find(engine) {
@@ -134,13 +154,13 @@ impl UserAgentInfo {
 
     fn extract_version(ua_lower: &str, start_pos: usize) -> Option<String> {
         let remaining = &ua_lower[start_pos..];
-        
+
         // 查找版本号通常跟在 '/' 或 ' ' 后面
         let version_start = remaining.find(|c: char| c == '/' || c == ' ' || c == ';')? + 1;
         let version_end = remaining[version_start..]
             .find(|c: char| !(c.is_ascii_digit() || c == '.'))
             .unwrap_or(remaining.len() - version_start);
-        
+
         let version_str = &remaining[version_start..version_start + version_end];
         if !version_str.is_empty() {
             Some(version_str.to_string())
@@ -196,7 +216,7 @@ mod tests {
     fn test_parse_user_agent() {
         let ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
         let info = UserAgentInfo::parse(ua);
-        
+
         assert_eq!(info.browser, Some("chrome".to_string()));
         assert_eq!(info.browser_version, Some("91.0.4472.124".to_string()));
         assert_eq!(info.os, Some("windows nt".to_string()));
@@ -209,7 +229,7 @@ mod tests {
     fn test_parse_internet_explorer() {
         let ua = "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko";
         let info = UserAgentInfo::parse(ua);
-        
+
         assert_eq!(info.browser, Some("internet explorer".to_string()));
         assert_eq!(info.browser_version, Some("11.0".to_string()));
         assert_eq!(info.os, Some("windows nt".to_string()));
@@ -220,7 +240,7 @@ mod tests {
     fn test_parse_safari() {
         let ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15";
         let info = UserAgentInfo::parse(ua);
-        
+
         assert_eq!(info.browser, Some("safari".to_string()));
         assert_eq!(info.browser_version, Some("605.1.15".to_string()));
         assert_eq!(info.os, Some("mac os x".to_string()));

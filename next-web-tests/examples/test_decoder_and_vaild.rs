@@ -5,8 +5,8 @@ use next_web::{
     macros::bind::singleton,
 };
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, traits::data_decoder::DataDecoder,
-    ApplicationContext,
+    ApplicationContext, async_trait, context::properties::ApplicationProperties,
+    traits::data_decoder::DataDecoder,
 };
 use serde::{Deserialize, Serialize};
 use validator::Validate;

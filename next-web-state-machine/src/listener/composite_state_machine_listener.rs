@@ -2,11 +2,11 @@ use next_web_core::anys::any_value::AnyValue;
 use next_web_core::traits::message::Message;
 use std::sync::{Arc, RwLock};
 
+use crate::StateMachine;
 use crate::listener::state_machine_listener::StateMachineListener;
 use crate::state::StateMachineState;
 use crate::state_context::StateContext;
 use crate::transition::StateMachineTransition;
-use crate::StateMachine;
 
 /// Default state machine listener dispatcher.
 ///

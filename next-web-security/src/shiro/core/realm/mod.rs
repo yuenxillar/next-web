@@ -13,8 +13,8 @@ pub mod caching_realm;
 
 #[async_trait]
 pub trait Realm
-where 
-Self: Send + Sync,
+where
+    Self: Send + Sync,
 {
     fn get_name(&self) -> &str;
 
@@ -28,15 +28,15 @@ Self: Send + Sync,
 
 #[async_trait]
 impl Realm for Arc<dyn Realm> {
-    fn get_name(&self) ->  &str {
+    fn get_name(&self) -> &str {
         self.as_ref().get_name()
     }
 
-    fn supports(&self,authentication_token: &dyn AuthenticationToken) -> bool {
+    fn supports(&self, authentication_token: &dyn AuthenticationToken) -> bool {
         self.as_ref().supports(authentication_token)
     }
 
-     async fn get_authentication_info(
+    async fn get_authentication_info(
         &self,
         token: &dyn AuthenticationToken,
     ) -> Option<Box<dyn AuthenticationInfo>> {

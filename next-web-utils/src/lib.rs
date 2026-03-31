@@ -1,20 +1,20 @@
-pub mod url;
-pub mod html;
 pub mod calendar;
 pub mod common;
+pub mod control;
 pub mod cron;
 pub mod crypto;
 pub mod datetime;
 pub mod file;
+pub mod html;
+pub mod image;
 pub mod io;
 pub mod socket;
 pub mod system;
-pub mod control;
-pub mod image;
+pub mod url;
 
-#[cfg(feature = "qr-code")]
-pub mod qr_code;
 #[cfg(feature = "cache")]
 pub mod cache;
 #[cfg(feature = "captcha")]
 pub mod captcha;
+#[cfg(feature = "qr-code")]
+pub mod qr_code;

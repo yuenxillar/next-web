@@ -1,4 +1,4 @@
-use next_web_core::{clone_trait_object, error::BoxError, DynClone};
+use next_web_core::{DynClone, clone_trait_object, error::BoxError};
 
 /// Trait for configuring an `Configurer`.
 ///

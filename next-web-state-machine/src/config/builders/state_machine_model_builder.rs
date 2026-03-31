@@ -8,7 +8,7 @@ use crate::config::{
     common::{
         base_builder::{BaseBuilder, BaseBuilderExt},
         base_configured_builder::{
-            execute_configured_build, BaseConfiguredBuilder, BaseConfiguredBuilderExt,
+            BaseConfiguredBuilder, BaseConfiguredBuilderExt, execute_configured_build,
         },
         builder::Builder,
     },

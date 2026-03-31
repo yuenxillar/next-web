@@ -1,18 +1,18 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
-use next_web_core::async_trait;
 use aes::{
-    cipher::{block_padding::Pkcs7, generic_array::GenericArray, BlockDecryptMut, KeyIvInit},
     Aes128,
+    cipher::{BlockDecryptMut, KeyIvInit, block_padding::Pkcs7, generic_array::GenericArray},
 };
+use next_web_core::async_trait;
 
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use cbc::Decryptor;
 use chrono::{DateTime, Duration, Utc};
 use hex::encode;
@@ -21,11 +21,14 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::from_slice;
 use sha2::Sha256;
 use tokio::sync::{Notify, RwLock};
-use tracing::{event, instrument, Level};
+use tracing::{Level, event, instrument};
 
 use crate::{
-    error::Error::InternalServer, response::Response, client::WechatClient, user::{User, UserBuilder},
     Result,
+    client::WechatClient,
+    error::Error::InternalServer,
+    response::Response,
+    user::{User, UserBuilder},
 };
 
 type Aes128CbcDec = Decryptor<Aes128>;
@@ -450,9 +453,7 @@ impl CheckSessionKey for GenericAccessToken<AccessToken> {
 
             response.extract()
         } else {
-            Err(crate::error::Error::InternalServer(
-                response.text().await?,
-            ))
+            Err(crate::error::Error::InternalServer(response.text().await?))
         }
     }
 }

@@ -51,10 +51,9 @@ impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for LogoutConfigurer<H
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn init(&mut self, builer: &mut H) {
-    }
+    fn init(&mut self, builer: &mut H) {}
 
-    fn configure(&mut self, builer:&mut  H) {
+    fn configure(&mut self, builer: &mut H) {
         todo!()
     }
 }

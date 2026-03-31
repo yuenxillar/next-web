@@ -1,18 +1,17 @@
 use std::fmt::Display;
-use std::hash::Hasher;
 use std::hash::Hash;
+use std::hash::Hasher;
 
-
-pub mod wildcard_permission_resolver;
-pub mod role_permission_resolver_aware;
+pub mod permission_resolver;
 pub mod permission_resolver_aware;
 pub mod role_permission_resolver;
-pub mod permission_resolver;
+pub mod role_permission_resolver_aware;
+pub mod wildcard_permission_resolver;
 
 pub trait Permission
-where 
-Self: Send + Sync,
-Self: Display,
+where
+    Self: Send + Sync,
+    Self: Display,
 {
     fn implies(&self, p: &dyn Permission) -> bool;
 
@@ -20,7 +19,6 @@ Self: Display,
 }
 
 struct PermissionWrapper(Box<dyn Permission>);
-
 
 impl PartialEq for PermissionWrapper {
     fn eq(&self, other: &Self) -> bool {

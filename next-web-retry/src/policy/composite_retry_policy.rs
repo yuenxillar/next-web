@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use next_web_core::{async_trait, anys::any_error::AnyError};
+use next_web_core::{anys::any_error::AnyError, async_trait};
 
 use crate::{
     context::retry_context_support::RetryContextSupport,
@@ -31,11 +31,9 @@ impl CompositeRetryPolicy {
     }
 }
 
-
 #[async_trait]
 impl RetryPolicy for CompositeRetryPolicy {
     async fn can_retry(&self, context: &dyn RetryContext) -> bool {
-
         let any: &dyn Any = context;
         if let Some(ctx) = any.downcast_ref::<CompositeRetryContext>() {
             let mut retryable = true;
@@ -47,8 +45,7 @@ impl RetryPolicy for CompositeRetryPolicy {
                         retryable = true;
                     }
                 }
-            }
-            else {
+            } else {
                 for (i, c) in ctx.contexts.iter().enumerate() {
                     if !ctx.policies[i].can_retry(c.as_ref()).await {
                         // println!("Retry policy {} failed.", ctx.policies[i].as_ref().to_string());
@@ -78,17 +75,13 @@ impl RetryPolicy for CompositeRetryPolicy {
     fn close(&self, context: &dyn RetryContext) {
         let any: &dyn Any = context;
         if let Some(ctx) = any.downcast_ref::<CompositeRetryContext>() {
-            for (i,c) in ctx.contexts.iter().enumerate() {
+            for (i, c) in ctx.contexts.iter().enumerate() {
                 ctx.policies[i].close(c.as_ref());
             }
         }
     }
 
-    fn register_error(
-        &self,
-        context: &dyn RetryContext,
-        error: Option<&dyn AnyError>,
-    ) {
+    fn register_error(&self, context: &dyn RetryContext, error: Option<&dyn AnyError>) {
         let any: &dyn Any = context;
         if let Some(ctx) = any.downcast_ref::<CompositeRetryContext>() {
             let policies = &ctx.policies;
@@ -122,7 +115,6 @@ struct CompositeRetryContext {
 }
 
 impl_retry_context!(CompositeRetryContext);
-
 
 impl ToString for CompositeRetryPolicy {
     fn to_string(&self) -> String {

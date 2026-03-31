@@ -1,4 +1,4 @@
-use crate::{region::Region, StateMachine};
+use crate::{StateMachine, region::Region};
 
 pub struct BaseState<S, E> {
     s: (S, E),

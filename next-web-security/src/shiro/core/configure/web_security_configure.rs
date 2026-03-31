@@ -1,7 +1,1 @@
-
-
-pub trait WebSecurityConfigure
-{
-    
-    
-}
+pub trait WebSecurityConfigure {}

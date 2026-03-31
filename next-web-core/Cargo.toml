@@ -29,6 +29,7 @@ sys-locale = { workspace = true }
 headers = { workspace = true, optional = true }
 urlencoding = { workspace = true }
 inventory = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
 
 uuid = { workspace = true }
 

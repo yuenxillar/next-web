@@ -432,7 +432,6 @@ mod tests {
 
     #[test]
     fn test_any() {
-       
         let cache = BackCache::new();
         cache.set(
             "key1",
@@ -440,8 +439,10 @@ mod tests {
             Some(Duration::from_secs(100)),
         );
         let value = cache.get("key1");
-        assert_eq!(value.map(|f| f.as_object::<String>()).unwrap().unwrap(), "Hello, world!".to_string());
-
+        assert_eq!(
+            value.map(|f| f.as_object::<String>()).unwrap().unwrap(),
+            "Hello, world!".to_string()
+        );
 
         #[derive(Clone, Debug)]
         struct TestA(pub String);

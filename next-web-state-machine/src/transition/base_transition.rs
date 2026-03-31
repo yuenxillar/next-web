@@ -5,12 +5,12 @@ use next_web_core::async_trait;
 use tracing::warn;
 
 use crate::{
-    security::security_rule::SecurityRule,
-    state::{action_listener::ActionListener, StateMachineState},
-    state_context::StateContext,
-    transition::{transition_kind::TransitionKind, StateMachineTransition},
-    trigger::Trigger,
     BoxedStateAction, BoxedStateGuard,
+    security::security_rule::SecurityRule,
+    state::{StateMachineState, action_listener::ActionListener},
+    state_context::StateContext,
+    transition::{StateMachineTransition, transition_kind::TransitionKind},
+    trigger::Trigger,
 };
 
 /// Base implementation of a transition in a state machine.

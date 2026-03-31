@@ -8,7 +8,7 @@ use super::attrs::scheduled_attr::ScheduledAttr;
 macro_rules! quote_some {
     ($opt:expr) => {
         match $opt {
-            Some(ref x) => quote::quote! { Some(#x) },
+            Some(ref x) => quote::quote! { Some(::std::string::String::from(#x)) },
             None => quote::quote! { None },
         }
     };
@@ -141,7 +141,12 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
             ::std::boxed::Box::new(move || { #(#cloneds)* ::std::boxed::Box::pin(#name(#(#args),*)) })
         }
     } else {
-        quote! {::std::boxed::Box::new(#name(#(#args),*))}
+        quote! {
+            ::std::boxed::Box::new(move || {
+                #(#cloneds)*
+                #name(#(#args),*)
+            })
+        }
     };
 
     let doc_attributes: Vec<syn::Attribute> = item_fn
@@ -157,13 +162,13 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
         #vis struct #name;
 
         impl ::next_web::autoregister::scheduler_autoregister::SchedulerAutoRegister for #name {
-            fn register(& self, __ctx: &mut ::next_web::ApplicationContext) -> ::next_web::autoregister::scheduler_autoregister::AnJob {
+            fn register(& self, __ctx: &mut ::next_web::ApplicationContext) -> ::next_web::manager::job_scheduler_manager::BoxedJob {
 
                 #item_fn
 
                 #( #variables )*
 
-                ::next_web::autoregister::scheduler_autoregister::AnJob::#mark ( (#schedule , #run) )
+                ::next_web::manager::job_scheduler_manager::BoxedJob::#mark ( (#schedule , #run) )
             }
         }
 

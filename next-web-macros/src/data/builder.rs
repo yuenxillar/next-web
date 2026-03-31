@@ -94,8 +94,8 @@ pub(crate) fn impl_macro_builder(input: &syn::DeriveInput) -> TokenStream {
         .collect::<Vec<_>>();
 
     // Generate build method
-let build_method = {
-    let field_initializers = fields.iter().map(|field| {
+    let build_method = {
+        let field_initializers = fields.iter().map(|field| {
         let field_name = &field.ident;
         let is_option = FieldType::is_option(&field.ty);
         
@@ -126,14 +126,14 @@ let build_method = {
         quote! { #field_name: #setter }
     });
 
-    quote! {
-        pub fn build(mut self) -> Result<#struct_name, &'static str> {
-            Ok(#struct_name {
-                #( #field_initializers ),*
-            })
+        quote! {
+            pub fn build(mut self) -> Result<#struct_name, &'static str> {
+                Ok(#struct_name {
+                    #( #field_initializers ),*
+                })
+            }
         }
-    }
-};
+    };
 
     // In the builder function, all fields default to None
     let builer_fields = fields
@@ -189,26 +189,30 @@ impl FieldConfig {
         for attr in &field.attrs {
             if attr.path().is_ident("builder") {
                 attr.parse_nested_meta(|meta| {
-                        match meta.path.get_ident() {
+                    match meta.path.get_ident() {
                         Some(ident) => {
                             if ident == "default" {
-                                 match meta.value() {
-                                        Ok(lit) => {
-                                            let function_str: syn::LitStr = lit.parse()?;
-                                            let function_ident = syn::Ident::new(&function_str.value(), function_str.span());
-                                            result =  Self::WithDefaultFunction(function_ident);
-                                        },
-                                        Err(_) => result = Self::WithDefaultTrait,
+                                match meta.value() {
+                                    Ok(lit) => {
+                                        let function_str: syn::LitStr = lit.parse()?;
+                                        let function_ident = syn::Ident::new(
+                                            &function_str.value(),
+                                            function_str.span(),
+                                        );
+                                        result = Self::WithDefaultFunction(function_ident);
                                     }
+                                    Err(_) => result = Self::WithDefaultTrait,
+                                }
                             }
-                        },
+                        }
                         None => {}
                     }
                     Ok(())
-                  }).unwrap();
+                })
+                .unwrap();
             }
         }
-        
+
         result
     }
 }

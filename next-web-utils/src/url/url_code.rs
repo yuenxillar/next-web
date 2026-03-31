@@ -50,7 +50,7 @@ impl UrlCode {
         let mut result = Vec::new(); // 存储解码后的字节
         let mut i = 0;
         let bytes = s.as_bytes();
-        
+
         while i < bytes.len() {
             match bytes[i] {
                 // 加号转换为空格
@@ -63,14 +63,19 @@ impl UrlCode {
                     if i + 2 >= bytes.len() {
                         return Err("URL解码错误: %后没有足够的字符".to_string());
                     }
-                    
+
                     // 解析十六进制值
                     let hex = match (Self::from_hex(bytes[i + 1]), Self::from_hex(bytes[i + 2])) {
                         (Some(h1), Some(h2)) => h1 * 16 + h2,
-                        _ => return Err(format!("URL解码错误: 无效的十六进制值 %{}{}", 
-                            bytes[i + 1] as char, bytes[i + 2] as char))
+                        _ => {
+                            return Err(format!(
+                                "URL解码错误: 无效的十六进制值 %{}{}",
+                                bytes[i + 1] as char,
+                                bytes[i + 2] as char
+                            ))
+                        }
                     };
-                    
+
                     // 将解码后的字节添加到结果
                     result.push(hex);
                     i += 3;
@@ -82,14 +87,14 @@ impl UrlCode {
                 }
             }
         }
-        
+
         // 将字节向量转换为UTF-8字符串
         match String::from_utf8(result) {
             Ok(s) => Ok(s),
-            Err(e) => Err(format!("URL解码错误: 无效的UTF-8序列: {}", e))
+            Err(e) => Err(format!("URL解码错误: 无效的UTF-8序列: {}", e)),
         }
     }
-    
+
     /// 将十六进制字符转换为数值
     fn from_hex(c: u8) -> Option<u8> {
         match c {
@@ -99,20 +104,36 @@ impl UrlCode {
             _ => None,
         }
     }
-    
+
     /// 编码表单数据中的字符串
     pub fn encode_form_value(s: &str) -> String {
         Self::encode(s)
     }
-    
+
     /// 编码URL路径部分
     pub fn encode_path_segment(s: &str) -> String {
         let mut result = String::new();
         for b in s.bytes() {
             match b {
                 // 路径段中允许的字符
-                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'!' |
-                b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'=' => {
+                b'A'..=b'Z'
+                | b'a'..=b'z'
+                | b'0'..=b'9'
+                | b'-'
+                | b'.'
+                | b'_'
+                | b'~'
+                | b'!'
+                | b'$'
+                | b'&'
+                | b'\''
+                | b'('
+                | b')'
+                | b'*'
+                | b'+'
+                | b','
+                | b';'
+                | b'=' => {
                     result.push(b as char);
                 }
                 // 其他字符编码为%HH
@@ -124,7 +145,7 @@ impl UrlCode {
         }
         result
     }
-    
+
     /// 编码URL参数名或值
     pub fn encode_query_param(s: &str) -> String {
         let mut result = String::new();
@@ -145,79 +166,79 @@ impl UrlCode {
         }
         result
     }
-    
+
     /// 判断字符是否需要URL编码
     pub fn needs_encoding(c: char) -> bool {
         let b = c as u8;
         match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => false,
-            _ => true
+            _ => true,
         }
     }
-    
+
     /// 解析URL中的查询参数，返回键值对
     pub fn parse_query_string(query: &str) -> Result<Vec<(String, String)>, String> {
         let mut params = Vec::new();
-        
+
         if query.is_empty() {
             return Ok(params);
         }
-        
+
         for param in query.split('&') {
             if param.is_empty() {
                 continue;
             }
-            
+
             let parts: Vec<&str> = param.split('=').collect();
             match parts.len() {
                 1 => {
                     // 没有值的参数，如 "param"
                     let key = Self::decode(parts[0])?;
                     params.push((key, String::new()));
-                },
+                }
                 2 => {
                     // 正常的键值对，如 "param=value"
                     let key = Self::decode(parts[0])?;
                     let value = Self::decode(parts[1])?;
                     params.push((key, value));
-                },
+                }
                 _ => {
                     // 处理 "param=value=something" 的情况，把第一个等号后面的全部作为值
                     let key = Self::decode(parts[0])?;
-                    let value = Self::decode(&param[parts[0].len()+1..])?;
+                    let value = Self::decode(&param[parts[0].len() + 1..])?;
                     params.push((key, value));
                 }
             }
         }
-        
+
         Ok(params)
     }
-    
+
     /// 构建查询字符串
     pub fn build_query_string(params: &[(String, String)]) -> String {
         let mut query = String::new();
-        
+
         for (i, (key, value)) in params.iter().enumerate() {
             if i > 0 {
                 query.push('&');
             }
-            
+
             query.push_str(&Self::encode_query_param(key));
-            
+
             if !value.is_empty() {
                 query.push('=');
                 query.push_str(&Self::encode_query_param(value));
             }
         }
-        
+
         query
     }
-    
+
     /// 解析完整URL，拆分为各个组成部分
     pub fn parse_url(url: &str) -> Result<UrlComponents, String> {
         let mut components = UrlComponents::default();
         let mut remaining = url;
-        
+
         // 解析协议 (scheme)
         if let Some(pos) = remaining.find("://") {
             components.scheme = remaining[..pos].to_lowercase();
@@ -225,12 +246,12 @@ impl UrlCode {
         } else {
             return Err("URL格式错误: 缺少协议部分".to_string());
         }
-        
+
         // 解析认证信息 (用户名和密码)
         if let Some(pos) = remaining.find('@') {
             let auth = &remaining[..pos];
             remaining = &remaining[pos + 1..];
-            
+
             if let Some(pos_colon) = auth.find(':') {
                 components.username = auth[..pos_colon].to_string();
                 match Self::decode(&auth[pos_colon + 1..]) {
@@ -241,15 +262,15 @@ impl UrlCode {
                 components.username = auth.to_string();
             }
         }
-        
+
         // 解析主机和端口
         let path_start = remaining.find('/').unwrap_or(remaining.len());
         let query_start = remaining.find('?').unwrap_or(remaining.len());
         let fragment_start = remaining.find('#').unwrap_or(remaining.len());
-        
+
         let authority_end = path_start.min(query_start).min(fragment_start);
         let authority = &remaining[..authority_end];
-        
+
         if let Some(pos) = authority.rfind(':') {
             components.host = authority[..pos].to_string();
             match authority[pos + 1..].parse::<u16>() {
@@ -266,9 +287,9 @@ impl UrlCode {
                 _ => None,
             };
         }
-        
+
         remaining = &remaining[authority_end..];
-        
+
         // 解析路径
         if path_start < query_start && path_start < fragment_start {
             let path_end = query_start.min(fragment_start);
@@ -277,7 +298,7 @@ impl UrlCode {
         } else {
             components.path = "/".to_string();
         }
-        
+
         // 解析查询参数
         if query_start < fragment_start && query_start < remaining.len() {
             let query_end = fragment_start;
@@ -288,40 +309,40 @@ impl UrlCode {
             }
             remaining = &remaining[query_end..];
         }
-        
+
         // 解析片段标识符
         if fragment_start < remaining.len() {
             components.fragment = remaining[1..].to_string(); // 跳过开头的 '#'
         }
-        
+
         Ok(components)
     }
-    
+
     /// 根据各组成部分构建完整URL
     pub fn build_url(components: &UrlComponents) -> String {
         let mut url = String::new();
-        
+
         // 添加协议
         if !components.scheme.is_empty() {
             url.push_str(&components.scheme);
             url.push_str("://");
         }
-        
+
         // 添加认证信息
         if !components.username.is_empty() {
             url.push_str(&Self::encode(&components.username));
-            
+
             if !components.password.is_empty() {
                 url.push(':');
                 url.push_str(&Self::encode(&components.password));
             }
-            
+
             url.push('@');
         }
-        
+
         // 添加主机
         url.push_str(&components.host);
-        
+
         // 添加端口
         if let Some(port) = components.port {
             // 只有当端口不是协议的默认端口时才添加
@@ -331,13 +352,13 @@ impl UrlCode {
                 "ftp" => port == 21,
                 _ => false,
             };
-            
+
             if !is_default_port {
                 url.push(':');
                 url.push_str(&port.to_string());
             }
         }
-        
+
         // 添加路径
         if components.path.is_empty() {
             url.push('/');
@@ -347,33 +368,33 @@ impl UrlCode {
         } else {
             url.push_str(&components.path);
         }
-        
+
         // 添加查询参数
         if !components.query.is_empty() {
             url.push('?');
             url.push_str(&Self::build_query_string(&components.query));
         }
-        
+
         // 添加片段标识符
         if !components.fragment.is_empty() {
             url.push('#');
             url.push_str(&components.fragment);
         }
-        
+
         url
     }
-    
+
     /// 提取URL的域名部分
     pub fn get_domain(url: &str) -> Result<String, String> {
         let components = Self::parse_url(url)?;
         Ok(components.host)
     }
-    
+
     /// 判断URL是否为绝对URL（包含协议部分）
     pub fn is_absolute_url(url: &str) -> bool {
         url.contains("://")
     }
-    
+
     /// 提取URL的path部分
     pub fn get_path(url: &str) -> Result<String, String> {
         let components = Self::parse_url(url)?;
@@ -396,10 +417,13 @@ mod tests {
     #[test]
     fn test_decode() {
         assert_eq!(UrlCode::decode("Hello+World").unwrap(), "Hello World");
-        assert_eq!(UrlCode::decode("hello%40example.com").unwrap(), "hello@example.com");
+        assert_eq!(
+            UrlCode::decode("hello%40example.com").unwrap(),
+            "hello@example.com"
+        );
         assert_eq!(UrlCode::decode("%E4%BD%A0%E5%A5%BD").unwrap(), "你好");
     }
-    
+
     #[test]
     fn test_decode_error() {
         assert!(UrlCode::decode("%").is_err());
@@ -407,33 +431,36 @@ mod tests {
         assert!(UrlCode::decode("%XY").is_err());
         assert!(UrlCode::decode("%FF%FF").is_err()); // 无效的UTF-8序列
     }
-    
+
     #[test]
     fn test_parse_query_string() {
         let query = "name=%E5%BC%A0%E4%B8%89&age=25&hobby=coding&hobby=reading";
         let params = UrlCode::parse_query_string(query).unwrap();
-        
+
         assert_eq!(params.len(), 4);
         assert_eq!(params[0], ("name".to_string(), "张三".to_string()));
         assert_eq!(params[1], ("age".to_string(), "25".to_string()));
         assert_eq!(params[2], ("hobby".to_string(), "coding".to_string()));
         assert_eq!(params[3], ("hobby".to_string(), "reading".to_string()));
-        
+
         // 测试空查询字符串
         assert_eq!(UrlCode::parse_query_string("").unwrap().len(), 0);
-        
+
         // 测试没有值的参数
         let params = UrlCode::parse_query_string("param1&param2=value").unwrap();
         assert_eq!(params.len(), 2);
         assert_eq!(params[0], ("param1".to_string(), "".to_string()));
         assert_eq!(params[1], ("param2".to_string(), "value".to_string()));
-        
+
         // 测试多个等号的情况
         let params = UrlCode::parse_query_string("key=value=something").unwrap();
         assert_eq!(params.len(), 1);
-        assert_eq!(params[0], ("key".to_string(), "value=something".to_string()));
+        assert_eq!(
+            params[0],
+            ("key".to_string(), "value=something".to_string())
+        );
     }
-    
+
     #[test]
     fn test_build_query_string() {
         let params = vec![
@@ -442,10 +469,13 @@ mod tests {
             ("hobby".to_string(), "coding".to_string()),
             ("hobby".to_string(), "reading".to_string()),
         ];
-        
+
         let query = UrlCode::build_query_string(&params);
-        assert_eq!(query, "name=%E5%BC%A0%E4%B8%89&age=25&hobby=coding&hobby=reading");
-        
+        assert_eq!(
+            query,
+            "name=%E5%BC%A0%E4%B8%89&age=25&hobby=coding&hobby=reading"
+        );
+
         // 测试没有值的参数
         let params = vec![
             ("param1".to_string(), "".to_string()),
@@ -454,12 +484,12 @@ mod tests {
         let query = UrlCode::build_query_string(&params);
         assert_eq!(query, "param1&param2=value");
     }
-    
+
     #[test]
     fn test_parse_url() {
         let url = "https://user:pass@example.com:8080/path/to/resource?name=value&foo=bar#section";
         let components = UrlCode::parse_url(url).unwrap();
-        
+
         assert_eq!(components.scheme, "https");
         assert_eq!(components.username, "user");
         assert_eq!(components.password, "pass");
@@ -467,22 +497,25 @@ mod tests {
         assert_eq!(components.port, Some(8080));
         assert_eq!(components.path, "/path/to/resource");
         assert_eq!(components.query.len(), 2);
-        assert_eq!(components.query[0], ("name".to_string(), "value".to_string()));
+        assert_eq!(
+            components.query[0],
+            ("name".to_string(), "value".to_string())
+        );
         assert_eq!(components.query[1], ("foo".to_string(), "bar".to_string()));
         assert_eq!(components.fragment, "section");
-        
+
         // 测试没有用户名密码的URL
         let url = "http://example.com/path";
         let components = UrlCode::parse_url(url).unwrap();
         assert_eq!(components.username, "");
         assert_eq!(components.password, "");
-        
+
         // 测试默认端口
         let url = "https://example.com/path";
         let components = UrlCode::parse_url(url).unwrap();
         assert_eq!(components.port, Some(443));
     }
-    
+
     #[test]
     fn test_build_url() {
         let mut components = UrlComponents::default();
@@ -497,13 +530,19 @@ mod tests {
             ("foo".to_string(), "bar".to_string()),
         ];
         components.fragment = "section".to_string();
-        
+
         let url = UrlCode::build_url(&components);
-        assert_eq!(url, "https://user:pass@example.com:8080/path/to/resource?name=value&foo=bar#section");
-        
+        assert_eq!(
+            url,
+            "https://user:pass@example.com:8080/path/to/resource?name=value&foo=bar#section"
+        );
+
         // 测试默认端口不会被添加到URL中
         components.port = Some(443); // HTTPS的默认端口
         let url = UrlCode::build_url(&components);
-        assert_eq!(url, "https://user:pass@example.com/path/to/resource?name=value&foo=bar#section");
+        assert_eq!(
+            url,
+            "https://user:pass@example.com/path/to/resource?name=value&foo=bar#section"
+        );
     }
 }

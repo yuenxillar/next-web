@@ -10,7 +10,6 @@ use crate::{
 
 pub struct NoBackOffPolicy {}
 
-
 impl NoBackOffPolicy {
     pub fn new() -> Self {
         Self {}
@@ -23,14 +22,14 @@ impl BackOffPolicy for NoBackOffPolicy {
         None
     }
 
-    async fn backoff(&self, _context: Option<&dyn BackOffContext>,) -> Result<(), RetryError> {
+    async fn backoff(&self, _context: Option<&dyn BackOffContext>) -> Result<(), RetryError> {
         Ok(())
     }
 }
 
 impl Default for NoBackOffPolicy {
     fn default() -> Self {
-        Self {  }
+        Self {}
     }
 }
 

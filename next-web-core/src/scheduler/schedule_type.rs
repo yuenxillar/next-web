@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScheduleType {
     Cron(WithArgs),
     // second
@@ -10,12 +12,12 @@ pub enum ScheduleType {
     OneShot(WithArgs),
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WithArgs {
-    pub cron: Option<&'static str>,
+    pub cron: Option<String>,
     pub fixed_rate: Option<u64>,
     pub initial_delay: Option<u64>,
-    pub timezone: Option<&'static str>,
+    pub timezone: Option<String>,
 
-    pub time_unit: Option<&'static str>,
+    pub time_unit: Option<String>,
 }

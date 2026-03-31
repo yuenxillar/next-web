@@ -22,24 +22,24 @@ use crate::config::model::verifier::state_machine_model_verifier::StateMachineMo
 use crate::config::state_machine_factory::StateMachineFactory;
 use crate::extended_state::ExtendedState;
 use crate::monitor::state_machine_monitor::StateMachineMonitor;
+use crate::state::StateMachineState;
 use crate::state::action_listener::ActionListener;
 use crate::state::default_pseudo_state::DefaultPseudoState;
 use crate::state::pseudo_state::PseudoState;
 use crate::state::pseudo_state_kind::PseudoStateKind;
 use crate::state::state_listener::StateListener;
-use crate::state::StateMachineState;
 use crate::state_context::StateContext;
 use crate::state_machine_event_result::DefaultStateMachineEventResult;
 use crate::support::base_state_machine::BaseStateMachine;
 use crate::support::default_extended_state::DefaultExtendedState;
 use crate::support::lifecycle_object_support::LifecycleObjectSupportExt;
+use crate::transition::StateMachineTransition;
 use crate::transition::base_transition::BaseTransition;
 use crate::transition::initial_transition::InitialTransition;
 use crate::transition::transition_kind::TransitionKind;
-use crate::transition::StateMachineTransition;
+use crate::trigger::Trigger;
 use crate::trigger::trigger_context::TriggerContext;
 use crate::trigger::trigger_listener::TriggerListener;
-use crate::trigger::Trigger;
 use crate::{BoxedStateAction, StateMachine};
 
 fn factory_error(message: impl Into<String>) -> BoxError {

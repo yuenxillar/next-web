@@ -4,7 +4,10 @@ use next_web_core::traits::required::Required;
 
 use crate::{
     config::{
-        security_builder::SecurityBuilder, security_configurer::SecurityConfigurer, security_configurer_adapter::SecurityConfigurerAdapter, web::{
+        security_builder::SecurityBuilder,
+        security_configurer::SecurityConfigurer,
+        security_configurer_adapter::SecurityConfigurerAdapter,
+        web::{
             configurers::{
                 abstract_authentication_filter_configurer::{
                     AbstractAuthenticationFilterConfigurer, AuthenticationFilterConfigurer,
@@ -12,14 +15,17 @@ use crate::{
                 abstract_http_configurer::AbstractHttpConfigurer,
             },
             http_security_builder::HttpSecurityBuilder,
-        }
+        },
     },
-    web::{authentication::{
-        forward_authentication_failure_handler::ForwardAuthenticationFailureHandler,
-        forward_authentication_success_handler::ForwardAuthenticationSuccessHandler,
-        ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
-        username_password_authentication_filter::UsernamePasswordAuthenticationFilter,
-    }, default_security_filter_chain::DefaultSecurityFilterChain},
+    web::{
+        authentication::{
+            forward_authentication_failure_handler::ForwardAuthenticationFailureHandler,
+            forward_authentication_success_handler::ForwardAuthenticationSuccessHandler,
+            ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
+            username_password_authentication_filter::UsernamePasswordAuthenticationFilter,
+        },
+        default_security_filter_chain::DefaultSecurityFilterChain,
+    },
 };
 
 #[derive(Clone)]
@@ -233,14 +239,14 @@ where
     }
 }
 
-
-impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>> for FormLoginConfigurer<H>
-where 
-H:  SecurityBuilder<DefaultSecurityFilterChain>,
-H:  HttpSecurityBuilder<H>,
-H:  AuthenticationFilterConfigurer<H> + Clone
+impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>>
+    for FormLoginConfigurer<H>
+where
+    H: SecurityBuilder<DefaultSecurityFilterChain>,
+    H: HttpSecurityBuilder<H>,
+    H: AuthenticationFilterConfigurer<H> + Clone,
 {
-    fn get_object(&self) -> & SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         todo!()
     }
 

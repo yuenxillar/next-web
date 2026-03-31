@@ -1,5 +1,5 @@
 use from_attr::FromAttr;
-use syn::{parse_quote, Expr};
+use syn::{Expr, parse_quote};
 
 #[derive(FromAttr)]
 #[attribute(idents = [value])]
@@ -14,8 +14,6 @@ fn default_key() -> Expr {
 
 impl Default for ValueAttr {
     fn default() -> Self {
-        Self {
-            key: default_key(),
-        }
+        Self { key: default_key() }
     }
 }

@@ -130,10 +130,7 @@ impl PlatformInfo {
     }
 }
 
-fn collect_filtered_source<F>(
-    vars: &[(String, String)],
-    predicate: F,
-) -> BTreeMap<String, EnvValue>
+fn collect_filtered_source<F>(vars: &[(String, String)], predicate: F) -> BTreeMap<String, EnvValue>
 where
     F: Fn(&str) -> bool,
 {
@@ -155,7 +152,11 @@ where
 fn compile_time_properties() -> BTreeMap<String, EnvValue> {
     let mut properties = BTreeMap::new();
 
-    insert_compile_time(&mut properties, "CARGO_PKG_NAME", option_env!("CARGO_PKG_NAME"));
+    insert_compile_time(
+        &mut properties,
+        "CARGO_PKG_NAME",
+        option_env!("CARGO_PKG_NAME"),
+    );
     insert_compile_time(
         &mut properties,
         "CARGO_PKG_VERSION",
@@ -247,7 +248,14 @@ fn redact_env_value(key: &str, value: &str) -> String {
     }
 
     let prefix: String = chars.iter().take(2).collect();
-    let suffix: String = chars.iter().rev().take(2).collect::<Vec<_>>().into_iter().rev().collect();
+    let suffix: String = chars
+        .iter()
+        .rev()
+        .take(2)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
     format!("{prefix}***{suffix}")
 }
 
@@ -266,24 +274,32 @@ mod tests {
 
         assert_eq!(report.summary.total_vars, 4);
         assert_eq!(report.summary.rust_related_vars, 3);
-        assert!(report
-            .property_sources
-            .iter()
-            .any(|source| source.name == "rust-env" && source.properties.contains_key("RUST_LOG")));
-        assert!(report
-            .property_sources
-            .iter()
-            .any(|source| source.name == "cargo-env" && source.properties.contains_key("CARGO_HOME")));
-        assert!(report
-            .property_sources
-            .iter()
-            .any(|source| source.name == "rustup-env" && source.properties.contains_key("RUSTUP_HOME")));
+        assert!(
+            report
+                .property_sources
+                .iter()
+                .any(|source| source.name == "rust-env"
+                    && source.properties.contains_key("RUST_LOG"))
+        );
+        assert!(report.property_sources.iter().any(
+            |source| source.name == "cargo-env" && source.properties.contains_key("CARGO_HOME")
+        ));
+        assert!(
+            report
+                .property_sources
+                .iter()
+                .any(|source| source.name == "rustup-env"
+                    && source.properties.contains_key("RUSTUP_HOME"))
+        );
     }
 
     #[test]
     fn masks_sensitive_values() {
         assert!(should_mask_env_value("CARGO_REGISTRY_TOKEN"));
-        assert_eq!(redact_env_value("CARGO_REGISTRY_TOKEN", "abcdef123456"), "ab***56");
+        assert_eq!(
+            redact_env_value("CARGO_REGISTRY_TOKEN", "abcdef123456"),
+            "ab***56"
+        );
         assert_eq!(redact_env_value("RUST_LOG", "debug"), "debug");
     }
 

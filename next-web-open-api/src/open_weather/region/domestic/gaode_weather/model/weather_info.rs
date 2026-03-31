@@ -1,6 +1,5 @@
 use serde::Deserialize;
 
-
 #[derive(Debug, Deserialize)]
 pub struct WeatherInfo {
     /// Total number of returned results
@@ -12,7 +11,7 @@ pub struct WeatherInfo {
     ///
     /// 实况天气数据信息
     pub lives: Vec<Live>,
-    
+
     /// Forecast weather information data
     ///
     /// 预报天气信息数据

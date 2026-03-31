@@ -3,7 +3,6 @@ use crate::core::{event::event_bus::EventBus, util::destroyable::Destroyable};
 #[derive(Clone)]
 pub struct DefaultEventBus {}
 
-
 impl EventBus for DefaultEventBus {
     fn publish(&self, event: crate::core::util::object::Object) {
         todo!()
@@ -18,7 +17,7 @@ impl EventBus for DefaultEventBus {
     }
 }
 
-impl Destroyable for DefaultEventBus  {
+impl Destroyable for DefaultEventBus {
     fn destroy(self) {
         todo!()
     }
@@ -26,8 +25,6 @@ impl Destroyable for DefaultEventBus  {
 
 impl Default for DefaultEventBus {
     fn default() -> Self {
-        Self {  }
+        Self {}
     }
 }
-
-

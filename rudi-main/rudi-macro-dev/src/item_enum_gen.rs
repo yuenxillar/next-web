@@ -2,12 +2,12 @@ use from_attr::{AttrsValue, FromAttr, PathValue};
 use proc_macro2::TokenStream;
 use quote::quote;
 use rudi_core::{Color, Scope};
-use syn::{spanned::Spanned, ItemEnum};
+use syn::{ItemEnum, spanned::Spanned};
 
 use crate::{
     commons::{self, FieldResolveStmts, ResolvedFields},
-    resource_attr::ResourceAttr,
     impl_fn_or_enum_variant_attr::ImplFnOrEnumVariantAttr,
+    resource_attr::ResourceAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
 
@@ -34,7 +34,7 @@ pub(crate) fn generate(
         async_,
         #[cfg(feature = "auto-register")]
         auto_register,
-        default
+        default,
     } = attr;
 
     #[cfg(feature = "auto-register")]

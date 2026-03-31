@@ -9,13 +9,14 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
+use crate::StateMachine;
 use crate::access::state_machine_accessor::StateMachineAccessor;
 use crate::extended_state::ExtendedState;
 use crate::listener::state_machine_listener::StateMachineListener;
 use crate::region::Region;
+use crate::state::StateMachineState;
 use crate::state::pseudo_state::PseudoState;
 use crate::state::pseudo_state_kind::PseudoStateKind;
-use crate::state::StateMachineState;
 use crate::state_context::{Stage, StateContext};
 use crate::state_machine_event_result::StateMachineEventResult;
 use crate::support::default_extended_state::DefaultExtendedState;
@@ -25,12 +26,11 @@ use crate::support::state_machine_executor::StateMachineExecutor;
 use crate::support::state_machine_object_support::{
     StateMachineObjectSupport, StateMachineObjectSupportExt,
 };
+use crate::transition::StateMachineTransition;
 use crate::transition::initial_transition::InitialTransition;
 use crate::transition::transition_conflict_policy::TransitionConflictPolicy;
 use crate::transition::transition_kind::TransitionKind;
-use crate::transition::StateMachineTransition;
 use crate::trigger::trigger_context::TriggerContext;
-use crate::StateMachine;
 
 fn state_machine_error(message: impl Into<String>) -> BoxError {
     std::io::Error::other(message.into()).into()

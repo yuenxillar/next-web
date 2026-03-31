@@ -1,8 +1,8 @@
 use next_web_core::async_trait;
 
+use crate::Result;
 use crate::client::WechatClient;
 use crate::response::Response;
-use crate::Result;
 
 use super::model::CreateMenuRequest;
 
@@ -15,7 +15,7 @@ pub trait CustomizeMenuInterface {
     const QUERY_URL: &'static str =
         "https://api.weixin.qq.com/cgi-bin/get_current_selfmenu_info?access_token=";
 
-    async fn query(&self, access_token: &str) -> Result<Response<()>> ; 
+    async fn query(&self, access_token: &str) -> Result<Response<()>>;
 
     const DELETE_URL: &'static str = "https://api.weixin.qq.com/cgi-bin/menu/delete?access_token=";
 
@@ -43,7 +43,7 @@ impl CustomizeMenuInterface for WechatClient {
         Ok(result.json().await?)
     }
 
-    async fn delete(&self, access_token: &str)  -> Result<Response<()>> {
+    async fn delete(&self, access_token: &str) -> Result<Response<()>> {
         let result = self
             .request()
             .get(format!("{}{}", Self::DELETE_URL, access_token))

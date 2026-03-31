@@ -34,3 +34,11 @@ pub use next_web_macros::api_doc;
 pub mod application {
     pub use next_web_macros::next_application;
 }
+
+#[cfg(feature = "enable-web-security")]
+pub mod security {
+    pub use next_web_macros::pre_authorize;
+}
+
+#[cfg(feature = "enable-retry")]
+pub use next_web_macros::retryable;

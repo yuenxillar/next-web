@@ -1,8 +1,5 @@
-
-
 pub trait RoleHierarchy
-where 
-Self: Send + Sync
- {
-    
+where
+    Self: Send + Sync,
+{
 }

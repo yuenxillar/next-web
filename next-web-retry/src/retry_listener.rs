@@ -2,13 +2,15 @@ use std::any::Any;
 
 use next_web_core::anys::any_error::AnyError;
 
-use crate:: retry_context::RetryContext;
+use crate::retry_context::RetryContext;
 
 pub trait RetryListener
 where
     Self: Send + Sync,
 {
-    fn open(&self, context: &dyn RetryContext) -> bool { true }
+    fn open(&self, context: &dyn RetryContext) -> bool {
+        true
+    }
 
     fn close(&self, context: &dyn RetryContext, error: Option<&dyn AnyError>) {}
 
@@ -16,7 +18,6 @@ where
 
     fn on_error(&self, context: &dyn RetryContext, error: &dyn AnyError) {}
 }
-
 
 pub struct DefaultRetryListener {}
 

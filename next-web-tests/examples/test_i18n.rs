@@ -1,9 +1,9 @@
-use next_web::extract::find_singleton::FindSingleton;
+use next_web::ApplicationContext;
 use next_web::extract::Path;
+use next_web::extract::find_singleton::FindSingleton;
 use next_web::i18n::accept_header_locale_resolver::AcceptHeaderLocaleResolver;
 use next_web::i18n::message_source_service::MessageSourceService;
 use next_web::traits::locale_resolver::LocaleResolver;
-use next_web::ApplicationContext;
 use next_web::{
     application::Application, async_trait, context::properties::ApplicationProperties,
     macros::bind::get_mapping,

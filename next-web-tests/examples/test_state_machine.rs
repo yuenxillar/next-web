@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use next_web::{
-    application::Application, async_trait, context::properties::ApplicationProperties,
-    messaging::generic_message::GenericMessage, ApplicationContext,
+    ApplicationContext, application::Application, async_trait,
+    context::properties::ApplicationProperties, messaging::generic_message::GenericMessage,
 };
 use next_web_core::error::BoxError;
 use next_web_state_machine::{
@@ -76,29 +76,20 @@ impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig 
         impl StateMachineListener<OrderState, OrderEvent> for DefaultListener {
             fn state_changed(
                 &self,
-                _from: &dyn next_web_state_machine::state::StateMachineState<
-                    OrderState,
-                    OrderEvent,
-                >,
+                _from: &dyn next_web_state_machine::state::StateMachineState<OrderState, OrderEvent>,
                 _to: &dyn next_web_state_machine::state::StateMachineState<OrderState, OrderEvent>,
             ) {
             }
 
             fn state_entered(
                 &self,
-                _state: &dyn next_web_state_machine::state::StateMachineState<
-                    OrderState,
-                    OrderEvent,
-                >,
+                _state: &dyn next_web_state_machine::state::StateMachineState<OrderState, OrderEvent>,
             ) {
             }
 
             fn state_exited(
                 &self,
-                _state: &dyn next_web_state_machine::state::StateMachineState<
-                    OrderState,
-                    OrderEvent,
-                >,
+                _state: &dyn next_web_state_machine::state::StateMachineState<OrderState, OrderEvent>,
             ) {
             }
 
@@ -215,7 +206,6 @@ impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig 
                 &self,
                 _context: &dyn StateContext<OrderState, OrderEvent>,
             ) -> Result<(), BoxError> {
-
                 println!("hello!!!");
                 Ok(())
             }

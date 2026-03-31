@@ -1,1 +1,12 @@
-pub mod mail;
+pub mod autoconfigure;
+pub mod default_mail_message;
+pub mod email_content;
+pub mod mail_error;
+pub mod mail_message;
+pub mod mail_sender;
+pub mod mail_service;
+pub mod mime_mail_message;
+pub mod mime_message;
+pub mod mime_message_helper;
+pub mod mime_message_preparator;
+pub mod service;

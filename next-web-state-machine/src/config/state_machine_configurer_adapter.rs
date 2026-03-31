@@ -40,7 +40,6 @@ where
     E: Send + Sync + 'static,
     E: Clone,
     E: Eq,
-
     T: StateMachineConfigurer<S, E>,
 {
     pub fn new(
@@ -135,7 +134,6 @@ where
     E: Send + Sync + 'static,
     E: Eq,
     E: Clone,
-
     T: StateMachineConfigurer<S, E>,
     T: Clone,
 {
@@ -165,7 +163,6 @@ where
     E: Send + Sync + 'static,
     E: Clone,
     E: Eq,
-
     T: StateMachineConfigurer<S, E>,
     T: Clone,
 {

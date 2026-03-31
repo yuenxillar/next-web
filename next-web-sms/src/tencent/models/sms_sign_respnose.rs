@@ -61,8 +61,6 @@ pub mod query_respnose {
     }
 }
 
-
-
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(untagged)]
 pub enum Respnose {

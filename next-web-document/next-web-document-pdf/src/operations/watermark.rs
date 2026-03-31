@@ -138,7 +138,8 @@ impl PreparedWatermark {
                 color_rgb,
             } => {
                 if let Some(font_path) = font_path {
-                    let rendered = render_text_to_image(font_path, content, *font_size, *color_rgb)?;
+                    let rendered =
+                        render_text_to_image(font_path, content, *font_size, *color_rgb)?;
                     let (width, height) = rendered.dimensions();
                     let object_id = add_dynamic_image_object(doc, &rendered)?;
                     Ok(Self {
@@ -157,9 +158,7 @@ impl PreparedWatermark {
                         height,
                         kind: PreparedWatermarkKind::StandardText {
                             content: content.clone(),
-                            font_name: font_name
-                                .clone()
-                                .unwrap_or_else(|| "Helvetica".to_string()),
+                            font_name: font_name.clone().unwrap_or_else(|| "Helvetica".to_string()),
                             font_size: *font_size,
                             color_rgb: *color_rgb,
                         },
@@ -264,14 +263,16 @@ fn resolve_page_size(doc: &Document, page_id: ObjectId) -> PdfResult<PageSize> {
         .get_object(page_id)
         .and_then(|obj| obj.as_dict())
         .map_err(|error| {
-            PdfError::AnalysisError(format!("failed to get page dictionary {page_id:?}: {error}"))
+            PdfError::AnalysisError(format!(
+                "failed to get page dictionary {page_id:?}: {error}"
+            ))
         })?;
 
     let media_box = resolve_inherited_object(doc, page, b"MediaBox")?
         .ok_or_else(|| PdfError::AnalysisError("missing MediaBox".to_string()))?;
-    let media_box = media_box.as_array().map_err(|error| {
-        PdfError::AnalysisError(format!("MediaBox is not an array: {error}"))
-    })?;
+    let media_box = media_box
+        .as_array()
+        .map_err(|error| PdfError::AnalysisError(format!("MediaBox is not an array: {error}")))?;
 
     if media_box.len() < 4 {
         return Err(PdfError::AnalysisError(
@@ -290,7 +291,9 @@ fn resolve_page_resources(doc: &Document, page_id: ObjectId) -> PdfResult<Dictio
         .get_object(page_id)
         .and_then(|obj| obj.as_dict())
         .map_err(|error| {
-            PdfError::AnalysisError(format!("failed to get page dictionary {page_id:?}: {error}"))
+            PdfError::AnalysisError(format!(
+                "failed to get page dictionary {page_id:?}: {error}"
+            ))
         })?;
 
     let resources = resolve_inherited_object(doc, page, b"Resources")?;
@@ -336,7 +339,10 @@ fn resolve_inherited_object(
 
 fn dereference_object(doc: &Document, object: &Object) -> PdfResult<Object> {
     match object {
-        Object::Reference(object_id) => doc.get_object(*object_id).map(|obj| obj.clone()).map_err(Into::into),
+        Object::Reference(object_id) => doc
+            .get_object(*object_id)
+            .map(|obj| obj.clone())
+            .map_err(Into::into),
         other => Ok(other.clone()),
     }
 }

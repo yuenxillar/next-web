@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use next_web_core::traits::required::Required;
 
-use crate::core::{util::object::Object, session::SessionId, util::map_context::MapContext};
+use crate::core::{session::SessionId, util::map_context::MapContext, util::object::Object};
 
 use super::session_context::SessionContext;
 
@@ -72,7 +72,7 @@ impl SessionContext for DefaultSessionContext {
             .map(Object::as_object)
             .unwrap_or_default()
     }
-    
+
     fn put_all(&mut self, values: Vec<(String, Object)>) {
         todo!()
     }

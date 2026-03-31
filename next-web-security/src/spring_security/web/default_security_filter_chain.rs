@@ -18,7 +18,6 @@ impl DefaultSecurityFilterChain {
         T: RequestMatcher + 'static,
         F: IntoIterator<Item = Arc<dyn Filter>>,
     {
-
         let filters = filters.into_iter().collect::<Vec<_>>();
         Self {
             request_matcher: Arc::new(request_matcher),

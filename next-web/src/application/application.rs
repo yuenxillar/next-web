@@ -14,6 +14,7 @@ use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
+use next_web_core::signal::APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL;
 use next_web_core::state::application_state::ApplicationState;
 use next_web_core::traits::application::application_lifecycle::ApplicationLifecycle;
 use next_web_core::traits::apply_router::ApplyRouter;
@@ -52,9 +53,16 @@ use crate::util::local_date_time::LocalDateTime;
 use next_web_api_doc::openapi::OpenApi;
 
 #[cfg(feature = "enable-scheduling")]
-use crate::autoregister::scheduler_autoregister::SchedulerAutoRegister;
+use crate::autoregister::scheduler_autoregister::{
+    ScheduledJobHandlerAutoRegister, SchedulerAutoRegister,
+};
 #[cfg(feature = "enable-scheduling")]
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
+#[cfg(feature = "enable-scheduling")]
+#[allow(unused_imports)]
+use next_web_core::scheduler::{
+    repository::ScheduledJobRepository, InMemoryScheduledJobRepository, ScheduledJobRegistry,
+};
 #[cfg(feature = "enable-scheduling")]
 #[allow(unused_imports)]
 use next_web_core::traits::schedule::scheduled_task::ScheduledTask;
@@ -324,21 +332,48 @@ where
         // Register jobs
         #[cfg(feature = "enable-scheduling")]
         {
-            let mut manager = JobSchedulerManager::with_channel_size(240).await;
+            use next_web_core::scheduler::context::JobExecutionContext;
+
+            let job_execution_context = JobExecutionContext::default();
+            let registry = ScheduledJobRegistry::default();
+
+            for handler in inventory::iter::<&dyn ScheduledJobHandlerAutoRegister>.into_iter() {
+                if let Err(error) = registry.register(handler.register(ctx)) {
+                    error!("ScheduledJobRegistry failed to register handler: {}", error);
+                }
+            }
+
+            let repository = ctx
+                .resolve_by_type::<Arc<dyn ScheduledJobRepository>>()
+                .first()
+                .map(Clone::clone)
+                .unwrap_or(Arc::new(InMemoryScheduledJobRepository::default()));
+
+            let mut manager = JobSchedulerManager::with_channel_size_from_repository(
+                240,
+                repository.clone(),
+                registry.clone(),
+            )
+            .await;
+
             for scheduler in inventory::iter::<&dyn SchedulerAutoRegister>.into_iter() {
-                if let Err(error) = manager.add(scheduler.register(ctx)).await {
+                if let Err(error) = manager.add_static(scheduler.register(ctx)).await {
                     error!("JobSchedulerManager Failed to add job: {}", error);
                 }
             }
 
-            // let producers = ctx.resolve_by_type::<Arc<dyn ApplicationJob>>();
-            // for producer in producers {
-            //     manager.add_job(producer).await;
-            // }
+            if let Err(error) = manager.restore_all(job_execution_context.clone()).await {
+                error!(
+                    "JobSchedulerManager Failed to restore persisted jobs: {}",
+                    error
+                );
+            }
 
-            manager.start().await;
+            manager.start().await.unwrap();
 
             ctx.insert_singleton_with_default_name(manager);
+            ctx.insert_singleton_with_default_name(job_execution_context);
+            ctx.insert_singleton_with_default_name(registry);
         }
 
         let rest_client = RestClient::new();
@@ -609,6 +644,10 @@ where
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
 
         // Monitor application shutdown signal
+        let (graceful_shutdown_tx, mut graceful_shutdown_rx) =
+            tokio::sync::broadcast::channel::<()>(30);
+        APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL.get_or_init(|| graceful_shutdown_tx);
+
         #[cfg(not(feature = "rustls"))]
         let shutdown_signal = async move {
             use next_web_core::traits::application::application_lifecycle::{
@@ -640,12 +679,14 @@ where
 
             tokio::select! {
                 _ = ctrl_c => {
-                    shutdown_ctx.reason = ShutdownReason::Signal("SIGINT".into());
-                    info!("Received Ctrl+C. Shutting down...")
+                    shutdown_ctx.reason = ShutdownReason::Signal("Ctrl_C SIGTERM".into());
                 },
                 _ = terminate => {
-                    shutdown_ctx.reason = ShutdownReason::Signal("SIGTERM".into());
-                    info!("Received terminate signal. Shutting down...")
+                    shutdown_ctx.reason = ShutdownReason::Signal("Terminate SIGTERM".into());
+                },
+
+                _ = graceful_shutdown_rx.recv() => {
+                    shutdown_ctx.reason = ShutdownReason::Signal("Application SIGTERM".into());
                 },
             }
 
@@ -656,6 +697,11 @@ where
 
             // Stop background services
             let _result = background_service_manager.shutdown_all().await;
+
+            info!(
+                "Graceful shutdown of application completed, reason: {:?}",
+                shutdown_ctx.reason
+            )
         };
 
         // Configure certificate and private key used by https

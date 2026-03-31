@@ -2,9 +2,7 @@ use from_attr::FromAttr;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{
-    parse_quote,
-    punctuated::Punctuated,
-    Expr, Field, Fields, ItemStruct, LitStr, Meta, Token,
+    parse_quote, punctuated::Punctuated, Expr, Field, Fields, ItemStruct, LitStr, Meta, Token,
 };
 
 use crate::{

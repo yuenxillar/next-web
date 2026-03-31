@@ -11,8 +11,8 @@ use next_web::macros::{
     data::{Desensitized, GetSet},
 };
 use next_web_core::{
-    async_trait, context::properties::ApplicationProperties, traits::desensitized::Desensitized,
-    ApplicationContext,
+    ApplicationContext, async_trait, context::properties::ApplicationProperties,
+    traits::desensitized::Desensitized,
 };
 
 #[derive(Clone, Default)]

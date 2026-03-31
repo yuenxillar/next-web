@@ -16,7 +16,9 @@ path = "src/lib.rs"
 [dependencies]
 next-web-core           = { workspace = true }
 next-web-macros         = { workspace = true }
+
 next-web-security       = { workspace = true, optional = true }
+next-web-websocket      = { workspace = true, optional = true }
 next-web-retry          = { workspace = true, optional = true }
 next-web-api-doc        = { workspace = true, optional = true }
 next-web-state-machine  = { workspace = true, optional = true }
@@ -49,7 +51,6 @@ once_cell = { workspace = true }
 tracing = { workspace = true }
 tracing-appender = { workspace = true }
 regex = { workspace = true }
-jsonwebtoken = { workspace = true }
 flume = { workspace = true }
 validator = { workspace = true}
 thiserror = { workspace = true }
@@ -82,10 +83,10 @@ uuid = { workspace = true }
 num_cpus = { version = "1.17.0", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-mimalloc = { workspace = true }
+mimalloc        = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
+jemallocator    = { workspace = true }
 
 [features]
 default = ["decrypt-properties"]
@@ -106,8 +107,10 @@ full = [
 rustls = ["axum-server"]
 
 # web
-enable-scheduling   = ["tokio-cron-scheduler"]
 enable-web-security = ["next-web-security"]
+enable-websocket    = ["next-web-websocket"]
+
+enable-scheduling   = ["tokio-cron-scheduler"]
 enable-retry        = ["next-web-retry"]
 enable-api-doc      = ["next-web-api-doc", "utoipa-swagger-ui", "next-web-macros/api-doc"]
 enable-grpc = []

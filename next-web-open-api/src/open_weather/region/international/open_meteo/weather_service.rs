@@ -1,4 +1,3 @@
-
 const APP_ID_ENV_VAR_NAME: &'static str = "OPEN_METEO_APP_ID";
 
 #[derive(Clone)]

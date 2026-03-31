@@ -1,10 +1,10 @@
 use from_attr::{AttrsValue, FromAttr, PathValue};
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use rudi_core::{Color, Scope};
 use syn::{
-    parse_quote, spanned::Spanned, Generics, ImplItem, ImplItemFn, ItemImpl, Path, ReturnType,
-    Type, TypePath,
+    Generics, ImplItem, ImplItemFn, ItemImpl, Path, ReturnType, Type, TypePath, parse_quote,
+    spanned::Spanned,
 };
 
 use crate::{

@@ -1,21 +1,17 @@
 use std::sync::Arc;
 
-use next_web_core::{async_trait, anys::any_error::AnyError};
+use next_web_core::{anys::any_error::AnyError, async_trait};
 
-use crate::{error::retry_error::RetryError, retry_policy::RetryPolicy, Predicate};
+use crate::{Predicate, error::retry_error::RetryError, retry_policy::RetryPolicy};
 
 #[derive(Clone)]
 pub struct PredicateRetryPolicy {
-    predicate: Arc<dyn Predicate<RetryError>>
+    predicate: Arc<dyn Predicate<RetryError>>,
 }
 
 impl PredicateRetryPolicy {
-    pub fn new(
-        predicate: Arc<dyn Predicate<RetryError>>,
-    ) -> Self {
-        Self {
-            predicate,
-        }
+    pub fn new(predicate: Arc<dyn Predicate<RetryError>>) -> Self {
+        Self { predicate }
     }
 }
 
@@ -32,9 +28,7 @@ impl RetryPolicy for PredicateRetryPolicy {
         todo!()
     }
 
-    fn close(&self, _context: &dyn crate::retry_context::RetryContext) {
-        
-    }
+    fn close(&self, _context: &dyn crate::retry_context::RetryContext) {}
 
     fn register_error(
         &self,

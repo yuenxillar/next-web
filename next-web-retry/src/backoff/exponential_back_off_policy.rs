@@ -1,12 +1,18 @@
-use std::{any::Any, sync::{atomic::{AtomicU64, Ordering}, Arc}};
+use std::{
+    any::Any,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
-use next_web_core::{async_trait, anys::any_value::AnyValue};
+use next_web_core::{anys::any_value::AnyValue, async_trait};
 use tracing::warn;
 
 use crate::backoff::{
-        back_off_context::BackOffContext, back_off_policy::BackOffPolicy,
-        sleeping_back_off_policy::SleepingBackOffPolicy,
-    };
+    back_off_context::BackOffContext, back_off_policy::BackOffPolicy,
+    sleeping_back_off_policy::SleepingBackOffPolicy,
+};
 
 #[derive(Clone)]
 pub struct ExponentialBackOffPolicy {
@@ -34,7 +40,11 @@ impl ExponentialBackOffPolicy {
         if initial_interval < 1 {
             warn!("Initial interval must be at least 1, but was {initial_interval}");
         }
-        self.initial_interval = if initial_interval > 1 { initial_interval } else { 1 };
+        self.initial_interval = if initial_interval > 1 {
+            initial_interval
+        } else {
+            1
+        };
     }
 
     pub fn set_max_interval(&mut self, max_interval: u64) {
@@ -46,7 +56,9 @@ impl ExponentialBackOffPolicy {
 
     pub fn set_multiplier(&mut self, multiplier: f32) {
         if multiplier <= 1.0 {
-            warn!("Multiplier must be > 1.0 for effective exponential backoff, but was {multiplier}");
+            warn!(
+                "Multiplier must be > 1.0 for effective exponential backoff, but was {multiplier}"
+            );
         }
         self.multiplier = if multiplier > 1.0 { multiplier } else { 1.0 };
     }
@@ -123,16 +135,16 @@ pub struct ExponentialBackOffContext {
 
 impl ExponentialBackOffContext {
     pub fn get_sleep_and_increment(&self) -> u64 {
-        
         let mut sleep = self.get_interval();
         let max = self.get_max_interval();
 
         if sleep > max {
             sleep = max;
-        }else {
-            self.interval.store(self.get_next_interval(), Ordering::Relaxed);
+        } else {
+            self.interval
+                .store(self.get_next_interval(), Ordering::Relaxed);
         };
-        
+
         // TODO random
         sleep
     }

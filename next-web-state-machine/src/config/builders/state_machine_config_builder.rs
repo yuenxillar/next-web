@@ -15,7 +15,7 @@ use crate::config::{
     common::{
         base_builder::{BaseBuilder, BaseBuilderExt},
         base_configured_builder::{
-            execute_configured_build, BaseConfiguredBuilder, BaseConfiguredBuilderExt,
+            BaseConfiguredBuilder, BaseConfiguredBuilderExt, execute_configured_build,
         },
         builder::Builder,
     },
@@ -134,7 +134,6 @@ where
     S: Eq + Hash,
     E: Clone + 'static,
     E: Eq,
-
     S: Send + Sync,
     E: Send + Sync,
 {
@@ -152,7 +151,6 @@ where
     E: Clone + 'static,
     E: Send + Sync,
     E: Eq,
-
     S: Send + Sync,
     E: Send + Sync,
 {
@@ -184,7 +182,6 @@ where
     S: Eq + Hash,
     E: Clone + 'static,
     E: Eq,
-
     S: Send + Sync,
     E: Send + Sync,
 {

@@ -1,6 +1,5 @@
 use next_web_core::anys::any_error::AnyError;
 
-
 pub trait RetryState<K = String>
 where
     Self: Send + Sync,

@@ -1,5 +1,5 @@
 use from_attr::FromAttr;
-use syn::{parse_quote, Path};
+use syn::{Path, parse_quote};
 
 // #[di(rudi_path = path::to::rudi)]
 

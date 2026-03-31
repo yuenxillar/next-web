@@ -41,8 +41,9 @@ next-web-websocket      = { path = "../next-web-websocket", version = "*" }
 next-web-security       = { path = "../next-web-security", version = "*" }
 next-web-data-redis     = { path = "../next-web-data/next-web-data-redis", version = "*", features = ["expired-key-listener"]}
 next-web-data-database  = { path = "../next-web-data/next-web-data-database", version = "*" }
-next-web-state-machine = { path = "../next-web-state-machine", version = "*" }
+next-web-state-machine  = { path = "../next-web-state-machine", version = "*" }
 next-web-xxl-job        = { path = "../next-web-xxl-job", version = "*" }
+next-web-mail           = { path = "../next-web-mail", version = "*" }
 
 # next-web-retry = { path = "../next-web-retry", version = "*"}
 

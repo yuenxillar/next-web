@@ -37,7 +37,7 @@ impl BinaryErrorClassifier {
         Self {
             traverse_causes: false,
             default_value: Some(default_value),
-            classified: Arc::new(Mutex::new(HashMap::new()))
+            classified: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -58,7 +58,11 @@ impl BinaryErrorClassifier {
     ) -> Self {
         let mut classifier = Self::with_default_value(default_value);
         let items = errors.into_iter();
-        classifier.set_type_map(items.map(|key| (key,default_value )).collect::<HashMap<_, _>>());
+        classifier.set_type_map(
+            items
+                .map(|key| (key, default_value))
+                .collect::<HashMap<_, _>>(),
+        );
 
         classifier
     }
@@ -71,7 +75,6 @@ impl BinaryErrorClassifier {
         self.classified = Arc::new(Mutex::new(type_map));
     }
 }
-
 
 #[async_trait]
 impl Classifier<RetryError, bool> for BinaryErrorClassifier {
@@ -87,9 +90,11 @@ impl Classifier<RetryError, bool> for BinaryErrorClassifier {
 
         let mut value: Option<bool> = Some(true);
 
-
         if let Some(val) = value.as_ref() {
-            self.classified.lock().await.insert(classifiable.clone(), *val);
+            self.classified
+                .lock()
+                .await
+                .insert(classifiable.clone(), *val);
         }
 
         if value.is_none() {
@@ -104,9 +109,9 @@ impl Classifier<RetryError, bool> for BinaryErrorClassifier {
 
         if classified == self.default_value.unwrap_or_default() {
             let cause = classifiable;
-           
+
             let mut i = 0;
-            while i >= 0  && (classified == self.default_value.unwrap_or_default()) {
+            while i >= 0 && (classified == self.default_value.unwrap_or_default()) {
                 if self.classified.lock().await.contains_key(&cause) {
                     return classified;
                 }

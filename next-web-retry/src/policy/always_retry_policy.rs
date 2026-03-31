@@ -1,15 +1,11 @@
 use std::sync::Arc;
 
-use next_web_core::{async_trait, anys::any_error::AnyError};
+use next_web_core::{anys::any_error::AnyError, async_trait};
 
 use crate::retry_policy::RetryPolicy;
 
-
-
 #[derive(Clone, Default)]
 pub struct AlwaysRetryPolicy;
-
-
 
 #[async_trait]
 impl RetryPolicy for AlwaysRetryPolicy {

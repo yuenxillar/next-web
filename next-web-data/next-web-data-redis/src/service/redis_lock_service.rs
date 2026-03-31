@@ -5,22 +5,20 @@ use rslock::LockManager;
 
 #[derive(Clone)]
 pub struct RedisLockService {
-    lock: LockManager
+    lock: LockManager,
 }
 
 impl RedisLockService {
-    
     pub fn new(urls: Vec<String>) -> Self {
         Self {
-            lock: LockManager::new(urls)
+            lock: LockManager::new(urls),
         }
     }
 }
 
 impl Service for RedisLockService {}
 
-
-impl Deref  for  RedisLockService {
+impl Deref for RedisLockService {
     type Target = LockManager;
 
     fn deref(&self) -> &Self::Target {

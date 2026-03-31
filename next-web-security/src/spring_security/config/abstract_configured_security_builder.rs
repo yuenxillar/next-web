@@ -30,9 +30,7 @@ where
     B: SecurityBuilder<O>,
     O: Send + Sync,
 {
-    pub fn new(
-        allow_configurers_of_same_type: bool,
-    ) -> Self {
+    pub fn new(allow_configurers_of_same_type: bool) -> Self {
         Self {
             configurers: Default::default(),
             configurers_added_in_initializing: Default::default(),
@@ -40,7 +38,7 @@ where
             build_state: BuildState::UNBUILT,
             abstract_security_builder: AbstractSecurityBuilder::new(),
             allow_configurers_of_same_type,
-            _marker: PhantomData
+            _marker: PhantomData,
         }
     }
 }

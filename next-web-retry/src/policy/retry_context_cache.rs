@@ -4,12 +4,12 @@ use crate::retry_context::RetryContext;
 
 pub trait RetryContextCache
 where
-    Self: Send + Sync
+    Self: Send + Sync,
 {
-    fn get(&self, key: &str) -> Option<&dyn  RetryContext>;
+    fn get(&self, key: &str) -> Option<&dyn RetryContext>;
 
-    fn get_mut(&self, key: &str) -> Option<&mut dyn  RetryContext>;
-    
+    fn get_mut(&self, key: &str) -> Option<&mut dyn RetryContext>;
+
     fn put(&mut self, key: &str, value: Arc<dyn RetryContext>);
 
     fn remove(&mut self, key: &str);

@@ -1,4 +1,5 @@
 use next_web::{
+    ApplicationContext,
     application::Application,
     macros::{bind::singleton, scheduled},
     scheduler::{
@@ -7,13 +8,12 @@ use next_web::{
     },
     traits::schedule::scheduled_task::ScheduledTask,
     util::local_date_time::LocalDateTime,
-    ApplicationContext,
 };
 use next_web_core::{async_trait, context::properties::ApplicationProperties};
 
 use std::sync::{
-    atomic::{AtomicI32, Ordering},
     Arc,
+    atomic::{AtomicI32, Ordering},
 };
 
 #[derive(Clone, Default)]
@@ -34,7 +34,7 @@ impl Application for TestApplication {
 #[singleton(binds=[Self::into_task])]
 #[derive(Clone)]
 pub struct TestTask {
-    #[resource(default)]
+    #[autowired(default)]
     pub number: Arc<AtomicI32>,
 }
 

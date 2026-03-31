@@ -1,6 +1,18 @@
 use std::collections::HashMap;
 
-use crate::{core::filter::Filter, web::{access::{error_translation_filter::ErrorTranslationFilter, intercept::authorization_filter::AuthorizationFilter}, authentication::{logout::logout_filter::LogoutFilter, ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter}}};
+use crate::{
+    core::filter::Filter,
+    web::{
+        access::{
+            error_translation_filter::ErrorTranslationFilter,
+            intercept::authorization_filter::AuthorizationFilter,
+        },
+        authentication::{
+            logout::logout_filter::LogoutFilter,
+            ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
+        },
+    },
+};
 
 #[derive(Clone)]
 pub struct FilterOrderRegistration {
@@ -28,15 +40,12 @@ impl Default for FilterOrderRegistration {
             filter_to_order: Default::default(),
         };
 
-
         filter_order.put::<LogoutFilter>(order.next());
 
         order.next();
 
-
         filter_order.put::<DefaultLoginPageGeneratingFilter>(order.next());
         // filter_order.put::<DefaultLogoutPageGeneratingFilter>(order.next());
-
 
         filter_order.put::<ErrorTranslationFilter>(order.next());
         filter_order.put::<AuthorizationFilter>(order.next());

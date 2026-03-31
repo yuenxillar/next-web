@@ -288,7 +288,7 @@ impl Default for Ssl {
     }
 }
 
-// Ssl Builder  
+// Ssl Builder
 #[derive(Debug, Clone, Default)]
 pub struct SslBuilder {
     ssl: Ssl,

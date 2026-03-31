@@ -20,7 +20,7 @@ ___   ___ ___   ___  __                     __    ______   .______
 #[derive(Clone)]
 #[singleton(binds = [Self::into_background_service])]
 pub struct XxlWebServer {
-    #[resource(name = "xxlJobAppState")]
+    #[autowired(name = "xxlJobAppState")]
     app_state: Arc<XxlJobAppState>,
 }
 

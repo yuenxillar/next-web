@@ -84,7 +84,10 @@ impl BaseHealthIndicatorExt for ThreadHealthIndicator {
         );
 
         let process = system.process(pid).ok_or_else(|| {
-            format!("failed to resolve current process information for pid {}", pid.as_u32())
+            format!(
+                "failed to resolve current process information for pid {}",
+                pid.as_u32()
+            )
         })?;
 
         let thread_count = process.tasks().map(|tasks| tasks.len());

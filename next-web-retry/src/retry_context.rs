@@ -62,7 +62,8 @@ impl SyncAttributeAccessor for AttributeAccessorSupport {
     fn set_attribute(&self, name: &str, value: AnyValue) {
         self.attributes
             .try_lock()
-            .map(|mut m| m.insert(name.to_string(), value)).ok();
+            .map(|mut m| m.insert(name.to_string(), value))
+            .ok();
     }
 
     fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
@@ -73,7 +74,10 @@ impl SyncAttributeAccessor for AttributeAccessorSupport {
     }
 
     fn get_attribute(&self, name: &str) -> Option<AnyValue> {
-        self.attributes.try_lock().map(|m| m.get(name).cloned()).unwrap_or_default()        
+        self.attributes
+            .try_lock()
+            .map(|m| m.get(name).cloned())
+            .unwrap_or_default()
     }
 }
 
@@ -96,7 +100,10 @@ macro_rules! impl_retry_context {
                 self.context_support.remove_attribute(name)
             }
 
-            fn get_attribute(&self, name: &str) -> Option<next_web_core::anys::any_value::AnyValue> {
+            fn get_attribute(
+                &self,
+                name: &str,
+            ) -> Option<next_web_core::anys::any_value::AnyValue> {
                 self.context_support.get_attribute(name)
             }
         }

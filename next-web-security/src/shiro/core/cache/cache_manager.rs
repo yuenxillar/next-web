@@ -5,7 +5,7 @@ use std::{any::Any, collections::HashMap, fmt::Display, sync::Arc};
 pub trait CacheManager: Send + Sync
 where
     Self: Display,
-    Self: Any
+    Self: Any,
 {
     fn get_cache(&self, name: &str) -> Option<&HashMap<String, Object>>;
 }
@@ -16,4 +16,3 @@ where
 {
     fn get_cache_by_type<T>(&self, name: &str) -> Option<&AnyMap<T>>;
 }
-

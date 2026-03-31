@@ -1,6 +1,5 @@
 use crate::core::util::pattern_matcher::PatternMatcher;
 
-
 /// Ant 风格路径匹配器的 Rust 实现
 /// 支持 ? * ** 等通配符
 #[derive(Debug, Clone)]
@@ -41,7 +40,6 @@ impl AntPathMatcher {
         }
         path.contains('*') || path.contains('?')
     }
-
 
     /// 部分匹配模式（用于匹配开始部分）
     pub fn match_start(&self, pattern: &str, path: &str) -> bool {
@@ -363,8 +361,7 @@ impl AntPathMatcher {
     }
 }
 
-
-impl PatternMatcher for AntPathMatcher  {
+impl PatternMatcher for AntPathMatcher {
     fn matches(&self, pattern: &str, source: &str) -> bool {
         self.do_match(pattern, source, true)
     }

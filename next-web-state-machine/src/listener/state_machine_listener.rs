@@ -1,8 +1,8 @@
 use next_web_core::{anys::any_value::AnyValue, traits::message::Message};
 
 use crate::{
-    state::StateMachineState, state_context::StateContext, transition::StateMachineTransition,
-    StateMachine,
+    StateMachine, state::StateMachineState, state_context::StateContext,
+    transition::StateMachineTransition,
 };
 
 /// `StateMachineListener` for various state machine events.

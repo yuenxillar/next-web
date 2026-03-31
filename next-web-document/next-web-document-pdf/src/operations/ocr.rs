@@ -99,11 +99,13 @@ fn ocr_image_with_tesseract_cli(
     );
     let temp_path = std::env::temp_dir().join(file_name);
 
-    image.save_with_format(&temp_path, image::ImageFormat::Png).map_err(|error| {
-        PdfError::OcrError(format!(
-            "failed to save temporary OCR image for page {page_number}: {error}"
-        ))
-    })?;
+    image
+        .save_with_format(&temp_path, image::ImageFormat::Png)
+        .map_err(|error| {
+            PdfError::OcrError(format!(
+                "failed to save temporary OCR image for page {page_number}: {error}"
+            ))
+        })?;
 
     let output = Command::new("tesseract")
         .arg(&temp_path)

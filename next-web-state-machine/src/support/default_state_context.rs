@@ -6,11 +6,11 @@ use next_web_core::error::BoxError;
 use next_web_core::messaging::message_headers::MessageHeaders;
 use next_web_core::traits::message::Message;
 
+use crate::StateMachine;
 use crate::extended_state::ExtendedState;
 use crate::state::StateMachineState;
 use crate::state_context::{Stage, StateContext};
 use crate::transition::StateMachineTransition;
-use crate::StateMachine;
 
 /// Default implementation of StateContext
 pub struct DefaultStateContext<S, E> {

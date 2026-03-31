@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use crate::{
+    BoxedStateAction, StateMachine,
     config::{
         action::StateMachineAction,
         builders::state_machine_state_configurer::StateMachineStateConfigurer,
         configurer_builder::ConfigurerBuilder, state_machine_factory::StateMachineFactory,
     },
-    BoxedStateAction, StateMachine,
 };
 
 /// Base StateConfigurer interface for configuring States.

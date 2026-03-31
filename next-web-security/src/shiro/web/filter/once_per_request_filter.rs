@@ -167,7 +167,7 @@ where
         if !continue_chain {
             return Err("Advice filter pre-handle returned false.".into());
         }
-        
+
         let mut error = None;
         if let Err(err) = chain.do_filter(request, response).await {
             error = Some(err);

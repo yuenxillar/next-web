@@ -91,12 +91,7 @@ impl PdfOperation<()> for PdfVisibleSignatureOperation {
             .and_then(|obj| obj.as_dict_mut())
             .map_err(|e| PdfError::AnalysisError(format!("Get page resources failed: {e}")))?;
 
-        register_resource(
-            resources,
-            "ExtGState",
-            "SigAlpha",
-            Object::Reference(gs_id),
-        );
+        register_resource(resources, "ExtGState", "SigAlpha", Object::Reference(gs_id));
 
         register_resource(
             resources,
@@ -113,7 +108,12 @@ impl PdfOperation<()> for PdfVisibleSignatureOperation {
         );
 
         if let Some(image_id) = image_id {
-            register_resource(resources, "XObject", "SigImage", Object::Reference(image_id));
+            register_resource(
+                resources,
+                "XObject",
+                "SigImage",
+                Object::Reference(image_id),
+            );
         }
 
         let mut operations = Vec::new();
@@ -178,7 +178,10 @@ impl PdfOperation<()> for PdfVisibleSignatureOperation {
 
 #[derive(Debug, Clone)]
 pub enum SignatureCredential {
-    Pkcs12 { path: PathBuf, password: String },
+    Pkcs12 {
+        path: PathBuf,
+        password: String,
+    },
     Pem {
         cert_path: PathBuf,
         key_path: PathBuf,
@@ -397,7 +400,9 @@ fn sign_document(doc: &mut Document, options: DigitalSignOptions) -> PdfResult<S
         ("F", 4.into()),
         ("P", Object::Reference(page_id)),
     ]);
-    working.objects.insert(widget_id, Object::Dictionary(widget));
+    working
+        .objects
+        .insert(widget_id, Object::Dictionary(widget));
 
     {
         let page = working
@@ -479,9 +484,8 @@ fn sign_document(doc: &mut Document, options: DigitalSignOptions) -> PdfResult<S
     let contents_range = find_marker_range(&bytes, &contents_marker)
         .ok_or_else(|| PdfError::SignatureError("signature placeholder not found".to_string()))?;
 
-    let byte_range_pos = find_marker_range(&bytes, BYTE_RANGE_PLACEHOLDER).ok_or_else(|| {
-        PdfError::SignatureError("byte range placeholder not found".to_string())
-    })?;
+    let byte_range_pos = find_marker_range(&bytes, BYTE_RANGE_PLACEHOLDER)
+        .ok_or_else(|| PdfError::SignatureError("byte range placeholder not found".to_string()))?;
 
     let byte_range = [
         0usize,
@@ -500,7 +504,12 @@ fn sign_document(doc: &mut Document, options: DigitalSignOptions) -> PdfResult<S
         ));
     }
 
-    overwrite_marker(&mut bytes, byte_range_pos.start, BYTE_RANGE_PLACEHOLDER.len(), &byte_range_string);
+    overwrite_marker(
+        &mut bytes,
+        byte_range_pos.start,
+        BYTE_RANGE_PLACEHOLDER.len(),
+        &byte_range_string,
+    );
 
     let signed_payload = [&bytes[..contents_range.start], &bytes[contents_range.end..]].concat();
     let der = create_detached_signature_with_openssl_cli(&options.credential, &signed_payload)?;
@@ -639,9 +648,7 @@ fn sign_with_pem(
     }
 
     let output = command.output().map_err(|error| {
-        PdfError::RuntimeDependencyMissing(format!(
-            "failed to launch openssl executable: {error}"
-        ))
+        PdfError::RuntimeDependencyMissing(format!("failed to launch openssl executable: {error}"))
     })?;
 
     if output.status.success() {

@@ -1,11 +1,14 @@
-use axum::response::IntoResponse;
+use std::sync::Arc;
+
 use axum::Json;
+use axum::response::IntoResponse;
 use next_web::application::Application;
 use next_web::extract::find_singleton::FindSingleton;
 use next_web::macros::bind::singleton;
-use next_web_core::{async_trait, context::properties::ApplicationProperties, ApplicationContext};
-use next_web_mqtt::core::topic::base_topic::BaseTopic;
-use next_web_mqtt::service::mqtt_service::MQTTService;
+use next_web_core::{ApplicationContext, async_trait, context::properties::ApplicationProperties};
+use next_web_mqtt::{
+    service::default_mqtt_service::DefaultMQTTService, topic_listener::TopicListener,
+};
 
 #[derive(Clone, Default)]
 struct TestApplication;
@@ -29,41 +32,41 @@ impl Application for TestApplication {
 }
 
 async fn publish_message(
-    FindSingleton(mqtt_service): FindSingleton<MQTTService>,
+    FindSingleton(mqtt_service): FindSingleton<DefaultMQTTService>,
     Json(msg): Json<String>,
 ) -> impl IntoResponse {
-    let topic = "test/publish";
+    let topic = "test/1/event";
     mqtt_service.publish(topic, msg).await.ok();
     "Ok"
 }
 
-#[singleton( binds = [Self::into_base_topic])]
+#[singleton( binds = [Self::into_topic_listener])]
 #[derive(Clone)]
-pub(crate) struct TestOneBaseTopic;
+pub(crate) struct TestOneTopicListener;
 
-impl TestOneBaseTopic {
-    fn into_base_topic(self) -> Box<dyn BaseTopic> {
-        Box::new(self)
+impl TestOneTopicListener {
+    fn into_topic_listener(self) -> Arc<dyn TopicListener> {
+        Arc::new(self)
     }
 }
 
-#[singleton( binds = [Self::into_base_topic])]
+#[singleton( binds = [Self::into_topic_listener])]
 #[derive(Clone)]
-pub(crate) struct TestTwoBaseTopic;
+pub(crate) struct TestTwoTopicListener;
 
-impl TestTwoBaseTopic {
-    fn into_base_topic(self) -> Box<dyn BaseTopic> {
-        Box::new(self)
+impl TestTwoTopicListener {
+    fn into_topic_listener(self) -> Arc<dyn TopicListener> {
+        Arc::new(self)
     }
 }
 
 #[async_trait]
-impl BaseTopic for TestOneBaseTopic {
+impl TopicListener for TestOneTopicListener {
     fn topic(&self) -> &'static str {
         "test/+/event"
     }
 
-    async fn consume(&self, topic: &str, message: &[u8]) {
+    async fn on_message(&self, topic: &str, message: &[u8]) {
         println!(
             "Received message1, Topic: {}, Data Content: {:?}",
             topic,
@@ -73,12 +76,12 @@ impl BaseTopic for TestOneBaseTopic {
 }
 
 #[async_trait]
-impl BaseTopic for TestTwoBaseTopic {
+impl TopicListener for TestTwoTopicListener {
     fn topic(&self) -> &'static str {
         "test/123"
     }
 
-    async fn consume(&self, topic: &str, message: &[u8]) {
+    async fn on_message(&self, topic: &str, message: &[u8]) {
         println!(
             "Received message2, Topic: {}, Data Content: {:?}",
             topic,

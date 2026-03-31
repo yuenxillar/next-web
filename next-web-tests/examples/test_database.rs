@@ -1,6 +1,6 @@
 use next_web::application::Application;
 use next_web_core::async_trait;
-use next_web_core::{context::properties::ApplicationProperties, ApplicationContext};
+use next_web_core::{ApplicationContext, context::properties::ApplicationProperties};
 use next_web_data_database::transactional::transactionl_executor::TransactionalExecutor;
 
 use axum::routing::{get, post};

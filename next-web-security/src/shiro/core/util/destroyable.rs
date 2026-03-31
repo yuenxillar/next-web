@@ -1,5 +1,3 @@
-
-pub trait Destroyable 
-{
+pub trait Destroyable {
     fn destroy(self);
 }

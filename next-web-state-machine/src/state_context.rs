@@ -6,8 +6,8 @@ use next_web_core::{
 };
 
 use crate::{
-    extended_state::ExtendedState, state::StateMachineState, transition::StateMachineTransition,
-    StateMachine,
+    StateMachine, extended_state::ExtendedState, state::StateMachineState,
+    transition::StateMachineTransition,
 };
 
 /// `StateContext` represents the current context used in various stages

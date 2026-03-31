@@ -63,14 +63,9 @@ pub trait AdviceFilterExt: Send + Sync {
         response: &mut dyn HttpResponse,
         error: Option<BoxError>,
     ) -> Result<(), BoxError> {
-
-       match error {
-           Some(e) => {
-               Err(e)
-           },
-           None => {
-               Ok(())
-           }
-       }
+        match error {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 }

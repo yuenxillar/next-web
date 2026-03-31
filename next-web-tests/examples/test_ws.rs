@@ -7,11 +7,11 @@ use axum::extract::ws::CloseFrame;
 use next_web::application::Application;
 use next_web::{ApplicationContext, async_trait, macros::bind::singleton};
 use next_web_core::context::properties::ApplicationProperties;
-use next_web_websocket::ws::Message;
-use next_web_websocket::ws::config::ws_configurer::WebSocketConfigurer;
-use next_web_websocket::ws::config::ws_handler_registry::WebSocketHandlerRegistry;
-use next_web_websocket::ws::server::support::ws_session::WebSocketSession;
-use next_web_websocket::ws::ws_handler::{WSResult, WebSocketHandler};
+use next_web_websocket::Message;
+use next_web_websocket::config::ws_configurer::WebSocketConfigurer;
+use next_web_websocket::config::ws_handler_registry::WebSocketHandlerRegistry;
+use next_web_websocket::server::support::ws_session::WebSocketSession;
+use next_web_websocket::ws_handler::{WSResult, WebSocketHandler};
 
 #[singleton(binds = [Self::into_websocket_configurer])]
 #[derive(Clone)]

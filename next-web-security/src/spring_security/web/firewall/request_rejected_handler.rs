@@ -11,6 +11,6 @@ where
         &self,
         request: &mut Request,
         response: &mut Response,
-        request_rejected_error: & RequestRejectedError,
+        request_rejected_error: &RequestRejectedError,
     ) -> Result<(), BoxError>;
 }

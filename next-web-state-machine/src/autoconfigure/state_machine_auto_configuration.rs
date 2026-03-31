@@ -3,6 +3,7 @@ use std::{fmt::Debug, hash::Hash, sync::Arc};
 use next_web_core::error::BoxError;
 
 use crate::{
+    StateMachine,
     config::{
         builders::{
             state_machine_config_builder::StateMachineConfigBuilder,
@@ -13,7 +14,6 @@ use crate::{
         state_machine_configurer_adapter::StateMachineConfigurerAdapter,
         state_machine_factory::StateMachineFactory,
     },
-    StateMachine,
 };
 
 pub struct StateMachineAutoConfiguration;
@@ -30,7 +30,6 @@ impl StateMachineAutoConfiguration {
         E: Send + Sync + 'static,
         E: Clone,
         E: Eq,
-
         T: StateMachineConfigurer<S, E>,
         T: 'static,
         T: Clone,

@@ -1,11 +1,11 @@
 use from_attr::{AttrsValue, FlagOrValue, FromAttr};
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use rudi_core::{Color, Scope};
 use syn::{
-    parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
-    Attribute, Expr, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident,
-    PatType, Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath, TypeReference,
+    AngleBracketedGenericArguments, Attribute, Expr, Field, Fields, FieldsNamed, FieldsUnnamed,
+    FnArg, GenericArgument, Ident, PatType, Path, PathArguments, PathSegment, Stmt, Token, Type,
+    TypePath, TypeReference, parse_quote, punctuated::Punctuated, spanned::Spanned,
 };
 
 use crate::{field_or_argument_attr::FieldOrArgumentAttr, value_attr::ValueAttr};
@@ -65,7 +65,7 @@ fn extract_ref_type(ty: &Type) -> syn::Result<&Type> {
         please change to a reference type, \
         or if using a type alias, specify the original type using `#[di(ref = T)]`, \
         where `T` is a non-reference type",
-            ))
+            ));
         }
     };
 
@@ -320,7 +320,7 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                                     return Err(syn::Error::new(
                                         field_or_argument_ty.span(),
                                         "not support non-ident type",
-                                    ))
+                                    ));
                                 }
                             };
                             let singleton_name = super::util::singleton_name(&ident.to_string());
@@ -672,7 +672,7 @@ pub(crate) fn generate_argument_resolve_methods(
     for (index, input) in inputs.iter_mut().enumerate() {
         match input {
             FnArg::Receiver(r) => {
-                return Err(syn::Error::new(r.span(), "not support `self` receiver"))
+                return Err(syn::Error::new(r.span(), "not support `self` receiver"));
             }
             FnArg::Typed(PatType { attrs, ty, .. }) => {
                 let ResolveOne { stmt, variable } =

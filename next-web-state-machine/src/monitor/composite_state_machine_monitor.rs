@@ -3,11 +3,11 @@ use std::time::Duration;
 
 use futures::future::BoxFuture;
 
+use crate::StateMachine;
 use crate::listener::ordered_composite::OrderedComposite;
 use crate::monitor::state_machine_monitor::StateMachineMonitor;
 use crate::state_context::StateContext;
 use crate::transition::StateMachineTransition;
-use crate::StateMachine;
 
 /// Implementation of a `StateMachineMonitor` backed by multiple monitors.
 ///

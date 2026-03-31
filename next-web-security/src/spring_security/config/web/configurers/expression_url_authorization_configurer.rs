@@ -1,5 +1,1 @@
-
-
-pub struct ExpressionUrlAuthorizationConfigurer {
-    
-}
+pub struct ExpressionUrlAuthorizationConfigurer {}

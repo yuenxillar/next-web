@@ -1,9 +1,9 @@
+use crate::state::StateMachineState;
 use crate::state::composite_pseudo_state_listener::CompositePseudoStateListener;
 use crate::state::pseudo_state::PseudoState;
 use crate::state::pseudo_state_context::PseudoStateContext;
 use crate::state::pseudo_state_kind::PseudoStateKind;
 use crate::state::pseudo_state_listener::PseudoStateListener;
-use crate::state::StateMachineState;
 use crate::state_context::StateContext;
 
 use futures::future::BoxFuture;

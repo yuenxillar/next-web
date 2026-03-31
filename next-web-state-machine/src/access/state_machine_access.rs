@@ -3,9 +3,9 @@ use std::sync::Arc;
 use next_web_core::traits::message::Message;
 
 use crate::{
-    access::reactive_state_machine_access::ReactiveStateMachineAccess,
+    StateMachine, access::reactive_state_machine_access::ReactiveStateMachineAccess,
     monitor::state_machine_monitor::StateMachineMonitor,
-    support::state_machine_interceptor::StateMachineInterceptor, StateMachine,
+    support::state_machine_interceptor::StateMachineInterceptor,
 };
 
 /// Functional interface exposing `StateMachine` internals.

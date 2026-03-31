@@ -1,7 +1,8 @@
 use next_web_core::async_trait;
 
 use crate::{
-    error::retry_error::RetryError, recovery_callback::RecoveryCallback, retry_callback::RetryCallback, retry_state::RetryState
+    error::retry_error::RetryError, recovery_callback::RecoveryCallback,
+    retry_callback::RetryCallback, retry_state::RetryState,
 };
 
 #[async_trait]
@@ -9,7 +10,7 @@ pub trait RetryOperations<T>
 where
     Self: Send + Sync,
 {
-    async fn execute(&self, retry_callback:  impl RetryCallback<T>) -> Result<T, RetryError>;
+    async fn execute(&self, retry_callback: impl RetryCallback<T>) -> Result<T, RetryError>;
 
     async fn execute_with_recovery(
         &self,
@@ -19,7 +20,7 @@ where
 
     async fn execute_with_state(
         &self,
-        retry_callback: impl  RetryCallback<T>,
+        retry_callback: impl RetryCallback<T>,
         state: &dyn RetryState,
     ) -> Result<T, RetryError>;
 

@@ -5,7 +5,7 @@ pub mod trigger_listener;
 
 use std::{any::Any, sync::Arc};
 
-use next_web_core::{async_trait, clone_trait_object, traits::id::Id, DynClone};
+use next_web_core::{DynClone, async_trait, clone_trait_object, traits::id::Id};
 
 use crate::trigger::{trigger_context::TriggerContext, trigger_listener::TriggerListener};
 

@@ -8,7 +8,7 @@ where
     Self: Iterator<Item = Object>,
     Self: Send + Sync,
     Self: Display,
-    Self: DynClone + Id
+    Self: DynClone + Id,
 {
     fn get_primary_principal<'a>(&self) -> Option<&'a Object>;
 

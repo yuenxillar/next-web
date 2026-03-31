@@ -9,7 +9,6 @@ pub struct TencentCloudSignResponse {
     pub response: SignResponse,
 }
 
-
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum SignResponse {

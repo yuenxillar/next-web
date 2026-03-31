@@ -40,7 +40,10 @@ impl AccessControlFilterExt for AuthenticationFilter {
         response: &mut dyn HttpResponse,
         _mapped_value: Option<Object>,
     ) -> bool {
-        let subject = self.access_control_filter.get_subject(request, response).await;
+        let subject = self
+            .access_control_filter
+            .get_subject(request, response)
+            .await;
         subject.is_authenticated().await && subject.get_principal().await.is_some()
     }
 }

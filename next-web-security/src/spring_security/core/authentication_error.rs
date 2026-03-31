@@ -5,12 +5,10 @@ use next_web_core::anys::{any_error::AnyError, any_value::AnyValue};
 #[derive(Debug, Clone)]
 pub struct AuthenticationError {
     msg: String,
-    cause: Option<Box<dyn AnyError>>
+    cause: Option<Box<dyn AnyError>>,
 }
 
-
 impl AuthenticationError {
-
     pub fn get_message(&self) -> &str {
         &self.msg
     }
@@ -21,10 +19,9 @@ impl Display for AuthenticationError {
     }
 }
 
-
 impl Error for AuthenticationError {}
 
-impl Into<AnyValue> for  AuthenticationError  {
+impl Into<AnyValue> for AuthenticationError {
     fn into(self) -> AnyValue {
         AnyValue::Object(Box::new(self))
     }

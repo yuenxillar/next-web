@@ -12,21 +12,22 @@ pub struct AuthorizationFilter {
 }
 
 impl AuthorizationFilter {
-    pub fn new(
-        authorization_manager: Arc<dyn AuthorizationManager<Request>>, 
-    ) -> Self {
+    pub fn new(authorization_manager: Arc<dyn AuthorizationManager<Request>>) -> Self {
         Self {
             authorization_manager,
             observe_once_per_request: false,
             filter_error_dispatch: true,
-            filter_async_dispatch: true
+            filter_async_dispatch: true,
         }
     }
 }
 
-
 impl Filter for AuthorizationFilter {
-    fn do_filter(&self, req: &mut axum::extract::Request, res: &mut axum::response::Response) -> Result<(), next_web_core::error::BoxError>{
+    fn do_filter(
+        &self,
+        req: &mut axum::extract::Request,
+        res: &mut axum::response::Response,
+    ) -> Result<(), next_web_core::error::BoxError> {
         todo!()
     }
 }

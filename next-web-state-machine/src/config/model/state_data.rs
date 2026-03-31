@@ -1,9 +1,9 @@
 use std::{any::Any, sync::Arc};
 
 use crate::{
+    BoxedStateAction, StateMachine,
     config::{action::StateMachineAction, state_machine_factory::StateMachineFactory},
     state::pseudo_state_kind::PseudoStateKind,
-    BoxedStateAction, StateMachine,
 };
 
 /// `StateData` is a data representation of a `State` used as an

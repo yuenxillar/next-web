@@ -1,4 +1,10 @@
-use crate::core::{authz::{authorization_error::AuthorizationError, authorizer::Authorizer, permission::Permission}, realm::Realm, subject::principal_collection::PrincipalCollection};
+use crate::core::{
+    authz::{
+        authorization_error::AuthorizationError, authorizer::Authorizer, permission::Permission,
+    },
+    realm::Realm,
+    subject::principal_collection::PrincipalCollection,
+};
 
 #[derive(Clone)]
 pub struct ModularRealmAuthorizer {}
@@ -88,11 +94,7 @@ impl Authorizer for ModularRealmAuthorizer {
         todo!()
     }
 
-    fn has_role(
-        &self,
-        principal: Option<&dyn PrincipalCollection>,
-        role_identifier: &str,
-    ) -> bool {
+    fn has_role(&self, principal: Option<&dyn PrincipalCollection>, role_identifier: &str) -> bool {
         todo!()
     }
 

@@ -1,12 +1,10 @@
-
-
 #[derive(Debug, Clone)]
 pub enum CaptchaError {
     WidthNotApplicable,
     HeightNotApplicable,
 }
 
-impl std::fmt::Display for CaptchaError  {
+impl std::fmt::Display for CaptchaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CaptchaError::WidthNotApplicable => write!(f, "Width not applicable"),
@@ -15,6 +13,4 @@ impl std::fmt::Display for CaptchaError  {
     }
 }
 
-impl std::error::Error for CaptchaError {
-    
-}
+impl std::error::Error for CaptchaError {}

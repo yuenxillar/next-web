@@ -37,7 +37,6 @@ where
     FnRetryCallback::new(callback)
 }
 
-
 #[async_trait]
 impl<F, R, T> RetryCallback<T> for FnRetryCallback<F, T, R>
 where

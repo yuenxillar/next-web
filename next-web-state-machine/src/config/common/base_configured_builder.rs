@@ -451,7 +451,6 @@ pub trait BaseConfiguredBuilderExtOwn<O, I, B>
 where
     Self: AsRef<B>,
     Self: Required<BaseConfiguredBuilder<O, I, B>>,
-
     B: Builder<O>,
 {
     /// Similar to apply_adapter but checks if configurer already exists
@@ -622,7 +621,6 @@ impl<T, O, I, B> BaseConfiguredBuilderExtOwn<O, I, B> for T
 where
     Self: AsRef<B>,
     Self: Required<BaseConfiguredBuilder<O, I, B>>,
-
     B: Builder<O>,
 {
 }

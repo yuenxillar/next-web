@@ -1,5 +1,5 @@
 use crate::properties::redis_properties::RedisClientProperties;
-  #[cfg(feature = "lock")]
+#[cfg(feature = "lock")]
 pub mod redis_lock_service;
 
 pub mod redis_service;

@@ -1,6 +1,6 @@
 use crate::{
-    ensemble::state_machine_ensemble_error::StateMachineEnsembleError,
-    state_machine_context::StateMachineContext, StateMachine,
+    StateMachine, ensemble::state_machine_ensemble_error::StateMachineEnsembleError,
+    state_machine_context::StateMachineContext,
 };
 
 /// `EnsembleListener` for various ensemble events.

@@ -2,8 +2,6 @@ use crate::core::authc::credential::credentials_matcher::CredentialsMatcher;
 
 pub struct SimpleCredentialsMatcher {}
 
-
-
 impl CredentialsMatcher for SimpleCredentialsMatcher {
     fn do_credentials_match(
         &self,
@@ -15,9 +13,8 @@ impl CredentialsMatcher for SimpleCredentialsMatcher {
     }
 }
 
-
 impl Default for SimpleCredentialsMatcher {
     fn default() -> Self {
-        Self {  }
+        Self {}
     }
 }

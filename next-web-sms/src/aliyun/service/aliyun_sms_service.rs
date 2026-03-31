@@ -8,8 +8,8 @@ use next_web_core::{
 };
 use once_cell::sync::Lazy;
 use reqwest::{
-    header::{HeaderMap, HeaderName},
     Method,
+    header::{HeaderMap, HeaderName},
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;

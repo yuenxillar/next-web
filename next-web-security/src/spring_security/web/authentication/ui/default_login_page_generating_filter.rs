@@ -122,7 +122,7 @@ impl DefaultLoginPageGeneratingFilter {
     <div class="container">
     "#
         );
-      
+
         let s = format!(
             r#"<form class="form-signin" method="post" action="{context_path}{authentication_url}">
         <h2 class="form-signin-heading">Please sign in</h2>
@@ -143,7 +143,7 @@ impl DefaultLoginPageGeneratingFilter {
             authentication_url = self.authentication_url.as_deref().unwrap_or_default(),
             username_parameter = self.username_parameter.as_deref().unwrap_or_default(),
             password_parameter = self.password_parameter.as_deref().unwrap_or_default(),
-            error_html = self.create_error(login_error, & error_msg),
+            error_html = self.create_error(login_error, &error_msg),
             logout_html = self.create_logout_success(logout_success),
             remember_me_html = self.create_remember_me(self.password_parameter.as_deref()),
             hidden_inputs = self.render_hidden_inputs(request),
@@ -154,7 +154,8 @@ impl DefaultLoginPageGeneratingFilter {
         }
 
         if self.oauth2_login_enabled {
-            html = format!( r#"
+            html = format!(
+                r#"
             <h2 class="form-signin-heading">Login with OAuth 2.0</h2>
             {create_error}
             {create_logout_success}
@@ -162,9 +163,9 @@ impl DefaultLoginPageGeneratingFilter {
 
             </table>
             "#,
-            create_error = self.create_error(login_error, & error_msg),
-            create_logout_success = self.create_logout_success(logout_success),
-        );
+                create_error = self.create_error(login_error, &error_msg),
+                create_logout_success = self.create_logout_success(logout_success),
+            );
         }
         html += "</div>\n";
         html += "</body></html>";
@@ -173,7 +174,7 @@ impl DefaultLoginPageGeneratingFilter {
 
     async fn get_login_error_message(&self, request: &mut Request) -> String {
         if let Some(map) = request.extensions().get::<AnyMap>() {
-            if let Some(value) = map.get("NEXT_SECURITY_LAST_ERROR").await  {
+            if let Some(value) = map.get("NEXT_SECURITY_LAST_ERROR").await {
                 if let Some(value) = value.as_object::<AuthenticationError>() {
                     let msg = value.get_message().to_string();
                     if !msg.is_empty() {
@@ -181,19 +182,24 @@ impl DefaultLoginPageGeneratingFilter {
                     }
                 }
             }
-        }   
-        
+        }
+
         "Invalid credentials".to_string()
     }
 
     fn create_remember_me(&self, param_name: Option<&str>) -> String {
-        if let Some(name) =  param_name {
-            format!("<p><input type='checkbox' name='{}'/> Remember me on this computer.</p>\n", name)
-        } else { "".to_string() }
+        if let Some(name) = param_name {
+            format!(
+                "<p><input type='checkbox' name='{}'/> Remember me on this computer.</p>\n",
+                name
+            )
+        } else {
+            "".to_string()
+        }
     }
 
     fn render_hidden_inputs(&self, request: &mut Request) -> String {
-        // TODO 
+        // TODO
         "".to_string()
     }
 
@@ -221,7 +227,11 @@ impl DefaultLoginPageGeneratingFilter {
 }
 
 impl Filter for DefaultLoginPageGeneratingFilter {
-    fn do_filter(&self, req: &mut axum::extract::Request, res: &mut axum::response::Response) -> Result<(), next_web_core::error::BoxError>{
+    fn do_filter(
+        &self,
+        req: &mut axum::extract::Request,
+        res: &mut axum::response::Response,
+    ) -> Result<(), next_web_core::error::BoxError> {
         todo!()
     }
 }

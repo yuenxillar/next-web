@@ -2,13 +2,12 @@ use std::sync::Arc;
 
 use next_web_core::async_trait;
 
-use crate::{core::{
+use crate::core::{
     authc::{authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken},
     session::{Session, SessionId},
-    subject::{Subject, principal_collection::PrincipalCollection},
+    subject::{principal_collection::PrincipalCollection, Subject},
     util::object::Object,
-}};
-
+};
 
 #[cfg(not(feature = "web"))]
 use crate::core::mgt::security_manager::SecurityManager;

@@ -23,7 +23,7 @@ use crate::{
 pub struct DataSourceAutoConfiguration {
     pub data_source_properties: DataSourceProperties,
 
-    #[resource(option)]
+    #[autowired(option)]
     pub rbs_connection_properties: Option<RbsConnectionProperties>,
 }
 
@@ -40,7 +40,6 @@ impl AutoConfiguration for DataSourceAutoConfiguration {
         let data_source_properties = self.data_source_properties.clone();
 
         let mut database_service = DatabaseService::new(data_source_properties)?;
-
 
         // Search for interceptors implemented by users
         let mut intercepts = ctx.resolve_by_type::<Arc<dyn Intercept>>();
@@ -63,7 +62,6 @@ impl AutoConfiguration for DataSourceAutoConfiguration {
         Ok(())
     }
 }
-
 
 #[allow(unused)]
 fn generate_datasource_id(id: &str) -> String {

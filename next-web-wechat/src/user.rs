@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use next_web_core::async_trait;
 use serde::{Deserialize, Serialize};
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 use crate::{
+    Result,
     credential::{GenericAccessToken, GetAccessToken, GetStableAccessToken, StableAccessToken},
     error::Error::InternalServer,
     response::Response,
-    Result,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

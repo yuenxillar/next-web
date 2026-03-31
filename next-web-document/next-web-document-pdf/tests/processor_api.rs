@@ -1,5 +1,9 @@
 use std::path::PathBuf;
 
+#[cfg(feature = "word-convert")]
+use next_web_document_pdf::{
+    EmptyPageBehavior, PdfToWordOptions, WordInputFormat, WordToPdfOptions,
+};
 use next_web_document_pdf::{
     PdfProcessor,
     operations::{
@@ -7,10 +11,6 @@ use next_web_document_pdf::{
         split::SplitType,
         watermark::{WatermarkAnchor, WatermarkLayout},
     },
-};
-#[cfg(feature = "word-convert")]
-use next_web_document_pdf::{
-    EmptyPageBehavior, PdfToWordOptions, WordInputFormat, WordToPdfOptions,
 };
 #[cfg(feature = "word-convert")]
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
@@ -197,7 +197,11 @@ fn ocr_feature_returns_text_or_runtime_error() {
         Ok(result) => assert!(!result.full_text().is_empty()),
         Err(error) => {
             let message = error.to_string();
-            assert!(message.contains("tesseract") || message.contains("Pdfium") || message.contains("pdfium"));
+            assert!(
+                message.contains("tesseract")
+                    || message.contains("Pdfium")
+                    || message.contains("pdfium")
+            );
         }
     }
 }
@@ -277,10 +281,13 @@ fn word_convert_round_trip_from_pdf_to_docx_back_to_pdf() {
 #[test]
 fn word_convert_rejects_legacy_doc_input() {
     let legacy_doc_magic = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
-    let error = PdfProcessor::from_word_bytes(&legacy_doc_magic, WordToPdfOptions::default())
-        .unwrap_err();
+    let error =
+        PdfProcessor::from_word_bytes(&legacy_doc_magic, WordToPdfOptions::default()).unwrap_err();
     assert!(error.to_string().contains(".doc"));
-    assert!(matches!(WordInputFormat::from_bytes(&legacy_doc_magic), Ok(WordInputFormat::Doc)));
+    assert!(matches!(
+        WordInputFormat::from_bytes(&legacy_doc_magic),
+        Ok(WordInputFormat::Doc)
+    ));
 }
 
 #[cfg(feature = "word-convert")]

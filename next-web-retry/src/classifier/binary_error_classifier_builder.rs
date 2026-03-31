@@ -28,7 +28,6 @@ impl BinaryErrorClassifierBuilder {
         assert!(error.is_none(), "Error can not be none");
         self.is_white_list = Some(false);
         self.errors.push(error.unwrap());
-
     }
 
     pub fn traverse_causes(mut self) -> Self {

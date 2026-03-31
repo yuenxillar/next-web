@@ -15,8 +15,8 @@ use tokio::sync::Mutex;
 
 use crate::{
     classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier},
-    retry_context::AttributeAccessorSupport,
     error::retry_error::RetryError,
+    retry_context::AttributeAccessorSupport,
     retry_context::{RetryContext, SyncAttributeAccessor},
     retry_policy::RetryPolicy,
 };

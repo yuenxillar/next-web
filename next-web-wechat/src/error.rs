@@ -1,9 +1,9 @@
-use serde_repr::Deserialize_repr;
-use aes::cipher::block_padding::UnpadError;
 use aes::cipher::InvalidLength as AesInvalidLength;
+use aes::cipher::block_padding::UnpadError;
 use base64::DecodeError as Base64DecodeError;
 use reqwest::Error as ReqwestError;
 use serde_json::Error as SerdeJsonError;
+use serde_repr::Deserialize_repr;
 use strum::Display;
 
 #[non_exhaustive]

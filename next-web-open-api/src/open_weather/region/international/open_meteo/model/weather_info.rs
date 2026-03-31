@@ -12,8 +12,8 @@ pub struct WeatherInfo {
     pub elevation: f32,
     pub current_units: Option<serde_json::Map<String, Value>>,
     pub current: Option<serde_json::Map<String, Value>>,
-    pub hourly_units:  Option<serde_json::Map<String, Value>>,
+    pub hourly_units: Option<serde_json::Map<String, Value>>,
     pub hourly: Option<Vec<serde_json::Map<String, Value>>>,
-    pub daily_units:  Option<serde_json::Map<String, Value>>,
+    pub daily_units: Option<serde_json::Map<String, Value>>,
     pub daily: Option<Vec<serde_json::Map<String, Value>>>,
 }

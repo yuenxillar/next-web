@@ -3,11 +3,11 @@ use std::sync::Arc;
 use next_web_core::traits::message::Message;
 use tracing::debug;
 
+use crate::StateMachine;
 use crate::state::StateMachineState;
 use crate::state_context::StateContext;
 use crate::support::state_machine_interceptor::StateMachineInterceptor;
 use crate::transition::StateMachineTransition;
-use crate::StateMachine;
 
 /// A list of state machine interceptors that can be applied in order.
 ///

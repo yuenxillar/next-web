@@ -39,7 +39,6 @@ pub enum SessionValue {
     Null,
 }
 
-
 impl SessionValue {
     pub fn as_object<T: AnyClone>(&self) -> Option<&T> {
         if let SessionValue::Object(ref obj) = self {
@@ -57,7 +56,6 @@ impl SessionValue {
         }
     }
 }
-
 
 #[async_trait]
 pub trait Session
@@ -104,12 +102,11 @@ where
     async fn remove_attribute(&self, key: &str) -> Result<Option<SessionValue>, SessionError>;
 }
 
-
 impl Error for SessionError {}
 impl Display for SessionError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SessionError::Expired(msg)  => write!(f, "Session expired: {:?}", msg),
+            SessionError::Expired(msg) => write!(f, "Session expired: {:?}", msg),
             SessionError::Invalid(msg) => write!(f, "Session invalid: {:?}", msg),
             SessionError::NotFound => write!(f, "Session not found"),
             SessionError::Stopped(msg) => write!(f, "Session stopped: {}", msg),

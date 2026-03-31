@@ -2,19 +2,17 @@ use std::{any::Any, fmt::Display, sync::Arc};
 
 use next_web_core::DynClone;
 
-use crate::core::{util::object::Object, subject::principal_collection::PrincipalCollection};
+use crate::core::{subject::principal_collection::PrincipalCollection, util::object::Object};
 
 pub trait AuthenticationInfo
 where
     Self: Send + Sync,
     Self: Display + Any,
-    Self: DynClone
+    Self: DynClone,
 {
-
     fn get_principals(&self) -> Option<&Arc<dyn PrincipalCollection>>;
 
-
-    fn get_credentials(&self) -> Option<& Object>;
+    fn get_credentials(&self) -> Option<&Object>;
 }
 
 next_web_core::clone_trait_object!(AuthenticationInfo);

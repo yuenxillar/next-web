@@ -15,3 +15,6 @@ lettre          = { workspace = true }
 serde           = { workspace = true }
 chrono          = { workspace = true, features = ["serde"]}
 thiserror       = { workspace = true }
+
+[dev-dependencies]
+tokio           = { workspace = true }

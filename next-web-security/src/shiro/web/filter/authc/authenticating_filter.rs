@@ -56,7 +56,7 @@ impl AuthenticatingFilter {
             .get_subject(request, response)
             .await;
 
-        if let Err(error) = subject.login(token.as_ref(),request, response).await {
+        if let Err(error) = subject.login(token.as_ref(), request, response).await {
             return Ok(authenticating_filter_ext
                 .on_login_failure(token.as_ref(), &error, request, response)
                 .await);
@@ -112,7 +112,7 @@ impl AuthenticatingFilter {
 
     pub fn is_permissive(&self, mapped_value: Option<&Object>) -> bool {
         if let Some(value) = mapped_value.and_then(|s| s.as_list_str()) {
-            return value.contains( & Self::PERMISSIVE);
+            return value.contains(&Self::PERMISSIVE);
         }
 
         false

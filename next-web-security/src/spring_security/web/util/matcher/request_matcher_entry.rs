@@ -1,7 +1,5 @@
 use crate::config::web::util::matcher::request_matcher::RequestMatcher;
 
-
-
 #[derive(Clone)]
 pub struct RequestMatcherEntry<T> {
     request_matcher: Box<dyn RequestMatcher>,

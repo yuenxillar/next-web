@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use next_web_core::{async_trait, traits::service::Service, error::BoxError};
+use next_web_core::{async_trait, error::BoxError, traits::service::Service};
 use serde_json::Value;
 
 #[async_trait]
@@ -62,5 +62,4 @@ pub trait SmsService: Service {
 
     /// Build common HTTP headers required for API requests.
     fn common_req_headers(&self) -> BTreeMap<&str, String>;
-
 }

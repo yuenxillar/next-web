@@ -4,17 +4,11 @@ use std::{
 };
 
 use lopdf::Document;
-use zip::{
-    CompressionMethod, ZipWriter,
-    write::SimpleFileOptions,
-};
+use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 use crate::{
-    PdfResult,
-    error::pdf_error::PdfError,
-    operation::PdfQuery,
-    operations::extract_text::PdfExtractTextOperation,
-    util::save_bytes,
+    PdfResult, error::pdf_error::PdfError, operation::PdfQuery,
+    operations::extract_text::PdfExtractTextOperation, util::save_bytes,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,7 +90,8 @@ impl PdfQuery<WordDocument> for PdfToWordOperation {
 
         for page_number in doc.get_pages().keys().copied() {
             let text = PdfExtractTextOperation::from_pages([page_number]).query(doc)?;
-            if let Some(paragraphs) = paragraphs_for_page(&text, &self.options.empty_page_behavior) {
+            if let Some(paragraphs) = paragraphs_for_page(&text, &self.options.empty_page_behavior)
+            {
                 pages.push(paragraphs);
             }
         }
@@ -173,14 +168,11 @@ fn write_zip_file(
 ) -> PdfResult<()> {
     zip.start_file(name, options)
         .map_err(|error| PdfError::WordConversionFailed(error.to_string()))?;
-    zip.write_all(content.as_bytes())
-        .map_err(PdfError::from)
+    zip.write_all(content.as_bytes()).map_err(PdfError::from)
 }
 
 fn build_document_xml(pages: &[Vec<String>], preserve_page_breaks: bool) -> String {
-    let mut xml = String::from(
-        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
-    );
+    let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
     xml.push_str(
         r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>"#,
     );

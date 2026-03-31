@@ -11,15 +11,16 @@ pub mod filter;
 pub mod http;
 pub mod macros;
 pub mod messaging;
+pub mod mime_type;
 pub mod proxy;
 pub mod scheduler;
+pub mod server;
+pub mod signal;
 pub mod state;
 pub mod store;
 pub mod traits;
 pub mod util;
 pub mod wrapper;
-pub mod server;
-pub mod mime_type;
 
 pub use self::autoregister::auto_register::*;
 pub use self::context::application_context::*;

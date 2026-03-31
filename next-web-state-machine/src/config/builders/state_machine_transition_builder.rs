@@ -7,7 +7,7 @@ use std::{
 use next_web_core::error::BoxError;
 
 use crate::config::{
-    action::{actions::Actions, StateMachineAction},
+    action::{StateMachineAction, actions::Actions},
     builders::state_machine_transition_configurer::StateMachineTransitionConfigurer,
     common::builder::Builder,
     configurer_builder::ConfigurerBuilder,

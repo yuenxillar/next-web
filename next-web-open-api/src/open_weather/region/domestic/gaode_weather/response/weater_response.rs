@@ -19,10 +19,10 @@ pub struct WeatherResponse<T> {
     /// 返回状态说明 10000代表正确
     pub infocode: Box<str>,
     /// Data T
-    /// 
+    ///
     /// 数据 T
     #[serde(flatten)]
-    pub data: Option<T>
+    pub data: Option<T>,
 }
 
 impl<T> WeatherResponse<T> {

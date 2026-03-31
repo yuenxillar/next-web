@@ -115,7 +115,10 @@ impl WebUtils {
         false
     }
 
-    pub async fn get_subject(req: &mut dyn HttpRequest, resp: &mut dyn HttpResponse) -> Box<dyn Subject> {
+    pub async fn get_subject(
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+    ) -> Box<dyn Subject> {
         if let Some(subject) = req.get_attribute("NextSubject") {
             match subject {
                 AnyValue::Object(obj) => {
@@ -128,8 +131,7 @@ impl WebUtils {
             }
         }
 
-        req
-            .get_attribute(DEFAULT_WEB_DELEGATING_SUBJECT_KEY)
+        req.get_attribute(DEFAULT_WEB_DELEGATING_SUBJECT_KEY)
             .unwrap()
             .as_object::<Arc<dyn SecurityManager>>()
             .unwrap()

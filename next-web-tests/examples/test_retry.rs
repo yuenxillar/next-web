@@ -1,10 +1,10 @@
 use std::error::Error;
 
+use next_web::macros::retryable;
 use next_web::retry::error::retry_error::RetryError;
 use next_web::retry::retry_callback::with_fn;
 use next_web::retry::retry_operations::RetryOperations;
 use next_web::retry::support::retry_template::RetryTemplate;
-use next_web::retryable;
 use next_web::util::local_date_time::LocalDateTime;
 use next_web_core::anys::any_value::AnyValue;
 

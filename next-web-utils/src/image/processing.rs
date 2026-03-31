@@ -50,8 +50,8 @@ pub fn compress_image(
         _ => return Err(ImageProcessingError::UnsupportedFormat(format.to_string())),
     };
     // 创建输出文件并保存
-    let mut output_file =
-        std::fs::File::create(output_path).map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
+    let mut output_file = std::fs::File::create(output_path)
+        .map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;
 
     img.write_to(&mut output_file, output_format)
         .map_err(|e| ImageProcessingError::SaveError(e.to_string()))?;

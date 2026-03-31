@@ -59,7 +59,7 @@ impl QrCodeInput {
         // 使用 bardecoder 解析二维码
         let decoder = bardecoder::default_decoder();
         let results = decoder.decode(&img);
-        
+
         // 获取第一个成功的结果
         let content = results
             .into_iter()

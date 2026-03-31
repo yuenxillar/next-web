@@ -1,7 +1,16 @@
-use std::{any::Any, sync::{atomic::{AtomicU16, Ordering}, Arc}};
-use next_web_core::{async_trait, anys::any_error::AnyError};
+use next_web_core::{anys::any_error::AnyError, async_trait};
+use std::{
+    any::Any,
+    sync::{
+        Arc,
+        atomic::{AtomicU16, Ordering},
+    },
+};
 
-use crate::{context::retry_context_support::RetryContextSupport, retry_context::RetryContext, retry_policy::RetryPolicy};
+use crate::{
+    context::retry_context_support::RetryContextSupport, retry_context::RetryContext,
+    retry_policy::RetryPolicy,
+};
 
 #[derive(Clone)]
 pub struct MaxAttemptsRetryPolicy {
@@ -28,28 +37,20 @@ impl Default for MaxAttemptsRetryPolicy {
     }
 }
 
-
 #[async_trait]
 impl RetryPolicy for MaxAttemptsRetryPolicy {
     async fn can_retry(&self, context: &dyn RetryContext) -> bool {
         context.get_retry_count() < self.get_max_attempts()
     }
 
-    fn open(
-        &self,
-        _context: Option<&dyn RetryContext>,
-    ) -> Arc<dyn RetryContext> {
+    fn open(&self, _context: Option<&dyn RetryContext>) -> Arc<dyn RetryContext> {
         // TODO parent
         Arc::new(RetryContextSupport::default())
     }
 
     fn close(&self, _context: &dyn RetryContext) {}
 
-    fn register_error(
-        &self,
-        context: &dyn RetryContext,
-        error: Option<&dyn AnyError>,
-    ) {
+    fn register_error(&self, context: &dyn RetryContext, error: Option<&dyn AnyError>) {
         // TODO parent
         let any: &dyn Any = context;
         if let Some(ctx) = any.downcast_ref::<RetryContextSupport>() {
@@ -61,7 +62,6 @@ impl RetryPolicy for MaxAttemptsRetryPolicy {
         self.max_attempts.load(Ordering::Relaxed)
     }
 }
-
 
 impl ToString for MaxAttemptsRetryPolicy {
     fn to_string(&self) -> String {

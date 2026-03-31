@@ -21,19 +21,20 @@ impl HtmlUtil {
                         let mut potential_end = String::from("</");
                         let mut temp_chars = chars.clone();
                         temp_chars.next(); // 跳过 '/'
-                        
+
                         for _ in 0..tag.len() {
                             if let Some(tc) = temp_chars.next() {
                                 potential_end.push(tc);
                             }
                         }
-                        
+
                         if potential_end == tag_end {
                             tag_depth -= 1;
                             if tag_depth == 0 {
                                 in_tag = false;
                                 // 跳过整个结束标签
-                                for _ in 0..(tag.len() + 3) { // </tag>
+                                for _ in 0..(tag.len() + 3) {
+                                    // </tag>
                                     chars.next();
                                 }
                                 buffer.clear();
@@ -44,30 +45,30 @@ impl HtmlUtil {
                         // 检查是否是开始标签
                         let mut potential_start = String::from("<");
                         let mut temp_chars = chars.clone();
-                        
+
                         for _ in 0..tag.len() {
                             if let Some(tc) = temp_chars.next() {
                                 potential_start.push(tc);
                             }
                         }
-                        
+
                         if potential_start == tag_start {
                             // 检查是否是自闭合标签
                             let mut is_self_closing = false;
                             let mut temp_chars = chars.clone();
                             let mut tag_content = String::new();
-                            
+
                             while let Some(tc) = temp_chars.next() {
                                 tag_content.push(tc);
                                 if tc == '>' {
                                     break;
                                 }
                             }
-                            
+
                             if tag_content.ends_with("/>") {
                                 is_self_closing = true;
                             }
-                            
+
                             if is_self_closing {
                                 // 跳过自闭合标签
                                 for _ in 0..tag_content.len() {
@@ -124,10 +125,10 @@ impl HtmlUtil {
         let mut in_tag = false;
         let mut in_target_tag = false;
         let mut tag_depth = 0;
-        
+
         let open_tag = format!("<{}", tag);
         let close_tag = format!("</{}>", tag);
-    
+
         let mut chars = html.chars().peekable();
         while let Some(c) = chars.next() {
             if c == '<' {
@@ -135,19 +136,19 @@ impl HtmlUtil {
                     buffer.push(c);
                     continue;
                 }
-                
+
                 in_tag = true;
                 buffer.clear();
                 buffer.push(c);
                 continue;
             }
-            
+
             if in_tag {
                 buffer.push(c);
-                
+
                 if c == '>' {
                     in_tag = false;
-                    
+
                     if buffer.starts_with(&open_tag) {
                         if buffer.ends_with("/>") {
                             // 自闭合标签，直接跳过
@@ -167,7 +168,7 @@ impl HtmlUtil {
                         // 在目标标签内的其他标签，保留内容
                         result.push_str(&buffer);
                     }
-                    
+
                     buffer.clear();
                     continue;
                 }
@@ -177,11 +178,10 @@ impl HtmlUtil {
                 }
             }
         }
-    
+
         result
     }
 
-    
     /// 去除HTML标签中的指定属性
     pub fn remove_html_attr(html: &str, attr: &str) -> String {
         let mut result = String::new();
@@ -273,21 +273,21 @@ impl HtmlUtil {
                 let mut is_target = false;
                 let mut temp_chars = chars.clone();
                 let mut potential_tag = String::from("<");
-                
+
                 for _ in 0..tag.len() {
                     if let Some(tc) = temp_chars.next() {
                         potential_tag.push(tc);
                     }
                 }
-                
+
                 if potential_tag == tag_start {
                     is_target = true;
                 }
-                
+
                 in_tag = true;
                 in_target_tag = is_target;
                 result.push(c);
-                
+
                 if is_target {
                     // 跳过标签名
                     for _ in 0..tag.len() {
@@ -295,7 +295,7 @@ impl HtmlUtil {
                             result.push(tc);
                         }
                     }
-                    
+
                     // 跳过所有属性直到 '>'
                     while let Some(tc) = chars.peek() {
                         if *tc == '>' {
@@ -325,14 +325,81 @@ impl HtmlUtil {
     /// 过滤HTML文本，防止XSS攻击
     pub fn filter(html: &str) -> String {
         let allowed_tags: HashSet<&str> = [
-            "a", "abbr", "acronym", "address", "area", "b", "big", "blockquote", "br", "button",
-            "caption", "center", "cite", "code", "col", "colgroup", "dd", "del", "dfn", "dir",
-            "div", "dl", "dt", "em", "fieldset", "font", "form", "h1", "h2", "h3", "h4", "h5", "h6",
-            "hr", "i", "img", "input", "ins", "kbd", "label", "legend", "li", "map", "menu", "ol",
-            "optgroup", "option", "p", "pre", "q", "s", "samp", "select", "small", "span", "strike",
-            "strong", "sub", "sup", "table", "tbody", "td", "textarea", "tfoot", "th", "thead", "tr",
-            "tt", "u", "ul", "var",
-        ].iter().cloned().collect();
+            "a",
+            "abbr",
+            "acronym",
+            "address",
+            "area",
+            "b",
+            "big",
+            "blockquote",
+            "br",
+            "button",
+            "caption",
+            "center",
+            "cite",
+            "code",
+            "col",
+            "colgroup",
+            "dd",
+            "del",
+            "dfn",
+            "dir",
+            "div",
+            "dl",
+            "dt",
+            "em",
+            "fieldset",
+            "font",
+            "form",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "hr",
+            "i",
+            "img",
+            "input",
+            "ins",
+            "kbd",
+            "label",
+            "legend",
+            "li",
+            "map",
+            "menu",
+            "ol",
+            "optgroup",
+            "option",
+            "p",
+            "pre",
+            "q",
+            "s",
+            "samp",
+            "select",
+            "small",
+            "span",
+            "strike",
+            "strong",
+            "sub",
+            "sup",
+            "table",
+            "tbody",
+            "td",
+            "textarea",
+            "tfoot",
+            "th",
+            "thead",
+            "tr",
+            "tt",
+            "u",
+            "ul",
+            "var",
+        ]
+        .iter()
+        .cloned()
+        .collect();
 
         let mut result = String::new();
         let mut current_tag = String::new();
@@ -387,17 +454,23 @@ mod tests {
     #[test]
     fn test_clean_html_tag() {
         let html = "pre<div class=\"test_div\">\r\n\t\tdfdsfdsfdsf\r\n</div><div class=\"test_div\">BBBB</div>";
-        assert_eq!(HtmlUtil::clean_html_tag(html), "pre\r\n\t\tdfdsfdsfdsf\r\nBBBB");
+        assert_eq!(
+            HtmlUtil::clean_html_tag(html),
+            "pre\r\n\t\tdfdsfdsfdsf\r\nBBBB"
+        );
     }
 
     #[test]
     fn test_unwrap_html_tag() {
         let html = "pre<div class=\"test_div\">abc</div>";
         assert_eq!(HtmlUtil::unwrap_html_tag(html, "div"), "preabc");
-        
+
         let html_nested = "pre<div>outer<div>inner</div></div>";
-        assert_eq!(HtmlUtil::unwrap_html_tag(html_nested, "div"), "preouterinner");
-        
+        assert_eq!(
+            HtmlUtil::unwrap_html_tag(html_nested, "div"),
+            "preouterinner"
+        );
+
         let html_self_closing = "pre<img src=\"test.jpg\"/>";
         assert_eq!(HtmlUtil::unwrap_html_tag(html_self_closing, "img"), "pre");
     }
@@ -405,7 +478,10 @@ mod tests {
     #[test]
     fn test_remove_html_attr() {
         let html = "<div class=\"test_div\"></div><span class=\"test_div\"></span>";
-        assert_eq!(HtmlUtil::remove_html_attr(html, "class"), "<div></div><span></span>");
+        assert_eq!(
+            HtmlUtil::remove_html_attr(html, "class"),
+            "<div></div><span></span>"
+        );
     }
 
     #[test]

@@ -1,8 +1,8 @@
 use std::any::Any;
 use std::collections::HashSet;
 
-use crate::state::pseudo_state_kind::PseudoStateKind;
 use crate::state::StateMachineState;
+use crate::state::pseudo_state_kind::PseudoStateKind;
 use crate::state_context::StateContext;
 
 pub const HEADER_DO_ACTION_TIMEOUT: &str = "STATEMACHINE_DO_ACTION_TIMEOUT";

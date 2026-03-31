@@ -6,12 +6,14 @@ use crate::actuate::health::Health;
 /// HealthEndpoint.
 #[async_trait]
 pub trait HealthIndicator {
-
     /// Provide the indicator of health.
     /// if include_details is true, the details will be included in the Health result.
-    async fn get_health(&self, include_details: bool) -> Result<Health, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_health(
+        &self,
+        include_details: bool,
+    ) -> Result<Health, Box<dyn std::error::Error + Send + Sync>> {
         let health = self.health().await?;
-        
+
         let health = if include_details {
             health
         } else {

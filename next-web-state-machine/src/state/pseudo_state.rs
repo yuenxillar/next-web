@@ -4,8 +4,8 @@ use futures::future::BoxFuture;
 
 use crate::{
     state::{
-        pseudo_state_kind::PseudoStateKind, pseudo_state_listener::PseudoStateListener,
-        StateMachineState,
+        StateMachineState, pseudo_state_kind::PseudoStateKind,
+        pseudo_state_listener::PseudoStateListener,
     },
     state_context::StateContext,
 };

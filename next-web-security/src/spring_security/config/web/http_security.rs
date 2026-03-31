@@ -2,7 +2,10 @@ use std::{borrow::Cow, sync::Arc};
 
 use axum::{extract::Request, http::request, response::Response};
 use next_web_core::{
-    anys::any_map::AnyMap, error::BoxError, traits::{any_clone::AnyClone, ordered::Ordered, required::Required}, ApplicationContext
+    anys::any_map::AnyMap,
+    error::BoxError,
+    traits::{any_clone::AnyClone, ordered::Ordered, required::Required},
+    ApplicationContext,
 };
 
 use crate::{
@@ -167,8 +170,8 @@ impl HttpSecurity {
     // pub fn x509(self) -> Self {
     // }
 
-    fn perform_build(&mut self) -> DefaultSecurityFilterChain{
-        self.filters.sort_by(|a, b| a.order().cmp(& b.order()));
+    fn perform_build(&mut self) -> DefaultSecurityFilterChain {
+        self.filters.sort_by(|a, b| a.order().cmp(&b.order()));
 
         let filters = std::mem::take(&mut self.filters);
         // let request_matcher = std::mem::take(&mut self.request_matcher);
@@ -187,8 +190,6 @@ impl HttpSecurity {
         // }
         todo!()
     }
-
-
 }
 
 impl SecurityBuilder<DefaultSecurityFilterChain> for HttpSecurity {
@@ -256,7 +257,6 @@ impl HttpSecurityBuilder<Self> for HttpSecurity {
     {
         todo!()
     }
-
 }
 
 impl Clone for HttpSecurity {
@@ -306,12 +306,7 @@ impl Ordered for OrderedFilter {
 }
 
 impl Filter for OrderedFilter {
-    fn do_filter(
-        &self,
-        req: &mut Request,
-        res: &mut Response,
-    ) -> Result<(), BoxError>{
-       
-       Ok(())
+    fn do_filter(&self, req: &mut Request, res: &mut Response) -> Result<(), BoxError> {
+        Ok(())
     }
 }

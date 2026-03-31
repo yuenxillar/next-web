@@ -21,7 +21,7 @@ impl RequestCache for HttpSessionRequestCache {
         todo!()
     }
 
-    fn get_matching_request(&self, request: &axum::extract::Request) ->Option<& Request> {
+    fn get_matching_request(&self, request: &axum::extract::Request) -> Option<&Request> {
         todo!()
     }
 

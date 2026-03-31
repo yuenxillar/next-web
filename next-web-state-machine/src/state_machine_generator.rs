@@ -1,12 +1,12 @@
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use crate::{
+    StateMachine,
     config::{
         state_machine_configure::StateMachineConfigure,
         state_machine_state_configure::StateMachineStateConfigure,
         state_machine_transition_configure::StateMachineTransitionConfigure,
     },
-    StateMachine,
 };
 
 pub struct StateMachineGenerator;

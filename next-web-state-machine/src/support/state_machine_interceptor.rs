@@ -1,8 +1,8 @@
 use next_web_core::{error::BoxError, traits::message::Message};
 
 use crate::{
-    state::StateMachineState, state_context::StateContext, transition::StateMachineTransition,
-    StateMachine,
+    StateMachine, state::StateMachineState, state_context::StateContext,
+    transition::StateMachineTransition,
 };
 
 /// Interface which can be registered with a state machine and can be used

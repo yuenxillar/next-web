@@ -52,9 +52,11 @@ impl PdfImageSet {
         let pattern = pattern.as_ref();
         for (index, image) in self.images.iter().enumerate() {
             let path = render_output_path(pattern, index + 1);
-            image.save_with_format(&path, ImageFormat::Png).map_err(|error| {
-                PdfError::RenderError(format!("failed to save page image to {path}: {error}"))
-            })?;
+            image
+                .save_with_format(&path, ImageFormat::Png)
+                .map_err(|error| {
+                    PdfError::RenderError(format!("failed to save page image to {path}: {error}"))
+                })?;
         }
         Ok(())
     }
@@ -76,7 +78,9 @@ impl PdfQuery<PdfImageSet> for PdfToImagesOperation {
         let pdfium = bind_pdfium()?;
         let document = pdfium
             .load_pdf_from_byte_vec(bytes, None)
-            .map_err(|error| PdfError::RenderError(format!("failed to open PDF in Pdfium: {error}")))?;
+            .map_err(|error| {
+                PdfError::RenderError(format!("failed to open PDF in Pdfium: {error}"))
+            })?;
 
         let scale = f32::from(self.options.dpi) / 72.0;
         let render_config = PdfRenderConfig::new().scale_page_by_factor(scale.max(0.1));
@@ -124,8 +128,14 @@ fn render_output_path(pattern: &str, page_number: usize) -> String {
             .file_stem()
             .and_then(|stem| stem.to_str())
             .unwrap_or("page");
-        let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or("png");
-        let parent = path.parent().and_then(|parent| parent.to_str()).unwrap_or("");
+        let ext = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("png");
+        let parent = path
+            .parent()
+            .and_then(|parent| parent.to_str())
+            .unwrap_or("");
 
         if parent.is_empty() {
             format!("{stem}_{page_number}.{ext}")

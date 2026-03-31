@@ -59,7 +59,6 @@ impl From<(HttpMethod, &str)> for AntPathRequestMatcher {
     }
 }
 
-
 impl From<(Option<HttpMethod>, &str)> for AntPathRequestMatcher {
     fn from((method, pattern): (Option<HttpMethod>, &str)) -> Self {
         assert!(!pattern.is_empty(), "pattern cannot be empty");

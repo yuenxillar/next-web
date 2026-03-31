@@ -6,14 +6,16 @@ description = "Next Web Mqtt."
 license.workspace = true
 
 [dependencies]
-next-web-core = { workspace = true}
-next-web-macros = { workspace = true}
+next-web-core   = { workspace = true }
+next-web-macros = { workspace = true }
 
-serde = {workspace = true}
-rudi-dev = { workspace = true }
-rumqttc = { workspace = true}
+serde           = { workspace = true }
+rudi-dev        = { workspace = true }
+rumqttc         = { workspace = true }
 
-tokio = { workspace = true}
-tracing ={ workspace = true}
-hashbrown = { workspace = true}
-dyn-clone = { workspace = true }
+tokio           = { workspace = true }
+tracing         = { workspace = true }
+
+
+[features]
+trace-log = []

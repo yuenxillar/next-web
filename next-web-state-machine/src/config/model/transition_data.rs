@@ -1,8 +1,8 @@
 use futures::future::BoxFuture;
 
 use crate::{
-    security::security_rule::SecurityRule, state_context::StateContext,
-    transition::transition_kind::TransitionKind, BoxedStateAction, BoxedStateGuard,
+    BoxedStateAction, BoxedStateGuard, security::security_rule::SecurityRule,
+    state_context::StateContext, transition::transition_kind::TransitionKind,
 };
 
 pub type Action<S, E> = BoxedStateAction<S, E>;

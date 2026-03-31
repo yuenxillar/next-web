@@ -1,17 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
-use tracing::{event, instrument, Level};
+use tracing::{Level, event, instrument};
 
-use crate::credential::CredentialBuilder;
-use crate::response::Response;
 use crate::Result;
+use crate::credential::CredentialBuilder;
 use crate::error::Error::InternalServer;
+use crate::response::Response;
 
 use super::credential::{AccessTokenBuilder, Credential};
 
-
 /// 原作者 Github URL: https://github.com/headironc/open-wechat
-/// 
+///
 /// 存储微信小程序的 appid 和 secret
 #[derive(Debug, Clone)]
 pub struct WechatClient {

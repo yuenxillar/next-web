@@ -8,8 +8,8 @@ use axum::{
 };
 use next_web::context::properties::ApplicationProperties;
 use next_web::{
-    application::Application, filter::application_filter_chain::ApplicationFilterChain,
-    ApplicationContext,
+    ApplicationContext, application::Application,
+    filter::application_filter_chain::ApplicationFilterChain,
 };
 use next_web_core::async_trait;
 use next_web_core::state::application_state::ApplicationState;

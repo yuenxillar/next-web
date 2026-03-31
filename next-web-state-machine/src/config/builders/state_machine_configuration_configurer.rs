@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use next_web_core::{clone_trait_object, error::BoxError, DynClone};
+use next_web_core::{DynClone, clone_trait_object, error::BoxError};
 
 use crate::config::configurers::{
     configuration_configurer::ConfigurationConfigurer,

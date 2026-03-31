@@ -74,7 +74,10 @@ impl RetryContext for RetryContextSupport {
     }
 
     fn get_last_error(&self) -> Option<RetryError> {
-        self.last_error.try_lock().map(|lock| lock.clone()).unwrap_or_default()
+        self.last_error
+            .try_lock()
+            .map(|lock| lock.clone())
+            .unwrap_or_default()
     }
 }
 

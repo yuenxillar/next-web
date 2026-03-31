@@ -2,22 +2,22 @@ use std::{
     any::Any,
     collections::HashMap,
     fmt,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 
 use next_web_core::{async_trait, error::BoxError, traits::message::Message};
 use tokio::sync::broadcast::Sender;
 
 use crate::{
+    StateMachine,
     support::{
         lifecycle_object_support::{LifecycleObjectSupport, LifecycleObjectSupportExt},
         state_machine_executor::{StateMachineExecutorCallback, StateMachineExecutorTransit},
         state_machine_interceptor_list::StateMachineInterceptorList,
         transition_comparator::TransitionComparator,
     },
-    transition::{transition_conflict_policy::TransitionConflictPolicy, StateMachineTransition},
-    trigger::{timer_trigger::TimerTrigger, trigger_listener::TriggerListener, Trigger},
-    StateMachine,
+    transition::{StateMachineTransition, transition_conflict_policy::TransitionConflictPolicy},
+    trigger::{Trigger, timer_trigger::TimerTrigger, trigger_listener::TriggerListener},
 };
 
 const REACTOR_CONTEXT_TRIGGER_ERRORS: &str = "stateMachineTriggerErrors";
@@ -58,7 +58,6 @@ where
     S: PartialEq,
     S: Send + Sync + 'static,
     E: Send + Sync + 'static,
-
     S: Clone,
     E: Clone,
 {

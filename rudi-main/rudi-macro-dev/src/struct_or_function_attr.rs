@@ -1,5 +1,5 @@
 use from_attr::{ConvertParsed, FromAttr, PathValue};
-use syn::{parse_quote, spanned::Spanned, Expr, ExprPath};
+use syn::{Expr, ExprPath, parse_quote, spanned::Spanned};
 
 #[derive(FromAttr)]
 #[attribute(idents = [resource])]
@@ -20,7 +20,7 @@ pub(crate) struct StructOrFunctionAttr {
     #[attribute(default = DEFAULT_AUTO_REGISTER)]
     pub(crate) auto_register: bool,
 
-    pub(crate) default: bool
+    pub(crate) default: bool,
 }
 
 fn default_name() -> Expr {

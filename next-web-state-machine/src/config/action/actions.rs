@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::{async_trait, error::BoxError};
 
-use crate::{config::action::StateMachineAction, state_context::StateContext, BoxedStateAction};
+use crate::{BoxedStateAction, config::action::StateMachineAction, state_context::StateContext};
 
 pub struct Actions;
 

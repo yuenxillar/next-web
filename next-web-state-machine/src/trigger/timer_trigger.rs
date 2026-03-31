@@ -8,10 +8,10 @@ use tokio::task::JoinHandle;
 use tokio::time;
 
 use crate::support::lifecycle_object_support::{LifecycleObjectSupport, LifecycleObjectSupportExt};
+use crate::trigger::Trigger;
 use crate::trigger::composite_trigger_listener::CompositeTriggerListener;
 use crate::trigger::trigger_context::TriggerContext;
 use crate::trigger::trigger_listener::TriggerListener;
-use crate::trigger::Trigger;
 
 /// 定时器触发器
 #[derive(Clone)]

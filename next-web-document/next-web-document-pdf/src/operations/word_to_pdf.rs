@@ -5,12 +5,10 @@ use std::{
 };
 
 use image::{DynamicImage, Rgba, RgbaImage};
+use lopdf::{Document, Object, Stream, dictionary};
 use lopdf::{
-    Document, Object, Stream, dictionary,
-};
-use lopdf::{
-    content::{Content, Operation},
     ObjectId,
+    content::{Content, Operation},
 };
 use quick_xml::{
     Reader,
@@ -248,8 +246,8 @@ impl LayoutLine {
 
 fn parse_docx(bytes: &[u8], default_font_size_pt: f32) -> PdfResult<ParsedWordDocument> {
     let cursor = Cursor::new(bytes.to_vec());
-    let mut archive = ZipArchive::new(cursor)
-        .map_err(|error| PdfError::WordParseFailed(error.to_string()))?;
+    let mut archive =
+        ZipArchive::new(cursor).map_err(|error| PdfError::WordParseFailed(error.to_string()))?;
     let mut file = archive
         .by_name("word/document.xml")
         .map_err(|error| PdfError::WordParseFailed(error.to_string()))?;
@@ -436,8 +434,8 @@ fn handle_start_event(
             }
         }
         "sz" if *in_run_properties => {
-            if let Some(size) = attribute_value(event, decoder, b"val")
-                .and_then(|value| value.parse::<f32>().ok())
+            if let Some(size) =
+                attribute_value(event, decoder, b"val").and_then(|value| value.parse::<f32>().ok())
             {
                 current_style.font_size_pt = (size / 2.0).max(1.0);
                 if let Some(run) = current_run.as_mut() {
@@ -566,8 +564,8 @@ fn layout_document_pages(
                 let lines = layout_paragraph_lines(runs, font, max_width_px, scale_factor, options);
 
                 if lines.is_empty() {
-                    let blank_height = (options.font_size_pt * options.line_height * scale_factor)
-                        .max(1.0);
+                    let blank_height =
+                        (options.font_size_pt * options.line_height * scale_factor).max(1.0);
                     if cursor_y + blank_height > bottom_limit_px {
                         page_index += 1;
                         pages.push(new_page_image(page_width_px, page_height_px));
@@ -624,11 +622,14 @@ fn layout_paragraph_lines(
                 continue;
             }
 
-            let font_size_px = (run.style.font_size_pt.max(options.font_size_pt) * scale_factor)
-                .max(1.0);
+            let font_size_px =
+                (run.style.font_size_pt.max(options.font_size_pt) * scale_factor).max(1.0);
             let token_width = measure_text_width(font, &token_text, font_size_px);
 
-            if !current.is_empty() && !token_text.trim().is_empty() && current.width_px + token_width > max_width_px {
+            if !current.is_empty()
+                && !token_text.trim().is_empty()
+                && current.width_px + token_width > max_width_px
+            {
                 lines.push(std::mem::take(&mut current));
             }
 
@@ -728,7 +729,9 @@ fn split_token_to_fit(
 
     for ch in token.chars() {
         current.push(ch);
-        if measure_text_width(font, &current, font_size_px) > max_width_px && current.chars().count() > 1 {
+        if measure_text_width(font, &current, font_size_px) > max_width_px
+            && current.chars().count() > 1
+        {
             let last = current.pop().unwrap_or_default();
             if !current.is_empty() {
                 parts.push(std::mem::take(&mut current));
@@ -786,7 +789,8 @@ fn draw_layout_line(
             font_size_px,
         );
 
-        let segment_width = measure_text_width(font, &segment.text.replace('\t', "    "), font_size_px);
+        let segment_width =
+            measure_text_width(font, &segment.text.replace('\t', "    "), font_size_px);
         if segment.style.underline && !segment.text.trim().is_empty() {
             let underline_y = (baseline + font_size_px * 0.08).round() as i32;
             draw_horizontal_line(
@@ -872,10 +876,7 @@ fn build_pdf_from_images(images: &[RgbaImage], page_size: PdfPageSize) -> PdfRes
 
     for (index, image) in images.iter().enumerate() {
         let resource_name = format!("Im{}", index + 1);
-        let image_id = add_page_image_object(
-            &mut doc,
-            &DynamicImage::ImageRgba8(image.clone()),
-        )?;
+        let image_id = add_page_image_object(&mut doc, &DynamicImage::ImageRgba8(image.clone()))?;
         let content = Content {
             operations: vec![
                 Operation::new("q", vec![]),

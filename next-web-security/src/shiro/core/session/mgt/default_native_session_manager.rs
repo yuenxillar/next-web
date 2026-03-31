@@ -62,7 +62,9 @@ impl DefaultNativeSessionManager {
     }
 
     pub fn apply_global_session_timeout(&self, session: &dyn Session) {
-        session.set_timeout(Self::DEFAULT_GLOBAL_SESSION_TIMEOUT as i64).ok();
+        session
+            .set_timeout(Self::DEFAULT_GLOBAL_SESSION_TIMEOUT as i64)
+            .ok();
     }
 
     pub fn create_exposed_session(&self, session: &dyn Session) -> DelegatingSession {

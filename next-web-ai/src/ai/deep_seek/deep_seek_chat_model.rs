@@ -3,9 +3,7 @@ use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
 use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError};
 use next_web_retry::{
-    retry_callback::RetryCallback,
-    retry_context::RetryContext,
-    retry_operations::RetryOperations,
+    retry_callback::RetryCallback, retry_context::RetryContext, retry_operations::RetryOperations,
     support::retry_template::RetryTemplate,
 };
 
@@ -249,7 +247,10 @@ impl StreamingModel<Prompt, ChatResponse> for DeepSeekChatModel {
             async move {
                 let chat_completion = chat_completion?;
                 if chat_completion.is_empty() {
-                    return Ok(ChatResponse::new(ChatResponseMetadata::default(), Vec::new()));
+                    return Ok(ChatResponse::new(
+                        ChatResponseMetadata::default(),
+                        Vec::new(),
+                    ));
                 }
 
                 let chat_response_meta_data = chat_completion

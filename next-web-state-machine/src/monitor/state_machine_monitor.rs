@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures::future::BoxFuture;
 
-use crate::{state_context::StateContext, transition::StateMachineTransition, StateMachine};
+use crate::{StateMachine, state_context::StateContext, transition::StateMachineTransition};
 
 /// StateMachineMonitor for various state machine monitoring events.
 pub trait StateMachineMonitor<S, E>
