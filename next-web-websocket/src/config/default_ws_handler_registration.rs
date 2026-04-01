@@ -5,10 +5,11 @@ use crate::{
         base_ws_handler_registration::BaseWebSocketHandlerRegistration,
         ws_handler_registration::WebSocketHandlerRegistration,
     },
-    server::{handshake_handler::HandshakeHandler, handshake_interceptor::HandshakeInterceptor},
+    server::handshake_interceptor::HandshakeInterceptor,
     ws_handler::WebSocketHandler,
 };
 
+/// Default WebSocket Processor Registration
 pub struct DefaultWebSocketHandlerRegistration {
     base: BaseWebSocketHandlerRegistration,
 }
@@ -20,13 +21,6 @@ impl WebSocketHandlerRegistration for DefaultWebSocketHandlerRegistration {
         paths: Vec<String>,
     ) -> &mut dyn WebSocketHandlerRegistration {
         self.base.add_handler(handler, paths)
-    }
-
-    fn set_handshake_handler(
-        &mut self,
-        handshake_handler: std::sync::Arc<dyn HandshakeHandler>,
-    ) -> &mut dyn WebSocketHandlerRegistration {
-        self.base.set_handshake_handler(handshake_handler)
     }
 
     fn add_interceptors(
@@ -50,7 +44,9 @@ impl WebSocketHandlerRegistration for DefaultWebSocketHandlerRegistration {
         self.base.set_allowed_origin_patterns(origin_patterns)
     }
 
-    fn with_sock_js(&mut self) {
+    fn with_sock_js(
+        &mut self,
+    ) -> &mut crate::config::sock_js_service_registration::SockJsServiceRegistration {
         self.base.with_sock_js()
     }
 }

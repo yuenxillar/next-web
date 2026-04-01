@@ -3,12 +3,15 @@ use serde_json::Value;
 use crate::{async_trait, error::BoxError, scheduler::context::JobExecutionContext};
 
 #[async_trait]
-pub trait ScheduledJobHandler: Send + Sync {
-    fn task_key(&self) -> &'static str;
+pub trait ScheduledJobHandler
+where
+    Self: Send + Sync,
+{
+    fn id(&self) -> &str;
 
     async fn execute(
         &self,
-        context: JobExecutionContext,
+        ctx: JobExecutionContext,
         payload: Option<Value>,
     ) -> Result<(), BoxError>;
 }

@@ -118,7 +118,7 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
 
             quote! {::next_web::scheduler::schedule_type::ScheduleType::Cron(
                 ::next_web::scheduler::schedule_type::WithArgs {
-                    cron:           Some(#cron),
+                    cron:           Some(String::from(#cron)),
                     timezone:       #timezone,
                     ..Default::default()
                 }

@@ -10,7 +10,7 @@ use crate::{
 
 pub struct DefaultWebSocketHandlerRegistry {
     order: i32,
-    registrations: Vec<DefaultWebSocketHandlerRegistration>,
+    pub(crate) registrations: Vec<DefaultWebSocketHandlerRegistration>,
 }
 impl DefaultWebSocketHandlerRegistry {
     pub fn order(&self) -> i32 {

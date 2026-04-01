@@ -1,14 +1,13 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::server::support::{ws_context::WebSocketContext, ws_session::WebSocketSession};
 use axum::{
     body::Bytes,
     extract::{
-        ConnectInfo, State, WebSocketUpgrade,
+        ConnectInfo, Request, State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
-    http::{HeaderMap, Uri},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
 };
 use futures::{SinkExt, stream::StreamExt};
 use tokio::sync::watch;
@@ -36,19 +35,31 @@ pub(crate) async fn websocket_handle(
     ws: WebSocketUpgrade,
     State(ctx): State<Arc<WebSocketContext>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    uri: Uri,
-    header: axum::http::HeaderMap,
-) -> impl IntoResponse {
+    mut req: Request,
+) -> Response {
     // finalize the upgrade process by returning upgrade callback.
     // we can customize the callback by sending additional info such as address.
+    let mut attributes = HashMap::new();
+    let mut resp = Response::default();
+
+    for interceptor in ctx.interceptors() {
+        if !interceptor
+            .before_handshake(&mut req, &mut resp, &mut attributes)
+            .await
+            .ok()
+            .unwrap_or_default()
+        {
+            return resp;
+        }
+    }
+
     let properties = ctx.properties();
-    let path = uri.path().to_string();
     ws.max_message_size(properties.max_msg_size().unwrap_or(64 << 20))
         .max_write_buffer_size(properties.max_write_buffer_size().unwrap_or(usize::MAX))
-        .on_upgrade(move |socket| handle_socket(socket, ctx, addr, path, header))
+        .on_upgrade(move |socket| handle_socket(socket, ctx, addr, req))
+        .into_response()
 }
 
-//
 /// WebSocket连接处理主函数 - 每个连接都会生成一个实例
 ///
 /// 负责处理WebSocket连接的整个生命周期，包括：
@@ -68,16 +79,14 @@ pub(crate) async fn websocket_handle(
 /// # 参数/Parameters
 /// - `socket`: WebSocket连接对象/WebSocket connection object
 /// - `ctx`: WebSocket上下文，包含处理器注册信息/WebSocket context with handler registry
-/// - `remote_address`: 客户端远程地址/Client remote address
-/// - `path`: 请求路径/Request path
-/// - `header`: HTTP请求头/HTTP request headers
+/// - `req`:  HTTP请求对象/HTTP request object
 pub(crate) async fn handle_socket(
     mut socket: WebSocket,
     ctx: Arc<WebSocketContext>,
     remote_address: SocketAddr,
-    path: String,
-    header: HeaderMap,
+    req: Request,
 ) {
+    let path = req.uri().path();
     debug!("Start processing WebSocket connections: {remote_address}, Path: {path}");
 
     // 发送Ping包测试连接
@@ -101,7 +110,7 @@ pub(crate) async fn handle_socket(
     //
     // Match the corresponding handler through path matching
     // If no matching handler is found, close the connection
-    let handler = match ctx.get_handler(&path) {
+    let handler = match ctx.get_handler(path) {
         Some(handler) => handler,
         None => {
             error!("Path not found {path} The corresponding processor's connection will be closed");
@@ -116,7 +125,9 @@ pub(crate) async fn handle_socket(
         .msg_channel_capacity()
         .map(|cap| if cap != -1 { flume::bounded(cap as usize) } else { flume::unbounded() })
         .unwrap_or(flume::bounded(128));
-    let session = WebSocketSession::new(msg_sender, remote_address, header, path.to_owned());
+
+    let header = req.headers().clone();
+    let session = WebSocketSession::new(msg_sender, remote_address, header, path.to_string());
 
     // 分离socket实现同时收发
     // 使用flume通道实现异步消息传递

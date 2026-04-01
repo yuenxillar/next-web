@@ -37,7 +37,7 @@ impl Application for TestApplication {
 
 async fn download_file(Query(file_path): Query<String>) -> impl IntoResponse {
     // 1MB/s
-    ResponseStream::with_response(LocalFileStream(file_path)).target_rate(1024 * 1024)
+    ResponseStream::with_stream(LocalFileStream(file_path)).target_rate(1024 * 1024)
 }
 
 async fn download_bytes() -> impl IntoResponse {
@@ -45,7 +45,7 @@ async fn download_bytes() -> impl IntoResponse {
     let bytes = Bytes::from(vec![0x97; 1024 * 1024 * 10]);
 
     // 10KB/s
-    ResponseStream::with_response(
+    ResponseStream::with_stream(
         BytesStream::builder()
             .body(bytes)
             .file_name(LocalDateTime::now())
@@ -57,7 +57,7 @@ async fn download_bytes() -> impl IntoResponse {
 
 async fn download_network_file() -> impl IntoResponse {
     // 3KB/s
-    ResponseStream::with_response(NetworkFileStream::new(
+    ResponseStream::with_stream(NetworkFileStream::new(
         "http://127.0.0.1:11000/bytes",
         "GET",
         Some(HashMap::from_iter(vec![(

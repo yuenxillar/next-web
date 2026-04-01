@@ -53,16 +53,12 @@ use crate::util::local_date_time::LocalDateTime;
 use next_web_api_doc::openapi::OpenApi;
 
 #[cfg(feature = "enable-scheduling")]
-use crate::autoregister::scheduler_autoregister::{
-    ScheduledJobHandlerAutoRegister, SchedulerAutoRegister,
-};
+use crate::autoregister::scheduler_autoregister::SchedulerAutoRegister;
 #[cfg(feature = "enable-scheduling")]
 use crate::manager::job_scheduler_manager::JobSchedulerManager;
 #[cfg(feature = "enable-scheduling")]
 #[allow(unused_imports)]
-use next_web_core::scheduler::{
-    repository::ScheduledJobRepository, InMemoryScheduledJobRepository, ScheduledJobRegistry,
-};
+use next_web_core::scheduler::{InMemoryScheduledJobRepository, ScheduledJobRegistry};
 #[cfg(feature = "enable-scheduling")]
 #[allow(unused_imports)]
 use next_web_core::traits::schedule::scheduled_task::ScheduledTask;
@@ -332,16 +328,24 @@ where
         // Register jobs
         #[cfg(feature = "enable-scheduling")]
         {
-            use next_web_core::scheduler::context::JobExecutionContext;
+            use next_web_core::{
+                scheduler::context::JobExecutionContext,
+                traits::schedule::{
+                    scheduled_job_handler::ScheduledJobHandler,
+                    scheduled_job_repository::ScheduledJobRepository,
+                },
+            };
 
             let job_execution_context = JobExecutionContext::default();
             let registry = ScheduledJobRegistry::default();
 
-            for handler in inventory::iter::<&dyn ScheduledJobHandlerAutoRegister>.into_iter() {
-                if let Err(error) = registry.register(handler.register(ctx)) {
-                    error!("ScheduledJobRegistry failed to register handler: {}", error);
-                }
-            }
+            ctx.resolve_by_type::<Arc<dyn ScheduledJobHandler>>()
+                .into_iter()
+                .for_each(|handler| {
+                    if let Err(error) = registry.register(handler.to_owned()) {
+                        error!("ScheduledJobRegistry failed to register handler: {}", error);
+                    }
+                });
 
             let repository = ctx
                 .resolve_by_type::<Arc<dyn ScheduledJobRepository>>()
@@ -351,7 +355,7 @@ where
 
             let mut manager = JobSchedulerManager::with_channel_size_from_repository(
                 240,
-                repository.clone(),
+                repository,
                 registry.clone(),
             )
             .await;

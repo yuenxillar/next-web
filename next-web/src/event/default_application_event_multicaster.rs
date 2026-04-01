@@ -145,7 +145,7 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
                         EventValue::Value(box_event) => {
                             if let Some(event) = (box_event.as_ref()).downcast_ref::<E>() {
                                 for listener in listeners.values() {
-                                    listener.on_application_event(event).await;
+                                    listener.on_application_event(&event).await;
                                 }
                             } else {
                                 #[cfg(feature = "trace-log")]

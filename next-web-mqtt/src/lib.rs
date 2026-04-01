@@ -35,6 +35,7 @@ pub mod poll_error_handler;
 pub mod service;
 pub mod topic_listener;
 pub mod topic_router;
+pub mod mqtt_service;
 
 pub use rumqttc::*;
 
