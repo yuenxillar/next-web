@@ -30,7 +30,6 @@ impl BaseWebSocketHandlerRegistration {
     pub fn sock_js_service_registration(&self) -> Option<&SockJsServiceRegistration> {
         self.sock_js_service_registration.as_ref()
     }
-<<<<<<< HEAD
 
     /// Return the interceptors configured for this registration.
     pub fn interceptors(&self) -> &[Arc<dyn HandshakeInterceptor>] {
@@ -46,8 +45,6 @@ impl BaseWebSocketHandlerRegistration {
     pub fn allowed_origin_patterns(&self) -> &[String] {
         self.allowed_origin_patterns.as_slice()
     }
-=======
->>>>>>> 1682171e64249bc45df144e70279187af7651ce0
 }
 
 impl WebSocketHandlerRegistration for BaseWebSocketHandlerRegistration {

@@ -39,15 +39,8 @@ pub(crate) async fn websocket_handle(
 ) -> Response {
     // finalize the upgrade process by returning upgrade callback.
     // we can customize the callback by sending additional info such as address.
-<<<<<<< HEAD
     let mut attributes = HashMap::new();
     let mut resp = Response::default();
-
-=======
-
-    let mut attributes = HashMap::new();
-    let mut resp = Response::default();
->>>>>>> 1682171e64249bc45df144e70279187af7651ce0
     for interceptor in ctx.interceptors() {
         if !interceptor
             .before_handshake(&mut req, &mut resp, &mut attributes)
