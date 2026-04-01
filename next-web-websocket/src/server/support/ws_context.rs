@@ -4,7 +4,11 @@ use crate::{
     autoconfigure::ws_properties::WebSocketProperties,
     server::{
         handshake_interceptor::HandshakeInterceptor,
+<<<<<<< HEAD
         support::ws_handler_mapping::{WebSocketHandlerMapping},
+=======
+        support::ws_handler_mapping::WebSocketHandlerMapping,
+>>>>>>> 1682171e64249bc45df144e70279187af7651ce0
     },
     ws_handler::WebSocketHandler,
 };

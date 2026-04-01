@@ -1,6 +1,9 @@
 //! Test websocket handler
 
+<<<<<<< HEAD
 use std::any::Any;
+=======
+>>>>>>> 1682171e64249bc45df144e70279187af7651ce0
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
