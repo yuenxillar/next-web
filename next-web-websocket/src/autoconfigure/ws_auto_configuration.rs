@@ -14,7 +14,7 @@ use crate::{
         default_ws_handler_registry::DefaultWebSocketHandlerRegistry,
         ws_configurer::WebSocketConfigurer,
     },
-    server::support::ws_context::WebSocketContext,
+    server::{handshake_interceptor::HandshakeInterceptor, support::ws_context::WebSocketContext},
     ws_handle::websocket_handle,
 };
 
@@ -43,9 +43,11 @@ impl AutoConfiguration for WebsocketAutoConfiguration {
             configurer.register_web_socket_handlers(ctx, &mut registry);
         }
 
+        let interceptors = ctx.resolve_by_type::<Arc<dyn HandshakeInterceptor>>();
         let ws_context = WebSocketContext::new(
             self.web_socket_properties.clone(),
             registry.handler_mapping(),
+            interceptors,
         );
 
         let instance = Box::new(WebsocketApplyRouter { ws_context });

@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::{error::BoxError, scheduler::handler::ScheduledJobHandler};
+use crate::{error::BoxError, traits::schedule::scheduled_job_handler::ScheduledJobHandler};
 
 #[derive(Clone, Default)]
 pub struct ScheduledJobRegistry {
@@ -16,7 +16,7 @@ impl ScheduledJobRegistry {
     }
 
     pub fn register(&self, handler: Arc<dyn ScheduledJobHandler>) -> Result<(), BoxError> {
-        let task_key = handler.task_key().to_string();
+        let task_key = handler.id().to_string();
         let mut handlers = self
             .handlers
             .write()
@@ -55,8 +55,8 @@ mod tests {
     use serde_json::{Value, json};
 
     use crate::{
-        error::BoxError,
-        scheduler::{ScheduledJobHandler, context::JobExecutionContext},
+        error::BoxError, scheduler::context::JobExecutionContext,
+        traits::schedule::scheduled_job_handler::ScheduledJobHandler,
     };
 
     use super::ScheduledJobRegistry;
@@ -67,7 +67,7 @@ mod tests {
 
     #[crate::async_trait]
     impl ScheduledJobHandler for TestHandler {
-        fn task_key(&self) -> &'static str {
+        fn id(&self) -> &str {
             self.task_key
         }
 
@@ -117,7 +117,7 @@ mod tests {
 
         #[crate::async_trait]
         impl ScheduledJobHandler for PayloadHandler {
-            fn task_key(&self) -> &'static str {
+            fn id(&self) -> &'static str {
                 "handler.payload"
             }
 

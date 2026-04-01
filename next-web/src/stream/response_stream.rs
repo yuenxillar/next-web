@@ -10,7 +10,7 @@ impl<T> ResponseStream<T>
 where
     T: IntoRespnoseStream,
 {
-    pub fn with_response(stream: T) -> Self {
+    pub fn with_stream(stream: T) -> Self {
         Self {
             target_rate: 2048,
             stream,

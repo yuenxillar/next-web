@@ -2,7 +2,11 @@ use std::sync::Arc;
 
 use crate::{
     autoconfigure::ws_properties::WebSocketProperties,
-    server::support::ws_handler_mapping::WebSocketHandlerMapping, ws_handler::WebSocketHandler,
+    server::{
+        handshake_interceptor::HandshakeInterceptor,
+        support::ws_handler_mapping::WebSocketHandlerMapping,
+    },
+    ws_handler::WebSocketHandler,
 };
 
 ///
@@ -20,16 +24,25 @@ use crate::{
 pub struct WebSocketContext {
     properties: WebSocketProperties,
     handler_mapping: WebSocketHandlerMapping,
+
+    interceptors: Vec<Arc<dyn HandshakeInterceptor>>,
 }
 
 impl WebSocketContext {
-    pub fn new(properties: WebSocketProperties, handler_mapping: WebSocketHandlerMapping) -> Self {
+    /// Create a new instance of WebSocket Context.
+    pub fn new(
+        properties: WebSocketProperties,
+        handler_mapping: WebSocketHandlerMapping,
+        interceptors: Vec<Arc<dyn HandshakeInterceptor>>,
+    ) -> Self {
         Self {
             properties,
             handler_mapping,
+            interceptors,
         }
     }
 
+    /// Get the WebSocket Mapping.
     pub fn handler_mapping(&self) -> &WebSocketHandlerMapping {
         &self.handler_mapping
     }
@@ -44,6 +57,11 @@ impl WebSocketContext {
     /// 返回对内部 `WebSocketProperties` 实例的只读引用。
     pub fn properties(&self) -> &WebSocketProperties {
         &self.properties
+    }
+
+    /// Get Handshake Interceptor
+    pub fn interceptors(&self) -> &[Arc<dyn HandshakeInterceptor>] {
+        self.interceptors.as_slice()
     }
 
     ///

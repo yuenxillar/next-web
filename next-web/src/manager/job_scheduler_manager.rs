@@ -10,14 +10,18 @@ use next_web_core::{
     scheduler::{
         context::JobExecutionContext,
         persisted_job::PersistedScheduledJob,
-        repository::{
-            InMemoryScheduledJobRepository, ScheduledJobReader, ScheduledJobRepository,
-            ScheduledJobStore,
-        },
+        repository::InMemoryScheduledJobRepository,
         schedule_type::{ScheduleType, WithArgs},
         ScheduledJobRegistry,
     },
-    traits::singleton::Singleton,
+    traits::{
+        schedule::{
+            scheduled_job_reader::ScheduledJobReader,
+            scheduled_job_repository::ScheduledJobRepository,
+            scheduled_job_store::ScheduledJobStore,
+        },
+        singleton::Singleton,
+    },
     util::time::TimeUnit,
 };
 use tokio::sync::RwLock;
@@ -52,12 +56,12 @@ struct RepositoryReaderAdapter {
 
 #[next_web_core::async_trait]
 impl ScheduledJobReader for RepositoryReaderAdapter {
-    async fn find_by_id(&self, id: &str) -> Result<Option<PersistedScheduledJob>, BoxError> {
-        self.repository.find_by_id(id).await
+    async fn find(&self, id: &str) -> Result<Option<PersistedScheduledJob>, BoxError> {
+        self.repository.find(id).await
     }
 
-    async fn list(&self) -> Result<Vec<PersistedScheduledJob>, BoxError> {
-        self.repository.list().await
+    async fn read(&self) -> Result<Vec<PersistedScheduledJob>, BoxError> {
+        self.repository.read().await
     }
 }
 
@@ -234,7 +238,7 @@ impl JobSchedulerManager {
                     return;
                 }
 
-                match reader.find_by_id(&job_id).await {
+                match reader.find(&job_id).await {
                     Ok(Some(mut persisted_job)) => {
                         persisted_job.mark_ran_now();
                         if let Err(save_error) = store.save(persisted_job).await {
@@ -290,7 +294,7 @@ impl JobSchedulerManager {
     }
 
     pub async fn restore_all(&self, context: JobExecutionContext) -> Result<(), BoxError> {
-        for job in self.reader.list_enabled().await? {
+        for job in self.reader.read().await? {
             if self.registry.get(&job.task_key).is_none() {
                 warn!(
                     job_id = %job.id,
@@ -300,10 +304,12 @@ impl JobSchedulerManager {
                 continue;
             }
 
-            if let Err(error) = self.schedule_persisted(job.clone(), context.clone()).await {
+            let job_id = job.id.to_string();
+            let job_task_key = job.task_key.to_string();
+            if let Err(error) = self.schedule_persisted(job, context.clone()).await {
                 warn!(
-                    job_id = %job.id,
-                    task_key = %job.task_key,
+                    job_id = %job_id,
+                    task_key = %job_task_key,
                     error = %error,
                     "Persisted scheduled job restore failed"
                 );
@@ -330,10 +336,6 @@ impl JobSchedulerManager {
 
     pub async fn exists_persisted(&self, id: &str) -> Result<bool, BoxError> {
         self.reader.exists(id).await
-    }
-
-    pub async fn count_persisted(&self) -> Result<usize, BoxError> {
-        self.reader.count().await
     }
 
     pub async fn remove(&self, guid: Vec<u8>) {
@@ -533,14 +535,14 @@ mod tests {
     use next_web_core::{
         error::BoxError,
         scheduler::{
-            repository::{InMemoryScheduledJobRepository, ScheduledJobReader, ScheduledJobStore},
-            schedule_type::{ScheduleType, WithArgs},
-            PersistedScheduledJob, ScheduledJobHandler, ScheduledJobRegistry,
+            PersistedScheduledJob, ScheduledJobRegistry, repository::InMemoryScheduledJobRepository, schedule_type::{ScheduleType, WithArgs}
         },
+        traits::schedule::{scheduled_job_handler::ScheduledJobHandler, scheduled_job_reader::ScheduledJobReader},
     };
     use serde_json::{json, Value};
     use tokio::sync::RwLock;
 
+    use next_web_core::traits::schedule::scheduled_job_store::ScheduledJobStore;
     use super::{BoxedJob, JobSchedulerManager};
 
     struct CountingHandler {
@@ -551,7 +553,7 @@ mod tests {
 
     #[next_web_core::async_trait]
     impl ScheduledJobHandler for CountingHandler {
-        fn task_key(&self) -> &'static str {
+        fn id(&self) -> &'static str {
             self.task_key
         }
 
@@ -614,12 +616,12 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(repository.find_by_id("job-1").await.unwrap().is_some());
+        assert!(repository.find("job-1").await.unwrap().is_some());
         assert!(manager.exists_persisted("job-1").await.unwrap());
 
         let removed = manager.remove_persisted("job-1").await.unwrap();
         assert!(removed.is_some());
-        assert!(repository.find_by_id("job-1").await.unwrap().is_none());
+        assert!(repository.find("job-1").await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -677,9 +679,9 @@ mod tests {
             .await
         );
 
-        assert!(repository.find_by_id("enabled").await.unwrap().is_none());
-        assert!(repository.find_by_id("disabled").await.unwrap().is_some());
-        assert!(repository.find_by_id("missing").await.unwrap().is_some());
+        assert!(repository.find("enabled").await.unwrap().is_none());
+        assert!(repository.find("disabled").await.unwrap().is_some());
+        assert!(repository.find("missing").await.unwrap().is_some());
         assert_eq!(payloads.read().await.len(), 1);
     }
 
@@ -728,7 +730,7 @@ mod tests {
                 let repository = repository.clone();
                 Box::pin(async move {
                     repository
-                        .find_by_id("repeating")
+                        .find("repeating")
                         .await
                         .unwrap()
                         .and_then(|job| job.last_run_at)
@@ -741,7 +743,7 @@ mod tests {
         assert!(
             wait_until(Duration::from_secs(4), || {
                 let repository = repository.clone();
-                Box::pin(async move { repository.find_by_id("one-shot").await.unwrap().is_none() })
+                Box::pin(async move { repository.find("one-shot").await.unwrap().is_none() })
             })
             .await
         );
@@ -799,7 +801,5 @@ mod tests {
             })
             .await
         );
-
-        assert_eq!(repository.count().await.unwrap(), 0);
     }
 }

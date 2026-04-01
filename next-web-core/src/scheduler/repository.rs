@@ -2,42 +2,14 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
-use crate::{async_trait, error::BoxError, scheduler::persisted_job::PersistedScheduledJob};
-
-#[async_trait]
-pub trait ScheduledJobReader: Send + Sync {
-    async fn find_by_id(&self, id: &str) -> Result<Option<PersistedScheduledJob>, BoxError>;
-
-    async fn list(&self) -> Result<Vec<PersistedScheduledJob>, BoxError>;
-
-    async fn list_enabled(&self) -> Result<Vec<PersistedScheduledJob>, BoxError> {
-        let jobs = self.list().await?;
-        Ok(jobs.into_iter().filter(|job| job.enabled).collect())
-    }
-
-    async fn exists(&self, id: &str) -> Result<bool, BoxError> {
-        Ok(self.find_by_id(id).await?.is_some())
-    }
-
-    async fn count(&self) -> Result<usize, BoxError> {
-        Ok(self.list().await?.len())
-    }
-}
-
-#[async_trait]
-pub trait ScheduledJobStore: Send + Sync {
-    async fn save(&self, job: PersistedScheduledJob) -> Result<(), BoxError>;
-
-    async fn delete(&self, id: &str) -> Result<Option<PersistedScheduledJob>, BoxError>;
-}
-
-pub trait ScheduledJobRepository
-where
-    Self: ScheduledJobReader + ScheduledJobStore,
-{
-}
-
-impl<T> ScheduledJobRepository for T where T: ScheduledJobReader + ScheduledJobStore {}
+use crate::{
+    async_trait,
+    error::BoxError,
+    scheduler::persisted_job::PersistedScheduledJob,
+    traits::schedule::{
+        scheduled_job_reader::ScheduledJobReader, scheduled_job_store::ScheduledJobStore,
+    },
+};
 
 #[derive(Clone, Default)]
 pub struct InMemoryScheduledJobRepository {
@@ -52,11 +24,11 @@ impl InMemoryScheduledJobRepository {
 
 #[async_trait]
 impl ScheduledJobReader for InMemoryScheduledJobRepository {
-    async fn find_by_id(&self, id: &str) -> Result<Option<PersistedScheduledJob>, BoxError> {
+    async fn find(&self, id: &str) -> Result<Option<PersistedScheduledJob>, BoxError> {
         Ok(self.jobs.read().await.get(id).cloned())
     }
 
-    async fn list(&self) -> Result<Vec<PersistedScheduledJob>, BoxError> {
+    async fn read(&self) -> Result<Vec<PersistedScheduledJob>, BoxError> {
         Ok(self.jobs.read().await.values().cloned().collect())
     }
 }
@@ -75,10 +47,14 @@ impl ScheduledJobStore for InMemoryScheduledJobRepository {
 
 #[cfg(test)]
 mod tests {
-    use crate::scheduler::{
-        PersistedScheduledJob,
-        repository::{InMemoryScheduledJobRepository, ScheduledJobReader, ScheduledJobStore},
-        schedule_type::{ScheduleType, WithArgs},
+    use crate::{
+        scheduler::{
+            InMemoryScheduledJobRepository, PersistedScheduledJob,
+            schedule_type::{ScheduleType, WithArgs},
+        },
+        traits::schedule::{
+            scheduled_job_reader::ScheduledJobReader, scheduled_job_store::ScheduledJobStore,
+        },
     };
 
     fn one_shot_schedule() -> ScheduleType {
@@ -109,8 +85,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(repository.find_by_id("enabled").await.unwrap().is_some());
-        assert_eq!(repository.count().await.unwrap(), 2);
-        assert_eq!(repository.list_enabled().await.unwrap().len(), 1);
+        assert!(repository.find("enabled").await.unwrap().is_some());
+        assert_eq!(repository.read().await.unwrap().len(), 1);
     }
 }

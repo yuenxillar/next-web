@@ -1,15 +1,21 @@
 //! Test websocket handler
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 
 use axum::extract::ws::CloseFrame;
+use next_web::anys::any_value::AnyValue;
 use next_web::application::Application;
+use next_web::traits::http::http_request::HttpRequest;
+use next_web::traits::http::http_response::HttpResponse;
 use next_web::{ApplicationContext, async_trait, macros::bind::singleton};
 use next_web_core::context::properties::ApplicationProperties;
+use next_web_core::error::BoxError;
 use next_web_websocket::Message;
 use next_web_websocket::config::ws_configurer::WebSocketConfigurer;
 use next_web_websocket::config::ws_handler_registry::WebSocketHandlerRegistry;
+use next_web_websocket::server::handshake_interceptor::HandshakeInterceptor;
 use next_web_websocket::server::support::ws_session::WebSocketSession;
 use next_web_websocket::ws_handler::{WSResult, WebSocketHandler};
 
@@ -81,6 +87,38 @@ impl WebSocketHandler for TestWSHandler {
     ) -> WSResult<()> {
         println!("User left: {:?}", session.id());
         Ok(())
+    }
+}
+
+#[singleton(binds = [Self::into_interceptor])]
+#[derive(Clone)]
+pub struct TestWSHandshakeInterceptor;
+
+impl TestWSHandshakeInterceptor {
+    fn into_interceptor(self) -> Arc<dyn HandshakeInterceptor> {
+        Arc::new(self)
+    }
+}
+
+#[async_trait]
+impl HandshakeInterceptor for TestWSHandshakeInterceptor {
+    async fn before_handshake(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        attributes: &mut HashMap<String, AnyValue>,
+    ) -> Result<bool, BoxError> {
+        attributes.insert("test".into(), "var".into());
+
+        println!(
+            "Sec-WebSocket-Extensions: {}",
+            request
+                .header("Sec-WebSocket-Extensions")
+                .unwrap_or_default()
+        );
+
+        response.insert_header("Hello".as_bytes(), "World");
+        Ok(true)
     }
 }
 

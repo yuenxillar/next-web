@@ -4,10 +4,10 @@ use crate::{
     autoconfigure::mqtt_properties::{MQTTClientProperties, Topic},
     generate_client_id,
     interceptor::message_interceptor::MessageInterceptor,
+    mqtt_service::MQTTService,
     poll_error_handler::{
         is_connection_refused, MQTTPollErrorAction, MQTTPollErrorContext, MQTTPollErrorHandler,
     },
-    service::mqtt_service::MQTTService,
     topic_router::TopicRouter,
 };
 

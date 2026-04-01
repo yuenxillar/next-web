@@ -1,5 +1,5 @@
+use next_web::traits::event::application_event::EventAttributes;
 use next_web::traits::event::application_event_publisher::ApplicationEventPublisher;
-use next_web::util::local_date_time::LocalDateTime;
 use next_web::{
     event::default_application_event_publisher::DefaultApplicationEventPublisher,
     macros::event::event_listener,
@@ -39,7 +39,9 @@ impl Application for TestApplication {
         tokio::spawn(async move {
             loop {
                 event_publisher
-                    .publish_event(TestEvent(LocalDateTime::timestamp()))
+                    .publish_event(TestEvent {
+                        attr: Default::default(),
+                    })
                     .await
                     .unwrap();
 
@@ -53,16 +55,23 @@ impl Application for TestApplication {
 #[derive(Clone)]
 pub struct TestListener;
 
-#[singleton]
-#[derive(Clone)]
-pub struct TestEvent(i64);
-impl ApplicationEvent for TestEvent {}
+#[derive(Clone, Default)]
+pub struct TestEvent {
+    attr: EventAttributes,
+}
+
+// Now the timestamp will be automatically obtained
+impl AsRef<EventAttributes> for TestEvent {
+    fn as_ref(&self) -> &EventAttributes {
+        &self.attr
+    }
+}
 
 #[async_trait]
 #[event_listener(id = "testListener")]
 impl ApplicationListener<TestEvent> for TestListener {
     async fn on_application_event(&self, event: &TestEvent) {
-        println!("Time tick: {}", event.0)
+        println!("Timestamp: {}", event.timestamp())
     }
 }
 
