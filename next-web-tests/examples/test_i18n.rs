@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use next_web::ApplicationContext;
+use next_web::context::MessageSource;
 use next_web::extract::Path;
 use next_web::extract::find_singleton::FindSingleton;
 use next_web::i18n::accept_header_locale_resolver::AcceptHeaderLocaleResolver;
-use next_web::i18n::message_source_service::MessageSourceService;
 use next_web::traits::locale_resolver::LocaleResolver;
 use next_web::{
     application::Application, async_trait, context::properties::ApplicationProperties,
@@ -20,35 +22,28 @@ impl Application for TestApplication {
         &self,
         _ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
     }
 }
 
 #[get_mapping(path = "/message1/{msg}")]
 async fn req_message1(
     Path(msg): Path<String>,
-    FindSingleton(message_source_service): FindSingleton<MessageSourceService>,
+    #[find] FindSingleton(message_source): FindSingleton<Arc<dyn MessageSource>>,
     req: axum::http::Request<axum::body::Body>,
 ) -> impl IntoResponse {
-    let locale_resolver = AcceptHeaderLocaleResolver::resolve_locale(&req);
+    let locale = AcceptHeaderLocaleResolver::resolve_locale(&req);
     if msg == "name" {
-        message_source_service
-            .message_with_args(msg.to_string(), &["John", "180", "xxx"], locale_resolver)
+        message_source
+            .message_with_args(&msg, &["John", "180", "xxx"], locale)
+            .await
             .unwrap_or(msg.into())
     } else {
-        message_source_service.message_or_default(msg, locale_resolver)
+        message_source.message_or_default(&msg, locale).await
     }
 }
 
-// #[translation]
-#[get_mapping(path = "/message2/{msg}")]
-async fn req_message2(
-    Path(msg): Path<String>,
-    FindSingleton(message_source_service): FindSingleton<MessageSourceService>,
-    locale: AcceptHeaderLocaleResolver,
-) -> impl IntoResponse {
-    ""
-}
 
 #[tokio::main]
 async fn main() {

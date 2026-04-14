@@ -11,3 +11,5 @@ pub const RESOURCES: &'static str = "resources/";
 pub const NEXT_SECURE_PROPERTIES: &'static str = "nsp";
 
 pub const NEXT_DECRYPT_PASSWORD: &'static str = "NEXT_DECRYPT_PASSWORD";
+
+pub const MESSAGES: &'static str = "messages/";

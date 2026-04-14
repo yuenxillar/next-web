@@ -1,4 +1,4 @@
-use std::{ collections::HashMap};
+use std::collections::HashMap;
 
 use next_web_core::anys::any_value::AnyValue;
 use next_web_core::async_trait;
@@ -18,8 +18,6 @@ where
     Self: Send + Sync,
 {
     /// Called before handshake processing
-    ///
-    /// 在握手处理之前调用
     async fn before_handshake(
         &self,
         request: &mut dyn HttpRequest,

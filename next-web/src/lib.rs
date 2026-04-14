@@ -3,18 +3,15 @@ pub mod autoconfigure;
 pub mod autoregister;
 pub mod banner;
 
-pub mod config;
 pub mod configurer;
-pub mod converter;
 pub mod crypto;
+pub mod diagnostics;
 pub mod error;
 pub mod event;
 pub mod extract;
 pub mod interceptor;
 pub mod macros;
 pub mod manager;
-pub mod middleware;
-pub mod service;
 
 pub mod stream;
 pub mod util;

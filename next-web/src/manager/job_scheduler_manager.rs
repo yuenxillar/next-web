@@ -535,15 +535,19 @@ mod tests {
     use next_web_core::{
         error::BoxError,
         scheduler::{
-            PersistedScheduledJob, ScheduledJobRegistry, repository::InMemoryScheduledJobRepository, schedule_type::{ScheduleType, WithArgs}
+            repository::InMemoryScheduledJobRepository,
+            schedule_type::{ScheduleType, WithArgs},
+            PersistedScheduledJob, ScheduledJobRegistry,
         },
-        traits::schedule::{scheduled_job_handler::ScheduledJobHandler, scheduled_job_reader::ScheduledJobReader},
+        traits::schedule::{
+            scheduled_job_handler::ScheduledJobHandler, scheduled_job_reader::ScheduledJobReader,
+        },
     };
     use serde_json::{json, Value};
     use tokio::sync::RwLock;
 
-    use next_web_core::traits::schedule::scheduled_job_store::ScheduledJobStore;
     use super::{BoxedJob, JobSchedulerManager};
+    use next_web_core::traits::schedule::scheduled_job_store::ScheduledJobStore;
 
     struct CountingHandler {
         task_key: &'static str,

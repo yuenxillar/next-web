@@ -1,0 +1,21 @@
+[package]
+name = "next-web-mq-rabbitmq"
+version = "0.1.0"
+description = "RabbitMQ starter for the Next Web framework"
+readme = "../../README.md"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+next-web-core = { workspace = true }
+next-web-macros = { workspace = true }
+rudi-dev = { workspace = true }
+
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+amqprs = { workspace = true }
+
+[lints]
+workspace = true

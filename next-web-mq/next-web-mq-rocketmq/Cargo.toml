@@ -1,0 +1,19 @@
+[package]
+name = "next-web-mq-rocketmq"
+version = "0.1.0"
+description = "RocketMQ starter for the Next Web framework"
+readme = "../../README.md"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+next-web-core = { workspace = true }
+next-web-macros = { workspace = true }
+rudi-dev = { workspace = true }
+
+serde = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

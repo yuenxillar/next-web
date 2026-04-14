@@ -5,8 +5,8 @@ use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{quote, ToTokens};
 use syn::{
-    spanned::Spanned, Error, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, Lit, LitBool, LitFloat,
-    LitInt, LitStr, Pat, PatType, ReturnType, Signature, Type,
+    spanned::Spanned, Error, FnArg, GenericArgument, Ident, ImplItem, ImplItemFn, ItemImpl, Lit,
+    LitBool, LitFloat, LitInt, LitStr, Pat, PatType, PathArguments, ReturnType, Signature, Type,
 };
 
 use crate::{util::logic::Logic, web::attrs::auto_configuration_attr::*};
@@ -106,8 +106,8 @@ pub fn impl_macro_auto_configuration(_attrs: TokenStream, mut item_impl: ItemImp
              struct #name;
 
              impl ::next_web_core::autoregister::auto_configuration_autoregister::DefaultAutoConfigurationAutoregister for #name {
-                fn configuration<'life0, 'life1, 'async_trait>(&'life0 mut self, ctx: &'life1 mut ApplicationContext)
-                -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = Result<(), ::next_web_core::error::BoxError>>
+                fn configuration<'life0, 'life1, 'async_trait>(&'life0 self, ctx: &'life1 mut ApplicationContext)
+                -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ::std::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error>>>
                     + ::core::marker::Send + 'async_trait>>
 
                 where
@@ -371,9 +371,9 @@ fn gen_code(
                             let resolve_singleton = if is_ref {
 
                                 if default.unwrap_or_default() {
-                                    quote! { let #arg_name = ctx.resolve_option_with_name::<#ty>(#name).as_ref().unwrap_or_default(); }
+                                    quote! { let #arg_name = & ctx.resolve_option_with_name::<#ty>(#name).unwrap_or_default(); }
                                 }else {
-                                    quote! { let #arg_name = ctx.resolve_with_name::<#ty>(#name).as_ref(); }
+                                    quote! { let #arg_name = & ctx.resolve_with_name::<#ty>(#name); }
                                 }
                             } else {
 
@@ -390,7 +390,7 @@ fn gen_code(
                         None => {
 
                             let resolve_singleton =  if is_ref {
-                                quote! { let #arg_name = ctx.resolve_with_name::<#ty>(#default_name).as_ref(); }
+                                quote! { let #arg_name = & ctx.resolve_with_name::<#ty>(#default_name); }
                             } else {
                                 quote! { let #arg_name = ctx.resolve_with_name::<#ty>(#default_name); }
                             };
@@ -401,8 +401,9 @@ fn gen_code(
                 });
 
 
+            let result_unwrap = provider_result_unwrap(&sig);
             let instance = quote! {
-                let instance = #ident( #(#arg_names),* ) #_async ;
+                let instance = #ident( #(#arg_names),* ) #_async #result_unwrap;
             };
 
             let singleton_name = provider_attr.as_mut().map(|attr| attr.name.take())
@@ -429,6 +430,33 @@ fn gen_code(
         .collect::<Vec<_>>();
 
     Ok(impl_blocks)
+}
+
+fn extract_result_ok_type(ty: &Type) -> Option<Type> {
+    let Type::Path(type_path) = ty else {
+        return None;
+    };
+
+    let segment = type_path.path.segments.last()?;
+    if segment.ident != "Result" {
+        return None;
+    }
+
+    let PathArguments::AngleBracketed(generic_args) = &segment.arguments else {
+        return None;
+    };
+
+    generic_args.args.iter().find_map(|arg| match arg {
+        GenericArgument::Type(ty) => Some(ty.clone()),
+        _ => None,
+    })
+}
+
+fn provider_result_unwrap(sig: &Signature) -> TokenStream2 {
+    match &sig.output {
+        ReturnType::Type(_, ty) if extract_result_ok_type(ty.as_ref()).is_some() => quote! { ? },
+        _ => quote! {},
+    }
 }
 
 fn supported_attributes(impl_item_fn: &ImplItemFn) -> bool {
@@ -550,4 +578,35 @@ struct ItemFnArgAttr<'a> {
     pub autowired_attr: Option<AutowiredAttr>,
     pub arg_name: &'a Ident,
     pub is_ref: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::ToTokens;
+    use syn::parse_str;
+
+    use super::{extract_result_ok_type, provider_result_unwrap};
+
+    #[test]
+    fn extract_result_ok_type_returns_inner_type() {
+        let ty = parse_str::<syn::Type>("std::result::Result<String, BoxError>").unwrap();
+        let ok_ty = extract_result_ok_type(&ty).unwrap();
+
+        assert_eq!(ok_ty.to_token_stream().to_string(), "String");
+    }
+
+    #[test]
+    fn provider_result_unwrap_adds_question_mark_for_result() {
+        let sig =
+            parse_str::<syn::Signature>("fn redis_template() -> Result<String, BoxError>").unwrap();
+
+        assert_eq!(provider_result_unwrap(&sig).to_string(), "?");
+    }
+
+    #[test]
+    fn provider_result_unwrap_ignores_plain_return_type() {
+        let sig = parse_str::<syn::Signature>("fn redis_template() -> String").unwrap();
+
+        assert!(provider_result_unwrap(&sig).is_empty());
+    }
 }

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use axum::{Router, routing::any};
 use next_web_core::{
@@ -42,7 +42,7 @@ impl WebsocketAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for WebsocketAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), BoxError> {
+    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mut registry = DefaultWebSocketHandlerRegistry::default();
         for configurer in self.configurers.iter_mut() {
             configurer.register_web_socket_handlers(ctx, &mut registry);
@@ -83,13 +83,13 @@ pub(crate) struct WebsocketApplyRouter {
 
 impl ApplyRouter for WebsocketApplyRouter {
     fn apply(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
-        let mut router = Router::new();
-
-        for path in self.ws_context.handler_mapping().paths() {
-            router = router.route(path.as_str(), any(websocket_handle));
-        }
-
-        let ws_context = std::mem::take(&mut self.ws_context);
-        router.with_state(Arc::new(ws_context))
+        self.ws_context
+            .handler_mapping()
+            .paths()
+            .iter()
+            .fold(Router::new(), |router, path| {
+                router.route(path.as_str(), any(websocket_handle))
+            })
+            .with_state(Arc::new(std::mem::take(&mut self.ws_context)))
     }
 }

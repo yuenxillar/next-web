@@ -1,7 +1,9 @@
+use std::error::Error;
+
 use async_trait::async_trait;
 use dyn_clone::{DynClone, clone_trait_object};
 
-use crate::{ApplicationContext, error::BoxError};
+use crate::ApplicationContext;
 
 #[async_trait]
 pub trait AutoConfiguration
@@ -10,7 +12,11 @@ where
     Self: 'static,
     Self: DynClone,
 {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), BoxError>;
+    fn order(&self) -> i32 {
+        100
+    }
+
+    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>>;
 }
 
 clone_trait_object!(AutoConfiguration where Self: Send + Sync);

@@ -19,6 +19,7 @@ thiserror = { workspace = true }
 dyn-clone = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }
+encoding = { workspace = true }
 clap = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }

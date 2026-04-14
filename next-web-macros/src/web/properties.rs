@@ -300,6 +300,8 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
             }
         };
 
+        // println!("expanded: {}", expanded.to_string());
+
         Ok(expanded.into())
     });
 

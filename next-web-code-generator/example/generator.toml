@@ -1,0 +1,40 @@
+# next-web-code-generator example configuration
+
+[project]
+name = "sample-generated-app"
+output_dir = "./generated/sample-generated-app"
+overwrite = false
+
+[project.modules]
+create_mod_rs = true
+append_pub_mod = true
+
+[[datasources]]
+name = "db1"
+kind = "mysql"
+host = "127.0.0.1"
+port = 3306
+database = "demo"
+username = "root"
+password = "123456"
+tables = ["sys_user", "sys_role"]
+
+[[templates]]
+name = "lib"
+path = "./templates/src_lib.rs.tpl"
+output = "src/lib.rs"
+per_table = false
+overwrite = true
+
+[[templates]]
+name = "models_mod"
+path = "./templates/models_mod.rs.tpl"
+output = "src/models/mod.rs"
+per_table = false
+overwrite = true
+
+[[templates]]
+name = "entity"
+path = "./templates/entity.rs.tpl"
+output = "src/models/{{table.module_name}}.rs"
+per_table = true

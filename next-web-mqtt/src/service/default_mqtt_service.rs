@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::{error::Error, ops::Deref, sync::Arc};
 
 use crate::{
     autoconfigure::mqtt_properties::{MQTTClientProperties, Topic},
@@ -49,7 +49,7 @@ impl DefaultMQTTService {
         topic_router: TopicRouter,
         interceptor: Vec<Box<dyn MessageInterceptor>>,
         poll_error_handler: Arc<dyn MQTTPollErrorHandler>,
-    ) -> Result<Self, BoxError> {
+    ) -> Result<Self, Box<dyn Error>> {
         let client =
             Self::build_client(&properties, topic_router, interceptor, poll_error_handler)?;
 
@@ -63,7 +63,7 @@ impl DefaultMQTTService {
         topic_router: TopicRouter,
         interceptors: Vec<Box<dyn MessageInterceptor>>,
         poll_error_handler: Arc<dyn MQTTPollErrorHandler>,
-    ) -> Result<AsyncClient, BoxError> {
+    ) -> Result<AsyncClient, Box<dyn Error>> {
         let options = Self::build_options(properties);
         let cap = properties.cap().unwrap_or(DEFAULT_CHANNEL_CAP);
         let (client, mut eventloop) = AsyncClient::new(options, cap);

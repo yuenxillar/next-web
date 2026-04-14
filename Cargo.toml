@@ -13,6 +13,10 @@ members = [
     "next-web-tests",
     "next-web-utils",
     "next-web-websocket",
+    "next-web-mq/next-web-mq-kafka",
+    "next-web-mq/next-web-mq-rabbitmq",
+    "next-web-mq/next-web-mq-rocketmq",
+    "next-web-data/next-web-data-redis",
     "next-web-wechat",
     "next-web-api-doc",
     "next-web-actuator",
@@ -21,6 +25,7 @@ members = [
     "next-web-state-machine",
     "next-web-id-generator"
 ]
+exclude = ["next-web-code-generator"]
 resolver = "2"
 
 [workspace.package]
@@ -78,6 +83,9 @@ next-web-sms = { version = "0.1.0", path = "./next-web-sms" }
 next-web-tests = { version = "0.1.0", path = "./next-web-tests" }
 next-web-utils = { version = "0.1.0", path = "./next-web-utils" }
 next-web-websocket = { version = "0.1.2", path = "./next-web-websocket" }
+next-web-mq-kafka = { version = "0.1.0", path = "./next-web-mq/next-web-mq-kafka" }
+next-web-mq-rabbitmq = { version = "0.1.0", path = "./next-web-mq/next-web-mq-rabbitmq" }
+next-web-mq-rocketmq = { version = "0.1.0", path = "./next-web-mq/next-web-mq-rocketmq" }
 next-web-wechat = { version = "0.1.0", path = "./next-web-wechat" }
 next-web-xxl-job = { version = "0.1.0", path = "./next-web-xxl-job" }
 next-web-state-machine = { version = "0.1.0", path = "./next-web-state-machine" }
@@ -190,7 +198,7 @@ rbdc-mysql = { version = "4.6.1" }
 rbdc-pool-fast = { version = "4.6.1" }
 
 mongodb = { version = "3.2.0", features = ["zstd-compression"] }
-redis = { version = "0.30.0", features = ["tokio-comp", "script", "json"] }
+redis = { version = "1.2.0", features = ["tokio-comp", "json"] }
 rslock = { version = "0.7.1", default-features = false, features = [
     "tokio-comp",
 ] }

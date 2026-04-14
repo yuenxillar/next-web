@@ -1,8 +1,8 @@
-use std::{env, fs::File, io::Read, path::Path};
+use std::{env, error::Error, fs::File, io::Read, path::Path};
 
 use tracing::error;
 
-use crate::{error::BoxError, mime_type::mime_type_file::MimeTypeFile};
+use crate::mime_type::mime_type_file::MimeTypeFile;
 
 pub const DEFAULT_MIME_TYPES: &'static str = include_str!("mime.types");
 
@@ -16,7 +16,7 @@ impl ConfigurableMimeFileTypeMap {
         &mut self,
         mapping_location: P,
         mappings: Option<Vec<String>>,
-    ) -> Result<(), BoxError>
+    ) -> Result<(), Box<dyn Error>>
     where
         P: AsRef<str>,
     {

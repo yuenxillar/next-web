@@ -1,3 +1,4 @@
-pub mod next_properties;
-pub mod security_properties;
-pub mod user_authorization_options_properties;
+// #[cfg(feature = "enable-i18n")]
+pub mod message_source_properties;
+// #[cfg(feature = "enable-i18n")]
+pub mod message_source_auto_configuration;

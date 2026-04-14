@@ -17,7 +17,8 @@ impl Application for TestApplication {
         &self,
         _ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
     }
 
     async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {

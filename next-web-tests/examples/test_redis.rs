@@ -1,4 +1,5 @@
 use std::str;
+use std::sync::Arc;
 
 use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
@@ -8,32 +9,39 @@ use next_web::macros::bind::singleton;
 use next_web_core::context::properties::ApplicationProperties;
 use next_web_core::{ApplicationContext, async_trait};
 use next_web_data_redis::AsyncCommands;
-use next_web_data_redis::core::event::expired_keys_event::RedisExpiredKeysEvent;
-use next_web_data_redis::service::redis_service::RedisService;
+use next_web_data_redis::connection::default_message::DefaultMessage;
+use next_web_data_redis::connection::message::Message;
+use next_web_data_redis::core::redis_template::RedisTemplate;
+use next_web_data_redis::listener::key_expiration_event_message_listener::KeyExpirationEventMessageListener;
 
 #[singleton(binds = [Self::into_expired_key_listener])]
 #[derive(Clone)]
 pub(crate) struct TestExpiredKeyListener {
-    #[autowired(name = "redisService")]
-    pub redis_service: RedisService,
+    #[autowired(name = "redisTemplate")]
+    pub redis_template: RedisTemplate,
 }
 
 impl TestExpiredKeyListener {
-    fn into_expired_key_listener(self) -> Box<dyn RedisExpiredKeysEvent> {
-        Box::new(self)
+    fn into_expired_key_listener(self) -> Arc<dyn KeyExpirationEventMessageListener> {
+        Arc::new(self)
     }
 }
 
 #[async_trait]
-impl RedisExpiredKeysEvent for TestExpiredKeyListener {
-    async fn on_message(&mut self, message: &[u8], pattern: &[u8]) {
+impl KeyExpirationEventMessageListener for TestExpiredKeyListener {
+    async fn on_message(&self, message: &DefaultMessage, pattern: &[u8]) {
         println!(
             "Expired key: {}, pattern: {}",
-            String::from_utf8_lossy(message),
+            String::from_utf8_lossy(message.body()),
             String::from_utf8_lossy(pattern)
         );
 
-        if let Some(mut con) = self.redis_service.get_connection() {
+        if let Some(mut con) = self
+            .redis_template
+            .get_multiplexed_async_connection()
+            .await
+            .ok()
+        {
             let new_value: i64 = con.incr("keyabc", 1).await.unwrap();
             println!("new value: {}", new_value);
         }
@@ -50,7 +58,8 @@ impl Application for TestApplication {
         &self,
         _ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
     }
 
     // get the application router. (open api  and private api)
@@ -62,10 +71,10 @@ impl Application for TestApplication {
 }
 
 async fn get_cache(
-    FindSingleton(redis_service): FindSingleton<RedisService>,
+    FindSingleton(redis_template): FindSingleton<RedisTemplate>,
     Path(key): Path<String>,
 ) -> impl IntoResponse {
-    if let Some(mut con) = redis_service.get_connection() {
+    if let Some(mut con) = redis_template.get_multiplexed_async_connection().await.ok() {
         return match con.get(&key).await {
             Ok(value) => return value,
             Err(e) => format!("Get Error: {}", e.to_string()),
@@ -75,10 +84,10 @@ async fn get_cache(
 }
 
 async fn set_cache(
-    FindSingleton(redis_service): FindSingleton<RedisService>,
+    FindSingleton(redis_template): FindSingleton<RedisTemplate>,
     Query(cache): Query<KeyValue>,
 ) -> impl IntoResponse {
-    if let Some(mut con) = redis_service.get_connection() {
+    if let Some(mut con) = redis_template.get_multiplexed_async_connection().await.ok() {
         match con.set_ex::<_, _, ()>(cache.key, cache.value, 5).await {
             Ok(_) => {}
             Err(e) => return format!("Set Error: {}", e.to_string()),

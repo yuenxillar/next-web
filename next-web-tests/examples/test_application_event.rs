@@ -27,10 +27,14 @@ impl Application for TestApplication {
         &self,
         _ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
     }
 
-    async fn on_ready(&self, ctx: &mut ApplicationContext) {
+    async fn on_ready(
+        &self,
+        ctx: &mut ApplicationContext,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let event_publisher = ctx
             .get_single_with_default_name::<DefaultApplicationEventPublisher>()
             .unwrap()
@@ -48,6 +52,8 @@ impl Application for TestApplication {
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
         });
+
+        Ok(())
     }
 }
 

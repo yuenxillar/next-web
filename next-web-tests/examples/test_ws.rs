@@ -31,7 +31,7 @@ impl WebSocketConfigurer for TestWebSocketConfigurer {
     ) {
         registry
             .add_handler(Arc::new(TestWSHandler), vec!["/ws".into()])
-            .set_allowed_origins(vec!["*".into()]);
+            .set_allowed_origins(vec!["https://.*.example.com".into()]);
     }
 }
 
@@ -136,7 +136,8 @@ impl Application for TestWSApplication {
         &self,
         _ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
     }
 }
 

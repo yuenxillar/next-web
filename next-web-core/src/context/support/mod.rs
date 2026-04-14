@@ -1,0 +1,3 @@
+pub mod resource_bundle_message_source;
+
+pub use resource_bundle_message_source::ResourceBundleMessageSource;

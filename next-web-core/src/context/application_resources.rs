@@ -21,6 +21,8 @@ where
     fn load_dir(&self, dir: &str) -> Vec<Cow<'static, str>>;
 
     fn iter(&self) -> Vec<Cow<'static, str>>;
+
+    fn exists(&self, path: &str) -> bool;
 }
 
 #[derive(Clone)]
@@ -101,6 +103,25 @@ impl ResourceLoader for ApplicationResources {
                 .files
                 .as_ref()
                 .map(|fs| fs.inner.iter().map(|(s, _)| s.clone()).collect())
+                .unwrap_or_default();
+        }
+    }
+
+    fn exists(&self, path: &str) -> bool {
+        let path = path.replace("\\", "/");
+
+        #[cfg(feature = "embed-resources")]
+        {
+            let resource_loader = RESOURCE_LOADER.get()?;
+            return resource_loader.exists(&path);
+        }
+
+        #[cfg(not(feature = "embed-resources"))]
+        {
+            return self
+                .files
+                .as_ref()
+                .map(|fs| fs.inner.contains_key(path.as_str()))
                 .unwrap_or_default();
         }
     }
@@ -198,6 +219,11 @@ impl Files {
                 .map_err(|e| error!("Application resources loading error: {}", e))
                 .ok();
         }
+
+        // println!(
+        //     "Application resources loaded: {:?}",
+        //     inner.iter().map(|(k, _)| k.to_string()).collect::<Vec<_>>()
+        // );
 
         Self { inner }
     }

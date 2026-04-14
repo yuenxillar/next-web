@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use next_web_core::{
     context::application_context::ApplicationContext,
@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Auto-configuration for DataSource.
-#[singleton(binds = [Self::into_autoc_configuration])]
+#[singleton(binds = [Self::into_auto_configuration])]
 #[derive(Clone)]
 pub struct DataSourceAutoConfiguration {
     pub data_source_properties: DataSourceProperties,
@@ -28,14 +28,14 @@ pub struct DataSourceAutoConfiguration {
 }
 
 impl DataSourceAutoConfiguration {
-    fn into_autoc_configuration(self: Self) -> Box<dyn AutoConfiguration> {
+    fn into_auto_configuration(self: Self) -> Box<dyn AutoConfiguration> {
         Box::new(self)
     }
 }
 
 #[async_trait]
 impl AutoConfiguration for DataSourceAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), BoxError> {
+    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
         // Clone theconfiguration properties
         let data_source_properties = self.data_source_properties.clone();
 

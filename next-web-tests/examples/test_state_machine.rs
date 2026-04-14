@@ -36,9 +36,15 @@ impl Application for TestApplication {
         &self,
         _ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
     }
-    async fn on_ready(&self, _ctx: &mut ApplicationContext) {}
+    async fn on_ready(
+        &self,
+        _ctx: &mut ApplicationContext,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]

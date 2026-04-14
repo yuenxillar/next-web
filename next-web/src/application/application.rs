@@ -25,7 +25,9 @@ use next_web_core::traits::properties_post_processor::PropertiesPostProcessor;
 use next_web_core::traits::service::background_service::BackgroundService;
 use next_web_core::traits::use_router::UseRouter;
 use next_web_core::AutoRegister;
+use std::error::Error;
 use std::net::SocketAddr;
+use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
@@ -39,11 +41,14 @@ use crate::application::next_application::NextApplication;
 
 use crate::application::permitted_groups::PERMITTED_GROUPS;
 use crate::autoregister::application_event_autoregister::ApplicationEventAutoRegister;
-use crate::autoregister::default_autoregister::DefaultAutoRegister;
 use crate::autoregister::http_handler_autoregister::HttpHandlerAutoRegister;
 
 use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::configurer::http_method_handler_configurer::{RouteState, RouterContext};
+use crate::diagnostics::failure_analysis::FailureAnalysis;
+use crate::diagnostics::failure_analysis_reporter::FailureAnalysisReporter;
+use crate::diagnostics::failure_analyzers::FailureAnalyzers;
+use crate::diagnostics::logging_failure_analysis_reporter::LoggingFailureAnalysisReporter;
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::manager::background_service_manager::BackgroundServiceManager;
@@ -78,7 +83,7 @@ where
         &self,
         ctx: &mut ApplicationContext,
         properties: &ApplicationProperties,
-    );
+    ) -> Result<(), Box<dyn Error>>;
 
     /// Register the rpc server.
     #[cfg(feature = "enable-grpc")]
@@ -88,7 +93,7 @@ where
         application_properties: &ApplicationProperties,
         application_args: &ApplicationArgs,
         application_resources: &ApplicationResources,
-    );
+    ) -> Result<(), Box<dyn Error>>;
 
     /// Register the grpc client.
     #[cfg(feature = "enable-grpc")]
@@ -98,7 +103,7 @@ where
         application_properties: &ApplicationProperties,
         application_args: &ApplicationArgs,
         application_resources: &ApplicationResources,
-    );
+    ) -> Result<(), Box<dyn Error>>;
 
     /// Show the banner of the application.
     fn banner_show(application_resources: &ApplicationResources) {
@@ -184,7 +189,9 @@ where
 
     /// Before starting the application
     #[allow(unused_variables)]
-    async fn on_ready(&self, ctx: &mut ApplicationContext) {}
+    async fn on_ready(&self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
 
     /// Suitable for capturing panic in application
     fn catch_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
@@ -261,24 +268,35 @@ where
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn Error>> {
         for properties in ctx.resolve_by_type::<Box<dyn Properties>>() {
             properties
                 .register(ctx, application_properties)
                 .await
-                .unwrap();
+                .map_err(|err| Into::<Box<dyn Error>>::into(err.to_string()))?;
         }
+
+        Ok(())
     }
 
     /// Auto configuration
-    async fn auto_configuration(&self, ctx: &mut ApplicationContext) {
-        for auto_configuration in ctx
-            .resolve_by_type::<Box<dyn AutoConfiguration>>()
-            .iter_mut()
-            .map(|s| s.as_mut())
-        {
-            auto_configuration.configuration(ctx).await.unwrap();
+    async fn auto_configuration(&self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+        use next_web_core::autoregister::auto_configuration_autoregister::DefaultAutoConfigurationAutoregister;
+
+        let mut auto_configurations = ctx.resolve_by_type::<Box<dyn AutoConfiguration>>();
+        auto_configurations.sort_by_key(|v| v.order());
+
+        for auto_configuration in auto_configurations.iter_mut().map(|s| s.as_mut()) {
+            auto_configuration.configuration(ctx).await?;
         }
+
+        for auto_configuration in
+            inventory::iter::<&dyn DefaultAutoConfigurationAutoregister>.into_iter()
+        {
+            auto_configuration.configuration(ctx).await?;
+        }
+
+        Ok(())
     }
 
     /// Register application singleton
@@ -288,7 +306,7 @@ where
         application_properties: &ApplicationProperties,
         application_args: &ApplicationArgs,
         application_resources: &ApplicationResources,
-    ) {
+    ) -> Result<(), Box<dyn Error>> {
         // Register singletion
         // [properties] [args] [resources]
         ctx.insert_singleton_with_default_name(application_properties.to_owned());
@@ -296,20 +314,18 @@ where
         ctx.insert_singleton_with_default_name(application_resources.to_owned());
 
         // Resove autoRegister
-        for auto_register in inventory::iter::<&dyn DefaultAutoRegister>
-            .into_iter()
-            .map(|&var| var as &dyn AutoRegister)
-            .chain(
-                ctx.resolve_by_type::<Arc<dyn AutoRegister>>()
-                    .iter()
-                    .map(|s| s.as_ref()),
-            )
+        for auto_register in ctx
+            .resolve_by_type::<Arc<dyn AutoRegister>>()
+            .iter()
+            .map(|s| s.as_ref())
         {
             auto_register
                 .register(ctx, application_properties)
                 .await
-                .unwrap();
+                .map_err(|err| Into::<Box<dyn Error>>::into(err.to_string()))?;
         }
+
+        Ok(())
     }
 
     /// Initialize the context
@@ -317,7 +333,7 @@ where
         &self,
         ctx: &mut ApplicationContext,
         _application_properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn Error>> {
         // Register application event
         let mut multicaster = DefaultApplicationEventMulticaster::default();
         for event in inventory::iter::<&dyn ApplicationEventAutoRegister>.into_iter() {
@@ -373,7 +389,7 @@ where
                 );
             }
 
-            manager.start().await.unwrap();
+            manager.start().await?;
 
             ctx.insert_singleton_with_default_name(manager);
             ctx.insert_singleton_with_default_name(job_execution_context);
@@ -384,16 +400,18 @@ where
         ctx.insert_singleton_with_default_name(default_event_publisher);
         ctx.insert_singleton_with_default_name(multicaster);
         ctx.insert_singleton_with_default_name(rest_client);
+
+        Ok(())
     }
 
     /// Start all background services and register the service manager
-    async fn run_services(&self, ctx: &mut ApplicationContext) {
+    async fn run_services(&self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
         let manager = BackgroundServiceManager::default();
         for service in ctx
             .resolve_by_type::<Arc<dyn BackgroundService>>()
             .into_iter()
         {
-            manager.register(service).await.unwrap();
+            manager.register(service).await?;
         }
 
         // If the backend service fails to start, print logs for alerting purposes
@@ -411,6 +429,8 @@ where
             });
 
         ctx.insert_singleton_with_default_name(manager);
+
+        Ok(())
     }
 
     /// Get the application router.
@@ -446,7 +466,7 @@ where
 
         // insert open_api
         #[cfg(feature = "enable-api-doc")]
-        ctx.insert_singleton(context.open_api.unwrap());
+        ctx.insert_singleton(context.open_api?);
 
         router
     }
@@ -457,7 +477,7 @@ where
         mut ctx: ApplicationContext,
         application_properties: &ApplicationProperties,
         startup_time: std::time::Instant,
-    ) {
+    ) -> Result<(), Box<dyn Error>> {
         // 1. Read server configuration
         let config = application_properties.next().server();
         let context_path = config.context_path().unwrap_or("");
@@ -570,7 +590,7 @@ where
         }
 
         // 5. On Ready
-        self.on_ready(&mut ctx).await;
+        self.on_ready(&mut ctx).await?;
 
         // 6. Configure API documentation if feature is enabled
         //
@@ -626,13 +646,13 @@ where
         app_lifecycle.sort_by(|a, b| a.order().cmp(&b.order()));
 
         for lifecycle in app_lifecycle.iter_mut() {
-            lifecycle.on_start(&mut ctx).await.unwrap();
+            lifecycle.on_start(&mut ctx).await?;
         }
 
         let background_service_manager = ctx
             .get_single_with_default_name::<BackgroundServiceManager>()
-            .unwrap()
-            .to_owned();
+            .map(Clone::clone)
+            .unwrap_or_default();
 
         // 9. Add State to [Context]
         app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
@@ -645,7 +665,7 @@ where
         println!("Application Process   ID:  {:?}\n", std::process::id());
 
         //  Build socket addr
-        let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse().unwrap();
+        let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse()?;
 
         // Monitor application shutdown signal
         let (graceful_shutdown_tx, mut graceful_shutdown_rx) =
@@ -713,32 +733,32 @@ where
         {
             use axum_server::tls_rustls::RustlsConfig;
 
-            let certs_dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
+            let certs_dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR")?)
                 .join("self_signed_certs");
             let tls_config =
                 RustlsConfig::from_pem_file(certs_dir.join("cert.pem"), certs_dir.join("key.pem"))
-                    .await
-                    .unwrap();
+                    .await?;
 
             let mut server = axum_server::bind_rustls(socket_addr, tls_config);
             // IMPORTANT: This is required to advertise our support for HTTP/2 websockets to the client.
             // If you use axum::serve, it is enabled by default.
             server.http_builder().http2().enable_connect_protocol();
-            server.serve(app.into_make_service()).await.unwrap();
+            server.serve(app.into_make_service()).await?;
         }
 
         #[cfg(not(feature = "rustls"))]
         {
-            let listener = tokio::net::TcpListener::bind(&socket_addr).await.unwrap();
+            let listener = tokio::net::TcpListener::bind(&socket_addr).await?;
 
             axum::serve(
                 listener,
                 app.into_make_service_with_connect_info::<SocketAddr>(),
             )
             .with_graceful_shutdown(shutdown_signal)
-            .await
-            .unwrap();
+            .await?;
         }
+
+        Ok(())
     }
 
     /// Run the application.
@@ -796,54 +816,90 @@ where
 
         let application = next_application.application();
 
-        application.init_logging(properties);
-        info!("Logging initialized");
+        let mut application_error_reporter = None;
+        let run = async {
+            application.init_logging(properties);
+            info!("Logging initialized");
 
-        // Autowire properties
-        application.autowire_properties(&mut ctx, properties).await;
-        info!("Configuration properties loaded");
+            // Get failure analyzers
+            application_error_reporter = ctx.resolve_with_default_name::<FailureAnalyzers>().into();
 
-        // Register singleton
-        application
-            .register_singleton(&mut ctx, properties, args, resources)
-            .await;
-        info!("Singleton  registered");
-
-        // Init context
-        application.init_context(&mut ctx, properties).await;
-        info!("Context initialized",);
-
-        // AutoConfiguration
-        application.auto_configuration(&mut ctx).await;
-        info!("AutoConfiguration Ends");
-
-        // Init middleware
-        application.init_middleware(&mut ctx, properties).await;
-        info!("Middleware initialized");
-
-        #[cfg(feature = "enable-grpc")]
-        {
+            // Autowire properties
             application
-                .register_rpc_server(&mut ctx, properties, args, resources)
-                .await;
-            info!("gRPC server started");
+                .autowire_properties(&mut ctx, properties)
+                .await?;
+            info!("Configuration properties loaded");
+
+            // Register singleton
+            application
+                .register_singleton(&mut ctx, properties, args, resources)
+                .await?;
+            info!("Singleton  registered");
+
+            // Init context
+            application.init_context(&mut ctx, properties).await?;
+            info!("Context initialized",);
+
+            // AutoConfiguration
+            application.auto_configuration(&mut ctx).await?;
+            info!("AutoConfiguration Ends");
+
+            // Init middleware
+            application.init_middleware(&mut ctx, properties).await?;
+            info!("Middleware initialized");
+
+            #[cfg(feature = "enable-grpc")]
+            {
+                application
+                    .register_rpc_server(&mut ctx, properties, args, resources)
+                    .await?;
+                info!("gRPC server started");
+
+                application
+                    .connect_rpc_client(&mut ctx, properties, args, resources)
+                    .await?;
+                info!("gRPC client connected",);
+            }
+
+            // Run all background service
+            application.run_services(&mut ctx).await?;
+            info!("Run all background service");
+
+            info!("Starting Async Runtime: [Tokio/1.44.1]");
+            info!("Starting HTTP  Server:  [Axum/0.8.4]");
 
             application
-                .connect_rpc_client(&mut ctx, properties, args, resources)
-                .await;
-            info!("gRPC client connected",);
+                .bind_tcp_server(ctx, properties, startup_time)
+                .await?;
+
+            Ok::<(), Box<dyn Error>>(())
+        };
+
+        use futures::FutureExt;
+
+        // Set panic hook
+        std::panic::set_hook(Box::new(|hook_info| {
+            LoggingFailureAnalysisReporter::default()
+                .report(&FailureAnalysis::with_panic_hook(hook_info));
+        }));
+
+        match AssertUnwindSafe(run)
+            .catch_unwind()
+            .await
+            .map(Result::err)
+            .map_err(|err| {
+                err.downcast_ref::<&str>()
+                    .map(|s| s.to_string())
+                    .or_else(|| err.downcast_ref::<String>().map(|s| s.to_string()))
+                    .unwrap_or_else(|| "Unknown error".to_string())
+            }) {
+            Ok(Some(err)) => {
+                application_error_reporter
+                    .as_mut()
+                    .map(|reporter| reporter.report_error(err));
+            }
+            _ => {}
         }
-
-        // Run all background service
-        application.run_services(&mut ctx).await;
-        info!("Run all background service");
-
-        info!("Starting Async Runtime: [Tokio/1.44.1]");
-        info!("Starting HTTP  Server:  [Axum/0.8.4]");
-
-        application
-            .bind_tcp_server(ctx, properties, startup_time)
-            .await;
     }
 }
 

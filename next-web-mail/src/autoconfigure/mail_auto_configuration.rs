@@ -1,8 +1,7 @@
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use next_web_core::{
-    ApplicationContext, async_trait, error::BoxError,
-    traits::config::auto_configuration::AutoConfiguration,
+    ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
 };
 use rudi_dev::singleton;
 
@@ -26,7 +25,7 @@ impl MailAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for MailAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), BoxError> {
+    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mail_properties = self.mail_properties.clone();
 
         let default_mail_service = DefaultMailService::new(mail_properties)?;

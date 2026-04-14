@@ -29,7 +29,8 @@ impl Application for TestApplication {
         &self,
         _ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
     }
 
     // get the application router. (open api  and private api)
@@ -61,8 +62,13 @@ impl Application for TestApplication {
             )
     }
 
-    async fn on_ready(&self, ctx: &mut ApplicationContext) {
+    async fn on_ready(
+        &self,
+        ctx: &mut ApplicationContext,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
+
+        Ok(())
     }
 }
 

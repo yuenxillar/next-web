@@ -2,10 +2,7 @@
 //!
 //! This module provides CORS origin checking for WebSocket handshake requests,
 //! equivalent to Spring's OriginHandshakeInterceptor.
-use std::{
-    any::Any,
-    collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 
 use axum::http::{StatusCode, Uri, uri::Authority};
 use next_web_core::anys::any_value::AnyValue;

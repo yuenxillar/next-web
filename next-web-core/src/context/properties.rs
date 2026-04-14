@@ -3,6 +3,7 @@ use dyn_clone::DynClone;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Read;
+use std::path;
 
 use crate::constants::application_constants::APPLICATION_CONFIG;
 use crate::context::application_args::ApplicationArgs;
@@ -242,7 +243,16 @@ fn into_application_properties(
         .filter(|s| !s.is_empty())
         .filter(|s| std::fs::exists(s).is_ok())
     {
-        let mut file = std::fs::File::open(&path).unwrap();
+        let mut file = std::fs::File::open(&path)
+            .map_err(|err| {
+                format!(
+                    "Failed to open {}: {}\n\
+             Action: Check file path and permissions",
+                    path, err
+                )
+            })
+            .unwrap();
+
         let mut buffer = String::new();
         let _ = file.read_to_string(&mut buffer);
 

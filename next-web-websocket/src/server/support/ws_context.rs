@@ -4,7 +4,7 @@ use crate::{
     autoconfigure::ws_properties::WebSocketProperties,
     server::{
         handshake_interceptor::HandshakeInterceptor,
-        support::ws_handler_mapping::{WebSocketHandlerMapping},
+        support::ws_handler_mapping::WebSocketHandlerMapping,
     },
     ws_handler::WebSocketHandler,
 };
@@ -79,7 +79,6 @@ impl WebSocketContext {
     pub fn add_handler(&mut self, path: &str, handler: Arc<dyn WebSocketHandler>) {
         self.handler_mapping.insert(path, handler);
     }
-
 
     /// Retrieves the WebSocket handler associated with the given path.
     ///

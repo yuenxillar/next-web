@@ -24,5 +24,4 @@ deadpool-redis = { workspace = true, optional = true }
 [features]
 default = []
 deadpol = ["deadpool-redis"]
-expired-key-listener = []
 lock = ["rslock"]

@@ -50,7 +50,7 @@ where
     T: AsRef<EventAttributes>,
     T: Send + Sync,
     T: Clone,
-    T: Any
+    T: Any,
 {
     fn timestamp(&self) -> u64 {
         self.as_ref().timestamp()

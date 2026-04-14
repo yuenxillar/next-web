@@ -65,6 +65,10 @@ pub fn impl_macro_application(
                 fn iter(&self) -> ::std::vec::Vec<::std::borrow::Cow<'static, str>> {
                     Self::iter().collect()
                 }
+
+                fn exists(&self, path: &str) -> bool {
+                    Self::get(path).is_some()
+                }
             }
 
             #item_fn

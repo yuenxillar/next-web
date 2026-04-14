@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    error::Error,
     ops::Deref,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -13,7 +14,7 @@ use lettre::{
     transport::smtp::authentication::Credentials,
 };
 use next_web_core::{
-    async_trait, error::BoxError, impl_service,
+    async_trait, impl_service,
     mime_type::configurable_mime_file_type_map::ConfigurableMimeFileTypeMap,
 };
 
@@ -50,7 +51,7 @@ pub struct DefaultMailService {
 
 impl DefaultMailService {
     /// Create a new mail service instance.
-    pub fn new(mut mail_properties: MailProperties) -> Result<Self, BoxError> {
+    pub fn new(mut mail_properties: MailProperties) -> Result<Self, Box<dyn Error>> {
         let MailProperties {
             host,
             port,

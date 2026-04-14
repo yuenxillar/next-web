@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use next_web::{
     application::Application,
     async_trait,
@@ -18,7 +20,8 @@ impl Application for TestApplication {
         &self,
         _ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn Error>> {
+        Ok(())
     }
 }
 

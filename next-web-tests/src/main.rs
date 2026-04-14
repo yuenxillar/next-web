@@ -30,10 +30,14 @@ impl Application for TestApplication {
         &self,
         _ctx: &mut ApplicationContext,
         _properties: &ApplicationProperties,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
     }
 
-    async fn on_ready(&self, ctx: &mut ApplicationContext) {
+    async fn on_ready(
+        &self,
+        ctx: &mut ApplicationContext,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
 
         #[rustfmt::skip]
@@ -44,6 +48,8 @@ impl Application for TestApplication {
             Arc::new(MemoryIdempotencyStore::new()) as Arc<dyn IdempotencyStore<Value = ()>>,
             "memoryIdempotencyStore",
         );
+
+        Ok(())
     }
 }
 
