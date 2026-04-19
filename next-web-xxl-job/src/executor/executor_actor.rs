@@ -1,7 +1,7 @@
 use std::collections::HashMap;
+use std::error::Error;
 use std::sync::Arc;
 
-use axum::BoxError;
 use tokio::sync::Mutex;
 
 use crate::executor::admin_server::{ServerAccessActor, callback};
@@ -32,7 +32,7 @@ impl ExecutorActor {
         }
     }
 
-    pub async fn send(&self, msg: ExecutorActorReq) -> Result<ExecutorActorResult, BoxError> {
+    pub async fn send(&self, msg: ExecutorActorReq) -> Result<ExecutorActorResult, Box<dyn Error>> {
         match msg {
             ExecutorActorReq::Register(job_handler_value) => {
                 self.register_job_handler(job_handler_value).await;
@@ -57,7 +57,7 @@ impl ExecutorActor {
         &self,
         job_name: Arc<String>,
         job_context: JobContext,
-    ) -> Result<ExecutorActorResult, BoxError> {
+    ) -> Result<ExecutorActorResult, Box<dyn Error>> {
         enum RunDecision {
             Start(JobHandlerRunParam),
             Queued(Option<JobContext>),
@@ -207,7 +207,7 @@ impl ExecutorActor {
         }
     }
 
-    async fn check_idle_beat(&self, job_id: u64) -> Result<ExecutorActorResult, BoxError> {
+    async fn check_idle_beat(&self, job_id: u64) -> Result<ExecutorActorResult, Box<dyn Error>> {
         let job_name = { self.job_id_map.lock().await.get(&job_id).cloned() };
 
         if let Some(name) = job_name {

@@ -1,4 +1,3 @@
-use axum::BoxError;
 use tracing::{debug, warn};
 
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
     web_server::{config::client_config::ClientConfig, state::XxlJobAppState},
 };
 
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 #[derive(Clone, Debug, Default)]
 pub struct XxlClientBuilder {
@@ -69,7 +68,7 @@ impl XxlClientBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Arc<XxlClient>, BoxError> {
+    pub fn build(self) -> Result<Arc<XxlClient>, Box<dyn Error>> {
         let start_port = 9900;
         let port = Self::get_port(start_port, self.port);
         if port == 0 {
@@ -123,7 +122,7 @@ impl From<XxlJobProperties> for XxlClientBuilder {
     }
 }
 
-fn build_client(client_config: Arc<ClientConfig>) -> Result<Arc<XxlClient>, BoxError> {
+fn build_client(client_config: Arc<ClientConfig>) -> Result<Arc<XxlClient>, Box<dyn Error>> {
     let app_state = Arc::new(XxlJobAppState {
         executor_actor: ExecutorActor::new(client_config.clone()),
         server_access_actor: ServerAccessActor::new(client_config.clone()),

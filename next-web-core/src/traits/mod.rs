@@ -27,3 +27,4 @@ pub mod stream;
 pub mod submit;
 pub mod to_error_response;
 pub mod use_router;
+pub mod set_message;

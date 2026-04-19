@@ -69,7 +69,7 @@ impl AdviceFilterExt for SslFilter {
                 directives.push_str("; includeSubDomains");
             }
 
-            response.append_header(HSTS::HTTP_HEADER.as_bytes(), &directives);
+            response.append_header(HSTS::HTTP_HEADER, &directives);
         }
         Ok(())
     }

@@ -3,12 +3,13 @@ use std::str::FromStr;
 
 use sys_locale::get_locale;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Locale {
     ZhCn,
     ZhTw,
     ZhHk,
     EnHk,
+    #[default]
     EnUs,
     EnGb,
     EnWw,
@@ -256,15 +257,15 @@ impl Locale {
             .unwrap_or(Locale::EnUs)
     }
 
-    pub fn from_language(language: impl AsRef<str>) -> Option<Locale> {
+    pub fn from_accept_language(language: impl AsRef<str>) -> Option<Locale> {
         let language = language.as_ref().trim();
         if language.is_empty() {
             return None;
         }
 
-        let mut preferences: Vec<(String, f32)> = Vec::new();
+        let mut preferences: Vec<(usize, String, f32)> = Vec::new();
 
-        for part in language.split(',') {
+        for (index, part) in language.split(',').enumerate() {
             let part = part.trim();
             if part.is_empty() {
                 continue;
@@ -278,8 +279,12 @@ impl Locale {
 
                 for option in part[sep_idx + 1..].split(';') {
                     let option = option.trim();
-                    if let Some(value) = option.strip_prefix("q=") {
-                        if let Ok(parsed) = value.parse::<f32>() {
+                    let Some((name, value)) = option.split_once('=') else {
+                        continue;
+                    };
+
+                    if name.trim().eq_ignore_ascii_case("q") {
+                        if let Ok(parsed) = value.trim().parse::<f32>() {
                             if (0.0..=1.0).contains(&parsed) {
                                 q = parsed;
                             }
@@ -288,8 +293,8 @@ impl Locale {
                 }
             }
 
-            if !tag.is_empty() {
-                preferences.push((tag.to_string(), q));
+            if !tag.is_empty() && q > 0.0 {
+                preferences.push((index, tag.to_string(), q));
             }
         }
 
@@ -297,9 +302,13 @@ impl Locale {
             return None;
         }
 
-        preferences.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        preferences.sort_by(|a, b| {
+            b.2.partial_cmp(&a.2)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
 
-        for (tag, _) in preferences {
+        for (_, tag, _) in preferences {
             if tag == "*" {
                 return Some(Locale::default());
             }
@@ -434,12 +443,6 @@ impl fmt::Display for Locale {
     }
 }
 
-impl Default for Locale {
-    fn default() -> Self {
-        Locale::EnUs
-    }
-}
-
 fn normalize_locale_tag(input: &str) -> String {
     let trimmed = input.trim();
     let without_encoding = trimmed
@@ -503,29 +506,46 @@ mod tests {
     #[test]
     fn from_language_prefers_highest_quality_exact_match() {
         let header = "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6";
-        assert_eq!(Locale::from_language(header), Some(Locale::ZhCn));
+        assert_eq!(Locale::from_accept_language(header), Some(Locale::ZhCn));
     }
 
     #[test]
     fn from_language_falls_back_to_primary_language() {
-        assert_eq!(Locale::from_language("en;q=0.9"), Some(Locale::EnUs));
-        assert_eq!(Locale::from_language("zh;q=0.9"), Some(Locale::ZhCn));
+        assert_eq!(Locale::from_accept_language("en;q=0.9"), Some(Locale::EnUs));
+        assert_eq!(Locale::from_accept_language("zh;q=0.9"), Some(Locale::ZhCn));
     }
 
     #[test]
     fn from_language_can_reduce_unknown_subtags() {
         assert_eq!(
-            Locale::from_language("fr-CA-x-private;q=0.9"),
+            Locale::from_accept_language("fr-CA-x-private;q=0.9"),
             Some(Locale::FrCa)
         );
         assert_eq!(
-            Locale::from_language("zh-Hans-CN;q=0.9"),
+            Locale::from_accept_language("zh-Hans-CN;q=0.9"),
             Some(Locale::ZhCn)
         );
     }
 
     #[test]
     fn from_language_supports_wildcard() {
-        assert_eq!(Locale::from_language("*;q=0.5"), Some(Locale::EnUs));
+        assert_eq!(Locale::from_accept_language("*;q=0.5"), Some(Locale::EnUs));
+    }
+
+    #[test]
+    fn from_language_ignores_zero_quality_values() {
+        assert_eq!(
+            Locale::from_accept_language("zh-CN;q=0,en-US;q=0.8"),
+            Some(Locale::EnUs)
+        );
+        assert_eq!(Locale::from_accept_language("zh-CN;q=0,*;q=0"), None);
+    }
+
+    #[test]
+    fn from_language_accepts_case_insensitive_q_parameter() {
+        assert_eq!(
+            Locale::from_accept_language("fr-CA;Q=0.9,en-US;q=0.8"),
+            Some(Locale::FrCa)
+        );
     }
 }

@@ -98,6 +98,8 @@ pub trait AsyncJobHandler: Send + Sync {
 /// 每个任务起一个线程运行，CPU密集型任务推荐使用；
 /// 任务数量多后线程数量不可控，后续考虑支持放到线程池运行；
 pub trait SyncJobHandler: Send + Sync {
+    fn name(&self) -> String;
+
     fn process(&self, context: JobContext) -> Result<JobContext, BoxError>;
 }
 

@@ -6,7 +6,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use pingora::prelude::background_service;
-use pingora::services::Service;
+use pingora::services::{Service, ServiceWithDependents};
 use pingora::{prelude::Opt, proxy::http_proxy_service, server::Server};
 
 #[cfg(unix)]
@@ -87,7 +87,7 @@ pub trait GatewayApplication: Send + Sync {
             http_proxy_service(&gateway_server.configuration, gateway_application);
         proxy_service.add_tcp("127.0.0.1:8080");
 
-        let services: Vec<Box<dyn Service>> = vec![
+        let services: Vec<Box<dyn ServiceWithDependents>> = vec![
             Box::new(proxy_service),
             Box::new(traffic_monitoring_service),
         ];

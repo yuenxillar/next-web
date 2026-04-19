@@ -49,7 +49,7 @@ impl RouteServiceManager {
 
             if allowable {
                 if let Some(rate_limiter) = &service.rate_limiter {
-                    if rate_limiter.check_rate(service.id.as_str()) {
+                    if rate_limiter.check_rate(&service.id) {
                         return RoutepRedicateResult {
                             allowable: false,
                             service_name: DEFAULT_SERVICE_NAME,

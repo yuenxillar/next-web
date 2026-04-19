@@ -57,7 +57,7 @@ impl Logic {
     }
 
     pub fn add_block(item_fn: &mut ItemFn, block: TokenStream2) {
-        let default_block = item_fn.block.stmts.clone();
+        let default_block = item_fn.block.stmts.iter();
         *item_fn.block = syn::parse2(quote! {
             {
                 #block

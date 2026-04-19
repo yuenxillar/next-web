@@ -156,7 +156,7 @@ impl SimpleCookie {
         let header_value = self.build_header_value(
             name, value, comment, domain, path, max_age, version, secure, http_only, same_site,
         );
-        response.append_header(Self::COOKIE_HEADER_NAME.as_bytes(), &header_value);
+        response.append_header(Self::COOKIE_HEADER_NAME, &header_value);
 
         debug!("Adding cookie header_value: {}", header_value);
     }

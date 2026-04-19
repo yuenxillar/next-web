@@ -186,7 +186,7 @@ impl RedirectView {
         if self.http_10_compatible {
             // Always send status code 302.
             response.set_status_code(StatusCode::FOUND);
-            response.insert_header("location".as_bytes(), &encoded_redirect_url);
+            response.insert_header("location", &encoded_redirect_url);
         } else {
             response.set_redirect(&encoded_redirect_url);
         }

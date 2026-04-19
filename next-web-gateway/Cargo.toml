@@ -9,26 +9,26 @@ edition = "2021"
 
 
 [dependencies]
-pingora = { version = "0.6.0", features = ["lb", "proxy"] }
-pingora-limits = "0.6.0"
+pingora         = { workspace = true }
+pingora-limits  = { workspace = true}
 
-tokio = { workspace = true, features = ["fs"] }
+tokio           = { workspace = true, features = ["fs"] }
 
-serde = { workspace = true }
-serde_yaml = { workspace = true }
-async-trait = { workspace = true }
-regex = { workspace = true }
+serde           = { workspace = true }
+serde_yaml      = { workspace = true }
+async-trait     = { workspace = true }
+regex           = { workspace = true }
 
-ipnetwork = { workspace = true }
-chrono = { workspace = true }
-matchit = { workspace = true }
-hashbrown = { workspace = true }
-bytes = { workspace = true }
+ipnetwork       = { workspace = true }
+chrono          = { workspace = true }
+matchit         = { workspace = true }
+hashbrown       = { workspace = true }
+bytes           = { workspace = true }
 form_urlencoded = { workspace = true }
 
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-tracing-appender = { workspace = true }
+tracing             = { workspace = true }
+tracing-subscriber  = { workspace = true }
+tracing-appender    = { workspace = true }
 
 #jemallocator = { workspace = true, optional = true }
 

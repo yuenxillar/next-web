@@ -728,6 +728,9 @@ where
             )
         };
 
+        //  Take Panic hook
+        let _ = std::panic::take_hook();
+
         // Configure certificate and private key used by https
         #[cfg(feature = "rustls")]
         {

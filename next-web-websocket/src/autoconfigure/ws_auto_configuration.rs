@@ -3,7 +3,6 @@ use std::{error::Error, sync::Arc};
 use axum::{Router, routing::any};
 use next_web_core::{
     ApplicationContext, async_trait,
-    error::BoxError,
     traits::{apply_router::ApplyRouter, config::auto_configuration::AutoConfiguration},
 };
 use rudi_dev::singleton;
@@ -60,7 +59,6 @@ impl AutoConfiguration for WebsocketAutoConfiguration {
             )));
         }
 
-        let interceptors = ctx.resolve_by_type::<Arc<dyn HandshakeInterceptor>>();
         let ws_context = WebSocketContext::new(
             self.web_socket_properties.clone(),
             registry.handler_mapping(),

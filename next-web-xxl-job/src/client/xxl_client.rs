@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use next_web_core::error::BoxError;
+use std::{error::Error, sync::Arc};
 
 use crate::{
     executor::{
@@ -24,7 +22,7 @@ impl XxlClient {
         &self,
         job_name: S,
         job_handler: JobHandler,
-    ) -> Result<ExecutorActorResult, BoxError>
+    ) -> Result<ExecutorActorResult, Box<dyn Error>>
     where
         S: Into<String>,
     {

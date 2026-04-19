@@ -4,6 +4,7 @@ members = [
     "next-web-core",
     "next-web-ai",
     "next-web-document",
+    "next-web-gateway",
     "next-web-mail",
     "next-web-macros",
     "next-web-open-api",
@@ -128,8 +129,13 @@ umya-spreadsheet = { version = "2.3.0" }
 csv = { version = "1.3.1" }
 printpdf = { version = "0.8.2" }
 
+# proxy
+pingora         = { version = "0.8.0", features = ["lb", "proxy"] }
+pingora-limits  = "0.8.0"
+
 # pay
 wechat-pay-rust-sdk = { version = "0.2.18" }
+
 
 arc-swap = { version = "1.8.2" }
 byteorder = { version = "1.5.0" }

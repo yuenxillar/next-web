@@ -123,7 +123,7 @@ impl HttpAuthenticationFilter {
             self.get_authc_scheme().unwrap_or_default(),
             self.get_application_name()
         );
-        response.insert_header(Self::AUTHENTICATE_HEADER.as_bytes(), &authc_header);
+        response.insert_header(Self::AUTHENTICATE_HEADER, &authc_header);
 
         false
     }

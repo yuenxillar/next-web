@@ -1,17 +1,13 @@
-use axum::extract::FromRequestParts;
+use axum::extract::{FromRequestParts, Request};
 use next_web_core::{traits::locale_resolver::LocaleResolver, util::locale::Locale};
-use reqwest::StatusCode;
+use axum::http::{StatusCode ,header::ACCEPT_LANGUAGE};
 
 #[derive(Clone)]
-pub struct AcceptHeaderLocaleResolver(pub Locale);
+pub struct AcceptHeaderLocaleResolver<T = Locale>(pub T);
 
 impl LocaleResolver for AcceptHeaderLocaleResolver {
-    fn resolve_locale(req: &axum::extract::Request) -> next_web_core::util::locale::Locale {
-        req.headers()
-            .get(axum::http::header::ACCEPT_LANGUAGE)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| Locale::from_language(value))
-            .unwrap_or(next_web_core::util::locale::Locale::EnUs)
+    fn resolve_locale(&self, _req: &mut Request) -> Locale {
+       self.0
     }
 }
 
@@ -27,10 +23,10 @@ where
     ) -> Result<Self, Self::Rejection> {
         let locale = parts
             .headers
-            .get(axum::http::header::ACCEPT_LANGUAGE)
+            .get(ACCEPT_LANGUAGE)
             .and_then(|value| value.to_str().ok())
-            .and_then(|value| Locale::from_language(value))
-            .unwrap_or(next_web_core::util::locale::Locale::EnUs);
+            .and_then(|value| Locale::from_accept_language(value))
+            .unwrap_or(Locale::EnUs);
 
         Ok(AcceptHeaderLocaleResolver(locale))
     }

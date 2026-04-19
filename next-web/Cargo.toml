@@ -55,7 +55,6 @@ flume = { workspace = true }
 validator = { workspace = true}
 thiserror = { workspace = true }
 inventory = { workspace = true }
-arc-swap  = { workspace = true }
 
 utoipa-swagger-ui  = { workspace = true, optional = true }
 
@@ -115,7 +114,7 @@ enable-retry        = ["next-web-retry"]
 enable-api-doc      = ["next-web-api-doc", "utoipa-swagger-ui", "next-web-macros/api-doc"]
 enable-grpc = []
 enable-prometheus = ["axum-prometheus"]
-enable-i18n = []
+enable-i18n = ["next-web-macros/translation"]
 enable-state-machine = ["next-web-state-machine"]
 enable-thread-pool   = ["num_cpus"]
 

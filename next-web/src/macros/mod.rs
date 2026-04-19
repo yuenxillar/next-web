@@ -42,3 +42,8 @@ pub mod security {
 
 #[cfg(feature = "enable-retry")]
 pub use next_web_macros::retryable;
+
+#[cfg(feature = "enable-i18n")]
+pub mod i18n {
+    pub use next_web_macros::translation;
+}

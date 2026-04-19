@@ -9,7 +9,7 @@ pub struct RateLimiter {
 }
 
 impl RateLimiter {
-    pub fn check_rate(&self, key: &str) -> bool {
+    pub fn check_rate(&self, key: &String) -> bool {
         self.rate.observe(key, 1);
         self.rate.rate(key) > self.limit
     }

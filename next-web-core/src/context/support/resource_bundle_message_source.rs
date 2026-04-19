@@ -3,14 +3,13 @@ use std::io;
 use std::sync::{Arc, RwLock as StdRwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use arc_swap::ArcSwap;
 use encoding::label::encoding_from_whatwg_label;
-use tokio::sync::RwLock as AsyncRwLock;
 use tracing::warn;
 
-use crate::async_trait;
 use crate::constants::application_constants::MESSAGES;
-use crate::context::application_resources::ResourceLoader;
 use crate::context::MessageSource;
+use crate::context::application_resources::ResourceLoader;
 use crate::util::locale::Locale;
 
 const PROPERTIES_EXTENSION: &str = "properties";
@@ -99,7 +98,6 @@ struct CachedBundle {
     loaded_at_millis: i64,
 }
 
-#[derive(Clone)]
 pub struct ResourceBundleMessageSource {
     basenames: Vec<String>,
     default_encoding: Option<String>,
@@ -107,7 +105,7 @@ pub struct ResourceBundleMessageSource {
     fallback_to_system_locale: bool,
     default_locale: Option<Locale>,
     resource_loader: Arc<dyn ResourceLoader>,
-    cached_resource_bundles: Arc<AsyncRwLock<HashMap<String, HashMap<Locale, CachedBundle>>>>,
+    cached_resource_bundles: ArcSwap<HashMap<String, HashMap<Locale, CachedBundle>>>,
 }
 
 impl ResourceBundleMessageSource {
@@ -119,7 +117,7 @@ impl ResourceBundleMessageSource {
             fallback_to_system_locale: true,
             default_locale: None,
             resource_loader,
-            cached_resource_bundles: Arc::new(AsyncRwLock::new(HashMap::new())),
+            cached_resource_bundles: ArcSwap::new(Arc::new(HashMap::default())),
         }
     }
 
@@ -127,7 +125,7 @@ impl ResourceBundleMessageSource {
         &self.basenames
     }
 
-    pub async fn set_basenames(&mut self, basenames: Vec<String>) {
+    pub fn set_basenames(&mut self, basenames: Vec<String>) {
         let values = basenames
             .into_iter()
             .filter(|basename| !basename.trim().is_empty())
@@ -139,10 +137,10 @@ impl ResourceBundleMessageSource {
         );
 
         self.basenames = values;
-        self.clear_cache().await;
+        self.clear_cache();
     }
 
-    pub async fn add_basename(&mut self, basename: impl Into<String>) {
+    pub fn add_basename(&mut self, basename: impl Into<String>) {
         let basename = basename.into();
         if basename.trim().is_empty() {
             return;
@@ -150,7 +148,7 @@ impl ResourceBundleMessageSource {
 
         if !self.basenames.iter().any(|existing| existing == &basename) {
             self.basenames.push(basename);
-            self.clear_cache().await;
+            self.clear_cache();
         }
     }
 
@@ -158,58 +156,54 @@ impl ResourceBundleMessageSource {
         self.default_encoding.as_deref()
     }
 
-    pub async fn set_default_encoding(&mut self, encoding: impl Into<String>) {
+    pub fn set_default_encoding(&mut self, encoding: impl Into<String>) {
         self.default_encoding = Some(encoding.into());
-        self.clear_cache().await;
+        self.clear_cache();
     }
 
-    pub async fn clear_default_encoding(&mut self) {
+    pub fn clear_default_encoding(&mut self) {
         self.default_encoding = None;
-        self.clear_cache().await;
+        self.clear_cache();
     }
 
     pub fn cache_millis(&self) -> i64 {
         self.cache_millis
     }
 
-    pub async fn set_cache_millis(&mut self, millis: i64) {
+    pub fn set_cache_millis(&mut self, millis: i64) {
         self.cache_millis = millis;
-        self.clear_cache().await;
+        self.clear_cache();
     }
 
-    pub async fn set_cache_seconds(&mut self, seconds: i64) {
-        self.set_cache_millis(seconds.saturating_mul(1000)).await;
+    pub fn set_cache_seconds(&mut self, seconds: i64) {
+        self.set_cache_millis(seconds.saturating_mul(1000));
     }
 
     pub fn default_locale(&self) -> Option<Locale> {
         self.default_locale
     }
 
-    pub async fn set_default_locale(&mut self, locale: Option<Locale>) {
+    pub fn set_default_locale(&mut self, locale: Option<Locale>) {
         self.default_locale = locale;
-        self.clear_cache().await;
+        self.clear_cache();
     }
 
     pub fn fallback_to_system_locale(&self) -> bool {
         self.fallback_to_system_locale
     }
 
-    pub async fn set_fallback_to_system_locale(&mut self, fallback: bool) {
+    pub fn set_fallback_to_system_locale(&mut self, fallback: bool) {
         self.fallback_to_system_locale = fallback;
-        self.clear_cache().await;
+        self.clear_cache();
     }
 
     pub fn resource_loader(&self) -> &Arc<dyn ResourceLoader> {
         &self.resource_loader
     }
 
-    pub async fn resolve_code_without_arguments(
-        &self,
-        code: &str,
-        locale: &Locale,
-    ) -> Option<String> {
+    pub fn resolve_code_without_arguments(&self, code: &str, locale: &Locale) -> Option<String> {
         for basename in self.basenames.iter() {
-            if let Some(bundle) = self.get_resource_bundle(basename, locale).await {
+            if let Some(bundle) = self.get_resource_bundle(basename, locale) {
                 if let Some(result) = bundle.get_string(code) {
                     return Some(result);
                 }
@@ -219,14 +213,14 @@ impl ResourceBundleMessageSource {
         None
     }
 
-    pub async fn resolve_code(
+    pub fn resolve_code(
         &self,
         code: &str,
         locale: &Locale,
         args: &[impl AsRef<str>],
     ) -> Option<String> {
         for basename in &self.basenames {
-            if let Some(bundle) = self.get_resource_bundle(basename, locale).await {
+            if let Some(bundle) = self.get_resource_bundle(basename, locale) {
                 if let Some(result) = bundle.format(code, args) {
                     return Some(result);
                 }
@@ -236,11 +230,12 @@ impl ResourceBundleMessageSource {
         None
     }
 
-    pub async fn clear_cache(&self) {
-        self.cached_resource_bundles.write().await.clear();
+    pub fn clear_cache(&self) {
+        self.cached_resource_bundles
+            .store(Arc::new(Default::default()));
     }
 
-    pub async fn preload_all(&self) -> io::Result<()> {
+    pub fn preload_all(&self) -> io::Result<()> {
         let system_locale = self.fallback_to_system_locale.then(Locale::locale);
 
         for basename in self.basenames.iter() {
@@ -265,7 +260,7 @@ impl ResourceBundleMessageSource {
             }
 
             for locale in target_locales {
-                let _ = self.try_get_resource_bundle(basename, &locale, false).await;
+                let _ = self.try_get_resource_bundle(basename, &locale, false);
             }
         }
 
@@ -276,21 +271,17 @@ impl ResourceBundleMessageSource {
         &self.basenames
     }
 
-    async fn get_resource_bundle(
-        &self,
-        basename: &str,
-        locale: &Locale,
-    ) -> Option<Arc<ResourceBundle>> {
-        self.try_get_resource_bundle(basename, locale, true).await
+    fn get_resource_bundle(&self, basename: &str, locale: &Locale) -> Option<Arc<ResourceBundle>> {
+        self.try_get_resource_bundle(basename, locale, true)
     }
 
-    async fn try_get_resource_bundle(
+    fn try_get_resource_bundle(
         &self,
         basename: &str,
         locale: &Locale,
         log_missing: bool,
     ) -> Option<Arc<ResourceBundle>> {
-        if let Some(bundle) = self.get_cached_bundle(basename, locale).await {
+        if let Some(bundle) = self.get_cached_bundle(basename, locale) {
             return Some(bundle);
         }
 
@@ -310,29 +301,30 @@ impl ResourceBundleMessageSource {
 
         let loaded_at = current_time_millis();
         let bundle = Arc::new(ResourceBundle::new(basename.to_string(), *locale, resolved));
+        let cache = self.cached_resource_bundles.load();
 
-        let mut cache = self.cached_resource_bundles.write().await;
         if let Some(bundle) = self.cached_bundle_from_map(&cache, basename, locale) {
             return Some(bundle);
         }
 
-        cache.entry(basename.to_string()).or_default().insert(
-            *locale,
-            CachedBundle {
-                bundle: Arc::clone(&bundle),
-                loaded_at_millis: loaded_at,
-            },
-        );
+        self.cached_resource_bundles.rcu(|cache| {
+            let mut map = HashMap::clone(&cache);
+            map.entry(basename.to_string()).or_default().insert(
+                *locale,
+                CachedBundle {
+                    bundle: Arc::clone(&bundle),
+                    loaded_at_millis: loaded_at,
+                },
+            );
+
+            Arc::new(map)
+        });
 
         Some(bundle)
     }
 
-    async fn get_cached_bundle(
-        &self,
-        basename: &str,
-        locale: &Locale,
-    ) -> Option<Arc<ResourceBundle>> {
-        let cache = self.cached_resource_bundles.read().await;
+    fn get_cached_bundle(&self, basename: &str, locale: &Locale) -> Option<Arc<ResourceBundle>> {
+        let cache = self.cached_resource_bundles.load();
         self.cached_bundle_from_map(&cache, basename, locale)
     }
 
@@ -526,18 +518,31 @@ fn decode_with_encoding(data: &[u8], encoding: Option<&str>) -> io::Result<Strin
     }
 }
 
-#[async_trait]
 impl MessageSource for ResourceBundleMessageSource {
-    async fn message(&self, code: &str, locale: Locale) -> Option<String> {
-        self.resolve_code_without_arguments(code, &locale).await
+    fn message(&self, code: &str, locale: Locale) -> Option<String> {
+        self.resolve_code_without_arguments(code, &locale)
     }
 
-    async fn message_with_args(&self, code: &str, args: &[&str], locale: Locale) -> Option<String> {
-        self.resolve_code(code, &locale, args).await
+    fn message_with_args(&self, code: &str, args: &[&str], locale: Locale) -> Option<String> {
+        self.resolve_code(code, &locale, args)
     }
 
-    async fn message_or_default(&self, code: &str, locale: Locale) -> String {
-        self.message(code, locale).await.unwrap_or(code.to_string())
+    fn message_or_default(&self, code: &str, locale: Locale) -> String {
+        self.message(code, locale).unwrap_or(code.to_string())
+    }
+}
+
+impl Clone for ResourceBundleMessageSource {
+    fn clone(&self) -> Self {
+        Self {
+            basenames: self.basenames.clone(),
+            default_locale: self.default_locale.clone(),
+            fallback_to_system_locale: self.fallback_to_system_locale,
+            default_encoding: self.default_encoding.clone(),
+            resource_loader: self.resource_loader.clone(),
+            cache_millis: self.cache_millis,
+            cached_resource_bundles: ArcSwap::new(self.cached_resource_bundles.load_full()),
+        }
     }
 }
 
@@ -834,11 +839,13 @@ mod tests {
             HashMap::from([("welcome".to_string(), "Hello {0}".to_string())]),
         );
 
-        assert!(bundle
-            .templates
-            .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .is_empty());
+        assert!(
+            bundle
+                .templates
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_empty()
+        );
 
         assert_eq!(
             bundle.format("welcome", &["Rust"]),

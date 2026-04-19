@@ -1,6 +1,6 @@
 use axum::http::header;
 use axum::{
-    body::{Body, Bytes},
+    body::Body,
     http::{HeaderName, StatusCode, Version},
     response::Response,
 };
@@ -17,13 +17,13 @@ where
 
     fn header(&self, name: &str) -> Option<&str>;
 
-    fn append_header(&mut self, name: &[u8], value: &str) -> bool;
+    fn append_header(&mut self, name: &str, value: &str) -> bool;
 
-    fn insert_header(&mut self, name: &[u8], value: &str) -> Option<String>;
+    fn insert_header(&mut self, name: &str, value: &str) -> Option<String>;
 
-    fn remove_header(&mut self, name: &[u8]) -> Option<String>;
+    fn remove_header(&mut self, name: &str) -> Option<String>;
 
-    fn set_body(&mut self, body: Bytes);
+    fn set_body(&mut self, body: Vec<u8>);
 
     fn set_redirect(&mut self, url: &str);
 
@@ -49,19 +49,19 @@ impl HttpResponse for Response {
             .map(|value| value.to_str().ok().unwrap_or_default())
     }
 
-    fn append_header(&mut self, name: &[u8], value: &str) -> bool {
+    fn append_header(&mut self, name: &str, value: &str) -> bool {
         let value = match value.parse() {
             Ok(s) => s,
             Err(_) => return false,
         };
-        HeaderName::from_bytes(name)
+        HeaderName::from_bytes(name.as_bytes())
             .map(|name| self.headers_mut().append(name, value))
             .ok()
             .unwrap_or_default()
     }
 
-    fn insert_header(&mut self, name: &[u8], value: &str) -> Option<String> {
-        let name = match HeaderName::from_bytes(name) {
+    fn insert_header(&mut self, name: &str, value: &str) -> Option<String> {
+        let name = match HeaderName::from_bytes(name.as_bytes()) {
             Ok(name) => name,
             Err(_) => return None,
         };
@@ -74,15 +74,15 @@ impl HttpResponse for Response {
         })
     }
 
-    fn remove_header(&mut self, name: &[u8]) -> Option<String> {
-        HeaderName::from_bytes(name)
+    fn remove_header(&mut self, name: &str) -> Option<String> {
+        HeaderName::from_bytes(name.as_bytes())
             .map(|name| self.headers_mut().remove(name))
             .ok()
             .flatten()
             .map(|s| s.to_str().ok().map(ToString::to_string).unwrap_or_default())
     }
 
-    fn set_body(&mut self, body: Bytes) {
+    fn set_body(&mut self, body: Vec<u8>) {
         *self.body_mut() = Body::from(body);
     }
 

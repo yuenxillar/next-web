@@ -55,7 +55,7 @@ impl LogoutFilter {
         response: &mut dyn HttpResponse,
     ) -> bool {
         response.set_status_code(StatusCode::METHOD_NOT_ALLOWED);
-        response.insert_header("Allow".as_bytes(), "POST");
+        response.insert_header("Allow", "POST");
 
         false
     }

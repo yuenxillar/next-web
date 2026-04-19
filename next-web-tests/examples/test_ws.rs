@@ -119,7 +119,7 @@ impl HandshakeInterceptor for TestWSHandshakeInterceptor {
                 .unwrap_or_default()
         );
 
-        response.insert_header("Hello".as_bytes(), "World");
+        response.insert_header("Hello", "World");
         Ok(true)
     }
 }

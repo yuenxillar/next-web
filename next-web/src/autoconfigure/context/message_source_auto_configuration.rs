@@ -1,10 +1,8 @@
 use std::error::Error;
-#[cfg(not(feature = "embed-resources"))]
 use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
-    constants::application_constants::MESSAGES,
     context::{
         application_resources::{ApplicationResources, ResourceLoader},
         support::ResourceBundleMessageSource,
@@ -68,34 +66,22 @@ impl AutoConfiguration for MessageSourceAutoConfiguration {
 
         let base_name = self.message_source_properties.base_name();
         if base_name.iter().any(|s| !s.is_empty()) {
-            message_source.set_basenames(base_name).await;
+            message_source.set_basenames(base_name);
         }
 
-        message_source
-            .set_fallback_to_system_locale(
-                self.message_source_properties.fallback_to_system_locale(),
-            )
-            .await;
-        message_source
-            .set_cache_seconds(self.message_source_properties.cache_time() as i64)
-            .await;
-        message_source.preload_all().await?;
-
-        ctx.insert_singleton_with_name::<Arc<dyn MessageSource>, &'static str>(
-            Arc::new(message_source),
-            message_source_single_name,
+        message_source.set_fallback_to_system_locale(
+            self.message_source_properties.fallback_to_system_locale(),
         );
+        message_source.set_cache_seconds(self.message_source_properties.cache_time() as i64);
+        message_source.preload_all()?;
+
+        let message_source: Arc<dyn MessageSource> = Arc::new(message_source);
+
+        // MESSAGE_SOURCE
+        //     .set(message_source.clone())
+        //     .map_err(|_e| Into::<Box<dyn Error>>::into("MessageSource already exists"))?;
+
+        ctx.insert_singleton_with_name(message_source, message_source_single_name);
         Ok(())
     }
-}
-
-fn condition(
-    resource_loader: &Arc<dyn ResourceLoader>,
-    message_source_properties: &MessageSourceProperties,
-) -> bool {
-    message_source_properties
-        .base_name()
-        .iter()
-        .map(|name| format!("{}{}", MESSAGES, name))
-        .any(|name| resource_loader.exists(name.as_str()))
 }
