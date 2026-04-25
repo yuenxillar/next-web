@@ -14,7 +14,7 @@ inventory::collect!(&'static dyn SchedulerAutoRegister);
 #[macro_export]
 macro_rules! submit_scheduler {
     ($ty:ident) => {
-        ::next_web::submit! {
+        ::next_web::macros::submit! {
             &$ty as &dyn ::next_web::autoregister::scheduler_autoregister::SchedulerAutoRegister
         }
     };

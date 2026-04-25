@@ -1,15 +1,15 @@
 use axum::{http::StatusCode, response::IntoResponse};
+use next_web::core::{
+    ApplicationContext, async_trait, context::properties::ApplicationProperties,
+    traits::data_decoder::DataDecoder,
+};
+use next_web::validate::Validate;
 use next_web::{
     application::Application,
     extract::{data::Data, validated::Validated},
     macros::bind::singleton,
 };
-use next_web_core::{
-    ApplicationContext, async_trait, context::properties::ApplicationProperties,
-    traits::data_decoder::DataDecoder,
-};
 use serde::{Deserialize, Serialize};
-use validator::Validate;
 
 use std::sync::Arc;
 
@@ -39,6 +39,7 @@ impl Application for TestApplication {
 }
 
 #[derive(Clone, Debug, Deserialize, Validate)]
+#[validate(crate = "next_web::validate")]
 struct TestValidator {
     #[validate(length(min = 5, message = "Can not be empty"))]
     pub name: String,

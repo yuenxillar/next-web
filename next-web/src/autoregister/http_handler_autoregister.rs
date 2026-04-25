@@ -14,7 +14,7 @@ inventory::collect!(&'static dyn HttpHandlerAutoRegister);
 #[macro_export]
 macro_rules! submit_handler {
     ($ty:ident) => {
-        ::next_web::submit! {
+        ::next_web::macros::submit! {
             &$ty as &dyn ::next_web::autoregister::http_handler_autoregister::HttpHandlerAutoRegister
         }
     };

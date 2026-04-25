@@ -5,13 +5,15 @@ use std::error::Error;
 use std::sync::Arc;
 
 use axum::extract::ws::CloseFrame;
-use next_web::anys::any_value::AnyValue;
+
 use next_web::application::Application;
-use next_web::traits::http::http_request::HttpRequest;
-use next_web::traits::http::http_response::HttpResponse;
-use next_web::{ApplicationContext, async_trait, macros::bind::singleton};
-use next_web_core::context::properties::ApplicationProperties;
-use next_web_core::error::BoxError;
+use next_web::core::anys::any_value::AnyValue;
+use next_web::core::context::properties::ApplicationProperties;
+use next_web::core::error::BoxError;
+use next_web::core::traits::http::http_request::HttpRequest;
+use next_web::core::traits::http::http_response::HttpResponse;
+use next_web::core::{ApplicationContext, async_trait};
+use next_web::macros::bind::singleton;
 use next_web_websocket::Message;
 use next_web_websocket::config::ws_configurer::WebSocketConfigurer;
 use next_web_websocket::config::ws_handler_registry::WebSocketHandlerRegistry;

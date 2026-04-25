@@ -22,6 +22,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>
 pub struct GatewayApplicationProperties {
     pub routes: Vec<RoutesProperties>,
     pub global_cors: Option<GlobalCorsProperties>,
+    pub local_response_cache: Option<LocalResponseCacheProperties>,
     #[serde(skip_deserializing)]
     pub circuitbreaker: Option<Vec<CircuitBreakerProperties>>,
 }
@@ -101,18 +102,15 @@ impl GatewayApplicationProperties {
             .get("gateway")
             .ok_or_else(|| std::io::Error::other("missing top-level 'gateway' section"))?;
 
-        let mut gateway_properties = serde_yaml::from_value::<Self>(gateway.clone()).map_err(
-            |error| {
-                std::io::Error::other(format!(
-                    "failed to deserialize gateway properties: {error}"
-                ))
-            },
-        )?;
+        let mut gateway_properties =
+            serde_yaml::from_value::<Self>(gateway.clone()).map_err(|error| {
+                std::io::Error::other(format!("failed to deserialize gateway properties: {error}"))
+            })?;
 
         if let Some(circuit_breakers) = gateway.get("circuitbreaker") {
-            let mapping = circuit_breakers
-                .as_mapping()
-                .ok_or_else(|| std::io::Error::other("'gateway.circuitbreaker' must be a mapping"))?;
+            let mapping = circuit_breakers.as_mapping().ok_or_else(|| {
+                std::io::Error::other("'gateway.circuitbreaker' must be a mapping")
+            })?;
             let mut circuitbreaker = Vec::new();
 
             for (key, value) in mapping.iter() {
@@ -120,12 +118,14 @@ impl GatewayApplicationProperties {
                     .as_str()
                     .ok_or_else(|| std::io::Error::other("circuit breaker id must be a string"))?
                     .to_string();
-                let mut properties = serde_yaml::from_value::<CircuitBreakerProperties>(value.clone())
-                    .map_err(|error| {
-                        std::io::Error::other(format!(
-                            "failed to deserialize circuit breaker '{id}': {error}"
-                        ))
-                    })?;
+                let mut properties = serde_yaml::from_value::<CircuitBreakerProperties>(
+                    value.clone(),
+                )
+                .map_err(|error| {
+                    std::io::Error::other(format!(
+                        "failed to deserialize circuit breaker '{id}': {error}"
+                    ))
+                })?;
                 properties.id = id;
                 circuitbreaker.push(properties);
             }
@@ -135,18 +135,26 @@ impl GatewayApplicationProperties {
 
         Ok(gateway_properties)
     }
+
+    pub fn local_response_cache_enabled(&self) -> bool {
+        self.local_response_cache
+            .as_ref()
+            .and_then(|config| config.enabled)
+            .unwrap_or(false)
+    }
 }
 
 impl Default for GatewayApplicationProperties {
     fn default() -> Self {
-        let path = std::env::var(Self::CONFIG_ENV_VAR).unwrap_or_else(|_| {
-            PathBuf::from("application.yaml").display().to_string()
-        });
+        let path = std::env::var(Self::CONFIG_ENV_VAR)
+            .unwrap_or_else(|_| PathBuf::from("application.yaml").display().to_string());
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .unwrap_or_else(|error| panic!("failed to build tokio runtime for gateway config: {error}"));
+            .unwrap_or_else(|error| {
+                panic!("failed to build tokio runtime for gateway config: {error}")
+            });
 
         runtime
             .block_on(Self::load_from_path(path))
@@ -156,3 +164,8 @@ impl Default for GatewayApplicationProperties {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct GlobalCorsProperties {}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct LocalResponseCacheProperties {
+    pub enabled: Option<bool>,
+}

@@ -5,7 +5,6 @@ pub mod client;
 pub mod common;
 pub mod constants;
 pub mod context;
-pub mod convert;
 pub mod error;
 pub mod filter;
 pub mod http;
@@ -15,7 +14,6 @@ pub mod mime_type;
 pub mod proxy;
 pub mod scheduler;
 pub mod server;
-pub mod signal;
 pub mod state;
 pub mod store;
 pub mod traits;
@@ -24,8 +22,8 @@ pub mod wrapper;
 
 pub use self::autoregister::auto_register::*;
 pub use self::context::application_context::*;
-pub use async_trait::async_trait;
 pub use arc_swap::ArcSwap;
+pub use async_trait::async_trait;
 pub use dyn_clone::{DynClone, clone_box, clone_trait_object};
 
 #[cfg(feature = "http-request")]

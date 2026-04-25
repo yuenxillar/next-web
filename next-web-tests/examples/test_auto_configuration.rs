@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use next_web::{
-    ApplicationContext, AutoRegister,
     application::Application,
-    async_trait,
-    context::properties::ApplicationProperties,
+    core::{
+        ApplicationContext, async_trait, context::properties::ApplicationProperties,
+        traits::config::auto_configuration::AutoConfiguration,
+    },
     macros::{autoconfigure::auto_configuration, bind::singleton},
 };
-use next_web_core::error::BoxError;
 
 #[derive(Clone, Default)]
 pub struct TestApplication;
@@ -27,20 +27,15 @@ impl Application for TestApplication {
 }
 
 #[derive(Clone)]
-#[singleton(binds = [Self::into_auto])]
+#[singleton(binds = [Self::into_auto_configuration])]
 pub struct TestAutoRegister;
 
 #[async_trait]
-impl AutoRegister for TestAutoRegister {
-    fn name(&self) -> &'static str {
-        ""
-    }
-
-    async fn register(
-        &self,
+impl AutoConfiguration for TestAutoRegister {
+    async fn configuration(
+        &mut self,
         ctx: &mut ApplicationContext,
-        _properties: &ApplicationProperties,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         ctx.insert_singleton_with_name(String::from("value1"), "msg2");
         ctx.insert_singleton_with_name(String::from("value0"), "s3");
 
@@ -51,8 +46,8 @@ impl AutoRegister for TestAutoRegister {
 }
 
 impl TestAutoRegister {
-    pub fn into_auto(self) -> Arc<dyn AutoRegister> {
-        Arc::new(self)
+    pub fn into_auto_configuration(self) -> Box<dyn AutoConfiguration> {
+        Box::new(self)
     }
 }
 

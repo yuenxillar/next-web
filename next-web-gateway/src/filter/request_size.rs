@@ -12,20 +12,27 @@ pub struct RequestSizeFilter {
 }
 
 impl GatewayFilter for RequestSizeFilter {
-    fn filter(&self, _ctx: &mut ApplicationContext, upstream: &mut UpStream) {
+    fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream) -> pingora::Result<()> {
         let request_header = match upstream.request_header.as_mut() {
             Some(request_header) => request_header,
-            None => return,
+            None => return Ok(()),
         };
+
+        if self.max_size == 0 {
+            return Ok(());
+        }
 
         if let Some(content_length) = request_header.headers.get("content-length") {
             if let Ok(content_length) = content_length.to_str() {
                 if let Ok(size) = content_length.parse::<u64>() {
+                    // Reject requests that already advertise a body larger than the configured limit.
                     if size > self.max_size {
-                        return;
+                        return ctx.respond_with_text(413, Vec::new(), "Request size exceeded");
                     }
                 }
             }
         }
+
+        Ok(())
     }
 }

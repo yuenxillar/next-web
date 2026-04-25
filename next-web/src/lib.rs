@@ -2,7 +2,6 @@ pub mod application;
 pub mod autoconfigure;
 pub mod autoregister;
 pub mod banner;
-
 pub mod configurer;
 pub mod crypto;
 pub mod diagnostics;
@@ -12,21 +11,20 @@ pub mod extract;
 pub mod interceptor;
 pub mod macros;
 pub mod manager;
-
 pub mod stream;
 pub mod util;
+pub mod signal;
 
-pub use urlencoding;
 
 pub use crate::extract::required_header::header_names;
 
 pub use axum::Router;
 pub use axum::{body, error_handling, handler, http, response, routing};
 
-pub use headers;
 pub use rand;
+pub use validator as validate;
 
-pub use next_web_core::*;
+pub use next_web_core as core;
 
 #[cfg(feature = "enable-state-machine")]
 pub use next_web_state_machine as state_machine;

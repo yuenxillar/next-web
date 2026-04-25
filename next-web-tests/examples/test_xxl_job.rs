@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use next_web::{
-    ApplicationContext, application::Application, async_trait,
-    context::properties::ApplicationProperties, macros::bind::singleton,
+    application::Application,
+    core::{ApplicationContext, async_trait, context::properties::ApplicationProperties},
+    macros::bind::singleton,
 };
 use next_web_core::error::BoxError;
 use next_web_xxl_job::executor::context::job_context::{AsyncJobHandler, JobContext};

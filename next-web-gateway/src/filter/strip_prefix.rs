@@ -4,6 +4,7 @@ use crate::{
 };
 
 use super::gateway_filter::GatewayFilter;
+use crate::util::path::{set_request_path, strip_prefix_segments};
 
 #[derive(Debug, Clone)]
 pub struct StripPrefixFilter {
@@ -11,27 +12,21 @@ pub struct StripPrefixFilter {
 }
 
 impl GatewayFilter for StripPrefixFilter {
-    fn filter(&self, _ctx: &mut ApplicationContext, upstream: &mut UpStream) {
+    fn filter(
+        &self,
+        _ctx: &mut ApplicationContext,
+        upstream: &mut UpStream,
+    ) -> pingora::Result<()> {
         let request_header = match upstream.request_header.as_mut() {
             Some(request_header) => request_header,
-            None => return,
+            None => return Ok(()),
         };
 
-        let raw_path = String::from_utf8_lossy(request_header.raw_path());
+        let query = request_header.uri.query().map(str::to_owned);
 
-        let mut path = String::new();
-        raw_path
-            .split("/")
-            .into_iter()
-            .enumerate()
-            .filter(|(i, _)| i >= &self.offset)
-            .for_each(|(_, s)| {
-                path.push('/');
-                path.push_str(s);
-            });
-
-        if !path.is_empty() {
-            request_header.set_uri(path.parse().unwrap());
-        }
+        // Drop the configured number of leading path segments and preserve the query string.
+        let rewritten_path = strip_prefix_segments(request_header.uri.path(), self.offset);
+        set_request_path(request_header, &rewritten_path, query.as_deref());
+        Ok(())
     }
 }

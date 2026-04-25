@@ -1,18 +1,14 @@
-use next_web::traits::event::application_event::EventAttributes;
-use next_web::traits::event::application_event_publisher::ApplicationEventPublisher;
+use next_web::core::context::properties::ApplicationProperties;
+use next_web::core::traits::event::application_event::EventAttributes;
+use next_web::core::traits::event::application_listener::ApplicationListener;
+use next_web::core::{ApplicationContext, async_trait};
+use next_web::{application::Application, macros::bind::singleton};
 use next_web::{
     event::default_application_event_publisher::DefaultApplicationEventPublisher,
     macros::event::event_listener,
 };
-use next_web_core::{
-    ApplicationContext, async_trait,
-    context::properties::ApplicationProperties,
-    traits::event::{
-        application_event::ApplicationEvent, application_listener::ApplicationListener,
-    },
-};
-
-use next_web::{application::Application, macros::bind::singleton};
+use next_web_core::traits::event::application_event::ApplicationEvent;
+use next_web_core::traits::event::application_event_publisher::ApplicationEventPublisher;
 
 /// Test application
 #[derive(Default, Clone)]

@@ -9,14 +9,22 @@ use super::gateway_filter::GatewayFilter;
 pub struct SaveSessionFilter {}
 
 impl GatewayFilter for SaveSessionFilter {
-    fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream) {
-        // if let Some(session) = &ctx.session {
-        //     request_header
-        //         .insert_header(
-        //             "Set-Cookie".to_string(),
-        //             format!("session_id={}; Path=/", session).as_str(),
-        //         )
-        //         .ok();
-        // }
+    fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream) -> pingora::Result<()> {
+        let response_header = match upstream.response_header.as_mut() {
+            Some(response_header) => response_header,
+            None => return Ok(()),
+        };
+
+        if let Some(session) = &ctx.session {
+            // Persist the gateway session as a response cookie when one exists on the context.
+            response_header
+                .append_header(
+                    "Set-Cookie",
+                    format!("session_id={session}; Path=/; HttpOnly; SameSite=Lax"),
+                )
+                .ok();
+        }
+
+        Ok(())
     }
 }

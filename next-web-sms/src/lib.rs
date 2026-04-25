@@ -1,5 +1,7 @@
 pub mod core;
 
+pub use next_web_core as core1;
+
 #[cfg(feature = "aliyun")]
 pub mod aliyun;
 #[cfg(feature = "tencent")]

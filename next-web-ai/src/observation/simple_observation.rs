@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use next_web_core::{autoconfigure::context, convert::into_box::IntoBox};
+use next_web_core::autoconfigure::context;
 
 use crate::{
     chat::observation::observation_convention::ObservationConvention,

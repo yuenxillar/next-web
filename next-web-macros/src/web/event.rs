@@ -42,7 +42,7 @@ pub fn impl_macro_event_listener(args: TokenStream, input: ItemImpl) -> TokenStr
 
     let impl_id = if has_id {
         quote! {
-            impl ::next_web::traits::id::Id for #listener_type {
+            impl ::next_web::core::traits::id::Id for #listener_type {
                 fn id(&self) -> &'static str { #listener_id }
             }
         }
@@ -78,12 +78,12 @@ pub fn impl_macro_event_listener(args: TokenStream, input: ItemImpl) -> TokenStr
 
         impl ::next_web::autoregister::application_event_autoregister::ApplicationEventAutoRegister  for  #name {
             fn register<'life_a>(&'life_a self,
-                ctx: &'life_a mut ::next_web::ApplicationContext,
+                ctx: &'life_a mut ::next_web::core::ApplicationContext,
                 multicaster: &'life_a mut ::next_web::event::default_application_event_multicaster::DefaultApplicationEventMulticaster
             ) -> ::core::pin::Pin<::std::boxed::Box<dyn ::core::future::Future<Output = ()> + Send + 'life_a>>
             {
                 ::std::boxed::Box::pin(async move {
-                    use ::next_web::traits::event::application_event_multicaster::ApplicationEventMulticaster;
+                    use ::next_web::core::traits::event::application_event_multicaster::ApplicationEventMulticaster;
 
                     let listener = ctx.resolve_with_default_name::<#listener_type>();
                     #impl_add_listener

@@ -1,8 +1,7 @@
 use std::{error::Error, sync::Arc};
 
 use next_web_core::{
-    ApplicationContext, async_trait,
-    traits::config::auto_configuration::AutoConfiguration,
+    ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
 };
 use rudi_dev::singleton;
 

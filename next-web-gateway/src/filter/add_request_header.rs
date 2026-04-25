@@ -9,7 +9,11 @@ pub struct AddRequestHeaderFilter {
 }
 
 impl GatewayFilter for AddRequestHeaderFilter {
-    fn filter(&self, _ctx: &mut ApplicationContext, upstream: &mut UpStream) {
+    fn filter(
+        &self,
+        _ctx: &mut ApplicationContext,
+        upstream: &mut UpStream,
+    ) -> pingora::Result<()> {
         upstream.request_header.as_mut().map(|request_header| {
             for header in self.headers.iter() {
                 request_header
@@ -17,5 +21,7 @@ impl GatewayFilter for AddRequestHeaderFilter {
                     .ok();
             }
         });
+
+        Ok(())
     }
 }

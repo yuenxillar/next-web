@@ -2,7 +2,6 @@ use std::{error::Error, sync::Arc};
 
 use next_web_core::{
     context::application_context::ApplicationContext,
-    error::BoxError,
     traits::{config::auto_configuration::AutoConfiguration, singleton::Singleton},
 };
 use rbatis::{Intercept, async_trait};

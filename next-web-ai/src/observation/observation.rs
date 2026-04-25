@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError, DynClone};
+use next_web_core::{async_trait, error::BoxError, DynClone};
 
 use crate::{
     chat::observation::observation_convention::ObservationConvention,
@@ -78,7 +78,7 @@ impl ObservationImpl {
         registry: Option<Box<dyn ObservationRegistry>>,
     ) -> Box<dyn Observation> {
         if registry.is_none() || registry.as_ref().map(|s| s.is_noop()).unwrap_or(false) {
-            return Self::noop().into_boxed();
+            return Box::new(Self::noop());
         }
 
         let registry = registry.unwrap();
@@ -101,18 +101,18 @@ impl ObservationImpl {
         context.set_parent_from_current_observation(registry.as_ref());
 
         if is_observation_enabled {
-            return Self::noop().into_boxed();
+            return Box::new(Self::noop());
         }
 
         let convention = Some(convention);
-        SimpleObservation {
+        Box::new(SimpleObservation {
             context,
             registry,
             convention,
             handlers: VecDeque::new(),
             filters: Vec::new(),
         }
-        .into_boxed()
+        )
     }
 
     pub fn start(name: impl Into<String>, registry: Box<dyn ObservationRegistry>) {
@@ -126,7 +126,7 @@ impl ObservationImpl {
         registry: Box<dyn ObservationRegistry>,
     ) -> Box<dyn Observation> {
         if registry.is_noop() {
-            return Self::noop().into_boxed();
+            return Box::new(Self::noop());
         }
 
         let name = name.into();
@@ -137,10 +137,10 @@ impl ObservationImpl {
         context.set_parent_from_current_observation(registry.as_ref());
 
         if is_observation_enabled {
-            return Self::noop().into_boxed();
+            return Box::new(Self::noop());
         }
 
-        SimpleObservation::new(name, registry, context).into_boxed()
+        Box::new(SimpleObservation::new(name, registry, context))
     }
     pub fn noop() -> impl Observation {
         NoopObservation::default()

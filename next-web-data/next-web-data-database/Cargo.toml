@@ -9,7 +9,7 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-next-web-core = { workspace = true }
+next-web-core = { workspace = true, features = ["dev"] }
 next-web-macros = { workspace = true }
 rudi-dev = { workspace = true }
 

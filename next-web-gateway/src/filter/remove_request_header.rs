@@ -11,16 +11,22 @@ pub struct RemoveRequestHeaderFilter {
 }
 
 impl GatewayFilter for RemoveRequestHeaderFilter {
-    fn filter(&self, _ctx: &mut ApplicationContext, upstream: &mut UpStream) {
+    fn filter(
+        &self,
+        _ctx: &mut ApplicationContext,
+        upstream: &mut UpStream,
+    ) -> pingora::Result<()> {
         let request_header = match upstream.request_header.as_mut() {
             Some(request_header) => request_header,
-            None => return,
+            None => return Ok(()),
         };
 
-        // Traverse the list of headers that need to be removed
+        // Remove every configured header name from the proxied request.
         for header_name in &self.headers {
             let header_name = header_name.to_lowercase();
             request_header.remove_header(&header_name);
         }
+
+        Ok(())
     }
 }

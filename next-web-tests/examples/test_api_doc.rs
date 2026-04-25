@@ -2,11 +2,10 @@ use std::error::Error;
 
 use next_web::{
     application::Application,
-    async_trait,
+    core::{ApplicationContext, async_trait, context::properties::ApplicationProperties},
     extract::find_singleton::FindSingleton,
     macros::bind::{post_mapping, request_mapping},
 };
-use next_web_core::{ApplicationContext, context::properties::ApplicationProperties};
 use utoipa::openapi::OpenApi;
 
 #[derive(Default, Clone)]

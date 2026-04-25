@@ -14,15 +14,15 @@ impl GatewayFilter for AddRequestParameterFilter {
         &self,
         _ctx: &mut crate::application::next_gateway_application::ApplicationContext,
         upstream: &mut UpStream,
-    ) {
+    ) -> pingora::Result<()> {
         let request_header = match upstream.request_header.as_mut() {
             Some(request_header) => request_header,
-            None => return,
+            None => return Ok(()),
         };
 
-        // 如果没有参数需要添加，直接返回
+        // Skip the rewrite when there is nothing to merge into the query string.
         if self.parameters.is_empty() {
-            return;
+            return Ok(());
         }
 
         let uri = &request_header.uri;
@@ -31,49 +31,49 @@ impl GatewayFilter for AddRequestParameterFilter {
         let scheme = uri.scheme().map(|s| s.as_str()).unwrap_or("");
         let authority = uri.authority().map(|a| a.as_str()).unwrap_or("");
 
-        // 构建新的查询字符串（新参数覆盖旧参数）
+        // Merge the configured parameters on top of the existing query string.
         let new_query = merge_queries(query, &self.parameters);
 
-        // 构建新的 URI 字符串
+        // Rebuild the URI using the original path and authority.
         let new_uri_str = build_uri_string(scheme, authority, path, &new_query);
 
-        // 解析并设置新 URI
+        // Parse and update the proxied request URI in place.
         match new_uri_str.parse() {
-            Ok(new_uri) => {
-                request_header.set_uri(new_uri);
-            }
-            Err(e) => {
+            Ok(new_uri) => request_header.set_uri(new_uri),
+            Err(error) => {
                 warn!(
                     target: "gateway_filter",
                     "Failed to parse modified URI: {}, original_uri: {}",
-                    e,
+                    error,
                     uri
                 );
             }
         }
+
+        Ok(())
     }
 }
 
-/// 合并查询参数（新参数覆盖旧参数）
+/// Merge query parameters where new values override existing keys.
 fn merge_queries(original_query: &str, new_parameters: &[KeyValue<String, String>]) -> String {
     if new_parameters.is_empty() {
         return original_query.to_string();
     }
 
-    // 使用 HashMap 来高效处理参数覆盖
+    // A map is enough here because later parameters are meant to override earlier ones.
     let mut param_map: HashMap<String, String> = HashMap::new();
 
-    // 1. 先解析原始查询参数
-    for (k, v) in parse(original_query.as_bytes()) {
-        param_map.insert(k.into_owned(), v.into_owned());
+    // Load the original query first.
+    for (key, value) in parse(original_query.as_bytes()) {
+        param_map.insert(key.into_owned(), value.into_owned());
     }
 
-    // 2. 用新参数覆盖旧参数
+    // Then overwrite with the configured parameters.
     for param in new_parameters {
         param_map.insert(param.k.clone(), param.v.clone());
     }
 
-    // 3. 重新构建查询字符串
+    // Serialize the merged map back into a query string.
     let mut serializer = Serializer::new(String::with_capacity(
         original_query.len() + new_parameters.len() * 20,
     ));
@@ -84,25 +84,25 @@ fn merge_queries(original_query: &str, new_parameters: &[KeyValue<String, String
     serializer.finish()
 }
 
-/// 构建完整的 URI 字符串
+/// Build a full URI string from the individual URI components.
 fn build_uri_string(scheme: &str, authority: &str, path: &str, query: &str) -> String {
     let mut uri_string = String::new();
 
-    // 添加 scheme
+    // Preserve the original scheme when the upstream request uses an absolute URI.
     if !scheme.is_empty() {
         uri_string.push_str(scheme);
         uri_string.push_str("://");
     }
 
-    // 添加 authority
+    // Preserve the authority for absolute URIs as well.
     if !authority.is_empty() {
         uri_string.push_str(authority);
     }
 
-    // 添加 path
+    // The path is always required.
     uri_string.push_str(path);
 
-    // 添加 query（如果有）
+    // Append the query only when it exists.
     if !query.is_empty() {
         uri_string.push('?');
         uri_string.push_str(query);

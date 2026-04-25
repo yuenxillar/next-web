@@ -1,12 +1,14 @@
 use next_web::{
-    ApplicationContext,
     application::Application,
-    macros::{bind::singleton, scheduled},
-    scheduler::{
-        context::JobExecutionContext,
-        schedule_type::{ScheduleType, WithArgs},
+    core::{
+        ApplicationContext,
+        scheduler::{
+            context::JobExecutionContext,
+            schedule_type::{ScheduleType, WithArgs},
+        },
+        traits::schedule::scheduled_task::ScheduledTask,
     },
-    traits::schedule::scheduled_task::ScheduledTask,
+    macros::{bind::singleton, scheduled},
     util::local_date_time::LocalDateTime,
 };
 use next_web_core::{async_trait, context::properties::ApplicationProperties};

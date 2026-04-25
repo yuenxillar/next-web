@@ -20,7 +20,7 @@ inventory::collect!(&'static dyn ApplicationEventAutoRegister);
 #[macro_export]
 macro_rules! submit_application_event_autoregister {
     ($ty:ident) => {
-        ::next_web::submit! {
+        ::next_web::macros::submit! {
             &$ty as &dyn ::next_web::autoregister::application_event_autoregister::ApplicationEventAutoRegister
         }
     };

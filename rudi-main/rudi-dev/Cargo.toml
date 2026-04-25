@@ -26,7 +26,6 @@ tokio = { workspace = true }
 [features]
 default = ["rudi-macro-dev", "auto-register"]
 auto-register = ["dep:inventory", "rudi-macro-dev/auto-register"]
-nothing = []
 
 [lints]
 workspace = true

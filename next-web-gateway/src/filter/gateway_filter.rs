@@ -1,12 +1,20 @@
-use pingora::http::{RequestHeader, ResponseHeader};
+use std::sync::Arc;
+use std::time::Duration;
+
+use pingora_limits::rate::Rate;
 use regex::Regex;
 
 use crate::application::next_gateway_application::ApplicationContext;
+use crate::filter::local_response_cache::LocalResponseCacheFilter;
+use crate::filter::remove_json_attributes_response_body::RemoveJsonAttributesResponseBodyFilter;
+use crate::filter::remove_request_parameter::RemoveRequestParameterFilter;
 use crate::filter::secure_headers::SecureHeadersFilter;
 use crate::filter::set_path::SetPathFilter;
+use crate::filter::token_relay::TokenRelayFilter;
 use crate::route::route_service_manager::UpStream;
 use crate::{filter::add_request_parameter::AddRequestParameterFilter, util::key_value::KeyValue};
 
+use super::dedupe_response_header::DedupeResponseHeaderFilter;
 use super::map_request_header::MapRequestHeaderFilter;
 use super::prefix_path::PrefixPathFilter;
 use super::preserve_host_header::PreserveHostHeaderFilter;
@@ -31,13 +39,13 @@ macro_rules! delegate_filter {
     ($self:ident, $ctx:ident, $upstream:ident, $($variant:ident),*) => {
         match $self {
             $(Self::$variant(filter) => filter.filter($ctx, $upstream),)*
-            Self::Nothing => {}
+            Self::Null => Ok(()),
         }
     };
 }
 
 pub trait GatewayFilter {
-    fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream);
+    fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream) -> pingora::Result<()>;
 }
 
 #[derive(Debug, Clone)]
@@ -46,11 +54,15 @@ pub enum DefaultGatewayFilter {
     AddRequestHeaderIfNotPresent(AddRequestHeaderIfNotPresentFilter),
     AddRequestParameter(AddRequestParameterFilter),
     AddResponseHeader(AddResponseHeaderFilter),
+    DedupeResponseHeader(DedupeResponseHeaderFilter),
     MapRequestHeader(MapRequestHeaderFilter),
     PrefixPath(PrefixPathFilter),
     PreserveHostHeader(PreserveHostHeaderFilter),
     RedirectTo(RedirectToFilter),
+    LocalResponseCache(LocalResponseCacheFilter),
+    RemoveJsonAttributesResponseBody(RemoveJsonAttributesResponseBodyFilter),
     RemoveRequestHeader(RemoveRequestHeaderFilter),
+    RemoveRequestParameter(RemoveRequestParameterFilter),
     RemoveResponseHeader(RemoveResponseHeaderFilter),
     RequestHeaderSize(RequestHeaderSizeFilter),
     RequestRateLimiter(RequestRateLimiterFilter),
@@ -66,12 +78,17 @@ pub enum DefaultGatewayFilter {
     SetResponseHeader(SetResponseHeaderFilter),
     SetStatus(SetStatusFilter),
     StripPrefix(StripPrefixFilter),
+    TokenRelay(TokenRelayFilter),
 
-    Nothing,
+    Null,
 }
 
 impl DefaultGatewayFilter {
-    pub fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream) {
+    pub fn filter(
+        &self,
+        ctx: &mut ApplicationContext,
+        upstream: &mut UpStream,
+    ) -> pingora::Result<()> {
         delegate_filter!(
             self,
             ctx,
@@ -80,11 +97,15 @@ impl DefaultGatewayFilter {
             AddRequestHeaderIfNotPresent,
             AddResponseHeader,
             AddRequestParameter,
+            DedupeResponseHeader,
             MapRequestHeader,
             PrefixPath,
             PreserveHostHeader,
             RedirectTo,
+            LocalResponseCache,
+            RemoveJsonAttributesResponseBody,
             RemoveRequestHeader,
+            RemoveRequestParameter,
             RemoveResponseHeader,
             RequestHeaderSize,
             RequestRateLimiter,
@@ -99,15 +120,20 @@ impl DefaultGatewayFilter {
             SetRequestHostHeader,
             SetResponseHeader,
             SetStatus,
-            StripPrefix
-        );
+            StripPrefix,
+            TokenRelay
+        )
+    }
+
+    pub fn modifies_response_body(&self) -> bool {
+        matches!(self, Self::RemoveJsonAttributesResponseBody(_))
     }
 }
 
 impl From<&str> for DefaultGatewayFilter {
     fn from(str: &str) -> Self {
         if str.is_empty() {
-            panic!("empty filter name");
+            return Self::Null;
         }
 
         let (filter_name, value) = if let Some(pos) = str.find('=') {
@@ -130,7 +156,7 @@ impl From<&str> for DefaultGatewayFilter {
             "AddRequestParameter" => {
                 let parameters = split_params(value, "&", ",");
                 if parameters.is_empty() {
-                    Self::Nothing
+                    Self::Null
                 } else {
                     Self::AddRequestParameter(AddRequestParameterFilter { parameters })
                 }
@@ -140,13 +166,22 @@ impl From<&str> for DefaultGatewayFilter {
                 headers: split_kv_pairs(value),
             }),
 
+            "DedupeResponseHeader" => {
+                let filter = DedupeResponseHeaderFilter::from(value);
+                if filter.headers.is_empty() {
+                    Self::Null
+                } else {
+                    Self::DedupeResponseHeader(filter)
+                }
+            }
+
             "MapRequestHeader" => {
                 if let Some((key, value)) = value.split_once(',') {
                     Self::MapRequestHeader(MapRequestHeaderFilter {
                         header: KeyValue::from((key, value)),
                     })
                 } else {
-                    Self::Nothing
+                    Self::Null
                 }
             }
 
@@ -164,16 +199,40 @@ impl From<&str> for DefaultGatewayFilter {
                             url: url.trim().into(),
                         })
                     } else {
-                        Self::Nothing
+                        Self::Null
                     }
                 } else {
-                    Self::Nothing
+                    Self::Null
+                }
+            }
+
+            "LocalResponseCache" => {
+                let filter = LocalResponseCacheFilter::from(value);
+                if filter.is_valid() {
+                    Self::LocalResponseCache(filter)
+                } else {
+                    Self::Null
+                }
+            }
+
+            "RemoveJsonAttributesResponseBody" => {
+                let filter = RemoveJsonAttributesResponseBodyFilter::from(value);
+                if filter.names.is_empty() {
+                    Self::Null
+                } else {
+                    Self::RemoveJsonAttributesResponseBody(filter)
                 }
             }
 
             "RemoveRequestHeader" => Self::RemoveRequestHeader(RemoveRequestHeaderFilter {
                 headers: split_headers(value),
             }),
+
+            "RemoveRequestParameter" => {
+                Self::RemoveRequestParameter(RemoveRequestParameterFilter {
+                    names: split_headers(value),
+                })
+            }
 
             "RemoveResponseHeader" => Self::RemoveResponseHeader(RemoveResponseHeaderFilter {
                 headers: split_headers(value),
@@ -195,6 +254,7 @@ impl From<&str> for DefaultGatewayFilter {
 
             "RequestRateLimiter" => Self::RequestRateLimiter(RequestRateLimiterFilter {
                 rate_limit: value.trim().parse().unwrap_or(0),
+                limiter: Arc::new(Rate::new(Duration::from_secs(1))),
             }),
 
             "RequestSize" => Self::RequestSize(RequestSizeFilter {
@@ -219,7 +279,22 @@ impl From<&str> for DefaultGatewayFilter {
                         header: (KeyValue::from((parts[0], parts[1])), regex),
                     })
                 } else {
-                    Self::Nothing
+                    Self::Null
+                }
+            }
+
+            "RewritePath" => {
+                if let Some((regex, replacement)) = value.split_once(',') {
+                    if let Ok(regex) = Regex::new(regex.trim()) {
+                        Self::RewritePath(RewritePathFilter {
+                            regex,
+                            replacement: replacement.trim().to_string(),
+                        })
+                    } else {
+                        Self::Null
+                    }
+                } else {
+                    Self::Null
                 }
             }
 
@@ -250,7 +325,9 @@ impl From<&str> for DefaultGatewayFilter {
                 offset: value.trim().parse().unwrap_or(0),
             }),
 
-            _ => Self::Nothing,
+            "TokenRelay" => Self::TokenRelay(TokenRelayFilter {}),
+
+            _ => Self::Null,
         }
     }
 }

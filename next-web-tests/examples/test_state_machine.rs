@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
 use next_web::{
-    ApplicationContext, application::Application, async_trait,
-    context::properties::ApplicationProperties, messaging::generic_message::GenericMessage,
+    application::Application,
+    core::{
+        ApplicationContext, async_trait, context::properties::ApplicationProperties,
+        messaging::generic_message::GenericMessage,
+        traits::message::Message,
+    },
 };
-use next_web_core::error::BoxError;
+use next_web_core::{anys::any_value::AnyValue, error::BoxError};
 use next_web_state_machine::{
     autoconfigure::state_machine_auto_configuration::StateMachineAutoConfiguration,
     config::{
@@ -99,11 +103,7 @@ impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig 
             ) {
             }
 
-            fn event_not_accepted(
-                &self,
-                _event: &dyn next_web::traits::message::Message<OrderEvent>,
-            ) {
-            }
+            fn event_not_accepted(&self, _event: &dyn Message<OrderEvent>) {}
 
             fn transition(
                 &self,
@@ -152,12 +152,7 @@ impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig 
             ) {
             }
 
-            fn extended_state_changed(
-                &self,
-                _key: &str,
-                _value: &next_web::anys::any_value::AnyValue,
-            ) {
-            }
+            fn extended_state_changed(&self, _key: &str, _value: &AnyValue) {}
 
             fn state_context(&self, _state_context: &dyn StateContext<OrderState, OrderEvent>) {}
         }

@@ -369,7 +369,7 @@ fn generate_block(
                                         if flag {
                                             angle_bracketed.args.clear();
                                             angle_bracketed.args.push(syn::GenericArgument::Type(
-                                                    parse_quote!(::next_web_core::state::application_state::ApplicationState)
+                                                    parse_quote!(::next_web::core::state::application_state::ApplicationState)
                                             ));
 
                                             let pat = syn::Pat::Ident(syn::PatIdent {
@@ -395,7 +395,7 @@ fn generate_block(
 
                         if is_single {
                             let arg: syn::Type = parse_quote!(
-                                ::next_web_core::state::application_state::ApplicationState
+                                ::next_web::core::state::application_state::ApplicationState
                             );
                             let path: syn::Path =
                                 parse_quote!(::next_web::extract::Extension<#arg>);
@@ -447,7 +447,7 @@ fn generate_block(
                     item,
                     [
                         quote! {
-                        ::next_web::extract::typed_header::TypedHeader(__verify_content_type) : ::next_web::extract::typed_header::TypedHeader<::next_web::headers::ContentType>
+                        ::next_web::extract::typed_header::TypedHeader(__verify_content_type) : ::next_web::extract::typed_header::TypedHeader<::next_web::core::headers::ContentType>
                     }].into_iter(),
                 );
 

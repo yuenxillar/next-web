@@ -104,8 +104,8 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
         let timezone = quote_some!(timezone);
         let time_unit = quote_some!(time_unit);
 
-        quote! {::next_web::scheduler::schedule_type::ScheduleType::OneShot(
-            ::next_web::scheduler::schedule_type::WithArgs {
+        quote! {::next_web::core::scheduler::schedule_type::ScheduleType::OneShot(
+            ::next_web::core::scheduler::schedule_type::WithArgs {
                     initial_delay:  Some(#initial_delay),
                     timezone:       #timezone,
                     time_unit:      #time_unit,
@@ -116,8 +116,8 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
         if let Some(cron) = cron {
             let timezone = quote_some!(timezone);
 
-            quote! {::next_web::scheduler::schedule_type::ScheduleType::Cron(
-                ::next_web::scheduler::schedule_type::WithArgs {
+            quote! {::next_web::core::scheduler::schedule_type::ScheduleType::Cron(
+                ::next_web::core::scheduler::schedule_type::WithArgs {
                     cron:           Some(String::from(#cron)),
                     timezone:       #timezone,
                     ..Default::default()
@@ -126,8 +126,8 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
         } else {
             let time_unit = quote_some!(time_unit);
 
-            quote! {::next_web::scheduler::schedule_type::ScheduleType::FixedRate(
-                ::next_web::scheduler::schedule_type::WithArgs {
+            quote! {::next_web::core::scheduler::schedule_type::ScheduleType::FixedRate(
+                ::next_web::core::scheduler::schedule_type::WithArgs {
                         fixed_rate: Some(#fixed_rate),
                         time_unit: #time_unit,
                         ..Default::default()
@@ -162,7 +162,7 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
         #vis struct #name;
 
         impl ::next_web::autoregister::scheduler_autoregister::SchedulerAutoRegister for #name {
-            fn register(& self, __ctx: &mut ::next_web::ApplicationContext) -> ::next_web::manager::job_scheduler_manager::BoxedJob {
+            fn register(& self, __ctx: &mut ::next_web::core::ApplicationContext) -> ::next_web::manager::job_scheduler_manager::BoxedJob {
 
                 #item_fn
 

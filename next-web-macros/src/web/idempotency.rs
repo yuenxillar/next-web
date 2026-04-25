@@ -62,7 +62,7 @@ pub(crate) fn impl_macro_idempotency(attr: TokenStream, mut item_fn: ItemFn) -> 
         );
         let idempotency_store = quote! {
             ::next_web::extract::Extension( #extension ) :
-            ::next_web::extract::Extension< ::next_web::state::application_state::ApplicationState >
+            ::next_web::extract::Extension< ::next_web::core::state::application_state::ApplicationState >
         };
 
         let key = key
@@ -93,7 +93,7 @@ pub(crate) fn impl_macro_idempotency(attr: TokenStream, mut item_fn: ItemFn) -> 
             let __idempotency_store = #extension.context()
                 .read()
                 .await
-                .get_single_with_name::<::std::sync::Arc<dyn ::next_web::traits::store::idempotency_store::IdempotencyStore<Value = ()>> >( #name )
+                .get_single_with_name::<::std::sync::Arc<dyn ::next_web::core::traits::store::idempotency_store::IdempotencyStore<Value = ()>> >( #name )
                 .clone();
 
             match __idempotency_store.check_and_store(#cache_key, Some(()), #ttl).await {

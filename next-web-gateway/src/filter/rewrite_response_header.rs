@@ -12,10 +12,14 @@ pub struct RewriteResponseHeaderFilter {
 }
 
 impl GatewayFilter for RewriteResponseHeaderFilter {
-    fn filter(&self, _ctx: &mut ApplicationContext, upstream: &mut UpStream) {
+    fn filter(
+        &self,
+        _ctx: &mut ApplicationContext,
+        upstream: &mut UpStream,
+    ) -> pingora::Result<()> {
         let response_header = match upstream.response_header.as_mut() {
             Some(response_header) => response_header,
-            None => return,
+            None => return Ok(()),
         };
 
         if let Some(value) = response_header.headers.get(&self.header.0.k) {
@@ -29,5 +33,7 @@ impl GatewayFilter for RewriteResponseHeaderFilter {
                     .insert_header(self.header.0.k.clone(), self.header.0.v.as_str());
             }
         }
+
+        Ok(())
     }
 }

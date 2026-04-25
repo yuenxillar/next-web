@@ -2,7 +2,6 @@
 use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 use next_web_core::{
     async_trait,
-    convert::into_box::IntoBox,
     error::{illegal_state_error::IllegalStateError, BoxError},
     traits::required::Required,
 };
@@ -213,7 +212,7 @@ impl DelegatingSubject {
                     session
                         .set_attribute(
                             Self::RUN_AS_PRINCIPALS_SESSION_KEY,
-                            SessionValue::Object(stack.into_boxed()),
+                            SessionValue::Object(Box::new(stack)),
                         )
                         .await
                         .unwrap();

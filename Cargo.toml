@@ -21,7 +21,8 @@ members = [
     "next-web-wechat",
     "next-web-api-doc",
     "next-web-actuator",
-    "next-web-pay",
+    "next-web-pay/next-web-pay-alipay",
+    "next-web-pay/next-web-pay-wechatpay",
     "next-web-xxl-job",
     "next-web-state-machine",
     "next-web-id-generator"
@@ -144,7 +145,7 @@ mime = { version = "0.3.17" }
 bigdecimal = { version = "0.4.9" }
 headers = { version = "0.4.1" }
 form_urlencoded = { version = "1.2.2" }
-validator = { version = "0.20.0" }
+validator = { version = "0.20.0", features = ["derive"] }
 reqwest = { version = "0.12.15", features = ["json"] }
 once_cell = { version = "1.20.2" }
 async-trait = { version = "0.1.88" }
@@ -193,7 +194,8 @@ hex = { version = "0.4.3" }
 base64 = { version = "0.22.1" }
 aes-gcm = { version = "0.10.3" }
 aes = { version = "0.8.4" }
-scrypt = { version = "0.11.0" }
+scrypt  = { version = "0.11.0" }
+rsa     = { version = "0.9.10" }
 
 # data
 rbs = { version = "4.6.2" }

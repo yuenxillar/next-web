@@ -11,12 +11,18 @@ pub struct SetStatusFilter {
 }
 
 impl GatewayFilter for SetStatusFilter {
-    fn filter(&self, _ctx: &mut ApplicationContext, upstream: &mut UpStream) {
+    fn filter(
+        &self,
+        _ctx: &mut ApplicationContext,
+        upstream: &mut UpStream,
+    ) -> pingora::Result<()> {
         match upstream.response_header.as_mut() {
             Some(response_header) => {
                 response_header.set_status(self.status).ok();
             }
-            None => return,
+            None => return Ok(()),
         }
+
+        Ok(())
     }
 }

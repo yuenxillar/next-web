@@ -14,7 +14,6 @@ use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
-use next_web_core::signal::APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL;
 use next_web_core::state::application_state::ApplicationState;
 use next_web_core::traits::application::application_lifecycle::ApplicationLifecycle;
 use next_web_core::traits::apply_router::ApplyRouter;
@@ -52,7 +51,9 @@ use crate::diagnostics::logging_failure_analysis_reporter::LoggingFailureAnalysi
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::manager::background_service_manager::BackgroundServiceManager;
+use crate::signal::{APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL, APPLICATION_STARTED_SIGNAL};
 use crate::util::local_date_time::LocalDateTime;
+use crate::util::thread::ThreadUtil;
 
 #[cfg(feature = "enable-api-doc")]
 use next_web_api_doc::openapi::OpenApi;
@@ -668,9 +669,7 @@ where
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse()?;
 
         // Monitor application shutdown signal
-        let (graceful_shutdown_tx, mut graceful_shutdown_rx) =
-            tokio::sync::broadcast::channel::<()>(30);
-        APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL.get_or_init(|| graceful_shutdown_tx);
+        let mut graceful_shutdown_rx = APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL.subscribe();
 
         #[cfg(not(feature = "rustls"))]
         let shutdown_signal = async move {
@@ -730,6 +729,13 @@ where
 
         //  Take Panic hook
         let _ = std::panic::take_hook();
+
+        // Delay trigger
+        ThreadUtil::spawn(async move {
+            ThreadUtil::sleep(std::time::Duration::from_millis(1500)).await;
+
+            let _ = APPLICATION_STARTED_SIGNAL.send(());
+        });
 
         // Configure certificate and private key used by https
         #[cfg(feature = "rustls")]

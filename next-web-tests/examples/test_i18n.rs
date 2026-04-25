@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use next_web::ApplicationContext;
-use next_web::context::MessageSource;
+use next_web::core::ApplicationContext;
+use next_web::core::context::MessageSource;
 use next_web::extract::Path;
 use next_web::i18n::RequestLocaleHolder;
 use next_web::macros::i18n::translation;
 use next_web::{
-    application::Application, async_trait, context::properties::ApplicationProperties,
+    application::Application,
+    core::{async_trait, context::properties::ApplicationProperties},
     macros::bind::get_mapping,
 };
 
@@ -47,11 +48,13 @@ async fn req_message(
     Path(code): Path<String>,
     #[find] FindSingleton(message_source): FindSingleton<Arc<dyn MessageSource>>,
 ) -> impl IntoResponse {
-    message_source.message_with_args(
-        code.as_str(),
-        &["Ben", "Jack", "John"],
-        RequestLocaleHolder::locale_or_default(),
-    ).unwrap_or("Sorry!!".into())
+    message_source
+        .message_with_args(
+            code.as_str(),
+            &["Ben", "Jack", "John"],
+            RequestLocaleHolder::locale_or_default(),
+        )
+        .unwrap_or("Sorry!!".into())
 }
 
 #[tokio::main]

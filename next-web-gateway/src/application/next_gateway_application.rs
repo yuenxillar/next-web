@@ -4,22 +4,28 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use pingora::http::ResponseHeader;
 use pingora::prelude::*;
-use pingora::proxy::ProxyHttp;
+use pingora::proxy::{FailToProxy, ProxyHttp};
 use pingora::upstreams::peer::HttpPeer;
-use tracing::warn;
+use tracing::{error, warn};
 
 use crate::circuit_breaker::circuit_breaker_service_manager::CircuitBreakerServiceManager;
 use crate::circuit_breaker::circuit_state::CircuitState;
 use crate::error::gateway_error::GatewayError;
+use crate::filter::local_response_cache::{
+    capture_response_for_local_cache, serve_from_local_cache_if_present, store_local_cache_entry,
+    LocalResponseCacheManager, LocalResponseCacheRequestState, PendingLocalResponseCacheEntry,
+};
 use crate::properties::gateway_properties::GatewayApplicationProperties;
 use crate::route::route_service_manager::{RouteServiceManager, UpStream};
 use crate::service::route_service::RouteWork;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct NextGatewayApplication {
     application_properties: GatewayApplicationProperties,
     route_service_manager: RouteServiceManager,
     circuit_breaker_service_manager: Option<CircuitBreakerServiceManager>,
+    local_response_cache_manager: Option<Arc<LocalResponseCacheManager>>,
     jingyue_service: crate::service::jingyue_service::JingYueService,
 }
 
@@ -30,6 +36,9 @@ impl NextGatewayApplication {
         circuit_breaker_service_manager: Option<CircuitBreakerServiceManager>,
     ) -> Self {
         Self {
+            local_response_cache_manager: application_properties
+                .local_response_cache_enabled()
+                .then(LocalResponseCacheManager::shared),
             application_properties,
             route_service_manager,
             circuit_breaker_service_manager,
@@ -46,7 +55,14 @@ impl ProxyHttp for NextGatewayApplication {
         Self::CTX {
             fallback_id: None,
             route_id: None,
+            original_request_path: None,
+            buffer_response_body: false,
+            response_body_buffer: Vec::new(),
+            local_response_cache_manager: self.local_response_cache_manager.clone(),
+            local_response_cache_request: None,
+            pending_local_response_cache: None,
             session: None,
+            direct_response: None,
         }
     }
 
@@ -67,7 +83,9 @@ impl ProxyHttp for NextGatewayApplication {
 
         // Is the routing fuse in open or half open position
         if !fallback_id.is_empty() {
-            if let Some(circuit_breaker_service_manager) = &self.circuit_breaker_service_manager {
+            if let Some(circuit_breaker_service_manager) =
+                self.circuit_breaker_service_manager.as_ref()
+            {
                 if let Some(service) = circuit_breaker_service_manager.services.get(fallback_id) {
                     ctx.fallback_id = Some(fallback_id.into());
                     if let CircuitState::Open = service.controller.state().await {
@@ -142,8 +160,22 @@ impl ProxyHttp for NextGatewayApplication {
         upstream_request_header: &mut RequestHeader,
         ctx: &mut Self::CTX,
     ) -> Result<()> {
+        // Keep the original downstream path so response filters can inspect it later.
+        ctx.original_request_path = upstream_request_header
+            .uri
+            .path_and_query()
+            .map(|value| value.as_str().to_string())
+            .or_else(|| Some(upstream_request_header.uri.path().to_string()));
+
+        if let Some(filter) = self
+            .route_service_manager
+            .local_response_cache_filter(ctx.route_id.as_deref())
+        {
+            serve_from_local_cache_if_present(filter, ctx, upstream_request_header)?;
+        }
+
         self.route_service_manager
-            .filter(ctx, UpStream::from_request_header(upstream_request_header));
+            .filter(ctx, UpStream::from_request_header(upstream_request_header))?;
         Ok(())
     }
 
@@ -165,20 +197,61 @@ impl ProxyHttp for NextGatewayApplication {
         }
 
         self.route_service_manager
-            .filter(ctx, UpStream::from_response_header(upstream_response));
+            .filter(ctx, UpStream::from_response_header(upstream_response))?;
+
+        if let Some(filter) = self
+            .route_service_manager
+            .local_response_cache_filter(ctx.route_id.as_deref())
+        {
+            capture_response_for_local_cache(filter, ctx, upstream_response);
+        }
+
+        let should_buffer_response_body = self
+            .route_service_manager
+            .has_response_body_filters(ctx.route_id.as_deref())
+            || ctx.pending_local_response_cache.is_some();
+
+        if should_buffer_response_body {
+            ctx.buffer_response_body = true;
+            ctx.response_body_buffer.clear();
+            upstream_response.remove_header("Content-Length");
+            upstream_response.remove_header("Transfer-Encoding");
+            upstream_response
+                .insert_header("Transfer-Encoding", "Chunked")
+                .ok();
+        }
+
         Ok(())
     }
 
     fn response_body_filter(
         &self,
         _session: &mut Session,
-        _body: &mut Option<Bytes>,
-        _end_of_stream: bool,
-        _ctx: &mut Self::CTX,
+        body: &mut Option<Bytes>,
+        end_of_stream: bool,
+        ctx: &mut Self::CTX,
     ) -> Result<Option<Duration>>
     where
         Self::CTX: Send + Sync,
     {
+        if !ctx.buffer_response_body {
+            return Ok(None);
+        }
+
+        if let Some(chunk) = body.take() {
+            ctx.response_body_buffer.extend_from_slice(&chunk);
+        }
+
+        if !end_of_stream {
+            return Ok(None);
+        }
+
+        *body = Some(Bytes::from(std::mem::take(&mut ctx.response_body_buffer)));
+        self.route_service_manager
+            .filter(ctx, UpStream::from_response_body(body))?;
+        store_local_cache_entry(ctx, body.as_ref());
+        ctx.buffer_response_body = false;
+
         Ok(None)
     }
 
@@ -187,7 +260,8 @@ impl ProxyHttp for NextGatewayApplication {
         true
     }
 
-    // 当与上游服务器建立连接后出现代理错误时触发（如上游连接意外断开、响应解析失败等）
+    /// Triggered when a proxy error occurs after establishing a connection with the upstream server
+    ///(such as unexpected disconnection of the upstream connection, response parsing failure, etc.)
     fn error_while_proxy(
         &self,
         peer: &HttpPeer,
@@ -234,13 +308,161 @@ impl ProxyHttp for NextGatewayApplication {
         }
         e
     }
+
+    async fn fail_to_proxy(
+        &self,
+        session: &mut Session,
+        e: &Error,
+        ctx: &mut Self::CTX,
+    ) -> FailToProxy
+    where
+        Self::CTX: Send + Sync,
+    {
+        if let Some(direct_response) = ctx.direct_response.take() {
+            let response_code = direct_response.status;
+            let mut response =
+                match ResponseHeader::build(response_code, Some(direct_response.headers.len() + 1))
+                {
+                    Ok(response) => response,
+                    Err(build_error) => {
+                        error!("failed to build direct response header: {build_error}");
+                        session
+                            .respond_error(response_code)
+                            .await
+                            .unwrap_or_else(|write_error| {
+                                error!("failed to send fallback direct response: {write_error}");
+                            });
+
+                        return FailToProxy {
+                            error_code: response_code,
+                            can_reuse_downstream: false,
+                        };
+                    }
+                };
+
+            // Materialize the synthetic response collected during request filtering.
+            for (name, value) in direct_response.headers {
+                if let Err(header_error) = response.append_header(name, value.as_str()) {
+                    error!("failed to insert direct response header: {header_error}");
+                }
+            }
+
+            if let Err(length_error) = response.set_content_length(direct_response.body.len()) {
+                error!("failed to set direct response content length: {length_error}");
+            }
+
+            if let Err(write_error) = session
+                .write_response_header(Box::new(response), false)
+                .await
+            {
+                error!("failed to write direct response header: {write_error}");
+            } else if let Err(write_error) = session
+                .write_response_body(Some(direct_response.body), true)
+                .await
+            {
+                error!("failed to write direct response body: {write_error}");
+            }
+
+            return FailToProxy {
+                error_code: response_code,
+                can_reuse_downstream: false,
+            };
+        }
+
+        let code = match e.etype() {
+            HTTPStatus(code) => *code,
+            _ => match e.esource() {
+                ErrorSource::Upstream => 502,
+                ErrorSource::Downstream => match e.etype() {
+                    WriteError | ReadError | ConnectionClosed => 0,
+                    _ => 400,
+                },
+                ErrorSource::Internal | ErrorSource::Unset => 500,
+            },
+        };
+
+        if code > 0 {
+            session
+                .respond_error(code)
+                .await
+                .unwrap_or_else(|write_error| {
+                    error!("failed to send error response to downstream: {write_error}");
+                });
+        }
+
+        FailToProxy {
+            error_code: code,
+            can_reuse_downstream: false,
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct ApplicationContext {
     pub fallback_id: Option<String>,
     pub route_id: Option<String>,
+    pub original_request_path: Option<String>,
+    pub buffer_response_body: bool,
+    pub response_body_buffer: Vec<u8>,
+    pub local_response_cache_manager: Option<Arc<LocalResponseCacheManager>>,
+    pub local_response_cache_request: Option<LocalResponseCacheRequestState>,
+    pub pending_local_response_cache: Option<PendingLocalResponseCacheEntry>,
     pub session: Option<String>,
+    pub direct_response: Option<DirectResponse>,
+}
+
+#[derive(Clone)]
+pub struct DirectResponse {
+    pub status: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: Bytes,
+}
+
+impl ApplicationContext {
+    pub fn respond_with_text(
+        &mut self,
+        status: u16,
+        headers: Vec<(String, String)>,
+        body: impl Into<String>,
+    ) -> Result<()> {
+        // Store the response on the context and stop the proxy flow with an HTTP status error.
+        self.direct_response = Some(DirectResponse {
+            status,
+            headers,
+            body: Bytes::from(body.into()),
+        });
+
+        Err(pingora::Error::new(pingora::ErrorType::HTTPStatus(status)))
+    }
+
+    pub fn respond_with_empty(
+        &mut self,
+        status: u16,
+        headers: Vec<(String, String)>,
+    ) -> Result<()> {
+        self.direct_response = Some(DirectResponse {
+            status,
+            headers,
+            body: Bytes::new(),
+        });
+
+        Err(pingora::Error::new(pingora::ErrorType::HTTPStatus(status)))
+    }
+
+    pub fn respond_with_body(
+        &mut self,
+        status: u16,
+        headers: Vec<(String, String)>,
+        body: Bytes,
+    ) -> Result<()> {
+        self.direct_response = Some(DirectResponse {
+            status,
+            headers,
+            body,
+        });
+
+        Err(pingora::Error::new(pingora::ErrorType::HTTPStatus(status)))
+    }
 }
 
 pub fn set_request_timeout(

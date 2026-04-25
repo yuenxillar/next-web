@@ -8,5 +8,6 @@ pub mod remote_addr_route_predicate_factory;
 pub mod route_predicate;
 pub mod route_predicate_factory;
 pub mod route_service_manager;
+pub mod weight_route_predicate_factory;
 pub mod x_forwarded_remote_addr_route_predicate_factory;
 pub mod zoned_datetime_route_predicate_factory;

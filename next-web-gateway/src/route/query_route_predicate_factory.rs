@@ -1,23 +1,51 @@
+use form_urlencoded::parse;
+use regex::Regex;
+
 use super::route_predicate::RoutePredicate;
 
 #[derive(Debug, Clone)]
 pub struct QueryRoutePredicateFactory {
     pub name: String,
+    pub regex: Option<Regex>,
 }
 
 impl RoutePredicate for QueryRoutePredicateFactory {
     fn matches(&self, session: &mut pingora::protocols::http::ServerSession) -> bool {
-        // 1. 获取查询字符串
-        let query_str = match session.req_header().uri.query() {
-            Some(q) => q,
-            None => return false, // 没有查询字符串，不匹配
+        let Some(query_str) = session.req_header().uri.query() else {
+            return false;
         };
 
-        // 2. 按 '&' 分割并直接使用迭代器检查
-        query_str.split('&').any(|param| {
-            // 检查参数是否以 `name` 开头
-            // 这涵盖了 `name` 和 `name=value` 两种情况
-            param == self.name || param.starts_with(&format!("{}=", &self.name))
-        })
+        query_matches(query_str, &self.name, self.regex.as_ref())
+    }
+}
+
+fn query_matches(query: &str, name: &str, regex: Option<&Regex>) -> bool {
+    parse(query.as_bytes()).any(|(key, value)| {
+        if key.as_ref() != name {
+            return false;
+        }
+
+        regex
+            .map(|compiled| compiled.is_match(value.as_ref()))
+            .unwrap_or(true)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::query_matches;
+    use regex::Regex;
+
+    #[test]
+    fn query_matches_name_only() {
+        assert!(query_matches("token=abc&lang=zh", "token", None));
+        assert!(!query_matches("lang=zh", "token", None));
+    }
+
+    #[test]
+    fn query_matches_regex_value() {
+        let regex = Regex::new(r"^\d+$").unwrap();
+        assert!(query_matches("page=123", "page", Some(&regex)));
+        assert!(!query_matches("page=abc", "page", Some(&regex)));
     }
 }

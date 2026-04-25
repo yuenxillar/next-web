@@ -6,10 +6,12 @@ use axum::{
     response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
-use next_web::context::properties::ApplicationProperties;
 use next_web::{
-    ApplicationContext, application::Application,
-    filter::application_filter_chain::ApplicationFilterChain,
+    application::Application,
+    core::{
+        ApplicationContext, context::properties::ApplicationProperties,
+        filter::application_filter_chain::ApplicationFilterChain,
+    },
 };
 use next_web_core::async_trait;
 use next_web_core::state::application_state::ApplicationState;

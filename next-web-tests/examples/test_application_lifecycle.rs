@@ -1,13 +1,14 @@
 use next_web::{
-    ApplicationContext,
     application::Application,
-    async_trait,
-    context::properties::ApplicationProperties,
-    macros::bind::singleton,
-    traits::{
-        application::application_lifecycle::{ApplicationLifecycle, ShutdownContext},
-        ordered::Ordered,
+    core::{
+        ApplicationContext, async_trait,
+        context::properties::ApplicationProperties,
+        traits::{
+            application::application_lifecycle::{ApplicationLifecycle, ShutdownContext},
+            ordered::Ordered,
+        },
     },
+    macros::bind::singleton,
 };
 use tracing::info;
 

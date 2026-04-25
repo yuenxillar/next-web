@@ -1,7 +1,6 @@
-use bytes::Bytes;
 use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
-use next_web_core::{async_trait, convert::into_box::IntoBox, error::BoxError};
+use next_web_core::{async_trait,error::BoxError};
 use next_web_retry::{
     retry_callback::RetryCallback, retry_context::RetryContext, retry_operations::RetryOperations,
     support::retry_template::RetryTemplate,
@@ -146,8 +145,8 @@ impl DeepSeekChatModel {
         let usage = chat_completion
             .usage
             .as_ref()
-            .map(|u| Self::default_usage(u).into_boxed() as Box<dyn Usage>)
-            .unwrap_or_else(|| EmptyUsage.into_boxed())
+            .map(|u| Box::new(Self::default_usage(u)) as Box<dyn Usage>)
+            .unwrap_or_else(|| Box::new(EmptyUsage))
             .into();
 
         ChatResponseMetadata {
@@ -175,15 +174,15 @@ impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
         let mut observation_context = ChatModelObservationContext::new(
             prompt,
             AiProvider::DeepSeek,
-            Self::build_request_options(&req).into_boxed(),
+            Box::new(Self::build_request_options(&req))
         );
 
-        let observation_convention = self.observation_convention.clone().into_boxed();
+        let observation_convention = Box::new(self.observation_convention.clone());
         match ChatModelObservationDocumentation::ChatModelOperation.observation(
             Some(observation_convention.clone()),
             Some(observation_convention),
             observation_context.clone(),
-            self.observation_registry.clone().into_boxed(),
+            Box::new(self.observation_registry.clone())
         ) {
             Ok(observation) => observation,
             Err(e) => return Err(e.into()),

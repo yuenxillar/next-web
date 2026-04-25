@@ -1,6 +1,5 @@
 pub mod calendar;
 pub mod common;
-pub mod control;
 pub mod cron;
 pub mod crypto;
 pub mod datetime;

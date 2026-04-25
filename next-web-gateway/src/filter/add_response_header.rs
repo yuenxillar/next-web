@@ -10,10 +10,14 @@ pub struct AddResponseHeaderFilter {
 }
 
 impl GatewayFilter for AddResponseHeaderFilter {
-    fn filter(&self, _ctx: &mut ApplicationContext, upstream: &mut UpStream) {
+    fn filter(
+        &self,
+        _ctx: &mut ApplicationContext,
+        upstream: &mut UpStream,
+    ) -> pingora::Result<()> {
         let response_header = match upstream.response_header.as_mut() {
             Some(response_header) => response_header,
-            None => return,
+            None => return Ok(()),
         };
 
         self.headers.iter().for_each(|header| {
@@ -21,5 +25,7 @@ impl GatewayFilter for AddResponseHeaderFilter {
                 .append_header(header.k.clone(), header.v.as_str())
                 .ok();
         });
+
+        Ok(())
     }
 }

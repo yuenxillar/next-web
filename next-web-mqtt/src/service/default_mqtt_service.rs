@@ -11,9 +11,7 @@ use crate::{
     topic_router::TopicRouter,
 };
 
-use next_web_core::{
-    async_trait, error::BoxError, impl_service, signal::APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL,
-};
+use next_web_core::{async_trait, impl_service};
 use rumqttc::{
     AsyncClient, ClientError, ConnectReturnCode, ConnectionError, Event, EventLoop, MqttOptions,
     NetworkOptions, Packet, QoS, SubscribeFilter,
@@ -164,7 +162,6 @@ impl DefaultMQTTService {
                                 tokio::time::sleep(delay).await;
                             }
                             MQTTPollErrorAction::Shutdown => {
-                                Self::request_graceful_shutdown();
                                 break;
                             }
                         }
@@ -255,15 +252,6 @@ impl DefaultMQTTService {
 
         retries_remaining - 1
     }
-
-    fn request_graceful_shutdown() {
-        if let Some(tx) = APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL.get() {
-            if let Err(error) = tx.send(()) {
-                error!("Failed to send graceful shutdown signal: {:?}", error);
-            }
-        }
-    }
-
     async fn publish_inner<S, V>(
         &self,
         topic: S,
