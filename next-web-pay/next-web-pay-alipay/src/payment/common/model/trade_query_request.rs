@@ -1,8 +1,10 @@
 use serde::Serialize;
 
+use crate::Method;
+
 /// 统一收单交易查询
 #[derive(Debug, Clone, Serialize)]
-pub struct TradeQueryRequest {
+pub struct AlipayTradeQueryRequest {
     /// 订单支付时传入的商户订单号,和支付宝交易号不能同时为空。
     /// trade_no,out_trade_no如果同时存在优先取trade_no
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -17,7 +19,7 @@ pub struct TradeQueryRequest {
     query_options: Option<Vec<String>>,
 }
 
-impl TradeQueryRequest {
+impl AlipayTradeQueryRequest {
     pub fn with_out_trade_no(out_trade_no: String) -> Self {
         Self {
             out_trade_no: Some(out_trade_no),
@@ -38,5 +40,11 @@ impl TradeQueryRequest {
         self.query_options = Some(query_options);
 
         self
+    }
+}
+
+impl Method for AlipayTradeQueryRequest {
+    fn method() -> &'static str {
+        "alipay.trade.query"
     }
 }

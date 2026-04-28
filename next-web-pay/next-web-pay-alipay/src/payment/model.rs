@@ -17,7 +17,7 @@ where
     pub sign: String,
 
     /// 业务数据
-    pub data: Response<T>,
+    data: Response<T>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -43,6 +43,13 @@ where
     pub fn is_success(&self) -> bool {
         self.code == "10000"
     }
+
+    pub fn data(self) -> T {
+        match self.data {
+            Response::Success(data) => data,
+            Response::Error(_) => panic!("ErrorResponse does not have data"),
+        }
+    }
 }
 
 impl<'de, T> Deserialize<'de> for AlipayResponse<T>
@@ -59,10 +66,7 @@ where
         let mut value: Value = Deserialize::deserialize(deserializer)?;
 
         // 2. 提取 sign 字段
-        let sign = value["sign"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string();
+        let sign = value["sign"].as_str().unwrap_or_default().to_string();
 
         // 3. 根据 T 的 name() 获取业务数据字段名，比如 "alipay_trade_pay_response"
         let biz_key = T::name();

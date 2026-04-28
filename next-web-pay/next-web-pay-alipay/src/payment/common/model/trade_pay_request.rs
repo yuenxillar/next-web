@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+use crate::Method;
+
 /// 支付宝当面付请求参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TradePayRequest {
+pub struct AlipayTradePayRequest {
     /// 商户订单号（必填）
     /// 64个字符以内，仅支持字母、数字、下划线且需保证在商户端不重复
     out_trade_no: String,
@@ -189,8 +191,7 @@ pub enum QueryOption {
     MdiscountAmount,
 }
 
-
-impl TradePayRequest {
+impl AlipayTradePayRequest {
     /// 创建当面付基础请求
     pub fn new(
         out_trade_no: impl Into<String>,
@@ -266,44 +267,8 @@ impl TradePayRequest {
     }
 }
 
-// ============ 使用示例 ============
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn build_alipay_request() {
-        let request = TradePayRequest::new(
-            "20250425001".to_string(),
-            "88.88",
-            "Iphone16 256G".to_string(),
-            "28763443825664394".to_string(),
-        )
-        .with_scene(PaymentScene::BarCode)
-        .with_store_id("NJ_001")
-        .with_operator_id("yx_001")
-        .with_terminal_id("NJ_T_001")
-        .with_query_options(vec![
-            QueryOption::FundBillList,
-            QueryOption::VoucherDetailList,
-        ]);
-
-        let json = serde_json::to_string(&request).unwrap();
-        println!("{}", json);
-
-        // 输出示例：
-        // {
-        //   "out_trade_no": "20250425001",
-        //   "total_amount": "88.88",
-        //   "subject": "Iphone16 256G",
-        //   "auth_code": "28763443825664394",
-        //   "scene": "bar_code",
-        //   "product_code": "FACE_TO_FACE_PAYMENT",
-        //   "store_id": "NJ_001",
-        //   "operator_id": "yx_001",
-        //   "terminal_id": "NJ_T_001",
-        //   "query_options": ["fund_bill_list", "voucher_detail_list"]
-        // }
+impl Method for AlipayTradePayRequest {
+    fn method() -> &'static str {
+        "alipay.trade.pay"
     }
 }

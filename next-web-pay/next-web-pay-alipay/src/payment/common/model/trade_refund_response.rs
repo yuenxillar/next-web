@@ -4,7 +4,7 @@ use crate::Named;
 
 /// 支付宝退款查询响应数据
 #[derive(Debug, Clone, Deserialize)]
-pub struct TradeRefundResponse {
+pub struct AlipayTradeRefundResponse {
     /// 支付宝交易号
     pub trade_no: String,
 
@@ -153,7 +153,7 @@ pub struct ContributeDetail {
     pub contribute_amount: String,
 }
 
-impl Named for TradeRefundResponse {
+impl Named for AlipayTradeRefundResponse {
     fn name() -> &'static str {
         "alipay_trade_refund_response"
     }

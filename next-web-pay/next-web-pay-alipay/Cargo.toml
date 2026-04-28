@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 chrono          = { workspace = true }
 form_urlencoded = { workspace = true }
-urlencoding     = { workspace = true }
 reqwest         = { workspace = true }
 serde           = { workspace = true }
 serde_json      = { workspace = true }
@@ -15,10 +14,13 @@ rand            = { workspace = true }
 
 base64          = { workspace = true }
 sha2            = { workspace = true, features = ["oid"] }
+md5             = { workspace = true }
 
 aes             = { workspace = true }
 aes-gcm         = { workspace = true }
 rsa             = { workspace = true, features = ["pem"] }
+
+tracing         = { workspace = true }
 
 [dev-dependencies]
 tokio           = { workspace = true }

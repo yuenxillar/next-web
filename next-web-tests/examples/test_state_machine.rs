@@ -4,8 +4,7 @@ use next_web::{
     application::Application,
     core::{
         ApplicationContext, async_trait, context::properties::ApplicationProperties,
-        messaging::generic_message::GenericMessage,
-        traits::message::Message,
+        messaging::generic_message::GenericMessage, traits::message::Message,
     },
 };
 use next_web_core::{anys::any_value::AnyValue, error::BoxError};

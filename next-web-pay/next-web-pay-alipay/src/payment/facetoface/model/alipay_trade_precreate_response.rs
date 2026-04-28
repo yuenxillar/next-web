@@ -83,5 +83,4 @@ impl AlipayTradePrecreateResponse {
     pub fn set_qr_code(&mut self, value: String) {
         self.qr_code = value;
     }
-
 }

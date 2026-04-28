@@ -4,7 +4,7 @@ use crate::Named;
 
 /// 支付宝统一交易查询返回参数
 #[derive(Debug, Clone, Deserialize)]
-pub struct TradeQueryResponse {
+pub struct AlipayTradeQueryResponse {
     /// 支付宝交易号
     pub trade_no: String,
 
@@ -103,7 +103,7 @@ pub enum BuyerUserType {
     Private,
 }
 
-impl Named for TradeQueryResponse {
+impl Named for AlipayTradeQueryResponse {
     fn name() -> &'static str {
         "alipay_trade_query_response"
     }

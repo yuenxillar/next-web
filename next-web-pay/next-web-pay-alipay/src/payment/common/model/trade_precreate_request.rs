@@ -1,8 +1,10 @@
 use serde::Serialize;
 
+use crate::Method;
+
 /// 统一收单交易支付预创建
 #[derive(Debug, Serialize)]
-pub struct TradePrecreateRequest {
+pub struct AlipayTradePrecreateRequest {
     /// 商户订单号。必选，64个字符以内，仅支持字母、数字、下划线
     pub out_trade_no: String,
 
@@ -90,7 +92,7 @@ pub struct BusinessParams {
     pub mc_create_trade_ip: Option<String>,
 }
 
-impl TradePrecreateRequest {
+impl AlipayTradePrecreateRequest {
     /// 创建必需参数的最小化请求
     pub fn new(
         out_trade_no: impl Into<String>,
@@ -203,5 +205,11 @@ impl GoodsDetail {
     pub fn with_show_url(mut self, url: String) -> Self {
         self.show_url = Some(url);
         self
+    }
+}
+
+impl Method for AlipayTradePrecreateRequest {
+    fn method() -> &'static str {
+        "alipay.trade.precreate"
     }
 }

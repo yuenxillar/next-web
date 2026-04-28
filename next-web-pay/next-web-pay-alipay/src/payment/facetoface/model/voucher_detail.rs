@@ -18,7 +18,6 @@ pub struct VoucherDetail {
     purchase_ant_contribute: String,
 }
 
-
 impl VoucherDetail {
     /// Returns the `id` field.
     pub fn id(&self) -> &str {
@@ -129,5 +128,4 @@ impl VoucherDetail {
     pub fn set_purchase_ant_contribute(&mut self, value: String) {
         self.purchase_ant_contribute = value;
     }
-
 }

@@ -4,7 +4,7 @@ use crate::Named;
 
 /// 支付宝交易支付响应数据
 #[derive(Debug, Clone, Deserialize)]
-pub struct TradePayResponse {
+pub struct AlipayTradePayResponse {
     /// 商户订单号（必填）
     /// 64个字符以内
     pub out_trade_no: String,
@@ -138,7 +138,7 @@ pub struct VoucherDetail {
     pub purchase_ant_contribute: Option<String>,
 }
 
-impl TradePayResponse {
+impl AlipayTradePayResponse {
     /// 获取买家标识（优先使用 open_id）
     pub fn buyer_id(&self) -> Option<&str> {
         self.buyer_open_id
@@ -159,8 +159,7 @@ impl TradePayResponse {
     }
 }
 
-
-impl Named for TradePayResponse {
+impl Named for AlipayTradePayResponse {
     fn name() -> &'static str {
         "alipay_trade_pay_response"
     }

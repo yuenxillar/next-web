@@ -4,10 +4,10 @@ use crate::Named;
 
 ///交易撤销
 #[derive(Debug, Clone, Deserialize)]
-pub struct TradeCancelResponse {
+pub struct AlipayTradeCancelResponse {
     /// 商户订单号
     pub out_trade_no: String,
-    
+
     /// 是否需要重试
     pub retry_flag: String,
 
@@ -19,7 +19,7 @@ pub struct TradeCancelResponse {
     pub action: Option<String>,
 }
 
-impl Named for TradeCancelResponse {
+impl Named for AlipayTradeCancelResponse {
     fn name() -> &'static str {
         "alipay_trade_cancel_response"
     }

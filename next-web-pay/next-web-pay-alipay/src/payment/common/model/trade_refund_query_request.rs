@@ -1,8 +1,10 @@
 use serde::Serialize;
 
+use crate::Method;
+
 /// 统一收单交易退款查询
 #[derive(Debug, Clone, Serialize)]
-pub struct TradeRefundQueryRequest {
+pub struct AlipayTradeRefundQueryRequest {
     /// 退款请求号。 请求退款接口时，传入的退款请求号，如果在退款请求时未传入，则该值为创建交易时的商户订单号
     out_request_no: String,
 
@@ -19,7 +21,7 @@ pub struct TradeRefundQueryRequest {
     query_options: Option<Vec<String>>,
 }
 
-impl TradeRefundQueryRequest {
+impl AlipayTradeRefundQueryRequest {
     pub fn with_out_trade_no(
         out_request_no: impl Into<String>,
         out_trade_no: impl Into<String>,
@@ -51,5 +53,11 @@ impl TradeRefundQueryRequest {
         self.query_options = Some(query_options);
 
         self
+    }
+}
+
+impl Method for AlipayTradeRefundQueryRequest {
+    fn method() -> &'static str {
+        "alipay.trade.fastpay.refund.query"
     }
 }

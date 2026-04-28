@@ -5,22 +5,40 @@ use std::fmt::Debug;
 pub struct AlipayConfig {
     /// Alipay app id.
     app_id: String,
+
     /// Merchant RSA private key in PEM or base64 form.
     merchant_private_key: String,
+
     /// Alipay RSA public key in PEM or base64 form.
     alipay_public_key: String,
+
     /// Gateway endpoint.
     gateway_url: String,
+
     /// Request charset.
     charset: String,
+
     /// Response format.
     format: String,
+
     /// Signature type.
     sign_type: String,
+
     /// OpenAPI version.
     version: String,
+
+    /// Merchant certificate path.
+    merchant_cert_path: Option<String>,
+
+    /// Alipay certificate path.
+    alipay_cert_path: Option<String>,
+
+    /// Alipay root certificate path.
+    alipay_root_cert_path: Option<String>,
+
     /// Default asynchronous notification address.
     notify_url: Option<String>,
+
     /// Default synchronous return address.
     return_url: Option<String>,
 
@@ -49,6 +67,9 @@ impl AlipayConfig {
             format: "JSON".to_string(),
             sign_type: "RSA2".to_string(),
             version: "1.0".to_string(),
+            merchant_cert_path: None,
+            alipay_cert_path: None,
+            alipay_root_cert_path: None,
             notify_url: None,
             return_url: None,
             app_auth_token: None,
@@ -64,12 +85,6 @@ impl AlipayConfig {
     /// Sets a default notification URL.
     pub fn with_notify_url(mut self, notify_url: impl Into<String>) -> Self {
         self.notify_url = Some(notify_url.into());
-        self
-    }
-
-    /// Sets a default return URL.
-    pub fn with_return_url(mut self, return_url: impl Into<String>) -> Self {
-        self.return_url = Some(return_url.into());
         self
     }
 }
@@ -170,6 +185,36 @@ impl AlipayConfig {
         self.version = value;
     }
 
+    /// Sets the `alipay_cert_path` field.
+    pub fn set_alipay_cert_path(&mut self, value: String) {
+        self.alipay_cert_path = Some(value);
+    }
+
+    /// Sets the merchant application public certificate path.
+    pub fn set_merchant_cert_path(&mut self, value: String) {
+        self.merchant_cert_path = Some(value);
+    }
+
+    /// Sets the `alipay_root_cert_path` field.
+    pub fn set_alipay_root_cert_path(&mut self, value: String) {
+        self.alipay_root_cert_path = Some(value);
+    }
+
+    /// Returns the merchant application public certificate path.
+    pub fn merchant_cert_path(&self) -> Option<&str> {
+        self.merchant_cert_path.as_deref()
+    }
+
+    /// Returns the Alipay public certificate path.
+    pub fn alipay_cert_path(&self) -> Option<&str> {
+        self.alipay_cert_path.as_deref()
+    }
+
+    /// Returns the Alipay root certificate path.
+    pub fn alipay_root_cert_path(&self) -> Option<&str> {
+        self.alipay_root_cert_path.as_deref()
+    }
+
     /// Sets the `notify_url` field.
     pub fn set_notify_url<V>(&mut self, value: V)
     where
@@ -206,6 +251,9 @@ impl Debug for AlipayConfig {
             .field("format", &self.format)
             .field("sign_type", &self.sign_type)
             .field("version", &self.version)
+            .field("merchant_cert_path", &self.merchant_cert_path)
+            .field("alipay_cert_path", &self.alipay_cert_path)
+            .field("alipay_root_cert_path", &self.alipay_root_cert_path)
             .field("notify_url", &self.notify_url)
             .field("return_url", &self.return_url)
             .field("app_auth_token", &"***")
@@ -220,10 +268,13 @@ impl Default for AlipayConfig {
             merchant_private_key: std::env::var("ALIPAY_APP_PRIVATE_KEY").unwrap(),
             alipay_public_key: std::env::var("ALIPAY_PUBLIC_KEY").unwrap(),
             gateway_url: Self::DEFAULT_GATEWAY_URL.into(),
-            charset: "utf-8".to_string(),
-            format: "JSON".to_string(),
-            sign_type: "RSA2".to_string(),
-            version: "1.0".to_string(),
+            charset: "utf-8".into(),
+            format: "JSON".into(),
+            sign_type: "RSA2".into(),
+            version: "1.0".into(),
+            merchant_cert_path: Default::default(),
+            alipay_cert_path: Default::default(),
+            alipay_root_cert_path: Default::default(),
             notify_url: Default::default(),
             return_url: Default::default(),
             app_auth_token: Default::default(),

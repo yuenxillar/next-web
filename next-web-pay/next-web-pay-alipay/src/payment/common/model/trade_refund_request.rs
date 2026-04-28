@@ -1,13 +1,14 @@
-use serde::Deserialize;
+use serde::Serialize;
+
+use crate::Method;
 
 /// 支付宝退款请求参数
-#[derive(Debug, Clone, Deserialize)]
-pub struct TradeRefundRequest {
+#[derive(Debug, Clone, Serialize)]
+pub struct AlipayTradeRefundRequest {
     /// 退款金额（必填）
     /// 需要退款的金额，不能大于订单金额，单位为元，支持两位小数
     refund_amount: String,
 
-    // ============ 二选一（至少传一个） ============
     /// 商户订单号
     /// 与 trade_no 不能同时为空
     out_trade_no: Option<String>,
@@ -38,7 +39,7 @@ pub struct TradeRefundRequest {
 }
 
 /// 退款商品详情
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RefundGoodsDetail {
     /// 商品编号（必填）
     pub goods_id: String,
@@ -57,7 +58,7 @@ pub struct RefundGoodsDetail {
 }
 
 /// 退分账明细信息
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct OpenApiRoyaltyDetailInfoPojo {
     /// 分账类型
     pub royalty_type: Option<RoyaltyType>,
@@ -88,7 +89,7 @@ pub struct OpenApiRoyaltyDetailInfoPojo {
 }
 
 /// 分账类型
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum RoyaltyType {
     /// 分账
@@ -98,7 +99,7 @@ pub enum RoyaltyType {
 }
 
 /// 支出方/收入方账户类型
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum TransAccountType {
     /// 支付宝账号对应的支付宝唯一用户号
@@ -108,7 +109,7 @@ pub enum TransAccountType {
 }
 
 /// 收入方账户类型（比支出方多一个卡编号）
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum TransInAccountType {
     /// 支付宝账号对应的支付宝唯一用户号
@@ -120,7 +121,7 @@ pub enum TransInAccountType {
 }
 
 /// 退款查询选项
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum RefundQueryOption {
     /// 本次退款使用的资金渠道
@@ -131,8 +132,7 @@ pub enum RefundQueryOption {
     RefundVoucherDetailList,
 }
 
-impl TradeRefundRequest {
-
+impl AlipayTradeRefundRequest {
     pub fn new(
         out_trade_no: impl Into<Option<String>>,
         trade_no: impl Into<Option<String>>,
@@ -140,6 +140,8 @@ impl TradeRefundRequest {
     ) -> Self {
         let out_trade_no = out_trade_no.into();
         let trade_no = trade_no.into();
+        assert!(out_trade_no.is_some() || trade_no.is_some());
+
         let refund_amount = refund_amount.into();
 
         Self {
@@ -205,12 +207,10 @@ impl TradeRefundRequest {
         self.related_settle_confirm_no = Some(confirm_no.into());
         self
     }
+}
 
-    /// 确保 out_trade_no 和 trade_no 至少有一个存在
-    pub fn validate(&self) -> Result<(), &'static str> {
-        if self.out_trade_no.is_none() && self.trade_no.is_none() {
-            return Err("out_trade_no and trade_no cannot both be empty");
-        }
-        Ok(())
+impl Method for AlipayTradeRefundRequest {
+    fn method() -> &'static str {
+        "alipay.trade.refund"
     }
 }

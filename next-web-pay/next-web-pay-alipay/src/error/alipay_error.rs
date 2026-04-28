@@ -53,7 +53,6 @@ pub enum AlipayError {
     Custom(String),
 }
 
-
 impl From<String> for AlipayError {
     fn from(value: String) -> Self {
         Self::Custom(value)

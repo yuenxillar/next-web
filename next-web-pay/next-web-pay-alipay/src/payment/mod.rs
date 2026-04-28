@@ -1,17 +1,10 @@
-mod app;
-mod facetoface;
-mod page;
-mod wap;
-mod huabei;
-pub mod trade;
+pub mod app;
+pub mod facetoface;
+pub mod huabei;
+pub mod page;
+pub mod wap;
 
-
-pub use app::*;
-pub use facetoface::*;
-pub use page::*;
 pub use wap::*;
-pub use huabei::*;
-pub use trade::TradePay;
 
-
+pub mod common;
 pub mod model;

@@ -9,6 +9,31 @@ use rand::RngCore;
 pub struct AesUtil;
 
 impl AesUtil {
+    /// Encrypts content in the format expected by Alipay OpenAPI `encrypt_type=AES`.
+    pub fn encrypt_alipay_content(
+        aes_key_base64: &str,
+        biz_content_json: &str,
+    ) -> Result<String, String> {
+        let key = decode_aes128_key(aes_key_base64)?;
+        let ciphertext = encrypt_cbc_pkcs7(key, *b"0102030405060708", biz_content_json.as_bytes());
+        Ok(BASE64.encode(ciphertext))
+    }
+
+    /// Decrypts Alipay OpenAPI AES encrypted content.
+    pub fn decrypt_alipay_content(
+        aes_key_base64: &str,
+        encrypted_base64: &str,
+    ) -> Result<String, String> {
+        let key = decode_aes128_key(aes_key_base64)?;
+        let encrypted = BASE64
+            .decode(encrypted_base64)
+            .map_err(|error| format!("failed to decode encrypted content: {error}"))?;
+        let plaintext = decrypt_cbc_pkcs7(key, *b"0102030405060708", &encrypted)?;
+
+        String::from_utf8(plaintext)
+            .map_err(|error| format!("decrypted content is not valid UTF-8: {error}"))
+    }
+
     pub fn encrypt_biz_content(
         aes_key_base64: &str,
         biz_content_json: &str,
@@ -36,8 +61,10 @@ impl AesUtil {
             .map_err(|error| format!("failed to decode encrypted biz content: {error}"))?;
 
         if encrypted.len() < 32 || encrypted.len() % 16 != 0 {
-            return Err("encrypted biz content must contain a 16-byte IV followed by AES blocks"
-                .to_string());
+            return Err(
+                "encrypted biz content must contain a 16-byte IV followed by AES blocks"
+                    .to_string(),
+            );
         }
 
         let mut iv = [0u8; 16];
@@ -48,11 +75,7 @@ impl AesUtil {
             .map_err(|error| format!("decrypted biz content is not valid UTF-8: {error}"))
     }
 
-    pub fn decrypt(
-        key: &[u8; 32],
-        nonce: &[u8; 12],
-        ciphertext: &[u8],
-    ) -> Result<Vec<u8>, String> {
+    pub fn decrypt(key: &[u8; 32], nonce: &[u8; 12], ciphertext: &[u8]) -> Result<Vec<u8>, String> {
         let cipher = Aes256Gcm::new_from_slice(key)
             .map_err(|error| format!("failed to initialize AES-256-GCM cipher: {error}"))?;
 
@@ -162,7 +185,7 @@ fn pkcs7_unpad(data: &[u8]) -> Result<&[u8], String> {
 #[cfg(test)]
 mod tests {
     use super::AesUtil;
-    use aes_gcm::{Aes256Gcm, Nonce, aead::Aead, KeyInit as _};
+    use aes_gcm::{Aes256Gcm, KeyInit as _, Nonce, aead::Aead};
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
     #[test]
@@ -172,6 +195,17 @@ mod tests {
 
         let encrypted = AesUtil::encrypt_biz_content(&key_base64, plaintext).expect("encrypt");
         let decrypted = AesUtil::decrypt_biz_content(&key_base64, &encrypted).expect("decrypt");
+
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn encrypt_and_decrypt_alipay_content_round_trip() {
+        let key_base64 = BASE64.encode([0x11_u8; 16]);
+        let plaintext = r#"{"out_trade_no":"trade-001","total_amount":"88.00"}"#;
+
+        let encrypted = AesUtil::encrypt_alipay_content(&key_base64, plaintext).expect("encrypt");
+        let decrypted = AesUtil::decrypt_alipay_content(&key_base64, &encrypted).expect("decrypt");
 
         assert_eq!(decrypted, plaintext);
     }
