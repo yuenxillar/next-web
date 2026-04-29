@@ -7,6 +7,7 @@ pub mod payment;
 pub mod service;
 pub mod sign;
 pub mod util;
+pub mod handler;
 
 /// Crate level error type.
 pub use crate::error::alipay_error::AlipayError;

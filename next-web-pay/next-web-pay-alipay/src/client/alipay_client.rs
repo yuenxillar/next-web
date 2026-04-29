@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::BTreeMap;
 
 use chrono::Local;
@@ -9,12 +10,14 @@ use crate::sign::{
     build_notify_sign_content, build_sign_content, cert_sn_from_path, public_key_from_cert_path,
     root_cert_sn_from_path, sign_with_rsa2, verify_with_rsa2,
 };
+use crate::util::PageUtil;
 
 /// High-level Alipay OpenAPI client.
 #[derive(Debug, Clone)]
 pub struct AlipayClient {
     config: AlipayConfig,
     certificate_info: Option<AlipayCertificateInfo>,
+
     _client: reqwest::Client,
 }
 
@@ -32,7 +35,7 @@ impl AlipayClient {
         Self {
             config,
             certificate_info,
-            _client: reqwest::Client::new(),
+            _client: reqwest::Client::builder().http1_only().build().unwrap(),
         }
     }
 
@@ -89,6 +92,7 @@ impl AlipayClient {
     ) -> Result<BTreeMap<&'static str, String>, String>
     where
         T: Serialize + ?Sized,
+        T: Any,
     {
         if self.config.app_id().trim().is_empty() {
             return Err("app_id is empty".to_string());
@@ -99,7 +103,6 @@ impl AlipayClient {
 
         let mut params = BTreeMap::new();
         params.insert("app_id", self.config.app_id().into());
-        params.insert("method", method.into());
         params.insert("format", "JSON".into());
         params.insert("charset", self.config.charset().into());
         params.insert("sign_type", self.config.sign_type().into());
@@ -107,7 +110,12 @@ impl AlipayClient {
             "timestamp",
             Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         );
+
         params.insert("version", self.config.version().into());
+
+        if !method.is_empty() {
+            params.insert("method", method.into());
+        }
 
         if let Some(certificate_info) = self.certificate_info() {
             if let Some(app_cert_sn) = certificate_info.app_cert_sn.as_ref() {
@@ -125,16 +133,18 @@ impl AlipayClient {
             params.insert("app_auth_token", app_auth_token.into());
         }
 
-        params.insert(
-            "biz_content",
-            serde_json::to_string(biz_content)
-                .map_err(|e| format!("Failed to serialize biz_content to JSON: {}", e))?,
-        );
+        if std::any::TypeId::of::<()>() != std::any::TypeId::of::<T>() {
+            params.insert(
+                "biz_content",
+                serde_json::to_string(biz_content)
+                    .map_err(|e| format!("Failed to serialize biz_content to JSON: {}", e))?,
+            );
+        }
 
         extra_params.map(|ext| params.extend(ext));
 
         let sign = sign_with_rsa2(
-            build_sign_content(& params).as_str(),
+            build_sign_content(&params).as_str(),
             self.config.merchant_private_key(),
         )?;
         params.insert("sign", sign);
@@ -142,6 +152,34 @@ impl AlipayClient {
         Ok(params)
     }
 
+    pub fn generate_page(
+        &self,
+        method: &str,
+        params: &mut BTreeMap<&'static str, String>,
+    ) -> Result<String, &'static str> {
+        if method.eq_ignore_ascii_case("GET") {
+            Ok(format!(
+                "{}?{}",
+                self.config.gateway_url(),
+                build_sign_content(&params)
+            ))
+        } else if method.eq_ignore_ascii_case("POST") {
+            let action_url = format!(
+                "{}?{}",
+                self.config.gateway_url(),
+                build_sign_content(&params)
+            );
+
+            let biz_content = params.remove("biz_content");
+            let parameters = biz_content
+                .map(|s| BTreeMap::from_iter([("biz_content", s)]))
+                .unwrap_or_default();
+
+            Ok(PageUtil::build_form(action_url, &parameters))
+        } else {
+            return Err("Invalid method, only POST or GET are supported");
+        }
+    }
     fn certificate_info(&self) -> Option<&AlipayCertificateInfo> {
         self.certificate_info.as_ref()
     }

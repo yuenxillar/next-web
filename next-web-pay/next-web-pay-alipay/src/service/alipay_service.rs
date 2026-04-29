@@ -26,8 +26,6 @@ impl AliPayService {
             .collect::<BTreeMap<&str, &str>>();
         let content = build_notify_sign_content(&pairs);
 
-        println!("content: {}", content);
-
         self.client
             .verify_signature(content.as_str(), sign)
             .inspect_err(|e| tracing::error!("verify sign[{}] failed: {}", sign, e))

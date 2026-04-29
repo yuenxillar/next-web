@@ -30,7 +30,7 @@ fn build_sign_content_with_options(
     params
         .iter()
         .filter(|(key, value)| {
-            !value.is_empty() && **key != "sign" && (!skip_sign_type || **key != "sign_type")
+            !value.is_empty() && (!skip_sign_type || ( **key != "sign" && **key != "sign_type"))
         })
         .map(|(key, value)| format!("{key}={value}"))
         .collect::<Vec<_>>()

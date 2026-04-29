@@ -1,7 +1,9 @@
+use std::any::Any;
+
 use crate::{
     AlipayError, AlipayResult, Method, Named,
     client::AlipayClient,
-    payment::{model::AlipayResponse, common::model::*},
+    payment::{common::model::*, model::AlipayResponse},
 };
 
 pub trait AlipayTradePay {
@@ -49,7 +51,8 @@ where
     fn precreate(
         &self,
         req: AlipayTradePrecreateRequest,
-    ) -> impl Future<Output = AlipayResult<AlipayResponse<AlipayTradePrecreateResponse>>> + Send {
+    ) -> impl Future<Output = AlipayResult<AlipayResponse<AlipayTradePrecreateResponse>>> + Send
+    {
         self.call(req)
     }
 
@@ -84,7 +87,8 @@ where
     fn refund_query(
         &self,
         req: AlipayTradeRefundQueryRequest,
-    ) -> impl Future<Output = AlipayResult<AlipayResponse<AlipayTradeRefundQueryResponse>>> + Send {
+    ) -> impl Future<Output = AlipayResult<AlipayResponse<AlipayTradeRefundQueryResponse>>> + Send
+    {
         self.call(req)
     }
 
@@ -98,10 +102,14 @@ where
 
 #[allow(unused)]
 trait AlipayTradePayExt {
-    fn call<Req, Resp>(&self, req: Req) -> impl Future<Output = AlipayResult<AlipayResponse<Resp>>> + Send
+    fn call<Req, Resp>(
+        &self,
+        req: Req,
+    ) -> impl Future<Output = AlipayResult<AlipayResponse<Resp>>> + Send
     where
         Req: Method + serde::Serialize,
         Req: Send + Sync,
+        Req: Any,
         Resp: Named + serde::de::DeserializeOwned,
         Resp: Send + Sync;
 }
@@ -111,10 +119,14 @@ where
     T: AsRef<AlipayClient>,
     T: Sync,
 {
-    fn call<Req, Resp>(&self, req: Req) -> impl Future<Output = AlipayResult<AlipayResponse<Resp>>> + Send
+    fn call<Req, Resp>(
+        &self,
+        req: Req,
+    ) -> impl Future<Output = AlipayResult<AlipayResponse<Resp>>> + Send
     where
         Req: Method + serde::Serialize,
         Req: Send + Sync,
+        Req: Any,
         Resp: Named + serde::de::DeserializeOwned,
         Resp: Send + Sync,
     {

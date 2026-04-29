@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+tokio           = { workspace = true }
+
 chrono          = { workspace = true }
 form_urlencoded = { workspace = true }
-reqwest         = { workspace = true }
 serde           = { workspace = true }
 serde_json      = { workspace = true }
 thiserror       = { workspace = true }
@@ -22,5 +23,9 @@ rsa             = { workspace = true, features = ["pem"] }
 
 tracing         = { workspace = true }
 
+futures-util    = { workspace = true }
+
+reqwest             = { workspace = true }
+reqwest-websocket   = { workspace = true }
+
 [dev-dependencies]
-tokio           = { workspace = true }

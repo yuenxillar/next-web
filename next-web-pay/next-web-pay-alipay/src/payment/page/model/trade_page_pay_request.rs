@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::Method;
 
@@ -245,7 +245,7 @@ pub struct ExtUserInfo {
     pub identity_hash: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize,PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CertType {
     /// 身份证
@@ -266,6 +266,20 @@ pub enum CertType {
     /// 其他证件
     #[serde(other)]
     Other,
+}
+
+impl std::fmt::Display for CertType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            CertType::IdentityCard => "IDENTITY_CARD",
+            CertType::PassPort => "PASSPORT",
+            CertType::OfficerCard => "OFFICER_CARD",
+            CertType::SoldierCard => "SOLDIER_CARD",
+            CertType::HoKou => "HOKOU",
+            CertType::Other => "OTHER",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 /// 开票信息
