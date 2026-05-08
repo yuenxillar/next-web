@@ -14,6 +14,9 @@ mod trade_query_response;
 mod trade_refund_query_response;
 mod trade_refund_response;
 
+mod bill_downloadurl_query_request;
+mod bill_downloadurl_query_response;
+
 mod trade_pay_notify;
 
 pub use trade_cancel_request::AlipayTradeCancelRequest;
@@ -31,5 +34,8 @@ pub use trade_precreate_response::AlipayTradePrecreateResponse;
 pub use trade_query_response::AlipayTradeQueryResponse;
 pub use trade_refund_query_response::AlipayTradeRefundQueryResponse;
 pub use trade_refund_response::AlipayTradeRefundResponse;
+
+pub use bill_downloadurl_query_request::AlipayTradeBillDownloadurlQueryRequest;
+pub use bill_downloadurl_query_response::AlipayTradeBillDownloadurlQueryResponse;
 
 pub use trade_pay_notify::AlipayTradePayNotify;

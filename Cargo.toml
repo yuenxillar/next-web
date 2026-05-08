@@ -25,8 +25,9 @@ members = [
     "next-web-pay/next-web-pay-wechatpay",
     "next-web-xxl-job",
     "next-web-state-machine",
-    "next-web-id-generator"
-]
+    "next-web-id-generator",
+    "next-web-cloud",
+    "next-web-cloud/next-web-cloud-jingyue"]
 exclude = ["next-web-code-generator"]
 resolver = "2"
 

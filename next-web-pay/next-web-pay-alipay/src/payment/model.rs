@@ -1,3 +1,5 @@
+use std::fmt::{Debug, Display, format};
+
 use serde::{Deserialize, Deserializer, de::DeserializeOwned};
 use serde_json::Value;
 
@@ -11,8 +13,10 @@ where
 {
     /// 网关返回码
     pub code: String,
+
     /// 网关返回码描述
     pub msg: String,
+
     /// 签名
     pub sign: String,
 
@@ -50,8 +54,17 @@ where
             Response::Error(_) => panic!("ErrorResponse does not have data"),
         }
     }
-}
 
+    pub fn to_error_string(self) -> String {
+        match self.data {
+            Response::Success(_) => panic!("SuccessResponse does not have error"),
+            Response::Error(error) => format!(
+                "code: {}, msg: {}, sub_code: {}, sub_msg: {}",
+                self.code, self.msg, error.sub_code, error.sub_msg
+            ),
+        }
+    }
+}
 impl<'de, T> Deserialize<'de> for AlipayResponse<T>
 where
     T: DeserializeOwned + Named,
@@ -66,7 +79,10 @@ where
         let mut value: Value = Deserialize::deserialize(deserializer)?;
 
         // 2. 提取 sign 字段
-        let sign = value["sign"].as_str().unwrap_or_default().to_string();
+        let sign = match value["sign"].take() {
+            Value::String(sign) => sign,
+            _ => String::new(),
+        };
 
         // 3. 根据 T 的 name() 获取业务数据字段名，比如 "alipay_trade_pay_response"
         let biz_key = T::name();
@@ -75,20 +91,15 @@ where
             .ok_or_else(|| Error::custom(format!("missing field: {}", biz_key)))?;
 
         // 4. 从业务数据中提取公共字段
-        let code = biz_body["code"]
-            .as_str()
-            .map(ToString::to_string)
-            .unwrap_or_default();
+        let code = match biz_body["code"].take() {
+            Value::String(code) => code,
+            _ => String::new(),
+        };
 
-        let msg = biz_body["msg"]
-            .as_str()
-            .map(ToString::to_string)
-            .unwrap_or_default();
-
-        if let Some(object) = biz_body.as_object_mut() {
-            object.remove("code");
-            object.remove("msg");
-        }
+        let msg = match biz_body["msg"].take() {
+            Value::String(msg) => msg,
+            _ => String::new(),
+        };
 
         // 5. 反序列化业务数据 T（包含 code/msg 在内的所有字段）
         let data: Response<T> = serde_json::from_value(biz_body.take()).map_err(Error::custom)?;

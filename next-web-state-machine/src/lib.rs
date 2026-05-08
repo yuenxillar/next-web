@@ -14,7 +14,6 @@ pub mod region;
 pub mod security;
 pub mod state;
 pub mod state_context;
-mod state_machine;
 pub mod state_machine_context;
 pub mod state_machine_event_result;
 pub mod state_machine_generator;
@@ -23,5 +22,7 @@ pub mod state_machine_system_constants;
 pub mod support;
 pub mod transition;
 pub mod trigger;
+
+mod state_machine;
 
 pub use state_machine::*;

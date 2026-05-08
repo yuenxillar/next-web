@@ -1,0 +1,12 @@
+[package]
+name = "next-web-cloud-jingyue"
+version = "0.1.0"
+keywords = ["next-web", "jingyue"]
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

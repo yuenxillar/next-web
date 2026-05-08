@@ -1,5 +1,5 @@
 pub mod app;
-pub mod facetoface;
+pub mod face;
 pub mod huabei;
 pub mod page;
 pub mod wap;

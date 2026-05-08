@@ -252,6 +252,7 @@ pub enum CertType {
     IdentityCard,
 
     /// 护照
+    #[serde(rename = "PASSPORT")]
     PassPort,
 
     ///军官证
