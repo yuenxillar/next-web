@@ -60,6 +60,6 @@ pub fn fail_xml(message: &str) -> String {
 /// Converts a flat parameter map into a typed notification.
 pub fn notification_from_map(
     params: &BTreeMap<String, String>,
-) -> crate::Result<PaymentNotification> {
+) -> crate::WechatPayResult<PaymentNotification> {
     serde_json::from_value(serde_json::to_value(params)?).map_err(Into::into)
 }

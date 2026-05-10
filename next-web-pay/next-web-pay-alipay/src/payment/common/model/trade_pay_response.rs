@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::Named;
+use crate::{Named, payment::common::model::trade_pay_notify::FundChannel};
 
 /// 支付宝交易支付响应数据
 #[derive(Debug, Clone, Deserialize)]
@@ -79,7 +79,8 @@ pub struct AlipayTradePayResponse {
 pub struct TradeFundBill {
     /// 交易使用的资金渠道（必填）
     /// 32个字符
-    pub fund_channel: String,
+    #[serde(rename = "fundChannel")]
+    pub fund_channel: FundChannel,
 
     /// 该支付工具类型所使用的金额（必填）
     /// 单位：元

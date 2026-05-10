@@ -1,24 +1,32 @@
-use crate::model::SignType;
-
 /// WeChat Pay V2 configuration.
 #[derive(Debug, Clone)]
 pub struct WechatPayConfig {
     /// WeChat app id.
     pub app_id: String,
+
     /// Merchant id.
     pub mch_id: String,
+
     /// API key configured in the merchant platform.
     pub api_key: String,
-    /// Default sign type.
-    pub sign_type: SignType,
+
     /// Default notify URL.
     pub notify_url: Option<String>,
+
     /// Gateway base URL.
     pub base_url: String,
+
     /// PKCS#12 certificate path for refund and reverse APIs.
     pub merchant_cert_p12_path: Option<String>,
+
     /// PKCS#12 certificate password. Usually the merchant id.
     pub merchant_cert_p12_password: Option<String>,
+
+    /// V3 API: merchant certificate serial number for Authorization header.
+    pub merchant_serial_no: Option<String>,
+    
+    /// V3 API: merchant private key (PEM format) for signing.
+    pub merchant_private_key: Option<String>,
 }
 
 impl WechatPayConfig {
@@ -35,19 +43,15 @@ impl WechatPayConfig {
             app_id: app_id.into(),
             mch_id: mch_id.into(),
             api_key: api_key.into(),
-            sign_type: SignType::Md5,
             notify_url: None,
             base_url: Self::DEFAULT_BASE_URL.to_string(),
             merchant_cert_p12_path: None,
             merchant_cert_p12_password: None,
+            merchant_serial_no: None,
+            merchant_private_key: None,
         }
     }
 
-    /// Sets the default sign type.
-    pub fn with_sign_type(mut self, sign_type: SignType) -> Self {
-        self.sign_type = sign_type;
-        self
-    }
 
     /// Sets the default notify URL.
     pub fn with_notify_url(mut self, notify_url: impl Into<String>) -> Self {
@@ -70,5 +74,23 @@ impl WechatPayConfig {
         self.merchant_cert_p12_path = Some(path.into());
         self.merchant_cert_p12_password = Some(password.into());
         self
+    }
+
+    /// Sets the V3 API merchant certificate serial number.
+    pub fn with_merchant_serial_no(mut self, serial_no: impl Into<String>) -> Self {
+        self.merchant_serial_no = Some(serial_no.into());
+        self
+    }
+
+    /// Sets the V3 API merchant private key (PEM format).
+    pub fn with_merchant_private_key(mut self, private_key: impl Into<String>) -> Self {
+        self.merchant_private_key = Some(private_key.into());
+        self
+    }
+}
+
+impl WechatPayConfig {
+    pub fn base_url(&self) -> &str {
+        self.base_url.as_str()
     }
 }

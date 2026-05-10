@@ -1,16 +1,18 @@
-//! WeChat Pay V2 client.
-
+//! WeChat Pay V3 client.
 pub mod client;
 pub mod config;
 pub mod error;
-pub mod model;
 pub mod notify;
+pub mod payment;
 pub mod sign;
-pub mod xml;
 
-pub use client::WechatPayClient;
-pub use config::WechatPayConfig;
-pub use error::WechatPayError;
+/// Alias for the crate-level result type.
+pub type WechatPayResult<T> = std::result::Result<T, crate::error::WechatPayError>;
 
-/// Crate-level result type.
-pub type Result<T> = std::result::Result<T, WechatPayError>;
+pub trait Path {
+    fn path() -> &'static str;
+}
+
+pub trait ToPath {
+    fn to_path(&self) -> Result<String, crate::error::WechatPayError>;
+}

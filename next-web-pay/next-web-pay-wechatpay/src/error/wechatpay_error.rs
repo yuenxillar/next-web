@@ -12,9 +12,6 @@ pub enum WechatPayError {
     /// Raised when JSON serialization or deserialization fails.
     #[error("serde error: {0}")]
     Serde(#[from] serde_json::Error),
-    /// Raised when XML parsing fails.
-    #[error("xml parse error: {0}")]
-    Xml(#[from] quick_xml::Error),
     /// Raised when HTTP transport fails.
     #[error("http request failed: {0}")]
     Http(#[from] reqwest::Error),
@@ -47,4 +44,7 @@ pub enum WechatPayError {
     /// Raised when a response signature is invalid.
     #[error("invalid wechat pay signature")]
     InvalidSignature,
+
+    #[error("custom error: {0}")]
+    Custom(String),
 }
