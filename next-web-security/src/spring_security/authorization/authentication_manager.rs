@@ -1,8 +1,8 @@
 use crate::core::{authentication::Authentication, authentication_error::AuthenticationError};
 
 pub trait AuthenticationManager: Send + Sync {
-    fn authenticate(
+    fn authenticate<'a>(
         &self,
-        authentication: &dyn Authentication,
-    ) -> Result<&dyn Authentication, AuthenticationError>;
+        authentication: &'a dyn Authentication,
+    ) -> Result<&'a dyn Authentication, AuthenticationError>;
 }

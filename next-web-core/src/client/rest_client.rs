@@ -40,26 +40,34 @@ impl RestClient {
         RestClientBuilder::default()
     }
 
+    /// Send a GET request to the specified URL
     pub async fn get<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
         self.request(Method::GET, url)
     }
 
+    /// Send a POST request to the specified URL
     pub async fn post<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
         self.request(Method::POST, url)
     }
 
+    /// Send a PUT request to the specified URL
     pub async fn put<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
         self.request(Method::PUT, url)
     }
 
+
+    /// Send a DELETE request to the specified URL
     pub async fn delete<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
         self.request(Method::DELETE, url)
     }
 
+
+    /// Send a PATCH request to the specified URL
     pub async fn patch<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
         self.request(Method::PATCH, url)
     }
 
+    /// Send a HEAD request to the specified URL
     pub async fn head<U: AsRef<str>>(&self, url: U) -> RequestBuilder {
         self.request(Method::HEAD, url)
     }

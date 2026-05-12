@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use next_web_core::{anys::any_error::AnyError, async_trait};
+use next_web_core::{anys::any_error::AnyError, async_trait, traits::named::Named};
 
 use crate::{
     context::retry_context_support::RetryContextSupport,
@@ -116,8 +116,8 @@ struct CompositeRetryContext {
 
 impl_retry_context!(CompositeRetryContext);
 
-impl ToString for CompositeRetryPolicy {
-    fn to_string(&self) -> String {
-        "CompositeRetryPolicy".to_string()
+impl Named for CompositeRetryPolicy {
+    fn name(&self) -> &str {
+        "CompositeRetryPolicy"
     }
 }

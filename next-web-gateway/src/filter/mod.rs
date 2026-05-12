@@ -1,32 +1,8 @@
-pub mod add_request_header;
-pub mod add_request_headers_if_not_present;
-pub mod add_request_parameter;
-pub mod add_response_header;
-pub mod dedupe_response_header;
-pub mod default;
+
 pub mod gateway_filter;
 pub mod global_filter;
-pub mod local_response_cache;
-pub mod map_request_header;
-pub mod prefix_path;
-pub mod preserve_host_header;
-pub mod redirect_to;
-pub mod remove_json_attributes_response_body;
-pub mod remove_request_header;
-pub mod remove_request_parameter;
-pub mod remove_response_header;
-pub mod request_header_size;
-pub mod request_rate_limiter;
-pub mod request_size;
-pub mod rewrite_location_response_header;
-pub mod rewrite_path;
-pub mod rewrite_response_header;
-pub mod save_session;
-pub mod secure_headers;
-pub mod set_path;
-pub mod set_request_header;
-pub mod set_request_host_header;
-pub mod set_response_header;
-pub mod set_status;
-pub mod strip_prefix;
-pub mod token_relay;
+
+pub mod ordered_gateway_filter;
+pub mod gateway_filter_chain;
+
+pub mod factory;

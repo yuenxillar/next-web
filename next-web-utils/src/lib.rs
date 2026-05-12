@@ -1,8 +1,7 @@
-pub mod calendar;
 pub mod common;
 pub mod cron;
 pub mod crypto;
-pub mod datetime;
+pub mod date;
 pub mod file;
 pub mod html;
 pub mod image;

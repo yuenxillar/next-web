@@ -12,7 +12,7 @@ use crate::{
         circuit_breaker_service::CircuitBreakerService,
         circuit_breaker_service_manager::CircuitBreakerServiceManager,
     },
-    route::route_service_manager::RouteServiceManager,
+    handler::predicate::RouteServiceManager,
     service::route_service::RoutePredicateService,
 };
 

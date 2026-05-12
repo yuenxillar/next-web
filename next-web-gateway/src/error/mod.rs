@@ -1,1 +1,4 @@
-pub mod gateway_error;
+mod gateway_error;
+
+
+pub use gateway_error::GatewayError;

@@ -23,7 +23,22 @@ impl AntPathRequestMatcher {
 
 impl RequestMatcher for AntPathRequestMatcher {
     fn matches(&self, request: &axum::extract::Request) -> bool {
-        todo!()
+        if let Some(http_method) = self.http_method {
+            if request.method().as_str() != http_method.to_string() {
+                return false;
+            }
+        }
+
+        let path = request.uri().path();
+        if self.pattern == Self::MATCH_ALL {
+            return true;
+        }
+
+        if self.case_sensitive {
+            ant_match(&self.pattern, path)
+        } else {
+            ant_match(&self.pattern.to_ascii_lowercase(), &path.to_ascii_lowercase())
+        }
     }
 }
 
@@ -35,6 +50,71 @@ impl From<HttpMethod> for AntPathRequestMatcher {
             case_sensitive: true,
         }
     }
+}
+
+fn ant_match(pattern: &str, path: &str) -> bool {
+    if pattern == path {
+        return true;
+    }
+
+    let pattern_segments = split_path(pattern);
+    let path_segments = split_path(path);
+    match_segments(&pattern_segments, &path_segments)
+}
+
+fn split_path(path: &str) -> Vec<&str> {
+    path.trim_matches('/')
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect()
+}
+
+fn match_segments(pattern: &[&str], path: &[&str]) -> bool {
+    if pattern.is_empty() {
+        return path.is_empty();
+    }
+
+    if pattern[0] == "**" {
+        return match_segments(&pattern[1..], path)
+            || (!path.is_empty() && match_segments(pattern, &path[1..]));
+    }
+
+    if path.is_empty() {
+        return false;
+    }
+
+    match_segment(pattern[0], path[0]) && match_segments(&pattern[1..], &path[1..])
+}
+
+fn match_segment(pattern: &str, text: &str) -> bool {
+    let pattern = pattern.as_bytes();
+    let text = text.as_bytes();
+    let (mut p, mut t) = (0, 0);
+    let mut star = None;
+    let mut star_match = 0;
+
+    while t < text.len() {
+        if p < pattern.len() && (pattern[p] == b'?' || pattern[p] == text[t]) {
+            p += 1;
+            t += 1;
+        } else if p < pattern.len() && pattern[p] == b'*' {
+            star = Some(p);
+            star_match = t;
+            p += 1;
+        } else if let Some(star_index) = star {
+            p = star_index + 1;
+            star_match += 1;
+            t = star_match;
+        } else {
+            return false;
+        }
+    }
+
+    while p < pattern.len() && pattern[p] == b'*' {
+        p += 1;
+    }
+
+    p == pattern.len()
 }
 
 impl From<&str> for AntPathRequestMatcher {

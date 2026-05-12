@@ -8,11 +8,13 @@ use axum::{
 use futures::FutureExt;
 use next_web::{
     application::Application,
-    extract::find_singleton::FindSingleton,
+    extract::{find_singleton::FindSingleton, typed_header::TypedHeader},
     macros::bind::{get_mapping, post_mapping},
     rand::{self, Rng},
 };
-use next_web_core::{ApplicationContext, async_trait, context::properties::ApplicationProperties};
+use next_web_core::{
+    ApplicationContext, async_trait, context::properties::ApplicationProperties, headers::Host,
+};
 use next_web_pay_alipay::{
     config::AlipayConfig,
     payment::{
@@ -51,36 +53,25 @@ impl Application for TestApplication {
         let mut config = AlipayConfig::default()
             .with_gateway_url("https://openapi-sandbox.dl.alipaydev.com/gateway.do")
             .with_notify_url(format!("{MY_GATEWAY_URL}/pay/notify/alipay"));
-        config.set_alipay_root_cert_path(
-            std::env::home_dir()
-                .map(|s| {
-                    s.join("alipay/cert/alipayRootCert.crt")
-                        .to_str()
-                        .map(ToString::to_string)
-                })
-                .unwrap()
-                .unwrap_or("/alipay/cert/alipayRootCert.crt".into()),
-        );
-        config.set_merchant_cert_path(
-            std::env::home_dir()
-                .map(|s| {
-                    s.join("alipay/cert/appPublicCert.crt")
-                        .to_str()
-                        .map(ToString::to_string)
-                })
-                .unwrap()
-                .unwrap_or("/alipay/cert/appPublicCert.crt".into()),
-        );
-        config.set_alipay_cert_path(
-            std::env::home_dir()
-                .map(|s| {
-                    s.join("alipay/cert/alipayPublicCert.crt")
-                        .to_str()
-                        .map(ToString::to_string)
-                })
-                .unwrap()
-                .unwrap_or("/alipay/cert/alipayPublicCert.crt".into()),
-        );
+
+        macro_rules! auto_set {
+            ($field:ident, path: $path:expr) => {
+                if let Some(home) = std::env::home_dir() {
+                    let full_path = home.join($path);
+                    if let Some(path_str) = full_path.to_str() {
+                        config.$field(path_str.to_string());
+                    } else {
+                        config.$field($path.to_string());
+                    }
+                } else {
+                    config.$field($path.to_string());
+                }
+            };
+        }
+
+        auto_set!(set_alipay_root_cert_path, path: "alipay/cert/alipayRootCert.crt");
+        auto_set!(set_merchant_cert_path, path: "alipay/cert/appPublicCert.crt");
+        auto_set!(set_alipay_cert_path, path: "alipay/cert/alipayPublicCert.crt");
 
         let alipay_service = AliPayService::new(config);
 
@@ -162,9 +153,10 @@ async fn alipay_return(Query(params): Query<BTreeMap<String, String>>) -> String
 #[post_mapping(path = "/pay/notify/alipay")]
 async fn alipay_notify(
     FindSingleton(alipay_service): FindSingleton<AliPayService>,
+    TypedHeader(host): TypedHeader<Host>,
     // 建议先用有序的 map 存储参数
     Form(trade_pay_notify): Form<BTreeMap<String, String>>,
-) -> String {
+) -> &'static str {
     // 1. 商家需要验证该通知数据中的 out_trade_no 是否为商家系统中创建的订单号。
     // 2. 判断 total_amount 是否确实为该订单的实际金额（即商家订单创建时的金额）。
     // 3. 校验通知中的 seller_id（或者 seller_email ) 是否为 out_trade_no 这笔单据的对应的操作方（有的时候，一个商家可能有多个seller_id/seller_email）。
@@ -181,12 +173,17 @@ async fn alipay_notify(
             .unwrap_or_default()
     );
 
+    // 1. 判断来源是否为阿里云官方
+    if host.hostname() == "xxxx" {
+        return "fail".into_response();
+    }
+
     trade_pay_notify
         .get("sign")
         .map(|sign| alipay_service.verify_sign(&trade_pay_notify, sign.as_str()))
         .unwrap_or_default()
-        .then(|| String::from("success"))
-        .unwrap_or(String::from("fail"))
+        .then(|| "success")
+        .unwrap_or("fail")
 }
 
 fn generate_order_no() -> String {

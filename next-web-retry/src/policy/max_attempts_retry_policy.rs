@@ -1,4 +1,4 @@
-use next_web_core::{anys::any_error::AnyError, async_trait};
+use next_web_core::{anys::any_error::AnyError, async_trait, traits::named::Named};
 use std::{
     any::Any,
     sync::{
@@ -63,8 +63,8 @@ impl RetryPolicy for MaxAttemptsRetryPolicy {
     }
 }
 
-impl ToString for MaxAttemptsRetryPolicy {
-    fn to_string(&self) -> String {
-        "MaxAttemptsRetryPolicy".to_string()
+impl Named for MaxAttemptsRetryPolicy {
+    fn name(&self) -> &str {
+        "MaxAttemptsRetryPolicy"
     }
 }

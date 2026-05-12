@@ -5,9 +5,9 @@ pub struct LogoutFilter {}
 impl Filter for LogoutFilter {
     fn do_filter(
         &self,
-        req: &mut axum::extract::Request,
-        res: &mut axum::response::Response,
+        _req: &mut axum::extract::Request,
+        _res: &mut axum::response::Response,
     ) -> Result<(), next_web_core::error::BoxError> {
-        todo!()
+        Ok(())
     }
 }

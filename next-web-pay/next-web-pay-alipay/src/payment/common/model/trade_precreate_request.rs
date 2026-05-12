@@ -93,7 +93,6 @@ pub struct BusinessParams {
 }
 
 impl AlipayTradePrecreateRequest {
-    /// 创建必需参数的最小化请求
     pub fn new(
         out_trade_no: impl Into<String>,
         total_amount: impl Into<String>,

@@ -14,8 +14,8 @@ impl MapRetryContextCache {
 }
 
 impl RetryContextCache for MapRetryContextCache {
-    fn get(&self, key: &str) -> Option<&dyn RetryContext> {
-        self.contexts.get(key).map(|context| context.as_ref())
+    fn get(&self, key: &str) -> Option<Arc<dyn RetryContext>> {
+        self.contexts.get(key).cloned()
     }
 
     fn get_mut(&self, _key: &str) -> Option<&mut dyn RetryContext> {
@@ -32,5 +32,23 @@ impl RetryContextCache for MapRetryContextCache {
 
     fn contains_key(&self, key: &str) -> bool {
         self.contexts.contains_key(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::context::retry_context_support::RetryContextSupport;
+
+    use super::*;
+
+    #[test]
+    fn get_returns_the_same_cached_context_object() {
+        let mut cache = MapRetryContextCache::new();
+        let context: Arc<dyn RetryContext> = Arc::new(RetryContextSupport::default());
+
+        cache.put("item", context.clone());
+        let cached = cache.get("item").expect("context should exist");
+
+        assert!(Arc::ptr_eq(&context, &cached));
     }
 }

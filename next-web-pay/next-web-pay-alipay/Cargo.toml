@@ -1,7 +1,13 @@
 [package]
 name = "next-web-pay-alipay"
 version = "0.1.0"
-edition = "2024"
+keywords = ["next-web", "alipay", "pay"]
+description = "A alipay pay Service"
+readme = "README.md"
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
 tokio           = { workspace = true }

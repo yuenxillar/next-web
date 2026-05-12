@@ -194,7 +194,9 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
         self.mapping_count += 1;
     }
 
-    fn create_authorization_manager(&self) -> Arc<dyn AuthorizationManager<Request>> {
+    fn create_authorization_manager(
+        &self,
+    ) -> Arc<dyn AuthorizationManager<RequestAuthorizationContext>> {
         assert!(self.unmapped_matchers.is_none(), "An incomplete mapping was found for [{:?}] . Try completing it with something like requestUrls().<something>.hasRole('USER')",
         self.unmapped_matchers);
 

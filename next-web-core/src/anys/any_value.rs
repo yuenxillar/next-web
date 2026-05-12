@@ -16,65 +16,47 @@ pub enum AnyValue {
 }
 
 impl AnyValue {
-    /// Check if the value is a number
-    ///
-    /// 检查是否为数字类型
+    /// Check if the value is a number.
     pub fn is_number(&self) -> bool {
         matches!(self, AnyValue::Number(_))
     }
 
-    /// Check if the value is a float
-    ///
-    /// 检查是否为浮点数类型
+    /// Check if the value is a float.
     pub fn is_float(&self) -> bool {
         matches!(self, AnyValue::Float(_))
     }
 
-    /// Check if the value is a string
-    ///
-    /// 检查是否为字符串类型
+    /// Check if the value is a string.
     pub fn is_string(&self) -> bool {
         matches!(self, AnyValue::String(_))
     }
 
-    /// Check if the value is a boolean
-    ///
-    /// 检查是否为布尔类型
+    /// Check if the value is a boolean.
     pub fn is_boolean(&self) -> bool {
         matches!(self, AnyValue::Boolean(_))
     }
 
-    /// Check if the value is null
-    ///
-    /// 检查是否为null
+    /// Check if the value is null.
     pub fn is_null(&self) -> bool {
         matches!(self, AnyValue::Null)
     }
 
-    /// Check if the value is a map
-    ///
-    /// 检查是否为map类型
+    /// Check if the value is a map.
     pub fn is_map(&self) -> bool {
         matches!(self, AnyValue::Map(_))
     }
 
-    /// Check if the value is an array
-    ///
-    /// 检查是否为数组类型
+    /// Check if the value is a list.
     pub fn is_list(&self) -> bool {
         matches!(self, AnyValue::List(_))
     }
 
-    /// Check if the value is an object
-    ///
-    /// 检查是否为对象类型
+    /// Check if the value is an object.
     pub fn is_object(&self) -> bool {
         matches!(self, AnyValue::Object(_))
     }
 
-    /// Get string value
-    ///
-    /// 获取字符串值
+    /// Get a cloned string value.
     pub fn as_string(&self) -> Option<String> {
         if let AnyValue::String(value) = self {
             Some(value.clone())
@@ -83,9 +65,7 @@ impl AnyValue {
         }
     }
 
-    /// Get string value
-    ///
-    /// 获取字符串值
+    /// Get a borrowed string value.
     pub fn as_str(&self) -> Option<&str> {
         if let AnyValue::String(value) = self {
             Some(value.as_str())
@@ -94,9 +74,7 @@ impl AnyValue {
         }
     }
 
-    /// Get number value
-    ///
-    /// 获取数字值
+    /// Get a number value.
     pub fn as_number(&self) -> Option<i64> {
         if let AnyValue::Number(value) = self {
             Some(*value)
@@ -105,9 +83,7 @@ impl AnyValue {
         }
     }
 
-    /// Get float value
-    ///
-    /// 获取浮点数
+    /// Get a float value.
     pub fn as_float(&self) -> Option<f64> {
         if let AnyValue::Float(value) = self {
             Some(*value)
@@ -116,9 +92,7 @@ impl AnyValue {
         }
     }
 
-    /// Get boolean value
-    ///
-    /// 获取布尔值
+    /// Get a boolean value.
     pub fn as_boolean(&self) -> Option<bool> {
         if let AnyValue::Boolean(value) = self {
             Some(*value)
@@ -127,9 +101,7 @@ impl AnyValue {
         }
     }
 
-    /// Get map value
-    ///
-    /// 获取映射
+    /// Get a map reference.
     pub fn as_map(&self) -> Option<&HashMap<String, AnyValue>> {
         if let AnyValue::Map(value) = self {
             Some(value)
@@ -138,20 +110,20 @@ impl AnyValue {
         }
     }
 
-    /// Get list reference
-    ///
-    /// 获取数组引用
+    /// Get a list reference.
     pub fn as_list(&self) -> Option<&Vec<AnyValue>> {
-        if let AnyValue::List(a) = self {
-            Some(a)
+        if let AnyValue::List(value) = self {
+            Some(value)
         } else {
             None
         }
     }
 
-    /// Get object reference
+    /// Get a cloned object value.
     ///
-    /// 获取对象
+    /// This clones the stored object before downcasting it. Use
+    /// [`Self::as_ref_object`] to borrow the object without cloning, or
+    /// [`Self::as_own_object`] when consuming this `AnyValue`.
     pub fn as_object<T: Any>(&self) -> Option<T> {
         if let AnyValue::Object(obj) = self {
             let any_obj = obj.clone();
@@ -161,21 +133,17 @@ impl AnyValue {
         }
     }
 
-    /// Get object reference
-    ///
-    /// 获取对象引用
+    /// Get an object reference.
     pub fn as_ref_object<T: Any>(&self) -> Option<&T> {
         if let AnyValue::Object(obj) = self {
-            let any_obj: &dyn Any = obj;
+            let any_obj: &dyn Any = obj.as_ref();
             any_obj.downcast_ref()
         } else {
             None
         }
     }
 
-    /// Get own object
-    ///
-    /// 获取对象所有权
+    /// Get an owned object by consuming this value.
     pub fn as_own_object<T: Any>(self) -> Option<T> {
         if let AnyValue::Object(any_obj) = self {
             any_obj.into_any().downcast().map(|obj| *obj).ok()
@@ -184,127 +152,187 @@ impl AnyValue {
         }
     }
 
+    /// Convert to a string representation.
+    #[allow(clippy::inherent_to_string_shadow_display)]
     pub fn to_string(&self) -> String {
-        match self {
-            AnyValue::String(s) => s.clone(),
-            AnyValue::Number(n) => n.to_string(),
-            AnyValue::Boolean(b) => b.to_string(),
-            AnyValue::Null => "null".to_string(),
-            AnyValue::List(a) => {
-                let mut s = String::new();
-                s.push('[');
-
-                for v in a.iter() {
-                    s.push_str(&v.to_string());
-                    s.push(',');
-                }
-                s.push(']');
-                s
-            }
-            _ => "".to_string(),
-        }
+        ToString::to_string(self)
     }
 }
 
-impl Into<AnyValue> for String {
-    fn into(self) -> AnyValue {
-        AnyValue::String(self)
+impl From<String> for AnyValue {
+    fn from(value: String) -> Self {
+        AnyValue::String(value)
     }
 }
 
-impl Into<AnyValue> for &str {
-    fn into(self) -> AnyValue {
-        AnyValue::String(self.to_string())
+impl From<&str> for AnyValue {
+    fn from(value: &str) -> Self {
+        AnyValue::String(value.to_string())
     }
 }
 
-impl Into<AnyValue> for i8 {
-    fn into(self) -> AnyValue {
-        AnyValue::Number(self as i64)
+impl From<i8> for AnyValue {
+    fn from(value: i8) -> Self {
+        AnyValue::Number(value as i64)
     }
 }
 
-impl Into<AnyValue> for i16 {
-    fn into(self) -> AnyValue {
-        AnyValue::Number(self as i64)
+impl From<i16> for AnyValue {
+    fn from(value: i16) -> Self {
+        AnyValue::Number(value as i64)
     }
 }
 
-impl Into<AnyValue> for i32 {
-    fn into(self) -> AnyValue {
-        AnyValue::Number(self as i64)
+impl From<i32> for AnyValue {
+    fn from(value: i32) -> Self {
+        AnyValue::Number(value as i64)
     }
 }
 
-impl Into<AnyValue> for i64 {
-    fn into(self) -> AnyValue {
-        AnyValue::Number(self)
+impl From<i64> for AnyValue {
+    fn from(value: i64) -> Self {
+        AnyValue::Number(value)
     }
 }
 
-impl Into<AnyValue> for u8 {
-    fn into(self) -> AnyValue {
-        AnyValue::Number(self as i64)
+impl From<u8> for AnyValue {
+    fn from(value: u8) -> Self {
+        AnyValue::Number(value as i64)
     }
 }
 
-impl Into<AnyValue> for u16 {
-    fn into(self) -> AnyValue {
-        AnyValue::Number(self as i64)
+impl From<u16> for AnyValue {
+    fn from(value: u16) -> Self {
+        AnyValue::Number(value as i64)
     }
 }
 
-impl Into<AnyValue> for u32 {
-    fn into(self) -> AnyValue {
-        AnyValue::Number(self as i64)
+impl From<u32> for AnyValue {
+    fn from(value: u32) -> Self {
+        AnyValue::Number(value as i64)
     }
 }
 
-impl Into<AnyValue> for u64 {
-    fn into(self) -> AnyValue {
-        if self <= i64::MAX as u64 {
-            AnyValue::Number(self as i64)
+impl From<u64> for AnyValue {
+    /// Converts a `u64` to `AnyValue::Number`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the value is larger than `i64::MAX`.
+    fn from(value: u64) -> Self {
+        if value <= i64::MAX as u64 {
+            AnyValue::Number(value as i64)
         } else {
-            panic!("u64 value {} cannot fit into i64", self);
+            panic!("u64 value {value} cannot fit into i64");
         }
     }
 }
 
-impl Into<AnyValue> for f32 {
-    fn into(self) -> AnyValue {
-        AnyValue::Float(self as f64)
+impl From<f32> for AnyValue {
+    fn from(value: f32) -> Self {
+        AnyValue::Float(value as f64)
     }
 }
 
-impl Into<AnyValue> for f64 {
-    fn into(self) -> AnyValue {
-        AnyValue::Float(self)
+impl From<f64> for AnyValue {
+    fn from(value: f64) -> Self {
+        AnyValue::Float(value)
     }
 }
 
-impl Into<AnyValue> for bool {
-    fn into(self) -> AnyValue {
-        AnyValue::Boolean(self)
+impl From<bool> for AnyValue {
+    fn from(value: bool) -> Self {
+        AnyValue::Boolean(value)
     }
 }
 
-impl Into<AnyValue> for Vec<AnyValue> {
-    fn into(self) -> AnyValue {
-        AnyValue::List(self)
+impl From<Vec<AnyValue>> for AnyValue {
+    fn from(value: Vec<AnyValue>) -> Self {
+        AnyValue::List(value)
+    }
+}
+
+impl From<HashMap<String, AnyValue>> for AnyValue {
+    fn from(value: HashMap<String, AnyValue>) -> Self {
+        AnyValue::Map(value)
+    }
+}
+
+impl fmt::Display for AnyValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AnyValue::String(value) => write!(f, "{value}"),
+            AnyValue::Number(value) => write!(f, "{value}"),
+            AnyValue::Boolean(value) => write!(f, "{value}"),
+            AnyValue::Float(value) => write!(f, "{value}"),
+            AnyValue::Map(value) => write!(f, "{value:?}"),
+            AnyValue::List(value) => {
+                write!(f, "[")?;
+                for (index, item) in value.iter().enumerate() {
+                    if index > 0 {
+                        write!(f, ",")?;
+                    }
+                    write!(f, "{item}")?;
+                }
+                write!(f, "]")
+            }
+            AnyValue::Object(_) => write!(f, "<object>"),
+            AnyValue::Null => write!(f, "null"),
+        }
     }
 }
 
 impl fmt::Debug for AnyValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AnyValue::String(s) => write!(f, "String({:?})", s),
-            AnyValue::Number(n) => write!(f, "Number({})", n),
-            AnyValue::Boolean(b) => write!(f, "Boolean({})", b),
-            AnyValue::Float(num) => write!(f, "Float({})", num),
-            AnyValue::Map(map) => write!(f, "Map({:?})", map),
-            AnyValue::List(arr) => write!(f, "List({:?})", arr),
-            AnyValue::Object(obj) => write!(f, "Object({:?})", obj),
+            AnyValue::String(value) => write!(f, "String({value:?})"),
+            AnyValue::Number(value) => write!(f, "Number({value})"),
+            AnyValue::Boolean(value) => write!(f, "Boolean({value})"),
+            AnyValue::Float(value) => write!(f, "Float({value})"),
+            AnyValue::Map(value) => write!(f, "Map({value:?})"),
+            AnyValue::List(value) => write!(f, "List({value:?})"),
+            AnyValue::Object(_) => write!(f, "Object(<object>)"),
             AnyValue::Null => write!(f, "Null"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::AnyValue;
+
+    #[test]
+    fn display_and_to_string_cover_supported_variants() {
+        assert_eq!(AnyValue::from("hello").to_string(), "hello");
+        assert_eq!(AnyValue::from(42_i64).to_string(), "42");
+        assert_eq!(AnyValue::from(1.5_f64).to_string(), "1.5");
+        assert_eq!(AnyValue::from(true).to_string(), "true");
+        assert_eq!(AnyValue::Null.to_string(), "null");
+
+        let list = AnyValue::from(vec![AnyValue::from(1_i64), AnyValue::from("two")]);
+        assert_eq!(list.to_string(), "[1,two]");
+
+        let mut map = HashMap::new();
+        map.insert("key".to_string(), AnyValue::from("value"));
+        let map_value = AnyValue::from(map);
+        assert!(map_value.to_string().contains("key"));
+        assert!(map_value.to_string().contains("value"));
+    }
+
+    #[test]
+    fn object_accessors_support_clone_borrow_and_owned_access() {
+        let value = AnyValue::Object(Box::new(String::from("payload")));
+
+        assert_eq!(
+            value.as_ref_object::<String>(),
+            Some(&String::from("payload"))
+        );
+        assert_eq!(value.as_object::<String>(), Some(String::from("payload")));
+        assert_eq!(
+            value.as_own_object::<String>(),
+            Some(String::from("payload"))
+        );
     }
 }

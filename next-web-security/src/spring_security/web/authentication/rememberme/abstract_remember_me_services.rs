@@ -1,3 +1,5 @@
+use crate::web::authentication::remember_me_services::RememberMeServices;
+
 #[derive(Clone)]
 pub struct AbstractRememberMeServices {}
 
@@ -6,3 +8,5 @@ impl AbstractRememberMeServices {
         "remember-me"
     }
 }
+
+impl RememberMeServices for AbstractRememberMeServices {}

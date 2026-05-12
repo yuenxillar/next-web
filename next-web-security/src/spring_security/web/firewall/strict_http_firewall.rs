@@ -12,14 +12,10 @@ impl Default for StrictHttpFirewall {
 impl StrictHttpFirewall {}
 
 impl HttpFirewall for StrictHttpFirewall {
-    // fn get_firewalled_request(&self, request: &mut axum::extract::Request) -> Result<FirewalledRequest, RequestRejectedError> {
-    //     todo!()
-    // }
-
     fn get_firewalled_response(
         &self,
         response: axum::response::Response,
     ) -> axum::response::Response {
-        todo!()
+        response
     }
 }

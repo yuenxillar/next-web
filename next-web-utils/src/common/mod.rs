@@ -1,4 +1,5 @@
 pub mod bencher;
+pub mod bloom_filter;
 pub mod command;
 pub mod data_source;
 pub mod generator;

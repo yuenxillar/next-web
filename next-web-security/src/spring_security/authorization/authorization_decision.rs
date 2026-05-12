@@ -8,6 +8,6 @@ impl AuthorizationDecision {
     }
 
     pub fn is_granted(&self) -> bool {
-        true
+        self.granted
     }
 }

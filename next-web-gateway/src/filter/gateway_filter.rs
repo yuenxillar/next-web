@@ -1,51 +1,69 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use pingora_limits::rate::Rate;
 use regex::Regex;
 
-use crate::application::next_gateway_application::ApplicationContext;
-use crate::filter::local_response_cache::LocalResponseCacheFilter;
-use crate::filter::remove_json_attributes_response_body::RemoveJsonAttributesResponseBodyFilter;
-use crate::filter::remove_request_parameter::RemoveRequestParameterFilter;
-use crate::filter::secure_headers::SecureHeadersFilter;
-use crate::filter::set_path::SetPathFilter;
-use crate::filter::token_relay::TokenRelayFilter;
-use crate::route::route_service_manager::UpStream;
-use crate::{filter::add_request_parameter::AddRequestParameterFilter, util::key_value::KeyValue};
-
-use super::dedupe_response_header::DedupeResponseHeaderFilter;
-use super::map_request_header::MapRequestHeaderFilter;
-use super::prefix_path::PrefixPathFilter;
-use super::preserve_host_header::PreserveHostHeaderFilter;
-use super::redirect_to::RedirectToFilter;
-use super::remove_response_header::RemoveResponseHeaderFilter;
-use super::request_header_size::RequestHeaderSizeFilter;
-use super::request_rate_limiter::RequestRateLimiterFilter;
-use super::rewrite_location_response_header::RewriteLocationResponseHeaderFilter;
-use super::{
-    add_request_header::AddRequestHeaderFilter,
-    add_request_headers_if_not_present::AddRequestHeaderIfNotPresentFilter,
-    add_response_header::AddResponseHeaderFilter, remove_request_header::RemoveRequestHeaderFilter,
-    request_size::RequestSizeFilter, rewrite_path::RewritePathFilter,
-    rewrite_response_header::RewriteResponseHeaderFilter, save_session::SaveSessionFilter,
-    set_request_header::SetRequestHeaderFilter,
-    set_request_host_header::SetRequestHostHeaderFilter,
-    set_response_header::SetResponseHeaderFilter, set_status::SetStatusFilter,
-    strip_prefix::StripPrefixFilter,
-};
+use crate::error::GatewayError;
+use crate::filter::factory::add_request_header::AddRequestHeaderFilter;
+use crate::filter::factory::add_request_headers_if_not_present::AddRequestHeaderIfNotPresentFilter;
+use crate::filter::factory::add_request_parameter::AddRequestParameterFilter;
+use crate::filter::factory::add_response_header::AddResponseHeaderFilter;
+use crate::filter::factory::dedupe_response_header::DedupeResponseHeaderFilter;
+use crate::filter::factory::local_response_cache::LocalResponseCacheFilter;
+use crate::filter::factory::map_request_header::MapRequestHeaderFilter;
+use crate::filter::factory::prefix_path::PrefixPathFilter;
+use crate::filter::factory::preserve_host_header::PreserveHostHeaderFilter;
+use crate::filter::factory::redirect_to::RedirectToFilter;
+use crate::filter::factory::remove_json_attributes_response_body::RemoveJsonAttributesResponseBodyFilter;
+use crate::filter::factory::remove_request_header::RemoveRequestHeaderFilter;
+use crate::filter::factory::remove_request_parameter::RemoveRequestParameterFilter;
+use crate::filter::factory::remove_response_header::RemoveResponseHeaderFilter;
+use crate::filter::factory::request_header_size::RequestHeaderSizeFilter;
+use crate::filter::factory::request_rate_limiter::RequestRateLimiterFilter;
+use crate::filter::factory::request_size::RequestSizeFilter;
+use crate::filter::factory::rewrite_location_response_header::RewriteLocationResponseHeaderFilter;
+use crate::filter::factory::rewrite_path::RewritePathFilter;
+use crate::filter::factory::rewrite_response_header::RewriteResponseHeaderFilter;
+use crate::filter::factory::save_session::SaveSessionFilter;
+use crate::filter::factory::secure_headers::SecureHeadersFilter;
+use crate::filter::factory::set_path::SetPathFilter;
+use crate::filter::factory::set_request_header::SetRequestHeaderFilter;
+use crate::filter::factory::set_request_host_header::SetRequestHostHeaderFilter;
+use crate::filter::factory::set_response_header::SetResponseHeaderFilter;
+use crate::filter::factory::set_status::SetStatusFilter;
+use crate::filter::factory::strip_prefix::StripPrefixFilter;
+use crate::filter::factory::token_relay::TokenRelayFilter;
+use crate::filter::gateway_filter_chain::GatewayFilterChain;
+use crate::server::ServerWebExchange;
+use crate::util::key_value::KeyValue;
 
 macro_rules! delegate_filter {
-    ($self:ident, $ctx:ident, $upstream:ident, $($variant:ident),*) => {
+    ($self:ident, $exchange:ident, $chain:ident, $($variant:ident),*) => {
         match $self {
-            $(Self::$variant(filter) => filter.filter($ctx, $upstream),)*
-            Self::Null => Ok(()),
+            $(Self::$variant(filter) => filter.filter($exchange, $chain).await,)*
+            Self::Nothing => $chain.filter($exchange).await,
         }
     };
 }
 
-pub trait GatewayFilter {
-    fn filter(&self, ctx: &mut ApplicationContext, upstream: &mut UpStream) -> pingora::Result<()>;
+/// Name key.
+pub const NAME_KEY: &str = "name";
+
+/// Value key.
+pub const VALUE_KEY: &str = "value";
+
+#[async_trait]
+pub trait GatewayFilter
+where
+    Self: Send + Sync,
+{
+    async fn filter(
+        &self,
+        exchange: &mut dyn ServerWebExchange,
+        chain: &dyn GatewayFilterChain,
+    ) -> Result<(), GatewayError>;
 }
 
 #[derive(Debug, Clone)]
@@ -80,19 +98,20 @@ pub enum DefaultGatewayFilter {
     StripPrefix(StripPrefixFilter),
     TokenRelay(TokenRelayFilter),
 
-    Null,
+    Nothing,
 }
 
-impl DefaultGatewayFilter {
-    pub fn filter(
+#[async_trait]
+impl GatewayFilter for DefaultGatewayFilter {
+    async fn filter(
         &self,
-        ctx: &mut ApplicationContext,
-        upstream: &mut UpStream,
-    ) -> pingora::Result<()> {
+        exchange: &mut dyn ServerWebExchange,
+        chain: &dyn GatewayFilterChain,
+    ) -> Result<(), GatewayError> {
         delegate_filter!(
             self,
-            ctx,
-            upstream,
+            exchange,
+            chain,
             AddRequestHeader,
             AddRequestHeaderIfNotPresent,
             AddResponseHeader,
@@ -124,7 +143,9 @@ impl DefaultGatewayFilter {
             TokenRelay
         )
     }
+}
 
+impl DefaultGatewayFilter {
     pub fn modifies_response_body(&self) -> bool {
         matches!(self, Self::RemoveJsonAttributesResponseBody(_))
     }
@@ -133,7 +154,7 @@ impl DefaultGatewayFilter {
 impl From<&str> for DefaultGatewayFilter {
     fn from(str: &str) -> Self {
         if str.is_empty() {
-            return Self::Null;
+            return Self::Nothing;
         }
 
         let (filter_name, value) = if let Some(pos) = str.find('=') {
@@ -156,7 +177,7 @@ impl From<&str> for DefaultGatewayFilter {
             "AddRequestParameter" => {
                 let parameters = split_params(value, "&", ",");
                 if parameters.is_empty() {
-                    Self::Null
+                    Self::Nothing
                 } else {
                     Self::AddRequestParameter(AddRequestParameterFilter { parameters })
                 }
@@ -169,7 +190,7 @@ impl From<&str> for DefaultGatewayFilter {
             "DedupeResponseHeader" => {
                 let filter = DedupeResponseHeaderFilter::from(value);
                 if filter.headers.is_empty() {
-                    Self::Null
+                    Self::Nothing
                 } else {
                     Self::DedupeResponseHeader(filter)
                 }
@@ -181,7 +202,7 @@ impl From<&str> for DefaultGatewayFilter {
                         header: KeyValue::from((key, value)),
                     })
                 } else {
-                    Self::Null
+                    Self::Nothing
                 }
             }
 
@@ -199,10 +220,10 @@ impl From<&str> for DefaultGatewayFilter {
                             url: url.trim().into(),
                         })
                     } else {
-                        Self::Null
+                        Self::Nothing
                     }
                 } else {
-                    Self::Null
+                    Self::Nothing
                 }
             }
 
@@ -211,14 +232,14 @@ impl From<&str> for DefaultGatewayFilter {
                 if filter.is_valid() {
                     Self::LocalResponseCache(filter)
                 } else {
-                    Self::Null
+                    Self::Nothing
                 }
             }
 
             "RemoveJsonAttributesResponseBody" => {
                 let filter = RemoveJsonAttributesResponseBodyFilter::from(value);
                 if filter.names.is_empty() {
-                    Self::Null
+                    Self::Nothing
                 } else {
                     Self::RemoveJsonAttributesResponseBody(filter)
                 }
@@ -279,7 +300,7 @@ impl From<&str> for DefaultGatewayFilter {
                         header: (KeyValue::from((parts[0], parts[1])), regex),
                     })
                 } else {
-                    Self::Null
+                    Self::Nothing
                 }
             }
 
@@ -291,10 +312,10 @@ impl From<&str> for DefaultGatewayFilter {
                             replacement: replacement.trim().to_string(),
                         })
                     } else {
-                        Self::Null
+                        Self::Nothing
                     }
                 } else {
-                    Self::Null
+                    Self::Nothing
                 }
             }
 
@@ -327,7 +348,7 @@ impl From<&str> for DefaultGatewayFilter {
 
             "TokenRelay" => Self::TokenRelay(TokenRelayFilter {}),
 
-            _ => Self::Null,
+            _ => Self::Nothing,
         }
     }
 }
@@ -340,7 +361,6 @@ fn split(str: &str) -> Vec<KeyValue<String, String>> {
         .collect()
 }
 
-// 使用更高效的字符串分割和处理方式
 fn split_kv_pairs(str: &str) -> Vec<KeyValue<String, String>> {
     str.trim()
         .split(',')

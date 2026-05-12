@@ -4,7 +4,7 @@ use pingora_limits::rate::Rate;
 use tracing::debug;
 
 use crate::properties::routes_properties::RoutesProperties;
-use crate::route::route_predicate_factory::RoutePredicateFactory;
+use crate::handler::predicate::RoutePredicateFactory;
 use crate::util::rate_limiter::RateLimiter;
 use crate::{
     filter::gateway_filter::DefaultGatewayFilter, properties::routes_properties::RouteMetadata,

@@ -31,3 +31,6 @@ Cargo.lock
 
 
 application-local.yaml
+
+
+settings.local.json

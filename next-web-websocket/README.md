@@ -30,7 +30,7 @@ use next_web_websocket::ws_handler::{WSResult, WebSocketHandler};
 pub struct TestWebSocketConfigurer;
 
 impl WebSocketConfigurer for TestWebSocketConfigurer {
-    fn register_web_socket_handlers(
+    fn register_websocket_handlers(
         &mut self,
         _ctx: &mut ApplicationContext,
         registry: &mut dyn WebSocketHandlerRegistry,

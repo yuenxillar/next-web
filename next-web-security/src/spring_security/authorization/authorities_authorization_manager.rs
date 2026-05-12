@@ -1,13 +1,49 @@
 use std::sync::Arc;
 
-use crate::access::hierarchicalroles::role_hierarchy::RoleHierarchy;
+use std::collections::HashSet;
+
+use crate::{
+    access::hierarchicalroles::role_hierarchy::RoleHierarchy,
+    core::authentication::Authentication,
+};
 
 pub struct AuthoritiesAuthorizationManager {
     role_hierarchy: Arc<dyn RoleHierarchy>,
 }
 
 impl AuthoritiesAuthorizationManager {
+    pub fn new() -> Self {
+        Self {
+            role_hierarchy: Arc::new(NullRoleHierarchy),
+        }
+    }
+
     pub fn set_role_hierarchy(&mut self, role_hierarchy: Arc<dyn RoleHierarchy>) {
         self.role_hierarchy = role_hierarchy;
     }
+
+    pub fn is_authorized(
+        &self,
+        authentication: &dyn Authentication,
+        required_authorities: &HashSet<String>,
+    ) -> bool {
+        if required_authorities.is_empty() {
+            return false;
+        }
+
+        authentication
+            .authorities()
+            .into_iter()
+            .any(|authority| required_authorities.contains(&authority))
+    }
 }
+
+impl Default for AuthoritiesAuthorizationManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+struct NullRoleHierarchy;
+
+impl RoleHierarchy for NullRoleHierarchy {}

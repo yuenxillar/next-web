@@ -9,7 +9,7 @@ where
     Self: Send + Sync,
 {
     /// Register WebSocketHandler including SockJS fallback options if desired.
-    fn register_web_socket_handlers(
+    fn register_websocket_handlers(
         &mut self,
         ctx: &mut ApplicationContext,
         registry: &mut dyn WebSocketHandlerRegistry,

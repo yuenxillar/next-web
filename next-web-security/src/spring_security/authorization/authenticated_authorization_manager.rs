@@ -4,7 +4,9 @@ use next_web_core::async_trait;
 
 use crate::{
     authorization::{
-        authentication_trust_resolver::AuthenticationTrustResolver,
+        authentication_trust_resolver::{
+            DefaultAuthenticationTrustResolver, AuthenticationTrustResolver,
+        },
         authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
     },
     core::authentication::Authentication,
@@ -16,10 +18,11 @@ pub struct AuthenticatedAuthorizationManager {
 
 impl AuthenticatedAuthorizationManager {
     pub fn authenticated() -> Self {
-        // AuthenticatedAuthorizationManager {
-        //     authorization_strategy: Arc::new(AuthenticatedAuthorizationStrategy::new()),
-        // }
-        todo!()
+        AuthenticatedAuthorizationManager {
+            authorization_strategy: Arc::new(AuthenticatedAuthorizationStrategy::new(
+                DefaultAuthenticationTrustResolver::default(),
+            )),
+        }
     }
 
     pub fn fully_authenticated() -> Self {
@@ -110,7 +113,9 @@ struct FullyAuthenticatedAuthorizationStrategy {
 impl FullyAuthenticatedAuthorizationStrategy {
     pub fn new() -> Self {
         Self {
-            abstract_authorization_strategy: todo!(),
+            abstract_authorization_strategy: AbstractAuthorizationStrategy::new(
+                DefaultAuthenticationTrustResolver::default(),
+            ),
         }
     }
 }
@@ -130,7 +135,9 @@ struct RememberMeAuthorizationStrategy {
 impl RememberMeAuthorizationStrategy {
     pub fn new() -> Self {
         Self {
-            abstract_authorization_strategy: todo!(),
+            abstract_authorization_strategy: AbstractAuthorizationStrategy::new(
+                DefaultAuthenticationTrustResolver::default(),
+            ),
         }
     }
 }
@@ -150,7 +157,9 @@ struct AnonymousAuthorizationStrategy {
 impl AnonymousAuthorizationStrategy {
     pub fn new() -> Self {
         Self {
-            abstract_authorization_strategy: todo!(),
+            abstract_authorization_strategy: AbstractAuthorizationStrategy::new(
+                DefaultAuthenticationTrustResolver::default(),
+            ),
         }
     }
 }

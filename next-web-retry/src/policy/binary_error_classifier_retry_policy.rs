@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::{anys::any_error::AnyError, async_trait};
+use next_web_core::{anys::any_error::AnyError, async_trait, traits::named::Named};
 
 use crate::{
     classifier::{binary_error_classifier::BinaryErrorClassifier, classifier::Classifier},
@@ -42,8 +42,8 @@ impl RetryPolicy for BinaryErrorClassifierRetryPolicy {
     }
 }
 
-impl ToString for BinaryErrorClassifierRetryPolicy {
-    fn to_string(&self) -> String {
-        "BinaryErrorClassifierRetryPolicy".to_string()
+impl Named for BinaryErrorClassifierRetryPolicy {
+    fn name(&self) -> &str {
+        "BinaryErrorClassifierRetryPolicy"
     }
 }

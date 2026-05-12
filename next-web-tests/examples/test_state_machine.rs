@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
-use next_web::{
-    application::Application,
-    core::{
-        ApplicationContext, async_trait, context::properties::ApplicationProperties,
-        messaging::generic_message::GenericMessage, traits::message::Message,
-    },
+use next_web::core::{
+    async_trait, messaging::generic_message::GenericMessage, traits::message::Message,
 };
 use next_web_core::{anys::any_value::AnyValue, error::BoxError};
 use next_web_state_machine::{
@@ -25,30 +21,6 @@ use next_web_state_machine::{
     listener::state_machine_listener::StateMachineListener,
     state_context::StateContext,
 };
-
-#[derive(Clone, Default)]
-#[allow(unused)]
-struct TestApplication;
-
-#[async_trait]
-impl Application for TestApplication {
-    type ErrorSolve = ();
-
-    /// initialize the middleware.
-    async fn init_middleware(
-        &self,
-        _ctx: &mut ApplicationContext,
-        _properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(())
-    }
-    async fn on_ready(
-        &self,
-        _ctx: &mut ApplicationContext,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(())
-    }
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub enum OrderState {
@@ -268,8 +240,6 @@ impl
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
-    // TestApplication::run().await;
-
     let config = OrderStateMachineConfig {};
     let state_machine = StateMachineAutoConfiguration::build(config)?;
     state_machine.start().await?;

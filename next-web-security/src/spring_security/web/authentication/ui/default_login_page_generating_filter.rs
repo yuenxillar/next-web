@@ -1,4 +1,4 @@
-use axum::extract::Request;
+use axum::{extract::Request, http::{header, StatusCode}};
 use next_web_core::{anys::any_map::AnyMap, traits::required::Required};
 
 use crate::{
@@ -145,7 +145,7 @@ impl DefaultLoginPageGeneratingFilter {
             password_parameter = self.password_parameter.as_deref().unwrap_or_default(),
             error_html = self.create_error(login_error, &error_msg),
             logout_html = self.create_logout_success(logout_success),
-            remember_me_html = self.create_remember_me(self.password_parameter.as_deref()),
+            remember_me_html = self.create_remember_me(self.remember_me_parameter.as_deref()),
             hidden_inputs = self.render_hidden_inputs(request),
         );
 
@@ -198,8 +198,7 @@ impl DefaultLoginPageGeneratingFilter {
         }
     }
 
-    fn render_hidden_inputs(&self, request: &mut Request) -> String {
-        // TODO
+    fn render_hidden_inputs(&self, _request: &mut Request) -> String {
         "".to_string()
     }
 
@@ -209,9 +208,7 @@ impl DefaultLoginPageGeneratingFilter {
         } else {
             format!(
                 "<div class=\"alert alert-danger\" role=\"alert\"> {} </div>",
-                // TODO encodeing?
-                // HtmlUtils.htmlEscape(error_msg)
-                error_msg
+                html_escape(error_msg)
             )
         }
     }
@@ -232,6 +229,51 @@ impl Filter for DefaultLoginPageGeneratingFilter {
         req: &mut axum::extract::Request,
         res: &mut axum::response::Response,
     ) -> Result<(), next_web_core::error::BoxError> {
-        todo!()
+        if !self.is_enabled() || req.method() != axum::http::Method::GET {
+            return Ok(());
+        }
+
+        let path = req.uri().path();
+        if path != self.login_page_url.as_ref() {
+            return Ok(());
+        }
+
+        let query = req.uri().query().unwrap_or_default();
+        let login_error = query
+            .split('&')
+            .any(|pair| pair == Self::ERROR_PARAMETER_NAME || pair.starts_with("error="));
+        let logout_success = query
+            .split('&')
+            .any(|pair| pair == "logout" || pair.starts_with("logout="));
+
+        let html = block_on(self.generate_login_page_html(req, login_error, logout_success));
+        *res.status_mut() = StatusCode::OK;
+        res.headers_mut().insert(
+            header::CONTENT_TYPE,
+            "text/html; charset=utf-8".parse().unwrap(),
+        );
+        *res.body_mut() = html.into();
+        Ok(())
     }
+}
+
+fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        tokio::task::block_in_place(|| handle.block_on(future))
+    } else {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("failed to build Tokio runtime")
+            .block_on(future)
+    }
+}
+
+fn html_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
 }

@@ -7,7 +7,7 @@ use next_web_core::anys::{any_error::AnyError, any_value::AnyValue};
 use tokio::sync::Mutex;
 
 use crate::{
-    error::retry_error::RetryError,
+    error::retry_error::{DefaultAnyError, RetryError},
     retry_context::{AttributeAccessorSupport, RetryContext, SyncAttributeAccessor},
 };
 
@@ -30,9 +30,14 @@ impl RetryContextSupport {
     pub fn register_error(&self, error: Option<&dyn AnyError>) {
         if let Some(error) = error {
             self.count.fetch_add(1, Ordering::Relaxed);
+            let error = error
+                .as_any()
+                .downcast_ref::<DefaultAnyError>()
+                .map(|error| RetryError::Custom(error.0.msg.clone()))
+                .unwrap_or_else(|| RetryError::Any(error.to_boxed()));
             self.last_error
                 .try_lock()
-                .map(|mut lock| lock.replace(RetryError::Any(error.to_boxed())))
+                .map(|mut lock| lock.replace(error))
                 .ok();
         }
     }

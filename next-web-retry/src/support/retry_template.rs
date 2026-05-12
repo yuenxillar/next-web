@@ -40,7 +40,7 @@ use tracing::debug;
 #[derive(Clone)]
 pub struct RetryTemplate {
     back_off_policy: Arc<dyn BackOffPolicy>,
-    retry_policy: Box<dyn RetryPolicy>,
+    retry_policy: Arc<dyn RetryPolicy>,
     listeners: Vec<Arc<dyn RetryListener>>,
     retry_context_cache: Arc<RwLock<dyn RetryContextCache>>,
     last_error_on_exhausted: bool,
@@ -115,12 +115,10 @@ impl RetryTemplate {
                 }
             }
 
-            /*
-             * We allow the whole loop to be skipped if the policy or context already
-             * forbid the first try. This is used in the case of external retry to allow a
-             * recovery in handleRetryExhausted without the callback processing (which
-             * would throw an exception).
-             */
+            // We allow the whole loop to be skipped if the policy or context already
+            // forbid the first try. This is used in the case of external retry to allow a
+            // recovery in handleRetryExhausted without the callback processing (which
+            // would throw an exception).
             while self
                 .can_retry(self.retry_policy.as_ref(), context.as_ref())
                 .await
@@ -138,17 +136,21 @@ impl RetryTemplate {
                     Err(error) => {
                         last_error = error.as_any_error();
 
-                        let e = match self.register_error(self.retry_policy.as_ref() , state, context.clone() , 
-                            last_error.as_deref()                           
-                        ).await
-                         {
-                                Ok(_) => None,
-                                Err(_) => Some(RetryError::TerminatedRetryError(
-                                    WithCauseError {
-                                    msg: "Retry terminated abnormally by interceptor before first attempt".to_string(),
-                                    cause: None
-                                    }
-                                ))
+                        let e = match self
+                            .register_error(
+                                self.retry_policy.as_ref(),
+                                state,
+                                context.clone(),
+                                last_error.as_deref(),
+                            )
+                            .await
+                        {
+                            Ok(_) => None,
+                            Err(_) => Some(RetryError::TerminatedRetryError(WithCauseError {
+                                msg: "Retry terminated abnormally by interceptor before first attempt"
+                                    .to_string(),
+                                cause: None,
+                            })),
                         };
                         self.do_on_error_interceptors(context.as_ref(), &error);
 
@@ -189,11 +191,9 @@ impl RetryTemplate {
                     }
                 };
 
-                /*
-                 * A stateful attempt that can retry may rethrow the exception before now,
-                 * but if we get this far in a stateful retry there's a reason for it,
-                 * like a circuit breaker or a rollback classifier.
-                 */
+                // A stateful attempt that can retry may rethrow the exception before now,
+                // but if we get this far in a stateful retry there's a reason for it,
+                // like a circuit breaker or a rollback classifier.
                 if state.is_some() && context.has_attribute(Self::GLOBAL_STATE) {
                     break;
                 }
@@ -233,7 +233,6 @@ impl RetryTemplate {
         result
     }
 
-    // =====================
     pub fn register_listener<T>(&mut self, listener: T)
     where
         T: RetryListener + 'static,
@@ -362,7 +361,7 @@ impl RetryTemplate {
                 context.remove_attribute(retry_context_constants::CLOSED);
                 context.remove_attribute(retry_context_constants::EXHAUSTED);
                 context.remove_attribute(retry_context_constants::RECOVERED);
-                return Ok(Arc::from(next_web_core::clone_box(context)));
+                return Ok(context);
             }
 
             None => {
@@ -575,7 +574,7 @@ impl RetryTemplate {
     where
         T: RetryPolicy + 'static,
     {
-        self.retry_policy = Box::new(retry_policy);
+        self.retry_policy = Arc::new(retry_policy);
     }
 }
 
@@ -755,8 +754,7 @@ impl RetryTemplateBuilder {
     }
 
     pub fn retry_on(mut self, error: RetryError) -> Self {
-        self.classifier_builder
-            .as_mut()
+        self._classifier_builder()
             .map(|bin| bin.retry_on(Some(error)));
         self
     }
@@ -771,8 +769,7 @@ impl RetryTemplateBuilder {
     }
 
     pub fn not_retry_on(mut self, error: RetryError) -> Self {
-        self.classifier_builder
-            .as_mut()
+        self._classifier_builder()
             .map(|bin| bin.no_retry_on(Some(error)));
         self
     }
@@ -881,10 +878,33 @@ impl Default for RetryTemplate {
     fn default() -> Self {
         Self {
             back_off_policy: Arc::new(NoBackOffPolicy::default()),
-            retry_policy: Box::new(SimpleRetryPolicy::with_max_attempts(3)),
+            retry_policy: Arc::new(SimpleRetryPolicy::with_max_attempts(3)),
             listeners: vec![Arc::new(DefaultRetryListener {})],
             retry_context_cache: Arc::new(RwLock::new(MapRetryContextCache::new())),
             last_error_on_exhausted: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::RetryTemplate;
+
+    #[test]
+    fn clone_shares_expensive_template_state() {
+        let template = RetryTemplate::builder().max_attempts(3).build();
+        let cloned = template.clone();
+
+        assert!(Arc::ptr_eq(&template.retry_policy, &cloned.retry_policy));
+        assert!(Arc::ptr_eq(
+            &template.back_off_policy,
+            &cloned.back_off_policy
+        ));
+        assert!(Arc::ptr_eq(
+            &template.retry_context_cache,
+            &cloned.retry_context_cache
+        ));
     }
 }

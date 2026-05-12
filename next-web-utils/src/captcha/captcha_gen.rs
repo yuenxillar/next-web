@@ -19,7 +19,7 @@ pub struct CaptchaResult {
 
 // 定义 CaptchaBuilder 结构体，用于配置验证码生成器的参数
 #[derive(Debug, Default, Clone)]
-pub(crate) struct CaptchaBuilder {
+pub struct CaptchaBuilder {
     text: Option<String>, // 自定义文本（可选）
     length: usize,        // 验证码长度
     complexity: u32,      // 验证码复杂度

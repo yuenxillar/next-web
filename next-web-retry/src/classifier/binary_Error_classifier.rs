@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
+use dashmap::DashMap;
 use next_web_core::async_trait;
-use tokio::sync::Mutex;
 
 use crate::error::retry_error::RetryError;
 
@@ -11,14 +11,12 @@ use super::classifier::Classifier;
 pub struct BinaryErrorClassifier<T = RetryError, C = bool> {
     traverse_causes: bool,
     default_value: Option<C>,
-    classified: Arc<Mutex<HashMap<T, C>>>,
+    classified: Arc<DashMap<T, C>>,
 }
 
 impl BinaryErrorClassifier {
     pub fn default_classifier() -> Self {
-        let mut map: HashMap<RetryError, bool> = Default::default();
-        map.insert(RetryError::Custom("TODO".to_string()), true);
-        Self::with_retryable_errors_and_default_value(map, false)
+        Self::with_default_value(true)
     }
 
     pub fn new(
@@ -27,7 +25,7 @@ impl BinaryErrorClassifier {
         traverse_causes: bool,
     ) -> Self {
         Self {
-            classified: Arc::new(Mutex::new(type_map)),
+            classified: Arc::new(type_map.into_iter().collect()),
             default_value: Some(default_value),
             traverse_causes,
         }
@@ -37,7 +35,7 @@ impl BinaryErrorClassifier {
         Self {
             traverse_causes: false,
             default_value: Some(default_value),
-            classified: Arc::new(Mutex::new(HashMap::new())),
+            classified: Arc::new(DashMap::new()),
         }
     }
 
@@ -48,7 +46,7 @@ impl BinaryErrorClassifier {
         Self {
             traverse_causes: false,
             default_value: Some(default_value),
-            classified: Arc::new(Mutex::new(type_map)),
+            classified: Arc::new(type_map.into_iter().collect()),
         }
     }
 
@@ -60,7 +58,7 @@ impl BinaryErrorClassifier {
         let items = errors.into_iter();
         classifier.set_type_map(
             items
-                .map(|key| (key, default_value))
+                .map(|key| (key, !default_value))
                 .collect::<HashMap<_, _>>(),
         );
 
@@ -72,7 +70,7 @@ impl BinaryErrorClassifier {
     }
 
     pub fn set_type_map(&mut self, type_map: HashMap<RetryError, bool>) {
-        self.classified = Arc::new(Mutex::new(type_map));
+        self.classified = Arc::new(type_map.into_iter().collect());
     }
 }
 
@@ -84,42 +82,68 @@ impl Classifier<RetryError, bool> for BinaryErrorClassifier {
         }
 
         let classifiable = classifiable.unwrap();
-        if let Some(value) = self.classified.lock().await.get(&classifiable) {
+        if let Some(value) = self.classified.get(classifiable) {
             return *value;
         }
 
-        let mut value: Option<bool> = Some(true);
-
-        if let Some(val) = value.as_ref() {
-            self.classified
-                .lock()
-                .await
-                .insert(classifiable.clone(), *val);
-        }
-
-        if value.is_none() {
-            value = self.default_value.clone();
-        }
-
-        let classified = value.unwrap_or_default();
-
-        if !self.traverse_causes {
-            return classified;
-        }
-
-        if classified == self.default_value.unwrap_or_default() {
-            let cause = classifiable;
-
-            let mut i = 0;
-            while i >= 0 && (classified == self.default_value.unwrap_or_default()) {
-                if self.classified.lock().await.contains_key(&cause) {
-                    return classified;
-                }
-
-                i += 1;
-            }
-        }
+        let classified = self.default_value.unwrap_or_default();
 
         classified
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{classifier::classifier::Classifier, error::retry_error::RetryError};
+
+    use super::BinaryErrorClassifier;
+
+    #[tokio::test]
+    async fn default_classifier_retries_unclassified_errors() {
+        let classifier = BinaryErrorClassifier::default_classifier();
+
+        assert!(
+            classifier
+                .classify(Some(&RetryError::Custom("any".to_string())))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn whitelist_classifier_only_retries_configured_errors() {
+        let classifier = BinaryErrorClassifier::with_retryable_errors_collects_and_default_value(
+            [RetryError::Custom("retry".to_string())],
+            false,
+        );
+
+        assert!(
+            classifier
+                .classify(Some(&RetryError::Custom("retry".to_string())))
+                .await
+        );
+        assert!(
+            !classifier
+                .classify(Some(&RetryError::Custom("stop".to_string())))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn blacklist_classifier_rejects_configured_errors() {
+        let classifier = BinaryErrorClassifier::with_retryable_errors_collects_and_default_value(
+            [RetryError::Custom("stop".to_string())],
+            true,
+        );
+
+        assert!(
+            !classifier
+                .classify(Some(&RetryError::Custom("stop".to_string())))
+                .await
+        );
+        assert!(
+            classifier
+                .classify(Some(&RetryError::Custom("retry".to_string())))
+                .await
+        );
     }
 }

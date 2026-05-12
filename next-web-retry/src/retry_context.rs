@@ -1,7 +1,7 @@
-use std::{any::Any, collections::BTreeMap, sync::Arc};
+use std::{any::Any, sync::Arc};
 
+use dashmap::DashMap;
 use next_web_core::{DynClone, anys::any_value::AnyValue};
-use tokio::sync::{Mutex, RwLock};
 
 use crate::error::retry_error::RetryError;
 
@@ -18,7 +18,7 @@ pub trait RetryContext
 where
     Self: Send + Sync,
     Self: Any,
-    Self: SyncAttributeAccessor + DynClone,
+    Self: SyncAttributeAccessor,
 {
     fn set_exhausted_only(&self);
 
@@ -31,7 +31,6 @@ where
     fn get_last_error(&self) -> Option<RetryError>;
 }
 
-next_web_core::clone_trait_object!(RetryContext);
 
 pub trait SyncAttributeAccessor
 where
@@ -48,36 +47,51 @@ where
 
 #[derive(Clone, Default)]
 pub struct AttributeAccessorSupport {
-    attributes: Arc<Mutex<BTreeMap<String, AnyValue>>>,
+    attributes: Arc<DashMap<String, AnyValue>>,
 }
 
 impl SyncAttributeAccessor for AttributeAccessorSupport {
     fn has_attribute(&self, name: &str) -> bool {
-        self.attributes
-            .try_lock()
-            .map(|m| m.contains_key(name))
-            .unwrap_or_default()
+        self.attributes.contains_key(name)
     }
 
     fn set_attribute(&self, name: &str, value: AnyValue) {
-        self.attributes
-            .try_lock()
-            .map(|mut m| m.insert(name.to_string(), value))
-            .ok();
+        self.attributes.insert(name.to_string(), value);
     }
 
     fn remove_attribute(&self, name: &str) -> Option<AnyValue> {
-        self.attributes
-            .try_lock()
-            .map(|mut m| m.remove(name))
-            .unwrap_or_default()
+        self.attributes.remove(name).map(|(_, value)| value)
     }
 
     fn get_attribute(&self, name: &str) -> Option<AnyValue> {
-        self.attributes
-            .try_lock()
-            .map(|m| m.get(name).cloned())
-            .unwrap_or_default()
+        self.attributes.get(name).map(|value| value.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn attribute_accessor_stores_reads_and_removes_values() {
+        let attributes = AttributeAccessorSupport::default();
+
+        attributes.set_attribute("answer", AnyValue::Number(42));
+
+        assert!(attributes.has_attribute("answer"));
+        assert_eq!(
+            attributes
+                .get_attribute("answer")
+                .and_then(|value| value.as_number()),
+            Some(42)
+        );
+        assert_eq!(
+            attributes
+                .remove_attribute("answer")
+                .and_then(|value| value.as_number()),
+            Some(42)
+        );
+        assert!(!attributes.has_attribute("answer"));
     }
 }
 

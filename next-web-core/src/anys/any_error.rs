@@ -38,7 +38,7 @@ where
 
 struct HasherWrapper<'a>(&'a mut dyn Hasher);
 
-impl<'a> Hasher for HasherWrapper<'a> {
+impl Hasher for HasherWrapper<'_> {
     fn write(&mut self, bytes: &[u8]) {
         self.0.write(bytes);
     }
@@ -66,3 +66,42 @@ impl Hash for Box<dyn AnyError> {
 }
 
 dyn_clone::clone_trait_object!(AnyError where Self: Send + Sync);
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fmt,
+        hash::{Hash, Hasher},
+    };
+
+    use super::AnyError;
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct TestError {
+        code: u16,
+    }
+
+    impl fmt::Display for TestError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "test error {}", self.code)
+        }
+    }
+
+    impl std::error::Error for TestError {}
+
+    impl Hash for TestError {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.code.hash(state);
+        }
+    }
+
+    #[test]
+    fn to_boxed_preserves_concrete_error_type() {
+        let error = TestError { code: 42 };
+
+        let boxed = error.to_boxed();
+        let actual = boxed.as_any().downcast_ref::<TestError>();
+
+        assert_eq!(actual, Some(&TestError { code: 42 }));
+    }
+}

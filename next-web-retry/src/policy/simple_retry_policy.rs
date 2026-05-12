@@ -10,6 +10,7 @@ use std::{
 use next_web_core::{
     anys::{any_error::AnyError, any_value::AnyValue},
     async_trait,
+    traits::named::Named,
 };
 use tokio::sync::Mutex;
 
@@ -242,8 +243,8 @@ impl RetryContext for SimpleRetryContext {
     }
 }
 
-impl ToString for SimpleRetryPolicy {
-    fn to_string(&self) -> String {
-        "SimpleRetryPolicy".to_string()
+impl Named for SimpleRetryPolicy {
+    fn name(&self) -> &str {
+        "SimpleRetryPolicy"
     }
 }

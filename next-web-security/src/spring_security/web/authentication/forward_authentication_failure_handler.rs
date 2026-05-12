@@ -27,10 +27,22 @@ impl AuthenticationFailureHandler for ForwardAuthenticationFailureHandler {
         error: &crate::core::authentication_error::AuthenticationError,
     ) {
         if let Some(any_map) = request.extensions().get::<AnyMap>() {
-            any_map.set("NEXT_SECURITY_LAST_ERROR".to_string(), error.clone().into());
+            block_on(any_map.insert("NEXT_SECURITY_LAST_ERROR".to_string(), error.clone().into()));
             request
                 .request_dispatcher(&self.forward_url)
                 .map(|dispatcher| dispatcher.forward(request, response));
         };
+    }
+}
+
+fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        tokio::task::block_in_place(|| handle.block_on(future))
+    } else {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("failed to build Tokio runtime")
+            .block_on(future)
     }
 }

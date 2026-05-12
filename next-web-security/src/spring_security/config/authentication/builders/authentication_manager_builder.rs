@@ -3,7 +3,10 @@ use std::sync::Arc;
 
 use crate::authentication::authentication_provider::AuthenticationProvider;
 use crate::config::abstract_configured_security_builder::AbstractConfiguredSecurityBuilder;
-use crate::core::userdetails::user_details_service::UserDetailsService;
+use crate::core::{
+    authentication::Authentication, authentication_error::AuthenticationError,
+    userdetails::user_details_service::UserDetailsService,
+};
 use crate::{
     authorization::authentication_manager::AuthenticationManager,
     config::{
@@ -43,7 +46,13 @@ impl ProviderManagerBuilder<Self> for AuthenticationManagerBuilder {}
 
 impl SecurityBuilder<Arc<dyn AuthenticationManager>> for AuthenticationManagerBuilder {
     fn build(&self) -> Arc<dyn AuthenticationManager> {
-        todo!()
+        if let Some(authentication_manager) = &self.authentication_manager {
+            return authentication_manager.clone();
+        }
+
+        Arc::new(ProviderAuthenticationManager {
+            providers: self.authentication_providers.clone(),
+        })
     }
 }
 
@@ -60,5 +69,39 @@ impl Required<AbstractConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, 
         &mut self,
     ) -> &mut AbstractConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self> {
         &mut self.abstract_configured_security_builder
+    }
+}
+
+struct ProviderAuthenticationManager {
+    providers: Vec<Arc<dyn AuthenticationProvider>>,
+}
+
+impl AuthenticationManager for ProviderAuthenticationManager {
+    fn authenticate<'a>(
+        &self,
+        authentication: &'a dyn Authentication,
+    ) -> Result<&'a dyn Authentication, AuthenticationError> {
+        if self.providers.is_empty() {
+            return Ok(authentication);
+        }
+
+        let handle = tokio::runtime::Handle::try_current().ok();
+        for provider in &self.providers {
+            let result = if let Some(handle) = &handle {
+                tokio::task::block_in_place(|| handle.block_on(provider.authenticate(authentication)))
+            } else {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(|err| AuthenticationError::new(err.to_string()))?
+                    .block_on(provider.authenticate(authentication))
+            };
+
+            if result.is_ok() {
+                return Ok(authentication);
+            }
+        }
+
+        Err(AuthenticationError::new("No AuthenticationProvider accepted the authentication"))
     }
 }

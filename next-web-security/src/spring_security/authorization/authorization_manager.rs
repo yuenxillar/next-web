@@ -27,7 +27,7 @@ where
     ) -> Result<(), AccessDeniedError> {
         let decision = self.check(authentication, object).await;
         if let Some(decision) = decision {
-            if decision.is_granted() {
+            if !decision.is_granted() {
                 return Err(AccessDeniedError::from("Access Denied"));
             }
         }

@@ -1,4 +1,7 @@
-use crate::web::authentication_entry_point::AuthenticationEntryPoint;
+use crate::web::{
+    authentication_entry_point::AuthenticationEntryPoint,
+    redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},
+};
 
 #[derive(Clone)]
 pub struct LoginUrlAuthenticationEntryPoint {
@@ -19,10 +22,11 @@ impl LoginUrlAuthenticationEntryPoint {
 impl AuthenticationEntryPoint for LoginUrlAuthenticationEntryPoint {
     fn commence(
         &self,
-        request: &mut axum::extract::Request,
+        _request: &mut axum::extract::Request,
         response: &mut axum::response::Response,
-        auth_error: Option<crate::core::authentication_error::AuthenticationError>,
+        _auth_error: Option<crate::core::authentication_error::AuthenticationError>,
     ) -> Result<(), next_web_core::error::BoxError> {
-        todo!()
+        DefaultRedirectStrategy::default().send_redirect(None, &self.login_form_url, response);
+        Ok(())
     }
 }

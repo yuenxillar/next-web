@@ -1,4 +1,4 @@
-use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc};
+use std::{collections::HashSet, marker::PhantomData, sync::Arc};
 
 use next_web_core::async_trait;
 
@@ -23,7 +23,7 @@ impl<T> AuthorityAuthorizationManager<T> {
         Self {
             context: PhantomData,
             authorities,
-            delegate: todo!(),
+            delegate: AuthoritiesAuthorizationManager::new(),
         }
     }
 
@@ -77,8 +77,11 @@ where
     async fn check(
         &self,
         authentication: Box<dyn Authentication>,
-        object: T,
+        _object: T,
     ) -> Option<AuthorizationDecision> {
-        None
+        Some(AuthorizationDecision::new(
+            self.delegate
+                .is_authorized(authentication.as_ref(), &self.authorities),
+        ))
     }
 }

@@ -44,7 +44,7 @@ impl AutoConfiguration for WebsocketAutoConfiguration {
     async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mut registry = DefaultWebSocketHandlerRegistry::default();
         for configurer in self.configurers.iter_mut() {
-            configurer.register_web_socket_handlers(ctx, &mut registry);
+            configurer.register_websocket_handlers(ctx, &mut registry);
         }
 
         let mut interceptors = ctx.resolve_by_type::<Arc<dyn HandshakeInterceptor>>();

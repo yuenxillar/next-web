@@ -43,12 +43,6 @@ impl WebSocketHandlerRegistration for DefaultWebSocketHandlerRegistration {
     ) -> &mut dyn WebSocketHandlerRegistration {
         self.base.set_allowed_origin_patterns(origin_patterns)
     }
-
-    fn with_sock_js(
-        &mut self,
-    ) -> &mut crate::config::sock_js_service_registration::SockJsServiceRegistration {
-        self.base.with_sock_js()
-    }
 }
 
 impl Default for DefaultWebSocketHandlerRegistration {

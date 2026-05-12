@@ -3,7 +3,6 @@ use std::sync::Arc;
 use axum::{extract::Request, http::StatusCode, response::Response};
 use next_web_core::{
     anys::{any_map::AnyMap, any_value::AnyValue},
-    convert::into_box::IntoBox,
     traits::http::http_request::HttpRequest,
 };
 use tracing::debug;
@@ -44,9 +43,9 @@ impl SimpleUrlAuthenticationFailureHandler {
         if self.forward_to_destination {
             match request.extensions().get::<AnyMap>() {
                 Some(map) => {
-                    map.set(
+                    map.insert(
                         "NEXT_SECURITY_LAST_ERROR".to_string(),
-                        AnyValue::Object(error.clone().into_boxed()),
+                        AnyValue::Object(Box::new(error.clone())),
                     )
                     .await;
                 }

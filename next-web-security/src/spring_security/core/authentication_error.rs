@@ -9,13 +9,20 @@ pub struct AuthenticationError {
 }
 
 impl AuthenticationError {
+    pub fn new(msg: impl Into<String>) -> Self {
+        Self {
+            msg: msg.into(),
+            cause: None,
+        }
+    }
+
     pub fn get_message(&self) -> &str {
         &self.msg
     }
 }
 impl Display for AuthenticationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Authentication Error")
+        write!(f, "Authentication Error: {}", self.msg)
     }
 }
 

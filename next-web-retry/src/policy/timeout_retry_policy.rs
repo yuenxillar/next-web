@@ -3,6 +3,7 @@ use std::{any::Any, sync::Arc};
 use next_web_core::{
     anys::{any_error::AnyError, any_value::AnyValue},
     async_trait,
+    traits::named::Named,
 };
 
 use crate::{
@@ -122,9 +123,9 @@ impl RetryContext for TimeoutRetryContext {
     }
 }
 
-impl ToString for TimeoutRetryPolicy {
-    fn to_string(&self) -> String {
-        "TimeoutRetryPolicy".to_string()
+impl Named for TimeoutRetryPolicy {
+    fn name(&self) -> &str {
+        "TimeoutRetryPolicy"
     }
 }
 

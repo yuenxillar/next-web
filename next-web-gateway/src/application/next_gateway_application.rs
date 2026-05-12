@@ -10,13 +10,14 @@ use tracing::{error, warn};
 
 use crate::circuit_breaker::circuit_breaker_service_manager::CircuitBreakerServiceManager;
 use crate::circuit_breaker::circuit_state::CircuitState;
-use crate::error::gateway_error::GatewayError;
-use crate::filter::local_response_cache::{
+use crate::context::{HeaderAndBody, RequestContext};
+use crate::error::GatewayError;
+use crate::filter::factory::local_response_cache::{
     capture_response_for_local_cache, serve_from_local_cache_if_present, store_local_cache_entry,
-    LocalResponseCacheManager, LocalResponseCacheRequestState, PendingLocalResponseCacheEntry,
+    LocalResponseCacheManager,
 };
 use crate::properties::gateway_properties::GatewayApplicationProperties;
-use crate::route::route_service_manager::{RouteServiceManager, UpStream};
+use crate::handler::predicate::RouteServiceManager;
 use crate::service::route_service::RouteWork;
 use std::sync::Arc;
 
@@ -49,7 +50,7 @@ impl NextGatewayApplication {
 
 #[async_trait]
 impl ProxyHttp for NextGatewayApplication {
-    type CTX = ApplicationContext;
+    type CTX = RequestContext;
 
     fn new_ctx<'a>(&self) -> Self::CTX {
         Self::CTX {
@@ -175,7 +176,8 @@ impl ProxyHttp for NextGatewayApplication {
         }
 
         self.route_service_manager
-            .filter(ctx, UpStream::from_request_header(upstream_request_header))?;
+            .filter(ctx, HeaderAndBody::with_req_header(upstream_request_header))
+            .await?;
         Ok(())
     }
 
@@ -197,7 +199,8 @@ impl ProxyHttp for NextGatewayApplication {
         }
 
         self.route_service_manager
-            .filter(ctx, UpStream::from_response_header(upstream_response))?;
+            .filter(ctx, HeaderAndBody::with_resp_header(upstream_response))
+            .await?;
 
         if let Some(filter) = self
             .route_service_manager
@@ -248,14 +251,13 @@ impl ProxyHttp for NextGatewayApplication {
 
         *body = Some(Bytes::from(std::mem::take(&mut ctx.response_body_buffer)));
         self.route_service_manager
-            .filter(ctx, UpStream::from_response_body(body))?;
+            .filter_blocking(ctx, HeaderAndBody::with_resp_body(body))?;
         store_local_cache_entry(ctx, body.as_ref());
         ctx.buffer_response_body = false;
 
         Ok(None)
     }
 
-    // 是否抑制日志的输出
     fn suppress_error_log(&self, _session: &Session, _ctx: &Self::CTX, _error: &Error) -> bool {
         true
     }
@@ -287,7 +289,6 @@ impl ProxyHttp for NextGatewayApplication {
         e
     }
 
-    // 当连接上游服务器失败时触发（如DNS解析失败、TCP连接超时等）
     fn fail_to_connect(
         &self,
         _session: &mut Session,
@@ -394,74 +395,6 @@ impl ProxyHttp for NextGatewayApplication {
             error_code: code,
             can_reuse_downstream: false,
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct ApplicationContext {
-    pub fallback_id: Option<String>,
-    pub route_id: Option<String>,
-    pub original_request_path: Option<String>,
-    pub buffer_response_body: bool,
-    pub response_body_buffer: Vec<u8>,
-    pub local_response_cache_manager: Option<Arc<LocalResponseCacheManager>>,
-    pub local_response_cache_request: Option<LocalResponseCacheRequestState>,
-    pub pending_local_response_cache: Option<PendingLocalResponseCacheEntry>,
-    pub session: Option<String>,
-    pub direct_response: Option<DirectResponse>,
-}
-
-#[derive(Clone)]
-pub struct DirectResponse {
-    pub status: u16,
-    pub headers: Vec<(String, String)>,
-    pub body: Bytes,
-}
-
-impl ApplicationContext {
-    pub fn respond_with_text(
-        &mut self,
-        status: u16,
-        headers: Vec<(String, String)>,
-        body: impl Into<String>,
-    ) -> Result<()> {
-        // Store the response on the context and stop the proxy flow with an HTTP status error.
-        self.direct_response = Some(DirectResponse {
-            status,
-            headers,
-            body: Bytes::from(body.into()),
-        });
-
-        Err(pingora::Error::new(pingora::ErrorType::HTTPStatus(status)))
-    }
-
-    pub fn respond_with_empty(
-        &mut self,
-        status: u16,
-        headers: Vec<(String, String)>,
-    ) -> Result<()> {
-        self.direct_response = Some(DirectResponse {
-            status,
-            headers,
-            body: Bytes::new(),
-        });
-
-        Err(pingora::Error::new(pingora::ErrorType::HTTPStatus(status)))
-    }
-
-    pub fn respond_with_body(
-        &mut self,
-        status: u16,
-        headers: Vec<(String, String)>,
-        body: Bytes,
-    ) -> Result<()> {
-        self.direct_response = Some(DirectResponse {
-            status,
-            headers,
-            body,
-        });
-
-        Err(pingora::Error::new(pingora::ErrorType::HTTPStatus(status)))
     }
 }
 

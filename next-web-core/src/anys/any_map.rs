@@ -1,130 +1,88 @@
-use std::any::Any;
-use std::borrow::Borrow;
-use std::collections::HashMap;
-use std::hash::Hash;
-use tokio::sync::RwLock;
+use std::{any::Any, borrow::Borrow, collections::HashMap, hash::Hash, sync::Arc};
 
-use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use crate::anys::any_value::AnyValue;
 
-/// Support AnyMap caching for different data types
-///
-/// 支持不同数据类型的 AnyMap 缓存
+/// A small concurrent map for storing values behind an async lock.
 #[derive(Clone, Default)]
 pub struct AnyMap<K = String, V = AnyValue> {
-    /// The underlying concurrent hash map storing cache items
-    ///
-    /// 存储缓存项的底层并发哈希表
+    /// The underlying map storing items.
     data: Arc<RwLock<HashMap<K, V>>>,
 }
 
 impl<K, V> AnyMap<K, V>
 where
     K: Hash + Eq,
-    K: Clone,
-    V: Clone,
 {
-    /// Creates a new AnyMap instance
-    /// 创建一个新的 AnyMap 实例
+    /// Creates a new empty `AnyMap`.
     ///
     /// # Examples
-    /// 示例
     ///
     /// ```
-    /// let cache = AnyMap::new();
+    /// # use next_web_core::anys::any_map::AnyMap;
+    /// let cache: AnyMap = AnyMap::new();
     /// ```
+    #[must_use]
     pub fn new() -> Self {
-        let map = Self {
+        Self {
             data: Arc::new(RwLock::new(HashMap::new())),
-        };
-        map
+        }
     }
 
-    /// Sets a key-value pair with optional time-to-live
-    /// 设置键值对，带有可选的存活时间
+    /// Inserts a key-value pair.
     ///
     /// # Arguments
-    /// 参数
     ///
-    /// * `key` - Cache key
-    /// * `key` - 缓存键
-    /// * `value` - Value to cache
-    /// * `value` - 要缓存的值
-    /// * `ttl` - Optional time-to-live duration
-    /// * `ttl` - 可选的存活时间
+    /// * `key` - Map key.
+    /// * `value` - Value to store.
     ///
     /// # Examples
-    /// 示例
     ///
     /// ```
-    /// cache.insert("my_key", "my_value", Some(Duration::from_secs(60)));
+    /// # use next_web_core::anys::any_map::AnyMap;
+    /// # async fn example() {
+    /// let cache = AnyMap::new();
+    /// cache.insert("my_key".to_string(), "my_value".to_string()).await;
+    /// # }
     /// ```
     pub async fn insert(&self, key: K, value: V) {
         self.data.write().await.insert(key, value);
     }
 
-    /// Gets a value by key, returns None if expired or not found
-    /// 通过键获取值，如果过期或不存在则返回 None
-    ///
-    /// # Arguments
-    /// 参数
-    ///
-    /// * `key` - Key to look up
-    /// * `key` - 要查找的键
-    ///
-    /// # Examples
-    /// 示例
-    ///
-    /// ```
-    /// let value = cache.get("my_key");
-    /// ```
-    pub async fn get<Q: ?Sized>(&self, key: &Q) -> Option<V>
+    /// Removes a value by key.
+    pub async fn remove<Q>(&self, key: &Q) -> Option<V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
-    {
-        self.data.read().await.get(key).map(|s| s.clone())
-    }
-
-    /// 删除键
-    pub async fn remove<Q: ?Sized>(&self, key: &Q) -> Option<V>
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         self.data.write().await.remove(key)
     }
 
-    /// 检查键是否存在
-    pub async fn exists<Q: ?Sized>(&self, key: &Q) -> bool
+    /// Returns `true` when the key is present.
+    pub async fn exists<Q>(&self, key: &Q) -> bool
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         self.data.read().await.contains_key(key)
     }
 
-    /// 清除所有键
+    /// Removes all entries.
     pub async fn clear(&self) {
-        let _ = self.data.write().await.clear();
+        self.data.write().await.clear();
     }
 
-    /// 获取缓存项数量
+    /// Returns the number of entries.
+    #[must_use]
     pub async fn len(&self) -> usize {
         self.data.read().await.len()
     }
 
-    /// 检查缓存是否为空
+    /// Returns `true` when the map contains no entries.
+    #[must_use]
     pub async fn is_empty(&self) -> bool {
         self.data.read().await.is_empty()
-    }
-
-    pub async fn extend(&self, other: Self) {
-        self.data
-            .write()
-            .await
-            .extend(other.data.read().await.clone())
     }
 
     pub fn for_each<F>(&self, mut f: F)
@@ -136,21 +94,51 @@ where
             .map(|map| map.iter().for_each(|(k, v)| f(k, v)))
             .ok();
     }
+}
 
+impl<K, V> AnyMap<K, V>
+where
+    K: Hash + Eq,
+    V: Clone,
+{
+    /// Gets a cloned value by key.
+    #[must_use]
+    pub async fn get<Q>(&self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
+        self.data.read().await.get(key).cloned()
+    }
+}
+
+impl<K, V> AnyMap<K, V>
+where
+    K: Hash + Eq + Clone,
+    V: Clone,
+{
+    /// Extends this map with a cloned snapshot of another map.
+    pub async fn extend(&self, other: Self) {
+        if Arc::ptr_eq(&self.data, &other.data) {
+            return;
+        }
+
+        let entries = other.data.read().await.clone();
+        self.data.write().await.extend(entries);
+    }
+
+    #[must_use]
     pub async fn filter<F>(&self, f: F) -> HashMap<K, V>
     where
         F: Fn(&K, &V) -> bool,
     {
-        let filtered_map: HashMap<K, V> = self
-            .data
+        self.data
             .read()
             .await
             .iter()
             .filter(|(k, v)| f(k, v))
             .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-
-        filtered_map
+            .collect()
     }
 }
 
@@ -158,6 +146,7 @@ impl<K, V> AnyMap<K, V>
 where
     K: ToString,
 {
+    #[must_use]
     pub async fn keys(&self) -> Vec<String> {
         self.data
             .read()
@@ -167,14 +156,55 @@ where
             .collect()
     }
 }
-/// 缓存对象包装器
-/// Cache object wrapper
+
+/// Cache object wrapper.
 pub struct CacheObject<T>(pub T)
 where
     T: Any + Clone + Send + Sync;
 
-impl<T: 'static + Any + Clone + Send + Sync> Into<AnyValue> for CacheObject<T> {
-    fn into(self) -> AnyValue {
-        AnyValue::Object(Box::new(self.0))
+impl<T: 'static + Any + Clone + Send + Sync> From<CacheObject<T>> for AnyValue {
+    fn from(value: CacheObject<T>) -> Self {
+        AnyValue::Object(Box::new(value.0))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AnyMap;
+
+    #[tokio::test]
+    async fn borrowed_key_lookup_remove_and_exists_work() {
+        let map = AnyMap::<String, i32>::new();
+        map.insert("answer".to_string(), 42).await;
+
+        assert!(map.exists("answer").await);
+        assert_eq!(map.get("answer").await, Some(42));
+        assert_eq!(map.remove("answer").await, Some(42));
+        assert!(!map.exists("answer").await);
+    }
+
+    #[tokio::test]
+    async fn extend_merges_distinct_maps() {
+        let first = AnyMap::<String, i32>::new();
+        let second = AnyMap::<String, i32>::new();
+
+        first.insert("a".to_string(), 1).await;
+        second.insert("b".to_string(), 2).await;
+
+        first.extend(second).await;
+
+        assert_eq!(first.get("a").await, Some(1));
+        assert_eq!(first.get("b").await, Some(2));
+    }
+
+    #[tokio::test]
+    async fn extend_with_clone_of_self_is_noop() {
+        let map = AnyMap::<String, i32>::new();
+        map.insert("a".to_string(), 1).await;
+
+        map.extend(map.clone()).await;
+
+        assert_eq!(map.len().await, 1);
+        assert_eq!(map.get("a").await, Some(1));
     }
 }

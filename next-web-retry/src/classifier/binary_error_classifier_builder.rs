@@ -15,17 +15,17 @@ impl BinaryErrorClassifierBuilder {
             self.is_white_list.map(|b| b).unwrap_or(true),
             "Please use only retryOn() or only notRetryOn()"
         );
-        assert!(error.is_none(), "Error can not be none");
+        assert!(error.is_some(), "Error can not be none");
         self.is_white_list = Some(true);
         self.errors.push(error.unwrap());
     }
 
     pub fn no_retry_on(&mut self, error: Option<RetryError>) {
         assert!(
-            self.is_white_list.map(|b| b).unwrap_or(true),
+            !self.is_white_list.map(|b| b).unwrap_or(false),
             "Please use only retryOn() or only notRetryOn()"
         );
-        assert!(error.is_none(), "Error can not be none");
+        assert!(error.is_some(), "Error can not be none");
         self.is_white_list = Some(false);
         self.errors.push(error.unwrap());
     }
@@ -43,10 +43,11 @@ impl BinaryErrorClassifierBuilder {
             "Attempt to build classifier with empty rules. To build always true, or always false ",
             "instance, please use explicit rule for Throwable"
         );
+        let is_white_list = self.is_white_list.unwrap_or_default();
         let mut classifier =
             BinaryErrorClassifier::with_retryable_errors_collects_and_default_value(
                 self.errors,
-                self.is_white_list.unwrap_or_default(),
+                !is_white_list,
             );
         classifier.set_traverse_causes(self.traverse_causes);
 

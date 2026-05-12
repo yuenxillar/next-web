@@ -7,6 +7,7 @@ use std::{
 };
 
 use next_web_core::{anys::any_value::AnyValue, async_trait};
+use rand::Rng;
 use tracing::warn;
 
 use crate::backoff::{
@@ -28,12 +29,10 @@ impl ExponentialBackOffPolicy {
     }
 
     pub fn with_random() -> Self {
-        // Self {
-        //     with_random: true,
-        //     ..Default::default()
-        // }
-
-        unimplemented!("Randomized backoff is not implemented yet.");
+        Self {
+            with_random: true,
+            ..Default::default()
+        }
     }
 
     pub fn set_initial_interval(&mut self, initial_interval: u64) {
@@ -86,6 +85,7 @@ impl BackOffPolicy for ExponentialBackOffPolicy {
             interval: Arc::new(AtomicU64::new(self.initial_interval)),
             multiplier: self.multiplier,
             max_interval: self.max_interval,
+            with_random: self.with_random,
         }))
     }
 
@@ -131,11 +131,13 @@ pub struct ExponentialBackOffContext {
     interval: Arc<AtomicU64>,
     multiplier: f32,
     max_interval: u64,
+    with_random: bool,
 }
 
 impl ExponentialBackOffContext {
     pub fn get_sleep_and_increment(&self) -> u64 {
-        let mut sleep = self.get_interval();
+        let interval = self.get_interval();
+        let mut sleep = interval;
         let max = self.get_max_interval();
 
         if sleep > max {
@@ -145,7 +147,13 @@ impl ExponentialBackOffContext {
                 .store(self.get_next_interval(), Ordering::Relaxed);
         };
 
-        // TODO random
+        if self.with_random {
+            let next = self.calculate_next_interval(interval).min(max);
+            if sleep < next {
+                return rand::thread_rng().gen_range(sleep..=next);
+            }
+        }
+
         sleep
     }
 
@@ -158,16 +166,61 @@ impl ExponentialBackOffContext {
     }
 
     pub fn get_next_interval(&self) -> u64 {
-        self.interval.load(Ordering::Relaxed) * (self.multiplier as u64)
+        self.calculate_next_interval(self.interval.load(Ordering::Relaxed))
     }
 
     pub fn get_max_interval(&self) -> u64 {
         self.max_interval
+    }
+
+    fn calculate_next_interval(&self, interval: u64) -> u64 {
+        ((interval as f32) * self.multiplier).ceil() as u64
     }
 }
 
 impl BackOffContext for ExponentialBackOffContext {
     fn get_value(&self) -> Option<&AnyValue> {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn with_random_enables_randomized_backoff() {
+        let policy = ExponentialBackOffPolicy::with_random();
+
+        assert!(policy.with_random);
+    }
+
+    #[test]
+    fn deterministic_backoff_keeps_fractional_multiplier() {
+        let context = ExponentialBackOffContext {
+            interval: Arc::new(AtomicU64::new(1000)),
+            multiplier: 1.5,
+            max_interval: 10_000,
+            with_random: false,
+        };
+
+        assert_eq!(context.get_sleep_and_increment(), 1000);
+        assert_eq!(context.get_sleep_and_increment(), 1500);
+        assert_eq!(context.get_sleep_and_increment(), 2250);
+    }
+
+    #[test]
+    fn randomized_backoff_stays_between_current_interval_and_capped_next_interval() {
+        let context = ExponentialBackOffContext {
+            interval: Arc::new(AtomicU64::new(1000)),
+            multiplier: 2.0,
+            max_interval: 1500,
+            with_random: true,
+        };
+
+        let sleep = context.get_sleep_and_increment();
+
+        assert!((1000..=1500).contains(&sleep));
+        assert_eq!(context.get_interval(), 2000);
     }
 }

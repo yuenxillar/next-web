@@ -1,4 +1,7 @@
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 
 use crate::config::security_builder::SecurityBuilder;
 
@@ -9,7 +12,7 @@ where
     Self: SecurityBuilder<O>,
 {
     building: Arc<AtomicBool>,
-    object: Option<O>,
+    object: Arc<Mutex<Option<O>>>,
 }
 
 impl<O> AbstractSecurityBuilder<O>
@@ -19,8 +22,12 @@ where
     pub fn new() -> Self {
         AbstractSecurityBuilder {
             building: Arc::new(AtomicBool::new(false)),
-            object: None,
+            object: Arc::new(Mutex::new(None)),
         }
+    }
+
+    pub fn set_object(&mut self, object: O) {
+        *self.object.lock().expect("security builder lock poisoned") = Some(object);
     }
 }
 
@@ -29,6 +36,15 @@ where
     O: Send + Sync,
 {
     fn build(&self) -> O {
-        todo!()
+        assert!(
+            !self.building.swap(true, Ordering::SeqCst),
+            "This object has already been built"
+        );
+
+        self.object
+            .lock()
+            .expect("security builder lock poisoned")
+            .take()
+            .expect("No object has been configured for this security builder")
     }
 }

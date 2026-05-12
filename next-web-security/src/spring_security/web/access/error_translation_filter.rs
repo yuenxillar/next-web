@@ -7,9 +7,9 @@ pub struct ErrorTranslationFilter {}
 impl Filter for ErrorTranslationFilter {
     fn do_filter(
         &self,
-        req: &mut axum::extract::Request,
-        res: &mut axum::response::Response,
+        _req: &mut axum::extract::Request,
+        _res: &mut axum::response::Response,
     ) -> Result<(), BoxError> {
-        todo!()
+        Ok(())
     }
 }
