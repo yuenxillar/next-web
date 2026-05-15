@@ -6,6 +6,7 @@ pub mod forward_authentication_failure_handler;
 pub mod forward_authentication_success_handler;
 pub mod login_url_authentication_entry_point;
 pub mod logout;
+pub mod preauth;
 pub mod remember_me_services;
 pub mod rememberme;
 pub mod saved_request_aware_authentication_success_handler;

@@ -29,3 +29,44 @@ impl AuthenticationTrustResolver for DefaultAuthenticationTrustResolver {
         authentication.is_remember_me()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        authentication::{
+            anonymous_authentication_token::AnonymousAuthenticationToken,
+            remember_me_authentication_token::RememberMeAuthenticationToken,
+        },
+        authorization::authentication_trust_resolver::{
+            AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
+        },
+        core::authority_utils::AuthorityUtils,
+    };
+
+    #[test]
+    fn trust_resolver_detects_anonymous_authentication() {
+        let resolver = DefaultAuthenticationTrustResolver;
+        let authentication = AnonymousAuthenticationToken::new(
+            "anonymous",
+            "anonymousUser",
+            AuthorityUtils::create_authority_list(["ROLE_ANONYMOUS"]),
+        );
+
+        assert!(resolver.is_anonymous(&authentication));
+        assert!(!resolver.is_authenticated(&authentication));
+    }
+
+    #[test]
+    fn trust_resolver_detects_remember_me_authentication() {
+        let resolver = DefaultAuthenticationTrustResolver;
+        let authentication = RememberMeAuthenticationToken::new(
+            "remember",
+            "alice",
+            AuthorityUtils::create_authority_list(["ROLE_USER"]),
+        );
+
+        assert!(resolver.is_remember_me(&authentication));
+        assert!(resolver.is_authenticated(&authentication));
+        assert!(!resolver.is_fully_authenticated(&authentication));
+    }
+}

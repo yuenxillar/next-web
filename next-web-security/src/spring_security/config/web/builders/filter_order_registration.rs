@@ -20,16 +20,20 @@ pub struct FilterOrderRegistration {
 }
 
 impl FilterOrderRegistration {
-    fn put<F: Filter>(&mut self, position: i32) {
+    pub fn put<F: Filter>(&mut self, position: i32) {
         self.filter_to_order
             .entry(std::any::type_name::<F>().to_string())
             .or_insert(position);
     }
 
-    fn get_order<F: Filter>(&self) -> Option<i32> {
+    pub fn get_order<F: Filter>(&self) -> Option<i32> {
         self.filter_to_order
             .get(std::any::type_name::<F>())
             .map(|v| *v)
+    }
+
+    pub fn get_order_by_name(&self, filter_name: &str) -> Option<i32> {
+        self.filter_to_order.get(filter_name).copied()
     }
 }
 

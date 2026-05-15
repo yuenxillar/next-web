@@ -1,3 +1,4 @@
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuthorizationDecision {
     granted: bool,
 }

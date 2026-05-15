@@ -74,6 +74,6 @@ impl ExactUrlRequestMatcher {
 
 impl RequestMatcher for ExactUrlRequestMatcher {
     fn matches(&self, request: &axum::extract::Request) -> bool {
-        todo!()
+        request.uri().path() == self.process_url.as_ref()
     }
 }

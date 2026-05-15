@@ -4,8 +4,14 @@ use axum::{extract::Request, http::StatusCode};
 
 use crate::{
     access::intercept::request_authorization_context::RequestAuthorizationContext,
+    authentication::anonymous_authentication_token::AnonymousAuthenticationToken,
     authorization::authorization_manager::AuthorizationManager,
-    core::{authentication::Authentication, filter::Filter},
+    core::{
+        authority_utils::AuthorityUtils,
+        context::security_context_holder::SecurityContextHolder,
+        filter::Filter,
+        simple_authentication::SimpleAuthentication,
+    },
 };
 
 pub struct AuthorizationFilter {
@@ -34,10 +40,24 @@ impl Filter for AuthorizationFilter {
         _req: &mut axum::extract::Request,
         res: &mut axum::response::Response,
     ) -> Result<(), next_web_core::error::BoxError> {
-        let decision = block_on(
-            self.authorization_manager
-                .check(Box::new(AnonymousAuthentication), RequestAuthorizationContext {}),
-        );
+        let authentication = SecurityContextHolder::get_context()
+            .get_authentication()
+            .map(|authentication| {
+                Box::new(SimpleAuthentication::builder_from(authentication.as_ref()).build())
+                    as Box<dyn crate::core::authentication::Authentication>
+            })
+            .unwrap_or_else(|| {
+                Box::new(AnonymousAuthenticationToken::new(
+                    "anonymous",
+                    "anonymousUser",
+                    AuthorityUtils::create_authority_list(["ROLE_ANONYMOUS"]),
+                )) as Box<dyn crate::core::authentication::Authentication>
+            });
+
+        let decision = block_on(self.authorization_manager.check(
+            authentication,
+            RequestAuthorizationContext::from_request(_req),
+        ));
 
         if decision.map(|decision| decision.is_granted()).unwrap_or(false) {
             Ok(())
@@ -46,18 +66,6 @@ impl Filter for AuthorizationFilter {
             *res.body_mut() = "Forbidden".to_string().into();
             Ok(())
         }
-    }
-}
-
-struct AnonymousAuthentication;
-
-impl Authentication for AnonymousAuthentication {
-    fn is_authenticated(&self) -> bool {
-        false
-    }
-
-    fn is_anonymous(&self) -> bool {
-        true
     }
 }
 

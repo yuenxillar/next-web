@@ -1,8 +1,21 @@
 pub mod authentication;
 pub mod authentication_error;
+pub mod authenticated_principal;
+pub mod authority_utils;
+pub mod authority_mapping;
+pub mod context;
+pub mod credentials_container;
+pub mod factor_granted_authority;
 pub mod filter;
 pub mod granted_authority;
+pub mod granted_authorities_container;
+pub mod simple_authentication;
+pub mod simple_granted_authority;
+pub mod session;
+pub mod token;
 pub mod userdetails;
+pub mod user_cache;
+pub mod username_password_authentication_token;
 pub mod username_not_found_error;
 pub mod web_security_configure;
 

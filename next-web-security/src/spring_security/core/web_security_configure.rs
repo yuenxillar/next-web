@@ -2,7 +2,11 @@ use next_web_core::DynClone;
 
 use crate::config::web::http_security::HttpSecurity;
 
-pub trait WebSecurityConfigure: DynClone + Send + Sync {
+pub trait WebSecurityConfigure
+where
+    Self: DynClone,
+    Self: Send + Sync,
+{
     fn configure(self) -> HttpSecurity;
 }
 

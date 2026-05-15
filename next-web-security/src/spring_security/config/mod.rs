@@ -3,6 +3,7 @@ pub mod abstract_security_builder;
 pub mod authentication;
 pub mod configuration;
 pub mod configurers;
+pub mod core;
 pub mod object_post_processor;
 pub mod security_builder;
 pub mod security_configurer;

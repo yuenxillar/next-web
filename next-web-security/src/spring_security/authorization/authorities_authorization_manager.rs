@@ -3,7 +3,9 @@ use std::sync::Arc;
 use std::collections::HashSet;
 
 use crate::{
-    access::hierarchicalroles::role_hierarchy::RoleHierarchy,
+    access::hierarchicalroles::{
+        null_role_hierarchy::NullRoleHierarchy, role_hierarchy::RoleHierarchy,
+    },
     core::authentication::Authentication,
 };
 
@@ -31,8 +33,8 @@ impl AuthoritiesAuthorizationManager {
             return false;
         }
 
-        authentication
-            .authorities()
+        self.role_hierarchy
+            .get_reachable_granted_authorities(&authentication.authorities())
             .into_iter()
             .any(|authority| required_authorities.contains(&authority))
     }
@@ -43,7 +45,3 @@ impl Default for AuthoritiesAuthorizationManager {
         Self::new()
     }
 }
-
-struct NullRoleHierarchy;
-
-impl RoleHierarchy for NullRoleHierarchy {}

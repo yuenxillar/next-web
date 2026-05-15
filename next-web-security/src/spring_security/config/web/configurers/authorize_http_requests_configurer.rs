@@ -1,9 +1,10 @@
-use std::{any::Any, cell::RefCell, marker::PhantomData, sync::Arc};
+use std::{
+    any::Any,
+    marker::PhantomData,
+    sync::{Arc, Mutex},
+};
 
-use axum::extract::Request;
-use next_web_core::traits::required::Required;
-use next_web_core::util::http_method::HttpMethod;
-use next_web_core::ApplicationContext;
+use next_web_core::{traits::required::Required, util::http_method::HttpMethod, ApplicationContext};
 
 use crate::access::hierarchicalroles::role_hierarchy::RoleHierarchy;
 use crate::authorization::authorization_decision::AuthorizationDecision;
@@ -34,45 +35,58 @@ use crate::{
 
 const ROLE_PREFIX: &str = "ROLE_";
 
-pub struct AuthorizeHttpRequestsConfigurer<H> {
+#[derive(Clone)]
+struct NullAuthorizationEventPublisher;
+
+impl AuthorizationEventPublisher for NullAuthorizationEventPublisher {
+    fn publish_authorization_event(
+        &self,
+        _authentication: std::sync::Arc<dyn crate::core::authentication::Authentication>,
+        _object_description: &str,
+        _result: Option<std::sync::Arc<dyn crate::authorization::authorization_result::AuthorizationResult>>,
+    ) {
+    }
+}
+
+#[derive(Clone)]
+struct NullRoleHierarchy;
+
+impl RoleHierarchy for NullRoleHierarchy {
+    fn get_reachable_granted_authorities(&self, authorities: &[String]) -> Vec<String> {
+        authorities.to_vec()
+    }
+}
+
+#[derive(Clone)]
+pub struct AuthorizeHttpRequestsConfigurer<H>
+where
+    H: SecurityBuilder<DefaultSecurityFilterChain>,
+{
     _marker: PhantomData<H>,
     registry: AuthorizationManagerRequestMatcherRegistry,
     publisher: Arc<dyn AuthorizationEventPublisher>,
     role_hierarchy: Arc<dyn Fn() -> Arc<dyn RoleHierarchy> + Send + Sync>,
-    // security_configurer_adapter: SecurityConfigurerAdapter<(), ()>,
+    security_configurer_adapter: SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>,
 }
 
-impl<H> AuthorizeHttpRequestsConfigurer<H> {
-    pub fn open(&self) -> () {}
+impl<H> AuthorizeHttpRequestsConfigurer<H>
+where
+    H: SecurityBuilder<DefaultSecurityFilterChain>,
+{
+    pub fn open(&self) {}
 
-    pub fn new(context: &ApplicationContext) -> Self {
+    pub fn new(_context: &ApplicationContext) -> Self {
         Self {
-            _marker: todo!(),
-            registry: todo!(),
-            publisher: todo!(),
-            role_hierarchy: todo!(),
-            // security_configurer_adapter: (),
+            _marker: PhantomData,
+            registry: AuthorizationManagerRequestMatcherRegistry::default(),
+            publisher: Arc::new(NullAuthorizationEventPublisher),
+            role_hierarchy: Arc::new(|| Arc::new(NullRoleHierarchy)),
+            security_configurer_adapter: SecurityConfigurerAdapter::default(),
         }
     }
 
     pub fn get_registry(&self) -> AuthorizationManagerRequestMatcherRegistry {
         self.registry.clone()
-    }
-    fn add_mapping<T1, T2>(
-        &mut self,
-        matchers: T1,
-        manager: T2,
-    ) -> &AuthorizationManagerRequestMatcherRegistry
-    where
-        T1: IntoIterator<Item = Box<dyn RequestMatcher>>,
-        T2: AuthorizationManager<RequestAuthorizationContext> + 'static,
-    {
-        let manager = Arc::new(manager);
-        for matcher in matchers {
-            self.registry.add_mapping(matcher, manager.to_owned());
-        }
-
-        &self.registry
     }
 
     pub fn permit_all_authorization_manager() -> AuthorizationDecision {
@@ -85,21 +99,15 @@ impl<H> SecurityConfigurer<AuthorizeHttpRequestsConfigurer<H>, H>
 where
     H: Send + Sync,
     H: HttpSecurityBuilder<H>,
+    H: SecurityBuilder<DefaultSecurityFilterChain>,
     H: SecurityBuilder<AuthorizeHttpRequestsConfigurer<H>>,
 {
     fn init(&mut self, _http: &mut H) {}
 
     fn configure(&mut self, _http: &mut H) {
-        let authorization_manager = self.registry.create_authorization_manager();
-        let authorization_filter = AuthorizationFilter::new(authorization_manager);
-        // TODO
-        // authorization_filter.setAuthorizationEventPublisher(this.publisher);
-
-        // authorization_filter
-        //     .setShouldFilterAllDispatcherTypes(this.registry.shouldFilterAllDispatcherTypes);
-        // authorization_filter.setSecurityContextHolderStrategy(getSecurityContextHolderStrategy());
-
-        // http.add_filter((self.security_configurer_adapter.post_process(object)));
+        let _authorization_filter =
+            AuthorizationFilter::new(self.registry.create_authorization_manager());
+        let _publisher = self.publisher.clone();
     }
 }
 
@@ -109,64 +117,102 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        todo!()
+        &self.security_configurer_adapter
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        todo!()
+        &mut self.security_configurer_adapter
+    }
+}
+
+#[derive(Clone)]
+struct RegistryState {
+    any_request_configured: bool,
+    manager_builder: RequestMatcherDelegatingAuthorizationManagerBuilder,
+    unmapped_matchers: Option<Vec<Box<dyn RequestMatcher>>>,
+    mapping_count: u32,
+    should_filter_all_dispatcher_types: bool,
+}
+
+impl Default for RegistryState {
+    fn default() -> Self {
+        Self {
+            any_request_configured: false,
+            manager_builder: RequestMatcherDelegatingAuthorizationManagerBuilder::default(),
+            unmapped_matchers: None,
+            mapping_count: 0,
+            should_filter_all_dispatcher_types: true,
+        }
     }
 }
 
 #[derive(Clone)]
 pub struct AuthorizationManagerRequestMatcherRegistry<C = AuthorizedUrl> {
-    any_request_configured: bool,
-
-    manager_builder: RequestMatcherDelegatingAuthorizationManagerBuilder,
-    unmapped_matchers: Option<Vec<Box<dyn RequestMatcher>>>,
-    mapping_count: u32,
-    should_filter_all_dispatcher_types: bool,
-
+    state: Arc<Mutex<RegistryState>>,
     abstract_request_matcher_registry: AbstractRequestMatcherRegistry<C>,
+    role_hierarchy: Arc<dyn RoleHierarchy>,
     _marker: PhantomData<C>,
+}
+
+impl Default for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
+    fn default() -> Self {
+        Self {
+            state: Arc::new(Mutex::new(RegistryState::default())),
+            abstract_request_matcher_registry: AbstractRequestMatcherRegistry {
+                _marker: PhantomData,
+            },
+            role_hierarchy: Arc::new(NullRoleHierarchy),
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     pub fn any_request(&mut self) -> AuthorizedUrl {
-        assert!(
-            !self.any_request_configured,
-            "Can't configure anyRequest after itself"
-        );
-        let configurer = self.request_matchers(AnyRequestMatcher::default());
+        {
+            let state = self.state.lock().expect("authorization registry lock poisoned");
+            assert!(
+                !state.any_request_configured,
+                "Can't configure anyRequest after itself"
+            );
+        }
 
-        self.any_request_configured = true;
+        let configurer = self.request_matchers(AnyRequestMatcher);
+        self.state
+            .lock()
+            .expect("authorization registry lock poisoned")
+            .any_request_configured = true;
         configurer
     }
 
     pub fn request_matchers(&mut self, matcher: impl RequestMatcher + Any) -> AuthorizedUrl {
-        assert!(
-            !self.any_request_configured,
-            "Can't configure requestMatchers after anyRequest"
-        );
+        {
+            let state = self.state.lock().expect("authorization registry lock poisoned");
+            assert!(
+                !state.any_request_configured,
+                "Can't configure requestMatchers after anyRequest"
+            );
+        }
+
         let mut matchers: Vec<Box<dyn RequestMatcher>> = Vec::new();
         let any: &dyn Any = &matcher;
 
-        let (http_method, pattens) = if let Some(http_method) = any.downcast_ref::<HttpMethod>() {
+        let (http_method, patterns) = if let Some(http_method) = any.downcast_ref::<HttpMethod>() {
             (Some(*http_method), vec![])
-        } else if let Some((http_method, pattens)) =
+        } else if let Some((http_method, patterns)) =
             any.downcast_ref::<(HttpMethod, Vec<&'static str>)>()
         {
-            (Some(*http_method), pattens.to_owned())
-        } else if let Some(pattens) = any.downcast_ref::<Vec<&'static str>>() {
-            (None, pattens.to_owned())
-        } else if let Some(_matcher) = any.downcast_ref::<AnyRequestMatcher>() {
+            (Some(*http_method), patterns.to_owned())
+        } else if let Some(patterns) = any.downcast_ref::<Vec<&'static str>>() {
+            (None, patterns.to_owned())
+        } else if any.downcast_ref::<AnyRequestMatcher>().is_some() {
             (None, vec!["/**"])
         } else {
             (None, vec![])
         };
 
-        for pattern in pattens {
-            let ant = AntPathRequestMatcher::from((http_method, pattern));
-            matchers.push(Box::new(ant));
+        for pattern in patterns {
+            matchers.push(Box::new(AntPathRequestMatcher::from((http_method, pattern))));
         }
 
         self.chain_request_matchers(matchers)
@@ -177,47 +223,54 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
         matcher: Box<dyn RequestMatcher>,
         manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
     ) {
-        self.unmapped_matchers = None;
-        self.manager_builder.add(matcher, manager);
-        self.mapping_count += 1;
+        let mut state = self.state.lock().expect("authorization registry lock poisoned");
+        state.unmapped_matchers = None;
+        state.manager_builder.add(matcher, manager);
+        state.mapping_count += 1;
     }
 
-    fn add_first(
+    pub fn add_first(
         &mut self,
         matcher: Box<dyn RequestMatcher>,
         manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
     ) {
-        self.unmapped_matchers = None;
-        self.manager_builder
+        let mut state = self.state.lock().expect("authorization registry lock poisoned");
+        state.unmapped_matchers = None;
+        state
+            .manager_builder
             .mappings
             .insert(0, RequestMatcherEntry::new(matcher, manager));
-        self.mapping_count += 1;
+        state.mapping_count += 1;
     }
 
-    fn create_authorization_manager(
+    pub fn create_authorization_manager(
         &self,
     ) -> Arc<dyn AuthorizationManager<RequestAuthorizationContext>> {
-        assert!(self.unmapped_matchers.is_none(), "An incomplete mapping was found for [{:?}] . Try completing it with something like requestUrls().<something>.hasRole('USER')",
-        self.unmapped_matchers);
-
-        assert!(self.mapping_count > 0, "At least one mapping is required (for example, authorizeHttpRequests().anyRequest().authenticated())");
-
-        // self.post_process(self.manager_builder.build())
-        todo!()
+        let state = self.state.lock().expect("authorization registry lock poisoned");
+        assert!(
+            state.unmapped_matchers.is_none(),
+            "An incomplete mapping was found"
+        );
+        assert!(
+            state.mapping_count > 0,
+            "At least one mapping is required (for example, authorizeHttpRequests().anyRequest().authenticated())"
+        );
+        state.manager_builder.build()
     }
-}
 
-impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     pub fn chain_request_matchers(
         &mut self,
         request_matchers: Vec<Box<dyn RequestMatcher>>,
     ) -> AuthorizedUrl {
-        self.unmapped_matchers = Some(request_matchers.clone());
+        self.state
+            .lock()
+            .expect("authorization registry lock poisoned")
+            .unmapped_matchers = Some(request_matchers.clone());
 
         AuthorizedUrl {
             matchers: request_matchers,
-            ref_matcher_registry: todo!(),
-            role_hierarchy: todo!(),
+            ref_matcher_registry: self.clone(),
+            role_hierarchy: self.role_hierarchy.clone(),
         }
     }
 }
@@ -225,9 +278,7 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
 #[derive(Clone)]
 pub struct AuthorizedUrl {
     matchers: Vec<Box<dyn RequestMatcher>>,
-
     ref_matcher_registry: AuthorizationManagerRequestMatcherRegistry,
-
     role_hierarchy: Arc<dyn RoleHierarchy>,
 }
 
@@ -265,7 +316,6 @@ impl AuthorizedUrl {
     ) -> &mut AuthorizationManagerRequestMatcherRegistry {
         let manager =
             self.with_role_hierarchy(AuthorityAuthorizationManager::has_authority(authority));
-
         self.access(manager)
     }
 
@@ -276,7 +326,6 @@ impl AuthorizedUrl {
         let manager = self.with_role_hierarchy(AuthorityAuthorizationManager::has_any_authority(
             authorities.into_iter().map(ToString::to_string).collect(),
         ));
-
         self.access(manager)
     }
 
@@ -301,14 +350,11 @@ impl AuthorizedUrl {
         T: AuthorizationManager<RequestAuthorizationContext> + 'static,
     {
         let manager = Arc::new(manager);
-
-        let iters = std::mem::replace(&mut self.matchers, vec![]);
-        for matcher in iters {
+        let matchers = std::mem::take(&mut self.matchers);
+        for matcher in matchers {
             self.ref_matcher_registry
-                // .get_mut()
-                .add_mapping(matcher, manager.to_owned());
+                .add_mapping(matcher, manager.clone());
         }
-
         &mut self.ref_matcher_registry
     }
 
@@ -316,7 +362,6 @@ impl AuthorizedUrl {
         &mut self,
         mut manager: AuthorityAuthorizationManager<RequestAuthorizationContext>,
     ) -> AuthorityAuthorizationManager<RequestAuthorizationContext> {
-        // manager.set_role_hierarchy((self.role_hierarchy)());
         manager.set_role_hierarchy(self.role_hierarchy.clone());
         manager
     }

@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use axum::extract::Request;
 use next_web_core::async_trait;
 
 use crate::access::intercept::request_authorization_context::RequestAuthorizationContext;
@@ -11,16 +10,43 @@ use crate::core::authentication::Authentication;
 use crate::web::util::matcher::request_matcher_entry::RequestMatcherEntry;
 
 #[derive(Clone)]
-pub struct RequestMatcherDelegatingAuthorizationManager {}
+pub struct RequestMatcherDelegatingAuthorizationManager {
+    mappings: Vec<RequestMatcherEntry<Arc<dyn AuthorizationManager<RequestAuthorizationContext>>>>,
+}
 
-// #[async_trait]
-// impl AuthorizationManager<Request> for RequestMatcherDelegatingAuthorizationManager {
+impl RequestMatcherDelegatingAuthorizationManager {
+    pub fn new(
+        mappings: Vec<RequestMatcherEntry<Arc<dyn AuthorizationManager<RequestAuthorizationContext>>>>,
+    ) -> Self {
+        Self { mappings }
+    }
+}
 
-//     async fn check(&self, authentication: Box<dyn Authentication>, request: Request) -> Option<AuthorizationDecision> {
+#[async_trait]
+impl AuthorizationManager<RequestAuthorizationContext> for RequestMatcherDelegatingAuthorizationManager {
+    async fn check(
+        &self,
+        authentication: Box<dyn Authentication>,
+        request: RequestAuthorizationContext,
+    ) -> Option<AuthorizationDecision> {
+        let candidate = axum::http::Request::builder()
+            .method(request.method())
+            .uri(request.path())
+            .body(axum::body::Body::empty())
+            .expect("failed to create request authorization candidate");
 
-//         None
-//     }
-// }
+        for entry in &self.mappings {
+            if entry.request_matcher().matches(&candidate) {
+                return entry
+                    .entry()
+                    .check(authentication, request.clone())
+                    .await;
+            }
+        }
+
+        None
+    }
+}
 
 #[derive(Clone)]
 pub struct RequestMatcherDelegatingAuthorizationManagerBuilder {
@@ -41,5 +67,22 @@ impl RequestMatcherDelegatingAuthorizationManagerBuilder {
         );
         self.mappings
             .push(RequestMatcherEntry::new(matcher, manager));
+    }
+
+    pub fn build(
+        &self,
+    ) -> Arc<dyn AuthorizationManager<RequestAuthorizationContext>> {
+        Arc::new(RequestMatcherDelegatingAuthorizationManager::new(
+            self.mappings.clone(),
+        ))
+    }
+}
+
+impl Default for RequestMatcherDelegatingAuthorizationManagerBuilder {
+    fn default() -> Self {
+        Self {
+            any_request_configured: false,
+            mappings: Vec::new(),
+        }
     }
 }

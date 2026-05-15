@@ -12,7 +12,7 @@ use crate::{
                 abstract_authentication_filter_configurer::{
                     AbstractAuthenticationFilterConfigurer, AuthenticationFilterConfigurer,
                 },
-                abstract_http_configurer::AbstractHttpConfigurer,
+                base_http_configurer::BaseHttpConfigurer,
             },
             http_security_builder::HttpSecurityBuilder,
         },
@@ -44,7 +44,7 @@ where
         UsernamePasswordAuthenticationFilter,
     >,
 
-    abstract_http_configurer: AbstractHttpConfigurer<FormLoginConfigurer<H>, H>,
+    abstract_http_configurer: BaseHttpConfigurer<FormLoginConfigurer<H>, H>,
 }
 
 impl<H> FormLoginConfigurer<H>
@@ -91,7 +91,7 @@ where
             .get_password_parameter()
     }
 
-    fn init_default_login_filter(&mut self, http: &mut H) {
+    pub(crate) fn init_default_login_filter(&mut self, http: &mut H) {
         let login_page_generating_filter =
             http.get_mut_shared_object::<DefaultLoginPageGeneratingFilter>();
         let abs = &self.abstract_authentication_filter_configurer;
@@ -101,7 +101,7 @@ where
         {
             if let Some(login_page_generating_filter) = login_page_generating_filter {
                 login_page_generating_filter.set_form_login_enabled(true);
-                login_page_generating_filter.set_username_parameter(self.get_password_parameter());
+                login_page_generating_filter.set_username_parameter(self.get_username_parameter());
                 login_page_generating_filter.set_password_parameter(self.get_password_parameter());
                 login_page_generating_filter.set_login_page_url(abs.get_login_page());
                 login_page_generating_filter
@@ -119,11 +119,13 @@ where
     H: Clone,
 {
     fn get_object(&self) -> &UsernamePasswordAuthenticationFilter {
-        &self.username_password_authentication_filter
+        self.abstract_authentication_filter_configurer
+            .get_authentication_filter()
     }
 
     fn get_mut_object(&mut self) -> &mut UsernamePasswordAuthenticationFilter {
-        &mut self.username_password_authentication_filter
+        self.abstract_authentication_filter_configurer
+            .get_mut_authentication_filter()
     }
 }
 
@@ -161,17 +163,17 @@ where
     }
 }
 
-impl<H> Required<AbstractHttpConfigurer<FormLoginConfigurer<H>, H>> for FormLoginConfigurer<H>
+impl<H> Required<BaseHttpConfigurer<FormLoginConfigurer<H>, H>> for FormLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
     H: AuthenticationFilterConfigurer<H>,
     H: Clone,
 {
-    fn get_object(&self) -> &AbstractHttpConfigurer<FormLoginConfigurer<H>, H> {
+    fn get_object(&self) -> &BaseHttpConfigurer<FormLoginConfigurer<H>, H> {
         &self.abstract_http_configurer
     }
 
-    fn get_mut_object(&mut self) -> &mut AbstractHttpConfigurer<FormLoginConfigurer<H>, H> {
+    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<FormLoginConfigurer<H>, H> {
         &mut self.abstract_http_configurer
     }
 }
@@ -222,9 +224,9 @@ where
         let authentication_filter = UsernamePasswordAuthenticationFilter::default();
 
         let abstract_authentication_filter_configurer =
-            AbstractAuthenticationFilterConfigurer::new(authentication_filter, None);
+            AbstractAuthenticationFilterConfigurer::new(authentication_filter, Some("/login".into()));
 
-        let abstract_http_configurer = AbstractHttpConfigurer::default();
+        let abstract_http_configurer = BaseHttpConfigurer::default();
         let mut form_login_configurer = Self {
             abstract_authentication_filter_configurer,
             abstract_http_configurer,
@@ -247,10 +249,10 @@ where
     H: AuthenticationFilterConfigurer<H> + Clone,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        todo!()
+        self.abstract_http_configurer.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        todo!()
+        self.abstract_http_configurer.get_mut_object()
     }
 }

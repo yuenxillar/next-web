@@ -13,4 +13,12 @@ impl<T> RequestMatcherEntry<T> {
             entry,
         }
     }
+
+    pub fn request_matcher(&self) -> &dyn RequestMatcher {
+        self.request_matcher.as_ref()
+    }
+
+    pub fn entry(&self) -> &T {
+        &self.entry
+    }
 }

@@ -14,10 +14,9 @@ where
     O: Send + Sync,
     Self: SecurityConfigurer<O, B>,
 {
-    security_builder: Option<B>,
     composite_object_post_processor: CompositeObjectPostProcessor,
 
-    _marker: std::marker::PhantomData<O>,
+    _marker: std::marker::PhantomData<(O, B)>,
 }
 
 impl<O, B> SecurityConfigurerAdapter<O, B>
@@ -38,12 +37,10 @@ where
     where
         B: Clone,
     {
-        assert!(
-            self.security_builder.is_some(),
-            "security_builder cannot be null"
-        );
-        self.security_builder.clone()
+        None
     }
+
+    pub fn set_builder(&mut self, _security_builder: B) {}
 }
 
 #[derive(Clone)]
@@ -66,6 +63,22 @@ impl ObjectPostProcessor<AnyValue> for CompositeObjectPostProcessor {
             }
         }
         value
+    }
+}
+
+impl<O, B> Default for SecurityConfigurerAdapter<O, B>
+where
+    B: SecurityBuilder<O>,
+    O: Send + Sync,
+    Self: SecurityConfigurer<O, B>,
+{
+    fn default() -> Self {
+        Self {
+            composite_object_post_processor: CompositeObjectPostProcessor {
+                post_processors: Vec::new(),
+            },
+            _marker: std::marker::PhantomData,
+        }
     }
 }
 

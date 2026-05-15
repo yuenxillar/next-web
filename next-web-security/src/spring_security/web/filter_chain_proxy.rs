@@ -35,6 +35,24 @@ impl FilterChainProxy {
 
 impl Filter for FilterChainProxy {
     fn do_filter(&self, req: &mut Request, res: &mut Response) -> Result<(), BoxError> {
+        self.filter_chain_validator.validate(self);
+
+        let Some(chain) = self
+            .filter_chains
+            .iter()
+            .find(|chain| chain.matches(req))
+            .cloned()
+        else {
+            return Ok(());
+        };
+
+        for filter in chain.get_filters() {
+            filter.do_filter(req, res)?;
+            if !res.status().is_success() && !res.status().is_redirection() {
+                break;
+            }
+        }
+
         Ok(())
     }
 }

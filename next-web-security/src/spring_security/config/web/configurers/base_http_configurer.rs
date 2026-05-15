@@ -11,9 +11,9 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct AbstractHttpConfigurer<T, B>
+pub struct BaseHttpConfigurer<T, B>
 where
-    T: Required<AbstractHttpConfigurer<T, B>>,
+    T: Required<BaseHttpConfigurer<T, B>>,
     B: HttpSecurityBuilder<B>,
     Self: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>,
 {
@@ -22,30 +22,30 @@ where
     _marker_2: PhantomData<B>,
 }
 
-impl<T, B> AbstractHttpConfigurer<T, B>
+impl<T, B> BaseHttpConfigurer<T, B>
 where
-    T: Required<AbstractHttpConfigurer<T, B>>,
+    T: Required<BaseHttpConfigurer<T, B>>,
     B: HttpSecurityBuilder<B>,
     Self: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>,
 {
     pub fn new() -> Self {
         Self {
-            security_configurer_adapter: todo!(),
+            security_configurer_adapter: SecurityConfigurerAdapter::default(),
             _marker_1: PhantomData,
             _marker_2: PhantomData,
         }
     }
 }
 
-impl<T, B> Default for AbstractHttpConfigurer<T, B>
+impl<T, B> Default for BaseHttpConfigurer<T, B>
 where
-    T: Required<AbstractHttpConfigurer<T, B>>,
+    T: Required<BaseHttpConfigurer<T, B>>,
     B: HttpSecurityBuilder<B>,
     Self: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>,
 {
     fn default() -> Self {
         Self {
-            security_configurer_adapter: todo!(),
+            security_configurer_adapter: SecurityConfigurerAdapter::default(),
             _marker_1: Default::default(),
             _marker_2: Default::default(),
         }
@@ -53,9 +53,9 @@ where
 }
 
 impl<T, B> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>
-    for AbstractHttpConfigurer<T, B>
+    for BaseHttpConfigurer<T, B>
 where
-    T: Required<AbstractHttpConfigurer<T, B>>,
+    T: Required<BaseHttpConfigurer<T, B>>,
     B: HttpSecurityBuilder<B>,
     B: SecurityBuilder<DefaultSecurityFilterChain>,
 {
@@ -66,4 +66,9 @@ where
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, B> {
         &mut self.security_configurer_adapter
     }
+}
+
+
+pub trait BaseHttpConfigurerExt {
+    
 }

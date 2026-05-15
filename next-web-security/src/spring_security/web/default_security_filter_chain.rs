@@ -25,6 +25,17 @@ impl DefaultSecurityFilterChain {
             name: "defaultSecurityFilterChain".into(),
         }
     }
+
+    pub fn from_parts(
+        request_matcher: Arc<dyn RequestMatcher>,
+        filters: Vec<Arc<dyn Filter>>,
+    ) -> Self {
+        Self {
+            request_matcher,
+            filters,
+            name: "defaultSecurityFilterChain".into(),
+        }
+    }
 }
 
 impl SecurityFilterChain for DefaultSecurityFilterChain {

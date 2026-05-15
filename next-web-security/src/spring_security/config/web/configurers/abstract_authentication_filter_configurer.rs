@@ -9,7 +9,7 @@ use crate::{
         security_configurer::SecurityConfigurer,
         web::{
             configurers::{
-                abstract_http_configurer::AbstractHttpConfigurer,
+                base_http_configurer::BaseHttpConfigurer,
                 logout_configurer::LogoutConfigurer, permit_all_support::PermitAllSupport,
             },
             http_security_builder::HttpSecurityBuilder,
@@ -37,7 +37,7 @@ pub struct AbstractAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
     T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
-    T: Required<AbstractHttpConfigurer<T, B>>,
+    T: Required<BaseHttpConfigurer<T, B>>,
     T: AuthenticationFilterConfigurer<B>,
     F: Required<AbstractAuthenticationProcessingFilter>,
 {
@@ -56,7 +56,7 @@ where
     permit_all: bool,
     failure_url: Option<Box<str>>,
 
-    abstract_http_configurer: AbstractHttpConfigurer<T, B>,
+    abstract_http_configurer: BaseHttpConfigurer<T, B>,
 
     _marker_1: PhantomData<T>,
     _marker_2: PhantomData<B>,
@@ -67,19 +67,23 @@ where
     B: HttpSecurityBuilder<B>,
     B: Clone,
     T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
-    T: Required<AbstractHttpConfigurer<T, B>>,
+    T: Required<BaseHttpConfigurer<T, B>>,
     T: AuthenticationFilterConfigurer<B>,
     F: Required<AbstractAuthenticationProcessingFilter>,
 {
     pub fn new(authentication_filter: F, default_login_processing_url: Option<Box<str>>) -> Self {
         let default_success_handler =
             Arc::new(SavedRequestAwareAuthenticationSuccessHandler::new());
+        let mut authentication_filter = authentication_filter;
+        authentication_filter
+            .get_mut_object()
+            .set_success_handler(default_success_handler.clone());
         let mut configurer = Self {
             default_success_handler: default_success_handler.clone(),
             auth_filter: authentication_filter,
             success_handler: default_success_handler,
 
-            abstract_http_configurer: AbstractHttpConfigurer::new(),
+            abstract_http_configurer: BaseHttpConfigurer::new(),
             authentication_details_source: Default::default(),
             authentication_entry_point: Default::default(),
             custom_login_page: Default::default(),
@@ -112,6 +116,9 @@ where
         T1: AuthenticationSuccessHandler + 'static,
     {
         self.success_handler = Arc::new(success_handler);
+        self.auth_filter
+            .get_mut_object()
+            .set_success_handler(self.success_handler.clone());
     }
 
     pub const fn permit_all(&mut self) {
@@ -131,6 +138,9 @@ where
     {
         self.failure_url = None;
         self.failure_handler = Some(Arc::new(authentication_failure_handler));
+        self.auth_filter
+            .get_mut_object()
+            .set_failure_handler(self.failure_handler.clone().unwrap());
     }
 
     pub fn is_custom_login_page(&self) -> bool {
@@ -209,20 +219,20 @@ where
     }
 }
 
-impl<B, T, F> Required<AbstractHttpConfigurer<T, B>>
+impl<B, T, F> Required<BaseHttpConfigurer<T, B>>
     for AbstractAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
     T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
-    T: Required<AbstractHttpConfigurer<T, B>>,
+    T: Required<BaseHttpConfigurer<T, B>>,
     T: AuthenticationFilterConfigurer<B>,
     F: Required<AbstractAuthenticationProcessingFilter>,
 {
-    fn get_object(&self) -> &AbstractHttpConfigurer<T, B> {
+    fn get_object(&self) -> &BaseHttpConfigurer<T, B> {
         &self.abstract_http_configurer
     }
 
-    fn get_mut_object(&mut self) -> &mut AbstractHttpConfigurer<T, B> {
+    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<T, B> {
         &mut self.abstract_http_configurer
     }
 }
@@ -232,7 +242,7 @@ where
     B: HttpSecurityBuilder<B>,
     B: Clone,
     T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
-    T: Required<AbstractHttpConfigurer<T, B>>,
+    T: Required<BaseHttpConfigurer<T, B>>,
     T: AuthenticationFilterConfigurer<B>,
     F: Required<AbstractAuthenticationProcessingFilter>,
 {
@@ -259,7 +269,7 @@ where
     B: SecurityBuilder<DefaultSecurityFilterChain>,
     B: Clone,
     T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
-    T: Required<AbstractHttpConfigurer<T, B>>,
+    T: Required<BaseHttpConfigurer<T, B>>,
     T: AuthenticationFilterConfigurer<B>,
     T: Sync + Send,
     F: Required<AbstractAuthenticationProcessingFilter> + Sync + Send,
@@ -269,8 +279,7 @@ where
         // self.update_acc
     }
 
-    fn configure(&mut self, http: &mut B) {
-        todo!()
+    fn configure(&mut self, _http: &mut B) {
     }
 }
 

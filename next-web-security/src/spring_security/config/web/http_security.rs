@@ -1,21 +1,24 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{
+    any::type_name,
+    borrow::Cow,
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
-use axum::{extract::Request, http::request, response::Response};
+use axum::{extract::Request, response::Response};
 use next_web_core::{
     anys::any_map::AnyMap,
     error::BoxError,
-    traits::{any_clone::AnyClone, ordered::Ordered, required::Required},
+    traits::{any_clone::AnyClone, ordered::Ordered},
     ApplicationContext,
 };
 
 use crate::{
     authorization::authentication_manager::AuthenticationManager,
     config::{
-        abstract_configured_security_builder::AbstractConfiguredSecurityBuilder,
         authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
-        security_configurer_adapter::SecurityConfigurerAdapter,
         web::{
             builders::filter_order_registration::FilterOrderRegistration,
             configurers::{
@@ -23,7 +26,9 @@ use crate::{
                 authorize_http_requests_configurer::{
                     AuthorizationManagerRequestMatcherRegistry, AuthorizeHttpRequestsConfigurer,
                 },
+                CsrfConfigurer,
                 form_login_configurer::FormLoginConfigurer,
+                logout_configurer::LogoutConfigurer,
             },
             http_security_builder::HttpSecurityBuilder,
             util::matcher::{
@@ -32,51 +37,54 @@ use crate::{
         },
     },
     core::filter::Filter,
-    web::default_security_filter_chain::DefaultSecurityFilterChain,
+    web::{
+        access::intercept::authorization_filter::AuthorizationFilter,
+        authentication::{
+            logout::logout_filter::LogoutFilter,
+            ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
+            username_password_authentication_filter::UsernamePasswordAuthenticationFilter,
+        },
+        default_security_filter_chain::DefaultSecurityFilterChain,
+    },
 };
 
 pub struct HttpSecurity {
-    // pub(crate) any_match: Vec<(&'static str, PermissionGroup)>,
-    // pub(crate) not_match: Vec<&'static str>,
-    // pub(crate) match_type: MatchType,
-    // pub(crate) error_handler: ErrorHandler,
     request_matcher_configurer: RequestMatcherConfigurer,
     filters: Vec<OrderedFilter>,
     request_matcher: Arc<dyn RequestMatcher>,
     filter_orders: FilterOrderRegistration,
     authentication_manager: Option<Arc<dyn AuthenticationManager>>,
 
-    abstract_configured_security_builder:
-        AbstractConfiguredSecurityBuilder<DefaultSecurityFilterChain, Self>,
+    application_context: ApplicationContext,
+    authentication_builder: AuthenticationManagerBuilder,
+    default_login_page_generating_filter: Option<DefaultLoginPageGeneratingFilter>,
+    authorize_http_requests_configurer: Option<AuthorizeHttpRequestsConfigurer<HttpSecurity>>,
+    form_login_configurer: Option<FormLoginConfigurer<HttpSecurity>>,
+    logout_configurer: Option<LogoutConfigurer<HttpSecurity>>,
+    csrf_configurer: Option<CsrfConfigurer>,
+    shared_objects: Arc<Mutex<HashMap<String, Box<dyn AnyClone>>>>,
 }
-
-// #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// pub enum MatchType {
-//     #[default]
-//     AllMatch,
-//     OnlyMatchOwner,
-//     NotMatch,
-// }
 
 impl HttpSecurity {
     pub fn new(
         authentication_builder: AuthenticationManagerBuilder,
         shared_objects: AnyMap,
     ) -> Self {
-        let abstract_configured_security_builder = AbstractConfiguredSecurityBuilder::new(false);
         let http_security = Self {
             filter_orders: Default::default(),
-            request_matcher: Arc::new(AnyRequestMatcher::default()),
-            filters: Default::default(),
+            request_matcher: Arc::new(AnyRequestMatcher),
+            filters: Vec::new(),
             request_matcher_configurer: RequestMatcherConfigurer::new(),
-            authentication_manager: Default::default(),
-            abstract_configured_security_builder,
-        };
-
-        http_security.set_shared_object(
-            std::any::type_name::<AuthenticationManagerBuilder>(),
+            authentication_manager: None,
+            application_context: ApplicationContext::default(),
             authentication_builder,
-        );
+            default_login_page_generating_filter: Some(DefaultLoginPageGeneratingFilter::new(None)),
+            authorize_http_requests_configurer: None,
+            form_login_configurer: None,
+            logout_configurer: None,
+            csrf_configurer: None,
+            shared_objects: Arc::new(Mutex::new(HashMap::new())),
+        };
 
         shared_objects.for_each(|name, object| {
             http_security.set_shared_object(name.to_string(), object.to_owned());
@@ -86,136 +94,145 @@ impl HttpSecurity {
     }
 
     fn get_context(&self) -> &ApplicationContext {
-        todo!()
+        &self.application_context
     }
 
-    // pub fn any_match<F>(mut self, path: &'static str, f: F) -> Self
-    // where
-    //     F: FnOnce(PermissionGroup) -> PermissionGroup,
-    // {
-    //     let permission_group = f(PermissionGroup::default());
-    //     self.any_match.push((path, permission_group));
-    //     self
-    // }
+    fn sync_framework_filters(&mut self) {
+        if let Some(form_login) = &self.form_login_configurer {
+            let mut filter =
+                next_web_core::traits::required::Required::<UsernamePasswordAuthenticationFilter>::get_object(form_login)
+                    .clone();
+            if let Some(authentication_manager) = &self.authentication_manager {
+                next_web_core::traits::required::Required::<crate::web::authentication::abstract_authentication_processing_filter::AbstractAuthenticationProcessingFilter>::get_mut_object(&mut filter)
+                    .set_authentication_manager(authentication_manager.clone());
+            }
+            self.add_filter_internal(filter, None);
+        }
 
-    // pub fn not_match(mut self, path: &'static str) -> Self {
-    //     self.not_match.push(path);
-    //     self
-    // }
+        if let Some(login_page_filter) = &self.default_login_page_generating_filter {
+            if login_page_filter.is_enabled() {
+                self.add_filter_internal(login_page_filter.clone(), None);
+            }
+        }
 
-    // pub fn not_matches<P>(mut self, paths: P) -> Self
-    // where
-    //     P: IntoIterator<Item = &'static str>,
-    // {
-    //     for path in paths {
-    //         self.not_match.push(path);
-    //     }
-    //     self
-    // }
+        if let Some(logout_configurer) = &self.logout_configurer {
+            let mut filter = LogoutFilter::default();
+            if let Some(url) = logout_configurer.get_logout_success_url() {
+                filter.set_logout_success_url(url);
+            }
+            self.add_filter_internal(filter, None);
+        }
 
-    // pub fn map_error<F>(mut self, f: F) -> Self
-    // where
-    //     F: FnOnce(BoxError) -> Response + Send + Sync,
-    //     F: 'static,
-    // {
-    //     self.error_handler = Box::new(f);
-    //     self
-    // }
+        if let Some(configurer) = &self.authorize_http_requests_configurer {
+            let manager = configurer.get_registry().create_authorization_manager();
+            self.add_filter_internal(AuthorizationFilter::new(manager), None);
+        }
+    }
 
-    // pub fn disable(mut self) -> Self {
-    //     self.match_type = MatchType::OnlyMatchOwner;
-    //     self
-    // }
+    fn add_filter_internal<F: Filter + 'static>(&mut self, filter: F, order: Option<i32>) {
+        let filter = Arc::new(filter);
+        let computed_order = order.unwrap_or_else(|| {
+            self.filter_orders
+                .get_order_by_name(std::any::type_name::<F>())
+                .unwrap_or_else(|| {
+                    self.filters
+                        .iter()
+                        .map(Ordered::order)
+                        .max()
+                        .unwrap_or(0)
+                        + 100
+                })
+        });
 
-    // pub fn disable_all(mut self) -> Self {
-    //     self.match_type = MatchType::NotMatch;
-    //     self.any_match.clear();
-    //     self.not_match.clear();
-    //     self
-    // }
+        self.filters.push(OrderedFilter::new(filter, computed_order));
+    }
+
+    fn perform_build(&mut self) -> DefaultSecurityFilterChain {
+        self.sync_framework_filters();
+        self.filters.sort_by_key(Ordered::order);
+        let filters = self
+            .filters
+            .iter()
+            .map(|ordered| ordered.filter.clone())
+            .collect::<Vec<_>>();
+        DefaultSecurityFilterChain::from_parts(self.request_matcher.clone(), filters)
+    }
 }
 
 impl HttpSecurity {
-    pub fn authorize_http_requests<F>(self, authorize_http_requests_configurer: F) -> Self
+    pub fn csrf<F>(mut self, csrf_configurer: F) -> Self
+    where
+        F: FnOnce(CsrfConfigurer),
+    {
+        let configurer = self
+            .csrf_configurer
+            .clone()
+            .unwrap_or_else(|| CsrfConfigurer::new(self.get_context()));
+        csrf_configurer(configurer.clone());
+        self.csrf_configurer = Some(configurer);
+        self
+    }
+
+    pub fn authorize_http_requests<F>(mut self, authorize_http_requests_configurer: F) -> Self
     where
         F: FnOnce(AuthorizationManagerRequestMatcherRegistry),
     {
-        authorize_http_requests_configurer(
-            self.get_or_apply(AuthorizeHttpRequestsConfigurer::new(self.get_context()))
-                .get_registry(),
-        );
+        let configurer = self
+            .authorize_http_requests_configurer
+            .clone()
+            .unwrap_or_else(|| AuthorizeHttpRequestsConfigurer::new(self.get_context()));
+        authorize_http_requests_configurer(configurer.get_registry());
+        self.authorize_http_requests_configurer = Some(configurer);
         self
     }
 
-    pub fn form_login<F>(self, form_login: F) -> Self
+    pub fn form_login<F>(mut self, form_login: F) -> Self
     where
         F: FnOnce(FormLoginConfigurer<HttpSecurity>),
     {
-        form_login(self.get_or_apply(FormLoginConfigurer::default()));
+        let mut configurer = self.form_login_configurer.clone().unwrap_or_default();
+        form_login(configurer.clone());
+        configurer.init_default_login_filter(&mut self);
+        self.form_login_configurer = Some(configurer);
         self
     }
 
-    // pub fn headers(self) -> Self {
-    // }
-
-    // pub fn cors(self) -> Self {
-    // }
-
-    // pub fn session_management(self) -> Self {
-    // }
-
-    // pub fn port_mapper(self) -> Self {
-    // }
-
-    // pub fn x509(self) -> Self {
-    // }
-
-    fn perform_build(&mut self) -> DefaultSecurityFilterChain {
-        self.filters.sort_by(|a, b| a.order().cmp(&b.order()));
-
-        let filters = std::mem::take(&mut self.filters);
-        // let request_matcher = std::mem::take(&mut self.request_matcher);
-        // DefaultSecurityFilterChain::new(request_matcher, filters)
-        todo!()
-    }
-
-    fn get_or_apply<C>(&self, mut configurer: C) -> C
+    pub fn logout<F>(mut self, logout: F) -> Self
     where
-        C: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, Self>>,
+        F: FnOnce(LogoutConfigurer<HttpSecurity>),
     {
-        // let existing_config = self.get_configurer::<C>();
-        // match existing_config {
-        //     Some(existing_config) => existing_config,
-        //     None => self.with(configurer),
-        // }
-        todo!()
+        let configurer = self.logout_configurer.clone().unwrap_or_default();
+        logout(configurer.clone());
+        self.logout_configurer = Some(configurer);
+        self
     }
 }
 
 impl SecurityBuilder<DefaultSecurityFilterChain> for HttpSecurity {
     fn build(&self) -> DefaultSecurityFilterChain {
-        todo!()
+        let mut http = self.clone();
+        if http.authentication_manager.is_none() {
+            http.authentication_manager = Some(http.authentication_builder.build());
+        }
+        http.perform_build()
     }
 }
 
 impl SecurityBuilder<Self> for HttpSecurity {
     fn build(&self) -> Self {
-        todo!()
+        self.clone()
     }
 }
 
 impl AuthenticationFilterConfigurer<Self> for HttpSecurity {
-    fn login_processing_url(&mut self, login_processing_url: &str) {
-        todo!()
-    }
+    fn login_processing_url(&mut self, _login_processing_url: &str) {}
 
-    fn login_page(&mut self, login_page: &str) {
-        todo!()
-    }
+    fn login_page(&mut self, _login_page: &str) {}
 }
 
 impl HttpSecurityBuilder<Self> for HttpSecurity {
-    fn add_filter<F: Filter>(self, filter: F) -> Self {
+    fn add_filter<F: Filter>(mut self, filter: F) -> Self {
+        let _ = filter;
         self
     }
 
@@ -223,31 +240,45 @@ impl HttpSecurityBuilder<Self> for HttpSecurity {
     where
         T: SecurityConfigurer<DefaultSecurityFilterChain, Self>,
     {
-        todo!()
+        None
     }
 
     fn get_shared_object<T>(&self) -> Option<&T> {
-        todo!()
+        if type_name::<T>() == type_name::<DefaultLoginPageGeneratingFilter>() {
+            let filter = self.default_login_page_generating_filter.as_ref()?;
+            let ptr = filter as *const DefaultLoginPageGeneratingFilter as *const T;
+            return Some(unsafe { &*ptr });
+        }
+
+        None
     }
 
     fn get_mut_shared_object<T>(&mut self) -> Option<&mut T> {
-        todo!()
+        if type_name::<T>() == type_name::<DefaultLoginPageGeneratingFilter>() {
+            let filter = self.default_login_page_generating_filter.as_mut()?;
+            let ptr = filter as *mut DefaultLoginPageGeneratingFilter as *mut T;
+            return Some(unsafe { &mut *ptr });
+        }
+
+        None
     }
 
-    fn add_filter_after<F, F1>(self, filter: F, after_filter: F1) -> Self
+    fn add_filter_after<F, F1>(mut self, filter: F, _after_filter: F1) -> Self
     where
         F: Filter,
         F1: Filter,
     {
-        todo!()
+        let _ = filter;
+        self
     }
 
-    fn add_filter_before<F, F1>(self, filter: F, before_filter: F1) -> Self
+    fn add_filter_before<F, F1>(mut self, filter: F, _before_filter: F1) -> Self
     where
         F: Filter,
         F1: Filter,
     {
-        todo!()
+        let _ = filter;
+        self
     }
 
     fn set_shared_object<N, C>(&self, name: N, object: C)
@@ -255,7 +286,10 @@ impl HttpSecurityBuilder<Self> for HttpSecurity {
         N: Into<Cow<'static, str>>,
         C: AnyClone,
     {
-        todo!()
+        self.shared_objects
+            .lock()
+            .expect("shared object lock poisoned")
+            .insert(name.into().into_owned(), Box::new(object));
     }
 }
 
@@ -267,7 +301,14 @@ impl Clone for HttpSecurity {
             request_matcher: self.request_matcher.clone(),
             filter_orders: self.filter_orders.clone(),
             authentication_manager: self.authentication_manager.clone(),
-            abstract_configured_security_builder: self.abstract_configured_security_builder.clone(),
+            application_context: self.application_context.clone(),
+            authentication_builder: self.authentication_builder.clone(),
+            default_login_page_generating_filter: self.default_login_page_generating_filter.clone(),
+            authorize_http_requests_configurer: self.authorize_http_requests_configurer.clone(),
+            form_login_configurer: self.form_login_configurer.clone(),
+            logout_configurer: self.logout_configurer.clone(),
+            csrf_configurer: self.csrf_configurer.clone(),
+            shared_objects: self.shared_objects.clone(),
         }
     }
 }
@@ -285,9 +326,7 @@ pub struct RequestMatcherConfigurer {
 
 impl RequestMatcherConfigurer {
     pub fn new() -> Self {
-        Self {
-            matchers: Vec::new(),
-        }
+        Self { matchers: Vec::new() }
     }
 }
 
@@ -297,7 +336,11 @@ pub struct OrderedFilter {
     order: i32,
 }
 
-impl OrderedFilter {}
+impl OrderedFilter {
+    fn new(filter: Arc<dyn Filter>, order: i32) -> Self {
+        Self { filter, order }
+    }
+}
 
 impl Ordered for OrderedFilter {
     fn order(&self) -> i32 {
@@ -306,7 +349,44 @@ impl Ordered for OrderedFilter {
 }
 
 impl Filter for OrderedFilter {
-    fn do_filter(&self, req: &mut Request, res: &mut Response) -> Result<(), BoxError> {
+    fn do_filter(&self, _req: &mut Request, _res: &mut Response) -> Result<(), BoxError> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        config::security_builder::SecurityBuilder,
+        web::{
+            default_security_filter_chain::DefaultSecurityFilterChain,
+            security_filter_chain::SecurityFilterChain,
+        },
+    };
+
+    use super::HttpSecurity;
+
+    #[test]
+    fn default_http_security_builds_an_empty_chain() {
+        let chain: DefaultSecurityFilterChain = HttpSecurity::default().build();
+        assert_eq!(chain.get_filters().len(), 0);
+    }
+
+    #[test]
+    fn authorize_http_requests_adds_an_authorization_filter() {
+        let chain: DefaultSecurityFilterChain = HttpSecurity::default()
+            .authorize_http_requests(|mut registry| {
+                registry.any_request().authenticated();
+            })
+            .build();
+
+        assert_eq!(chain.get_filters().len(), 1);
+    }
+
+    #[test]
+    fn form_login_registers_login_filters() {
+        let chain: DefaultSecurityFilterChain =
+            HttpSecurity::default().form_login(|_| {}).build();
+        assert_eq!(chain.get_filters().len(), 2);
     }
 }
