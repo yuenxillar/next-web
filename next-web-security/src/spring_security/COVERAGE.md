@@ -1,6 +1,6 @@
 # Spring Security Translation Coverage
 
-Java baseline: `D:\EdgeDownload\spring-security-main\spring-security-main`
+Java baseline: ``
 
 ## Implemented mainline
 
