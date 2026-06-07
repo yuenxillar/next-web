@@ -8,10 +8,11 @@ use next_web_core::{
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
+    util::http_method::HttpMethod,
 };
 
 use crate::web::{
-    access::{AccessDeniedHandler, AccessDeniedHandlerImpl},
+    access::{AccessDeniedError, AccessDeniedHandler, AccessDeniedHandlerImpl},
     csrf::{CsrfTokenRepository, CsrfTokenRequestHandler, XorCsrfTokenRequestAttributeHandler},
     util::matcher::RequestMatcher,
 };
@@ -68,12 +69,18 @@ impl CsrfFilter {
     }
 }
 
+/// Default CSRF protection matcher: requires CSRF for mutating HTTP methods.
 #[derive(Debug, Clone, Default)]
 struct DefaultRequiresCsrfMatcher {}
 
 impl RequestMatcher for DefaultRequiresCsrfMatcher {
     fn matches(&self, request: &dyn HttpRequest) -> bool {
-        todo!()
+        // CSRF protection is required for state-changing methods.
+        // Safe methods (GET, HEAD, OPTIONS, TRACE) are excluded.
+        !matches!(
+            request.method(),
+            HttpMethod::Get | HttpMethod::Head | HttpMethod::Options | HttpMethod::Trace
+        )
     }
 }
 
@@ -85,7 +92,41 @@ impl HttpFilter for CsrfFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), BoxError> {
-        todo!()
+        // Check if CSRF protection is required for this request
+        if !self.require_csrf_protection_matcher.matches(request) {
+            return filter_chain.do_filter(request, response).await;
+        }
+
+        // Load the expected token from the repository
+        let expected_token = self.token_repository.load_token(request).await;
+
+        // Resolve the actual token from the request (header or parameter)
+        let actual_token = match &expected_token {
+            Some(token) => self
+                .request_handler
+                .resolve_csrf_token_value(request, token.as_ref()),
+            None => None,
+        };
+
+        // If no token found or token mismatch → deny access
+        let is_valid = match (&expected_token, &actual_token) {
+            (Some(expected), Some(actual)) if !actual.is_empty() => {
+                expected.get_token() == actual
+            }
+            _ => false,
+        };
+
+        if !is_valid {
+            self.access_denied_handler.handle(
+                request,
+                response,
+                AccessDeniedError("Access Denied: Invalid CSRF Token".to_string()),
+            )?;
+            return Ok(());
+        }
+
+        // Token valid — proceed
+        filter_chain.do_filter(request, response).await
     }
 }
 

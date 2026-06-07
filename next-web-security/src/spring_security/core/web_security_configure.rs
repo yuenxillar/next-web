@@ -1,6 +1,6 @@
 use next_web_core::DynClone;
 
-use crate::config::web::http_security::HttpSecurity;
+use crate::config::web::builders::HttpSecurity;
 
 pub trait WebSecurityConfigure
 where

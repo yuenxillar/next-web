@@ -48,7 +48,7 @@ impl HstsHeaderWriter {
 impl HeaderWriter for HstsHeaderWriter {
     fn write_headers(
         &self,
-        request: &mut dyn next_web_core::traits::http::http_request::HttpRequest,
+        request: &dyn next_web_core::traits::http::http_request::HttpRequest,
         response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
     ) {
         if !request.is_secure() {

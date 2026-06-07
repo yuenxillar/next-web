@@ -269,14 +269,19 @@ where
     T: Required<BaseHttpConfigurer<T, B>>,
     T: AuthenticationFilterConfigurer<B>,
     T: Sync + Send,
-    F: Required<AbstractAuthenticationProcessingFilter> + Sync + Send,
+    F: Required<AbstractAuthenticationProcessingFilter> + Clone + Sync + Send,
+    F: next_web_core::traits::filter::HttpFilter,
 {
     fn init(&mut self, http: &mut B) {
-        // self.update_authentication_defaults();
-        // self.update_acc
+        self.update_authentication_defaults();
+        self.update_access_defaults(http);
     }
 
-    fn configure(&mut self, _http: &mut B) {}
+    fn configure(&mut self, http: &mut B) {
+        // Add the authentication filter to the chain.
+        let filter = self.auth_filter.clone();
+        http.add_filter(filter);
+    }
 }
 
 pub trait AuthenticationFilterConfigurer<T> {

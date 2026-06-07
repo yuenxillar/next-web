@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 use crate::config::security_configurer::SecurityConfigurer;
 use crate::config::{
-    abstract_security_builder::AbstractSecurityBuilder, security_builder::SecurityBuilder,
+    base_security_builder::AbstractSecurityBuilder, security_builder::SecurityBuilder,
 };
 use next_web_core::anys::any_map::AnyMap;
 use next_web_core::traits::required::Required;

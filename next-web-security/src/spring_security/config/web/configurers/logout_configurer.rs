@@ -13,7 +13,7 @@ use crate::{
     },
     web::{
         authentication::{
-            logout::{LogoutFilter, LogoutHandler},
+            logout::{LogoutFilter, LogoutHandler, SimpleUrlLogoutSuccessHandler},
             ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
         },
         default_security_filter_chain::DefaultSecurityFilterChain,
@@ -48,6 +48,11 @@ where
 
     pub fn get_logout_success_url(&self) -> Option<&str> {
         self.logout_success_url.as_deref()
+    }
+
+    /// Returns the registered logout handlers.
+    pub fn get_logout_handlers(&self) -> &[Arc<dyn LogoutHandler>] {
+        &self.logout_handlers
     }
 
     pub fn add_logout_handler<T>(&mut self, logout_handler: T)
@@ -105,15 +110,27 @@ impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for LogoutConfigurer<H
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn init(&mut self, _builer: &mut H) {}
+    fn init(&mut self, _http: &mut H) {}
 
-    fn configure(&mut self, builer: &mut H) {
+    fn configure(&mut self, http: &mut H) {
+        // Wire up DefaultLoginPageGeneratingFilter if present
         if let Some(login_page_filter) =
-            builer.get_mut_shared_object::<DefaultLoginPageGeneratingFilter>()
+            http.get_mut_shared_object::<DefaultLoginPageGeneratingFilter>()
         {
             if let Some(url) = &self.logout_success_url {
                 login_page_filter.set_logout_success_url(url.clone());
             }
         }
+
+        // Create and add the LogoutFilter
+        let handlers = self.logout_handlers.clone();
+        let filter = if let Some(success_url) = &self.logout_success_url {
+            LogoutFilter::with_logout_success_url(success_url.as_ref(), handlers)
+        } else {
+            let mut handler = SimpleUrlLogoutSuccessHandler::default();
+            handler.set_default_target_url("/login?logout");
+            LogoutFilter::new(Arc::new(handler), handlers)
+        };
+        http.add_filter(filter);
     }
 }

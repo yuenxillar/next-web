@@ -203,8 +203,14 @@ where
     H: Clone,
 {
     fn init(&mut self, http: &mut H) {
+        // Wire up the AuthenticationManager to the filter
+        if let Some(am) = http.authentication_manager() {
+            self.abstract_authentication_filter_configurer
+                .get_mut_authentication_filter()
+                .get_mut_object()
+                .set_authentication_manager(am);
+        }
         self.abstract_authentication_filter_configurer.init(http);
-
         self.init_default_login_filter(http);
     }
 

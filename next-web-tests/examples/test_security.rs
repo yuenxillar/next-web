@@ -81,8 +81,8 @@ mod t2 {
     use next_web_core::util::http_method::HttpMethod;
     use next_web_security::{
         config::web::{
+            builders::HttpSecurity,
             configurers::{CsrfConfigurer, base_http_configurer::BaseHttpConfigurer},
-            http_security::HttpSecurity,
         },
         core::web_security_configure::WebSecurityConfigure,
     };

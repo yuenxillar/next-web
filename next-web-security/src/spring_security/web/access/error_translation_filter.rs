@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use next_web_core::{
     async_trait,
     error::BoxError,
@@ -8,8 +10,22 @@ use next_web_core::{
     },
 };
 
+use crate::{
+    authorization::AuthenticationTrustResolver,
+    web::{
+        access::AccessDeniedHandler, authentication_entry_point::AuthenticationEntryPoint,
+        savedrequest::RequestCache,
+    },
+};
+
 #[derive(Clone)]
-pub struct ErrorTranslationFilter {}
+pub struct ErrorTranslationFilter {
+    access_denied_handler: Arc<dyn AccessDeniedHandler>,
+    authentication_entry_point: Arc<dyn AuthenticationEntryPoint>,
+    authentication_trust_resolver: Arc<dyn AuthenticationTrustResolver>,
+
+    request_cache: Arc<dyn RequestCache>,
+}
 
 #[async_trait]
 impl HttpFilter for ErrorTranslationFilter {
@@ -19,6 +35,7 @@ impl HttpFilter for ErrorTranslationFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), BoxError> {
+        let result = filter_chain.do_filter(request, response).await;
         Ok(())
     }
 }

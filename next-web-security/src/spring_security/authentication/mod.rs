@@ -1,12 +1,12 @@
-pub mod authentication_details_source;
-pub mod authentication_provider;
 pub mod account_status_user_details_checker;
 pub mod account_status_user_details_exceptions;
+pub mod anonymous_authentication_provider;
+pub mod anonymous_authentication_token;
+pub mod authentication_details_source;
 pub mod authentication_event_publisher;
 pub mod authentication_events;
 pub mod authentication_manager_resolver;
-pub mod anonymous_authentication_provider;
-pub mod anonymous_authentication_token;
+pub mod authentication_provider;
 pub mod caching_user_details_service;
 pub mod dao;
 pub mod default_authentication_event_publisher;
