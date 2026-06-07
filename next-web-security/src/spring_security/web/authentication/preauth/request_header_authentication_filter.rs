@@ -1,13 +1,19 @@
 use std::sync::Arc;
 
-use axum::{extract::Request, response::Response};
-use next_web_core::error::BoxError;
+use next_web_core::{
+    async_trait,
+    error::BoxError,
+    traits::{
+        filter::{HttpFilter, HttpFilterChain},
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
+    },
+};
 
 use crate::{
-    authorization::authentication_manager::AuthenticationManager,
-    core::filter::Filter,
+    authorization::AuthenticationManager,
     web::authentication::preauth::{
-        abstract_pre_authenticated_processing_filter::AbstractPreAuthenticatedProcessingFilterSupport,
+        base_pre_authenticated_processing_filter::BasePreAuthenticatedProcessingFilterSupport,
         pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
         pre_authenticated_credentials_not_found_exception::pre_authenticated_credentials_not_found,
     },
@@ -15,7 +21,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct RequestHeaderAuthenticationFilter {
-    support: AbstractPreAuthenticatedProcessingFilterSupport,
+    support: BasePreAuthenticatedProcessingFilterSupport,
     principal_request_header: String,
     credentials_request_header: Option<String>,
     exception_if_header_missing: bool,
@@ -24,7 +30,7 @@ pub struct RequestHeaderAuthenticationFilter {
 impl RequestHeaderAuthenticationFilter {
     pub fn new(authentication_manager: Arc<dyn AuthenticationManager>) -> Self {
         Self {
-            support: AbstractPreAuthenticatedProcessingFilterSupport::new(authentication_manager),
+            support: BasePreAuthenticatedProcessingFilterSupport::new(authentication_manager),
             principal_request_header: String::from("SM_USER"),
             credentials_request_header: None,
             exception_if_header_missing: true,
@@ -58,12 +64,10 @@ impl RequestHeaderAuthenticationFilter {
 
     pub fn pre_authenticated_principal(
         &self,
-        request: &Request,
+        request: &dyn HttpRequest,
     ) -> Result<Option<String>, crate::core::authentication_error::AuthenticationError> {
         let principal = request
-            .headers()
-            .get(&self.principal_request_header)
-            .and_then(|value| value.to_str().ok())
+            .header(&self.principal_request_header)
             .map(ToOwned::to_owned);
         if principal.is_none() && self.exception_if_header_missing {
             return Err(pre_authenticated_credentials_not_found(format!(
@@ -74,19 +78,24 @@ impl RequestHeaderAuthenticationFilter {
         Ok(principal)
     }
 
-    pub fn pre_authenticated_credentials(&self, request: &Request) -> Option<String> {
+    pub fn pre_authenticated_credentials(&self, request: &dyn HttpRequest) -> Option<String> {
         self.credentials_request_header
             .as_ref()
-            .and_then(|header| request.headers().get(header))
-            .and_then(|value| value.to_str().ok())
+            .and_then(|header| request.header(header))
             .map(ToOwned::to_owned)
             .or_else(|| Some(String::from("N/A")))
     }
 }
 
-impl Filter for RequestHeaderAuthenticationFilter {
-    fn do_filter(&self, req: &mut Request, res: &mut Response) -> Result<(), BoxError> {
-        let principal = match self.pre_authenticated_principal(req) {
+#[async_trait]
+impl HttpFilter for RequestHeaderAuthenticationFilter {
+    async fn do_filter(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        filter_chain: &dyn HttpFilterChain,
+    ) -> Result<(), BoxError> {
+        let principal = match self.pre_authenticated_principal(request) {
             Ok(principal) => principal,
             Err(error) => return Err(Box::new(error)),
         };
@@ -96,10 +105,16 @@ impl Filter for RequestHeaderAuthenticationFilter {
 
         let token = PreAuthenticatedAuthenticationToken::unauthenticated(
             Some(principal),
-            self.pre_authenticated_credentials(req),
+            self.pre_authenticated_credentials(request),
         );
-        let _ = self.support.authenticate(req, res, &token)?;
+        let _ = self.support.authenticate(request, response, &token)?;
         Ok(())
+    }
+}
+
+impl Named for RequestHeaderAuthenticationFilter {
+    fn name(&self) -> &str {
+        "RequestHeaderAuthenticationFilter"
     }
 }
 
@@ -110,8 +125,8 @@ mod tests {
     use axum::{body::Body, extract::Request, http::Request as HttpRequest};
 
     use crate::{
-        authorization::authentication_manager::AuthenticationManager,
-        core::{authentication::Authentication, authority_utils::AuthorityUtils},
+        authorization::AuthenticationManager,
+        core::{authority_utils::AuthorityUtils, Authentication},
     };
 
     use super::RequestHeaderAuthenticationFilter;
@@ -122,7 +137,8 @@ mod tests {
         fn authenticate(
             &self,
             authentication: &dyn Authentication,
-        ) -> Result<Arc<dyn Authentication>, crate::core::authentication_error::AuthenticationError> {
+        ) -> Result<Arc<dyn Authentication>, crate::core::authentication_error::AuthenticationError>
+        {
             Ok(Arc::new(
                 crate::web::authentication::preauth::pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken::authenticated(
                     authentication.get_name(),
@@ -135,7 +151,8 @@ mod tests {
 
     #[test]
     fn request_header_filter_reads_principal_and_credentials_headers() {
-        let mut filter = RequestHeaderAuthenticationFilter::new(Arc::new(StubAuthenticationManager));
+        let mut filter =
+            RequestHeaderAuthenticationFilter::new(Arc::new(StubAuthenticationManager));
         filter.set_principal_request_header("x-user");
         filter.set_credentials_request_header("x-credential");
 

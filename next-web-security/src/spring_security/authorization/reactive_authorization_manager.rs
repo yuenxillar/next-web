@@ -5,7 +5,7 @@ use next_web_core::async_trait;
 use crate::{
     access::access_denied_error::AccessDeniedError,
     authorization::authorization_result::AuthorizationResult,
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 /// Reactive equivalent of `AuthorizationManager`.

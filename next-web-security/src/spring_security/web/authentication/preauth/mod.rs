@@ -1,4 +1,4 @@
-pub mod abstract_pre_authenticated_processing_filter;
+pub mod base_pre_authenticated_processing_filter;
 pub mod pre_authenticated_authentication_provider;
 pub mod pre_authenticated_authentication_token;
 pub mod pre_authenticated_credentials_not_found_exception;

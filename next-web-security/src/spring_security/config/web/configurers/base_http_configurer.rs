@@ -68,7 +68,6 @@ where
     }
 }
 
-
-pub trait BaseHttpConfigurerExt {
-    
+pub trait BaseHttpConfigurerExt<B> {
+    fn disable(&mut self) -> B;
 }

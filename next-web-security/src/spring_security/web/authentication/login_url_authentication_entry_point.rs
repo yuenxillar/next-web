@@ -22,11 +22,11 @@ impl LoginUrlAuthenticationEntryPoint {
 impl AuthenticationEntryPoint for LoginUrlAuthenticationEntryPoint {
     fn commence(
         &self,
-        _request: &mut axum::extract::Request,
+        request: &mut axum::extract::Request,
         response: &mut axum::response::Response,
         _auth_error: Option<crate::core::authentication_error::AuthenticationError>,
     ) -> Result<(), next_web_core::error::BoxError> {
-        DefaultRedirectStrategy::default().send_redirect(None, &self.login_form_url, response);
+        DefaultRedirectStrategy::default().send_redirect(request, response, &self.login_form_url);
         Ok(())
     }
 }

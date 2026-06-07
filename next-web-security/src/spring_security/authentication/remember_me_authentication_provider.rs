@@ -8,7 +8,7 @@ use crate::{
         authentication_provider::AuthenticationProvider,
         remember_me_authentication_token::RememberMeAuthenticationToken,
     },
-    core::{authentication::Authentication, authentication_error::AuthenticationError},
+    core::{Authentication, authentication_error::AuthenticationError},
 };
 
 #[derive(Clone)]

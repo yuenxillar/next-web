@@ -1,8 +1,18 @@
-use axum::{extract::Request, http::{header, StatusCode}};
-use next_web_core::{anys::any_map::AnyMap, traits::required::Required};
+use axum::http::StatusCode;
+use next_web_core::{
+    async_trait,
+    error::BoxError,
+    traits::{
+        filter::{HttpFilter, HttpFilterChain},
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
+        required::Required,
+    },
+    util::http_method::HttpMethod,
+};
 
 use crate::{
-    core::{authentication_error::AuthenticationError, filter::Filter},
+    core::authentication_error::AuthenticationError,
     web::authentication::{
         rememberme::abstract_remember_me_services::AbstractRememberMeServices,
         username_password_authentication_filter::UsernamePasswordAuthenticationFilter,
@@ -96,12 +106,12 @@ impl DefaultLoginPageGeneratingFilter {
 
     async fn generate_login_page_html(
         &self,
-        request: &mut Request,
+        request: &dyn HttpRequest,
         login_error: bool,
         logout_success: bool,
     ) -> String {
         let error_msg = if login_error {
-            self.get_login_error_message(request).await
+            self.get_login_error_message(request)
         } else {
             "Invalid credentials".to_string()
         };
@@ -172,14 +182,12 @@ impl DefaultLoginPageGeneratingFilter {
         html
     }
 
-    async fn get_login_error_message(&self, request: &mut Request) -> String {
-        if let Some(map) = request.extensions().get::<AnyMap>() {
-            if let Some(value) = map.get("NEXT_SECURITY_LAST_ERROR").await {
-                if let Some(value) = value.as_object::<AuthenticationError>() {
-                    let msg = value.get_message().to_string();
-                    if !msg.is_empty() {
-                        return msg;
-                    }
+    fn get_login_error_message(&self, request: &dyn HttpRequest) -> String {
+        if let Some(value) = request.get_attribute("NEXT_SECURITY_LAST_ERROR") {
+            if let Some(error) = value.as_ref_object::<AuthenticationError>() {
+                let msg = error.get_message().to_string();
+                if !msg.is_empty() {
+                    return msg;
                 }
             }
         }
@@ -198,7 +206,7 @@ impl DefaultLoginPageGeneratingFilter {
         }
     }
 
-    fn render_hidden_inputs(&self, _request: &mut Request) -> String {
+    fn render_hidden_inputs(&self, _request: &dyn HttpRequest) -> String {
         "".to_string()
     }
 
@@ -223,22 +231,24 @@ impl DefaultLoginPageGeneratingFilter {
     }
 }
 
-impl Filter for DefaultLoginPageGeneratingFilter {
-    fn do_filter(
+#[async_trait]
+impl HttpFilter for DefaultLoginPageGeneratingFilter {
+    async fn do_filter(
         &self,
-        req: &mut axum::extract::Request,
-        res: &mut axum::response::Response,
-    ) -> Result<(), next_web_core::error::BoxError> {
-        if !self.is_enabled() || req.method() != axum::http::Method::GET {
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        filter_chain: &dyn HttpFilterChain,
+    ) -> Result<(), BoxError> {
+        if !self.is_enabled() || request.method() != HttpMethod::Get {
             return Ok(());
         }
 
-        let path = req.uri().path();
+        let path = request.path();
         if path != self.login_page_url.as_ref() {
             return Ok(());
         }
 
-        let query = req.uri().query().unwrap_or_default();
+        let query = request.query().unwrap_or_default();
         let login_error = query
             .split('&')
             .any(|pair| pair == Self::ERROR_PARAMETER_NAME || pair.starts_with("error="));
@@ -246,14 +256,18 @@ impl Filter for DefaultLoginPageGeneratingFilter {
             .split('&')
             .any(|pair| pair == "logout" || pair.starts_with("logout="));
 
-        let html = block_on(self.generate_login_page_html(req, login_error, logout_success));
-        *res.status_mut() = StatusCode::OK;
-        res.headers_mut().insert(
-            header::CONTENT_TYPE,
-            "text/html; charset=utf-8".parse().unwrap(),
-        );
-        *res.body_mut() = html.into();
-        Ok(())
+        let html = block_on(self.generate_login_page_html(request, login_error, logout_success));
+        // request.set_status_code(StatusCode::OK);
+        // request.insert_header("content-type", "text/html; charset=utf-8");
+        // request.set_body(html.into_bytes());
+
+        todo!()
+    }
+}
+
+impl Named for DefaultLoginPageGeneratingFilter {
+    fn name(&self) -> &str {
+        "DefaultLoginPageGeneratingFilter"
     }
 }
 

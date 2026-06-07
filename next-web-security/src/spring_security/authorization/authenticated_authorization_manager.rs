@@ -5,11 +5,13 @@ use next_web_core::async_trait;
 use crate::{
     authorization::{
         authentication_trust_resolver::{
-            DefaultAuthenticationTrustResolver, AuthenticationTrustResolver,
+            AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
         },
-        authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
+        authorization_decision::AuthorizationDecision,
+        authorization_manager::AuthorizationManager,
+        AuthorizationResult,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 pub struct AuthenticatedAuthorizationManager {
@@ -56,15 +58,12 @@ where
     T: Send + Sync,
     T: 'static,
 {
-    async fn check(
+    async fn authorize(
         &self,
-        authentication: Box<dyn Authentication>,
-        _object: T,
-    ) -> Option<AuthorizationDecision> {
-        let granted = self
-            .authorization_strategy
-            .is_granted(authentication.as_ref());
-        Some(AuthorizationDecision::new(granted))
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }
 

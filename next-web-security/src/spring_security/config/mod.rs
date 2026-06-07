@@ -1,4 +1,4 @@
-pub mod abstract_configured_security_builder;
+pub mod base_configured_security_builder;
 pub mod abstract_security_builder;
 pub mod authentication;
 pub mod configuration;
@@ -9,3 +9,4 @@ pub mod security_builder;
 pub mod security_configurer;
 pub mod security_configurer_adapter;
 pub mod web;
+pub mod http;

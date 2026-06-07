@@ -1,4 +1,4 @@
-use crate::authorization::authorization_decision::AuthorizationDecision;
+use crate::authorization::AuthorizationDecision;
 
 pub struct ExpressionUtils;
 

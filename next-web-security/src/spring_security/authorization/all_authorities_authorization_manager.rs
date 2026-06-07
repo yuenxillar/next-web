@@ -8,8 +8,9 @@ use crate::{
     },
     authorization::{
         authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
+        AuthorizationResult,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 pub struct AllAuthoritiesAuthorizationManager<T> {
@@ -82,14 +83,12 @@ impl<T> AuthorizationManager<T> for AllAuthoritiesAuthorizationManager<T>
 where
     T: Send + Sync + 'static,
 {
-    async fn check(
+    async fn authorize(
         &self,
-        authentication: Box<dyn Authentication>,
-        _object: T,
-    ) -> Option<AuthorizationDecision> {
-        Some(AuthorizationDecision::new(
-            self.missing_authorities(authentication.as_ref()).is_empty(),
-        ))
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }
 

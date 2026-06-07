@@ -1,4 +1,4 @@
-use crate::core::authentication::Authentication;
+use crate::core::Authentication;
 
 pub trait AuthenticationTrustResolver
 where

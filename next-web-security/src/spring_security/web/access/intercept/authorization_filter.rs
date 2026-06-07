@@ -1,21 +1,34 @@
 use std::sync::Arc;
 
-use axum::{extract::Request, http::StatusCode};
-
-use crate::{
-    access::intercept::request_authorization_context::RequestAuthorizationContext,
-    authentication::anonymous_authentication_token::AnonymousAuthenticationToken,
-    authorization::authorization_manager::AuthorizationManager,
-    core::{
-        authority_utils::AuthorityUtils,
-        context::security_context_holder::SecurityContextHolder,
-        filter::Filter,
-        simple_authentication::SimpleAuthentication,
+use next_web_core::{
+    anys::any_value::AnyValue,
+    async_trait,
+    error::BoxError,
+    traits::{
+        filter::{HttpFilter, HttpFilterChain},
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
     },
 };
 
+use crate::{
+    access::intercept::request_authorization_context::RequestAuthorizationContext,
+    authorization::{AuthorizationEventPublisher, AuthorizationManager},
+    core::{
+        context::{
+            security_context_holder::SecurityContextHolder,
+            security_context_holder_strategy::SecurityContextHolderStrategy,
+        },
+        Authentication,
+    },
+};
+
+#[derive(Clone)]
 pub struct AuthorizationFilter {
+    security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
     authorization_manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
+    event_publisher: Option<Arc<dyn AuthorizationEventPublisher>>,
+
     observe_once_per_request: bool,
     filter_error_dispatch: bool,
     filter_async_dispatch: bool,
@@ -26,57 +39,96 @@ impl AuthorizationFilter {
         authorization_manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
     ) -> Self {
         Self {
+            security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
             authorization_manager,
+            event_publisher: None,
             observe_once_per_request: false,
             filter_error_dispatch: true,
             filter_async_dispatch: true,
         }
     }
-}
 
-impl Filter for AuthorizationFilter {
-    fn do_filter(
-        &self,
-        _req: &mut axum::extract::Request,
-        res: &mut axum::response::Response,
-    ) -> Result<(), next_web_core::error::BoxError> {
-        let authentication = SecurityContextHolder::get_context()
-            .get_authentication()
-            .map(|authentication| {
-                Box::new(SimpleAuthentication::builder_from(authentication.as_ref()).build())
-                    as Box<dyn crate::core::authentication::Authentication>
-            })
-            .unwrap_or_else(|| {
-                Box::new(AnonymousAuthenticationToken::new(
-                    "anonymous",
-                    "anonymousUser",
-                    AuthorityUtils::create_authority_list(["ROLE_ANONYMOUS"]),
-                )) as Box<dyn crate::core::authentication::Authentication>
-            });
+    pub fn set_observe_once_per_request(&mut self, observe_once_per_request: bool) {
+        self.observe_once_per_request = observe_once_per_request;
+    }
 
-        let decision = block_on(self.authorization_manager.check(
-            authentication,
-            RequestAuthorizationContext::from_request(_req),
-        ));
+    pub fn set_filter_error_dispatch(&mut self, filter_error_dispatch: bool) {
+        self.filter_error_dispatch = filter_error_dispatch;
+    }
 
-        if decision.map(|decision| decision.is_granted()).unwrap_or(false) {
-            Ok(())
-        } else {
-            *res.status_mut() = StatusCode::FORBIDDEN;
-            *res.body_mut() = "Forbidden".to_string().into();
-            Ok(())
+    pub fn set_filter_async_dispatch(&mut self, filter_async_dispatch: bool) {
+        self.filter_async_dispatch = filter_async_dispatch;
+    }
+
+    fn is_applied(&self, req: &mut dyn HttpRequest) -> bool {
+        req.get_attribute(&self.get_already_filtered_attribute_name())
+            .is_some()
+    }
+
+    fn skip_dispatch(&self, req: &mut dyn HttpRequest) -> bool {
+        todo!()
+    }
+
+    fn get_already_filtered_attribute_name(&self) -> String {
+        format!("{}.APPLIED", self.name())
+    }
+
+    fn get_authentication(&self) -> Result<Arc<dyn Authentication>, &'static str> {
+        match self
+            .security_context_holder_strategy
+            .get_context()
+            .map(|ctx| ctx.get_authentication())
+            .unwrap_or_default()
+        {
+            Some(authentication) => Ok(authentication),
+            None => Err("An Authentication object was not found in the SecurityContext"),
         }
     }
 }
 
-fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        tokio::task::block_in_place(|| handle.block_on(future))
-    } else {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("failed to build Tokio runtime")
-            .block_on(future)
+#[async_trait]
+impl HttpFilter for AuthorizationFilter {
+    async fn do_filter(
+        &self,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+        filter_chain: &dyn HttpFilterChain,
+    ) -> Result<(), BoxError> {
+        if self.observe_once_per_request && self.is_applied(req) {
+            return filter_chain.do_filter(req, resp).await;
+        }
+
+        if self.skip_dispatch(req) {
+            return filter_chain.do_filter(req, resp).await;
+        }
+
+        let already_filtered_attribute_name = self.get_already_filtered_attribute_name();
+        req.set_attribute(&already_filtered_attribute_name, AnyValue::Boolean(true));
+
+        let authentication = self.get_authentication().map_err(Into::<BoxError>::into)?;
+
+        let var = todo!();
+        let result = self
+            .authorization_manager
+            .authorize(authentication.as_ref(), var)
+            .await;
+        self.event_publisher
+            .as_ref()
+            .map(|publisher| publisher.publish_authorization_event(authentication, (), result));
+
+        if result.as_ref().map(|s| s.is_granted()).unwrap_or(true) {
+            return Err("Access Denied".into());
+        }
+
+        filter_chain.do_filter(req, resp).await;
+        req.remove_attribute(&already_filtered_attribute_name);
+
+        Ok(())
+    }
+}
+
+impl Named for AuthorizationFilter {
+    fn name(&self) -> &str {
+        "AuthorizationFilter"
     }
 }

@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use crate::core::context::security_context::SecurityContext;
 
 /// Allows delayed access to a SecurityContext that may be generated.
 pub trait DeferredSecurityContext: Send {
     /// Returns the SecurityContext, generating it if necessary.
-    fn get(&self) -> SecurityContext;
+    fn get(&self) -> Arc<dyn SecurityContext>;
 
     /// Returns true if `get()` refers to a generated SecurityContext,
     /// or false if it already existed.
@@ -12,17 +14,17 @@ pub trait DeferredSecurityContext: Send {
 
 /// A DeferredSecurityContext backed by a pre-existing context.
 pub struct SuppliedDeferredSecurityContext {
-    context: SecurityContext,
+    context: Arc<dyn SecurityContext>,
 }
 
 impl SuppliedDeferredSecurityContext {
-    pub fn new(context: SecurityContext) -> Self {
+    pub fn new(context: Arc<dyn SecurityContext>) -> Self {
         Self { context }
     }
 }
 
 impl DeferredSecurityContext for SuppliedDeferredSecurityContext {
-    fn get(&self) -> SecurityContext {
+    fn get(&self) -> Arc<dyn SecurityContext> {
         self.context.clone()
     }
 
@@ -33,17 +35,17 @@ impl DeferredSecurityContext for SuppliedDeferredSecurityContext {
 
 /// A DeferredSecurityContext that lazily generates the context.
 pub struct GeneratedDeferredSecurityContext {
-    context: SecurityContext,
+    context: Arc<dyn SecurityContext>,
 }
 
 impl GeneratedDeferredSecurityContext {
-    pub fn new(context: SecurityContext) -> Self {
+    pub fn new(context: Arc<dyn SecurityContext>) -> Self {
         Self { context }
     }
 }
 
 impl DeferredSecurityContext for GeneratedDeferredSecurityContext {
-    fn get(&self) -> SecurityContext {
+    fn get(&self) -> Arc<dyn SecurityContext> {
         self.context.clone()
     }
 

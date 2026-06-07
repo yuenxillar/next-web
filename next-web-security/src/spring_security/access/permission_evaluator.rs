@@ -1,6 +1,6 @@
 use next_web_core::anys::any_value::AnyValue;
 
-use crate::core::authentication::Authentication;
+use crate::core::Authentication;
 
 pub trait PermissionEvaluator: Send + Sync {
     fn has_permission(

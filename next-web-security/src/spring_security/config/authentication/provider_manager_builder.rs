@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    authorization::authentication_manager::AuthenticationManager,
+    authorization::AuthenticationManager,
     config::security_builder::SecurityBuilder,
 };
 

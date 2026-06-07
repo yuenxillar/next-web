@@ -1,4 +1,6 @@
-use crate::core::context::security_context::SecurityContext;
+use std::sync::Arc;
+
+use crate::core::context::SecurityContext;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AbstractSessionEvent {
@@ -21,14 +23,14 @@ impl AbstractSessionEvent {
 pub struct SessionDestroyedEvent {
     base: AbstractSessionEvent,
     id: String,
-    security_contexts: Vec<SecurityContext>,
+    security_contexts: Vec<Arc<dyn SecurityContext>>,
 }
 
 impl SessionDestroyedEvent {
     pub fn new(
         source: impl Into<String>,
         id: impl Into<String>,
-        security_contexts: Vec<SecurityContext>,
+        security_contexts: Vec<Arc<dyn SecurityContext>>,
     ) -> Self {
         Self {
             base: AbstractSessionEvent::new(source),
@@ -45,7 +47,7 @@ impl SessionDestroyedEvent {
         &self.id
     }
 
-    pub fn security_contexts(&self) -> &[SecurityContext] {
+    pub fn security_contexts(&self) -> &[Arc<dyn SecurityContext>] {
         &self.security_contexts
     }
 }

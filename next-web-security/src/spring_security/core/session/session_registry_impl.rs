@@ -26,7 +26,7 @@ impl SessionRegistryImpl {
             SessionEvent::Destroyed(event) => self.remove_session_information(event.id()),
             SessionEvent::IdChanged(event) => {
                 if let Some(info) = self.session_information(event.old_session_id()) {
-                    let principal = info.principal().to_string();
+                    let principal = info.principal();
                     self.remove_session_information(event.old_session_id());
                     self.register_new_session(event.new_session_id(), principal);
                 }
@@ -86,9 +86,9 @@ impl SessionRegistry for SessionRegistryImpl {
         }
     }
 
-    fn register_new_session(&self, session_id: impl Into<String>, principal: impl Into<String>) {
-        let session_id = session_id.into();
-        let principal = principal.into();
+    fn register_new_session(&self, session_id: &str, principal: &str) {
+        let session_id = session_id.to_string();
+        let principal = principal.to_string();
         assert!(
             !session_id.trim().is_empty(),
             "SessionId required as per interface contract"

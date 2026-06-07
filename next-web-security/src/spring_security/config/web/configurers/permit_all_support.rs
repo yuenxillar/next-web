@@ -1,10 +1,7 @@
-use crate::config::web::{
-    configurers::{
-        authorize_http_requests_configurer::AuthorizeHttpRequestsConfigurer,
-        expression_url_authorization_configurer::ExpressionUrlAuthorizationConfigurer,
-    },
-    http_security_builder::HttpSecurityBuilder,
-    util::matcher::request_matcher::RequestMatcher,
+use next_web_core::traits::http::http_request::HttpRequest;
+
+use crate::{
+    config::web::http_security_builder::HttpSecurityBuilder, web::util::matcher::RequestMatcher,
 };
 
 pub struct PermitAllSupport;
@@ -73,7 +70,7 @@ impl ExactUrlRequestMatcher {
 }
 
 impl RequestMatcher for ExactUrlRequestMatcher {
-    fn matches(&self, request: &axum::extract::Request) -> bool {
+    fn matches(&self, request: &dyn HttpRequest) -> bool {
         request.uri().path() == self.process_url.as_ref()
     }
 }

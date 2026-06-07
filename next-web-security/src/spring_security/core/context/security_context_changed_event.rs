@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::core::context::security_context::SecurityContext;
 
-type ContextSupplier = Arc<dyn Fn() -> Option<SecurityContext> + Send + Sync>;
+type ContextSupplier = Arc<dyn Fn() -> Option<Arc<dyn SecurityContext>> + Send + Sync>;
 
 /// Event that represents a change in SecurityContext.
 #[derive(Clone)]
@@ -19,8 +19,8 @@ impl SecurityContextChangedEvent {
 
     /// Construct from existing contexts.
     pub fn new(
-        old_context: SecurityContext,
-        new_context: Option<SecurityContext>,
+        old_context: Arc<dyn SecurityContext>,
+        new_context: Option<Arc<dyn SecurityContext>>,
     ) -> Self {
         let old: ContextSupplier = Arc::new(move || Some(old_context.clone()));
         let new: ContextSupplier = match new_context {
@@ -34,10 +34,7 @@ impl SecurityContextChangedEvent {
     }
 
     /// Construct from supplier functions.
-    pub fn from_suppliers(
-        old_context: ContextSupplier,
-        new_context: ContextSupplier,
-    ) -> Self {
+    pub fn from_suppliers(old_context: ContextSupplier, new_context: ContextSupplier) -> Self {
         Self {
             old_context,
             new_context,
@@ -45,12 +42,12 @@ impl SecurityContextChangedEvent {
     }
 
     /// Get the previous SecurityContext.
-    pub fn get_old_context(&self) -> Option<SecurityContext> {
+    pub fn get_old_context(&self) -> Option<Arc<dyn SecurityContext>> {
         (self.old_context)()
     }
 
     /// Get the current/new SecurityContext.
-    pub fn get_new_context(&self) -> Option<SecurityContext> {
+    pub fn get_new_context(&self) -> Option<Arc<dyn SecurityContext>> {
         (self.new_context)()
     }
 

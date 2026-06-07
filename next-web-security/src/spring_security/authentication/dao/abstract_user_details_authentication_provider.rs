@@ -6,7 +6,7 @@ use crate::{
         account_status_user_details_exceptions::credentials_expired,
     },
     core::{
-        authentication::Authentication,
+        Authentication,
         authentication_error::AuthenticationError,
         authority_mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
         authority_utils::AuthorityUtils,

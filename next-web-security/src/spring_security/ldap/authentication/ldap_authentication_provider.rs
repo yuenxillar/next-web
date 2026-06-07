@@ -5,7 +5,7 @@ use next_web_core::async_trait;
 use crate::{
     authentication::authentication_provider::AuthenticationProvider,
     core::{
-        authentication::Authentication,
+        Authentication,
         authentication_error::AuthenticationError,
         authority_mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
     },

@@ -1,0 +1,24 @@
+use crate::web::header::HeaderWriter;
+
+pub struct XContentTypeOptionsHeaderWriter;
+
+impl Default for XContentTypeOptionsHeaderWriter {
+    fn default() -> Self {
+        Self {}
+    }
+}
+
+impl HeaderWriter for XContentTypeOptionsHeaderWriter {
+    fn write_headers(
+        &self,
+        _request: &mut dyn next_web_core::traits::http::http_request::HttpRequest,
+        response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
+    ) {
+        let header_name = "X-Content-Type-Options";
+        let header_value = "nosniff";
+
+        if !response.contains_header(header_name) {
+            response.append_header(header_name, header_value);
+        }
+    }
+}

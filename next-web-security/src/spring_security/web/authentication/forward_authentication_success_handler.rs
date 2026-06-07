@@ -1,4 +1,4 @@
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 
 use crate::web::authentication::authentication_success_handler::AuthenticationSuccessHandler;
 
@@ -22,12 +22,12 @@ impl ForwardAuthenticationSuccessHandler {
 impl AuthenticationSuccessHandler for ForwardAuthenticationSuccessHandler {
     fn on_authentication_success(
         &self,
-        request: &axum::extract::Request,
-        response: &mut axum::response::Response,
-        _authentication: &dyn crate::core::authentication::Authentication,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+        _authentication: &dyn crate::core::Authentication,
     ) {
-        if let Some(dispatcher) = request.request_dispatcher(&self.forward_url) {
-            dispatcher.forward(request, response);
-        }
+        // TODO: request_dispatcher always returns None currently;
+        // forward will be implemented when RequestDispatcher is wired up.
+        let _ = (req, resp);
     }
 }

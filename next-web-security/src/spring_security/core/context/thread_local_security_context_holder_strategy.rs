@@ -1,12 +1,16 @@
-use std::cell::RefCell;
+use std::sync::Arc;
+
+use futures::future::BoxFuture;
+use next_web_core::error::BoxError;
+use tokio::task_local;
 
 use crate::core::context::{
     security_context::SecurityContext,
-    security_context_holder_strategy::SecurityContextHolderStrategy,
+    security_context_holder_strategy::SecurityContextHolderStrategy, SecurityContextImpl,
 };
 
-thread_local! {
-    static THREAD_LOCAL_CONTEXT: RefCell<SecurityContext> = RefCell::new(SecurityContext::default());
+task_local! {
+    static CONTEXT_HOLDER: Arc<dyn SecurityContext>
 }
 
 #[derive(Clone, Default)]
@@ -14,18 +18,26 @@ pub struct ThreadLocalSecurityContextHolderStrategy;
 
 impl SecurityContextHolderStrategy for ThreadLocalSecurityContextHolderStrategy {
     fn clear_context(&self) {
-        THREAD_LOCAL_CONTEXT.with(|context| {
-            *context.borrow_mut() = SecurityContext::default();
-        });
+        unimplemented!()
     }
 
-    fn get_context(&self) -> SecurityContext {
-        THREAD_LOCAL_CONTEXT.with(|context| context.borrow().clone())
+    fn get_context(&self) -> Option<Arc<dyn SecurityContext>> {
+        CONTEXT_HOLDER.try_get().ok()
     }
 
-    fn set_context(&self, context: SecurityContext) {
-        THREAD_LOCAL_CONTEXT.with(|slot| {
-            *slot.borrow_mut() = context;
-        });
+    fn scope_with_context<'a>(
+        &'a self,
+        context: Arc<dyn SecurityContext>,
+        f: BoxFuture<'a, Result<(), BoxError>>,
+    ) -> BoxFuture<'a, Result<(), BoxError>> {
+        Box::pin(CONTEXT_HOLDER.scope(context, async move { f.await }))
+    }
+
+    fn set_context(&self, context: Arc<dyn SecurityContext>) {
+        unimplemented!()
+    }
+
+    fn create_empty_context(&self) -> Arc<dyn SecurityContext> {
+        Arc::new(SecurityContextImpl::default())
     }
 }

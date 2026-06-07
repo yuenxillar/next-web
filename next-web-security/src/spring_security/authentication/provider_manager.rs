@@ -9,9 +9,9 @@ use crate::{
         authentication_events::{AuthenticationFailureEvent, AuthenticationSuccessEvent},
         authentication_provider::AuthenticationProvider,
     },
-    authorization::authentication_manager::AuthenticationManager,
+    authorization::AuthenticationManager,
     core::{
-        authentication::Authentication,
+        Authentication,
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
     },
 };
@@ -171,8 +171,8 @@ mod tests {
             testing_authentication_provider::TestingAuthenticationProvider,
             testing_authentication_token::TestingAuthenticationToken,
         },
-        authorization::authentication_manager::AuthenticationManager,
-        core::{authority_utils::AuthorityUtils, authentication::Authentication},
+        authorization::AuthenticationManager,
+        core::{authority_utils::AuthorityUtils, Authentication},
     };
 
     #[test]

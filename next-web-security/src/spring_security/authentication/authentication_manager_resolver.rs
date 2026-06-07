@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::authorization::authentication_manager::AuthenticationManager;
+use crate::authorization::AuthenticationManager;
 
 pub trait AuthenticationManagerResolver<C>: Send + Sync {
     fn resolve(&self, context: &C) -> Arc<dyn AuthenticationManager>;

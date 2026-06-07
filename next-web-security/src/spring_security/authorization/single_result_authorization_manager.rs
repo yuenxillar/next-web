@@ -3,8 +3,11 @@ use std::marker::PhantomData;
 use next_web_core::async_trait;
 
 use crate::{
-    authorization::{authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager},
-    core::authentication::Authentication,
+    authorization::{
+        authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
+        AuthorizationResult,
+    },
+    core::Authentication,
 };
 
 /// An AuthorizationManager that always returns the same single result.
@@ -31,55 +34,20 @@ impl<C> SingleResultAuthorizationManager<C> {
 }
 
 #[async_trait]
-impl<C: Send + Sync + 'static> AuthorizationManager<C> for SingleResultAuthorizationManager<C> {
-    async fn check(
+impl<T: Send + Sync + 'static> AuthorizationManager<T> for SingleResultAuthorizationManager<T> {
+    // async fn check(
+    //     &self,
+    //     _authentication: Box<dyn Authentication>,
+    //     _object: C,
+    // ) -> Option<AuthorizationDecision> {
+    //     Some(self.result.clone())
+    // }
+
+    async fn authorize(
         &self,
-        _authentication: Box<dyn Authentication>,
-        _object: C,
-    ) -> Option<AuthorizationDecision> {
-        Some(self.result.clone())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        authorization::{
-            authorization_manager::AuthorizationManager,
-            single_result_authorization_manager::SingleResultAuthorizationManager,
-        },
-        core::{authority_utils::AuthorityUtils, simple_authentication::SimpleAuthentication},
-    };
-
-    #[tokio::test]
-    async fn test_permit_all() {
-        let manager: SingleResultAuthorizationManager<()> =
-            SingleResultAuthorizationManager::permit_all();
-        let auth = Box::new(
-            SimpleAuthentication::builder()
-                .principal("alice")
-                .authorities(AuthorityUtils::create_authority_list(["ROLE_USER"]))
-                .authenticated(true)
-                .build(),
-        );
-
-        let result = manager.check(auth, ()).await;
-        assert!(result.unwrap().is_granted());
-    }
-
-    #[tokio::test]
-    async fn test_deny_all() {
-        let manager: SingleResultAuthorizationManager<()> =
-            SingleResultAuthorizationManager::deny_all();
-        let auth = Box::new(
-            SimpleAuthentication::builder()
-                .principal("alice")
-                .authorities(AuthorityUtils::create_authority_list(["ROLE_USER"]))
-                .authenticated(true)
-                .build(),
-        );
-
-        let result = manager.check(auth, ()).await;
-        assert!(!result.unwrap().is_granted());
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }

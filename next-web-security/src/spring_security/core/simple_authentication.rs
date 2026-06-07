@@ -3,7 +3,7 @@ use std::sync::Arc;
 use next_web_core::anys::any_value::AnyValue;
 
 use crate::core::{
-    authentication::Authentication, granted_authority::GrantedAuthority,
+    Authentication, granted_authority::GrantedAuthority,
 };
 
 #[derive(Clone, Default)]
@@ -119,7 +119,7 @@ impl SimpleAuthenticationBuilder {
 #[cfg(test)]
 mod tests {
     use crate::core::{
-        authentication::Authentication, authority_utils::AuthorityUtils,
+        Authentication, authority_utils::AuthorityUtils,
         simple_authentication::SimpleAuthentication,
     };
 

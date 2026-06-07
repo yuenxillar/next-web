@@ -8,7 +8,7 @@ use crate::{
         anonymous_authentication_token::AnonymousAuthenticationToken,
         authentication_provider::AuthenticationProvider,
     },
-    core::{authentication::Authentication, authentication_error::AuthenticationError},
+    core::{Authentication, authentication_error::AuthenticationError},
 };
 
 #[derive(Clone)]

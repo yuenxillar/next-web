@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::async_trait;
 
-use crate::core::{authentication::Authentication, userdetails::user_details::UserDetails};
+use crate::core::{Authentication, userdetails::user_details::UserDetails};
 
 use super::username_not_found_error::UsernameNotFoundError;
 

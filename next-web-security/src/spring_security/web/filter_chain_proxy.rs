@@ -1,9 +1,14 @@
 use std::sync::Arc;
 
-use axum::{extract::Request, response::Response};
-use next_web_core::error::BoxError;
-
-use crate::core::filter::Filter;
+use next_web_core::{
+    async_trait,
+    error::BoxError,
+    traits::{
+        filter::{HttpFilter, HttpFilterChain},
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
+    },
+};
 
 use super::{
     firewall::{
@@ -33,27 +38,39 @@ impl FilterChainProxy {
     }
 }
 
-impl Filter for FilterChainProxy {
-    fn do_filter(&self, req: &mut Request, res: &mut Response) -> Result<(), BoxError> {
+#[async_trait]
+impl HttpFilter for FilterChainProxy {
+    async fn do_filter(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        filter_chain: &dyn HttpFilterChain,
+    ) -> Result<(), BoxError> {
         self.filter_chain_validator.validate(self);
 
         let Some(chain) = self
             .filter_chains
             .iter()
-            .find(|chain| chain.matches(req))
+            .find(|chain| chain.matches(request))
             .cloned()
         else {
             return Ok(());
         };
 
         for filter in chain.get_filters() {
-            filter.do_filter(req, res)?;
-            if !res.status().is_success() && !res.status().is_redirection() {
+            filter.do_filter(request, response, filter_chain).await?;
+            if !response.status_code().is_success() && !response.status_code().is_redirection() {
                 break;
             }
         }
 
         Ok(())
+    }
+}
+
+impl Named for FilterChainProxy {
+    fn name(&self) -> &str {
+        "FilterChainProxy"
     }
 }
 

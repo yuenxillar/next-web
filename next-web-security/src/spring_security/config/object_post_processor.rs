@@ -1,9 +1,6 @@
-use next_web_core::anys::any_value::AnyValue;
-
 pub trait ObjectPostProcessor<T>
 where
-    T: Send + Sync,
-    Self: Send + Sync,
+    T: ?Sized,
 {
-    fn post_process(&self, object: AnyValue) -> Option<AnyValue>;
+    fn post_process(&mut self, object: &mut T);
 }

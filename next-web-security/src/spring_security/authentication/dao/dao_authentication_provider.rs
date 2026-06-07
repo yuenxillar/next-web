@@ -12,7 +12,7 @@ use crate::{
         password::compromised_password_checker::CompromisedPasswordChecker,
     },
     core::{
-        authentication::Authentication,
+        Authentication,
         authentication_error::AuthenticationError,
         userdetails::{
             user_details::UserDetails,

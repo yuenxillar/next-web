@@ -1,12 +1,12 @@
-use axum::{extract::Request, response::Response};
+use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 
-use crate::core::authentication::Authentication;
+use crate::core::Authentication;
 
 pub trait AuthenticationSuccessHandler: Send + Sync {
     fn on_authentication_success(
         &self,
-        request: &Request,
-        response: &mut Response,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
         authentication: &dyn Authentication,
     );
 }

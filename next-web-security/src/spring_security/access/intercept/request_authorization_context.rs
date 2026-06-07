@@ -1,4 +1,4 @@
-use axum::extract::Request;
+use next_web_core::traits::http::http_request::HttpRequest;
 
 #[derive(Clone, Default)]
 pub struct RequestAuthorizationContext {
@@ -14,8 +14,8 @@ impl RequestAuthorizationContext {
         }
     }
 
-    pub fn from_request(request: &Request) -> Self {
-        Self::new(request.uri().path(), request.method().as_str())
+    pub fn from_request(request: &dyn HttpRequest) -> Self {
+        Self::new(request.path(), request.method().to_string())
     }
 
     pub fn path(&self) -> &str {

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     authorization::{authorization_result::AuthorizationResult, event::authorization_event::AuthorizationEvent},
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 /// Event published when authorization is denied.

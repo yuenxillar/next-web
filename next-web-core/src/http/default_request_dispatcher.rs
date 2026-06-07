@@ -1,15 +1,27 @@
-use axum::{extract::Request, response::Response};
-
-use crate::{error::BoxError, traits::http::request_dispatcher::RequestDispatcher};
+use crate::{
+    error::BoxError,
+    traits::http::{
+        http_request::HttpRequest, http_response::HttpResponse,
+        request_dispatcher::RequestDispatcher,
+    },
+};
 
 pub struct DefaultRequestDispatcher {}
 
 impl RequestDispatcher for DefaultRequestDispatcher {
-    fn forward(&self, request: &Request, response: &mut Response) -> Result<(), BoxError> {
+    fn forward(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+    ) -> Result<(), BoxError> {
         Ok(())
     }
 
-    fn include(&self, request: &Request, response: &mut Response) -> Result<(), BoxError> {
+    fn include(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+    ) -> Result<(), BoxError> {
         Ok(())
     }
 }

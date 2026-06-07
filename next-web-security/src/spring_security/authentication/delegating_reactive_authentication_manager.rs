@@ -7,7 +7,7 @@ use crate::{
         account_status_user_details_exceptions::provider_not_found,
         reactive_authentication_manager::ReactiveAuthenticationManager,
     },
-    core::{authentication::Authentication, authentication_error::AuthenticationError},
+    core::{Authentication, authentication_error::AuthenticationError},
 };
 
 pub struct DelegatingReactiveAuthenticationManager {

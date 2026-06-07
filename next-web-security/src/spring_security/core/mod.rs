@@ -1,4 +1,4 @@
-pub mod authentication;
+mod authentication;
 pub mod authentication_error;
 pub mod authenticated_principal;
 pub mod authority_utils;
@@ -6,7 +6,6 @@ pub mod authority_mapping;
 pub mod context;
 pub mod credentials_container;
 pub mod factor_granted_authority;
-pub mod filter;
 pub mod granted_authority;
 pub mod granted_authorities_container;
 pub mod simple_authentication;
@@ -19,5 +18,8 @@ pub mod username_password_authentication_token;
 pub mod username_not_found_error;
 pub mod web_security_configure;
 
+
+
+pub use authentication::Authentication;
 // pub mod memory_auth_service;
 // pub mod user_permission_resource;

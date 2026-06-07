@@ -7,8 +7,9 @@ use crate::{
     authorization::{
         authorities_authorization_manager::AuthoritiesAuthorizationManager,
         authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
+        AuthorizationResult,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 pub struct AuthorityAuthorizationManager<T> {
@@ -74,14 +75,11 @@ impl<T> AuthorizationManager<T> for AuthorityAuthorizationManager<T>
 where
     T: Send + Sync + 'static,
 {
-    async fn check(
+    async fn authorize(
         &self,
-        authentication: Box<dyn Authentication>,
-        _object: T,
-    ) -> Option<AuthorizationDecision> {
-        Some(AuthorizationDecision::new(
-            self.delegate
-                .is_authorized(authentication.as_ref(), &self.authorities),
-        ))
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }

@@ -1,19 +1,21 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
 use next_web_core::traits::required::Required;
 
 use crate::{
     config::{
-        security_configurer_adapter::SecurityConfigurerAdapter,
         security_configurer::SecurityConfigurer,
+        security_configurer_adapter::SecurityConfigurerAdapter,
         web::{
             configurers::base_http_configurer::BaseHttpConfigurer,
             http_security_builder::HttpSecurityBuilder,
         },
     },
     web::{
-        authentication::logout::logout_filter::LogoutFilter,
-        authentication::ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
+        authentication::{
+            logout::{LogoutFilter, LogoutHandler},
+            ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
+        },
         default_security_filter_chain::DefaultSecurityFilterChain,
     },
 };
@@ -26,6 +28,8 @@ where
 {
     _marker: PhantomData<H>,
     logout_success_url: Option<Box<str>>,
+
+    logout_handlers: Vec<Arc<dyn LogoutHandler>>,
     base_http_configurer: BaseHttpConfigurer<LogoutConfigurer<H>, H>,
 }
 
@@ -45,6 +49,14 @@ where
     pub fn get_logout_success_url(&self) -> Option<&str> {
         self.logout_success_url.as_deref()
     }
+
+    pub fn add_logout_handler<T>(&mut self, logout_handler: T)
+    where
+        T: LogoutHandler,
+        T: 'static,
+    {
+        self.logout_handlers.push(Arc::new(logout_handler));
+    }
 }
 
 impl<H> Default for LogoutConfigurer<H>
@@ -55,8 +67,9 @@ where
     fn default() -> Self {
         Self {
             _marker: PhantomData,
-            logout_success_url: None,
-            base_http_configurer: BaseHttpConfigurer::default(),
+            logout_handlers: Default::default(),
+            logout_success_url: Default::default(),
+            base_http_configurer: Default::default(),
         }
     }
 }

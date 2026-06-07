@@ -9,6 +9,7 @@ license.workspace = true
 next-web-core.workspace = true
 rudi-dev.workspace      = true
 
+
 tokio.workspace     = true
 dashmap.workspace   = true
 tracing.workspace   = true
@@ -25,6 +26,7 @@ urlencoding.workspace = true
 hex.workspace       = true
 rand.workspace      = true
 sha2.workspace      = true
+regex.workspace     = true
 
 [features]
 default = ["T2"]

@@ -7,8 +7,9 @@ use crate::{
         authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
         factor_authorization_decision::FactorAuthorizationDecision,
         required_factor::RequiredFactor, required_factor_error::RequiredFactorError,
+        AuthorizationResult,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 pub struct AllRequiredFactorsAuthorizationManager<T> {
@@ -72,14 +73,12 @@ impl<T> AuthorizationManager<T> for AllRequiredFactorsAuthorizationManager<T>
 where
     T: Send + Sync + 'static,
 {
-    async fn check(
+    async fn authorize(
         &self,
-        authentication: Box<dyn Authentication>,
-        _object: T,
-    ) -> Option<AuthorizationDecision> {
-        Some(AuthorizationDecision::new(
-            self.authorize_factors(authentication.as_ref()).is_granted(),
-        ))
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }
 

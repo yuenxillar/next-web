@@ -1,6 +1,9 @@
 use super::session_information::SessionInformation;
 
-pub trait SessionRegistry: Send + Sync {
+pub trait SessionRegistry
+where
+    Self: Send + Sync,
+{
     fn all_principals(&self) -> Vec<String>;
 
     fn all_sessions(
@@ -13,7 +16,7 @@ pub trait SessionRegistry: Send + Sync {
 
     fn refresh_last_request(&self, session_id: &str);
 
-    fn register_new_session(&self, session_id: impl Into<String>, principal: impl Into<String>);
+    fn register_new_session(&self, session_id: &str, principal: &str);
 
     fn remove_session_information(&self, session_id: &str);
 }

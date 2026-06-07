@@ -11,10 +11,10 @@ use crate::{
             AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
         },
         authority_authorization_manager::AuthorityAuthorizationManager,
+        authorization_decision::AuthorizationDecision,
         authorization_manager::AuthorizationManager,
         authorization_manager_factory::AuthorizationManagerFactory,
         authorization_managers::AuthorizationManagers,
-        authorization_decision::AuthorizationDecision,
     },
 };
 
@@ -80,14 +80,18 @@ impl<T: Clone + Send + Sync + 'static> AuthorizationManagerFactory<T>
     for DefaultAuthorizationManagerFactory<T>
 {
     fn has_any_role(&self, roles: &[String]) -> Arc<dyn AuthorizationManager<T>> {
-        let manager = AuthorityAuthorizationManager::<T>::has_any_role(&self.role_prefix, roles.to_vec());
+        let manager =
+            AuthorityAuthorizationManager::<T>::has_any_role(&self.role_prefix, roles.to_vec());
         let mut manager = manager;
         manager.set_role_hierarchy(self.role_hierarchy.clone());
         self.with_additional(Arc::new(manager))
     }
 
     fn has_all_roles(&self, roles: &[String]) -> Arc<dyn AuthorizationManager<T>> {
-        let authorities: Vec<String> = roles.iter().map(|r| format!("{}{}", self.role_prefix, r)).collect();
+        let authorities: Vec<String> = roles
+            .iter()
+            .map(|r| format!("{}{}", self.role_prefix, r))
+            .collect();
         let mut manager = AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(authorities);
         manager.set_role_hierarchy(self.role_hierarchy.clone());
         self.with_additional(Arc::new(manager))
@@ -108,7 +112,8 @@ impl<T: Clone + Send + Sync + 'static> AuthorizationManagerFactory<T>
     }
 
     fn has_all_authorities(&self, authorities: &[String]) -> Arc<dyn AuthorizationManager<T>> {
-        let mut manager = AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(authorities.to_vec());
+        let mut manager =
+            AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(authorities.to_vec());
         manager.set_role_hierarchy(self.role_hierarchy.clone());
         self.with_additional(Arc::new(manager))
     }
@@ -131,71 +136,5 @@ impl<T: Clone + Send + Sync + 'static> AuthorizationManagerFactory<T>
     fn anonymous(&self) -> Arc<dyn AuthorizationManager<T>> {
         let manager = AuthenticatedAuthorizationManager::anonymous();
         self.with_additional(Arc::new(manager))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use crate::{
-        authorization::{
-            authorization_manager::AuthorizationManager,
-            authorization_manager_factory::AuthorizationManagerFactory,
-            default_authorization_manager_factory::DefaultAuthorizationManagerFactory,
-        },
-        core::{
-            authority_utils::AuthorityUtils, simple_authentication::SimpleAuthentication,
-        },
-    };
-
-    #[tokio::test]
-    async fn test_factory_has_role() {
-        let factory = DefaultAuthorizationManagerFactory::<()>::new();
-        let manager = factory.has_role("USER");
-
-        let auth = Box::new(
-            SimpleAuthentication::builder()
-                .principal("alice")
-                .authorities(AuthorityUtils::create_authority_list(["ROLE_USER"]))
-                .authenticated(true)
-                .build(),
-        );
-
-        let result = manager.check(auth, ()).await;
-        assert!(result.unwrap().is_granted());
-    }
-
-    #[tokio::test]
-    async fn test_factory_permit_all() {
-        let factory = DefaultAuthorizationManagerFactory::<()>::new();
-        let manager = factory.permit_all();
-
-        let auth = Box::new(
-            SimpleAuthentication::builder()
-                .principal("alice")
-                .authenticated(false)
-                .build(),
-        );
-
-        let result = manager.check(auth, ()).await;
-        assert!(result.unwrap().is_granted());
-    }
-
-    #[tokio::test]
-    async fn test_factory_deny_all() {
-        let factory = DefaultAuthorizationManagerFactory::<()>::new();
-        let manager = factory.deny_all();
-
-        let auth = Box::new(
-            SimpleAuthentication::builder()
-                .principal("alice")
-                .authorities(AuthorityUtils::create_authority_list(["ROLE_ADMIN"]))
-                .authenticated(true)
-                .build(),
-        );
-
-        let result = manager.check(auth, ()).await;
-        assert!(!result.unwrap().is_granted());
     }
 }

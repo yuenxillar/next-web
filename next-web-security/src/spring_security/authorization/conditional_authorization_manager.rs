@@ -5,9 +5,9 @@ use next_web_core::async_trait;
 use crate::{
     authorization::{
         authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
-        single_result_authorization_manager::SingleResultAuthorizationManager,
+        single_result_authorization_manager::SingleResultAuthorizationManager, AuthorizationResult,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 /// An AuthorizationManager that delegates based on a condition evaluated against the Authentication.
@@ -39,17 +39,25 @@ impl<T: Send + Sync + 'static> ConditionalAuthorizationManager<T> {
 
 #[async_trait]
 impl<T: Send + Sync + 'static> AuthorizationManager<T> for ConditionalAuthorizationManager<T> {
-    async fn check(
+    // async fn check(
+    //     &self,
+    //     authentication: Box<dyn Authentication>,
+    //     object: T,
+    // ) -> Option<AuthorizationDecision> {
+    //     let condition_met = (self.condition)(authentication.as_ref());
+    //     if condition_met {
+    //         self.when_true.check(authentication, object).await
+    //     } else {
+    //         self.when_false.check(authentication, object).await
+    //     }
+    // }
+
+    async fn authorize(
         &self,
-        authentication: Box<dyn Authentication>,
-        object: T,
-    ) -> Option<AuthorizationDecision> {
-        let condition_met = (self.condition)(authentication.as_ref());
-        if condition_met {
-            self.when_true.check(authentication, object).await
-        } else {
-            self.when_false.check(authentication, object).await
-        }
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }
 
@@ -60,9 +68,7 @@ pub struct ConditionalAuthorizationManagerBuilder<T: Send + Sync + 'static> {
 }
 
 impl<T: Send + Sync + 'static> ConditionalAuthorizationManagerBuilder<T> {
-    pub fn new(
-        condition: impl Fn(&dyn Authentication) -> bool + Send + Sync + 'static,
-    ) -> Self {
+    pub fn new(condition: impl Fn(&dyn Authentication) -> bool + Send + Sync + 'static) -> Self {
         Self {
             condition: Arc::new(condition),
             when_true: None,
@@ -81,9 +87,9 @@ impl<T: Send + Sync + 'static> ConditionalAuthorizationManagerBuilder<T> {
     }
 
     pub fn build(self) -> ConditionalAuthorizationManager<T> {
-        let when_false = self.when_false.unwrap_or_else(|| {
-            Arc::new(SingleResultAuthorizationManager::<T>::permit_all())
-        });
+        let when_false = self
+            .when_false
+            .unwrap_or_else(|| Arc::new(SingleResultAuthorizationManager::<T>::permit_all()));
         ConditionalAuthorizationManager {
             condition: self.condition,
             when_true: self.when_true.expect("when_true is required"),

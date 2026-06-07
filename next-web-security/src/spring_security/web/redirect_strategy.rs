@@ -1,11 +1,17 @@
-use axum::{
-    http::{self, StatusCode},
-    response::Response,
+use axum::http::StatusCode;
+use next_web_core::{
+    error::BoxError,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 use tracing::debug;
 
 pub trait RedirectStrategy: Send + Sync {
-    fn send_redirect(&self, context_path: Option<&str>, url: &str, response: &mut Response);
+    fn send_redirect(
+        &self,
+        request: &dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        url: &str,
+    ) -> Result<(), BoxError>;
 }
 
 #[derive(Clone)]
@@ -24,15 +30,22 @@ impl Default for DefaultRedirectStrategy {
 }
 
 impl RedirectStrategy for DefaultRedirectStrategy {
-    fn send_redirect(&self, context_path: Option<&str>, url: &str, response: &mut Response) {
-        let redirect_url = self.calculate_redirect_url(context_path.unwrap_or_default(), url);
+    fn send_redirect(
+        &self,
+        request: &dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        url: &str,
+    ) -> Result<(), BoxError> {
+        // let redirect_url = self.calculate_redirect_url(context_path.unwrap_or_default(), url);
 
-        debug!("Redirecting to {redirect_url}");
+        // debug!("Redirecting to {redirect_url}");
 
-        response
-            .headers_mut()
-            .insert(http::header::LOCATION, redirect_url.parse().unwrap());
-        *response.status_mut() = self.status_code.clone();
+        // response.insert_header("location", &redirect_url);
+        // response.set_status_code(self.status_code);
+
+        // Ok(())
+
+        todo!();
     }
 }
 

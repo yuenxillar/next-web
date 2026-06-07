@@ -5,8 +5,9 @@ use next_web_core::async_trait;
 use crate::{
     authorization::{
         authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
+        AuthorizationResult,
     },
-    core::{authentication::Authentication, simple_authentication::SimpleAuthentication},
+    core::{simple_authentication::SimpleAuthentication, Authentication},
 };
 
 pub struct AuthorizationManagers;
@@ -54,27 +55,35 @@ impl<T> AuthorizationManager<T> for AnyOfAuthorizationManager<T>
 where
     T: Clone + Send + Sync + 'static,
 {
-    async fn check(
+    // async fn check(
+    //     &self,
+    //     authentication: Box<dyn Authentication>,
+    //     object: T,
+    // ) -> Option<AuthorizationDecision> {
+    //     let snapshot = SimpleAuthentication::builder_from(authentication.as_ref()).build();
+    //     let mut denied = false;
+    //     for manager in &self.managers {
+    //         let candidate = SimpleAuthentication::builder_from(&snapshot).build();
+    //         if let Some(decision) = manager.check(Box::new(candidate), object.clone()).await {
+    //             if decision.is_granted() {
+    //                 return Some(decision);
+    //             }
+    //             denied = true;
+    //         }
+    //     }
+    //     Some(if denied {
+    //         AuthorizationDecision::new(false)
+    //     } else {
+    //         self.all_abstain_default_decision.clone()
+    //     })
+    // }
+
+    async fn authorize(
         &self,
-        authentication: Box<dyn Authentication>,
-        object: T,
-    ) -> Option<AuthorizationDecision> {
-        let snapshot = SimpleAuthentication::builder_from(authentication.as_ref()).build();
-        let mut denied = false;
-        for manager in &self.managers {
-            let candidate = SimpleAuthentication::builder_from(&snapshot).build();
-            if let Some(decision) = manager.check(Box::new(candidate), object.clone()).await {
-                if decision.is_granted() {
-                    return Some(decision);
-                }
-                denied = true;
-            }
-        }
-        Some(if denied {
-            AuthorizationDecision::new(false)
-        } else {
-            self.all_abstain_default_decision.clone()
-        })
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }
 
@@ -100,27 +109,35 @@ impl<T> AuthorizationManager<T> for AllOfAuthorizationManager<T>
 where
     T: Clone + Send + Sync + 'static,
 {
-    async fn check(
+    // async fn check(
+    //     &self,
+    //     authentication: Box<dyn Authentication>,
+    //     object: T,
+    // ) -> Option<AuthorizationDecision> {
+    //     let snapshot = SimpleAuthentication::builder_from(authentication.as_ref()).build();
+    //     let mut granted = false;
+    //     for manager in &self.managers {
+    //         let candidate = SimpleAuthentication::builder_from(&snapshot).build();
+    //         if let Some(decision) = manager.check(Box::new(candidate), object.clone()).await {
+    //             if !decision.is_granted() {
+    //                 return Some(decision);
+    //             }
+    //             granted = true;
+    //         }
+    //     }
+    //     Some(if granted {
+    //         AuthorizationDecision::new(true)
+    //     } else {
+    //         self.all_abstain_default_decision.clone()
+    //     })
+    // }
+
+    async fn authorize(
         &self,
-        authentication: Box<dyn Authentication>,
-        object: T,
-    ) -> Option<AuthorizationDecision> {
-        let snapshot = SimpleAuthentication::builder_from(authentication.as_ref()).build();
-        let mut granted = false;
-        for manager in &self.managers {
-            let candidate = SimpleAuthentication::builder_from(&snapshot).build();
-            if let Some(decision) = manager.check(Box::new(candidate), object.clone()).await {
-                if !decision.is_granted() {
-                    return Some(decision);
-                }
-                granted = true;
-            }
-        }
-        Some(if granted {
-            AuthorizationDecision::new(true)
-        } else {
-            self.all_abstain_default_decision.clone()
-        })
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }
 
@@ -134,14 +151,22 @@ impl<T> AuthorizationManager<T> for NotAuthorizationManager<T>
 where
     T: Send + Sync + 'static,
 {
-    async fn check(
+    // async fn check(
+    //     &self,
+    //     authentication: Box<dyn Authentication>,
+    //     object: T,
+    // ) -> Option<AuthorizationDecision> {
+    //     self.manager
+    //         .check(authentication, object)
+    //         .await
+    //         .map(|decision| AuthorizationDecision::new(!decision.is_granted()))
+    // }
+
+    async fn authorize(
         &self,
-        authentication: Box<dyn Authentication>,
-        object: T,
-    ) -> Option<AuthorizationDecision> {
-        self.manager
-            .check(authentication, object)
-            .await
-            .map(|decision| AuthorizationDecision::new(!decision.is_granted()))
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }

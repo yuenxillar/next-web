@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::authentication::Authentication;
+use crate::core::Authentication;
 
 use super::security_expression_operations::SecurityExpressionOperations;
 

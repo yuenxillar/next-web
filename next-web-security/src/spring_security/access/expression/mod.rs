@@ -1,4 +1,4 @@
-pub mod abstract_security_expression_handler;
+pub mod base_security_expression_handler;
 pub mod deny_all_permission_evaluator;
 pub mod expression_utils;
 pub mod method;

@@ -6,9 +6,5 @@ use crate::config::object_post_processor::ObjectPostProcessor;
 pub struct AutowireSingletonFactoryObjectPostProcessor {}
 
 impl ObjectPostProcessor<AnyValue> for AutowireSingletonFactoryObjectPostProcessor {
-    fn post_process(&self, object: AnyValue) -> Option<AnyValue> {
-        let result = None;
-
-        result
-    }
+    fn post_process(&mut self, object: &mut AnyValue) {}
 }

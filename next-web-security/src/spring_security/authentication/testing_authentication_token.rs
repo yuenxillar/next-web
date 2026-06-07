@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::core::{
-    authentication::Authentication, granted_authority::GrantedAuthority,
+    Authentication, granted_authority::GrantedAuthority,
 };
 
 #[derive(Clone, Default)]
@@ -67,7 +67,7 @@ impl Authentication for TestingAuthenticationToken {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{authentication::Authentication, authority_utils::AuthorityUtils};
+    use crate::core::{Authentication, authority_utils::AuthorityUtils};
 
     use super::TestingAuthenticationToken;
 

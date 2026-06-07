@@ -6,7 +6,7 @@ use crate::{
         authorization_result::AuthorizationResult,
         event::authorization_denied_event::AuthorizationDeniedEvent,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 /// A publisher that filters to only publish denied events by default
@@ -40,23 +40,22 @@ impl AuthorizationEventPublisher for SpringAuthorizationEventPublisher {
     fn publish_authorization_event(
         &self,
         authentication: Arc<dyn Authentication>,
-        object_description: &str,
-        result: Option<Arc<dyn AuthorizationResult>>,
+        object_description: (),
+        result: Option<Box<dyn AuthorizationResult>>,
     ) {
-        let result = match result {
-            Some(r) => r,
-            None => return,
-        };
+        // let result = match result {
+        //     Some(r) => r,
+        //     None => return,
+        // };
 
-        if !(self.should_publish)(result.as_ref()) {
-            return;
-        }
+        // if !(self.should_publish)(result.as_ref()) {
+        //     return;
+        // }
 
-        let event = AuthorizationDeniedEvent::new(
-            authentication,
-            object_description.to_string(),
-            result,
-        );
-        self.event_publisher.publish_event(Box::new(event));
+        // let event =
+        //     AuthorizationDeniedEvent::new(authentication, object_description.to_string(), result);
+        // self.event_publisher.publish_event(Box::new(event));
+        //
+        todo!()
     }
 }

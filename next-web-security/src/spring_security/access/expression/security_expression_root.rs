@@ -13,10 +13,10 @@ use crate::{
         },
         permission_evaluator::PermissionEvaluator,
     },
-    authorization::authentication_trust_resolver::{
+    authorization::{
         AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 pub struct SecurityExpressionRoot {

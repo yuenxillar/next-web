@@ -9,15 +9,15 @@ use crate::authentication::{
     authentication_events::{AuthenticationFailureEvent, AuthenticationSuccessEvent},
     authentication_provider::AuthenticationProvider,
 };
-use crate::config::abstract_configured_security_builder::AbstractConfiguredSecurityBuilder;
+use crate::config::base_configured_security_builder::AbstractConfiguredSecurityBuilder;
 use crate::core::{
-    authentication::Authentication,
+    Authentication,
     authentication_error::{AuthenticationError, AuthenticationErrorKind},
     credentials_container::CredentialsContainer,
     userdetails::user_details_service::UserDetailsService,
 };
 use crate::{
-    authorization::authentication_manager::AuthenticationManager,
+    authorization::AuthenticationManager,
     config::{
         authentication::provider_manager_builder::ProviderManagerBuilder,
         security_builder::SecurityBuilder,
@@ -272,9 +272,9 @@ mod tests {
             remember_me_authentication_provider::RememberMeAuthenticationProvider,
             remember_me_authentication_token::RememberMeAuthenticationToken,
         },
-        authorization::authentication_manager::AuthenticationManager,
+        authorization::AuthenticationManager,
         core::{
-            authentication::Authentication,
+            Authentication,
             authentication_error::AuthenticationError,
             authority_utils::AuthorityUtils,
             username_password_authentication_token::UsernamePasswordAuthenticationToken,

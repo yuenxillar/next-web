@@ -1,2 +1,6 @@
-pub mod http_filter;
-pub mod http_filter_chain;
+ mod http_filter;
+ mod http_filter_chain;
+
+
+ pub use http_filter::HttpFilter;
+ pub use http_filter_chain::HttpFilterChain;

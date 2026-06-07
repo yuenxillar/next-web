@@ -16,7 +16,7 @@ use next_web::{
 };
 use next_web_core::async_trait;
 use next_web_core::state::application_state::ApplicationState;
-use next_web_core::traits::filter::http_filter::HttpFilter;
+use next_web_core::traits::filter::HttpFilter;
 // use next_web_security::web::filter_proxy::FilterProxy;
 use tokio::sync::Mutex;
 
@@ -70,6 +70,8 @@ impl Application for TestApplication {
     ) -> Result<(), Box<dyn std::error::Error>> {
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
 
+        ctx.resolve_by_type::<Box<dyn next_web_security::core::web_security_configure::WebSecurityConfigure>>();
+
         Ok(())
     }
 }
@@ -98,6 +100,9 @@ mod t2 {
     impl WebSecurityConfigure for TestWebSecurityConfigure {
         fn configure(self) -> HttpSecurity {
             HttpSecurity::default()
+                .csrf(|csrf| {
+                    csrf.spa();
+                })
                 .authorize_http_requests(|mut auth| {
                     auth.request_matchers(vec!["/login", "/logout", "/open"])
                         .permit_all()
@@ -106,7 +111,6 @@ mod t2 {
                         .any_request()
                         .authenticated();
                 })
-                .form_login(|form| {})
         }
     }
 }

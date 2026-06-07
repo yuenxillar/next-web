@@ -3,14 +3,14 @@ use std::sync::Arc;
 use crate::{
     access::{
         expression::{
-            abstract_security_expression_handler::AbstractSecurityExpressionHandler,
+            base_security_expression_handler::AbstractSecurityExpressionHandler,
             method::method_security_expression_root::MethodSecurityExpressionRoot,
             security_expression_handler::SecurityExpressionHandler,
             security_expression_operations::SecurityExpressionOperations,
         },
         permission_evaluator::PermissionEvaluator,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 use super::{

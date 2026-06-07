@@ -14,7 +14,7 @@ use crate::{
         },
     },
     core::{
-        authentication::Authentication,
+        Authentication,
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
         authority_utils::AuthorityUtils,
         factor_granted_authority::FactorGrantedAuthority,

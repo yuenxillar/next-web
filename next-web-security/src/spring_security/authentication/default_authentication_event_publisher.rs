@@ -6,7 +6,7 @@ use crate::{
         authentication_events::{AuthenticationFailureEvent, AuthenticationSuccessEvent},
     },
     core::{
-        authentication::Authentication,
+        Authentication,
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
     },
 };

@@ -1,15 +1,30 @@
-use next_web_core::error::BoxError;
+use next_web_core::{
+    async_trait,
+    error::BoxError,
+    traits::{
+        filter::{HttpFilter, HttpFilterChain},
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
+    },
+};
 
-use crate::core::filter::Filter;
-
+#[derive(Clone)]
 pub struct ErrorTranslationFilter {}
 
-impl Filter for ErrorTranslationFilter {
-    fn do_filter(
+#[async_trait]
+impl HttpFilter for ErrorTranslationFilter {
+    async fn do_filter(
         &self,
-        _req: &mut axum::extract::Request,
-        _res: &mut axum::response::Response,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), BoxError> {
         Ok(())
+    }
+}
+
+impl Named for ErrorTranslationFilter {
+    fn name(&self) -> &str {
+        "ErrorTranslationFilter"
     }
 }

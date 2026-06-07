@@ -5,7 +5,7 @@ use next_web_core::async_trait;
 use crate::{
     authentication::authentication_provider::AuthenticationProvider,
     core::{
-        authentication::Authentication,
+        Authentication,
         authentication_error::AuthenticationError,
         authority_utils::AuthorityUtils,
         userdetails::{
@@ -136,7 +136,7 @@ mod tests {
         authentication::account_status_user_details_checker::AccountStatusUserDetailsChecker,
         authentication::authentication_provider::AuthenticationProvider,
         core::{
-            authentication::Authentication,
+            Authentication,
             authority_utils::AuthorityUtils,
             userdetails::{
                 authentication_user_details_service::AuthenticationUserDetailsService,

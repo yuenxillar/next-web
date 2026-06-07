@@ -1,9 +1,9 @@
-use axum::extract::Request;
+use std::sync::Arc;
 
-use crate::core::filter::Filter;
+use next_web_core::traits::{filter::HttpFilter, http::http_request::HttpRequest};
 
 pub trait SecurityFilterChain: Send + Sync {
-    fn matches(&self, request: &Request) -> bool;
+    fn matches(&self, request: &mut dyn HttpRequest) -> bool;
 
-    fn get_filters(&self) -> Vec<&dyn Filter>;
+    fn get_filters(&self) -> &[Arc<dyn HttpFilter>];
 }

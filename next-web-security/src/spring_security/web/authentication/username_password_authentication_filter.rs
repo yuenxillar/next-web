@@ -1,11 +1,18 @@
-use next_web_core::traits::required::Required;
+use axum::http::StatusCode;
+use next_web_core::{
+    async_trait,
+    traits::{
+        filter::{HttpFilter, HttpFilterChain},
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
+        required::Required,
+    },
+    util::http_method::HttpMethod,
+};
 
 use crate::{
-    core::{
-        filter::Filter,
-        username_password_authentication_token::UsernamePasswordAuthenticationToken,
-    },
-    web::authentication::abstract_authentication_processing_filter::AbstractAuthenticationProcessingFilter,
+    core::username_password_authentication_token::UsernamePasswordAuthenticationToken,
+    web::authentication::base_authentication_processing_filter::AbstractAuthenticationProcessingFilter,
 };
 
 #[derive(Clone)]
@@ -63,52 +70,53 @@ impl Required<AbstractAuthenticationProcessingFilter> for UsernamePasswordAuthen
     }
 }
 
-impl Filter for UsernamePasswordAuthenticationFilter {
-    fn do_filter(
+#[async_trait]
+impl HttpFilter for UsernamePasswordAuthenticationFilter {
+    async fn do_filter(
         &self,
-        req: &mut axum::extract::Request,
-        res: &mut axum::response::Response,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), next_web_core::error::BoxError> {
         if !self
             .abstract_authentication_processing_filter
-            .requires_authentication(req)
+            .requires_authentication(request)
         {
             return Ok(());
         }
 
-        if self.post_only && req.method() != axum::http::Method::POST {
-            *res.status_mut() = axum::http::StatusCode::METHOD_NOT_ALLOWED;
+        if self.post_only && (request.method() != HttpMethod::Post) {
+            response.set_status_code(StatusCode::METHOD_NOT_ALLOWED);
             return Ok(());
         }
 
-        let username = request_parameter(req, &self.username_parameter).unwrap_or_default();
-        let password = request_parameter(req, &self.password_parameter);
+        let username = request_parameter(request, &self.username_parameter).unwrap_or_default();
+        let password = request_parameter(request, &self.password_parameter);
         let token = UsernamePasswordAuthenticationToken::unauthenticated(
             Some(username.trim().to_string()),
             password,
         );
 
         self.abstract_authentication_processing_filter
-            .attempt_authentication(req, res, &token)?;
+            .attempt_authentication(request, response, &token)?;
         Ok(())
     }
 }
 
-fn request_parameter(request: &axum::extract::Request, name: &str) -> Option<String> {
+impl Named for UsernamePasswordAuthenticationFilter {
+    fn name(&self) -> &str {
+        "UsernamePasswordAuthenticationFilter"
+    }
+}
+
+fn request_parameter(request: &dyn HttpRequest, name: &str) -> Option<String> {
     request
-        .uri()
         .query()
         .and_then(|query| parse_urlencoded_parameter(query, name))
         .or_else(|| {
             request
-                .extensions()
-                .get::<next_web_core::anys::any_map::AnyMap>()
-                .and_then(|map| {
-                crate::web::authentication::preauth::abstract_pre_authenticated_processing_filter::block_on(
-                    map.get(name),
-                )
+                .get_attribute(name)
                 .and_then(|value| value.as_string())
-            })
         })
 }
 
@@ -120,6 +128,8 @@ fn parse_urlencoded_parameter(query: &str, name: &str) -> Option<String> {
             return None;
         }
         let value = parts.next().unwrap_or_default();
-        urlencoding::decode(value).ok().map(|value| value.into_owned())
+        urlencoding::decode(value)
+            .ok()
+            .map(|value| value.into_owned())
     })
 }

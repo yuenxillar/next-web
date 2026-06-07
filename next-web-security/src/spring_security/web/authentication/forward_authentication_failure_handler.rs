@@ -1,4 +1,4 @@
-use next_web_core::{anys::any_map::AnyMap, traits::http::http_request::HttpRequest};
+use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 
 use crate::web::authentication::authentication_failure_handler::AuthenticationFailureHandler;
 
@@ -22,27 +22,16 @@ impl ForwardAuthenticationFailureHandler {
 impl AuthenticationFailureHandler for ForwardAuthenticationFailureHandler {
     fn on_authentication_failure(
         &self,
-        request: &axum::extract::Request,
-        response: &mut axum::response::Response,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
         error: &crate::core::authentication_error::AuthenticationError,
     ) {
-        if let Some(any_map) = request.extensions().get::<AnyMap>() {
-            block_on(any_map.insert("NEXT_SECURITY_LAST_ERROR".to_string(), error.clone().into()));
-            request
-                .request_dispatcher(&self.forward_url)
-                .map(|dispatcher| dispatcher.forward(request, response));
-        };
-    }
-}
-
-fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        tokio::task::block_in_place(|| handle.block_on(future))
-    } else {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("failed to build Tokio runtime")
-            .block_on(future)
+        request.set_attribute(
+            "NEXT_SECURITY_LAST_ERROR",
+            error.clone().into(),
+        );
+        // TODO: request_dispatcher always returns None currently;
+        // forward will be implemented when RequestDispatcher is wired up.
+        let _ = response;
     }
 }

@@ -5,6 +5,8 @@ use axum::{
     response::Response,
 };
 
+use crate::http::cookie::Cookie;
+
 pub trait HttpResponse
 where
     Self: Send,
@@ -19,6 +21,8 @@ where
 
     fn append_header(&mut self, name: &str, value: &str) -> bool;
 
+    fn contains_header(&self, name: &str) -> bool;
+
     fn insert_header(&mut self, name: &str, value: &str) -> Option<String>;
 
     fn remove_header(&mut self, name: &str) -> Option<String>;
@@ -27,7 +31,9 @@ where
 
     fn set_redirect(&mut self, url: &str);
 
-    // fn set_cookie(&mut self, cookie: Cookie);
+    fn add_cookie(&mut self, cookie: Cookie);
+
+    fn is_committed(&self) -> bool;
 }
 
 impl HttpResponse for Response {
@@ -58,6 +64,10 @@ impl HttpResponse for Response {
             .map(|name| self.headers_mut().append(name, value))
             .ok()
             .unwrap_or_default()
+    }
+
+    fn contains_header(&self, name: &str) -> bool {
+        self.headers().contains_key(name)
     }
 
     fn insert_header(&mut self, name: &str, value: &str) -> Option<String> {
@@ -92,5 +102,13 @@ impl HttpResponse for Response {
             *self.status_mut() = StatusCode::SEE_OTHER;
             self.headers_mut().insert(header::LOCATION, url);
         }
+    }
+
+    fn add_cookie(&mut self, cookie: Cookie) {
+        todo!()
+    }
+
+    fn is_committed(&self) -> bool {
+        todo!()
     }
 }

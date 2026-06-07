@@ -1,15 +1,20 @@
 use std::sync::Arc;
 
-use axum::{extract::Request, response::Response};
-use next_web_core::{anys::any_map::AnyMap, error::BoxError};
+use next_web_core::{
+    async_trait,
+    error::BoxError,
+    traits::{
+        filter::{HttpFilter, HttpFilterChain},
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
+    },
+};
 
 use crate::{
-    authorization::authentication_manager::AuthenticationManager,
-    core::filter::Filter,
+    authorization::AuthenticationManager,
     web::authentication::preauth::{
-        abstract_pre_authenticated_processing_filter::{
-            AbstractPreAuthenticatedProcessingFilterSupport, NEXT_SECURITY_REQUEST_ATTRIBUTES,
-            block_on,
+        base_pre_authenticated_processing_filter::{
+            BasePreAuthenticatedProcessingFilterSupport, NEXT_SECURITY_REQUEST_ATTRIBUTES,
         },
         pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
         pre_authenticated_credentials_not_found_exception::pre_authenticated_credentials_not_found,
@@ -18,7 +23,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct RequestAttributeAuthenticationFilter {
-    support: AbstractPreAuthenticatedProcessingFilterSupport,
+    support: BasePreAuthenticatedProcessingFilterSupport,
     principal_environment_variable: String,
     credentials_environment_variable: Option<String>,
     exception_if_variable_missing: bool,
@@ -27,7 +32,7 @@ pub struct RequestAttributeAuthenticationFilter {
 impl RequestAttributeAuthenticationFilter {
     pub fn new(authentication_manager: Arc<dyn AuthenticationManager>) -> Self {
         Self {
-            support: AbstractPreAuthenticatedProcessingFilterSupport::new(authentication_manager),
+            support: BasePreAuthenticatedProcessingFilterSupport::new(authentication_manager),
             principal_environment_variable: String::from("REMOTE_USER"),
             credentials_environment_variable: None,
             exception_if_variable_missing: true,
@@ -64,7 +69,7 @@ impl RequestAttributeAuthenticationFilter {
 
     pub fn pre_authenticated_principal(
         &self,
-        request: &Request,
+        request: &dyn HttpRequest,
     ) -> Result<Option<String>, crate::core::authentication_error::AuthenticationError> {
         let principal = request_attribute(request, &self.principal_environment_variable);
         if principal.is_none() && self.exception_if_variable_missing {
@@ -76,7 +81,7 @@ impl RequestAttributeAuthenticationFilter {
         Ok(principal)
     }
 
-    pub fn pre_authenticated_credentials(&self, request: &Request) -> Option<String> {
+    pub fn pre_authenticated_credentials(&self, request: &dyn HttpRequest) -> Option<String> {
         self.credentials_environment_variable
             .as_ref()
             .and_then(|name| request_attribute(request, name))
@@ -84,9 +89,15 @@ impl RequestAttributeAuthenticationFilter {
     }
 }
 
-impl Filter for RequestAttributeAuthenticationFilter {
-    fn do_filter(&self, req: &mut Request, res: &mut Response) -> Result<(), BoxError> {
-        let principal = match self.pre_authenticated_principal(req) {
+#[async_trait]
+impl HttpFilter for RequestAttributeAuthenticationFilter {
+    async fn do_filter(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        filter_chain: &dyn HttpFilterChain,
+    ) -> Result<(), BoxError> {
+        let principal = match self.pre_authenticated_principal(request) {
             Ok(principal) => principal,
             Err(error) => return Err(Box::new(error)),
         };
@@ -96,18 +107,23 @@ impl Filter for RequestAttributeAuthenticationFilter {
 
         let token = PreAuthenticatedAuthenticationToken::unauthenticated(
             Some(principal),
-            self.pre_authenticated_credentials(req),
+            self.pre_authenticated_credentials(request),
         );
-        let _ = self.support.authenticate(req, res, &token)?;
+        let _ = self.support.authenticate(request, response, &token)?;
         Ok(())
     }
 }
 
-fn request_attribute(request: &Request, key: &str) -> Option<String> {
-    let map = request.extensions().get::<AnyMap>()?;
-    let value = block_on(map.get(NEXT_SECURITY_REQUEST_ATTRIBUTES))?;
-    let attributes = value.as_map()?;
-    attributes.get(key).and_then(|value| value.as_string())
+impl Named for RequestAttributeAuthenticationFilter {
+    fn name(&self) -> &str {
+        "RequestAttributeAuthenticationFilter"
+    }
+}
+
+fn request_attribute(request: &dyn HttpRequest, key: &str) -> Option<String> {
+    request
+        .get_attribute(key)
+        .and_then(|value| value.as_string())
 }
 
 #[cfg(test)]
@@ -118,11 +134,12 @@ mod tests {
     use next_web_core::anys::{any_map::AnyMap, any_value::AnyValue};
 
     use crate::{
-        authorization::authentication_manager::AuthenticationManager,
-        core::{authentication::Authentication, authority_utils::AuthorityUtils},
+        authorization::AuthenticationManager,
+        core::{authority_utils::AuthorityUtils, Authentication},
+        web::authentication::preauth::base_pre_authenticated_processing_filter::block_on,
     };
 
-    use super::{block_on, RequestAttributeAuthenticationFilter, NEXT_SECURITY_REQUEST_ATTRIBUTES};
+    use super::{RequestAttributeAuthenticationFilter, NEXT_SECURITY_REQUEST_ATTRIBUTES};
 
     struct StubAuthenticationManager;
 
@@ -130,7 +147,8 @@ mod tests {
         fn authenticate(
             &self,
             authentication: &dyn Authentication,
-        ) -> Result<Arc<dyn Authentication>, crate::core::authentication_error::AuthenticationError> {
+        ) -> Result<Arc<dyn Authentication>, crate::core::authentication_error::AuthenticationError>
+        {
             Ok(Arc::new(
                 crate::web::authentication::preauth::pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken::authenticated(
                     authentication.get_name(),
@@ -143,11 +161,13 @@ mod tests {
 
     #[test]
     fn request_attribute_filter_reads_principal_and_credentials_attributes() {
-        let mut filter = RequestAttributeAuthenticationFilter::new(Arc::new(StubAuthenticationManager));
+        let mut filter =
+            RequestAttributeAuthenticationFilter::new(Arc::new(StubAuthenticationManager));
         filter.set_principal_environment_variable("principal");
         filter.set_credentials_environment_variable("credential");
 
         let map = AnyMap::new();
+
         block_on(map.insert(
             NEXT_SECURITY_REQUEST_ATTRIBUTES.to_string(),
             AnyValue::Map(HashMap::from([
@@ -155,7 +175,6 @@ mod tests {
                 (String::from("credential"), AnyValue::from("external")),
             ])),
         ));
-
         let mut request = Request::from(HttpRequest::builder().body(Body::empty()).unwrap());
         request.extensions_mut().insert(map);
 

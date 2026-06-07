@@ -2,13 +2,15 @@ use axum::{
     extract::Request,
     http::{Uri, Version, uri::Scheme},
 };
-use headers::{Cookie, HeaderMapExt, Host};
+use headers::{HeaderMapExt, Host};
 use std::{collections::HashMap, str::FromStr};
 
 use crate::{
-    anys::any_value::AnyValue, autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES,
-    http::auth_type::AuthType, traits::http::request_dispatcher::RequestDispatcher,
-    util::http_method::HttpMethod,
+    anys::any_value::AnyValue,
+    autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES,
+    http::{auth_type::AuthType, cookie::Cookie},
+    traits::http::{HttpSession, request_dispatcher::RequestDispatcher},
+    util::{http_method::HttpMethod, locale::Locale},
 };
 
 pub const IDENTITY_REMOVED_KEY: &str = stringify!(format!(
@@ -20,11 +22,13 @@ pub trait HttpRequest
 where
     Self: Send,
 {
-    fn session(&self, name: &str) -> Option<String>;
+    fn session(&self, create: bool) -> Option<&dyn HttpSession>;
 
     fn auth_type(&self) -> AuthType;
 
-    fn cookie(&self) -> Option<Cookie>;
+    fn cookie(&self) -> Option<&Cookie>;
+
+    fn cookies(&self) -> Option<&[Cookie]>;
 
     fn request_dispatcher(&self, default_failure_url: &str) -> Option<&dyn RequestDispatcher>;
 
@@ -38,7 +42,9 @@ where
 
     fn query(&self) -> Option<&str>;
 
-    fn get_parameter(&self, name: &str) -> Option<&str>;
+    fn parameter(&self, name: &str) -> Option<&str>;
+
+    fn parameters(&self) -> Option<Vec<(&str, &str)>>;
 
     fn path(&self) -> &str;
 
@@ -51,6 +57,10 @@ where
     fn server_name(&self) -> Option<String>;
 
     fn context_path(&self) -> Option<&str>;
+
+    fn locale(&self) -> Option<&Locale>;
+
+    fn locales(&self) -> Option<Vec<&Locale>>;
 
     fn get_attribute(&self, name: &str) -> Option<&AnyValue>;
 
@@ -72,14 +82,22 @@ impl HttpRequest for Request {
         AuthType::from_request(self)
     }
 
-    fn session(&self, name: &str) -> Option<String> {
-        self.cookie()
-            .map(|cookie| cookie.get(name).map(ToString::to_string))
-            .unwrap_or_default()
+    // fn session(&self, name: &str) -> Option<String> {
+    //     self.cookie()
+    //         .map(|cookie| cookie.get(name).map(ToString::to_string))
+    //         .unwrap_or_default()
+    // }
+
+    fn session(&self, create: bool) -> Option<&dyn HttpSession> {
+        None
     }
 
-    fn cookie(&self) -> Option<Cookie> {
-        self.headers().typed_get::<Cookie>()
+    fn cookie(&self) -> Option<&Cookie> {
+        todo!()
+    }
+
+    fn cookies(&self) -> Option<&[Cookie]> {
+        todo!()
     }
 
     fn request_dispatcher(&self, mut path: &str) -> Option<&dyn RequestDispatcher> {
@@ -140,11 +158,26 @@ impl HttpRequest for Request {
         self.uri().query()
     }
 
-    fn get_parameter(&self, name: &str) -> Option<&str> {
+    fn parameter(&self, name: &str) -> Option<&str> {
         self.query().and_then(|query| {
             query
                 .split('&')
                 .find_map(|param| param.split('=').nth(1).filter(|value| *value == name))
+        })
+    }
+
+    fn parameters(&self) -> Option<Vec<(&str, &str)>> {
+        self.query().map(|query| {
+            query
+                .split('&')
+                .filter(|s| !s.is_empty())
+                .map(|param| {
+                    let mut parts = param.splitn(2, '=');
+                    let key = parts.next().unwrap_or("");
+                    let value = parts.next().unwrap_or("");
+                    (key, value)
+                })
+                .collect()
         })
     }
 
@@ -174,6 +207,14 @@ impl HttpRequest for Request {
         GLOBAL_SERVER_PROPERTIES
             .get()
             .map(|var| var.context_path())?
+    }
+
+    fn locale(&self) -> Option<&Locale> {
+        todo!()
+    }
+
+    fn locales(&self) -> Option<Vec<&Locale>> {
+        todo!()
     }
 
     fn remove_attribute(&mut self, name: &str) {

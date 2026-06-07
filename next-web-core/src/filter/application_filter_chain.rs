@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::{
     error::BoxError,
     traits::{
-        filter::http_filter_chain::HttpFilterChain,
+        filter::HttpFilterChain,
         http::{http_request::HttpRequest, http_response::HttpResponse},
     },
 };

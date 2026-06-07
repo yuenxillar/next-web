@@ -6,7 +6,7 @@ use crate::{
     access::hierarchicalroles::{
         null_role_hierarchy::NullRoleHierarchy, role_hierarchy::RoleHierarchy,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 pub struct AuthoritiesAuthorizationManager {

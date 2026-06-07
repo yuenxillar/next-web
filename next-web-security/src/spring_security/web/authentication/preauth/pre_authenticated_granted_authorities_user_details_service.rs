@@ -3,7 +3,7 @@ use std::sync::Arc;
 use next_web_core::async_trait;
 
 use crate::core::{
-    authentication::Authentication,
+    Authentication,
     granted_authorities_container::GrantedAuthoritiesContainer,
     userdetails::{
         authentication_user_details_service::AuthenticationUserDetailsService, user::User,

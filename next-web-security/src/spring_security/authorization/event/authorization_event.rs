@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     authorization::authorization_result::AuthorizationResult,
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 /// Base event for authorization results.

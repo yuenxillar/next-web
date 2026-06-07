@@ -4,33 +4,33 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use next_web_core::{traits::required::Required, util::http_method::HttpMethod, ApplicationContext};
+use next_web_core::{
+    traits::required::Required, util::http_method::HttpMethod, ApplicationContext,
+};
 
-use crate::access::hierarchicalroles::role_hierarchy::RoleHierarchy;
-use crate::authorization::authorization_decision::AuthorizationDecision;
+use crate::authorization::AuthorizationDecision;
 use crate::config::security_builder::SecurityBuilder;
-use crate::config::web::abstract_request_matcher_registry::AbstractRequestMatcherRegistry;
+use crate::config::web::base_request_matcher_registry::AbstractRequestMatcherRegistry;
 use crate::config::web::http_security_builder::HttpSecurityBuilder;
-use crate::web::access::intercept::authorization_filter::AuthorizationFilter;
+use crate::web::access::intercept::AuthorizationFilter;
 use crate::web::default_security_filter_chain::DefaultSecurityFilterChain;
-use crate::web::util::matcher::request_matcher_entry::RequestMatcherEntry;
+use crate::web::util::matcher::RequestMatcherEntry;
+use crate::{
+    access::hierarchicalroles::role_hierarchy::RoleHierarchy, authorization::AuthorizationResult,
+    core::Authentication,
+};
 use crate::{
     access::intercept::request_authorization_context::RequestAuthorizationContext,
     authorization::{
-        authenticated_authorization_manager::AuthenticatedAuthorizationManager,
-        authority_authorization_manager::AuthorityAuthorizationManager,
-        authorization_event_publisher::AuthorizationEventPublisher,
-        authorization_manager::{AuthorizationManager, DefaultAuthorizationManager},
+        AuthenticatedAuthorizationManager, AuthorityAuthorizationManager,
+        AuthorizationEventPublisher, AuthorizationManager, DefaultAuthorizationManager,
     },
     config::{
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::util::matcher::{
-            ant_path_request_matcher::AntPathRequestMatcher,
-            any_request_matcher::AnyRequestMatcher, request_matcher::RequestMatcher,
-        },
     },
-    web::access::intercept::request_matcher_delegating_authorization_manager::RequestMatcherDelegatingAuthorizationManagerBuilder,
+    web::access::intercept::RequestMatcherDelegatingAuthorizationManagerBuilder,
+    web::util::matcher::{AntPathRequestMatcher, AnyRequestMatcher, RequestMatcher},
 };
 
 const ROLE_PREFIX: &str = "ROLE_";
@@ -41,9 +41,9 @@ struct NullAuthorizationEventPublisher;
 impl AuthorizationEventPublisher for NullAuthorizationEventPublisher {
     fn publish_authorization_event(
         &self,
-        _authentication: std::sync::Arc<dyn crate::core::authentication::Authentication>,
-        _object_description: &str,
-        _result: Option<std::sync::Arc<dyn crate::authorization::authorization_result::AuthorizationResult>>,
+        authentication: Arc<dyn Authentication>,
+        var: (),
+        result: Option<Box<dyn AuthorizationResult>>,
     ) {
     }
 }
@@ -129,7 +129,7 @@ where
 struct RegistryState {
     any_request_configured: bool,
     manager_builder: RequestMatcherDelegatingAuthorizationManagerBuilder,
-    unmapped_matchers: Option<Vec<Box<dyn RequestMatcher>>>,
+    unmapped_matchers: Option<Vec<Arc<dyn RequestMatcher>>>,
     mapping_count: u32,
     should_filter_all_dispatcher_types: bool,
 }
@@ -170,7 +170,10 @@ impl Default for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
 impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     pub fn any_request(&mut self) -> AuthorizedUrl {
         {
-            let state = self.state.lock().expect("authorization registry lock poisoned");
+            let state = self
+                .state
+                .lock()
+                .expect("authorization registry lock poisoned");
             assert!(
                 !state.any_request_configured,
                 "Can't configure anyRequest after itself"
@@ -187,14 +190,17 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
 
     pub fn request_matchers(&mut self, matcher: impl RequestMatcher + Any) -> AuthorizedUrl {
         {
-            let state = self.state.lock().expect("authorization registry lock poisoned");
+            let state = self
+                .state
+                .lock()
+                .expect("authorization registry lock poisoned");
             assert!(
                 !state.any_request_configured,
                 "Can't configure requestMatchers after anyRequest"
             );
         }
 
-        let mut matchers: Vec<Box<dyn RequestMatcher>> = Vec::new();
+        let mut matchers: Vec<Arc<dyn RequestMatcher>> = Vec::new();
         let any: &dyn Any = &matcher;
 
         let (http_method, patterns) = if let Some(http_method) = any.downcast_ref::<HttpMethod>() {
@@ -212,7 +218,10 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
         };
 
         for pattern in patterns {
-            matchers.push(Box::new(AntPathRequestMatcher::from((http_method, pattern))));
+            matchers.push(Arc::new(AntPathRequestMatcher::from((
+                http_method,
+                pattern,
+            ))));
         }
 
         self.chain_request_matchers(matchers)
@@ -220,10 +229,13 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
 
     fn add_mapping(
         &mut self,
-        matcher: Box<dyn RequestMatcher>,
+        matcher: Arc<dyn RequestMatcher>,
         manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
     ) {
-        let mut state = self.state.lock().expect("authorization registry lock poisoned");
+        let mut state = self
+            .state
+            .lock()
+            .expect("authorization registry lock poisoned");
         state.unmapped_matchers = None;
         state.manager_builder.add(matcher, manager);
         state.mapping_count += 1;
@@ -231,10 +243,13 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
 
     pub fn add_first(
         &mut self,
-        matcher: Box<dyn RequestMatcher>,
+        matcher: Arc<dyn RequestMatcher>,
         manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
     ) {
-        let mut state = self.state.lock().expect("authorization registry lock poisoned");
+        let mut state = self
+            .state
+            .lock()
+            .expect("authorization registry lock poisoned");
         state.unmapped_matchers = None;
         state
             .manager_builder
@@ -246,7 +261,10 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     pub fn create_authorization_manager(
         &self,
     ) -> Arc<dyn AuthorizationManager<RequestAuthorizationContext>> {
-        let state = self.state.lock().expect("authorization registry lock poisoned");
+        let state = self
+            .state
+            .lock()
+            .expect("authorization registry lock poisoned");
         assert!(
             state.unmapped_matchers.is_none(),
             "An incomplete mapping was found"
@@ -260,7 +278,7 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
 
     pub fn chain_request_matchers(
         &mut self,
-        request_matchers: Vec<Box<dyn RequestMatcher>>,
+        request_matchers: Vec<Arc<dyn RequestMatcher>>,
     ) -> AuthorizedUrl {
         self.state
             .lock()
@@ -277,7 +295,7 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
 
 #[derive(Clone)]
 pub struct AuthorizedUrl {
-    matchers: Vec<Box<dyn RequestMatcher>>,
+    matchers: Vec<Arc<dyn RequestMatcher>>,
     ref_matcher_registry: AuthorizationManagerRequestMatcherRegistry,
     role_hierarchy: Arc<dyn RoleHierarchy>,
 }

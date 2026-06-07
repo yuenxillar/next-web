@@ -1,16 +1,12 @@
 use std::collections::HashMap;
 
-use crate::{
-    core::filter::Filter,
-    web::{
-        access::{
-            error_translation_filter::ErrorTranslationFilter,
-            intercept::authorization_filter::AuthorizationFilter,
-        },
-        authentication::{
-            logout::logout_filter::LogoutFilter,
-            ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
-        },
+use next_web_core::traits::filter::HttpFilter;
+
+use crate::web::{
+    access::{intercept::AuthorizationFilter, ErrorTranslationFilter},
+    authentication::{
+        logout::LogoutFilter,
+        ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
     },
 };
 
@@ -20,13 +16,13 @@ pub struct FilterOrderRegistration {
 }
 
 impl FilterOrderRegistration {
-    pub fn put<F: Filter>(&mut self, position: i32) {
+    pub fn put<F: HttpFilter>(&mut self, position: i32) {
         self.filter_to_order
             .entry(std::any::type_name::<F>().to_string())
             .or_insert(position);
     }
 
-    pub fn get_order<F: Filter>(&self) -> Option<i32> {
+    pub fn get_order<F: HttpFilter>(&self) -> Option<i32> {
         self.filter_to_order
             .get(std::any::type_name::<F>())
             .map(|v| *v)

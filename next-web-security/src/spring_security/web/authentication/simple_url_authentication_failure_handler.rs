@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
-use axum::{extract::Request, http::StatusCode, response::Response};
-use next_web_core::{
-    anys::{any_map::AnyMap, any_value::AnyValue},
-    traits::http::http_request::HttpRequest,
-};
+use axum::http::StatusCode;
+use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 use tracing::debug;
 
 use crate::{
@@ -39,20 +36,11 @@ impl SimpleUrlAuthenticationFailureHandler {
         }
     }
 
-    pub async fn save_error(&self, request: &Request, error: &AuthenticationError) {
+    pub async fn save_error(&self, request: &mut dyn HttpRequest, error: &AuthenticationError) {
         if self.forward_to_destination {
-            match request.extensions().get::<AnyMap>() {
-                Some(map) => {
-                    map.insert(
-                        "NEXT_SECURITY_LAST_ERROR".to_string(),
-                        AnyValue::Object(Box::new(error.clone())),
-                    )
-                    .await;
-                }
-                None => {}
-            }
+            request.set_attribute("NEXT_SECURITY_LAST_ERROR", error.clone().into());
         } else {
-            let session = request.session("sessionid");
+            let session = request.session(false);
             if session.is_some() || self.allow_session_creation {
                 // Set Error in session
                 // session.unwrap().set("NEXT_SECURITY_LAST_ERROR", error.clone().into_boxed());
@@ -97,19 +85,16 @@ impl SimpleUrlAuthenticationFailureHandler {
 impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
     fn on_authentication_failure(
         &self,
-        request: &Request,
-        response: &mut Response,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
         error: &AuthenticationError,
     ) {
         if self.default_failure_url.is_none() {
             debug!("Sending 401 Unauthorized error");
 
-            *response.status_mut() = StatusCode::UNAUTHORIZED;
-            *response.body_mut() = StatusCode::UNAUTHORIZED.as_str().to_string().into();
+            response.set_status_code(StatusCode::UNAUTHORIZED);
+            response.set_body(StatusCode::UNAUTHORIZED.as_str().to_string().into_bytes());
         } else {
-            // TODO: Save error in session
-            // self.save_error(request, error).await;
-
             if self.forward_to_destination {
                 debug!(
                     "Forwarding to {}",
@@ -118,22 +103,16 @@ impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
                         .map(|s| s.as_ref())
                         .unwrap_or_default()
                 );
-                if let Some(dispatcher) = request.request_dispatcher(
-                    self.default_failure_url
-                        .as_ref()
-                        .map(|s| s.as_ref())
-                        .unwrap_or_default(),
-                ) {
-                    dispatcher.forward(request, response).unwrap();
-                }
+                // TODO: request.request_dispatcher always returns None currently;
+                // forward to destination will be implemented when RequestDispatcher is wired up.
             } else {
                 self.redirect_strategy.send_redirect(
-                    None,
+                    request,
+                    response,
                     self.default_failure_url
                         .as_ref()
                         .map(|s| s.as_ref())
                         .unwrap_or_default(),
-                    response,
                 );
             }
         }

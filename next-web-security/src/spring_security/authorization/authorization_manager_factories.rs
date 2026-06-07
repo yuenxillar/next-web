@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     authorization::default_authorization_manager_factory::DefaultAuthorizationManagerFactory,
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 /// Creates common AuthorizationManagerFactory instances.

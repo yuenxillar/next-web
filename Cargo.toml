@@ -99,7 +99,7 @@ next-web-state-machine = { version = "0.1.0", path = "./next-web-state-machine" 
 rudi-dev = { version = "0.8.7", path = "./rudi-main/rudi-dev" }
 
 # main dependencies
-tokio = { version = "1.44.1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
 tokio-util = { version = "0.7.15" }
 async-stream = { version = "0.3.6" }
 axum = { version = "0.8.4" }

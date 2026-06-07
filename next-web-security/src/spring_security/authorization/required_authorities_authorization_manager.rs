@@ -6,9 +6,9 @@ use crate::{
     authorization::{
         all_authorities_authorization_manager::AllAuthoritiesAuthorizationManager,
         authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
-        required_authorities_repository::RequiredAuthoritiesRepository,
+        required_authorities_repository::RequiredAuthoritiesRepository, AuthorizationResult,
     },
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 pub struct RequiredAuthoritiesAuthorizationManager<T> {
@@ -30,19 +30,27 @@ impl<T> AuthorizationManager<T> for RequiredAuthoritiesAuthorizationManager<T>
 where
     T: Send + Sync + 'static,
 {
-    async fn check(
+    // async fn check(
+    //     &self,
+    //     authentication: Box<dyn Authentication>,
+    //     object: T,
+    // ) -> Option<AuthorizationDecision> {
+    //     let required = self
+    //         .authorities
+    //         .find_required_authorities(&authentication.get_name());
+    //     if required.is_empty() {
+    //         return Some(AuthorizationDecision::new(true));
+    //     }
+    //     AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(required)
+    //         .check(authentication, object)
+    //         .await
+    // }
+
+    async fn authorize(
         &self,
-        authentication: Box<dyn Authentication>,
-        object: T,
-    ) -> Option<AuthorizationDecision> {
-        let required = self
-            .authorities
-            .find_required_authorities(&authentication.get_name());
-        if required.is_empty() {
-            return Some(AuthorizationDecision::new(true));
-        }
-        AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(required)
-            .check(authentication, object)
-            .await
+        authentication: &dyn Authentication,
+        var: &mut T,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        todo!()
     }
 }

@@ -9,7 +9,7 @@ use crate::{
         security_configurer_adapter::SecurityConfigurerAdapter,
         web::{
             configurers::{
-                abstract_authentication_filter_configurer::{
+                base_authentication_filter_configurer::{
                     AbstractAuthenticationFilterConfigurer, AuthenticationFilterConfigurer,
                 },
                 base_http_configurer::BaseHttpConfigurer,
@@ -44,7 +44,7 @@ where
         UsernamePasswordAuthenticationFilter,
     >,
 
-    abstract_http_configurer: BaseHttpConfigurer<FormLoginConfigurer<H>, H>,
+    abstract_http_configurer: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> FormLoginConfigurer<H>

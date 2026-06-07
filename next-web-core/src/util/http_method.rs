@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, Default, Hash, PartialEq, Eq, Copy)]
 pub enum HttpMethod {
     #[default]
     Get,
@@ -28,6 +28,7 @@ impl ToString for HttpMethod {
         .to_string()
     }
 }
+
 impl FromStr for HttpMethod {
     type Err = &'static str;
 

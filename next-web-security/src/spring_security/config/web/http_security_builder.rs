@@ -1,10 +1,9 @@
 use std::borrow::Cow;
 
-use next_web_core::traits::any_clone::AnyClone;
+use next_web_core::traits::{any_clone::AnyClone, filter::HttpFilter};
 
 use crate::{
     config::{security_builder::SecurityBuilder, security_configurer::SecurityConfigurer},
-    core::filter::Filter,
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
 
@@ -22,17 +21,17 @@ where
 
     fn get_mut_shared_object<T>(&mut self) -> Option<&mut T>;
 
-    fn add_filter<F: Filter>(self, filter: F) -> Self;
+    fn add_filter<F: HttpFilter>(&mut self, filter: F);
 
     fn add_filter_after<F, F1>(self, filter: F, after_filter: F1) -> Self
     where
-        F: Filter,
-        F1: Filter;
+        F: HttpFilter,
+        F1: HttpFilter;
 
     fn add_filter_before<F, F1>(self, filter: F, before_filter: F1) -> Self
     where
-        F: Filter,
-        F1: Filter;
+        F: HttpFilter,
+        F1: HttpFilter;
 
     fn set_shared_object<N, C>(&self, name: N, object: C)
     where

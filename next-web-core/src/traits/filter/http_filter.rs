@@ -8,7 +8,7 @@ use crate::{
     traits::{
         filter::http_filter_chain::HttpFilterChain,
         http::{http_request::HttpRequest, http_response::HttpResponse},
-        nameable::Nameable,
+        named::Named,
     },
 };
 
@@ -17,7 +17,7 @@ pub trait HttpFilter
 where
     Self: Send + Sync,
     Self: Any + DynClone,
-    Self: Nameable,
+    Self: Named,
 {
     async fn do_filter(
         &self,

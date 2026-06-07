@@ -9,8 +9,8 @@ use crate::{
         hierarchicalroles::role_hierarchy::RoleHierarchy,
         permission_evaluator::PermissionEvaluator,
     },
-    authorization::authentication_trust_resolver::AuthenticationTrustResolver,
-    core::authentication::Authentication,
+    authorization::AuthenticationTrustResolver,
+    core::Authentication,
 };
 
 use super::{

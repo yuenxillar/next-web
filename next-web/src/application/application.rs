@@ -19,7 +19,7 @@ use next_web_core::traits::application::application_lifecycle::ApplicationLifecy
 use next_web_core::traits::apply_router::ApplyRouter;
 use next_web_core::traits::config::auto_configuration::AutoConfiguration;
 use next_web_core::traits::error_solver::ErrorSolver;
-use next_web_core::traits::filter::http_filter::HttpFilter;
+use next_web_core::traits::filter::HttpFilter;
 use next_web_core::traits::properties_post_processor::PropertiesPostProcessor;
 use next_web_core::traits::service::background_service::BackgroundService;
 use next_web_core::traits::use_router::UseRouter;
@@ -84,26 +84,6 @@ where
         &self,
         ctx: &mut ApplicationContext,
         properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn Error>>;
-
-    /// Register the rpc server.
-    #[cfg(feature = "enable-grpc")]
-    async fn register_rpc_server(
-        &self,
-        ctx: &mut ApplicationContext,
-        application_properties: &ApplicationProperties,
-        application_args: &ApplicationArgs,
-        application_resources: &ApplicationResources,
-    ) -> Result<(), Box<dyn Error>>;
-
-    /// Register the grpc client.
-    #[cfg(feature = "enable-grpc")]
-    async fn connect_rpc_client(
-        &self,
-        ctx: &mut ApplicationContext,
-        application_properties: &ApplicationProperties,
-        application_args: &ApplicationArgs,
-        application_resources: &ApplicationResources,
     ) -> Result<(), Box<dyn Error>>;
 
     /// Show the banner of the application.
@@ -856,19 +836,6 @@ where
             // Init middleware
             application.init_middleware(&mut ctx, properties).await?;
             info!("Middleware initialized");
-
-            #[cfg(feature = "enable-grpc")]
-            {
-                application
-                    .register_rpc_server(&mut ctx, properties, args, resources)
-                    .await?;
-                info!("gRPC server started");
-
-                application
-                    .connect_rpc_client(&mut ctx, properties, args, resources)
-                    .await?;
-                info!("gRPC client connected",);
-            }
 
             // Run all background service
             application.run_services(&mut ctx).await?;

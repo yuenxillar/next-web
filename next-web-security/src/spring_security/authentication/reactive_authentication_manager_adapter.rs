@@ -4,8 +4,8 @@ use next_web_core::async_trait;
 
 use crate::{
     authentication::reactive_authentication_manager::ReactiveAuthenticationManager,
-    authorization::authentication_manager::AuthenticationManager,
-    core::{authentication::Authentication, authentication_error::AuthenticationError},
+    authorization::AuthenticationManager,
+    core::{Authentication, authentication_error::AuthenticationError},
 };
 
 pub struct ReactiveAuthenticationManagerAdapter {

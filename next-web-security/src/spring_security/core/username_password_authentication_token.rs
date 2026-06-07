@@ -3,7 +3,7 @@ use std::sync::Arc;
 use next_web_core::anys::any_value::AnyValue;
 
 use crate::core::{
-    authentication::Authentication, credentials_container::CredentialsContainer,
+    Authentication, credentials_container::CredentialsContainer,
     granted_authority::GrantedAuthority,
 };
 
@@ -116,7 +116,7 @@ fn block_on<F: std::future::Future>(future: F) -> F::Output {
 #[cfg(test)]
 mod tests {
     use crate::core::{
-        authority_utils::AuthorityUtils, authentication::Authentication,
+        authority_utils::AuthorityUtils, Authentication,
         credentials_container::CredentialsContainer,
     };
 

@@ -2,7 +2,7 @@ use next_web_core::anys::any_value::AnyValue;
 
 use crate::{
     access::permission_evaluator::PermissionEvaluator,
-    core::authentication::Authentication,
+    core::Authentication,
 };
 
 #[derive(Clone, Debug, Default)]

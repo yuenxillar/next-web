@@ -1,4 +1,4 @@
-pub mod abstract_request_matcher_registry;
+pub mod base_request_matcher_registry;
 pub mod builders;
 pub mod configurers;
 pub mod http_security;

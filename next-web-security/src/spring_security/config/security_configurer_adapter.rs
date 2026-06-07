@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::any::Any;
 
-use next_web_core::{anys::any_value::AnyValue, traits::any_clone::AnyClone};
+use next_web_core::traits::any_clone::AnyClone;
 
 use crate::config::{
     object_post_processor::ObjectPostProcessor, security_builder::SecurityBuilder,
@@ -25,12 +25,8 @@ where
     O: Send + Sync,
     Self: SecurityConfigurer<O, B>,
 {
-    pub fn post_process<T>(&self, object: T)
-    where
-        T: AnyClone,
-    {
-        self.composite_object_post_processor
-            .post_process(AnyValue::Object(Box::new(object)));
+    pub fn post_process(&mut self, object: &mut dyn Any) {
+        self.composite_object_post_processor.post_process(object);
     }
 
     pub fn get_builder(&self) -> Option<B>
@@ -45,24 +41,23 @@ where
 
 #[derive(Clone)]
 pub struct CompositeObjectPostProcessor {
-    post_processors: Vec<Arc<dyn ObjectPostProcessor<AnyValue>>>,
+    post_processors: Vec<Box<dyn AnyClone>>,
 }
 
 impl CompositeObjectPostProcessor {
-    fn add_object_post_processor(&mut self, var: impl ObjectPostProcessor<AnyValue> + 'static) {
-        self.post_processors.push(Arc::new(var));
+    fn add_object_post_processor<T>(&mut self, object_post_processor: T)
+    where
+        T: ObjectPostProcessor<dyn Any>,
+    {
+        // self.post_processors.push(Box::new(object_post_processor));
+
+        todo!()
     }
 }
 
-impl ObjectPostProcessor<AnyValue> for CompositeObjectPostProcessor {
-    fn post_process(&self, object: AnyValue) -> Option<AnyValue> {
-        let mut value = Some(object);
-        for opp in self.post_processors.iter().map(AsRef::as_ref) {
-            if let Some(val) = value {
-                value = opp.post_process(val);
-            }
-        }
-        value
+impl ObjectPostProcessor<dyn Any> for CompositeObjectPostProcessor {
+    fn post_process(&mut self, object: &mut dyn Any) {
+        todo!()
     }
 }
 
