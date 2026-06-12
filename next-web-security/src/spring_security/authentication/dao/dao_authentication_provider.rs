@@ -12,16 +12,18 @@ use crate::{
         password::compromised_password_checker::CompromisedPasswordChecker,
     },
     core::{
-        Authentication,
         authentication_error::AuthenticationError,
         userdetails::{
             user_details::UserDetails,
-            user_details_password_service::{NoopUserDetailsPasswordService, UserDetailsPasswordService},
+            user_details_password_service::{
+                NoopUserDetailsPasswordService, UserDetailsPasswordService,
+            },
             user_details_service::UserDetailsService,
         },
         username_password_authentication_token::UsernamePasswordAuthenticationToken,
+        Authentication,
     },
-    crypto::{bcrypt::BCryptPasswordEncoder, password::password_encoder::PasswordEncoder},
+    crypto::{bcrypt::BCryptPasswordEncoder, password::PasswordEncoder},
 };
 
 pub struct DaoAuthenticationProvider {
@@ -114,10 +116,9 @@ impl DaoAuthenticationProvider {
     }
 
     fn prepare_timing_attack_protection(&self) -> Result<(), AuthenticationError> {
-        let mut encoded_password = self
-            .user_not_found_encoded_password
-            .lock()
-            .map_err(|_| internal_authentication_service("User-not-found password cache was poisoned"))?;
+        let mut encoded_password = self.user_not_found_encoded_password.lock().map_err(|_| {
+            internal_authentication_service("User-not-found password cache was poisoned")
+        })?;
         if encoded_password.is_none() {
             *encoded_password = Some(
                 self.password_encoder
@@ -128,10 +129,7 @@ impl DaoAuthenticationProvider {
         Ok(())
     }
 
-    fn mitigate_against_timing_attack(
-        &self,
-        authentication: &UsernamePasswordAuthenticationToken,
-    ) {
+    fn mitigate_against_timing_attack(&self, authentication: &UsernamePasswordAuthenticationToken) {
         let Some(credentials) = authentication.get_credentials() else {
             return;
         };
@@ -139,7 +137,9 @@ impl DaoAuthenticationProvider {
             return;
         };
         if let Some(encoded_password) = encoded_password.as_deref() {
-            let _ = self.password_encoder.matches(&credentials, encoded_password);
+            let _ = self
+                .password_encoder
+                .matches(&credentials, encoded_password);
         }
     }
 
@@ -153,7 +153,9 @@ impl DaoAuthenticationProvider {
         };
         let existing_encoded_password = user.get_password().await;
         if existing_encoded_password.is_empty()
-            || !self.password_encoder.upgrade_encoding(&existing_encoded_password)
+            || !self
+                .password_encoder
+                .upgrade_encoding(&existing_encoded_password)
         {
             return user;
         }
@@ -279,15 +281,14 @@ mod tests {
             authority_utils::AuthorityUtils,
             user_cache::InMemoryUserCache,
             userdetails::{
-                user::User,
-                user_details::UserDetails,
+                user::User, user_details::UserDetails,
                 user_details_password_service::UserDetailsPasswordService,
                 user_details_service::UserDetailsService,
                 username_not_found_error::UsernameNotFoundError,
             },
             username_password_authentication_token::UsernamePasswordAuthenticationToken,
         },
-        crypto::password::password_encoder::PasswordEncoder,
+        crypto::password::PasswordEncoder,
     };
 
     use super::DaoAuthenticationProvider;
@@ -389,7 +390,10 @@ mod tests {
 
         assert!(authentication.is_authenticated());
         assert_eq!(authentication.get_name(), "alice");
-        assert_eq!(authentication.authorities(), vec![String::from("ROLE_USER")]);
+        assert_eq!(
+            authentication.authorities(),
+            vec![String::from("ROLE_USER")]
+        );
     }
 
     #[tokio::test]

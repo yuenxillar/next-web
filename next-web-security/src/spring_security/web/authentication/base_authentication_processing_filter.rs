@@ -11,21 +11,20 @@ use crate::{
     authorization::AuthenticationManager,
     core::{
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
-        context::{security_context_holder::SecurityContextHolder, SecurityContext},
+        context::security_context_holder::SecurityContextHolder,
         Authentication,
     },
     web::authentication::{
         authentication_failure_handler::AuthenticationFailureHandler,
         authentication_success_handler::AuthenticationSuccessHandler,
-        preauth::base_pre_authenticated_processing_filter::NEXT_SECURITY_AUTHENTICATION,
         remember_me_services::RememberMeServices,
-        rememberme::abstract_remember_me_services::AbstractRememberMeServices,
+        rememberme::base_remember_me_services::BaseRememberMeServices,
     },
     web::util::matcher::RequestMatcher,
 };
 
 #[derive(Clone)]
-pub struct AbstractAuthenticationProcessingFilter {
+pub struct BaseAuthenticationProcessingFilter {
     authentication_manager: Option<Arc<dyn AuthenticationManager>>,
     success_handler: Option<Arc<dyn AuthenticationSuccessHandler>>,
     failure_handler: Option<Arc<dyn AuthenticationFailureHandler>>,
@@ -33,19 +32,19 @@ pub struct AbstractAuthenticationProcessingFilter {
     requires_authentication_request_matcher: Option<Arc<dyn RequestMatcher>>,
 }
 
-impl Default for AbstractAuthenticationProcessingFilter {
+impl Default for BaseAuthenticationProcessingFilter {
     fn default() -> Self {
         Self {
             authentication_manager: None,
             success_handler: None,
             failure_handler: None,
-            remember_me_services: Arc::new(AbstractRememberMeServices {}),
+            remember_me_services: Arc::new(BaseRememberMeServices {}),
             requires_authentication_request_matcher: None,
         }
     }
 }
 
-impl AbstractAuthenticationProcessingFilter {
+impl BaseAuthenticationProcessingFilter {
     pub fn get_remember_me_services(&self) -> &dyn RememberMeServices {
         self.remember_me_services.as_ref()
     }
@@ -142,7 +141,7 @@ impl AbstractAuthenticationProcessingFilter {
     }
 }
 
-impl AbstractAuthenticationProcessingFilter {
+impl BaseAuthenticationProcessingFilter {
     pub fn set_requires_authentication_request_matcher(
         &mut self,
         request_matcher: impl RequestMatcher + 'static,

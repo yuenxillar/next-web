@@ -29,7 +29,7 @@ where
         self.composite_object_post_processor.post_process(object);
     }
 
-    pub fn get_builder(&self) -> Option<B>
+    pub fn get_builder(&mut self) -> Option<&mut B>
     where
         B: Clone,
     {

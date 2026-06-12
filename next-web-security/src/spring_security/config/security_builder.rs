@@ -3,5 +3,5 @@ where
     Self: Send + Sync,
     O: Send + Sync,
 {
-    fn build(&self) -> O;
+    fn build(&mut self) -> O;
 }

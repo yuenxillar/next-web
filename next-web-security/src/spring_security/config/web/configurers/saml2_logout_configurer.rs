@@ -1,4 +1,4 @@
-use next_web_core::traits::required::Required;
+use next_web_core::{traits::required::Required, ApplicationContext};
 
 use crate::{
     config::{
@@ -38,6 +38,10 @@ where
     H: HttpSecurityBuilder<H>,
     Self: Required<BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>>,
 {
+    pub fn new(ctx: &ApplicationContext) -> Self {
+        Self::default()
+    }
+
     /// Set the RP-initiated logout URL.
     /// Default: `"/logout/saml2/slo"`.
     pub fn logout_url(mut self, url: &str) -> Self {
@@ -59,8 +63,7 @@ where
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>>
-    for Saml2LogoutConfigurer<H>
+impl<H> Required<BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>> for Saml2LogoutConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
@@ -68,9 +71,7 @@ where
         &self.base_http_configurer
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H> {
+    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H> {
         &mut self.base_http_configurer
     }
 }
@@ -85,9 +86,7 @@ where
         self.base_http_configurer.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_mut_object()
     }
 }

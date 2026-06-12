@@ -128,7 +128,7 @@ where
         self
     }
 
-    pub fn spa(mut self) -> Self {
+    pub fn spa(&mut self) -> &mut Self {
         self.csrf_token_repository = Arc::new(CookieCsrfTokenRepository::with_http_only_false());
         self.request_handler = Some(Arc::new(SpaCsrfTokenRequestHandler::default()));
 
@@ -139,6 +139,7 @@ where
 impl<H> CsrfConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
+    H: 'static,
 {
     fn get_require_csrf_protection_matcher(&self) -> Arc<dyn RequestMatcher> {
         if self.ignored_csrf_protection_matchers.is_empty() {
@@ -219,6 +220,7 @@ where
 impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for CsrfConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
+    H: 'static,
 {
     fn init(&mut self, _http: &mut H) {}
 

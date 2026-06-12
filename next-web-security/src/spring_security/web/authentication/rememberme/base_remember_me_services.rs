@@ -7,15 +7,15 @@ use crate::{core::Authentication, web::authentication::remember_me_services::Rem
 /// Base implementation of `RememberMeServices`.
 /// Subclasses should override `auto_login` with actual token processing logic.
 #[derive(Clone)]
-pub struct AbstractRememberMeServices {}
+pub struct BaseRememberMeServices {}
 
-impl AbstractRememberMeServices {
+impl BaseRememberMeServices {
     pub fn get_parameter(&self) -> &str {
         "remember-me"
     }
 }
 
-impl RememberMeServices for AbstractRememberMeServices {
+impl RememberMeServices for BaseRememberMeServices {
     fn auto_login(
         &self,
         _request: &dyn HttpRequest,

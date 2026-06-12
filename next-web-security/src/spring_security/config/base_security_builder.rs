@@ -1,50 +1,62 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
+use std::{
+    marker::PhantomData,
+    ops::DerefMut,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
-use crate::config::security_builder::SecurityBuilder;
-
 #[derive(Clone)]
-pub struct AbstractSecurityBuilder<O>
+pub struct BaseSecurityBuilder<O>
 where
     O: Send + Sync,
-    Self: SecurityBuilder<O>,
 {
-    building: Arc<AtomicBool>,
-    object: Arc<Mutex<Option<O>>>,
+    pub(crate) building: Arc<AtomicBool>,
+
+    _marker: PhantomData<O>,
 }
 
-impl<O> AbstractSecurityBuilder<O>
+impl<O> BaseSecurityBuilder<O>
 where
     O: Send + Sync,
 {
     pub fn new() -> Self {
-        AbstractSecurityBuilder {
+        Self {
             building: Arc::new(AtomicBool::new(false)),
-            object: Arc::new(Mutex::new(None)),
+            _marker: PhantomData,
         }
     }
 
-    pub fn set_object(&mut self, object: O) {
-        *self.object.lock().expect("security builder lock poisoned") = Some(object);
-    }
-}
-
-impl<O> SecurityBuilder<O> for AbstractSecurityBuilder<O>
-where
-    O: Send + Sync,
-{
-    fn build(&self) -> O {
+    pub fn build<C>(c: &mut C) -> O
+    where
+        C: DerefMut<Target = Self>,
+        C: BaseSecurityBuilderExt<O>,
+    {
         assert!(
-            !self.building.swap(true, Ordering::SeqCst),
+            !c.building.swap(true, Ordering::SeqCst),
             "This object has already been built"
         );
 
-        self.object
-            .lock()
-            .expect("security builder lock poisoned")
-            .take()
-            .expect("No object has been configured for this security builder")
+        c.do_build()
     }
+}
+
+impl<O> Default for BaseSecurityBuilder<O>
+where
+    O: Send + Sync,
+{
+    fn default() -> Self {
+        Self {
+            building: Arc::new(Default::default()),
+            _marker: PhantomData,
+        }
+    }
+}
+
+pub trait BaseSecurityBuilderExt<O>
+where
+    O: Send + Sync,
+{
+    fn do_build(&mut self) -> O;
 }

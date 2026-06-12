@@ -1,4 +1,4 @@
-use next_web_core::traits::required::Required;
+use next_web_core::{traits::required::Required, ApplicationContext};
 
 use crate::{
     config::{
@@ -35,6 +35,16 @@ where
     base_http_configurer: BaseHttpConfigurer<OAuth2ResourceServerConfigurer<H>, H>,
 }
 
+impl<H> OAuth2ResourceServerConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+    Self: Required<BaseHttpConfigurer<OAuth2ResourceServerConfigurer<H>, H>>,
+{
+    pub fn new(ctx: &ApplicationContext) -> Self {
+        Self::default()
+    }
+}
+
 impl<H> Default for OAuth2ResourceServerConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
@@ -56,9 +66,7 @@ where
         &self.base_http_configurer
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut BaseHttpConfigurer<OAuth2ResourceServerConfigurer<H>, H> {
+    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<OAuth2ResourceServerConfigurer<H>, H> {
         &mut self.base_http_configurer
     }
 }
@@ -73,15 +81,12 @@ where
         self.base_http_configurer.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_mut_object()
     }
 }
 
-impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H>
-    for OAuth2ResourceServerConfigurer<H>
+impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for OAuth2ResourceServerConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {

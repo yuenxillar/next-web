@@ -18,7 +18,7 @@ use crate::{
         authentication::{
             remember_me_authentication_filter::RememberMeAuthenticationFilter,
             remember_me_services::RememberMeServices,
-            rememberme::abstract_remember_me_services::AbstractRememberMeServices,
+            rememberme::base_remember_me_services::BaseRememberMeServices,
         },
         default_security_filter_chain::DefaultSecurityFilterChain,
     },
@@ -56,10 +56,7 @@ where
     }
 
     /// Set a custom `RememberMeServices` implementation.
-    pub fn remember_me_services(
-        mut self,
-        services: Arc<dyn RememberMeServices>,
-    ) -> Self {
+    pub fn remember_me_services(mut self, services: Arc<dyn RememberMeServices>) -> Self {
         self.remember_me_services = Some(services);
         self
     }
@@ -105,7 +102,7 @@ where
     fn get_remember_me_services(&self) -> Arc<dyn RememberMeServices> {
         self.remember_me_services
             .clone()
-            .unwrap_or_else(|| Arc::new(AbstractRememberMeServices {}))
+            .unwrap_or_else(|| Arc::new(BaseRememberMeServices {}))
     }
 }
 
@@ -128,8 +125,7 @@ where
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<RememberMeConfigurer<H>, H>>
-    for RememberMeConfigurer<H>
+impl<H> Required<BaseHttpConfigurer<RememberMeConfigurer<H>, H>> for RememberMeConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
@@ -137,9 +133,7 @@ where
         &self.base_http_configurer
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut BaseHttpConfigurer<RememberMeConfigurer<H>, H> {
+    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<RememberMeConfigurer<H>, H> {
         &mut self.base_http_configurer
     }
 }
@@ -154,9 +148,7 @@ where
         self.base_http_configurer.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_mut_object()
     }
 }
@@ -167,30 +159,27 @@ where
 {
     fn init(&mut self, http: &mut H) {
         // Register the RememberMeAuthenticationProvider
-        let provider =
-            RememberMeAuthenticationProvider::new(&self.get_key());
+        let provider = RememberMeAuthenticationProvider::new(&self.get_key());
         http.authentication_provider(provider);
 
         // Set RememberMeServices as a shared object
         let services = self.get_remember_me_services();
-        http.set_shared_object("remember_me_services", services);
+        http.set_shared_object(services);
     }
 
     fn configure(&mut self, http: &mut H) {
         // Obtain the AuthenticationManager from shared objects
-        let auth_manager: Arc<dyn AuthenticationManager> = match http
-            .get_shared_object::<Arc<dyn AuthenticationManager>>()
-        {
-            Some(m) => m.clone(),
-            None => panic!(
-                "AuthenticationManager is required for RememberMeConfigurer. \
+        let auth_manager: Arc<dyn AuthenticationManager> =
+            match http.get_shared_object::<Arc<dyn AuthenticationManager>>() {
+                Some(m) => m.clone(),
+                None => panic!(
+                    "AuthenticationManager is required for RememberMeConfigurer. \
                  Ensure authentication_manager() has been configured."
-            ),
-        };
+                ),
+            };
 
         let services = self.get_remember_me_services();
-        let filter =
-            RememberMeAuthenticationFilter::new(auth_manager, services);
+        let filter = RememberMeAuthenticationFilter::new(auth_manager, services);
         http.add_filter(filter);
     }
 }

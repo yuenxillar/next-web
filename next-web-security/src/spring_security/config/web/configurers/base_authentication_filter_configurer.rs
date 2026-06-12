@@ -18,9 +18,9 @@ use crate::{
     web::util::matcher::{AntPathRequestMatcher, RequestMatcher},
     web::{
         authentication::{
-            base_authentication_processing_filter::AbstractAuthenticationProcessingFilter,
             authentication_failure_handler::AuthenticationFailureHandler,
             authentication_success_handler::AuthenticationSuccessHandler,
+            base_authentication_processing_filter::BaseAuthenticationProcessingFilter,
             login_url_authentication_entry_point::LoginUrlAuthenticationEntryPoint,
             saved_request_aware_authentication_success_handler::SavedRequestAwareAuthenticationSuccessHandler,
             simple_url_authentication_failure_handler::SimpleUrlAuthenticationFailureHandler,
@@ -31,13 +31,12 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct AbstractAuthenticationFilterConfigurer<B, T, F>
+pub struct BaseAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
-    T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
+    T: Required<Self>,
     T: Required<BaseHttpConfigurer<T, B>>,
-    T: AuthenticationFilterConfigurer<B>,
-    F: Required<AbstractAuthenticationProcessingFilter>,
+    F: Required<BaseAuthenticationProcessingFilter>,
 {
     auth_filter: F,
 
@@ -54,20 +53,19 @@ where
     permit_all: bool,
     failure_url: Option<Box<str>>,
 
-    abstract_http_configurer: BaseHttpConfigurer<T, B>,
+    pub(super) base_http_configurer: BaseHttpConfigurer<T, B>,
 
     _marker_1: PhantomData<T>,
     _marker_2: PhantomData<B>,
 }
 
-impl<B, T, F> AbstractAuthenticationFilterConfigurer<B, T, F>
+impl<B, T, F> BaseAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
     B: Clone,
-    T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
+    T: Required<BaseAuthenticationFilterConfigurer<B, T, F>>,
     T: Required<BaseHttpConfigurer<T, B>>,
-    T: AuthenticationFilterConfigurer<B>,
-    F: Required<AbstractAuthenticationProcessingFilter>,
+    F: Required<BaseAuthenticationProcessingFilter>,
 {
     pub fn new(authentication_filter: F, default_login_processing_url: Option<Box<str>>) -> Self {
         let default_success_handler =
@@ -81,7 +79,7 @@ where
             auth_filter: authentication_filter,
             success_handler: default_success_handler,
 
-            abstract_http_configurer: BaseHttpConfigurer::new(),
+            base_http_configurer: BaseHttpConfigurer::new(),
             authentication_details_source: Default::default(),
             authentication_entry_point: Default::default(),
             custom_login_page: Default::default(),
@@ -95,9 +93,6 @@ where
             _marker_2: PhantomData,
         };
         configurer.set_login_page("/login");
-        if let Some(url) = default_login_processing_url {
-            configurer.login_processing_url(url.as_ref());
-        }
 
         configurer
     }
@@ -176,27 +171,29 @@ where
     }
 
     pub fn update_authentication_defaults(&mut self) {
-        let url = self.login_page.to_string();
-        if self.login_processing_url.is_none() {
-            self.login_processing_url(&url);
-        }
+        // let url = self.login_page.to_string();
+        // if self.login_processing_url.is_none() {
+        //     self.login_processing_url(&url);
+        // }
 
-        if self.failure_handler.is_none() {
-            self.failure_url(&format!("{}?error", url));
-        }
+        // if self.failure_handler.is_none() {
+        //     self.failure_url(&format!("{}?error", url));
+        // }
 
-        let abstract_http_configurer = self.get_object();
-        let security_configurer_adapter = abstract_http_configurer.get_object();
+        // let abstract_http_configurer = self.get_object();
+        // let security_configurer_adapter = abstract_http_configurer.get_object();
 
-        let logout_configurer = match security_configurer_adapter.get_builder() {
-            Some(builer) => builer.get_configurer::<LogoutConfigurer<B>>(),
-            None => None,
-        };
-        if let Some(mut logout_configurer) = logout_configurer {
-            if !logout_configurer.is_custom_logout_success() {
-                logout_configurer.logout_success_url(&format!("{}?logout", url));
-            }
-        }
+        // let logout_configurer = match security_configurer_adapter.get_builder() {
+        //     Some(builer) => builer.get_configurer::<LogoutConfigurer<B>>(),
+        //     None => None,
+        // };
+        // if let Some(mut logout_configurer) = logout_configurer {
+        //     if !logout_configurer.is_custom_logout_success() {
+        //         logout_configurer.logout_success_url(&format!("{}?logout", url));
+        //     }
+        // }
+        //
+        todo!()
     }
 
     pub fn update_access_defaults(&mut self, http: &mut B) {
@@ -217,31 +214,29 @@ where
     }
 }
 
-impl<B, T, F> Required<BaseHttpConfigurer<T, B>> for AbstractAuthenticationFilterConfigurer<B, T, F>
+impl<B, T, F> Required<BaseHttpConfigurer<T, B>> for BaseAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
-    T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
+    T: Required<BaseAuthenticationFilterConfigurer<B, T, F>>,
     T: Required<BaseHttpConfigurer<T, B>>,
-    T: AuthenticationFilterConfigurer<B>,
-    F: Required<AbstractAuthenticationProcessingFilter>,
+    F: Required<BaseAuthenticationProcessingFilter>,
 {
     fn get_object(&self) -> &BaseHttpConfigurer<T, B> {
-        &self.abstract_http_configurer
+        &self.base_http_configurer
     }
 
     fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<T, B> {
-        &mut self.abstract_http_configurer
+        &mut self.base_http_configurer
     }
 }
 
-impl<B, T, F> AuthenticationFilterConfigurer<T> for AbstractAuthenticationFilterConfigurer<B, T, F>
+impl<B, T, F> AuthenticationFilterConfigurer<T> for BaseAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
     B: Clone,
-    T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
+    T: Required<BaseAuthenticationFilterConfigurer<B, T, F>>,
     T: Required<BaseHttpConfigurer<T, B>>,
-    T: AuthenticationFilterConfigurer<B>,
-    F: Required<AbstractAuthenticationProcessingFilter>,
+    F: Required<BaseAuthenticationProcessingFilter>,
 {
     fn login_processing_url(&mut self, login_processing_url: &str) {
         self.login_processing_url = Some(login_processing_url.into());
@@ -260,16 +255,15 @@ where
 }
 
 impl<B, T, F> SecurityConfigurer<DefaultSecurityFilterChain, B>
-    for AbstractAuthenticationFilterConfigurer<B, T, F>
+    for BaseAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
     B: SecurityBuilder<DefaultSecurityFilterChain>,
     B: Clone,
-    T: Required<AbstractAuthenticationFilterConfigurer<B, T, F>>,
+    T: Required<BaseAuthenticationFilterConfigurer<B, T, F>>,
     T: Required<BaseHttpConfigurer<T, B>>,
-    T: AuthenticationFilterConfigurer<B>,
     T: Sync + Send,
-    F: Required<AbstractAuthenticationProcessingFilter> + Clone + Sync + Send,
+    F: Required<BaseAuthenticationProcessingFilter> + Clone + Sync + Send,
     F: next_web_core::traits::filter::HttpFilter,
 {
     fn init(&mut self, http: &mut B) {

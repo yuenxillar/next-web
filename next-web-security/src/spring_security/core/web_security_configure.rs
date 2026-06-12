@@ -7,7 +7,7 @@ where
     Self: DynClone,
     Self: Send + Sync,
 {
-    fn configure(self) -> HttpSecurity;
+    fn configure(&mut self) -> HttpSecurity;
 }
 
 next_web_core::clone_trait_object!(WebSecurityConfigure);

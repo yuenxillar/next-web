@@ -66,8 +66,7 @@ where
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<RequestCacheConfigurer<H>, H>>
-    for RequestCacheConfigurer<H>
+impl<H> Required<BaseHttpConfigurer<RequestCacheConfigurer<H>, H>> for RequestCacheConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
@@ -90,9 +89,7 @@ where
         self.base_http_configurer.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_mut_object()
     }
 }
@@ -104,7 +101,7 @@ where
     fn init(&mut self, http: &mut H) {
         // Set the RequestCache as a shared object
         let cache = self.get_request_cache(http);
-        http.set_shared_object("request_cache", cache);
+        http.set_shared_object(cache);
     }
 
     fn configure(&mut self, http: &mut H) {

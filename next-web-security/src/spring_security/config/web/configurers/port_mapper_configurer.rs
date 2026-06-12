@@ -70,8 +70,7 @@ where
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<PortMapperConfigurer<H>, H>>
-    for PortMapperConfigurer<H>
+impl<H> Required<BaseHttpConfigurer<PortMapperConfigurer<H>, H>> for PortMapperConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
@@ -79,9 +78,7 @@ where
         &self.base_http_configurer
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut BaseHttpConfigurer<PortMapperConfigurer<H>, H> {
+    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<PortMapperConfigurer<H>, H> {
         &mut self.base_http_configurer
     }
 }
@@ -96,9 +93,7 @@ where
         self.base_http_configurer.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_mut_object()
     }
 }
@@ -110,7 +105,7 @@ where
     fn init(&mut self, http: &mut H) {
         // Set PortMapper as a shared object for downstream configurers
         let mapper = self.get_port_mapper();
-        http.set_shared_object("port_mapper", mapper);
+        http.set_shared_object(mapper);
     }
 
     fn configure(&mut self, _http: &mut H) {

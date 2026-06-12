@@ -8,9 +8,8 @@ use next_web_core::{
     traits::required::Required, util::http_method::HttpMethod, ApplicationContext,
 };
 
-use crate::authorization::AuthorizationDecision;
 use crate::config::security_builder::SecurityBuilder;
-use crate::config::web::base_request_matcher_registry::AbstractRequestMatcherRegistry;
+use crate::config::web::base_request_matcher_registry::BaseRequestMatcherRegistry;
 use crate::config::web::http_security_builder::HttpSecurityBuilder;
 use crate::web::access::intercept::AuthorizationFilter;
 use crate::web::default_security_filter_chain::DefaultSecurityFilterChain;
@@ -32,6 +31,7 @@ use crate::{
     web::access::intercept::RequestMatcherDelegatingAuthorizationManagerBuilder,
     web::util::matcher::{AntPathRequestMatcher, AnyRequestMatcher, RequestMatcher},
 };
+use crate::{authorization::AuthorizationDecision, config::web::builders::HttpSecurity};
 
 const ROLE_PREFIX: &str = "ROLE_";
 
@@ -85,8 +85,16 @@ where
         }
     }
 
-    pub fn get_registry(&self) -> AuthorizationManagerRequestMatcherRegistry {
+    pub fn registry(&self) -> &AuthorizationManagerRequestMatcherRegistry {
+        &self.registry
+    }
+
+    pub fn registry_owned(&self) -> AuthorizationManagerRequestMatcherRegistry {
         self.registry.clone()
+    }
+
+    pub fn registry_mut(&mut self) -> &mut AuthorizationManagerRequestMatcherRegistry {
+        &mut self.registry
     }
 
     pub fn permit_all_authorization_manager() -> AuthorizationDecision {
@@ -108,6 +116,20 @@ where
         let _authorization_filter =
             AuthorizationFilter::new(self.registry.create_authorization_manager());
         let _publisher = self.publisher.clone();
+    }
+}
+
+impl<H> SecurityConfigurer<DefaultSecurityFilterChain, HttpSecurity>
+    for AuthorizeHttpRequestsConfigurer<H>
+where
+    H: SecurityBuilder<DefaultSecurityFilterChain>,
+{
+    fn init(&mut self, builer: &mut HttpSecurity) {
+        todo!()
+    }
+
+    fn configure(&mut self, builer: &mut HttpSecurity) {
+        todo!()
     }
 }
 
@@ -149,18 +171,21 @@ impl Default for RegistryState {
 #[derive(Clone)]
 pub struct AuthorizationManagerRequestMatcherRegistry<C = AuthorizedUrl> {
     state: Arc<Mutex<RegistryState>>,
-    abstract_request_matcher_registry: AbstractRequestMatcherRegistry<C>,
+    abstract_request_matcher_registry: BaseRequestMatcherRegistry<C>,
     role_hierarchy: Arc<dyn RoleHierarchy>,
     _marker: PhantomData<C>,
 }
 
+impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
+    pub fn new(ctx: &ApplicationContext) -> Self {
+        Self::default()
+    }
+}
 impl Default for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     fn default() -> Self {
         Self {
             state: Arc::new(Mutex::new(RegistryState::default())),
-            abstract_request_matcher_registry: AbstractRequestMatcherRegistry {
-                _marker: PhantomData,
-            },
+            abstract_request_matcher_registry: Default::default(),
             role_hierarchy: Arc::new(NullRoleHierarchy),
             _marker: PhantomData,
         }

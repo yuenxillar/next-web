@@ -1,10 +1,7 @@
-use std::{borrow::Cow, sync::Arc};
-
 use next_web_core::traits::{any_clone::AnyClone, filter::HttpFilter};
 
 use crate::{
     authentication::authentication_provider::AuthenticationProvider,
-    authorization::AuthenticationManager,
     config::{security_builder::SecurityBuilder, security_configurer::SecurityConfigurer},
     core::userdetails::user_details_service::UserDetailsService,
     web::default_security_filter_chain::DefaultSecurityFilterChain,
@@ -16,28 +13,33 @@ where
     Self: SecurityBuilder<DefaultSecurityFilterChain>,
     H: HttpSecurityBuilder<H>,
 {
-    fn get_configurer<T>(&self) -> Option<T>
+    fn get_configurer<C>(&mut self) -> Option<&mut C>
     where
-        T: SecurityConfigurer<DefaultSecurityFilterChain, H>;
+        C: SecurityConfigurer<DefaultSecurityFilterChain, H>,
+        C: 'static;
 
-    fn remove_configurer<T>(&mut self)
+    fn remove_configurer<C>(&mut self) -> Option<C>
     where
-        T: SecurityConfigurer<DefaultSecurityFilterChain, H>;
+        C: SecurityConfigurer<DefaultSecurityFilterChain, H>,
+        C: AnyClone + 'static;
 
-    fn set_shared_object<N, C>(&self, name: N, object: C)
+    fn set_shared_object<C>(&mut self, object: C)
     where
-        N: Into<Cow<'static, str>>,
         C: AnyClone;
 
-    fn get_shared_object<T>(&self) -> Option<&T>;
+    fn get_shared_object<T>(&self) -> Option<&T>
+    where
+        T: AnyClone;
 
-    fn get_mut_shared_object<T>(&mut self) -> Option<&mut T>;
+    fn get_mut_shared_object<T>(&mut self) -> Option<&mut T>
+    where
+        T: AnyClone;
 
-    fn authentication_provider<T>(&mut self, authentication_provider: T) -> H
+    fn authentication_provider<T>(&mut self, authentication_provider: T)
     where
         T: AuthenticationProvider + 'static;
 
-    fn user_details_service<T>(&mut self, user_details_service: T) -> H
+    fn user_details_service<T>(&mut self, user_details_service: T)
     where
         T: UserDetailsService + 'static;
 
@@ -52,9 +54,4 @@ where
     where
         F: HttpFilter,
         F1: HttpFilter;
-
-    /// Returns the configured `AuthenticationManager`, if any.
-    fn authentication_manager(&self) -> Option<Arc<dyn AuthenticationManager>> {
-        None
-    }
 }

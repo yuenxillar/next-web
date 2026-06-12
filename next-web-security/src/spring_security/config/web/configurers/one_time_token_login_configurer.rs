@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::traits::required::Required;
+use next_web_core::{traits::required::Required, ApplicationContext};
 
 use crate::{
     config::{
@@ -44,6 +44,10 @@ where
     H: HttpSecurityBuilder<H>,
     Self: Required<BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H>>,
 {
+    pub fn new(ctx: &ApplicationContext) -> Self {
+        Self::default()
+    }
+
     /// Set the login processing URL. Default: `"/login/ott"`.
     pub fn login_processing_url(mut self, url: &str) -> Self {
         self.login_processing_url = Some(url.to_string());
@@ -87,9 +91,7 @@ where
         &self.base_http_configurer
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H> {
+    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H> {
         &mut self.base_http_configurer
     }
 }
@@ -104,15 +106,12 @@ where
         self.base_http_configurer.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_mut_object()
     }
 }
 
-impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H>
-    for OneTimeTokenLoginConfigurer<H>
+impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for OneTimeTokenLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {

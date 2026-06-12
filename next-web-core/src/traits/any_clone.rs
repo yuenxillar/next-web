@@ -7,6 +7,8 @@ where
     Self: Any,
     Self: Send + Sync,
 {
+    fn as_any(&self) -> &dyn Any;
+
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 
     fn clone_box(&self) -> Box<dyn AnyClone>;
@@ -19,6 +21,10 @@ where
     Self: Any + Clone,
     Self: Send + Sync,
 {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
     }

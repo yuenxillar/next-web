@@ -12,7 +12,7 @@ use next_web_core::{
 
 use crate::{
     core::username_password_authentication_token::UsernamePasswordAuthenticationToken,
-    web::authentication::base_authentication_processing_filter::AbstractAuthenticationProcessingFilter,
+    web::authentication::base_authentication_processing_filter::BaseAuthenticationProcessingFilter,
 };
 
 #[derive(Clone)]
@@ -20,7 +20,7 @@ pub struct UsernamePasswordAuthenticationFilter {
     username_parameter: Box<str>,
     password_parameter: Box<str>,
     post_only: bool,
-    abstract_authentication_processing_filter: AbstractAuthenticationProcessingFilter,
+    abstract_authentication_processing_filter: BaseAuthenticationProcessingFilter,
 }
 
 impl Default for UsernamePasswordAuthenticationFilter {
@@ -29,8 +29,8 @@ impl Default for UsernamePasswordAuthenticationFilter {
             username_parameter: "username".into(),
             password_parameter: "password".into(),
             post_only: true,
-            abstract_authentication_processing_filter:
-                AbstractAuthenticationProcessingFilter::default(),
+            abstract_authentication_processing_filter: BaseAuthenticationProcessingFilter::default(
+            ),
         }
     }
 }
@@ -60,12 +60,12 @@ impl UsernamePasswordAuthenticationFilter {
         &self.password_parameter
     }
 }
-impl Required<AbstractAuthenticationProcessingFilter> for UsernamePasswordAuthenticationFilter {
-    fn get_object(&self) -> &AbstractAuthenticationProcessingFilter {
+impl Required<BaseAuthenticationProcessingFilter> for UsernamePasswordAuthenticationFilter {
+    fn get_object(&self) -> &BaseAuthenticationProcessingFilter {
         &self.abstract_authentication_processing_filter
     }
 
-    fn get_mut_object(&mut self) -> &mut AbstractAuthenticationProcessingFilter {
+    fn get_mut_object(&mut self) -> &mut BaseAuthenticationProcessingFilter {
         &mut self.abstract_authentication_processing_filter
     }
 }

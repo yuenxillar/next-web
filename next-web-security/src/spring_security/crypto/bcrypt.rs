@@ -1,4 +1,4 @@
-use crate::crypto::password::password_encoder::PasswordEncoder;
+use crate::crypto::password::PasswordEncoder;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use next_web_core::error::BoxError;
 

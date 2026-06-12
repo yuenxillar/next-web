@@ -16,9 +16,8 @@ use crate::{
         default_security_filter_chain::DefaultSecurityFilterChain,
         header::{
             writers::{
-                CacheControlHeadersWriter, HstsHeaderWriter,
-                XContentTypeOptionsHeaderWriter, XFrameOptionsHeaderWriter,
-                XFrameOptionsMode, XXssProtectionHeaderWriter,
+                CacheControlHeadersWriter, HstsHeaderWriter, XContentTypeOptionsHeaderWriter,
+                XFrameOptionsHeaderWriter, XFrameOptionsMode, XXssProtectionHeaderWriter,
             },
             HeaderWriter, HeaderWriterFilter,
         },
@@ -41,7 +40,7 @@ use crate::{
 pub struct HeadersConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<HeadersConfigurer<H>, H>>,
+    Self: Required<BaseHttpConfigurer<Self, H>>,
 {
     defaults_disabled: bool,
     cache_control_enabled: bool,
@@ -196,8 +195,7 @@ where
     }
 }
 
-impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>>
-    for HeadersConfigurer<H>
+impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>> for HeadersConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
     H: SecurityBuilder<DefaultSecurityFilterChain>,
@@ -206,9 +204,7 @@ where
         self.base_http_configurer.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_mut_object()
     }
 }

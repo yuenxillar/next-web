@@ -13,6 +13,6 @@ pub use ant_path_request_matcher::AntPathRequestMatcher;
 pub use any_request_matcher::AnyRequestMatcher;
 pub use negated_request_matcher::NegatedRequestMatcher;
 pub use or_request_matcher::OrRequestMatcher;
-pub use path_pattern_request_matcher::PathPatternRequestMatcher;
+pub use path_pattern_request_matcher::{Builder, PathPatternRequestMatcher};
 pub use request_matcher::{MatchResult, RequestMatcher};
 pub use request_matcher_entry::RequestMatcherEntry;

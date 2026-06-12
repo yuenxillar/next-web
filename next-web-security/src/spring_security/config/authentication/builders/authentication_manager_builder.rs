@@ -9,12 +9,12 @@ use crate::authentication::{
     authentication_events::{AuthenticationFailureEvent, AuthenticationSuccessEvent},
     authentication_provider::AuthenticationProvider,
 };
-use crate::config::base_configured_security_builder::AbstractConfiguredSecurityBuilder;
+use crate::config::base_configured_security_builder::BaseConfiguredSecurityBuilder;
 use crate::core::{
-    Authentication,
     authentication_error::{AuthenticationError, AuthenticationErrorKind},
     credentials_container::CredentialsContainer,
     userdetails::user_details_service::UserDetailsService,
+    Authentication,
 };
 use crate::{
     authorization::AuthenticationManager,
@@ -25,10 +25,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct AuthenticationManagerBuilder
-where
-    Self: Required<AbstractConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self>>,
-{
+pub struct AuthenticationManagerBuilder {
     authentication_manager: Option<Arc<dyn AuthenticationManager>>,
     parent_authentication_manager: Option<Arc<dyn AuthenticationManager>>,
     authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
@@ -36,13 +33,13 @@ where
     erase_credentials: Option<bool>,
     event_publisher: Arc<dyn AuthenticationEventPublisher>,
 
-    abstract_configured_security_builder:
-        AbstractConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self>,
+    base_configured_security_builder:
+        BaseConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self>,
 }
 
 impl AuthenticationManagerBuilder {
     pub fn new() -> Self {
-        let abstract_configured_security_builder = AbstractConfiguredSecurityBuilder::new(true);
+        let base_configured_security_builder = BaseConfiguredSecurityBuilder::new(true);
         Self {
             authentication_manager: Default::default(),
             parent_authentication_manager: Default::default(),
@@ -50,7 +47,7 @@ impl AuthenticationManagerBuilder {
             default_user_details_service: Default::default(),
             erase_credentials: Default::default(),
             event_publisher: Arc::new(NullAuthenticationEventPublisher),
-            abstract_configured_security_builder,
+            base_configured_security_builder,
         }
     }
 
@@ -103,7 +100,7 @@ impl AuthenticationManagerBuilder {
 impl ProviderManagerBuilder<Self> for AuthenticationManagerBuilder {}
 
 impl SecurityBuilder<Arc<dyn AuthenticationManager>> for AuthenticationManagerBuilder {
-    fn build(&self) -> Arc<dyn AuthenticationManager> {
+    fn build(&mut self) -> Arc<dyn AuthenticationManager> {
         if let Some(authentication_manager) = &self.authentication_manager {
             return authentication_manager.clone();
         }
@@ -117,19 +114,17 @@ impl SecurityBuilder<Arc<dyn AuthenticationManager>> for AuthenticationManagerBu
     }
 }
 
-impl Required<AbstractConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self>>
+impl Required<BaseConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self>>
     for AuthenticationManagerBuilder
 {
-    fn get_object(
-        &self,
-    ) -> &AbstractConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self> {
-        &self.abstract_configured_security_builder
+    fn get_object(&self) -> &BaseConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self> {
+        &self.base_configured_security_builder
     }
 
     fn get_mut_object(
         &mut self,
-    ) -> &mut AbstractConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self> {
-        &mut self.abstract_configured_security_builder
+    ) -> &mut BaseConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self> {
+        &mut self.base_configured_security_builder
     }
 }
 
@@ -162,7 +157,9 @@ impl AuthenticationManager for ProviderAuthenticationManager {
             }
             supported_provider_found = true;
             let result = if let Some(handle) = &handle {
-                tokio::task::block_in_place(|| handle.block_on(provider.authenticate(authentication)))
+                tokio::task::block_in_place(|| {
+                    handle.block_on(provider.authenticate(authentication))
+                })
             } else {
                 tokio::runtime::Builder::new_current_thread()
                     .enable_all()
@@ -227,9 +224,11 @@ impl AuthenticationManager for ProviderAuthenticationManager {
             AuthenticationErrorKind::BadCredentials,
         );
         if !parent_attempted {
-            self.event_publisher.publish_authentication_failure(
-                AuthenticationFailureEvent::new(authentication, error.clone()),
-            );
+            self.event_publisher
+                .publish_authentication_failure(AuthenticationFailureEvent::new(
+                    authentication,
+                    error.clone(),
+                ));
         }
         Err(error)
     }
@@ -274,10 +273,9 @@ mod tests {
         },
         authorization::AuthenticationManager,
         core::{
-            Authentication,
-            authentication_error::AuthenticationError,
-            authority_utils::AuthorityUtils,
+            authentication_error::AuthenticationError, authority_utils::AuthorityUtils,
             username_password_authentication_token::UsernamePasswordAuthenticationToken,
+            Authentication,
         },
     };
 
@@ -296,11 +294,13 @@ mod tests {
                 .as_any()
                 .downcast_ref::<UsernamePasswordAuthenticationToken>()
                 .expect("expected username/password token");
-            Ok(Arc::new(UsernamePasswordAuthenticationToken::authenticated(
-                token.get_name(),
-                token.get_credentials(),
-                AuthorityUtils::create_authority_list(["ROLE_USER"]),
-            )))
+            Ok(Arc::new(
+                UsernamePasswordAuthenticationToken::authenticated(
+                    token.get_name(),
+                    token.get_credentials(),
+                    AuthorityUtils::create_authority_list(["ROLE_USER"]),
+                ),
+            ))
         }
 
         fn supports(&self, authentication: &str) -> bool {
@@ -331,11 +331,13 @@ mod tests {
             &self,
             authentication: &dyn Authentication,
         ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
-            Ok(Arc::new(UsernamePasswordAuthenticationToken::authenticated(
-                authentication.get_name(),
-                None,
-                AuthorityUtils::create_authority_list(["ROLE_PARENT"]),
-            )))
+            Ok(Arc::new(
+                UsernamePasswordAuthenticationToken::authenticated(
+                    authentication.get_name(),
+                    None,
+                    AuthorityUtils::create_authority_list(["ROLE_PARENT"]),
+                ),
+            ))
         }
     }
 

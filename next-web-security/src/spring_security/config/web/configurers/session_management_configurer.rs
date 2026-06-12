@@ -23,7 +23,7 @@ use crate::{
 
 /// Configures session management: concurrency control, session fixation
 /// protection, invalid session handling, and session creation policy.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct SessionManagementConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
@@ -57,11 +57,11 @@ where
     }
 
     pub fn add_session_authentication_strategy(
-        mut self,
-        s: Arc<dyn SessionAuthenticationStrategy>,
-    ) -> Self {
-        self.session_authentication_strategies.push(s);
-        self
+        &mut self,
+        session_authentication_strategies: Arc<dyn SessionAuthenticationStrategy>,
+    ) {
+        self.session_authentication_strategies
+            .push(session_authentication_strategies);
     }
 
     pub fn enable_session_url_rewriting(mut self, v: bool) -> Self {
@@ -69,10 +69,7 @@ where
         self
     }
 
-    pub fn invalid_session_strategy<T: InvalidSessionStrategy + 'static>(
-        mut self,
-        s: T,
-    ) -> Self {
+    pub fn invalid_session_strategy<T: InvalidSessionStrategy + 'static>(mut self, s: T) -> Self {
         self.invalid_session_strategy = Some(Arc::new(s));
         self
     }
@@ -133,9 +130,7 @@ where
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_object()
     }
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_mut_object()
     }
 }
@@ -161,5 +156,28 @@ where
         //
         // All DSL fields (session_limit, expired_url, etc.) are preserved
         // on the configurer and ready for filter construction.
+    }
+}
+
+impl<H> Default for SessionManagementConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn default() -> Self {
+        Self {
+            session_registry: None,
+            max_sessions_prevents_login: false,
+            expired_url: None,
+            expired_session_strategy: None,
+            session_limit: None,
+            invalid_session_strategy: None,
+            invalid_session_url: None,
+            enable_session_url_rewriting: false,
+            session_authentication_strategies: Vec::new(),
+            session_policy: None,
+            properties_that_require_implicit_authentication: HashSet::new(),
+
+            base_http_configurer: Default::default(),
+        }
     }
 }

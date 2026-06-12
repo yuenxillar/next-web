@@ -1,4 +1,3 @@
-use axum::http::StatusCode;
 use next_web_core::{
     async_trait,
     error::BoxError,
@@ -14,7 +13,7 @@ use next_web_core::{
 use crate::{
     core::authentication_error::AuthenticationError,
     web::authentication::{
-        rememberme::abstract_remember_me_services::AbstractRememberMeServices,
+        rememberme::base_remember_me_services::BaseRememberMeServices,
         username_password_authentication_filter::UsernamePasswordAuthenticationFilter,
     },
 };
@@ -63,7 +62,7 @@ impl DefaultLoginPageGeneratingFilter {
         self.password_parameter = Some(auth_filter.get_password_parameter().into());
         let obj: &dyn std::any::Any = auth_filter.get_object().get_remember_me_services();
 
-        if let Some(remember_me_services) = obj.downcast_ref::<AbstractRememberMeServices>() {
+        if let Some(remember_me_services) = obj.downcast_ref::<BaseRememberMeServices>() {
             self.remember_me_parameter = Some(remember_me_services.get_parameter().into());
         }
     }

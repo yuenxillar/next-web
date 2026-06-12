@@ -1,23 +1,12 @@
 use std::{fs::File, io::Read, sync::Arc};
 
-use axum::{
-    body::Body,
-    extract::{Path, Request, State},
-    response::{Html, IntoResponse, Response},
-    routing::{get, post},
-};
+use axum::{response::Html, routing::get};
 use next_web::{
     application::Application,
-    core::{
-        ApplicationContext, context::properties::ApplicationProperties,
-        filter::application_filter_chain::ApplicationFilterChain,
-    },
-    macros::bind::singleton,
+    core::{ApplicationContext, context::properties::ApplicationProperties},
 };
 use next_web_core::async_trait;
-use next_web_core::state::application_state::ApplicationState;
-use next_web_core::traits::filter::HttpFilter;
-// use next_web_security::web::filter_proxy::FilterProxy;
+use next_web_security::config::security_builder::SecurityBuilder;
 use tokio::sync::Mutex;
 
 #[derive(Clone, Default)]
@@ -70,21 +59,30 @@ impl Application for TestApplication {
     ) -> Result<(), Box<dyn std::error::Error>> {
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
 
-        ctx.resolve_by_type::<Box<dyn next_web_security::core::web_security_configure::WebSecurityConfigure>>();
+        let web_security_configures = ctx.resolve_by_type::<Box<dyn next_web_security::core::web_security_configure::WebSecurityConfigure>>();
+
+        for mut web_security_configure in web_security_configures {
+            web_security_configure.configure().build();
+        }
 
         Ok(())
     }
 }
 
 mod t2 {
+    use std::{any::TypeId, collections::HashMap};
+
     use next_web::macros::bind::singleton;
-    use next_web_core::util::http_method::HttpMethod;
+    use next_web_core::{
+        ApplicationContext, traits::any_clone::AnyClone, util::http_method::HttpMethod,
+    };
     use next_web_security::{
-        config::web::{
-            builders::HttpSecurity,
-            configurers::{CsrfConfigurer, base_http_configurer::BaseHttpConfigurer},
+        config::{
+            authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
+            web::builders::HttpSecurity,
         },
         core::web_security_configure::WebSecurityConfigure,
+        web::util::matcher::Builder,
     };
 
     #[singleton(binds = [Self::into_web_security_configure])]
@@ -98,18 +96,28 @@ mod t2 {
     }
 
     impl WebSecurityConfigure for TestWebSecurityConfigure {
-        fn configure(self) -> HttpSecurity {
-            HttpSecurity::default()
+        fn configure(&mut self) -> HttpSecurity {
+            let mut ctx = ApplicationContext::default();
+            ctx.insert_singleton(Builder::default());
+
+            let mut shared_objects: HashMap<TypeId, Box<dyn AnyClone>> = HashMap::new();
+            shared_objects.insert(std::any::TypeId::of::<ApplicationContext>(), Box::new(ctx));
+
+            HttpSecurity::new(AuthenticationManagerBuilder::new(), shared_objects)
                 .csrf(|csrf| {
                     csrf.spa();
                 })
-                .authorize_http_requests(|mut auth| {
+                .authorize_http_requests(|auth| {
                     auth.request_matchers(vec!["/login", "/logout", "/open"])
                         .permit_all()
                         .request_matchers(HttpMethod::Options)
                         .has_authority("admin")
                         .any_request()
                         .authenticated();
+                })
+                .security_matchers(|mc| {
+                    mc.request_matchers_with_patterns(&["/api/v1/**"])
+                        .request_matchers_with_patterns(&["/api/v2/**"]);
                 })
         }
     }
