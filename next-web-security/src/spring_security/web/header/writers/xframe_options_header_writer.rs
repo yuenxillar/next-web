@@ -2,6 +2,7 @@ use crate::web::header::HeaderWriter;
 
 const XFRAME_OPTIONS_HEADER: &str = "X-Frame-Options";
 
+#[derive(Clone)]
 pub struct XFrameOptionsHeaderWriter {
     frame_options_mode: XFrameOptionsMode,
 }
@@ -28,15 +29,17 @@ impl HeaderWriter for XFrameOptionsHeaderWriter {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XFrameOptionsMode {
-    DenY,
+    Deny,
     SameoriGin,
+
+    #[deprecated = "ALLOW-FROM is an obsolete directive that no longer works in modern browsers. Instead use Content-Security-Policy with the frame-ancestors   directive."]
     AllowFrom,
 }
 
 impl XFrameOptionsMode {
     pub fn get_mode(&self) -> &'static str {
         match self {
-            XFrameOptionsMode::DenY => "DENY",
+            XFrameOptionsMode::Deny => "DENY",
             XFrameOptionsMode::SameoriGin => "SAMEORIGIN",
             XFrameOptionsMode::AllowFrom => "ALLOW-FROM",
         }

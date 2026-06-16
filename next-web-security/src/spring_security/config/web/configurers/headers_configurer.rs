@@ -16,11 +16,18 @@ use crate::{
         default_security_filter_chain::DefaultSecurityFilterChain,
         header::{
             writers::{
-                CacheControlHeadersWriter, HstsHeaderWriter, XContentTypeOptionsHeaderWriter,
-                XFrameOptionsHeaderWriter, XFrameOptionsMode, XXssProtectionHeaderWriter,
+                CacheControlHeadersWriter, ContentSecurityPolicyHeaderWriter,
+                CrossOriginEmbedderPolicy, CrossOriginEmbedderPolicyHeaderWriter,
+                CrossOriginOpenerPolicy, CrossOriginOpenerPolicyHeaderWriter,
+                CrossOriginResourcePolicy, CrossOriginResourcePolicyHeaderWriter,
+                FeaturePolicyHeaderWriter, HstsHeaderWriter, PermissionsPolicyHeaderWriter,
+                ReferrerPolicy, ReferrerPolicyHeaderWriter, XContentTypeOptionsHeaderWriter,
+                XFrameOptionsHeaderWriter, XFrameOptionsMode, XXssHeaderValue,
+                XXssProtectionHeaderWriter,
             },
             HeaderWriter, HeaderWriterFilter,
         },
+        util::matcher::RequestMatcher,
     },
 };
 
@@ -40,143 +47,281 @@ use crate::{
 pub struct HeadersConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<Self, H>>,
 {
-    defaults_disabled: bool,
-    cache_control_enabled: bool,
-    content_type_options_enabled: bool,
-    xss_protection_enabled: bool,
-    hsts_enabled: bool,
-    frame_options_enabled: bool,
-    frame_options_mode: XFrameOptionsMode,
+    header_writers: Vec<Arc<dyn HeaderWriter>>,
+    content_type_options: ContentTypeOptionsConfig,
+    xss_protection: XXssConfig,
+    cache_control: CacheControlConfig,
+    hsts: HstsConfig,
+    frame_options: FrameOptionsConfig,
+    content_security_policy: ContentSecurityPolicyConfig,
+    referrer_policy: ReferrerPolicyConfig,
+    feature_policy: FeaturePolicyConfig,
+    permissions_policy: PermissionsPolicyConfig,
+    cross_origin_opener_policy: CrossOriginOpenerPolicyConfig,
+    cross_origin_embedder_policy: CrossOriginEmbedderPolicyConfig,
+    cross_origin_resource_policy: CrossOriginResourcePolicyConfig,
 
-    hsts_max_age: u64,
-    hsts_include_subdomains: bool,
-    hsts_preload: bool,
-
-    custom_header_writers: Vec<Arc<dyn HeaderWriter>>,
-
-    base_http_configurer: BaseHttpConfigurer<HeadersConfigurer<H>, H>,
+    base_http_configurer: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> HeadersConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<HeadersConfigurer<H>, H>>,
 {
     /// Disable all default headers. Call this first, then selectively enable.
     pub fn defaults_disabled(mut self) -> Self {
-        self.defaults_disabled = true;
-        self.cache_control_enabled = false;
-        self.content_type_options_enabled = false;
-        self.xss_protection_enabled = false;
-        self.hsts_enabled = false;
-        self.frame_options_enabled = false;
-        self
-    }
+        self.content_type_options.disable();
+        self.xss_protection.disable();
+        self.cache_control.disable();
+        self.hsts.disable();
+        self.frame_options.disable();
 
-    /// Enable/disable `Cache-Control`, `Pragma`, and `Expires` headers.
-    pub fn cache_control(mut self, enabled: bool) -> Self {
-        self.cache_control_enabled = enabled;
-        self
-    }
-
-    /// Enable/disable `X-Content-Type-Options: nosniff`.
-    pub fn content_type_options(mut self, enabled: bool) -> Self {
-        self.content_type_options_enabled = enabled;
-        self
-    }
-
-    /// Enable/disable `X-XSS-Protection`.
-    pub fn xss_protection(mut self, enabled: bool) -> Self {
-        self.xss_protection_enabled = enabled;
-        self
-    }
-
-    /// Configure HTTP Strict Transport Security (HSTS).
-    pub fn http_strict_transport_security(
-        mut self,
-        enabled: bool,
-        max_age: u64,
-        include_subdomains: bool,
-    ) -> Self {
-        self.hsts_enabled = enabled;
-        self.hsts_max_age = max_age;
-        self.hsts_include_subdomains = include_subdomains;
-        self
-    }
-
-    /// Enable HSTS preload.
-    pub fn hsts_preload(mut self, preload: bool) -> Self {
-        self.hsts_preload = preload;
-        self
-    }
-
-    /// Configure `X-Frame-Options`. Use `deny()`, `same_origin()`, or set mode directly.
-    pub fn frame_options(mut self, mode: XFrameOptionsMode) -> Self {
-        self.frame_options_enabled = true;
-        self.frame_options_mode = mode;
         self
     }
 
     /// Add a custom `HeaderWriter`.
     pub fn add_header_writer(mut self, writer: Arc<dyn HeaderWriter>) -> Self {
-        self.custom_header_writers.push(writer);
+        self.header_writers.push(writer);
+
         self
     }
 
+    pub fn content_type_options<F>(mut self, mut content_type_options: F) -> Self
+    where
+        F: FnMut(&mut ContentTypeOptionsConfig),
+    {
+        content_type_options(&mut self.content_type_options);
+
+        self
+    }
+
+    pub fn xss_protection<F>(mut self, mut xss_protection: F) -> Self
+    where
+        F: FnMut(&mut XXssConfig),
+    {
+        xss_protection(&mut self.xss_protection);
+
+        self
+    }
+
+    pub fn cache_control<F>(mut self, mut cache_control: F) -> Self
+    where
+        F: FnMut(&mut CacheControlConfig),
+    {
+        cache_control(&mut self.cache_control);
+
+        self
+    }
+
+    pub fn http_strict_transport_security<F>(
+        mut self,
+        mut http_strict_transport_security: F,
+    ) -> Self
+    where
+        F: FnMut(&mut HstsConfig),
+    {
+        http_strict_transport_security(&mut self.hsts);
+
+        self
+    }
+
+    pub fn frame_options<F>(mut self, mut frame_options: F) -> Self
+    where
+        F: FnMut(&mut FrameOptionsConfig),
+    {
+        frame_options(&mut self.frame_options);
+
+        self
+    }
+
+    pub fn content_security_policy<F>(mut self, mut content_security_policy: F) -> Self
+    where
+        F: FnMut(&mut ContentSecurityPolicyConfig),
+    {
+        self.content_security_policy.writer = Some(Default::default());
+        content_security_policy(&mut self.content_security_policy);
+
+        self
+    }
+
+    pub fn referrer_policy<F>(mut self, mut referrer_policy: F) -> Self
+    where
+        F: FnMut(&mut ReferrerPolicyConfig),
+    {
+        self.referrer_policy.writer = Some(Default::default());
+        referrer_policy(&mut self.referrer_policy);
+
+        self
+    }
+
+    pub fn permissions_policy_header<F>(mut self, mut permissions_policy_header: F) -> Self
+    where
+        F: FnMut(&mut PermissionsPolicyConfig),
+    {
+        self.permissions_policy.writer = Some(Default::default());
+        permissions_policy_header(&mut self.permissions_policy);
+
+        self
+    }
+
+    pub fn cross_origin_opener_policy<F>(mut self, mut cross_origin_opener_policy: F) -> Self
+    where
+        F: FnMut(&mut CrossOriginOpenerPolicyConfig),
+    {
+        self.cross_origin_opener_policy.writer = Some(Default::default());
+        cross_origin_opener_policy(&mut self.cross_origin_opener_policy);
+
+        self
+    }
+
+    pub fn cross_origin_embedder_policy<F>(mut self, mut cross_origin_embedder_policy: F) -> Self
+    where
+        F: FnMut(&mut CrossOriginEmbedderPolicyConfig),
+    {
+        self.cross_origin_embedder_policy.writer = Some(Default::default());
+        cross_origin_embedder_policy(&mut self.cross_origin_embedder_policy);
+
+        self
+    }
+
+    pub fn cross_origin_resource_policy<F>(mut self, mut cross_origin_resource_policy: F) -> Self
+    where
+        F: FnMut(&mut CrossOriginResourcePolicyConfig),
+    {
+        self.cross_origin_resource_policy.writer = Some(Default::default());
+        cross_origin_resource_policy(&mut self.cross_origin_resource_policy);
+
+        self
+    }
+
+    fn create_header_writer_filter(&mut self) -> HeaderWriterFilter {
+        let writers = self.get_header_writers();
+        assert!(!writers.is_empty(), "Headers security is enabled, but no headers will be added. Either add headers or disable headers security");
+
+        // todo!(postProcess);
+        HeaderWriterFilter::new(writers)
+    }
+
     /// Build the list of configured header writers.
-    fn get_header_writers(&self) -> Vec<Arc<dyn HeaderWriter>> {
+    fn get_header_writers(&mut self) -> Vec<Arc<dyn HeaderWriter>> {
         let mut writers: Vec<Arc<dyn HeaderWriter>> = Vec::new();
 
-        if self.cache_control_enabled {
-            writers.push(Arc::new(CacheControlHeadersWriter::default()));
-        }
-        if self.content_type_options_enabled {
-            writers.push(Arc::new(XContentTypeOptionsHeaderWriter::default()));
-        }
-        if self.xss_protection_enabled {
-            writers.push(Arc::new(XXssProtectionHeaderWriter::default()));
-        }
-        if self.hsts_enabled {
-            let mut hsts = HstsHeaderWriter::default();
-            hsts.set_max_age_in_seconds(self.hsts_max_age);
-            hsts.set_include_sub_domains(self.hsts_include_subdomains);
-            hsts.set_preload(self.hsts_preload);
-            writers.push(Arc::new(hsts));
-        }
-        if self.frame_options_enabled {
-            writers.push(Arc::new(XFrameOptionsHeaderWriter::new(
-                self.frame_options_mode.clone(),
-            )));
-        }
-
-        // Add any custom header writers
-        writers.extend(self.custom_header_writers.clone());
+        Self::add_if_not_null(
+            &mut writers,
+            self.content_type_options
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.xss_protection
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.cache_control
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.hsts
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.frame_options
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.content_security_policy
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.referrer_policy
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.feature_policy
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.permissions_policy
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.cross_origin_opener_policy
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.cross_origin_embedder_policy
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        Self::add_if_not_null(
+            &mut writers,
+            self.cross_origin_resource_policy
+                .writer
+                .take()
+                .map(|s| Arc::new(s) as Arc<dyn HeaderWriter>),
+        );
+        writers.extend(std::mem::take(&mut self.header_writers));
 
         writers
+    }
+
+    fn add_if_not_null<T>(values: &mut Vec<T>, value: Option<T>) {
+        if let Some(value) = value {
+            values.push(value);
+        }
     }
 }
 
 impl<H> Default for HeadersConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<HeadersConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
-            defaults_disabled: false,
-            // All defaults enabled (matches Spring Security behavior)
-            cache_control_enabled: true,
-            content_type_options_enabled: true,
-            xss_protection_enabled: true,
-            hsts_enabled: true,
-            frame_options_enabled: true,
-            frame_options_mode: XFrameOptionsMode::DenY,
-            hsts_max_age: 31536000, // 1 year
-            hsts_include_subdomains: true,
-            hsts_preload: false,
-            custom_header_writers: Vec::new(),
+            header_writers: Default::default(),
+            content_type_options: Default::default(),
+            xss_protection: Default::default(),
+            cache_control: Default::default(),
+            hsts: Default::default(),
+            frame_options: Default::default(),
+            content_security_policy: Default::default(),
+            referrer_policy: Default::default(),
+            feature_policy: Default::default(),
+            permissions_policy: Default::default(),
+            cross_origin_opener_policy: Default::default(),
+            cross_origin_embedder_policy: Default::default(),
+            cross_origin_resource_policy: Default::default(),
             base_http_configurer: Default::default(),
         }
     }
@@ -218,13 +363,341 @@ where
     }
 
     fn configure(&mut self, http: &mut H) {
-        let writers = self.get_header_writers();
-        assert!(
-            !writers.is_empty(),
-            "At least one HeaderWriter must be configured, or call defaultsDisabled() \
-             before enabling specific headers."
-        );
-        let filter = HeaderWriterFilter::new(writers);
+        let filter = self.create_header_writer_filter();
         http.add_filter(filter);
+    }
+}
+
+#[derive(Clone)]
+pub struct ContentTypeOptionsConfig {
+    writer: Option<XContentTypeOptionsHeaderWriter>,
+}
+
+impl Default for ContentTypeOptionsConfig {
+    fn default() -> Self {
+        Self {
+            writer: Some(Default::default()),
+        }
+    }
+}
+
+impl ContentTypeOptionsConfig {
+    /// Removes the X-Content-Type-Options header.
+    pub fn disable(&mut self) {
+        self.writer = None;
+    }
+
+    fn enable(&mut self) {
+        if self.writer.is_none() {
+            self.writer = Some(Default::default());
+        }
+    }
+
+    fn writer(&self) -> Option<&XContentTypeOptionsHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+#[derive(Clone)]
+pub struct XXssConfig {
+    writer: Option<XXssProtectionHeaderWriter>,
+}
+
+impl XXssConfig {
+    /// Sets the value of the X-XSS-PROTECTION header.
+    pub fn header_value(mut self, header_value: XXssHeaderValue) -> Self {
+        if let Some(ref mut writer) = self.writer {
+            writer.set_header_value(header_value);
+        }
+        self
+    }
+
+    /// Disables X-XSS-Protection header.
+    pub fn disable(&mut self) {
+        self.writer = None;
+    }
+
+    fn enable(&mut self) {
+        if self.writer.is_none() {
+            self.writer = Some(Default::default());
+        }
+    }
+
+    fn writer(&self) -> Option<&XXssProtectionHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+impl Default for XXssConfig {
+    fn default() -> Self {
+        Self {
+            writer: Some(Default::default()),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct CacheControlConfig {
+    writer: Option<CacheControlHeadersWriter>,
+}
+
+impl CacheControlConfig {
+    /// Disables Cache Control.
+    pub fn disable(&mut self) {
+        self.writer = None;
+    }
+
+    fn enable(&mut self) {
+        if self.writer.is_none() {
+            self.writer = Some(Default::default());
+        }
+    }
+
+    fn writer(&self) -> Option<&CacheControlHeadersWriter> {
+        self.writer.as_ref()
+    }
+}
+
+impl Default for CacheControlConfig {
+    fn default() -> Self {
+        Self {
+            writer: Some(Default::default()),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct HstsConfig {
+    writer: Option<HstsHeaderWriter>,
+}
+
+impl HstsConfig {
+    /// Sets the value (in seconds) for the max-age directive.
+    pub fn max_age_in_seconds(mut self, max_age_in_seconds: u64) -> Self {
+        if let Some(ref mut writer) = self.writer {
+            writer.set_max_age_in_seconds(max_age_in_seconds);
+        }
+        self
+    }
+
+    /// Sets the RequestMatcher used to determine if the "Strict-Transport-Security" should be added.
+    pub fn request_matcher(mut self, request_matcher: Arc<dyn RequestMatcher>) -> Self {
+        if let Some(ref mut writer) = self.writer {
+            writer.set_request_matcher(request_matcher);
+        }
+        self
+    }
+
+    /// If true, subdomains should be considered HSTS Hosts too.
+    pub fn include_sub_domains(mut self, include_sub_domains: bool) -> Self {
+        if let Some(ref mut writer) = self.writer {
+            writer.set_include_sub_domains(include_sub_domains);
+        }
+        self
+    }
+
+    /// If true, preload will be included in HSTS Header.
+    pub fn preload(mut self, preload: bool) -> Self {
+        if let Some(ref mut writer) = self.writer {
+            writer.set_preload(preload);
+        }
+        self
+    }
+
+    /// Disables Strict Transport Security.
+    pub fn disable(&mut self) {
+        self.writer = None;
+    }
+
+    fn enable(&mut self) {
+        if self.writer.is_none() {
+            self.writer = Some(Default::default());
+        }
+    }
+
+    fn writer(&self) -> Option<&HstsHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+impl Default for HstsConfig {
+    fn default() -> Self {
+        Self {
+            writer: Some(Default::default()),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct FrameOptionsConfig {
+    writer: Option<XFrameOptionsHeaderWriter>,
+}
+
+impl FrameOptionsConfig {
+    /// Specify to DENY framing any content from this application.
+    pub fn deny(&mut self) {
+        self.writer = Some(XFrameOptionsHeaderWriter::new(XFrameOptionsMode::Deny));
+    }
+
+    /// Specify to allow any request that comes from the same origin to frame this application.
+    pub fn same_origin(&mut self) {
+        self.writer = Some(XFrameOptionsHeaderWriter::new(
+            XFrameOptionsMode::SameoriGin,
+        ));
+    }
+
+    /// Prevents the header from being added to the response.
+    pub fn disable(&mut self) {
+        self.writer = None;
+    }
+
+    fn enable(&mut self) {
+        if self.writer.is_none() {
+            self.writer = Some(XFrameOptionsHeaderWriter::new(XFrameOptionsMode::Deny));
+        }
+    }
+
+    fn writer(&self) -> Option<&XFrameOptionsHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+impl Default for FrameOptionsConfig {
+    fn default() -> Self {
+        Self {
+            writer: Some(XFrameOptionsHeaderWriter::new(XFrameOptionsMode::Deny)),
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct ContentSecurityPolicyConfig {
+    writer: Option<ContentSecurityPolicyHeaderWriter>,
+}
+
+impl ContentSecurityPolicyConfig {
+    /// Sets the security policy directive(s) to be used in the response header.
+    pub fn policy_directives(mut self, policy_directives: impl Into<String>) -> Self {
+        self.writer
+            .as_mut()
+            .map(|w| w.set_policy_directives(policy_directives));
+        self
+    }
+
+    /// Enables the Content-Security-Policy-Report-Only header.
+    pub fn report_only(mut self) -> Self {
+        self.writer.as_mut().map(|w| w.set_report_only(true));
+
+        self
+    }
+
+    fn writer(&self) -> Option<&ContentSecurityPolicyHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct ReferrerPolicyConfig {
+    writer: Option<ReferrerPolicyHeaderWriter>,
+}
+
+impl ReferrerPolicyConfig {
+    /// Sets the policy to be used in the response header.
+    pub fn policy(mut self, policy: ReferrerPolicy) -> Self {
+        self.writer.as_mut().map(|w| w.set_policy(policy));
+
+        self
+    }
+
+    fn writer(&self) -> Option<&ReferrerPolicyHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct FeaturePolicyConfig {
+    writer: Option<FeaturePolicyHeaderWriter>,
+}
+
+impl FeaturePolicyConfig {
+    pub fn and(self) -> Self {
+        self
+    }
+
+    fn writer(&self) -> Option<&FeaturePolicyHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct PermissionsPolicyConfig {
+    writer: Option<PermissionsPolicyHeaderWriter>,
+}
+
+impl PermissionsPolicyConfig {
+    /// Sets the policy to be used in the response header.
+    pub fn policy(mut self, policy: impl Into<String>) -> Self {
+        if let Some(writer) = self.writer.as_mut() {
+            writer.set_policy(policy);
+        }
+        self
+    }
+
+    fn writer(&self) -> Option<&PermissionsPolicyHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct CrossOriginOpenerPolicyConfig {
+    writer: Option<CrossOriginOpenerPolicyHeaderWriter>,
+}
+
+impl CrossOriginOpenerPolicyConfig {
+    /// Sets the policy to be used in the Cross-Origin-Opener-Policy header.
+    pub fn policy(mut self, policy: CrossOriginOpenerPolicy) -> Self {
+        self.writer.as_mut().map(|w| w.set_policy(policy));
+
+        self
+    }
+
+    fn writer(&self) -> Option<&CrossOriginOpenerPolicyHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct CrossOriginEmbedderPolicyConfig {
+    writer: Option<CrossOriginEmbedderPolicyHeaderWriter>,
+}
+
+impl CrossOriginEmbedderPolicyConfig {
+    /// Sets the policy to be used in the Cross-Origin-Embedder-Policy header.
+    pub fn policy(mut self, policy: CrossOriginEmbedderPolicy) -> Self {
+        self.writer.as_mut().map(|w| w.set_policy(policy));
+
+        self
+    }
+
+    fn writer(&self) -> Option<&CrossOriginEmbedderPolicyHeaderWriter> {
+        self.writer.as_ref()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct CrossOriginResourcePolicyConfig {
+    writer: Option<CrossOriginResourcePolicyHeaderWriter>,
+}
+
+impl CrossOriginResourcePolicyConfig {
+    /// Sets the policy to be used in the Cross-Origin-Resource-Policy header.
+    pub fn policy(mut self, policy: CrossOriginResourcePolicy) -> Self {
+        self.writer.as_mut().map(|w| w.set_policy(policy));
+
+        self
+    }
+
+    fn writer(&self) -> Option<&CrossOriginResourcePolicyHeaderWriter> {
+        self.writer.as_ref()
     }
 }

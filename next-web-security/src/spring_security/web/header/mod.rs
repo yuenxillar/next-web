@@ -6,6 +6,7 @@ pub mod writers;
 pub use header_writer::HeaderWriter;
 pub use header_writer_filter::HeaderWriterFilter;
 
+#[derive(Clone)]
 pub struct Header {
     header_name: String,
     header_value: Vec<String>,
@@ -17,5 +18,13 @@ impl Header {
             header_name,
             header_value,
         }
+    }
+
+    pub fn header_name(&self) -> &str {
+        &self.header_name
+    }
+
+    pub fn header_value(&self) -> &[String] {
+        &self.header_value
     }
 }

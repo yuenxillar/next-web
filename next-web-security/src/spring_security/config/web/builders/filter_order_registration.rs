@@ -7,8 +7,7 @@ use crate::web::{
     authentication::https_redirect_filter::HttpsRedirectFilter,
     authentication::{
         anonymous_authentication_filter::AnonymousAuthenticationFilter,
-        basic_authentication_filter::BasicAuthenticationFilter,
-        logout::LogoutFilter,
+        basic_authentication_filter::BasicAuthenticationFilter, logout::LogoutFilter,
         remember_me_authentication_filter::RememberMeAuthenticationFilter,
         ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
         username_password_authentication_filter::UsernamePasswordAuthenticationFilter,

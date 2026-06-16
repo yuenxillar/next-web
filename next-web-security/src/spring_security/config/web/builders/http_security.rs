@@ -129,6 +129,7 @@ impl HttpSecurity {
 }
 
 impl HttpSecurity {
+    /// Adds the Security headers to the response.
     pub fn headers<F>(mut self, headers: F) -> Self
     where
         F: FnMut(&mut HeadersConfigurer<Self>),
@@ -641,11 +642,11 @@ impl Ordered for OrderedFilter {
 impl HttpFilter for OrderedFilter {
     async fn do_filter(
         &self,
-        r: &mut dyn HttpRequest,
-        w: &mut dyn HttpResponse,
-        c: &dyn HttpFilterChain,
+        req: &mut dyn HttpRequest,
+        resp: &mut dyn HttpResponse,
+        chain: &dyn HttpFilterChain,
     ) -> Result<(), BoxError> {
-        self.filter.do_filter(r, w, c).await
+        self.filter.do_filter(req, resp, chain).await
     }
 }
 impl Named for OrderedFilter {

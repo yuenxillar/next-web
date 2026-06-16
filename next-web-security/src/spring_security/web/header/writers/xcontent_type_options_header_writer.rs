@@ -1,10 +1,14 @@
-use crate::web::header::HeaderWriter;
+use crate::web::header::{writers::StaticHeadersWriter, HeaderWriter};
 
-pub struct XContentTypeOptionsHeaderWriter;
+#[derive(Clone)]
+pub struct XContentTypeOptionsHeaderWriter(StaticHeadersWriter);
 
 impl Default for XContentTypeOptionsHeaderWriter {
     fn default() -> Self {
-        Self {}
+        Self(StaticHeadersWriter::with(
+            "X-Content-Type-Options",
+            vec!["nosniff".into()],
+        ))
     }
 }
 
