@@ -6,7 +6,6 @@ pub mod basic_authentication_entry_point;
 pub mod basic_authentication_filter;
 pub mod forward_authentication_failure_handler;
 pub mod forward_authentication_success_handler;
-pub mod https_redirect_filter;
 pub mod login_url_authentication_entry_point;
 pub mod logout;
 pub mod preauth;
@@ -16,6 +15,7 @@ pub mod rememberme;
 pub mod saved_request_aware_authentication_success_handler;
 pub mod session;
 pub mod simple_url_authentication_failure_handler;
+pub mod switchuser;
 pub mod ui;
 pub mod username_password_authentication_filter;
 

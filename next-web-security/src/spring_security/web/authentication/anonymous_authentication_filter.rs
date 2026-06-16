@@ -3,6 +3,7 @@ use std::sync::Arc;
 use next_web_core::{
     async_trait,
     error::BoxError,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -10,12 +11,9 @@ use next_web_core::{
     },
 };
 
-use crate::{
-    core::{
-        Authentication,
-        authority_utils::AuthorityUtils,
-        context::security_context_holder::SecurityContextHolder,
-    },
+use crate::core::{
+    authority_utils::AuthorityUtils, context::security_context_holder::SecurityContextHolder,
+    Authentication,
 };
 
 /// Detects when no `Authentication` object is present in the `SecurityContext`
@@ -29,11 +27,7 @@ pub struct AnonymousAuthenticationFilter {
 }
 
 impl AnonymousAuthenticationFilter {
-    pub fn new(
-        key: String,
-        principal: String,
-        authorities: Vec<String>,
-    ) -> Self {
+    pub fn new(key: String, principal: String, authorities: Vec<String>) -> Self {
         Self {
             key,
             principal,
@@ -61,7 +55,7 @@ impl HttpFilter for AnonymousAuthenticationFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         // Only set anonymous auth if no authentication exists in the current context
         let need_anonymous = match SecurityContextHolder::get_context() {
             Some(ctx) => ctx.get_authentication().is_none(),

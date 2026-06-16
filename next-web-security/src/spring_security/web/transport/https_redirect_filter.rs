@@ -3,6 +3,7 @@ use std::sync::Arc;
 use next_web_core::{
     async_trait,
     error::BoxError,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -43,9 +44,7 @@ impl HttpsRedirectFilter {
 
     /// Build the HTTPS redirect URL from the request URI.
     fn build_redirect_url(&self, request: &dyn HttpRequest) -> String {
-        let host = request
-            .header("Host")
-            .unwrap_or("localhost");
+        let host = request.header("Host").unwrap_or("localhost");
         let uri = request.uri();
         let https_port = self.https_port(host);
         format!("https://{}{}", https_port, uri)
@@ -70,7 +69,9 @@ impl HttpsRedirectFilter {
 }
 
 impl Default for HttpsRedirectFilter {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -80,7 +81,7 @@ impl HttpFilter for HttpsRedirectFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         if !request.is_secure() && self.request_matcher.matches(request) {
             let url = self.build_redirect_url(request);
             response.set_redirect(&url);
@@ -91,7 +92,9 @@ impl HttpFilter for HttpsRedirectFilter {
 }
 
 impl Named for HttpsRedirectFilter {
-    fn name(&self) -> &str { "HttpsRedirectFilter" }
+    fn name(&self) -> &str {
+        "HttpsRedirectFilter"
+    }
 }
 
 fn parse_host_port(host: &str) -> (&str, u16) {

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use dyn_clone::DynClone;
 
 use crate::{
-    error::BoxError,
+    filter::FilterError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
@@ -18,7 +18,7 @@ where
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    ) -> Result<(), BoxError>;
+    ) -> Result<(), FilterError>;
 }
 
 dyn_clone::clone_trait_object!(HttpFilterChain);

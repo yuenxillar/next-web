@@ -1,6 +1,7 @@
 use axum::http::StatusCode;
 use next_web_core::{
     async_trait,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -77,7 +78,7 @@ impl HttpFilter for UsernamePasswordAuthenticationFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), next_web_core::error::BoxError> {
+    ) -> Result<(), FilterError> {
         if !self
             .abstract_authentication_processing_filter
             .requires_authentication(request)

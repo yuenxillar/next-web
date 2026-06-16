@@ -8,7 +8,7 @@ use std::{
 
 use next_web_core::{
     async_trait,
-    error::BoxError,
+    filter::FilterError,
     traits::{
         any_clone::AnyClone,
         filter::{HttpFilter, HttpFilterChain},
@@ -645,7 +645,7 @@ impl HttpFilter for OrderedFilter {
         req: &mut dyn HttpRequest,
         resp: &mut dyn HttpResponse,
         chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         self.filter.do_filter(req, resp, chain).await
     }
 }

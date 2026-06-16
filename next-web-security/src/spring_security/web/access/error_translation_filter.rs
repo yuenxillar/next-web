@@ -3,6 +3,7 @@ use std::sync::Arc;
 use next_web_core::{
     async_trait,
     error::BoxError,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -34,7 +35,7 @@ impl HttpFilter for ErrorTranslationFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         let result = filter_chain.do_filter(request, response).await;
         Ok(())
     }

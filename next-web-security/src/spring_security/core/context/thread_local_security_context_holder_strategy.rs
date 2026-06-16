@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures::future::BoxFuture;
-use next_web_core::error::BoxError;
+use next_web_core::filter::FilterError;
 use tokio::task_local;
 
 use crate::core::context::{
@@ -28,8 +28,8 @@ impl SecurityContextHolderStrategy for ThreadLocalSecurityContextHolderStrategy 
     fn scope_with_context<'a>(
         &'a self,
         context: Arc<dyn SecurityContext>,
-        f: BoxFuture<'a, Result<(), BoxError>>,
-    ) -> BoxFuture<'a, Result<(), BoxError>> {
+        f: BoxFuture<'a, Result<(), FilterError>>,
+    ) -> BoxFuture<'a, Result<(), FilterError>> {
         Box::pin(CONTEXT_HOLDER.scope(context, async move { f.await }))
     }
 

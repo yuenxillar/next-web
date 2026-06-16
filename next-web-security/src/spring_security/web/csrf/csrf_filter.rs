@@ -3,6 +3,7 @@ use std::sync::{Arc, OnceLock};
 use next_web_core::{
     async_trait,
     error::BoxError,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -91,7 +92,7 @@ impl HttpFilter for CsrfFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         // Check if CSRF protection is required for this request
         if !self.require_csrf_protection_matcher.matches(request) {
             return filter_chain.do_filter(request, response).await;
@@ -110,9 +111,7 @@ impl HttpFilter for CsrfFilter {
 
         // If no token found or token mismatch → deny access
         let is_valid = match (&expected_token, &actual_token) {
-            (Some(expected), Some(actual)) if !actual.is_empty() => {
-                expected.get_token() == actual
-            }
+            (Some(expected), Some(actual)) if !actual.is_empty() => expected.get_token() == actual,
             _ => false,
         };
 

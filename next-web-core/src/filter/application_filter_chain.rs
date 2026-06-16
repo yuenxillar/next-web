@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::{
-    error::BoxError,
+    filter::FilterError,
     traits::{
         filter::HttpFilterChain,
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -20,7 +20,7 @@ impl HttpFilterChain for ApplicationFilterChain {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         // Call the next filter if there is one
         if self.pos < self.n {
             // self.

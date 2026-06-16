@@ -13,9 +13,9 @@ use crate::{
         },
     },
     web::{
-        authentication::https_redirect_filter::HttpsRedirectFilter,
         default_security_filter_chain::DefaultSecurityFilterChain,
         port_mapper::PortMapper,
+        transport::HttpsRedirectFilter,
         util::matcher::{OrRequestMatcher, RequestMatcher},
     },
 };
@@ -49,27 +49,42 @@ where
     Self: Required<BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>>,
 {
     fn default() -> Self {
-        Self { request_matchers: Vec::new(), base_http_configurer: Default::default() }
+        Self {
+            request_matchers: Vec::new(),
+            base_http_configurer: Default::default(),
+        }
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>>
-    for HttpsRedirectConfigurer<H> where H: HttpSecurityBuilder<H>
+impl<H> Required<BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>> for HttpsRedirectConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
 {
-    fn get_object(&self) -> &BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H> { &self.base_http_configurer }
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H> { &mut self.base_http_configurer }
+    fn get_object(&self) -> &BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H> {
+        &self.base_http_configurer
+    }
+    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H> {
+        &mut self.base_http_configurer
+    }
 }
 
 impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>>
     for HttpsRedirectConfigurer<H>
-where H: HttpSecurityBuilder<H>, H: SecurityBuilder<DefaultSecurityFilterChain>
+where
+    H: HttpSecurityBuilder<H>,
+    H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
-    fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> { self.base_http_configurer.get_object() }
-    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> { self.base_http_configurer.get_mut_object() }
+    fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+        self.base_http_configurer.get_object()
+    }
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+        self.base_http_configurer.get_mut_object()
+    }
 }
 
 impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for HttpsRedirectConfigurer<H>
-where H: HttpSecurityBuilder<H>
+where
+    H: HttpSecurityBuilder<H>,
 {
     fn init(&mut self, _http: &mut H) {}
 

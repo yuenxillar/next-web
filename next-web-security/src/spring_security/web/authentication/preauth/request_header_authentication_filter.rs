@@ -3,6 +3,7 @@ use std::sync::Arc;
 use next_web_core::{
     async_trait,
     error::BoxError,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -94,10 +95,10 @@ impl HttpFilter for RequestHeaderAuthenticationFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         let principal = match self.pre_authenticated_principal(request) {
             Ok(principal) => principal,
-            Err(error) => return Err(Box::new(error)),
+            Err(error) => return Err(FilterError::Chain(Box::new(error))),
         };
         let Some(principal) = principal else {
             return Ok(());

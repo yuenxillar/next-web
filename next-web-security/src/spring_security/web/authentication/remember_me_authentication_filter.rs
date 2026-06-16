@@ -3,6 +3,7 @@ use std::sync::Arc;
 use next_web_core::{
     async_trait,
     error::BoxError,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -43,31 +44,28 @@ impl HttpFilter for RememberMeAuthenticationFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         // Only attempt remember-me if no authentication already exists
         let has_auth = SecurityContextHolder::get_context()
             .and_then(|ctx| ctx.get_authentication())
             .is_some();
 
         if !has_auth {
-            if let Some(remember_me_auth) =
-                self.remember_me_services.auto_login(request, response)
+            if let Some(remember_me_auth) = self.remember_me_services.auto_login(request, response)
             {
                 // Authenticate the remember-me token via the AuthenticationManager
                 match self
                     .authentication_manager
                     .authenticate(remember_me_auth.as_ref())
                 {
-                    Ok(auth_result) => {
-                        match SecurityContextHolder::get_context() {
-                            Some(ctx) => ctx.set_authentication(Some(auth_result)),
-                            None => {
-                                let ctx = SecurityContextHolder::create_empty_context();
-                                ctx.set_authentication(Some(auth_result));
-                                SecurityContextHolder::set_context(ctx);
-                            }
+                    Ok(auth_result) => match SecurityContextHolder::get_context() {
+                        Some(ctx) => ctx.set_authentication(Some(auth_result)),
+                        None => {
+                            let ctx = SecurityContextHolder::create_empty_context();
+                            ctx.set_authentication(Some(auth_result));
+                            SecurityContextHolder::set_context(ctx);
                         }
-                    }
+                    },
                     Err(_) => {
                         // Remember-me failed — continue without authentication
                     }

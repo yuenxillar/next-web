@@ -4,6 +4,7 @@ use next_web_core::{
     anys::any_value::AnyValue,
     async_trait,
     error::BoxError,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -43,7 +44,7 @@ impl HttpFilter for SecurityContextHolderFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         if request.get_attribute(Self::FILTER_APPLIED).is_some() {
             return filter_chain.do_filter(request, response).await;
         }

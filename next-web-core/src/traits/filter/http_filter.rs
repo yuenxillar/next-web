@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use dyn_clone::{DynClone, clone_trait_object};
 
 use crate::{
-    error::BoxError,
+    filter::FilterError,
     traits::{
         filter::http_filter_chain::HttpFilterChain,
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -24,7 +24,7 @@ where
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError>;
+    ) -> Result<(), FilterError>;
 
     #[allow(unused_variables)]
     fn supports(&self, name: &str) -> bool {

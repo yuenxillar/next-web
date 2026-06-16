@@ -4,6 +4,7 @@ use next_web_core::{
     anys::any_value::AnyValue,
     async_trait,
     error::BoxError,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -93,7 +94,7 @@ impl HttpFilter for AuthorizationFilter {
         req: &mut dyn HttpRequest,
         resp: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         if self.observe_once_per_request && self.is_applied(req) {
             return filter_chain.do_filter(req, resp).await;
         }
@@ -117,7 +118,7 @@ impl HttpFilter for AuthorizationFilter {
             .map(|publisher| publisher.publish_authorization_event(authentication, (), result));
 
         if result.as_ref().map(|s| s.is_granted()).unwrap_or(true) {
-            return Err("Access Denied".into());
+            return Err(FilterError::Custom("Access Denied".into()));
         }
 
         filter_chain.do_filter(req, resp).await;

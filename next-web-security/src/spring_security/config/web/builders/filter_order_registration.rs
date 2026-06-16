@@ -4,17 +4,18 @@ use next_web_core::traits::filter::HttpFilter;
 
 use crate::web::{
     access::{intercept::AuthorizationFilter, ErrorTranslationFilter},
-    authentication::https_redirect_filter::HttpsRedirectFilter,
     authentication::{
         anonymous_authentication_filter::AnonymousAuthenticationFilter,
         basic_authentication_filter::BasicAuthenticationFilter, logout::LogoutFilter,
         remember_me_authentication_filter::RememberMeAuthenticationFilter,
+        switchuser::SwitchUserFilter,
         ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
         username_password_authentication_filter::UsernamePasswordAuthenticationFilter,
     },
     csrf::CsrfFilter,
     header::HeaderWriterFilter,
     savedrequest::RequestCacheAwareFilter,
+    transport::HttpsRedirectFilter,
 };
 
 #[derive(Clone)]
@@ -51,52 +52,34 @@ impl Default for FilterOrderRegistration {
             filter_to_order: Default::default(),
         };
 
-        // HttpsRedirectFilter — redirects HTTP to HTTPS
         filter_order.put::<HttpsRedirectFilter>(order.next());
-        order.next();
-
-        // LogoutFilter — handles /logout
-        filter_order.put::<LogoutFilter>(order.next());
-        order.next();
-
-        // CsrfFilter — validates CSRF tokens for mutating requests
-        filter_order.put::<CsrfFilter>(order.next());
-        order.next();
-
-        // UsernamePasswordAuthenticationFilter — processes form login
-        filter_order.put::<UsernamePasswordAuthenticationFilter>(order.next());
-        order.next();
-
-        // HeaderWriterFilter — writes security headers to the response
+        filter_order.put::<SecurityContextHolderFilter>(order.next());
         filter_order.put::<HeaderWriterFilter>(order.next());
+        filter_order.put::<CorsFilter>(order.next());
+        filter_order.put::<CsrfFilter>(order.next());
+        filter_order.put::<LogoutFilter>(order.next());
+
+        filter_order.put::<GenerateOneTimeTokenFilter>(order.next());
+
+        filter_order.put::<UsernamePasswordAuthenticationFilter>(order.next());
+        filter_order.put::<OneTimeTokenAuthenticationFilter>(order.next());
         order.next();
 
-        // BasicAuthenticationFilter — processes HTTP Basic auth
-        filter_order.put::<BasicAuthenticationFilter>(order.next());
-        order.next();
-
-        // DefaultLoginPageGeneratingFilter — auto-generated login page
+        filter_order.put::<DefaultResourcesFilter>(order.next());
         filter_order.put::<DefaultLoginPageGeneratingFilter>(order.next());
-        order.next();
+        filter_order.put::<DefaultLogoutPageGeneratingFilter>(order.next());
+        filter_order.put::<DefaultOneTimeTokenSubmitPageGeneratingFilter>(order.next());
 
-        // ErrorTranslationFilter — translates auth exceptions to HTTP responses
-        filter_order.put::<ErrorTranslationFilter>(order.next());
-        order.next();
-
-        // RequestCacheAwareFilter — replays saved requests after auth
+        filter_order.put::<BasicAuthenticationFilter>(order.next());
+        filter_order.put::<BasicAuthenticationFilter>(order.next());
+        filter_order.put::<AuthenticationFilter>(order.next());
         filter_order.put::<RequestCacheAwareFilter>(order.next());
-        order.next();
-
-        // RememberMeAuthenticationFilter — auto-login from persistent cookie
         filter_order.put::<RememberMeAuthenticationFilter>(order.next());
-        order.next();
-
-        // AnonymousAuthenticationFilter — populates anonymous SecurityContext
         filter_order.put::<AnonymousAuthenticationFilter>(order.next());
-        order.next();
-
-        // AuthorizationFilter — enforces access control rules
+        filter_order.put::<SessionManagementFilter>(order.next());
+        filter_order.put::<ErrorTranslationFilter>(order.next());
         filter_order.put::<AuthorizationFilter>(order.next());
+        filter_order.put::<SwitchUserFilter>(order.next());
 
         filter_order
     }

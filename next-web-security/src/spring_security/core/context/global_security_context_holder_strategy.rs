@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use futures::future::BoxFuture;
-use next_web_core::error::BoxError;
+use next_web_core::{error::BoxError, filter::FilterError};
 
 use crate::core::context::{
     security_context::SecurityContext,
@@ -49,8 +49,8 @@ impl SecurityContextHolderStrategy for GlobalSecurityContextHolderStrategy {
     fn scope_with_context<'a>(
         &'a self,
         context: Arc<dyn SecurityContext>,
-        f: BoxFuture<'a, Result<(), BoxError>>,
-    ) -> BoxFuture<'a, Result<(), BoxError>> {
+        f: BoxFuture<'a, Result<(), FilterError>>,
+    ) -> BoxFuture<'a, Result<(), FilterError>> {
         todo!()
     }
 

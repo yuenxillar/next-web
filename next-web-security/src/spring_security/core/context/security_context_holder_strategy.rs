@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures::future::BoxFuture;
-use next_web_core::error::BoxError;
+use next_web_core::filter::FilterError;
 
 use crate::core::context::security_context::SecurityContext;
 
@@ -18,8 +18,8 @@ where
     fn scope_with_context<'a>(
         &'a self,
         context: Arc<dyn SecurityContext>,
-        f: BoxFuture<'a, Result<(), BoxError>>,
-    ) -> BoxFuture<'a, Result<(), BoxError>>;
+        f: BoxFuture<'a, Result<(), FilterError>>,
+    ) -> BoxFuture<'a, Result<(), FilterError>>;
 
     fn create_empty_context(&self) -> Arc<dyn SecurityContext>;
 }

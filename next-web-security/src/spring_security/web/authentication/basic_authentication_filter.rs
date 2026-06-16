@@ -3,6 +3,7 @@ use std::sync::Arc;
 use next_web_core::{
     async_trait,
     error::BoxError,
+    filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -71,7 +72,7 @@ impl HttpFilter for BasicAuthenticationFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), FilterError> {
         // Extract and attempt authentication if header present
         if let Some((username, password)) = self.extract_basic_credentials(request) {
             let token = UsernamePasswordAuthenticationToken::unauthenticated(
@@ -123,7 +124,5 @@ impl Named for BasicAuthenticationFilter {
 /// Decode a base64-encoded string to bytes.
 fn base64_decode(input: &str) -> Option<Vec<u8>> {
     use base64::Engine;
-    base64::engine::general_purpose::STANDARD
-        .decode(input)
-        .ok()
+    base64::engine::general_purpose::STANDARD.decode(input).ok()
 }
