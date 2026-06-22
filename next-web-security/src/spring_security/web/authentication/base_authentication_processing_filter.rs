@@ -1,10 +1,17 @@
 use std::sync::Arc;
 
-use axum::http::StatusCode;
+use next_web_core::http::StatusCode;
 use next_web_core::{
     anys::any_value::AnyValue,
+    async_trait,
     error::BoxError,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    filter::FilterError,
+    traits::{
+        filter::{HttpFilter, HttpFilterChain},
+        http::{http_request::HttpRequest, http_response::HttpResponse},
+        named::Named,
+    },
+    util::http_method::HttpMethod,
 };
 
 use crate::{
@@ -14,17 +21,22 @@ use crate::{
         context::security_context_holder::SecurityContextHolder,
         Authentication,
     },
-    web::authentication::{
-        authentication_failure_handler::AuthenticationFailureHandler,
-        authentication_success_handler::AuthenticationSuccessHandler,
-        remember_me_services::RememberMeServices,
-        rememberme::base_remember_me_services::BaseRememberMeServices,
+    web::{
+        authentication::{
+            authentication_converter::AuthenticationConverter,
+            authentication_failure_handler::AuthenticationFailureHandler,
+            authentication_success_handler::AuthenticationSuccessHandler,
+            remember_me_services::RememberMeServices,
+            rememberme::base_remember_me_services::BaseRememberMeServices,
+        },
+        util::matcher::{PathPatternRequestMatcher, RequestMatcher},
     },
-    web::util::matcher::RequestMatcher,
 };
 
 #[derive(Clone)]
 pub struct BaseAuthenticationProcessingFilter {
+    authentication_converter: Option<Arc<dyn AuthenticationConverter>>,
+
     authentication_manager: Option<Arc<dyn AuthenticationManager>>,
     success_handler: Option<Arc<dyn AuthenticationSuccessHandler>>,
     failure_handler: Option<Arc<dyn AuthenticationFailureHandler>>,
@@ -35,9 +47,10 @@ pub struct BaseAuthenticationProcessingFilter {
 impl Default for BaseAuthenticationProcessingFilter {
     fn default() -> Self {
         Self {
-            authentication_manager: None,
-            success_handler: None,
-            failure_handler: None,
+            authentication_converter: Default::default(),
+            authentication_manager: Default::default(),
+            success_handler: Default::default(),
+            failure_handler: Default::default(),
             remember_me_services: Arc::new(BaseRememberMeServices {}),
             requires_authentication_request_matcher: None,
         }
@@ -45,6 +58,21 @@ impl Default for BaseAuthenticationProcessingFilter {
 }
 
 impl BaseAuthenticationProcessingFilter {
+    pub fn new(default_filter_processes_url: impl Into<String>) -> Self {
+        Self {
+            authentication_converter: Default::default(),
+            authentication_manager: Default::default(),
+            success_handler: Default::default(),
+            failure_handler: Default::default(),
+            remember_me_services: Arc::new(BaseRememberMeServices {}),
+            requires_authentication_request_matcher: Some(Arc::new(
+                PathPatternRequestMatcher::path_pattern(
+                    Some(HttpMethod::Post),
+                    default_filter_processes_url.into().as_str(),
+                ),
+            )),
+        }
+    }
     pub fn get_remember_me_services(&self) -> &dyn RememberMeServices {
         self.remember_me_services.as_ref()
     }
@@ -64,11 +92,25 @@ impl BaseAuthenticationProcessingFilter {
         self.failure_handler = Some(failure_handler);
     }
 
-    pub fn requires_authentication(&self, request: &mut dyn HttpRequest) -> bool {
+    pub fn requires_authentication(&self, request: &dyn HttpRequest) -> bool {
         self.requires_authentication_request_matcher
             .as_ref()
             .map(|matcher| matcher.matches(request))
             .unwrap_or(false)
+    }
+
+    pub fn set_authentication_converter(
+        &mut self,
+        authentication_converter: Arc<dyn AuthenticationConverter>,
+    ) {
+        self.authentication_converter = Some(authentication_converter);
+    }
+
+    pub fn set_requires_authentication_request_matcher(
+        &mut self,
+        request_matcher: impl RequestMatcher + 'static,
+    ) {
+        self.requires_authentication_request_matcher = Some(Arc::new(request_matcher));
     }
 
     pub fn attempt_authentication(
@@ -141,11 +183,20 @@ impl BaseAuthenticationProcessingFilter {
     }
 }
 
-impl BaseAuthenticationProcessingFilter {
-    pub fn set_requires_authentication_request_matcher(
-        &mut self,
-        request_matcher: impl RequestMatcher + 'static,
-    ) {
-        self.requires_authentication_request_matcher = Some(Arc::new(request_matcher));
+#[async_trait]
+impl HttpFilter for BaseAuthenticationProcessingFilter {
+    async fn do_filter(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        filter_chain: &dyn HttpFilterChain,
+    ) -> Result<(), FilterError> {
+        todo!()
+    }
+}
+
+impl Named for BaseAuthenticationProcessingFilter {
+    fn name(&self) -> &str {
+        "BaseAuthenticationProcessingFilter"
     }
 }

@@ -19,6 +19,8 @@ where
 
     fn header(&self, name: &str) -> Option<&str>;
 
+    fn headers(&self, name: &str) -> Option<Vec<&str>>;
+
     fn append_header(&mut self, name: &str, value: &str) -> bool;
 
     fn contains_header(&self, name: &str) -> bool;
@@ -53,6 +55,10 @@ impl HttpResponse for Response {
         self.headers()
             .get(name)
             .map(|value| value.to_str().ok().unwrap_or_default())
+    }
+
+    fn headers(&self, name: &str) -> Option<Vec<&str>> {
+        todo!()
     }
 
     fn append_header(&mut self, name: &str, value: &str) -> bool {

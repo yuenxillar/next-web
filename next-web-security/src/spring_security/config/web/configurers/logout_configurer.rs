@@ -14,7 +14,7 @@ use crate::{
     web::{
         authentication::{
             logout::{LogoutFilter, LogoutHandler, SimpleUrlLogoutSuccessHandler},
-            ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
+            ui::DefaultLoginPageGeneratingFilter,
         },
         default_security_filter_chain::DefaultSecurityFilterChain,
     },

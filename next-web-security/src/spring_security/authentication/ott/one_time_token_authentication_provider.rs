@@ -6,19 +6,18 @@ use crate::{
     authentication::{
         authentication_provider::AuthenticationProvider,
         ott::{
-            invalid_one_time_token_exception::invalid_one_time_token,
-            one_time_token::OneTimeToken,
+            invalid_one_time_token_exception::invalid_one_time_token, one_time_token::OneTimeToken,
             one_time_token_authentication::OneTimeTokenAuthentication,
             one_time_token_authentication_token::OneTimeTokenAuthenticationToken,
             one_time_token_service::OneTimeTokenService,
         },
     },
     core::{
-        Authentication,
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
         authority_utils::AuthorityUtils,
         factor_granted_authority::FactorGrantedAuthority,
         userdetails::user_details_service::UserDetailsService,
+        Authentication,
     },
 };
 
@@ -111,8 +110,7 @@ mod tests {
             authority_utils::AuthorityUtils,
             factor_granted_authority::FactorGrantedAuthority,
             userdetails::{
-                map_user_details_service::MapUserDetailsService,
-                user::User,
+                map_user_details_service::MapUserDetailsService, user::User,
                 user_details::UserDetails,
             },
         },
@@ -125,14 +123,12 @@ mod tests {
             "alice",
             Some(String::from("password")),
             AuthorityUtils::create_authority_list(["ROLE_USER"]),
-        )) as Arc<dyn UserDetails>]));
-        let provider = OneTimeTokenAuthenticationProvider::new(
-            token_service.clone(),
-            user_details_service,
-        );
+        ))
+            as Arc<dyn UserDetails>]));
+        let provider =
+            OneTimeTokenAuthenticationProvider::new(token_service.clone(), user_details_service);
         let generated = token_service.generate(GenerateOneTimeTokenRequest::new("alice"));
-        let authentication =
-            OneTimeTokenAuthenticationToken::new(generated.token_value());
+        let authentication = OneTimeTokenAuthenticationToken::new(generated.token_value());
 
         let result = provider.authenticate(&authentication).await.unwrap();
 

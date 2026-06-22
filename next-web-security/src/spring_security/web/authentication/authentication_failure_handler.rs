@@ -1,4 +1,7 @@
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::{
+    error::BoxError,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+};
 
 use crate::core::authentication_error::AuthenticationError;
 
@@ -8,5 +11,5 @@ pub trait AuthenticationFailureHandler: Send + Sync {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         error: &AuthenticationError,
-    );
+    ) -> Result<(), BoxError>;
 }

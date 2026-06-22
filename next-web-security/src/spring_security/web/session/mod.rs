@@ -1,10 +1,13 @@
-
-mod invalid_session_strategy;
-mod session_information_expired_strategy;
-mod session_information_expired_event;
+mod concurrent_session_filter;
 mod invalid_session_access_denied_handler;
+mod invalid_session_strategy;
+mod session_information_expired_event;
+mod session_information_expired_strategy;
+mod session_management_filter;
 
-pub use invalid_session_strategy::InvalidSessionStrategy;
-pub use session_information_expired_strategy::SessionInformationExpiredStrategy;
-pub use session_information_expired_event::SessionInformationExpiredEvent;
+pub use concurrent_session_filter::ConcurrentSessionFilter;
 pub use invalid_session_access_denied_handler::InvalidSessionAccessDeniedHandler;
+pub use invalid_session_strategy::InvalidSessionStrategy;
+pub use session_information_expired_event::SessionInformationExpiredEvent;
+pub use session_information_expired_strategy::SessionInformationExpiredStrategy;
+pub use session_management_filter::SessionManagementFilter;

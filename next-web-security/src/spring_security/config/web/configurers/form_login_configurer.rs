@@ -21,7 +21,7 @@ use crate::{
         authentication::{
             forward_authentication_failure_handler::ForwardAuthenticationFailureHandler,
             forward_authentication_success_handler::ForwardAuthenticationSuccessHandler,
-            ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
+            ui::DefaultLoginPageGeneratingFilter,
             username_password_authentication_filter::UsernamePasswordAuthenticationFilter,
         },
         default_security_filter_chain::DefaultSecurityFilterChain,

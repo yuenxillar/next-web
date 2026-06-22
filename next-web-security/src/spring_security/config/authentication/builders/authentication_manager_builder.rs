@@ -39,7 +39,7 @@ pub struct AuthenticationManagerBuilder {
 
 impl AuthenticationManagerBuilder {
     pub fn new() -> Self {
-        let base_configured_security_builder = BaseConfiguredSecurityBuilder::new(true);
+        let base_configured_security_builder = BaseConfiguredSecurityBuilder::new();
         Self {
             authentication_manager: Default::default(),
             parent_authentication_manager: Default::default(),

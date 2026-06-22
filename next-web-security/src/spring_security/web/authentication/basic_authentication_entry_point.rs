@@ -1,11 +1,11 @@
-use axum::{
-    extract::Request,
-    http::StatusCode,
-    response::Response,
-};
-use next_web_core::error::BoxError;
+use next_web_core::http::StatusCode;
+use next_web_core::traits::http::http_response::HttpResponse;
+use next_web_core::{error::BoxError, traits::http::http_request::HttpRequest};
 
-use crate::{core::authentication_error::AuthenticationError, web::authentication_entry_point::AuthenticationEntryPoint};
+use crate::{
+    core::authentication_error::AuthenticationError,
+    web::authentication_entry_point::AuthenticationEntryPoint,
+};
 
 /// Sends a `401 Unauthorized` response with a `WWW-Authenticate: Basic`
 /// header, challenging the client to provide HTTP Basic credentials.
@@ -30,17 +30,15 @@ impl BasicAuthenticationEntryPoint {
 impl AuthenticationEntryPoint for BasicAuthenticationEntryPoint {
     fn commence(
         &self,
-        _request: &mut Request,
-        _response: &mut Response,
+        _request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
         _auth_error: Option<AuthenticationError>,
     ) -> Result<(), BoxError> {
         let header_value = format!(r#"Basic realm="{}""#, self.realm_name);
-        let resp = Response::builder()
-            .status(StatusCode::UNAUTHORIZED)
-            .header("WWW-Authenticate", &header_value)
-            .body(axum::body::Body::empty())
-            .map_err(|e| Box::new(e) as BoxError)?;
-        *_response = resp;
+        response.set_status_code(StatusCode::UNAUTHORIZED);
+        response.insert_header("WWW-Authenticate", &header_value);
+        response.set_body(Default::default());
+
         Ok(())
     }
 }

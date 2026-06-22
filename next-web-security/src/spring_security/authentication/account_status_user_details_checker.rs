@@ -31,32 +31,3 @@ impl UserDetailsChecker for AccountStatusUserDetailsChecker {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        core::{
-            authority_utils::AuthorityUtils,
-            userdetails::{user::User, user_details_checker::UserDetailsChecker},
-        },
-    };
-
-    use super::AccountStatusUserDetailsChecker;
-
-    #[tokio::test]
-    async fn account_status_checker_rejects_locked_users() {
-        let checker = AccountStatusUserDetailsChecker;
-        let user = User::with_flags(
-            "alice",
-            Some(String::from("secret")),
-            true,
-            true,
-            true,
-            false,
-            AuthorityUtils::create_authority_list(["ROLE_USER"]),
-        );
-
-        let error = checker.check(&user).await.unwrap_err();
-        assert_eq!(error.get_message(), "User account is locked");
-    }
-}

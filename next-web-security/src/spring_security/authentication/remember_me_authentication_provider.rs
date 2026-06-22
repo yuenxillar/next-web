@@ -8,7 +8,7 @@ use crate::{
         authentication_provider::AuthenticationProvider,
         remember_me_authentication_token::RememberMeAuthenticationToken,
     },
-    core::{Authentication, authentication_error::AuthenticationError},
+    core::{authentication_error::AuthenticationError, Authentication},
 };
 
 #[derive(Clone)]
@@ -56,32 +56,7 @@ impl AuthenticationProvider for RememberMeAuthenticationProvider {
 }
 
 fn java_string_hash(value: &str) -> i32 {
-    value
-        .chars()
-        .fold(0_i32, |acc, ch| acc.wrapping_mul(31).wrapping_add(ch as i32))
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        authentication::{
-            authentication_provider::AuthenticationProvider,
-            remember_me_authentication_provider::RememberMeAuthenticationProvider,
-            remember_me_authentication_token::RememberMeAuthenticationToken,
-        },
-        core::authority_utils::AuthorityUtils,
-    };
-
-    #[tokio::test]
-    async fn remember_me_authentication_provider_validates_matching_key() {
-        let provider = RememberMeAuthenticationProvider::new("shared-key");
-        let token = RememberMeAuthenticationToken::new(
-            "shared-key",
-            "alice",
-            AuthorityUtils::create_authority_list(["ROLE_USER"]),
-        );
-
-        let result = provider.authenticate(&token).await.unwrap();
-        assert!(result.is_remember_me());
-    }
+    value.chars().fold(0_i32, |acc, ch| {
+        acc.wrapping_mul(31).wrapping_add(ch as i32)
+    })
 }

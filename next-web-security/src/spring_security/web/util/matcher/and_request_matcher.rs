@@ -1,7 +1,6 @@
-use std::fmt;
 use std::sync::Arc;
+use std::{collections::BTreeMap, fmt};
 
-use indexmap::IndexMap;
 use next_web_core::traits::http::http_request::HttpRequest;
 
 use crate::web::util::matcher::{MatchResult, RequestMatcher};
@@ -56,7 +55,7 @@ impl RequestMatcher for AndRequestMatcher {
     /// # Returns
     /// a MatchResult based on the given HTTP request
     fn matcher(&self, request: &dyn HttpRequest) -> MatchResult {
-        let mut variables = IndexMap::new();
+        let mut variables = BTreeMap::new();
         for matcher in self.request_matchers.iter() {
             let result = matcher.matcher(request);
             if !result.is_match() {

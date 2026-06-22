@@ -1,9 +1,8 @@
-use axum::http::StatusCode;
+use next_web_core::http::StatusCode;
 use next_web_core::{
     error::BoxError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
-use tracing::debug;
 
 pub trait RedirectStrategy: Send + Sync {
     fn send_redirect(

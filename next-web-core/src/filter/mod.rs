@@ -1,8 +1,9 @@
 pub mod application_filter_chain;
 
+mod cors_filter;
 mod filter_error;
 mod once_per_request_filter;
 
-pub use once_per_request_filter::OncePerRequestFilter;
-
+pub use cors_filter::CorsFilter;
 pub use filter_error::FilterError;
+pub use once_per_request_filter::OncePerRequestFilter;

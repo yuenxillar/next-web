@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
-use axum::http::StatusCode;
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::http::StatusCode;
+use next_web_core::{
+    error::BoxError,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+};
 use tracing::debug;
 
 use crate::{
@@ -88,7 +91,7 @@ impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         error: &AuthenticationError,
-    ) {
+    ) -> Result<(), BoxError> {
         if self.default_failure_url.is_none() {
             debug!("Sending 401 Unauthorized error");
 
@@ -116,5 +119,7 @@ impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
                 );
             }
         }
+
+        todo!()
     }
 }

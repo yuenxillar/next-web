@@ -16,8 +16,7 @@ use crate::{
     authorization::AuthenticationManager,
     core::{
         authentication_error::AuthenticationError,
-        context::{security_context_holder::SecurityContextHolder, SecurityContext},
-        Authentication,
+        context::security_context_holder::SecurityContextHolder, Authentication,
     },
 };
 
@@ -112,17 +111,5 @@ impl HttpFilter for BasePreAuthenticatedProcessingFilterSupport {
 impl Named for BasePreAuthenticatedProcessingFilterSupport {
     fn name(&self) -> &str {
         "BasePreAuthenticatedProcessingFilterSupport"
-    }
-}
-
-pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        tokio::task::block_in_place(|| handle.block_on(future))
-    } else {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("failed to build Tokio runtime")
-            .block_on(future)
     }
 }

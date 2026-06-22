@@ -15,6 +15,12 @@ pub enum HttpMethod {
 
 impl ToString for HttpMethod {
     fn to_string(&self) -> String {
+        self.as_ref().to_string()
+    }
+}
+
+impl AsRef<str> for HttpMethod {
+    fn as_ref(&self) -> &str {
         match self {
             HttpMethod::Get => "GET",
             HttpMethod::Head => "HEAD",
@@ -25,7 +31,6 @@ impl ToString for HttpMethod {
             HttpMethod::Options => "OPTIONS",
             HttpMethod::Trace => "TRACE",
         }
-        .to_string()
     }
 }
 

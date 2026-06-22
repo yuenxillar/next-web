@@ -1,9 +1,12 @@
-use axum::http::StatusCode;
-use next_web_core::error::BoxError;
+use next_web_core::http::StatusCode;
+use next_web_core::{
+    error::BoxError,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+};
 use tracing::debug;
 
 use super::{
-    request_rejectedError::RequestRejectedError, request_rejected_handler::RequestRejectedHandler,
+    request_rejected_error::RequestRejectedError, request_rejected_handler::RequestRejectedHandler,
 };
 
 #[derive(Clone)]
@@ -22,13 +25,13 @@ impl Default for HttpStatusRequestRejectedHandler {
 impl RequestRejectedHandler for HttpStatusRequestRejectedHandler {
     fn handle(
         &self,
-        _request: &mut axum::extract::Request,
-        response: &mut axum::response::Response,
+        _request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
         request_rejected_error: &RequestRejectedError,
     ) -> Result<(), BoxError> {
         debug!("Rejecting request due to: {}", request_rejected_error.0);
 
-        *response.status_mut() = self.http_status;
+        response.set_status_code(self.http_status);
         Ok(())
     }
 }

@@ -1,6 +1,5 @@
 use next_web_core::{
     async_trait,
-    error::BoxError,
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
@@ -104,7 +103,7 @@ impl DefaultLoginPageGeneratingFilter {
         self.authentication_url = Some(url.into());
     }
 
-    async fn generate_login_page_html(
+    fn generate_login_page_html(
         &self,
         request: &dyn HttpRequest,
         login_error: bool,
@@ -256,7 +255,7 @@ impl HttpFilter for DefaultLoginPageGeneratingFilter {
             .split('&')
             .any(|pair| pair == "logout" || pair.starts_with("logout="));
 
-        let html = block_on(self.generate_login_page_html(request, login_error, logout_success));
+        let html = self.generate_login_page_html(request, login_error, logout_success);
         // request.set_status_code(StatusCode::OK);
         // request.insert_header("content-type", "text/html; charset=utf-8");
         // request.set_body(html.into_bytes());
@@ -268,18 +267,6 @@ impl HttpFilter for DefaultLoginPageGeneratingFilter {
 impl Named for DefaultLoginPageGeneratingFilter {
     fn name(&self) -> &str {
         "DefaultLoginPageGeneratingFilter"
-    }
-}
-
-fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        tokio::task::block_in_place(|| handle.block_on(future))
-    } else {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("failed to build Tokio runtime")
-            .block_on(future)
     }
 }
 

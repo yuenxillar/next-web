@@ -1,4 +1,4 @@
-use axum::http::StatusCode;
+use next_web_core::http::StatusCode;
 use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 
 use crate::web::header::{writers::StaticHeadersWriter, Header, HeaderWriter};

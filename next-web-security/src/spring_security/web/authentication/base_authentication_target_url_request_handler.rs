@@ -8,6 +8,7 @@ use crate::{
     web::redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},
 };
 
+#[derive(Clone)]
 pub struct BaseAuthenticationTargetUrlRequestHandler {
     target_url_parameter: Option<Box<str>>,
     default_target_url: Box<str>,

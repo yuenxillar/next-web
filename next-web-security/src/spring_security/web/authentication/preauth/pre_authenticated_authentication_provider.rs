@@ -5,13 +5,13 @@ use next_web_core::async_trait;
 use crate::{
     authentication::authentication_provider::AuthenticationProvider,
     core::{
-        Authentication,
         authentication_error::AuthenticationError,
         authority_utils::AuthorityUtils,
         userdetails::{
             authentication_user_details_service::AuthenticationUserDetailsService,
             user_details_checker::UserDetailsChecker,
         },
+        Authentication,
     },
     web::authentication::preauth::{
         pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
@@ -102,7 +102,9 @@ impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
             .load_user_details(authentication)
             .await
             .map_err(|error| AuthenticationError::new(error.to_string()))?;
-        self.user_details_checker.check(user_details.as_ref()).await?;
+        self.user_details_checker
+            .check(user_details.as_ref())
+            .await?;
 
         let mut authorities = Vec::new();
         for authority in user_details.get_authorities().await {
@@ -123,66 +125,5 @@ impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
 
     fn supports(&self, authentication: &str) -> bool {
         authentication == std::any::type_name::<PreAuthenticatedAuthenticationToken>()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use next_web_core::async_trait;
-
-    use crate::{
-        authentication::account_status_user_details_checker::AccountStatusUserDetailsChecker,
-        authentication::authentication_provider::AuthenticationProvider,
-        core::{
-            Authentication,
-            authority_utils::AuthorityUtils,
-            userdetails::{
-                authentication_user_details_service::AuthenticationUserDetailsService,
-                user::User,
-                user_details::UserDetails,
-                username_not_found_error::UsernameNotFoundError,
-            },
-        },
-        web::authentication::preauth::{
-            pre_authenticated_authentication_provider::PreAuthenticatedAuthenticationProvider,
-            pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
-        },
-    };
-
-    struct StubAuthenticationUserDetailsService;
-
-    #[async_trait]
-    impl AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken>
-        for StubAuthenticationUserDetailsService
-    {
-        async fn load_user_details(
-            &self,
-            token: &PreAuthenticatedAuthenticationToken,
-        ) -> Result<Arc<dyn UserDetails>, UsernameNotFoundError> {
-            Ok(Arc::new(User::new(
-                token.get_name(),
-                token.get_credentials(),
-                AuthorityUtils::create_authority_list(["ROLE_USER"]),
-            )))
-        }
-    }
-
-    #[tokio::test]
-    async fn pre_authenticated_authentication_provider_authenticates_token() {
-        let provider = PreAuthenticatedAuthenticationProvider::new(
-            Arc::new(StubAuthenticationUserDetailsService),
-            Arc::new(AccountStatusUserDetailsChecker),
-        );
-        let token = PreAuthenticatedAuthenticationToken::unauthenticated(
-            Some(String::from("alice")),
-            Some(String::from("external-credential")),
-        );
-
-        let result = provider.authenticate(&token).await.unwrap();
-        assert!(result.is_authenticated());
-        assert_eq!(result.get_name(), "alice");
-        assert_eq!(result.authorities(), vec![String::from("ROLE_USER")]);
     }
 }

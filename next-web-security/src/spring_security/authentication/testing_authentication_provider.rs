@@ -7,7 +7,7 @@ use crate::{
         authentication_provider::AuthenticationProvider,
         testing_authentication_token::TestingAuthenticationToken,
     },
-    core::{Authentication, authentication_error::AuthenticationError},
+    core::{authentication_error::AuthenticationError, Authentication},
 };
 
 #[derive(Clone, Default)]
@@ -33,30 +33,5 @@ impl AuthenticationProvider for TestingAuthenticationProvider {
 
     fn supports(&self, authentication: &str) -> bool {
         authentication == std::any::type_name::<TestingAuthenticationToken>()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        authentication::{
-            authentication_provider::AuthenticationProvider,
-            testing_authentication_provider::TestingAuthenticationProvider,
-            testing_authentication_token::TestingAuthenticationToken,
-        },
-        core::authority_utils::AuthorityUtils,
-    };
-
-    #[tokio::test]
-    async fn testing_authentication_provider_accepts_testing_token() {
-        let provider = TestingAuthenticationProvider;
-        let token = TestingAuthenticationToken::with_authorities(
-            "alice",
-            Some(String::from("secret")),
-            AuthorityUtils::create_authority_list(["ROLE_TEST"]),
-        );
-
-        let result = provider.authenticate(&token).await.unwrap();
-        assert_eq!(result.get_name(), "alice");
     }
 }

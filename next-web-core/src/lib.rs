@@ -5,6 +5,7 @@ pub mod client;
 pub mod common;
 pub mod constants;
 pub mod context;
+pub mod cors;
 pub mod error;
 pub mod filter;
 pub mod http;

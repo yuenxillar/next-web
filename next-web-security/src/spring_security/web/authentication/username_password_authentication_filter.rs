@@ -1,4 +1,4 @@
-use axum::http::StatusCode;
+use next_web_core::http::StatusCode;
 use next_web_core::{
     async_trait,
     filter::FilterError,

@@ -7,41 +7,41 @@ use crate::core::poi::ss::usermodel::{border_style::BorderStyle, color::Color};
 pub trait BorderFormatting: Debug {
     /// Get the bottom border style.
     ///
-    /// @since POI 4.0.0
+
     fn get_border_bottom(&self) -> BorderStyle;
 
     /// Get the diagonal border style.
     ///
-    /// @since POI 4.0.0
+
     fn get_border_diagonal(&self) -> BorderStyle;
 
     /// Get the left border style.
     ///
-    /// @since POI 4.0.0
+
     fn get_border_left(&self) -> BorderStyle;
 
     /// Get the right border style.
     ///
-    /// @since POI 4.0.0
+
     fn get_border_right(&self) -> BorderStyle;
 
     /// Get the top border style.
     ///
-    /// @since POI 4.0.0
+
     fn get_border_top(&self) -> BorderStyle;
 
     /// Get the vertical border style.
     ///
     /// Only valid for range borders, such as table styles.
     ///
-    /// @since POI 4.0.0
+
     fn get_border_vertical(&self) -> BorderStyle;
 
     /// Get the horizontal border style.
     ///
     /// Only valid for range borders, such as table styles.
     ///
-    /// @since POI 4.0.0
+
     fn get_border_horizontal(&self) -> BorderStyle;
 
     /// Get the bottom border color index.
@@ -78,28 +78,28 @@ pub trait BorderFormatting: Debug {
     ///
     /// Range internal borders. Only relevant for range styles, such as table formatting.
     ///
-    /// @since 3.17 beta 1
+
     fn get_vertical_border_color(&self) -> u16;
 
     /// Get the vertical border color object.
     ///
     /// Range internal borders. Only relevant for range styles, such as table formatting.
     ///
-    /// @since 3.17 beta 1
+
     fn get_vertical_border_color_color(&self) -> Option<&dyn Color>;
 
     /// Get the horizontal border color index.
     ///
     /// Range internal borders. Only relevant for range styles, such as table formatting.
     ///
-    /// @since 3.17 beta 1
+
     fn get_horizontal_border_color(&self) -> u16;
 
     /// Get the horizontal border color object.
     ///
     /// Range internal borders. Only relevant for range styles, such as table formatting.
     ///
-    /// @since 3.17 beta 1
+
     fn get_horizontal_border_color_color(&self) -> Option<&dyn Color>;
 
     /// Set bottom border.
@@ -137,7 +137,7 @@ pub trait BorderFormatting: Debug {
     /// # Arguments
     /// * `border` - The style of border to set.
     ///
-    /// @since 3.17 beta 1
+
     fn set_border_horizontal(&mut self, border: BorderStyle);
 
     /// Set range internal vertical borders.
@@ -145,7 +145,7 @@ pub trait BorderFormatting: Debug {
     /// # Arguments
     /// * `border` - The style of border to set.
     ///
-    /// @since 3.17 beta 1
+
     fn set_border_vertical(&mut self, border: BorderStyle);
 
     /// Set bottom border color by index.
@@ -215,7 +215,7 @@ pub trait BorderFormatting: Debug {
     /// # Arguments
     /// * `color` - Color index.
     ///
-    /// @since 3.17 beta 1
+
     fn set_horizontal_border_color_index(&mut self, color: u16);
 
     /// Set horizontal border color by object.
@@ -225,7 +225,7 @@ pub trait BorderFormatting: Debug {
     /// # Arguments
     /// * `color` - Color object.
     ///
-    /// @since 3.17 beta 1
+
     fn set_horizontal_border_color(&mut self, color: Box<dyn Color>);
 
     /// Set vertical border color by index.
@@ -235,7 +235,7 @@ pub trait BorderFormatting: Debug {
     /// # Arguments
     /// * `color` - Color index.
     ///
-    /// @since 3.17 beta 1
+
     fn set_vertical_border_color_index(&mut self, color: u16);
 
     /// Set vertical border color by object.
@@ -245,6 +245,6 @@ pub trait BorderFormatting: Debug {
     /// # Arguments
     /// * `color` - Color object.
     ///
-    /// @since 3.17 beta 1
+
     fn set_vertical_border_color(&mut self, color: Box<dyn Color>);
 }

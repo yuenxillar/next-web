@@ -1,20 +1,30 @@
 use std::collections::HashMap;
 
-use next_web_core::traits::filter::HttpFilter;
+use next_web_core::{filter::CorsFilter, traits::filter::HttpFilter};
 
 use crate::web::{
     access::{intercept::AuthorizationFilter, ErrorTranslationFilter},
     authentication::{
         anonymous_authentication_filter::AnonymousAuthenticationFilter,
-        basic_authentication_filter::BasicAuthenticationFilter, logout::LogoutFilter,
+        base_authentication_processing_filter::BaseAuthenticationProcessingFilter,
+        basic_authentication_filter::BasicAuthenticationFilter,
+        logout::LogoutFilter,
+        ott::{GenerateOneTimeTokenFilter, OneTimeTokenAuthenticationFilter},
         remember_me_authentication_filter::RememberMeAuthenticationFilter,
         switchuser::SwitchUserFilter,
-        ui::default_login_page_generating_filter::DefaultLoginPageGeneratingFilter,
+        ui::{
+            DefaultLoginPageGeneratingFilter, DefaultLogoutPageGeneratingFilter,
+            DefaultOneTimeTokenSubmitPageGeneratingFilter, DefaultResourcesFilter,
+        },
         username_password_authentication_filter::UsernamePasswordAuthenticationFilter,
+        www::DigestAuthenticationFilter,
+        AuthenticationFilter,
     },
+    context::SecurityContextHolderFilter,
     csrf::CsrfFilter,
     header::HeaderWriterFilter,
     savedrequest::RequestCacheAwareFilter,
+    session::{ConcurrentSessionFilter, SessionManagementFilter},
     transport::HttpsRedirectFilter,
 };
 
@@ -53,24 +63,24 @@ impl Default for FilterOrderRegistration {
         };
 
         filter_order.put::<HttpsRedirectFilter>(order.next());
+        order.next();
         filter_order.put::<SecurityContextHolderFilter>(order.next());
         filter_order.put::<HeaderWriterFilter>(order.next());
         filter_order.put::<CorsFilter>(order.next());
         filter_order.put::<CsrfFilter>(order.next());
         filter_order.put::<LogoutFilter>(order.next());
-
         filter_order.put::<GenerateOneTimeTokenFilter>(order.next());
-
+        // filter_order.put::<X509AuthenticationFilter>(order.next());
+        filter_order.put::<BaseAuthenticationProcessingFilter>(order.next());
         filter_order.put::<UsernamePasswordAuthenticationFilter>(order.next());
         filter_order.put::<OneTimeTokenAuthenticationFilter>(order.next());
         order.next();
-
         filter_order.put::<DefaultResourcesFilter>(order.next());
         filter_order.put::<DefaultLoginPageGeneratingFilter>(order.next());
         filter_order.put::<DefaultLogoutPageGeneratingFilter>(order.next());
         filter_order.put::<DefaultOneTimeTokenSubmitPageGeneratingFilter>(order.next());
-
-        filter_order.put::<BasicAuthenticationFilter>(order.next());
+        filter_order.put::<ConcurrentSessionFilter>(order.next());
+        filter_order.put::<DigestAuthenticationFilter>(order.next());
         filter_order.put::<BasicAuthenticationFilter>(order.next());
         filter_order.put::<AuthenticationFilter>(order.next());
         filter_order.put::<RequestCacheAwareFilter>(order.next());

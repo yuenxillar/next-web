@@ -1,19 +1,20 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
-use axum::BoxError;
-use indexmap::IndexMap;
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::{
+    error::BoxError,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+};
 
 use crate::web::access::AccessDeniedHandler;
 
 pub struct DelegatingAccessDeniedHandler {
-    handlers: IndexMap<&'static str, Arc<dyn AccessDeniedHandler>>,
+    handlers: BTreeMap<&'static str, Arc<dyn AccessDeniedHandler>>,
     default_handler: Arc<dyn AccessDeniedHandler>,
 }
 
 impl DelegatingAccessDeniedHandler {
     pub fn new(
-        handlers: IndexMap<&'static str, Arc<dyn AccessDeniedHandler>>,
+        handlers: BTreeMap<&'static str, Arc<dyn AccessDeniedHandler>>,
         default_handler: Arc<dyn AccessDeniedHandler>,
     ) -> Self {
         Self {

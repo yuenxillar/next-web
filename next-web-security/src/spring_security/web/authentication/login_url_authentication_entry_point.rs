@@ -1,6 +1,11 @@
-use crate::web::{
-    authentication_entry_point::AuthenticationEntryPoint,
-    redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},
+use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+
+use crate::{
+    core::authentication_error::AuthenticationError,
+    web::{
+        authentication_entry_point::AuthenticationEntryPoint,
+        redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},
+    },
 };
 
 #[derive(Clone)]
@@ -22,9 +27,9 @@ impl LoginUrlAuthenticationEntryPoint {
 impl AuthenticationEntryPoint for LoginUrlAuthenticationEntryPoint {
     fn commence(
         &self,
-        request: &mut axum::extract::Request,
-        response: &mut axum::response::Response,
-        _auth_error: Option<crate::core::authentication_error::AuthenticationError>,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        _auth_error: Option<AuthenticationError>,
     ) -> Result<(), next_web_core::error::BoxError> {
         DefaultRedirectStrategy::default().send_redirect(request, response, &self.login_form_url);
         Ok(())

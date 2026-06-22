@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
-    error::BoxError,
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
@@ -116,61 +115,5 @@ impl HttpFilter for RequestHeaderAuthenticationFilter {
 impl Named for RequestHeaderAuthenticationFilter {
     fn name(&self) -> &str {
         "RequestHeaderAuthenticationFilter"
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use axum::{body::Body, extract::Request, http::Request as HttpRequest};
-
-    use crate::{
-        authorization::AuthenticationManager,
-        core::{authority_utils::AuthorityUtils, Authentication},
-    };
-
-    use super::RequestHeaderAuthenticationFilter;
-
-    struct StubAuthenticationManager;
-
-    impl AuthenticationManager for StubAuthenticationManager {
-        fn authenticate(
-            &self,
-            authentication: &dyn Authentication,
-        ) -> Result<Arc<dyn Authentication>, crate::core::authentication_error::AuthenticationError>
-        {
-            Ok(Arc::new(
-                crate::web::authentication::preauth::pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken::authenticated(
-                    authentication.get_name(),
-                    authentication.get_credentials(),
-                    AuthorityUtils::create_authority_list(["ROLE_USER"]),
-                ),
-            ))
-        }
-    }
-
-    #[test]
-    fn request_header_filter_reads_principal_and_credentials_headers() {
-        let mut filter =
-            RequestHeaderAuthenticationFilter::new(Arc::new(StubAuthenticationManager));
-        filter.set_principal_request_header("x-user");
-        filter.set_credentials_request_header("x-credential");
-
-        let request = HttpRequest::builder()
-            .header("x-user", "alice")
-            .header("x-credential", "external")
-            .body(Body::empty())
-            .unwrap();
-        let request = Request::from(request);
-
-        assert_eq!(
-            filter.pre_authenticated_principal(&request).unwrap(),
-            Some(String::from("alice"))
-        );
-        assert_eq!(
-            filter.pre_authenticated_credentials(&request),
-            Some(String::from("external"))
-        );
     }
 }

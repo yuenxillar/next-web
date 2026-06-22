@@ -1,6 +1,5 @@
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 
-use indexmap::IndexMap;
 use next_web_core::{traits::http::http_request::HttpRequest, util::http_method::HttpMethod};
 
 use crate::web::util::matcher::ant_path_request_matcher::AntPathRequestMatcher;
@@ -20,11 +19,11 @@ where
 
 pub struct MatchResult {
     is_match: bool,
-    variables: Option<IndexMap<String, String>>,
+    variables: Option<BTreeMap<String, String>>,
 }
 
 impl MatchResult {
-    fn new(is_match: bool, variables: Option<IndexMap<String, String>>) -> Self {
+    fn new(is_match: bool, variables: Option<BTreeMap<String, String>>) -> Self {
         Self {
             is_match,
             variables,
@@ -35,11 +34,11 @@ impl MatchResult {
         self.is_match
     }
 
-    pub fn get_variables(&self) -> Option<&IndexMap<String, String>> {
+    pub fn get_variables(&self) -> Option<&BTreeMap<String, String>> {
         self.variables.as_ref()
     }
 
-    pub fn get_own_variables(self) -> Option<IndexMap<String, String>> {
+    pub fn get_own_variables(self) -> Option<BTreeMap<String, String>> {
         self.variables
     }
 
@@ -50,7 +49,7 @@ impl MatchResult {
         }
     }
 
-    pub fn match_with_variables(variables: IndexMap<String, String>) -> Self {
+    pub fn match_with_variables(variables: BTreeMap<String, String>) -> Self {
         Self {
             is_match: true,
             variables: Some(variables),

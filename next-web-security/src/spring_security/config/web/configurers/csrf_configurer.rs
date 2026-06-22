@@ -1,6 +1,5 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
-use indexmap::IndexMap;
 use next_web_core::{
     traits::{
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -185,7 +184,7 @@ where
         let invalid_session_denied_handler =
             InvalidSessionAccessDeniedHandler::new(invalid_session_strategy);
 
-        let mut handlers = IndexMap::new();
+        let mut handlers = BTreeMap::new();
         handlers.insert(
             std::any::type_name::<MissingCsrfTokenError>(),
             Arc::new(invalid_session_denied_handler) as Arc<dyn AccessDeniedHandler>,

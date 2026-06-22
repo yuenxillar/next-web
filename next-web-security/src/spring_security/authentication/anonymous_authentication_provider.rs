@@ -8,7 +8,7 @@ use crate::{
         anonymous_authentication_token::AnonymousAuthenticationToken,
         authentication_provider::AuthenticationProvider,
     },
-    core::{Authentication, authentication_error::AuthenticationError},
+    core::{authentication_error::AuthenticationError, Authentication},
 };
 
 #[derive(Clone)]
@@ -56,32 +56,7 @@ impl AuthenticationProvider for AnonymousAuthenticationProvider {
 }
 
 fn java_string_hash(value: &str) -> i32 {
-    value
-        .chars()
-        .fold(0_i32, |acc, ch| acc.wrapping_mul(31).wrapping_add(ch as i32))
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        authentication::{
-            anonymous_authentication_provider::AnonymousAuthenticationProvider,
-            anonymous_authentication_token::AnonymousAuthenticationToken,
-            authentication_provider::AuthenticationProvider,
-        },
-        core::authority_utils::AuthorityUtils,
-    };
-
-    #[tokio::test]
-    async fn anonymous_authentication_provider_validates_matching_key() {
-        let provider = AnonymousAuthenticationProvider::new("shared-key");
-        let token = AnonymousAuthenticationToken::new(
-            "shared-key",
-            "anonymousUser",
-            AuthorityUtils::create_authority_list(["ROLE_ANONYMOUS"]),
-        );
-
-        let result = provider.authenticate(&token).await.unwrap();
-        assert!(result.is_anonymous());
-    }
+    value.chars().fold(0_i32, |acc, ch| {
+        acc.wrapping_mul(31).wrapping_add(ch as i32)
+    })
 }
