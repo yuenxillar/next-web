@@ -96,7 +96,7 @@ where
             )));
         }
         // Read PortMapper from shared objects if available
-        if let Some(mapper) = http.get_shared_object::<Arc<dyn PortMapper>>() {
+        if let Some(mapper) = http.shared_object::<Arc<dyn PortMapper>>() {
             filter.set_port_mapper(mapper.clone());
         }
         http.add_filter(filter);

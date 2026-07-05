@@ -52,6 +52,7 @@ pub use oauth2_login_configurer::OAuth2LoginConfigurer;
 pub use oauth2_resource_server_configurer::OAuth2ResourceServerConfigurer;
 pub use one_time_token_login_configurer::OneTimeTokenLoginConfigurer;
 pub use password_management_configurer::PasswordManagementConfigurer;
+pub use permit_all_support::PermitAllSupport;
 pub use port_mapper_configurer::PortMapperConfigurer;
 pub use remember_me_configurer::RememberMeConfigurer;
 pub use request_cache_configurer::RequestCacheConfigurer;

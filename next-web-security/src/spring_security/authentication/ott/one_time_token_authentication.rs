@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::anys::any_value::AnyValue;
 
-use crate::core::{Authentication, granted_authority::GrantedAuthority};
+use crate::core::{granted_authority::GrantedAuthority, Authentication};
 
 #[derive(Clone)]
 pub struct OneTimeTokenAuthentication {
@@ -12,10 +12,7 @@ pub struct OneTimeTokenAuthentication {
 }
 
 impl OneTimeTokenAuthentication {
-    pub fn new(
-        principal: impl Into<String>,
-        authorities: Vec<Arc<dyn GrantedAuthority>>,
-    ) -> Self {
+    pub fn new(principal: impl Into<String>, authorities: Vec<Arc<dyn GrantedAuthority>>) -> Self {
         let principal = principal.into();
         assert!(!principal.trim().is_empty(), "principal cannot be empty");
         Self {
@@ -54,7 +51,7 @@ impl Authentication for OneTimeTokenAuthentication {
     fn authorities(&self) -> Vec<String> {
         self.authorities
             .iter()
-            .filter_map(|authority| futures::executor::block_on(authority.get_authority()))
+            .filter_map(|authority| authority.authority().map(ToString::to_string))
             .collect()
     }
 }

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use next_web_core::{clone_trait_object, http::cookie::Cookie, util::locale::Locale, DynClone};
+use next_web_core::{clone_trait_object, http::Cookie, util::locale::Locale, DynClone};
 
 pub trait SavedRequest
 where

@@ -5,7 +5,7 @@ use axum::{
     response::Response,
 };
 
-use crate::http::cookie::Cookie;
+use crate::http::Cookie;
 
 pub trait HttpResponse
 where
@@ -36,6 +36,8 @@ where
     fn add_cookie(&mut self, cookie: Cookie);
 
     fn is_committed(&self) -> bool;
+
+    fn finish(&mut self);
 }
 
 impl HttpResponse for Response {
@@ -115,6 +117,10 @@ impl HttpResponse for Response {
     }
 
     fn is_committed(&self) -> bool {
+        todo!()
+    }
+
+    fn finish(&mut self) {
         todo!()
     }
 }

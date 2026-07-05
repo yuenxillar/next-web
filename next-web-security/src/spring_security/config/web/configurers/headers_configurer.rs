@@ -81,13 +81,13 @@ where
     }
 
     /// Add a custom `HeaderWriter`.
-    pub fn add_header_writer(mut self, writer: Arc<dyn HeaderWriter>) -> Self {
+    pub fn add_header_writer(&mut self, writer: Arc<dyn HeaderWriter>) -> &mut Self {
         self.header_writers.push(writer);
 
         self
     }
 
-    pub fn content_type_options<F>(mut self, mut content_type_options: F) -> Self
+    pub fn content_type_options<F>(&mut self, mut content_type_options: F) -> &mut Self
     where
         F: FnMut(&mut ContentTypeOptionsConfig),
     {
@@ -96,7 +96,7 @@ where
         self
     }
 
-    pub fn xss_protection<F>(mut self, mut xss_protection: F) -> Self
+    pub fn xss_protection<F>(&mut self, mut xss_protection: F) -> &mut Self
     where
         F: FnMut(&mut XXssConfig),
     {
@@ -105,7 +105,7 @@ where
         self
     }
 
-    pub fn cache_control<F>(mut self, mut cache_control: F) -> Self
+    pub fn cache_control<F>(&mut self, mut cache_control: F) -> &mut Self
     where
         F: FnMut(&mut CacheControlConfig),
     {
@@ -358,9 +358,7 @@ impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for HeadersConfigurer<
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn init(&mut self, _http: &mut H) {
-        // No init needed — header writers are self-contained.
-    }
+    fn init(&mut self, _http: &mut H) {}
 
     fn configure(&mut self, http: &mut H) {
         let filter = self.create_header_writer_filter();
@@ -371,14 +369,6 @@ where
 #[derive(Clone)]
 pub struct ContentTypeOptionsConfig {
     writer: Option<XContentTypeOptionsHeaderWriter>,
-}
-
-impl Default for ContentTypeOptionsConfig {
-    fn default() -> Self {
-        Self {
-            writer: Some(Default::default()),
-        }
-    }
 }
 
 impl ContentTypeOptionsConfig {
@@ -392,9 +382,16 @@ impl ContentTypeOptionsConfig {
             self.writer = Some(Default::default());
         }
     }
+}
 
-    fn writer(&self) -> Option<&XContentTypeOptionsHeaderWriter> {
-        self.writer.as_ref()
+impl Default for ContentTypeOptionsConfig {
+    fn default() -> Self {
+        let mut config = Self {
+            writer: Default::default(),
+        };
+        config.enable();
+
+        config
     }
 }
 
@@ -422,17 +419,16 @@ impl XXssConfig {
             self.writer = Some(Default::default());
         }
     }
-
-    fn writer(&self) -> Option<&XXssProtectionHeaderWriter> {
-        self.writer.as_ref()
-    }
 }
 
 impl Default for XXssConfig {
     fn default() -> Self {
-        Self {
-            writer: Some(Default::default()),
-        }
+        let mut config = Self {
+            writer: Default::default(),
+        };
+        config.enable();
+
+        config
     }
 }
 
@@ -452,17 +448,16 @@ impl CacheControlConfig {
             self.writer = Some(Default::default());
         }
     }
-
-    fn writer(&self) -> Option<&CacheControlHeadersWriter> {
-        self.writer.as_ref()
-    }
 }
 
 impl Default for CacheControlConfig {
     fn default() -> Self {
-        Self {
-            writer: Some(Default::default()),
-        }
+        let mut config = Self {
+            writer: Default::default(),
+        };
+        config.enable();
+
+        config
     }
 }
 
@@ -514,17 +509,16 @@ impl HstsConfig {
             self.writer = Some(Default::default());
         }
     }
-
-    fn writer(&self) -> Option<&HstsHeaderWriter> {
-        self.writer.as_ref()
-    }
 }
 
 impl Default for HstsConfig {
     fn default() -> Self {
-        Self {
-            writer: Some(Default::default()),
-        }
+        let mut config = Self {
+            writer: Default::default(),
+        };
+        config.enable();
+
+        config
     }
 }
 
@@ -556,17 +550,16 @@ impl FrameOptionsConfig {
             self.writer = Some(XFrameOptionsHeaderWriter::new(XFrameOptionsMode::Deny));
         }
     }
-
-    fn writer(&self) -> Option<&XFrameOptionsHeaderWriter> {
-        self.writer.as_ref()
-    }
 }
 
 impl Default for FrameOptionsConfig {
     fn default() -> Self {
-        Self {
-            writer: Some(XFrameOptionsHeaderWriter::new(XFrameOptionsMode::Deny)),
-        }
+        let mut config = Self {
+            writer: Default::default(),
+        };
+        config.enable();
+
+        config
     }
 }
 
@@ -590,10 +583,6 @@ impl ContentSecurityPolicyConfig {
 
         self
     }
-
-    fn writer(&self) -> Option<&ContentSecurityPolicyHeaderWriter> {
-        self.writer.as_ref()
-    }
 }
 
 #[derive(Clone, Default)]
@@ -608,10 +597,6 @@ impl ReferrerPolicyConfig {
 
         self
     }
-
-    fn writer(&self) -> Option<&ReferrerPolicyHeaderWriter> {
-        self.writer.as_ref()
-    }
 }
 
 #[derive(Clone, Default)]
@@ -620,12 +605,9 @@ pub struct FeaturePolicyConfig {
 }
 
 impl FeaturePolicyConfig {
+    #[allow(dead_code)]
     pub fn and(self) -> Self {
         self
-    }
-
-    fn writer(&self) -> Option<&FeaturePolicyHeaderWriter> {
-        self.writer.as_ref()
     }
 }
 
@@ -642,10 +624,6 @@ impl PermissionsPolicyConfig {
         }
         self
     }
-
-    fn writer(&self) -> Option<&PermissionsPolicyHeaderWriter> {
-        self.writer.as_ref()
-    }
 }
 
 #[derive(Clone, Default)]
@@ -659,10 +637,6 @@ impl CrossOriginOpenerPolicyConfig {
         self.writer.as_mut().map(|w| w.set_policy(policy));
 
         self
-    }
-
-    fn writer(&self) -> Option<&CrossOriginOpenerPolicyHeaderWriter> {
-        self.writer.as_ref()
     }
 }
 
@@ -678,10 +652,6 @@ impl CrossOriginEmbedderPolicyConfig {
 
         self
     }
-
-    fn writer(&self) -> Option<&CrossOriginEmbedderPolicyHeaderWriter> {
-        self.writer.as_ref()
-    }
 }
 
 #[derive(Clone, Default)]
@@ -695,9 +665,5 @@ impl CrossOriginResourcePolicyConfig {
         self.writer.as_mut().map(|w| w.set_policy(policy));
 
         self
-    }
-
-    fn writer(&self) -> Option<&CrossOriginResourcePolicyHeaderWriter> {
-        self.writer.as_ref()
     }
 }

@@ -6,18 +6,18 @@ use crate::{
         account_status_user_details_exceptions::credentials_expired,
     },
     core::{
-        Authentication,
         authentication_error::AuthenticationError,
         authority_mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
         authority_utils::AuthorityUtils,
         user_cache::{NullUserCache, UserCache},
         userdetails::{user_details::UserDetails, user_details_checker::UserDetailsChecker},
         username_password_authentication_token::UsernamePasswordAuthenticationToken,
+        Authentication,
     },
 };
 
 #[derive(Clone)]
-pub struct AbstractUserDetailsAuthenticationProviderSupport {
+pub struct BaseUserDetailsAuthenticationProviderSupport {
     user_cache: Arc<dyn UserCache>,
     force_principal_as_string: bool,
     hide_user_not_found_exceptions: bool,
@@ -27,7 +27,7 @@ pub struct AbstractUserDetailsAuthenticationProviderSupport {
     authorities_mapper: Arc<dyn GrantedAuthoritiesMapper>,
 }
 
-impl Default for AbstractUserDetailsAuthenticationProviderSupport {
+impl Default for BaseUserDetailsAuthenticationProviderSupport {
     fn default() -> Self {
         Self {
             user_cache: Arc::new(NullUserCache),
@@ -41,7 +41,7 @@ impl Default for AbstractUserDetailsAuthenticationProviderSupport {
     }
 }
 
-impl AbstractUserDetailsAuthenticationProviderSupport {
+impl BaseUserDetailsAuthenticationProviderSupport {
     pub fn determine_username(&self, authentication: &dyn Authentication) -> String {
         let username = authentication.get_name();
         if username.is_empty() {
@@ -125,8 +125,8 @@ impl AbstractUserDetailsAuthenticationProviderSupport {
         user: &dyn UserDetails,
     ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
         let mut authority_names = Vec::new();
-        for authority in user.get_authorities().await {
-            if let Some(authority) = authority.get_authority().await {
+        for authority in user.authorities() {
+            if let Some(authority) = authority.authority() {
                 authority_names.push(authority);
             }
         }
@@ -150,7 +150,7 @@ struct CredentialsNonExpiredChecker;
 #[next_web_core::async_trait]
 impl UserDetailsChecker for CredentialsNonExpiredChecker {
     async fn check(&self, to_check: &dyn UserDetails) -> Result<(), AuthenticationError> {
-        if !to_check.is_credentials_non_expired().await {
+        if !to_check.is_credentials_non_expired() {
             return Err(credentials_expired());
         }
         Ok(())

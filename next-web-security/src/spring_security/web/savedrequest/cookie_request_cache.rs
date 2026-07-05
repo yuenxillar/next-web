@@ -3,7 +3,7 @@ use base64::{
     Engine as _,
 };
 use next_web_core::{
-    http::cookie::Cookie,
+    http::Cookie,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
     util::WebUtils,
 };
@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 use crate::web::{
-    savedrequest::{DefaultSavedRequest, RequestCache, SavedRequest, SavedRequestAwareWrapper},
+    savedrequest::{DefaultSavedRequest, RequestCache, SavedRequest},
     util::{
         matcher::{AnyRequestMatcher, RequestMatcher},
         UrlUtils,
@@ -101,7 +101,7 @@ impl RequestCache for CookieRequestCache {
         }
 
         let redirect_url = UrlUtils::build_full_request_url(request);
-        let mut saved_cookie = Cookie::new(COOKIE_NAME, Self::encode_cookie(&redirect_url));
+        let mut saved_cookie = Cookie::new(COOKIE_NAME, Some(Self::encode_cookie(&redirect_url)));
         saved_cookie.set_max_age(COOKIE_MAX_AGE);
         saved_cookie.set_secure(request.is_secure());
         saved_cookie.set_path(Self::get_cookie_path(request));
@@ -162,7 +162,7 @@ impl RequestCache for CookieRequestCache {
     }
 
     fn remove_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {
-        let mut remove_saved_request_cookie = Cookie::new(COOKIE_NAME, "");
+        let mut remove_saved_request_cookie = Cookie::new(COOKIE_NAME, None);
         remove_saved_request_cookie.set_secure(request.is_secure());
         remove_saved_request_cookie.set_http_only(true);
         remove_saved_request_cookie.set_path(Self::get_cookie_path(request));

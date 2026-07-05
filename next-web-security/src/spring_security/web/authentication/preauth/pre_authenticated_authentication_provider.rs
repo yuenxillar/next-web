@@ -107,15 +107,15 @@ impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
             .await?;
 
         let mut authorities = Vec::new();
-        for authority in user_details.get_authorities().await {
-            if let Some(name) = authority.get_authority().await {
-                authorities.push(name);
+        for authority in user_details.authorities() {
+            if let Some(name) = authority.authority() {
+                authorities.push(name.to_string());
             }
         }
         authorities.extend(self.granted_authorities.iter().cloned());
 
         let mut result = PreAuthenticatedAuthenticationToken::authenticated(
-            user_details.get_username().await,
+            user_details.username(),
             authentication.get_credentials(),
             AuthorityUtils::create_authority_list(authorities),
         );

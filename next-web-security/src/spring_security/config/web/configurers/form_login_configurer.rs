@@ -86,7 +86,7 @@ where
 
     pub(crate) fn init_default_login_filter(&mut self, http: &mut H) {
         let login_page_generating_filter =
-            http.get_mut_shared_object::<DefaultLoginPageGeneratingFilter>();
+            http.shared_object_mut::<DefaultLoginPageGeneratingFilter>();
         let abs = &self.base_authentication_filter_configurer;
         if !self
             .base_authentication_filter_configurer

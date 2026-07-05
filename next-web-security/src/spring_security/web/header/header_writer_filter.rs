@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
-    error::BoxError,
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
@@ -26,13 +25,18 @@ pub struct HeaderWriterFilter {
 }
 
 impl HeaderWriterFilter {
-    pub fn new(header_writers: Vec<Arc<dyn HeaderWriter>>) -> Self {
+    /// Creates a new instance.
+    pub fn new<H>(header_writers: H) -> Self
+    where
+        H: IntoIterator<Item = Arc<dyn HeaderWriter>>,
+    {
         Self {
-            header_writers,
+            header_writers: header_writers.into_iter().collect(),
             should_write_headers_eagerly: false,
         }
     }
 
+    /// Allow writing headers at the beginning of the request.
     pub fn set_should_write_headers_eagerly(&mut self, should_write_headers_eagerly: bool) {
         self.should_write_headers_eagerly = should_write_headers_eagerly;
     }
@@ -56,16 +60,10 @@ impl HttpFilter for HeaderWriterFilter {
             self.write_headers(request, response);
             filter_chain.do_filter(request, response).await
         } else {
-            match filter_chain.do_filter(request, response).await {
-                Ok(_) => {
-                    self.write_headers(request, response);
-                    Ok(())
-                }
-                Err(err) => {
-                    self.write_headers(request, response);
-                    Err(err)
-                }
-            }
+            let result = filter_chain.do_filter(request, response).await;
+            self.write_headers(request, response);
+
+            result
         }
     }
 }

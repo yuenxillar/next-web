@@ -10,12 +10,14 @@ use crate::{
             CompositeLogoutHandler, LogoutHandler, LogoutSuccessHandler,
             SimpleUrlLogoutSuccessHandler,
         },
-        util::matcher::{PathPatternRequestMatcher, RequestMatcher},
+        util::{
+            matcher::{PathPatternRequestMatcher, RequestMatcher},
+            UrlUtils,
+        },
     },
 };
 use next_web_core::{
     async_trait,
-    error::BoxError,
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
@@ -37,6 +39,7 @@ pub struct LogoutFilter {
 }
 
 impl LogoutFilter {
+    /// New LogoutFilter
     pub fn new(
         logout_success_handler: Arc<dyn LogoutSuccessHandler>,
         handlers: impl IntoIterator<Item = Arc<dyn LogoutHandler>>,
@@ -57,12 +60,16 @@ impl LogoutFilter {
         logout_success_url: impl AsRef<str>,
         handlers: impl IntoIterator<Item = Arc<dyn LogoutHandler>>,
     ) -> Self {
+        let logout_success_url = logout_success_url.as_ref();
+        assert!(
+            !logout_success_url.is_empty() || UrlUtils::is_valid_redirect_url(logout_success_url),
+            "{} isn't a valid redirect URL",
+            logout_success_url
+        );
+
         let logout_request_matcher =
             Arc::new(PathPatternRequestMatcher::path_pattern(None, "/logout"));
-
         let mut url_logout_success_handler = SimpleUrlLogoutSuccessHandler::default();
-
-        let logout_success_url = logout_success_url.as_ref();
         if StringUtils::has_text(logout_success_url) {
             url_logout_success_handler.set_default_target_url(logout_success_url);
         }
@@ -77,6 +84,7 @@ impl LogoutFilter {
         }
     }
 
+    /// Allow subclasses to modify when a logout should take place.
     fn requires_logout(&self, request: &mut dyn HttpRequest) -> bool {
         if self.logout_request_matcher.matches(request) {
             return true;
@@ -89,6 +97,8 @@ impl LogoutFilter {
         false
     }
 
+    /// Sets the SecurityContextHolderStrategy to use.
+    /// The default action is to use the SecurityContextHolderStrategy stored in SecurityContextHolder.
     pub fn set_security_context_holder_strategy(
         &mut self,
         security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
@@ -126,10 +136,9 @@ impl HttpFilter for LogoutFilter {
                     debug!("Logging out [{:?}]", auth.as_ref().map(|s| s.get_name()));
                 }
 
-                let auth = auth.as_deref();
-                self.handler.logout(request, response, auth).await;
+                self.handler.logout(request, response, auth.as_ref()).await;
                 self.logout_success_handler
-                    .on_logout_success(request, response, auth)
+                    .on_logout_success(request, response, auth.as_deref())
                     .await?;
 
                 return Ok(());

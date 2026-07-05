@@ -6,10 +6,7 @@ use crate::{
     access::hierarchicalroles::{
         null_role_hierarchy::NullRoleHierarchy, role_hierarchy::RoleHierarchy,
     },
-    authorization::{
-        authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
-        AuthorizationResult,
-    },
+    authorization::{authorization_manager::AuthorizationManager, AuthorizationResult},
     core::Authentication,
 };
 
@@ -67,7 +64,7 @@ impl<T> AllAuthoritiesAuthorizationManager<T> {
         }
         let granted = self
             .role_hierarchy
-            .get_reachable_granted_authorities(&authentication.authorities())
+            .reachable_granted_authorities(&authentication.authorities())
             .into_iter()
             .collect::<BTreeSet<_>>();
         self.required_authorities

@@ -1,0 +1,15 @@
+[package]
+name = "next-web-context"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+keywords.workspace = true
+license.workspace = true
+
+
+[dependencies]
+async-trait.workspace   = true
+dyn-clone.workspace     = true
+
+[lints]
+workspace = true

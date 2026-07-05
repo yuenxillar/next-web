@@ -11,7 +11,7 @@ where
     /// the HTTP header that the CSRF is populated on the response and can be
     /// placed on requests instead of the parameter
     ///
-    fn get_header_name(&self) -> &str;
+    fn header_name(&self) -> &str;
 
     ////
     /// Gets the HTTP parameter name that should contain the token. Cannot be null.
@@ -20,7 +20,7 @@ where
     ///
     /// the HTTP parameter name that should contain the token.
     ///
-    fn get_parameter_name(&self) -> &str;
+    fn parameter_name(&self) -> &str;
 
     ////
     /// Gets the token value. Cannot be null.
@@ -29,5 +29,5 @@ where
     ///
     /// the token value
     ///
-    fn get_token(&self) -> &str;
+    fn token(&self) -> &str;
 }

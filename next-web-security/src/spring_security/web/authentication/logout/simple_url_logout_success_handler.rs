@@ -15,7 +15,7 @@ use crate::{
 
 #[derive(Default)]
 pub struct SimpleUrlLogoutSuccessHandler {
-    base: BaseAuthenticationTargetUrlRequestHandler,
+    inner: BaseAuthenticationTargetUrlRequestHandler,
 }
 
 #[async_trait]
@@ -34,12 +34,12 @@ impl Deref for SimpleUrlLogoutSuccessHandler {
     type Target = BaseAuthenticationTargetUrlRequestHandler;
 
     fn deref(&self) -> &Self::Target {
-        &self.base
+        &self.inner
     }
 }
 
 impl DerefMut for SimpleUrlLogoutSuccessHandler {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
+        &mut self.inner
     }
 }

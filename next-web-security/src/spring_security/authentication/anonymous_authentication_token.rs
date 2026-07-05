@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{
-    Authentication, granted_authority::GrantedAuthority,
-};
+use crate::core::{granted_authority::GrantedAuthority, Authentication};
 
 #[derive(Clone, Default)]
 pub struct AnonymousAuthenticationToken {
@@ -18,7 +16,10 @@ impl AnonymousAuthenticationToken {
         authorities: Vec<Arc<dyn GrantedAuthority>>,
     ) -> Self {
         let principal = principal.into();
-        assert!(!key.as_ref().trim().is_empty(), "key cannot be null or empty");
+        assert!(
+            !key.as_ref().trim().is_empty(),
+            "key cannot be null or empty"
+        );
         assert!(
             !principal.trim().is_empty(),
             "principal cannot be null or empty"
@@ -64,7 +65,7 @@ impl Authentication for AnonymousAuthenticationToken {
     fn authorities(&self) -> Vec<String> {
         self.authorities
             .iter()
-            .filter_map(|authority| futures::executor::block_on(authority.get_authority()))
+            .filter_map(|authority| authority.authority().map(ToString::to_string))
             .collect()
     }
 
@@ -74,14 +75,14 @@ impl Authentication for AnonymousAuthenticationToken {
 }
 
 fn java_string_hash(value: &str) -> i32 {
-    value
-        .chars()
-        .fold(0_i32, |acc, ch| acc.wrapping_mul(31).wrapping_add(ch as i32))
+    value.chars().fold(0_i32, |acc, ch| {
+        acc.wrapping_mul(31).wrapping_add(ch as i32)
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{Authentication, authority_utils::AuthorityUtils};
+    use crate::core::{authority_utils::AuthorityUtils, Authentication};
 
     use super::AnonymousAuthenticationToken;
 

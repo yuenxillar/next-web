@@ -1,6 +1,4 @@
-use std::any::Any;
-
-use next_web_core::traits::any_clone::AnyClone;
+use std::{any::Any, sync::Arc};
 
 use crate::config::{
     object_post_processor::ObjectPostProcessor, security_builder::SecurityBuilder,
@@ -14,7 +12,7 @@ where
     O: Send + Sync,
     Self: SecurityConfigurer<O, B>,
 {
-    composite_object_post_processor: CompositeObjectPostProcessor,
+    object_post_processor: CompositeObjectPostProcessor,
 
     _marker: std::marker::PhantomData<(O, B)>,
 }
@@ -26,7 +24,7 @@ where
     Self: SecurityConfigurer<O, B>,
 {
     pub fn post_process(&mut self, object: &mut dyn Any) {
-        self.composite_object_post_processor.post_process(object);
+        self.object_post_processor.post_process(object);
     }
 
     pub fn get_builder(&mut self) -> Option<&mut B>
@@ -41,7 +39,7 @@ where
 
 #[derive(Clone)]
 pub struct CompositeObjectPostProcessor {
-    post_processors: Vec<Box<dyn AnyClone>>,
+    post_processors: Vec<Arc<dyn ObjectPostProcessor<dyn Any>>>,
 }
 
 impl CompositeObjectPostProcessor {
@@ -56,8 +54,10 @@ impl CompositeObjectPostProcessor {
 }
 
 impl ObjectPostProcessor<dyn Any> for CompositeObjectPostProcessor {
-    fn post_process(&mut self, object: &mut dyn Any) {
-        todo!()
+    fn post_process(&self, object: &mut dyn Any) {
+        for opp in self.post_processors.iter() {
+            opp.post_process(object);
+        }
     }
 }
 
@@ -69,7 +69,7 @@ where
 {
     fn default() -> Self {
         Self {
-            composite_object_post_processor: CompositeObjectPostProcessor {
+            object_post_processor: CompositeObjectPostProcessor {
                 post_processors: Vec::new(),
             },
             _marker: std::marker::PhantomData,
@@ -83,7 +83,7 @@ where
     B: SecurityBuilder<O>,
     O: Send + Sync,
 {
-    fn init(&mut self, builer: &mut B) {}
+    fn init(&mut self, builder: &mut B) {}
 
-    fn configure(&mut self, builer: &mut B) {}
+    fn configure(&mut self, builder: &mut B) {}
 }

@@ -8,32 +8,36 @@ pub struct XFrameOptionsHeaderWriter {
 }
 
 impl XFrameOptionsHeaderWriter {
+    /// Creates a new instance
     pub fn new(frame_options_mode: XFrameOptionsMode) -> Self {
         Self { frame_options_mode }
     }
 }
 
 impl HeaderWriter for XFrameOptionsHeaderWriter {
+    /// Writes the X-Frame-Options header value, overwritting any previous value.
     fn write_headers(
         &self,
         _request: &dyn next_web_core::traits::http::http_request::HttpRequest,
         response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
     ) {
-        if XFrameOptionsMode::AllowFrom == self.frame_options_mode {
-            return;
-        } else {
-            response.insert_header(XFRAME_OPTIONS_HEADER, self.frame_options_mode.get_mode());
+        response.insert_header(XFRAME_OPTIONS_HEADER, self.frame_options_mode.get_mode());
+    }
+}
+
+impl Default for XFrameOptionsHeaderWriter {
+    fn default() -> Self {
+        Self {
+            frame_options_mode: XFrameOptionsMode::Deny,
         }
     }
 }
 
+/// The possible values for the X-Frame-Options header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XFrameOptionsMode {
     Deny,
     SameoriGin,
-
-    #[deprecated = "ALLOW-FROM is an obsolete directive that no longer works in modern browsers. Instead use Content-Security-Policy with the frame-ancestors   directive."]
-    AllowFrom,
 }
 
 impl XFrameOptionsMode {
@@ -41,7 +45,6 @@ impl XFrameOptionsMode {
         match self {
             XFrameOptionsMode::Deny => "DENY",
             XFrameOptionsMode::SameoriGin => "SAMEORIGIN",
-            XFrameOptionsMode::AllowFrom => "ALLOW-FROM",
         }
     }
 }

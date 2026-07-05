@@ -5,32 +5,30 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
-use crate::web::csrf::{
-    repository_deferred_csrf_token::RepositoryDeferredCsrfToken, CsrfToken, DeferredCsrfToken,
-};
+use crate::web::csrf::{repository_deferred_csrf_token::RepositoryDeferredCsrfToken, CsrfToken};
 
 #[async_trait]
 pub trait CsrfTokenRepository
 where
     Self: Send + Sync,
 {
-    /// 生成一个新的 CSRF Token
+    /// Generates a new CSRF Token.
     ///
-    /// # 参数
-    /// * `request` - HTTP 请求对象
+    /// # Parameters
+    /// * `request` - The HTTP request object.
     ///
-    /// # 返回值
-    /// 返回生成的 CSRF Token
+    /// # Returns
+    /// The generated CSRF Token.
     async fn generate_token(&self, request: &mut dyn HttpRequest) -> Arc<dyn CsrfToken>;
 
-    /// 保存 CSRF Token
+    /// Saves the CSRF Token.
     ///
-    /// 如果 token 为 None，则表示删除 token
+    /// If the token is `None`, the token will be deleted.
     ///
-    /// # 参数
-    /// * `token` - 要保存的 CSRF Token，或 None 表示删除
-    /// * `request` - HTTP 请求对象
-    /// * `response` - HTTP 响应对象
+    /// # Parameters
+    /// * `token` - The CSRF Token to save, or `None` to delete.
+    /// * `request` - The HTTP request object.
+    /// * `response` - The HTTP response object.
     async fn save_token(
         &self,
         token: Option<&Arc<dyn CsrfToken>>,
@@ -38,30 +36,27 @@ where
         response: &mut dyn HttpResponse,
     );
 
-    /// 从请求中加载 CSRF Token
+    /// Loads the CSRF Token from the request.
     ///
-    /// # 参数
-    /// * `request` - HTTP 请求对象
+    /// # Parameters
+    /// * `request` - The HTTP request object.
     ///
-    /// # 返回值
-    /// 返回加载的 CSRF Token，如果不存在则返回 None
+    /// # Returns
+    /// The loaded CSRF Token, or `None` if it does not exist.
     async fn load_token(&self, request: &mut dyn HttpRequest) -> Option<Arc<dyn CsrfToken>>;
 }
 
-/// 延迟加载 CSRF Token
+/// Lazily loads a CSRF Token.
 ///
-/// 返回一个 DeferredCsrfToken，它会缓存 token 以避免重复加载
+/// Returns a `DeferredCsrfToken` that caches the token to avoid repeated loading.
 ///
-/// # 参数
-/// * `request` - HTTP 请求对象
-/// * `response` - HTTP 响应对象
+/// # Parameters
+/// * `request` - The HTTP request object.
+/// * `response` - The HTTP response object.
 ///
-/// # 返回值
-/// 返回一个 DeferredCsrfToken 实例
-pub fn load_deferred_token(
-    _self: Arc<dyn CsrfTokenRepository>,
-    _: &mut dyn HttpRequest,
-    _: &mut dyn HttpResponse,
-) -> Arc<dyn DeferredCsrfToken> {
-    Arc::new(RepositoryDeferredCsrfToken::new(_self))
+/// # Returns
+/// A `DeferredCsrfToken` instance.
+#[allow(dead_code)]
+pub fn load_deferred_token(_self: Arc<dyn CsrfTokenRepository>) -> RepositoryDeferredCsrfToken {
+    RepositoryDeferredCsrfToken::new(_self)
 }

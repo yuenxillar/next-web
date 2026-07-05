@@ -27,11 +27,9 @@ impl DigestData {
     /// * `header` - The full Authorization header value starting with "Digest ".
     pub fn new(header: &str) -> Self {
         let section_212response = header[7..].to_string();
-        let header_entries =
-            digest_auth_utils::split_ignoring_quotes(&section_212response, ',');
-        let header_map = digest_auth_utils::split_each_array_element_and_create_map(
-            &header_entries, "=", "\"",
-        );
+        let header_entries = digest_auth_utils::split_ignoring_quotes(&section_212response, ',');
+        let header_map =
+            digest_auth_utils::split_each_array_element_and_create_map(&header_entries, "=", "\"");
 
         let username = header_map.get("username").cloned();
         let realm = header_map.get("realm").cloned();
@@ -112,16 +110,18 @@ impl DigestData {
 
         // Decode nonce from Base64.
         let nonce_str = self.nonce.as_deref().unwrap_or("");
-        let nonce_bytes = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            nonce_str,
-        )
-        .map_err(|_| {
-            AuthenticationError::with_kind(
-                format!("Nonce is not encoded in Base64; received nonce {}", nonce_str),
-                AuthenticationErrorKind::BadCredentials,
-            )
-        })?;
+        let nonce_bytes =
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, nonce_str).map_err(
+                |_| {
+                    AuthenticationError::with_kind(
+                        format!(
+                            "Nonce is not encoded in Base64; received nonce {}",
+                            nonce_str
+                        ),
+                        AuthenticationErrorKind::BadCredentials,
+                    )
+                },
+            )?;
 
         let nonce_as_plain_text = String::from_utf8_lossy(&nonce_bytes);
         let nonce_tokens: Vec<&str> = nonce_as_plain_text.split(':').collect();
@@ -164,7 +164,7 @@ impl DigestData {
     /// client-supplied response.
     pub fn calculate_server_digest(
         &self,
-        password: &str,
+        password: Option<&str>,
         http_method: &str,
         password_already_encoded: bool,
     ) -> String {

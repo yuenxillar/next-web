@@ -5,7 +5,10 @@ use next_web_core::{
 
 use crate::core::authentication_error::AuthenticationError;
 
-pub trait AuthenticationEntryPoint: Send + Sync {
+pub trait AuthenticationEntryPoint
+where
+    Self: Send + Sync,
+{
     fn commence(
         &self,
         request: &mut dyn HttpRequest,

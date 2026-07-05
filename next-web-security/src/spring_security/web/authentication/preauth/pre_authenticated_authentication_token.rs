@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::anys::any_value::AnyValue;
 
-use crate::core::{
-    Authentication, granted_authority::GrantedAuthority,
-};
+use crate::core::{granted_authority::GrantedAuthority, Authentication};
 
 #[derive(Clone, Default)]
 pub struct PreAuthenticatedAuthenticationToken {
@@ -16,10 +14,7 @@ pub struct PreAuthenticatedAuthenticationToken {
 }
 
 impl PreAuthenticatedAuthenticationToken {
-    pub fn unauthenticated(
-        principal: Option<String>,
-        credentials: Option<String>,
-    ) -> Self {
+    pub fn unauthenticated(principal: Option<String>, credentials: Option<String>) -> Self {
         Self {
             principal,
             credentials,
@@ -80,14 +75,14 @@ impl Authentication for PreAuthenticatedAuthenticationToken {
     fn authorities(&self) -> Vec<String> {
         self.authorities
             .iter()
-            .filter_map(|authority| futures::executor::block_on(authority.get_authority()))
+            .filter_map(|authority| authority.authority().map(ToString::to_string))
             .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{Authentication, authority_utils::AuthorityUtils};
+    use crate::core::{authority_utils::AuthorityUtils, Authentication};
 
     use super::PreAuthenticatedAuthenticationToken;
 

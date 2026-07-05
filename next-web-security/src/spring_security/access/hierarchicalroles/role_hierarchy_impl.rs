@@ -1,8 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use crate::access::hierarchicalroles::{
-    cycle_in_role_hierarchy_error::CycleInRoleHierarchyError,
-    role_hierarchy::RoleHierarchy,
+    cycle_in_role_hierarchy_error::CycleInRoleHierarchyError, role_hierarchy::RoleHierarchy,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -59,7 +58,11 @@ impl RoleHierarchyImpl {
 
     fn build_one_step_map(hierarchy: &str) -> BTreeMap<String, BTreeSet<String>> {
         let mut map = BTreeMap::<String, BTreeSet<String>>::new();
-        for line in hierarchy.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        for line in hierarchy
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+        {
             let roles = line
                 .split('>')
                 .map(str::trim)
@@ -76,7 +79,7 @@ impl RoleHierarchyImpl {
 }
 
 impl RoleHierarchy for RoleHierarchyImpl {
-    fn get_reachable_granted_authorities(&self, authorities: &[String]) -> Vec<String> {
+    fn reachable_granted_authorities(&self, authorities: &[String]) -> Vec<String> {
         let mut reachable = BTreeSet::new();
         for authority in authorities {
             reachable.insert(authority.clone());
@@ -105,7 +108,10 @@ impl RoleHierarchyBuilder {
     pub fn role<'a>(&'a mut self, role: impl Into<String>) -> ImpliedRoles<'a> {
         let role = role.into();
         assert!(!role.trim().is_empty(), "role must not be empty");
-        ImpliedRoles { builder: self, role }
+        ImpliedRoles {
+            builder: self,
+            role,
+        }
     }
 
     pub fn build(self) -> Result<RoleHierarchyImpl, CycleInRoleHierarchyError> {
@@ -135,7 +141,10 @@ pub struct ImpliedRoles<'a> {
 }
 
 impl<'a> ImpliedRoles<'a> {
-    pub fn implies(self, implied_roles: impl IntoIterator<Item = impl Into<String>>) -> &'a mut RoleHierarchyBuilder {
+    pub fn implies(
+        self,
+        implied_roles: impl IntoIterator<Item = impl Into<String>>,
+    ) -> &'a mut RoleHierarchyBuilder {
         self.builder.add_hierarchy(
             self.role,
             implied_roles.into_iter().map(Into::into).collect(),
@@ -152,13 +161,12 @@ mod tests {
 
     #[test]
     fn expands_reachable_roles_from_hierarchy_definition() {
-        let hierarchy = RoleHierarchyImpl::from_hierarchy(
-            "ROLE_ADMIN > ROLE_STAFF\nROLE_STAFF > ROLE_USER",
-        )
-        .unwrap();
+        let hierarchy =
+            RoleHierarchyImpl::from_hierarchy("ROLE_ADMIN > ROLE_STAFF\nROLE_STAFF > ROLE_USER")
+                .unwrap();
 
         assert_eq!(
-            hierarchy.get_reachable_granted_authorities(&[String::from("ROLE_ADMIN")]),
+            hierarchy.reachable_granted_authorities(&[String::from("ROLE_ADMIN")]),
             vec![
                 String::from("ROLE_ADMIN"),
                 String::from("ROLE_STAFF"),
@@ -169,9 +177,8 @@ mod tests {
 
     #[test]
     fn detects_cycles() {
-        let hierarchy = RoleHierarchyImpl::from_hierarchy(
-            "ROLE_ADMIN > ROLE_STAFF\nROLE_STAFF > ROLE_ADMIN",
-        );
+        let hierarchy =
+            RoleHierarchyImpl::from_hierarchy("ROLE_ADMIN > ROLE_STAFF\nROLE_STAFF > ROLE_ADMIN");
 
         assert!(hierarchy.is_err());
     }

@@ -1,13 +1,25 @@
 mod composite_logout_handler;
+mod cookie_clearing_logout_handler;
+mod delegating_logout_success_handler;
+mod forward_logout_success_handler;
+mod header_writer_logout_handler;
+mod http_status_returning_logout_success_handler;
 mod logout_filter;
 mod logout_handler;
+mod logout_success_event_publishing_logout_handler;
 mod logout_success_handler;
 mod security_context_logout_handler;
 mod simple_url_logout_success_handler;
 
 pub use composite_logout_handler::CompositeLogoutHandler;
+pub use cookie_clearing_logout_handler::CookieClearingLogoutHandler;
+pub use delegating_logout_success_handler::DelegatingLogoutSuccessHandler;
+pub use forward_logout_success_handler::ForwardLogoutSuccessHandler;
+pub use header_writer_logout_handler::HeaderWriterLogoutHandler;
+pub use http_status_returning_logout_success_handler::HttpStatusReturningLogoutSuccessHandler;
 pub use logout_filter::LogoutFilter;
 pub use logout_handler::LogoutHandler;
+pub use logout_success_event_publishing_logout_handler::LogoutSuccessEventPublishingLogoutHandler;
 pub use logout_success_handler::LogoutSuccessHandler;
 pub use security_context_logout_handler::SecurityContextLogoutHandler;
 pub use simple_url_logout_success_handler::SimpleUrlLogoutSuccessHandler;

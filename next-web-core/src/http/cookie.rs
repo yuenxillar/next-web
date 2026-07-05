@@ -4,7 +4,7 @@ pub struct Cookie {
 }
 
 impl Cookie {
-    pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
+    pub fn new(name: impl Into<String>, value: Option<String>) -> Self {
         Self {}
     }
 

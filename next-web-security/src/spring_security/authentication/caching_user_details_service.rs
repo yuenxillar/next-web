@@ -46,8 +46,9 @@ impl UserDetailsService for CachingUserDetailsService {
             .delegate
             .load_user_by_username(username.clone())
             .await?;
-        let cache_key = user.get_username().await;
-        self.user_cache.put_user_in_cache(cache_key, user.clone());
+        let cache_key = user.username();
+        self.user_cache
+            .put_user_in_cache(cache_key.to_string(), user.clone());
         Ok(user)
     }
 }

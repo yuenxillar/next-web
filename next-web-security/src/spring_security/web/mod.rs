@@ -1,6 +1,5 @@
 pub mod access;
 pub mod authentication;
-pub mod authentication_entry_point;
 pub mod context;
 pub mod csrf;
 pub mod default_security_filter_chain;
@@ -14,3 +13,9 @@ pub mod security_filter_chain;
 pub mod session;
 pub mod transport;
 pub mod util;
+
+mod authentication_entry_point;
+mod web_attributes;
+
+pub use authentication_entry_point::AuthenticationEntryPoint;
+pub use web_attributes::WebAttributes;

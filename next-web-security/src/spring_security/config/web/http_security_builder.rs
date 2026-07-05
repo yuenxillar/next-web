@@ -13,7 +13,12 @@ where
     Self: SecurityBuilder<DefaultSecurityFilterChain>,
     H: HttpSecurityBuilder<H>,
 {
-    fn get_configurer<C>(&mut self) -> Option<&mut C>
+    fn configurer<C>(&self) -> Option<&C>
+    where
+        C: SecurityConfigurer<DefaultSecurityFilterChain, H>,
+        C: 'static;
+
+    fn configurer_mut<C>(&mut self) -> Option<&mut C>
     where
         C: SecurityConfigurer<DefaultSecurityFilterChain, H>,
         C: 'static;
@@ -27,11 +32,11 @@ where
     where
         C: AnyClone;
 
-    fn get_shared_object<T>(&self) -> Option<&T>
+    fn shared_object<T>(&self) -> Option<&T>
     where
         T: AnyClone;
 
-    fn get_mut_shared_object<T>(&mut self) -> Option<&mut T>
+    fn shared_object_mut<T>(&mut self) -> Option<&mut T>
     where
         T: AnyClone;
 

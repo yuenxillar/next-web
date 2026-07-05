@@ -6,6 +6,8 @@ use next_web_core::{
 
 use crate::core::Authentication;
 
+/// Strategy that is called after a successful logout by the LogoutFilter, to handle redirection or forwarding to the appropriate destination.
+/// Note that the interface is almost the same as LogoutHandler but may raise an Error.
 #[async_trait]
 pub trait LogoutSuccessHandler
 where

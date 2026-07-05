@@ -70,11 +70,17 @@ impl HttpSecurity {
         authentication_builder: AuthenticationManagerBuilder,
         shared_objects: HashMap<TypeId, Box<dyn AnyClone>>,
     ) -> Self {
+        let builder = shared_objects
+            .get(&TypeId::of::<Builder>())
+            .and_then(|s| (s.as_any()).downcast_ref::<Builder>())
+            .cloned()
+            .unwrap_or_default();
+
         let mut http = Self {
             filter_orders: Default::default(),
             request_matcher: Arc::new(AnyRequestMatcher),
             filters: Vec::new(),
-            request_matcher_configurer: RequestMatcherConfigurer::new(),
+            request_matcher_configurer: RequestMatcherConfigurer::new(builder),
             authentication_manager: None,
 
             base: Default::default(),
@@ -90,20 +96,15 @@ impl HttpSecurity {
         self.get_shared_object::<ApplicationContext>().unwrap()
     }
 
-    // ------------------------------------------------------------------
-    // getOrApply — the central configurer management pattern from Java.
-    // Every configurer DSL method delegates to this single function.
-    // ------------------------------------------------------------------
-
     /// If a configurer of type `C` is already registered, clone and return it.
     /// Otherwise, register the given configurer and return it.
     fn get_or_apply<C, F>(&mut self, configurer: C, mut f: F)
     where
-        C: AnyClone + 'static,
+        C: AnyClone + Clone + 'static,
         C: SecurityConfigurer<DefaultSecurityFilterChain, Self>,
         F: FnMut(&mut C),
     {
-        if let Some(existing_config) = self.get_configurer::<C>() {
+        if let Some(existing_config) = self.configurer_mut::<C>() {
             f(existing_config);
         } else {
             self.with(configurer, f);
@@ -129,8 +130,9 @@ impl HttpSecurity {
 }
 
 impl HttpSecurity {
+    /// ok
     /// Adds the Security headers to the response.
-    pub fn headers<F>(mut self, headers: F) -> Self
+    pub fn headers<F>(&mut self, headers: F) -> &mut Self
     where
         F: FnMut(&mut HeadersConfigurer<Self>),
     {
@@ -139,7 +141,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn cors<F>(mut self, cors: F) -> Self
+    pub fn cors<F>(&mut self, cors: F) -> &mut Self
     where
         F: FnMut(&mut CorsConfigurer<Self>),
     {
@@ -148,7 +150,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn session_management<F>(mut self, session_management: F) -> Self
+    pub fn session_management<F>(&mut self, session_management: F) -> &mut Self
     where
         F: FnMut(&mut SessionManagementConfigurer<Self>),
     {
@@ -157,7 +159,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn port_mapper<F>(mut self, port_mapper: F) -> Self
+    pub fn port_mapper<F>(&mut self, port_mapper: F) -> &mut Self
     where
         F: FnMut(&mut PortMapperConfigurer<Self>),
     {
@@ -166,7 +168,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn remember_me<F>(mut self, remember_me: F) -> Self
+    pub fn remember_me<F>(&mut self, remember_me: F) -> &mut Self
     where
         F: FnMut(&mut RememberMeConfigurer<Self>),
     {
@@ -175,7 +177,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn authorize_http_requests<F>(mut self, mut authorize_http_requests: F) -> Self
+    pub fn authorize_http_requests<F>(&mut self, mut authorize_http_requests: F) -> &mut Self
     where
         F: FnMut(&mut AuthorizationManagerRequestMatcherRegistry),
     {
@@ -187,7 +189,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn request_cache<F>(mut self, request_cache: F) -> Self
+    pub fn request_cache<F>(&mut self, request_cache: F) -> &mut Self
     where
         F: FnMut(&mut RequestCacheConfigurer<Self>),
     {
@@ -196,7 +198,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn error_handling<F>(mut self, error_handling: F) -> Self
+    pub fn error_handling<F>(&mut self, error_handling: F) -> &mut Self
     where
         F: FnMut(&mut ErrorHandlingConfigurer<Self>),
     {
@@ -205,7 +207,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn security_context<F>(mut self, security_context: F) -> Self
+    pub fn security_context<F>(&mut self, security_context: F) -> &mut Self
     where
         F: FnMut(&mut SecurityContextConfigurer<Self>),
     {
@@ -214,7 +216,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn csrf<F>(mut self, csrf: F) -> Self
+    pub fn csrf<F>(&mut self, csrf: F) -> &mut Self
     where
         F: FnMut(&mut CsrfConfigurer<Self>),
     {
@@ -223,7 +225,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn logout<F>(mut self, logout: F) -> Self
+    pub fn logout<F>(&mut self, logout: F) -> &mut Self
     where
         F: FnMut(&mut LogoutConfigurer<Self>),
     {
@@ -232,7 +234,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn anonymous<F>(mut self, anonymous: F) -> Self
+    pub fn anonymous<F>(&mut self, anonymous: F) -> &mut Self
     where
         F: FnMut(&mut AnonymousConfigurer<Self>),
     {
@@ -241,7 +243,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn form_login<F>(mut self, form_login: F) -> Self
+    pub fn form_login<F>(&mut self, form_login: F) -> &mut Self
     where
         F: FnMut(&mut FormLoginConfigurer<Self>),
     {
@@ -250,7 +252,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn saml2_login<F>(mut self, saml2_login: F) -> Self
+    pub fn saml2_login<F>(&mut self, saml2_login: F) -> &mut Self
     where
         F: FnMut(&mut Saml2LoginConfigurer<Self>),
     {
@@ -259,7 +261,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn saml2_logout<F>(mut self, saml2_logout: F) -> Self
+    pub fn saml2_logout<F>(&mut self, saml2_logout: F) -> &mut Self
     where
         F: FnMut(&mut Saml2LogoutConfigurer<Self>),
     {
@@ -268,7 +270,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn saml2_metadata<F>(mut self, saml2_metadata: F) -> Self
+    pub fn saml2_metadata<F>(&mut self, saml2_metadata: F) -> &mut Self
     where
         F: FnMut(&mut Saml2MetadataConfigurer<Self>),
     {
@@ -280,7 +282,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn oauth2_login<F>(mut self, oauth2_login: F) -> Self
+    pub fn oauth2_login<F>(&mut self, oauth2_login: F) -> &mut Self
     where
         F: FnMut(&mut OAuth2LoginConfigurer<Self>),
     {
@@ -289,7 +291,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn oidc_logout<F>(mut self, oidc_logout: F) -> Self
+    pub fn oidc_logout<F>(&mut self, oidc_logout: F) -> &mut Self
     where
         F: FnMut(&mut OidcLogoutConfigurer<Self>),
     {
@@ -298,7 +300,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn oauth2_client<F>(mut self, oauth2_client: F) -> Self
+    pub fn oauth2_client<F>(&mut self, oauth2_client: F) -> &mut Self
     where
         F: FnMut(&mut OAuth2ClientConfigurer<Self>),
     {
@@ -307,7 +309,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn oauth2_resource_server<F>(mut self, oauth2_resource_server: F) -> Self
+    pub fn oauth2_resource_server<F>(&mut self, oauth2_resource_server: F) -> &mut Self
     where
         F: FnMut(&mut OAuth2ResourceServerConfigurer<Self>),
     {
@@ -319,7 +321,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn oauth2_authorization_server<F>(mut self, oauth2_authorization_server: F) -> Self
+    pub fn oauth2_authorization_server<F>(&mut self, oauth2_authorization_server: F) -> &mut Self
     where
         F: FnMut(&mut OAuth2AuthorizationServerConfigurer<Self>),
     {
@@ -331,7 +333,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn one_time_token_login<F>(mut self, one_time_token_login: F) -> Self
+    pub fn one_time_token_login<F>(&mut self, one_time_token_login: F) -> &mut Self
     where
         F: FnMut(&mut OneTimeTokenLoginConfigurer<Self>),
     {
@@ -343,7 +345,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn redirect_to_https<F>(mut self, redirect_to_https: F) -> Self
+    pub fn redirect_to_https<F>(&mut self, redirect_to_https: F) -> &mut Self
     where
         F: FnMut(&mut HttpsRedirectConfigurer<Self>),
     {
@@ -352,7 +354,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn http_basic<F>(mut self, http_basic: F) -> Self
+    pub fn http_basic<F>(&mut self, http_basic: F) -> &mut Self
     where
         F: FnMut(&mut HttpBasicConfigurer<Self>),
     {
@@ -361,7 +363,7 @@ impl HttpSecurity {
         self
     }
 
-    pub fn password_management<F>(mut self, password_management: F) -> Self
+    pub fn password_management<F>(&mut self, password_management: F) -> &mut Self
     where
         F: FnMut(&mut PasswordManagementConfigurer<Self>),
     {
@@ -371,14 +373,15 @@ impl HttpSecurity {
     }
 
     pub fn authentication_manager(
-        mut self,
+        &mut self,
         authentication_manager: Arc<dyn AuthenticationManager>,
-    ) -> Self {
+    ) -> &mut Self {
         self.authentication_manager = Some(authentication_manager);
+
         self
     }
 
-    pub fn security_matchers<F>(mut self, mut security_matchers: F) -> Self
+    pub fn security_matchers<F>(&mut self, mut security_matchers: F) -> &mut Self
     where
         F: FnMut(&mut RequestMatcherConfigurer),
     {
@@ -387,7 +390,7 @@ impl HttpSecurity {
         self.security_matcher(security_matcher)
     }
 
-    pub fn web_authn<F>(mut self, web_authn: F) -> Self
+    pub fn web_authn<F>(&mut self, web_authn: F) -> &mut Self
     where
         F: FnMut(&mut WebAuthnConfigurer<Self>),
     {
@@ -396,12 +399,12 @@ impl HttpSecurity {
         self
     }
 
-    pub fn security_matcher(mut self, request_matcher: Arc<dyn RequestMatcher>) -> Self {
+    pub fn security_matcher(&mut self, request_matcher: Arc<dyn RequestMatcher>) -> &mut Self {
         self.request_matcher = request_matcher;
         self
     }
 
-    pub fn security_matcher_with_strs(mut self, patterns: &[&str]) -> Self {
+    pub fn security_matcher_with_strs(&mut self, patterns: &[&str]) -> &mut Self {
         if let Some(builder) = self.get_shared_object::<Builder>() {
             let matchers = patterns
                 .into_iter()
@@ -424,7 +427,7 @@ impl HttpSecurity {
     }
 
     pub fn get_authentication_registry(&mut self) -> Option<&mut AuthenticationManagerBuilder> {
-        self.base.get_configurer::<AuthenticationManagerBuilder>()
+        self.base.configurer_mut::<AuthenticationManagerBuilder>()
     }
 }
 
@@ -444,10 +447,10 @@ impl SecurityBuilder<DefaultSecurityFilterChain> for HttpSecurity {
 
         self.base.build_state = BuildState::INITIALIZING;
         self.before_init();
-        self.base.init();
+        BaseConfiguredSecurityBuilder::init_configurers(self);
         self.base.build_state = BuildState::CONFIGURING;
         self.before_configure();
-        self.base.configure();
+        BaseConfiguredSecurityBuilder::configure_configurers(self);
         self.base.build_state = BuildState::BUILDING;
         let result = self.perform_build();
         self.base.build_state = BuildState::BUILT;
@@ -465,7 +468,7 @@ impl BaseConfiguredSecurityBuilderExt<DefaultSecurityFilterChain, Self> for Http
             None => self.get_authentication_registry().map(|s| s.build()),
         };
 
-        self.set_shared_object(manager);
+        manager.map(|m| self.set_shared_object(m));
     }
 
     fn perform_build(&mut self) -> DefaultSecurityFilterChain {
@@ -481,21 +484,20 @@ impl BaseConfiguredSecurityBuilderExt<DefaultSecurityFilterChain, Self> for Http
 }
 
 impl HttpSecurityBuilder<Self> for HttpSecurity {
-    fn add_filter<F: HttpFilter>(&mut self, filter: F) {
-        let name = std::any::type_name::<F>();
-        let order = self.filter_orders.get_order_by_name(name).unwrap_or_else(|| {
-            panic!("Filter {name} has no registered order. Use add_filter_before or add_filter_after.")
-        });
-        self.filters
-            .push(OrderedFilter::new(Arc::new(filter), order));
-    }
-
-    fn get_configurer<C>(&mut self) -> Option<&mut C>
+    fn configurer<C>(&self) -> Option<&C>
     where
         C: SecurityConfigurer<DefaultSecurityFilterChain, Self>,
         C: 'static,
     {
-        self.base.get_configurer()
+        self.base.configurer()
+    }
+
+    fn configurer_mut<C>(&mut self) -> Option<&mut C>
+    where
+        C: SecurityConfigurer<DefaultSecurityFilterChain, Self>,
+        C: 'static,
+    {
+        self.base.configurer_mut()
     }
 
     fn remove_configurer<C>(&mut self) -> Option<C>
@@ -529,18 +531,27 @@ impl HttpSecurityBuilder<Self> for HttpSecurity {
         self.base.set_shared_object(object);
     }
 
-    fn get_shared_object<T>(&self) -> Option<&T>
+    fn shared_object<T>(&self) -> Option<&T>
     where
         T: AnyClone,
     {
         self.base.get_shared_object()
     }
 
-    fn get_mut_shared_object<T>(&mut self) -> Option<&mut T>
+    fn shared_object_mut<T>(&mut self) -> Option<&mut T>
     where
         T: AnyClone,
     {
         self.base.get_mut_shared_object()
+    }
+
+    fn add_filter<F: HttpFilter>(&mut self, filter: F) {
+        let name = std::any::type_name::<F>();
+        let order = self.filter_orders.get_order_by_name(name).unwrap_or_else(|| {
+            panic!("Filter {name} has no registered order. Use add_filter_before or add_filter_after.")
+        });
+        self.filters
+            .push(OrderedFilter::new(Arc::new(filter), order));
     }
 
     fn add_filter_after<F, F1>(&mut self, f: F)
@@ -594,10 +605,11 @@ pub struct RequestMatcherConfigurer {
 }
 
 impl RequestMatcherConfigurer {
-    pub fn new() -> Self {
-        Self {
-            base: Default::default(),
-        }
+    pub fn new(builder: Builder) -> Self {
+        let mut base = BaseRequestMatcherRegistry::<Self>::default();
+        base.set_request_matcher_builder(builder);
+
+        Self { base }
     }
 
     pub fn set_matchers(&mut self, matchers: Vec<Arc<dyn RequestMatcher>>) {

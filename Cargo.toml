@@ -27,7 +27,9 @@ members = [
     "next-web-state-machine",
     "next-web-id-generator",
     "next-web-cloud",
-    "next-web-cloud/next-web-cloud-jingyue"]
+    "next-web-cloud/next-web-cloud-jingyue",
+    "next-web-context",
+]
 exclude = ["next-web-code-generator"]
 resolver = "2"
 
@@ -65,14 +67,15 @@ inefficient_to_string = "warn"
 str_to_string = "warn"
 uninlined_format_args = "warn"
 option_option = "warn"
-
 todo = "warn"
 
 [workspace.dependencies]
 # next dependencies
-next-web-ai = { version = "0.1.0", path = "./next-web-ai" }
-next-web-core = { version = "0.1.5", path = "./next-web-core" }
 next-web = { version = "0.1.7", path = "./next-web" }
+next-web-core = { version = "0.1.5", path = "./next-web-core" }
+next-web-context = { version = "0.1.0", path = "./next-web-context" }
+
+next-web-ai = { version = "0.1.0", path = "./next-web-ai" }
 next-web-api-doc = { version = "0.1.0", path = "./next-web-api-doc" }
 next-web-document = { version = "0.1.0", path = "./next-web-document" }
 next-web-mail = { version = "0.1.0", path = "./next-web-mail" }

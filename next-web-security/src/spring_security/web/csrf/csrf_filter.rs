@@ -1,8 +1,11 @@
-use std::sync::{Arc, OnceLock};
+use std::{
+    fmt::Display,
+    sync::{Arc, OnceLock},
+};
 
 use next_web_core::{
+    anys::any_value::AnyValue,
     async_trait,
-    error::BoxError,
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
@@ -11,15 +14,28 @@ use next_web_core::{
     },
     util::http_method::HttpMethod,
 };
+use tracing::{debug, trace};
+use tracing::{enabled, Level};
 
 use crate::web::{
     access::{AccessDeniedError, AccessDeniedHandler, AccessDeniedHandlerImpl},
-    csrf::{CsrfTokenRepository, CsrfTokenRequestHandler, XorCsrfTokenRequestAttributeHandler},
-    util::matcher::RequestMatcher,
+    csrf::{
+        csrf_token_repository::load_deferred_token, CsrfTokenRepository, CsrfTokenRequestHandler,
+        DeferredCsrfToken, XorCsrfTokenRequestAttributeHandler,
+    },
+    util::{matcher::RequestMatcher, UrlUtils},
 };
 
+/// The default RequestMatcher that indicates if CSRF protection is required or not.
+/// The default is to ignore GET, HEAD, TRACE, OPTIONS and process all other requests.
 static DEFAULT_CSRF_MATCHER: OnceLock<Arc<dyn RequestMatcher>> = OnceLock::new();
 
+/// Applies CSRF   protection using a synchronizer token pattern. Developers are required to ensure that
+/// CsrfFilter is invoked for any request that allows state to change. Typically this just means that they
+/// should ensure their web application follows proper REST semantics (i.e. do not change state with the HTTP methods GET, HEAD, TRACE, OPTIONS).
+///
+/// Typically the CsrfTokenRepository implementation chooses to store the CsrfToken in HttpSession with HttpSessionCsrfTokenRepository.
+/// This is preferred to storing the token in a cookie which can be modified by a client application.
 #[derive(Clone)]
 pub struct CsrfFilter {
     token_repository: Arc<dyn CsrfTokenRepository>,
@@ -43,6 +59,9 @@ impl CsrfFilter {
         }
     }
 
+    /// Specifies a RequestMatcher that is used to determine if CSRF protection should be applied. If the
+    /// RequestMatcher returns true for a given request, then CSRF protection is applied.
+    /// The default is to apply CSRF protection for any HTTP method other than GET, HEAD, TRACE, OPTIONS.
     pub fn set_require_csrf_protection_matcher(
         &mut self,
         require_csrf_protection_matcher: Arc<dyn RequestMatcher>,
@@ -50,38 +69,52 @@ impl CsrfFilter {
         self.require_csrf_protection_matcher = require_csrf_protection_matcher;
     }
 
+    /// Specifies a CsrfTokenRequestHandler that is used to make the CsrfToken available as a request attribute.
+    /// The default is XorCsrfTokenRequestAttributeHandler.
     pub fn set_request_handler(&mut self, request_handler: Arc<dyn CsrfTokenRequestHandler>) {
         self.request_handler = request_handler;
     }
 
+    /// Specifies a AccessDeniedHandler that should be used when CSRF protection fails.
+    /// The default is to use AccessDeniedHandlerImpl with no arguments.
     pub fn set_access_denied_handler(
         &mut self,
         access_denied_handler: Arc<dyn AccessDeniedHandler>,
     ) {
         self.access_denied_handler = access_denied_handler;
     }
-}
 
-impl CsrfFilter {
+    /// Returns the default CsrfTokenRequestHandler
     pub fn default_csrf_matcher() -> Arc<dyn RequestMatcher> {
         DEFAULT_CSRF_MATCHER
             .get_or_init(|| Arc::new(DefaultRequiresCsrfMatcher::default()))
             .clone()
     }
-}
 
-/// Default CSRF protection matcher: requires CSRF for mutating HTTP methods.
-#[derive(Debug, Clone, Default)]
-struct DefaultRequiresCsrfMatcher {}
+    /// Constant time comparison to prevent against timing attacks.
+    fn equals_constant_time(expected: &str, actual: Option<&str>) -> bool {
+        match actual {
+            None => false,
+            Some(actual_str) => {
+                if expected.eq(actual_str) {
+                    return true;
+                }
 
-impl RequestMatcher for DefaultRequiresCsrfMatcher {
-    fn matches(&self, request: &dyn HttpRequest) -> bool {
-        // CSRF protection is required for state-changing methods.
-        // Safe methods (GET, HEAD, OPTIONS, TRACE) are excluded.
-        !matches!(
-            request.method(),
-            HttpMethod::Get | HttpMethod::Head | HttpMethod::Options | HttpMethod::Trace
-        )
+                let expected_bytes = expected.as_bytes();
+                let actual_bytes = actual_str.as_bytes();
+
+                if expected_bytes.len() != actual_bytes.len() {
+                    return false;
+                }
+
+                let mut result: u8 = 0;
+                for (a, b) in expected_bytes.iter().zip(actual_bytes.iter()) {
+                    result |= a ^ b;
+                }
+
+                result == 0
+            }
+        }
     }
 }
 
@@ -93,44 +126,94 @@ impl HttpFilter for CsrfFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        // Check if CSRF protection is required for this request
-        if !self.require_csrf_protection_matcher.matches(request) {
-            return filter_chain.do_filter(request, response).await;
-        }
+        // let repository_deferred_csrf_token = load_deferred_token(self.token_repository.clone());
 
-        // Load the expected token from the repository
-        let expected_token = self.token_repository.load_token(request).await;
+        // let deferred_csrf_token: Arc<dyn DeferredCsrfToken> = todo!();
+        // request.set_attribute(
+        //     "DeferredCsrfToken",
+        //     AnyValue::Object(Box::new(deferred_csrf_token.clone())),
+        // );
+        // self.request_handler.handle(request, response, &|| {
+        //     repository_deferred_csrf_token.init(request, response);
+        //     repository_deferred_csrf_token.token()
+        // });
 
-        // Resolve the actual token from the request (header or parameter)
-        let actual_token = match &expected_token {
-            Some(token) => self
-                .request_handler
-                .resolve_csrf_token_value(request, token.as_ref()),
-            None => None,
-        };
+        // if !self.require_csrf_protection_matcher.matches(request) {
+        //     if enabled!(Level::TRACE) {
+        //         trace!(
+        //             "Did not protect against CSRF since request did not match {:?}",
+        //             self.require_csrf_protection_matcher
+        //         );
+        //     }
 
-        // If no token found or token mismatch → deny access
-        let is_valid = match (&expected_token, &actual_token) {
-            (Some(expected), Some(actual)) if !actual.is_empty() => expected.get_token() == actual,
-            _ => false,
-        };
+        //     return filter_chain.do_filter(request, response).await;
+        // }
 
-        if !is_valid {
-            self.access_denied_handler.handle(
-                request,
-                response,
-                AccessDeniedError("Access Denied: Invalid CSRF Token".to_string()),
-            )?;
-            return Ok(());
-        }
+        // let csrf_token = deferred_csrf_token.token();
+        // let actual_token = self
+        //     .request_handler
+        //     .resolve_csrf_token_value(request, csrf_token.as_ref());
+        // if let Some(actual_token) = actual_token.as_deref() {
+        //     if enabled!(Level::TRACE) {
+        //         trace!("Found a CSRF token in the request");
+        //     }
+        // }
 
-        // Token valid — proceed
-        filter_chain.do_filter(request, response).await
+        // if !Self::equals_constant_time(csrf_token.token(), actual_token.as_deref()) {
+        //     let missing_token = deferred_csrf_token.is_generated();
+        //     debug!(
+        //         "Invalid CSRF token found for {}",
+        //         UrlUtils::build_full_request_url(request)
+        //     );
+
+        //     let error = if !missing_token {
+        //         AccessDeniedError::InvalidCsrfToken {
+        //             expected_access_token: (
+        //                 csrf_token.parameter_name().to_string(),
+        //                 csrf_token.header_name().to_string(),
+        //             ),
+        //             actual_access_token: actual_token.clone(),
+        //         }
+        //     } else {
+        //         AccessDeniedError::MissingCsrfToken {
+        //             actual_token: actual_token.clone(),
+        //         }
+        //     };
+        //     self.access_denied_handler
+        //         .handle(request, response, error)?;
+
+        //     return Ok(());
+        // }
+
+        // filter_chain.do_filter(request, response).await
+        //
+        todo!()
     }
 }
 
 impl Named for CsrfFilter {
     fn name(&self) -> &str {
         "CsrfFilter"
+    }
+}
+
+/// Default CSRF protection matcher: requires CSRF for mutating HTTP methods.
+#[derive(Debug, Clone, Default)]
+struct DefaultRequiresCsrfMatcher;
+
+impl RequestMatcher for DefaultRequiresCsrfMatcher {
+    fn matches(&self, request: &dyn HttpRequest) -> bool {
+        // CSRF protection is required for state-changing methods.
+        // Safe methods (GET, HEAD, OPTIONS, TRACE) are excluded.
+        !matches!(
+            request.method(),
+            HttpMethod::Get | HttpMethod::Head | HttpMethod::Trace | HttpMethod::Options
+        )
+    }
+}
+
+impl Display for DefaultRequiresCsrfMatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IsNotHttpMethod GET, HEAD, TRACE, OPTIONS",)
     }
 }

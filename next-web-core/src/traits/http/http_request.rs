@@ -8,7 +8,7 @@ use std::{collections::HashMap, str::FromStr};
 use crate::{
     anys::any_value::AnyValue,
     autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES,
-    http::{auth_type::AuthType, cookie::Cookie},
+    http::{Cookie, auth_type::AuthType},
     traits::http::{HttpSession, request_dispatcher::RequestDispatcher},
     util::{http_method::HttpMethod, locale::Locale},
 };
@@ -22,7 +22,9 @@ pub trait HttpRequest
 where
     Self: Send,
 {
-    fn session(&self, create: bool) -> Option<&dyn HttpSession>;
+    fn session(&self) -> Option<&dyn HttpSession>;
+
+    fn session_mut(&mut self, create: bool) -> Option<&mut dyn HttpSession>;
 
     fn auth_type(&self) -> AuthType;
 
@@ -88,8 +90,12 @@ impl HttpRequest for Request {
     //         .unwrap_or_default()
     // }
 
-    fn session(&self, create: bool) -> Option<&dyn HttpSession> {
+    fn session(&self) -> Option<&dyn HttpSession> {
         None
+    }
+
+    fn session_mut(&mut self, create: bool) -> Option<&mut dyn HttpSession> {
+        todo!()
     }
 
     fn cookie(&self) -> Option<&Cookie> {

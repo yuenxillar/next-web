@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
 use next_web_core::traits::required::Required;
 
@@ -6,6 +6,10 @@ use crate::{
     config::{
         security_builder::SecurityBuilder, security_configurer_adapter::SecurityConfigurerAdapter,
         web::http_security_builder::HttpSecurityBuilder,
+    },
+    core::context::{
+        security_context_holder::SecurityContextHolder,
+        security_context_holder_strategy::SecurityContextHolderStrategy,
     },
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
@@ -17,9 +21,10 @@ where
     B: HttpSecurityBuilder<B>,
     Self: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>,
 {
+    security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
+
     security_configurer_adapter: SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>,
     _marker_1: PhantomData<T>,
-    _marker_2: PhantomData<B>,
 }
 
 impl<T, B> BaseHttpConfigurer<T, B>
@@ -28,12 +33,8 @@ where
     B: HttpSecurityBuilder<B>,
     Self: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>,
 {
-    pub fn new() -> Self {
-        Self {
-            security_configurer_adapter: SecurityConfigurerAdapter::default(),
-            _marker_1: PhantomData,
-            _marker_2: PhantomData,
-        }
+    pub fn get_security_context_holder_strategy(&self) -> &Arc<dyn SecurityContextHolderStrategy> {
+        &self.security_context_holder_strategy
     }
 }
 
@@ -45,9 +46,9 @@ where
 {
     fn default() -> Self {
         Self {
+            security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
             security_configurer_adapter: SecurityConfigurerAdapter::default(),
             _marker_1: Default::default(),
-            _marker_2: Default::default(),
         }
     }
 }

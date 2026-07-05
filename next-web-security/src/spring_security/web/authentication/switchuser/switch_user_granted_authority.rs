@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::async_trait;
 
-use crate::core::{Authentication, granted_authority::GrantedAuthority};
+use crate::core::{granted_authority::GrantedAuthority, Authentication};
 
 /// A `GrantedAuthority` that stores the original `Authentication` for use
 /// when exiting a switched user context.
@@ -36,13 +36,8 @@ impl SwitchUserGrantedAuthority {
     }
 }
 
-#[async_trait]
 impl GrantedAuthority for SwitchUserGrantedAuthority {
-    async fn get_authority(&self) -> Option<String> {
-        Some(self.authority_role.clone())
-    }
-
-    fn as_switch_user_source(&self) -> Option<Arc<dyn Authentication>> {
-        Some(self.source.clone())
+    fn authority(&self) -> Option<&str> {
+        Some(self.authority_role.as_str())
     }
 }

@@ -48,7 +48,7 @@ where
     fn get_request_cache(&self, _http: &H) -> Arc<dyn RequestCache> {
         self.request_cache
             .clone()
-            .unwrap_or_else(|| Arc::new(HttpSessionRequestCache::new()))
+            .unwrap_or_else(|| Arc::new(HttpSessionRequestCache::default()))
     }
 }
 

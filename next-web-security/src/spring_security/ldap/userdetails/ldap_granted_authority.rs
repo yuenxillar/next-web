@@ -1,5 +1,3 @@
-use next_web_core::async_trait;
-
 use crate::core::granted_authority::GrantedAuthority;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -19,9 +17,8 @@ impl LdapGrantedAuthority {
     }
 }
 
-#[async_trait]
 impl GrantedAuthority for LdapGrantedAuthority {
-    async fn get_authority(&self) -> Option<String> {
-        Some(self.authority.clone())
+    fn authority(&self) -> Option<&str> {
+        Some(self.authority.as_str())
     }
 }

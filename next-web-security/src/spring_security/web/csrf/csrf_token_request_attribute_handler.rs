@@ -1,15 +1,25 @@
 use std::sync::Arc;
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::{
+    anys::any_value::AnyValue,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+};
 use tracing::trace;
 
 use crate::web::csrf::{CsrfToken, CsrfTokenRequestHandler, CsrfTokenRequestResolver};
 
+/// An implementation of the CsrfTokenRequestHandler interface that is capable of making the
+/// CsrfToken available as a request attribute and resolving the token value as either a header or
+/// parameter value of the request.
+#[derive(Clone)]
 pub struct CsrfTokenRequestAttributeHandler {
     csrf_request_attribute_name: Option<Box<str>>,
 }
 
 impl CsrfTokenRequestAttributeHandler {
+    /// The CsrfToken is available as a request attribute named CsrfToken::type_name().
+    /// By default, an additional request attribute that is the same as CsrfToken::parameter_name() is set.
+    /// This attribute allows overriding the additional attribute.
     pub fn set_csrf_request_attribute_name(
         &mut self,
         csrf_request_attribute_name: Option<Box<str>>,
@@ -21,8 +31,8 @@ impl CsrfTokenRequestAttributeHandler {
 impl CsrfTokenRequestHandler for CsrfTokenRequestAttributeHandler {
     fn handle(
         &self,
-        request: &mut dyn next_web_core::traits::http::http_request::HttpRequest,
-        _response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
+        request: &mut dyn HttpRequest,
+        _response: &mut dyn HttpResponse,
         deferred_csrf_token: &dyn Fn() -> Arc<dyn CsrfToken>,
     ) {
         let csrf_token = deferred_csrf_token();
@@ -30,16 +40,14 @@ impl CsrfTokenRequestHandler for CsrfTokenRequestAttributeHandler {
         let type_name = std::any::type_name::<&dyn CsrfToken>();
         request.set_attribute(type_name, AnyValue::Object(Box::new(csrf_token.clone())));
 
-        let csrf_attr_name = self
+        let csrf_attr_name = &self
             .csrf_request_attribute_name
             .as_ref()
             .map(|s| s.as_ref())
-            .unwrap_or(csrf_token.get_parameter_name());
+            .unwrap_or(csrf_token.parameter_name())
+            .to_string();
 
-        request.set_attribute(
-            csrf_attr_name,
-            AnyValue::Object(Box::new(csrf_token.clone())),
-        );
+        request.set_attribute(csrf_attr_name, AnyValue::Object(Box::new(csrf_token)));
 
         trace!(
             "Wrote a CSRF token to the following request attributes: [{}, {}]",
@@ -50,22 +58,6 @@ impl CsrfTokenRequestHandler for CsrfTokenRequestAttributeHandler {
 }
 
 impl CsrfTokenRequestResolver for CsrfTokenRequestAttributeHandler {}
-
-struct SupplierCsrfToken {
-    csrf_token_supplier: Arc<dyn Fn() -> Arc<dyn CsrfToken>>,
-}
-
-impl SupplierCsrfToken {
-    fn new(csrf_token_supplier: Arc<dyn Fn() -> Arc<dyn CsrfToken>>) -> Self {
-        Self {
-            csrf_token_supplier,
-        }
-    }
-
-    fn get_delegate(&self) -> Arc<dyn CsrfToken> {
-        (self.csrf_token_supplier)()
-    }
-}
 
 impl Default for CsrfTokenRequestAttributeHandler {
     fn default() -> Self {

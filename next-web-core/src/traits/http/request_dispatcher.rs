@@ -4,11 +4,7 @@ use crate::{
 };
 
 pub trait RequestDispatcher {
-    fn forward(
-        &self,
-        req: &mut dyn HttpRequest,
-        resp: &mut dyn HttpResponse,
-    ) -> Result<(), BoxError>;
+    fn forward(&self, req: &dyn HttpRequest, resp: &mut dyn HttpResponse) -> Result<(), BoxError>;
 
     fn include(
         &self,

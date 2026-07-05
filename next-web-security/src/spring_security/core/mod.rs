@@ -16,7 +16,6 @@ pub mod user_cache;
 pub mod userdetails;
 pub mod username_not_found_error;
 pub mod username_password_authentication_token;
-pub mod web_security_configure;
 
 pub use authentication::Authentication;
 // pub mod memory_auth_service;

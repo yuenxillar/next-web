@@ -70,15 +70,14 @@ impl AuthenticationProvider for OneTimeTokenAuthenticationProvider {
             })?;
 
         let mut authorities = user
-            .get_authorities()
-            .await
+            .authorities()
             .into_iter()
-            .filter_map(|authority| futures::executor::block_on(authority.get_authority()))
+            .filter_map(|authority| authority.authority().map(ToString::to_string))
             .collect::<Vec<_>>();
         authorities.push(FactorGrantedAuthority::OTT_AUTHORITY.to_string());
 
         let mut result = OneTimeTokenAuthentication::new(
-            user.get_username().await,
+            user.username(),
             AuthorityUtils::create_authority_list(authorities),
         );
         result.set_details_value(authentication.get_details_value());

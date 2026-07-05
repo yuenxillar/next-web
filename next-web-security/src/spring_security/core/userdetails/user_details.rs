@@ -1,23 +1,35 @@
-use next_web_core::async_trait;
-
 use crate::core::granted_authority::GrantedAuthority;
 
-#[async_trait]
 pub trait UserDetails
 where
     Self: Send + Sync,
 {
-    async fn get_authorities(&self) -> Vec<&dyn GrantedAuthority>;
+    /// Returns the authorities granted to the user.
+    fn authorities(&self) -> Vec<&dyn GrantedAuthority>;
 
-    async fn get_password(&self) -> String;
+    /// Returns the password used to authenticate the user.
+    fn password(&self) -> Option<&str>;
 
-    async fn get_username(&self) -> String;
+    /// Returns the username used to authenticate the user.
+    fn username(&self) -> &str;
 
-    async fn is_account_non_expired(&self) -> bool;
+    /// Indicates whether the user's account has expired. An expired account cannot be authenticated.
+    fn is_account_non_expired(&self) -> bool {
+        true
+    }
 
-    async fn is_account_non_locked(&self) -> bool;
+    /// Indicates whether the user is locked or unlocked. A locked user cannot be authenticated.
+    fn is_account_non_locked(&self) -> bool {
+        true
+    }
 
-    async fn is_credentials_non_expired(&self) -> bool;
+    /// Indicates whether the user's credentials (password) has expired. Expired credentials prevent authentication.
+    fn is_credentials_non_expired(&self) -> bool {
+        true
+    }
 
-    async fn is_enabled(&self) -> bool;
+    /// Indicates whether the user is enabled or disabled. A disabled user cannot be authenticated.
+    fn is_enabled(&self) -> bool {
+        true
+    }
 }

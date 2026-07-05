@@ -3,8 +3,7 @@ use std::sync::Arc;
 use crate::{
     access::hierarchicalroles::role_hierarchy::RoleHierarchy,
     core::{
-        authority_mapping::GrantedAuthoritiesMapper,
-        granted_authority::GrantedAuthority,
+        authority_mapping::GrantedAuthoritiesMapper, granted_authority::GrantedAuthority,
         simple_granted_authority::SimpleGrantedAuthority,
     },
 };
@@ -26,13 +25,15 @@ impl GrantedAuthoritiesMapper for RoleHierarchyAuthoritiesMapper {
     ) -> Vec<Arc<dyn GrantedAuthority>> {
         let names = authorities
             .into_iter()
-            .filter_map(|authority| futures::executor::block_on(authority.get_authority()))
+            .filter_map(|authority| authority.authority().map(ToString::to_string))
             .collect::<Vec<_>>();
 
         self.role_hierarchy
-            .get_reachable_granted_authorities(&names)
+            .reachable_granted_authorities(&names)
             .into_iter()
-            .map(|authority| Arc::new(SimpleGrantedAuthority::new(authority)) as Arc<dyn GrantedAuthority>)
+            .map(|authority| {
+                Arc::new(SimpleGrantedAuthority::new(authority)) as Arc<dyn GrantedAuthority>
+            })
             .collect()
     }
 }

@@ -3,8 +3,12 @@ use std::collections::HashMap;
 pub struct StringUtils;
 
 impl StringUtils {
-    pub fn has_text(s: &str) -> bool {
-        !Self::is_blank(s)
+    /// Determine whether the string has text content (not blank)
+    pub fn has_text<S>(s: S) -> bool
+    where
+        S: AsRef<str>,
+    {
+        !Self::is_blank(s.as_ref())
     }
 
     /// Determine whether the string is null or empty

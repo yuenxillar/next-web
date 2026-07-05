@@ -45,7 +45,7 @@ impl fmt::Display for PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails
         let authorities = self
             .authorities
             .iter()
-            .filter_map(|authority| futures::executor::block_on(authority.get_authority()))
+            .filter_map(|authority| authority.authority())
             .collect::<Vec<_>>();
 
         write!(

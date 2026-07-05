@@ -61,6 +61,20 @@ impl AuthorizationFilter {
         self.filter_async_dispatch = filter_async_dispatch;
     }
 
+    pub fn set_authorization_event_publisher(
+        &mut self,
+        event_publisher: Arc<dyn AuthorizationEventPublisher<()>>,
+    ) {
+        self.event_publisher = Some(event_publisher);
+    }
+
+    pub fn set_security_context_holder_strategy(
+        &mut self,
+        strategy: Arc<dyn SecurityContextHolderStrategy>,
+    ) {
+        self.security_context_holder_strategy = strategy;
+    }
+
     fn is_applied(&self, req: &mut dyn HttpRequest) -> bool {
         req.get_attribute(&self.get_already_filtered_attribute_name())
             .is_some()

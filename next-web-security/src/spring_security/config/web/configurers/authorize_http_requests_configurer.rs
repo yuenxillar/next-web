@@ -8,9 +8,9 @@ use next_web_core::{
     traits::required::Required, util::http_method::HttpMethod, ApplicationContext,
 };
 
-use crate::config::security_builder::SecurityBuilder;
 use crate::config::web::base_request_matcher_registry::BaseRequestMatcherRegistry;
 use crate::config::web::http_security_builder::HttpSecurityBuilder;
+use crate::config::{security_builder::SecurityBuilder, web::configurers::BaseHttpConfigurer};
 use crate::web::access::intercept::AuthorizationFilter;
 use crate::web::default_security_filter_chain::DefaultSecurityFilterChain;
 use crate::web::util::matcher::RequestMatcherEntry;
@@ -52,26 +52,28 @@ impl AuthorizationEventPublisher for NullAuthorizationEventPublisher {
 struct NullRoleHierarchy;
 
 impl RoleHierarchy for NullRoleHierarchy {
-    fn get_reachable_granted_authorities(&self, authorities: &[String]) -> Vec<String> {
-        authorities.to_vec()
+    fn reachable_granted_authorities(&self, authorities: &[String]) -> Vec<String> {
+        authorities.iter().map(ToString::to_string).collect()
     }
 }
 
 #[derive(Clone)]
 pub struct AuthorizeHttpRequestsConfigurer<H>
 where
-    H: SecurityBuilder<DefaultSecurityFilterChain>,
+    H: HttpSecurityBuilder<H>,
 {
     _marker: PhantomData<H>,
     registry: AuthorizationManagerRequestMatcherRegistry,
     publisher: Arc<dyn AuthorizationEventPublisher>,
     role_hierarchy: Arc<dyn Fn() -> Arc<dyn RoleHierarchy> + Send + Sync>,
     security_configurer_adapter: SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>,
+
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> AuthorizeHttpRequestsConfigurer<H>
 where
-    H: SecurityBuilder<DefaultSecurityFilterChain>,
+    H: HttpSecurityBuilder<H>,
 {
     pub fn open(&self) {}
 
@@ -82,6 +84,8 @@ where
             publisher: Arc::new(NullAuthorizationEventPublisher),
             role_hierarchy: Arc::new(|| Arc::new(NullRoleHierarchy)),
             security_configurer_adapter: SecurityConfigurerAdapter::default(),
+
+            base: Default::default(),
         }
     }
 
@@ -100,6 +104,13 @@ where
     pub fn permit_all_authorization_manager() -> AuthorizationDecision {
         AuthorizationDecision::new(true)
     }
+
+    pub fn add_first(
+        &mut self,
+        matcher: Arc<dyn RequestMatcher>,
+        manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
+    ) {
+    }
 }
 
 impl<H> SecurityConfigurer<AuthorizeHttpRequestsConfigurer<H>, H>
@@ -107,7 +118,6 @@ impl<H> SecurityConfigurer<AuthorizeHttpRequestsConfigurer<H>, H>
 where
     H: Send + Sync,
     H: HttpSecurityBuilder<H>,
-    H: SecurityBuilder<DefaultSecurityFilterChain>,
     H: SecurityBuilder<AuthorizeHttpRequestsConfigurer<H>>,
 {
     fn init(&mut self, _http: &mut H) {}
@@ -119,24 +129,29 @@ where
     }
 }
 
-impl<H> SecurityConfigurer<DefaultSecurityFilterChain, HttpSecurity>
-    for AuthorizeHttpRequestsConfigurer<H>
+impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for AuthorizeHttpRequestsConfigurer<H>
 where
-    H: SecurityBuilder<DefaultSecurityFilterChain>,
+    H: HttpSecurityBuilder<H>,
 {
-    fn init(&mut self, builer: &mut HttpSecurity) {
-        todo!()
-    }
+    fn init(&mut self, _http: &mut H) {}
 
-    fn configure(&mut self, builer: &mut HttpSecurity) {
-        todo!()
+    fn configure(&mut self, http: &mut H) {
+        let authorization_manager = self.registry.create_authorization_manager();
+
+        let mut authorization_filter = AuthorizationFilter::new(authorization_manager);
+        authorization_filter.set_authorization_event_publisher(self.publisher.clone());
+        authorization_filter.set_security_context_holder_strategy(
+            self.base.get_security_context_holder_strategy().clone(),
+        );
+
+        http.add_filter(authorization_filter);
     }
 }
 
 impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>>
     for AuthorizeHttpRequestsConfigurer<H>
 where
-    H: SecurityBuilder<DefaultSecurityFilterChain>,
+    H: HttpSecurityBuilder<H>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         &self.security_configurer_adapter
@@ -144,6 +159,19 @@ where
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         &mut self.security_configurer_adapter
+    }
+}
+
+impl<H> Required<BaseHttpConfigurer<Self, H>> for AuthorizeHttpRequestsConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn get_object(&self) -> &BaseHttpConfigurer<Self, H> {
+        &self.base
+    }
+
+    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<Self, H> {
+        &mut self.base
     }
 }
 
@@ -181,6 +209,7 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
         Self::default()
     }
 }
+
 impl Default for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     fn default() -> Self {
         Self {

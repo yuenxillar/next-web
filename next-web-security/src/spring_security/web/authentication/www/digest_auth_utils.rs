@@ -110,7 +110,7 @@ pub fn generate_digest(
     password_already_encoded: bool,
     username: &str,
     realm: &str,
-    password: &str,
+    password: Option<&str>,
     http_method: &str,
     uri: &str,
     qop: Option<&str>,
@@ -121,6 +121,7 @@ pub fn generate_digest(
     let a2 = format!("{}:{}", http_method, uri);
     let a2_md5 = md5_hex(&a2);
 
+    let password = password.unwrap_or_default();
     let a1_md5 = if !password_already_encoded {
         encode_password_in_a1_format(username, realm, password)
     } else {
@@ -134,7 +135,10 @@ pub fn generate_digest(
         }
         Some("auth") => {
             // RFC 2617 compliant clients
-            md5_hex(&format!("{}:{}:{}:{}:{}:{}", a1_md5, nonce, nc, cnonce, "auth", a2_md5))
+            md5_hex(&format!(
+                "{}:{}:{}:{}:{}:{}",
+                a1_md5, nonce, nc, cnonce, "auth", a2_md5
+            ))
         }
         Some(other) => panic!("This method does not support a qop: '{}'", other),
     }

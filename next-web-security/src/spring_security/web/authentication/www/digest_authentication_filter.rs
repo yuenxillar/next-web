@@ -265,22 +265,26 @@ impl DigestAuthenticationFilter {
             // Build an authenticated token with authorities.
             // Note: get_authorities() and get_password() are async on UserDetails,
             // so we use block_on here since this is a sync helper.
-            let username = futures::executor::block_on(user.get_username());
-            let password = futures::executor::block_on(user.get_password());
-            let authorities = futures::executor::block_on(user.get_authorities());
+            let username = user.username();
+            let password = user.password();
+            let authorities = user.authorities();
             let mut auth_list: Vec<Arc<dyn crate::core::granted_authority::GrantedAuthority>> =
                 Vec::new();
             for auth in authorities {
-                let name = futures::executor::block_on(auth.get_authority()).unwrap_or_default();
+                let name = auth.authority().unwrap_or_default();
                 auth_list.push(Arc::new(
                     crate::core::simple_granted_authority::SimpleGrantedAuthority::new(name),
                 ));
             }
-            UsernamePasswordAuthenticationToken::authenticated(username, Some(password), auth_list)
+            UsernamePasswordAuthenticationToken::authenticated(
+                username,
+                password.map(ToString::to_string),
+                auth_list,
+            )
         } else {
             UsernamePasswordAuthenticationToken::unauthenticated(
-                Some(futures::executor::block_on(user.get_username())),
-                Some(futures::executor::block_on(user.get_password())),
+                user.username().to_string(),
+                user.password().map(ToString::to_string),
             )
         }
     }
@@ -344,9 +348,9 @@ impl HttpFilter for DigestAuthenticationFilter {
 
         // Calculate the expected server digest.
         let http_method = request.method().to_string();
-        let password = futures::executor::block_on(user.get_password());
+        let password = user.password();
         let mut server_digest_md5 = digest_auth.calculate_server_digest(
-            &password,
+            password,
             &http_method,
             self.password_already_encoded,
         );
@@ -367,9 +371,9 @@ impl HttpFilter for DigestAuthenticationFilter {
                 })?;
             self.user_cache
                 .put_user_in_cache(username.to_string(), user.clone());
-            let refreshed_password = futures::executor::block_on(user.get_password());
+            let refreshed_password = user.password();
             server_digest_md5 = digest_auth.calculate_server_digest(
-                &refreshed_password,
+                refreshed_password,
                 &http_method,
                 self.password_already_encoded,
             );

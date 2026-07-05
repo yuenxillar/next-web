@@ -37,15 +37,15 @@ impl DefaultCsrfToken {
 }
 
 impl CsrfToken for DefaultCsrfToken {
-    fn get_header_name(&self) -> &str {
+    fn header_name(&self) -> &str {
         self.header_name.as_str()
     }
 
-    fn get_parameter_name(&self) -> &str {
+    fn parameter_name(&self) -> &str {
         self.parameter_name.as_str()
     }
 
-    fn get_token(&self) -> &str {
+    fn token(&self) -> &str {
         self.token.as_str()
     }
 }

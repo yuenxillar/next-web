@@ -11,6 +11,7 @@ pub mod caching_user_details_service;
 pub mod dao;
 pub mod default_authentication_event_publisher;
 pub mod delegating_reactive_authentication_manager;
+pub mod event;
 pub mod ott;
 pub mod password;
 pub mod provider_manager;
@@ -21,3 +22,7 @@ pub mod remember_me_authentication_provider;
 pub mod remember_me_authentication_token;
 pub mod testing_authentication_provider;
 pub mod testing_authentication_token;
+
+mod authentication_trust_resolver_impl;
+
+pub use authentication_trust_resolver_impl::AuthenticationTrustResolverImpl;

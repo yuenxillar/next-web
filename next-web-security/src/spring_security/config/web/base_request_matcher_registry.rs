@@ -1,14 +1,12 @@
 use std::{marker::PhantomData, sync::Arc};
 
-use next_web_core::{util::http_method::HttpMethod, ApplicationContext};
+use next_web_core::util::http_method::HttpMethod;
 use tracing::warn;
 
 use crate::web::util::matcher::{AnyRequestMatcher, Builder, RequestMatcher};
 
 #[derive(Clone)]
 pub struct BaseRequestMatcherRegistry<C> {
-    context: Option<ApplicationContext>,
-
     any_request_configured: bool,
     request_matcher_builder: Option<Builder>,
 
@@ -22,10 +20,8 @@ impl<C> BaseRequestMatcherRegistry<C> {}
 impl<C> Default for BaseRequestMatcherRegistry<C> {
     fn default() -> Self {
         Self {
-            context: None,
             any_request_configured: false,
             request_matcher_builder: None,
-
             _marker: PhantomData,
             _req_matchers: Default::default(),
         }
@@ -33,16 +29,6 @@ impl<C> Default for BaseRequestMatcherRegistry<C> {
 }
 
 impl<C> BaseRequestMatcherRegistry<C> {
-    /// Sets the ApplicationContext
-    pub fn set_application_context(&mut self, context: ApplicationContext) {
-        self.context = Some(context);
-    }
-
-    /// Gets the ApplicationContext
-    pub fn application_context(&self) -> Option<&ApplicationContext> {
-        self.context.as_ref()
-    }
-
     /// Maps any request.
     /// Returns the object that is chained after creating the RequestMatcher
     pub fn any_request(&mut self) -> &mut Self {
@@ -113,17 +99,17 @@ impl<C> BaseRequestMatcherRegistry<C> {
         self.request_matchers(Some(method), &["/**"])
     }
 
-    fn get_request_matcher_builder(&mut self) -> &Builder {
-        if self.request_matcher_builder.is_none() {
-            let builder = self
-                .context
-                .as_ref()
-                .map(|ctx| ctx.get_single::<Builder>())
-                .cloned()
-                .expect("Builder not found. Ensure it is registered with the ApplicationContext.");
-            self.request_matcher_builder = Some(builder);
-        }
+    /// Sets the request matcher builder to use for creating RequestMatchers.
+    pub fn set_request_matcher_builder(&mut self, builder: Builder) {
+        self.request_matcher_builder = Some(builder);
+    }
 
+    /// Takes the request matchers from this registry and returns them.
+    pub fn take_request_matchers(&mut self) -> Vec<Arc<dyn RequestMatcher>> {
+        std::mem::take(&mut self._req_matchers)
+    }
+
+    fn get_request_matcher_builder(&mut self) -> &Builder {
         self.request_matcher_builder
             .as_ref()
             .expect("Builder not found. Ensure it is registered with the ApplicationContext.")

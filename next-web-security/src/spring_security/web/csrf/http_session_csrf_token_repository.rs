@@ -111,12 +111,12 @@ impl CsrfTokenRepository for HttpSessionCsrfTokenRepository {
     ) {
         match token {
             None => {
-                if let Some(session) = request.session(false) {
+                if let Some(session) = request.session() {
                     session.remove_attribute(&self.session_attribute_name);
                 }
             }
             Some(token) => {
-                let Some(session) = request.session(true) else {
+                let Some(session) = request.session_mut(true) else {
                     return;
                 };
                 session.set_attribute(
@@ -128,10 +128,10 @@ impl CsrfTokenRepository for HttpSessionCsrfTokenRepository {
     }
 
     async fn load_token(&self, request: &mut dyn HttpRequest) -> Option<Arc<dyn CsrfToken>> {
-        match request.session(false) {
+        match request.session() {
             None => return None,
             Some(session) => session
-                .get_attribute(&self.session_attribute_name)
+                .attribute(&self.session_attribute_name)
                 .map(|value| value.as_object::<Arc<dyn CsrfToken>>())
                 .unwrap_or_default(),
         }

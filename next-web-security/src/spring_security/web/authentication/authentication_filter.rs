@@ -401,10 +401,10 @@ impl HttpFilter for AuthenticationFilter {
                 // In the Servlet API this is `request.changeSessionId()`.
                 // TODO: Add change_session_id() to the HttpRequest/HttpSession trait
                 // when session management infrastructure is complete.
-                if let Some(session) = request.session(false) {
+                if let Some(session) = request.session() {
                     debug!(
                         "Session exists (id={}); session fixation protection: changeSessionId not yet implemented",
-                        session.get_id()
+                        session.id()
                     );
                 }
 

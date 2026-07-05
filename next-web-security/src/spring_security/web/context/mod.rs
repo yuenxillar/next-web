@@ -1,5 +1,7 @@
+mod http_session_security_context_repository;
 mod security_context_holder_filter;
 mod security_context_repository;
 
+pub use http_session_security_context_repository::HttpSessionSecurityContextRepository;
 pub use security_context_holder_filter::SecurityContextHolderFilter;
 pub use security_context_repository::SecurityContextRepository;

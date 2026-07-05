@@ -17,7 +17,11 @@ impl RepositoryDeferredCsrfToken {
         }
     }
 
-    async fn init(&mut self, request: &mut dyn HttpRequest, response: &mut dyn HttpResponse) {
+    pub(crate) async fn init(
+        &mut self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+    ) {
         match self.csrf_token.as_ref() {
             Some(_) => {
                 return;
@@ -37,8 +41,8 @@ impl RepositoryDeferredCsrfToken {
 }
 
 impl DeferredCsrfToken for RepositoryDeferredCsrfToken {
-    fn get_token(&self) -> &dyn super::CsrfToken {
-        self.csrf_token.as_deref().unwrap()
+    fn token(&self) -> Arc<dyn super::CsrfToken> {
+        self.csrf_token.as_ref().map(Clone::clone).unwrap()
     }
 
     fn is_generated(&self) -> bool {

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use next_web_core::anys::any_value::AnyValue;
 
 use crate::core::{
-    Authentication, credentials_container::CredentialsContainer,
-    granted_authority::GrantedAuthority,
+    credentials_container::CredentialsContainer, granted_authority::GrantedAuthority,
+    Authentication,
 };
 
 #[derive(Clone, Default)]
@@ -18,12 +18,12 @@ pub struct UsernamePasswordAuthenticationToken {
 
 impl UsernamePasswordAuthenticationToken {
     pub fn unauthenticated(
-        principal: Option<String>,
-        credentials: Option<String>,
+        principal: impl Into<Option<String>>,
+        credentials: impl Into<Option<String>>,
     ) -> Self {
         Self {
-            principal,
-            credentials,
+            principal: principal.into(),
+            credentials: credentials.into(),
             details: None,
             authenticated: false,
             authorities: Vec::new(),
@@ -32,12 +32,12 @@ impl UsernamePasswordAuthenticationToken {
 
     pub fn authenticated(
         principal: impl Into<String>,
-        credentials: Option<String>,
+        credentials: impl Into<Option<String>>,
         authorities: Vec<Arc<dyn GrantedAuthority>>,
     ) -> Self {
         Self {
             principal: Some(principal.into()),
-            credentials,
+            credentials: credentials.into(),
             details: None,
             authenticated: true,
             authorities,
@@ -95,8 +95,8 @@ impl Authentication for UsernamePasswordAuthenticationToken {
     fn authorities(&self) -> Vec<String> {
         let mut authorities = Vec::with_capacity(self.authorities.len());
         for authority in &self.authorities {
-            if let Some(authority) = block_on(authority.get_authority()) {
-                authorities.push(authority);
+            if let Some(authority) = authority.authority() {
+                authorities.push(authority.to_string());
             }
         }
         authorities
@@ -109,15 +109,11 @@ impl CredentialsContainer for UsernamePasswordAuthenticationToken {
     }
 }
 
-fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    futures::executor::block_on(future)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::core::{
-        authority_utils::AuthorityUtils, Authentication,
-        credentials_container::CredentialsContainer,
+        authority_utils::AuthorityUtils, credentials_container::CredentialsContainer,
+        Authentication,
     };
 
     use super::UsernamePasswordAuthenticationToken;

@@ -8,7 +8,7 @@ use crate::{
             bad_credentials, compromised_password, internal_authentication_service,
         },
         authentication_provider::AuthenticationProvider,
-        dao::abstract_user_details_authentication_provider::AbstractUserDetailsAuthenticationProviderSupport,
+        dao::base_user_details_authentication_provider::BaseUserDetailsAuthenticationProviderSupport,
         password::compromised_password_checker::CompromisedPasswordChecker,
     },
     core::{
@@ -32,7 +32,7 @@ pub struct DaoAuthenticationProvider {
     user_not_found_encoded_password: Mutex<Option<String>>,
     user_details_password_service: Arc<dyn UserDetailsPasswordService>,
     compromised_password_checker: Option<Arc<dyn CompromisedPasswordChecker>>,
-    support: AbstractUserDetailsAuthenticationProviderSupport,
+    support: BaseUserDetailsAuthenticationProviderSupport,
 }
 
 impl DaoAuthenticationProvider {
@@ -43,7 +43,7 @@ impl DaoAuthenticationProvider {
             user_not_found_encoded_password: Mutex::new(None),
             user_details_password_service: Arc::new(NoopUserDetailsPasswordService),
             compromised_password_checker: None,
-            support: AbstractUserDetailsAuthenticationProviderSupport::default(),
+            support: BaseUserDetailsAuthenticationProviderSupport::default(),
         }
     }
 
@@ -68,7 +68,7 @@ impl DaoAuthenticationProvider {
         self.compromised_password_checker = Some(compromised_password_checker);
     }
 
-    pub fn support_mut(&mut self) -> &mut AbstractUserDetailsAuthenticationProviderSupport {
+    pub fn support_mut(&mut self) -> &mut BaseUserDetailsAuthenticationProviderSupport {
         &mut self.support
     }
 
@@ -81,11 +81,10 @@ impl DaoAuthenticationProvider {
             return Err(bad_credentials());
         };
 
-        if !self
-            .password_encoder
-            .matches(&presented_password, &user_details.get_password().await)
-        {
-            return Err(bad_credentials());
+        if let Some(password) = user_details.password() {
+            if !self.password_encoder.matches(&presented_password, password) {
+                return Err(bad_credentials());
+            }
         }
 
         Ok(())
@@ -151,7 +150,7 @@ impl DaoAuthenticationProvider {
         let Some(presented_password) = presented_password else {
             return user;
         };
-        let existing_encoded_password = user.get_password().await;
+        let existing_encoded_password = user.password().unwrap_or_default();
         if existing_encoded_password.is_empty()
             || !self
                 .password_encoder
@@ -251,7 +250,7 @@ impl AuthenticationProvider for DaoAuthenticationProvider {
             .await;
 
         self.support
-            .create_success_authentication(user.get_username().await, authentication, user.as_ref())
+            .create_success_authentication(user.username(), authentication, user.as_ref())
             .await
     }
 

@@ -40,7 +40,7 @@ impl DerefMut for SavedRequestAwareAuthenticationSuccessHandler {
 impl SavedRequestAwareAuthenticationSuccessHandler {
     pub fn new() -> Self {
         Self {
-            request_cache: Arc::new(HttpSessionRequestCache::new()),
+            request_cache: Arc::new(HttpSessionRequestCache::default()),
             base_authentication_target_url_request_handler: Default::default(),
         }
     }
@@ -54,7 +54,9 @@ impl SavedRequestAwareAuthenticationSuccessHandler {
         let save_request = self.request_cache.get_request(request, response);
         if let Some(save_request) = save_request {
             let target_url_parameter = self.get_target_url_parameter();
-            if target_url_parameter.is_empty() && !self.is_always_use_default_target_url() {
+            if target_url_parameter.map(|s| s.is_empty()).unwrap_or(false)
+                && !self.is_always_use_default_target_url()
+            {
                 return Some(save_request.get_redirect_url());
             }
         }

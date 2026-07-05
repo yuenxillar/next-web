@@ -34,7 +34,7 @@ impl AuthoritiesAuthorizationManager {
         }
 
         self.role_hierarchy
-            .get_reachable_granted_authorities(&authentication.authorities())
+            .reachable_granted_authorities(&authentication.authorities())
             .into_iter()
             .any(|authority| required_authorities.contains(&authority))
     }

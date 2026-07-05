@@ -170,7 +170,7 @@ where
     fn configure(&mut self, http: &mut H) {
         // Obtain the AuthenticationManager from shared objects
         let auth_manager: Arc<dyn AuthenticationManager> =
-            match http.get_shared_object::<Arc<dyn AuthenticationManager>>() {
+            match http.shared_object::<Arc<dyn AuthenticationManager>>() {
                 Some(m) => m.clone(),
                 None => panic!(
                     "AuthenticationManager is required for RememberMeConfigurer. \

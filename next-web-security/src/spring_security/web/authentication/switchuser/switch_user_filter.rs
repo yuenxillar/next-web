@@ -23,8 +23,7 @@ use crate::{
         granted_authority::GrantedAuthority,
         simple_granted_authority::SimpleGrantedAuthority,
         userdetails::{
-            user_details::UserDetails,
-            user_details_checker::UserDetailsChecker,
+            user_details::UserDetails, user_details_checker::UserDetailsChecker,
             user_details_service::UserDetailsService,
         },
         username_password_authentication_token::UsernamePasswordAuthenticationToken,
@@ -199,8 +198,7 @@ impl SwitchUserFilter {
     /// Use `set_success_handler` instead if you need more customized behaviour.
     pub fn set_target_url(&mut self, target_url: String) {
         self.target_url = Some(target_url.clone());
-        self.success_handler =
-            Arc::new(SimpleUrlAuthenticationSuccessHandler::new(&target_url));
+        self.success_handler = Arc::new(SimpleUrlAuthenticationSuccessHandler::new(&target_url));
     }
 
     /// Used to define custom behaviour on a successful switch or exit user.
@@ -218,8 +216,9 @@ impl SwitchUserFilter {
             "switchFailureUrl must be a valid redirect URL"
         );
         self.switch_failure_url = Some(switch_failure_url.clone());
-        self.failure_handler =
-            Arc::new(SimpleUrlAuthenticationFailureHandler::new(&switch_failure_url));
+        self.failure_handler = Arc::new(SimpleUrlAuthenticationFailureHandler::new(
+            &switch_failure_url,
+        ));
     }
 
     /// Used to define custom behaviour when a switch fails.
@@ -261,10 +260,7 @@ impl SwitchUserFilter {
 
     /// Sets the `SecurityContextRepository` to save the `SecurityContext` on
     /// switch user success. The default is `None` (context not persisted).
-    pub fn set_security_context_repository(
-        &mut self,
-        repo: Arc<dyn SecurityContextRepository>,
-    ) {
+    pub fn set_security_context_repository(&mut self, repo: Arc<dyn SecurityContextRepository>) {
         self.security_context_repository = Some(repo);
     }
 
@@ -294,10 +290,14 @@ impl SwitchUserFilter {
             .as_any()
             .downcast_ref::<UsernamePasswordAuthenticationToken>()?;
         for authority in upat.authorities_objects() {
-            if let Some(source) = authority.as_switch_user_source() {
-                debug!("Found original switch user granted authority [{:?}]", source.get_name());
-                return Some(source);
-            }
+            // if let Some(source) = authority.as_switch_user_source() {
+            //     debug!(
+            //         "Found original switch user granted authority [{:?}]",
+            //         source.get_name()
+            //     );
+            //     return Some(source);
+            // }
+            todo!()
         }
         None
     }
@@ -305,9 +305,7 @@ impl SwitchUserFilter {
     /// Retrieves the current `Authentication`, attempting to find the original
     /// (pre-switch) authentication first. If the user is already switched, the
     /// original is returned; otherwise the current context authentication is used.
-    fn get_current_authentication(
-        &self,
-    ) -> Option<Arc<dyn crate::core::Authentication>> {
+    fn get_current_authentication(&self) -> Option<Arc<dyn crate::core::Authentication>> {
         match self.attempt_exit_user() {
             Ok(original) => Some(original),
             Err(_) => self
@@ -331,17 +329,16 @@ impl SwitchUserFilter {
 
         // Clone the Arc before moving it into SwitchUserGrantedAuthority,
         // since we may need it again for the authority changer.
-        let switch_authority: Arc<dyn GrantedAuthority> = Arc::new(
-            SwitchUserGrantedAuthority::new(
+        let switch_authority: Arc<dyn GrantedAuthority> =
+            Arc::new(SwitchUserGrantedAuthority::new(
                 &self.switch_authority_role,
                 current_authentication.clone(),
-            ),
-        );
+            ));
 
         // Get the original authorities from the target user and convert to owned arcs.
         let mut orig: Vec<Arc<dyn GrantedAuthority>> = Vec::new();
-        for auth in target_user.get_authorities().await {
-            if let Some(name) = auth.get_authority().await {
+        for auth in target_user.authorities() {
+            if let Some(name) = auth.authority() {
                 orig.push(Arc::new(SimpleGrantedAuthority::new(name)));
             }
         }
@@ -360,8 +357,8 @@ impl SwitchUserFilter {
 
         // Create the new authentication token.
         UsernamePasswordAuthenticationToken::authenticated(
-            target_user.get_username().await,
-            Some(target_user.get_password().await),
+            target_user.username(),
+            target_user.password().map(ToString::to_string),
             orig,
         )
     }
@@ -406,9 +403,7 @@ impl SwitchUserFilter {
             .await?;
 
         // Create the switch user token.
-        let token = self
-            .create_switch_user_token(target_user.as_ref())
-            .await;
+        let token = self.create_switch_user_token(target_user.as_ref()).await;
 
         Ok(Arc::new(token))
     }
@@ -463,10 +458,7 @@ impl SwitchUserFilter {
         context.set_authentication(Some(authentication.clone()));
         self.security_context_holder_strategy
             .set_context(context.clone());
-        debug!(
-            "Set SecurityContextHolder to {}",
-            authentication.get_name()
-        );
+        debug!("Set SecurityContextHolder to {}", authentication.get_name());
         if let Some(repo) = &self.security_context_repository {
             repo.save_context(context.as_ref(), request, response).await;
         }

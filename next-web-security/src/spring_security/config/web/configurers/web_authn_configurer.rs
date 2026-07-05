@@ -34,11 +34,11 @@ impl<H> SecurityConfigurer<DefaultSecurityFilterChain, HttpSecurity> for WebAuth
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn init(&mut self, builer: &mut HttpSecurity) {
+    fn init(&mut self, builder: &mut HttpSecurity) {
         todo!()
     }
 
-    fn configure(&mut self, builer: &mut HttpSecurity) {
+    fn configure(&mut self, builder: &mut HttpSecurity) {
         todo!()
     }
 }

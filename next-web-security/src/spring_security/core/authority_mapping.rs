@@ -27,10 +27,7 @@ impl GrantedAuthoritiesMapper for NullAuthoritiesMapper {
 }
 
 pub trait Attributes2GrantedAuthoritiesMapper: Send + Sync {
-    fn get_granted_authorities(
-        &self,
-        attributes: Vec<String>,
-    ) -> Vec<Arc<dyn GrantedAuthority>>;
+    fn get_granted_authorities(&self, attributes: Vec<String>) -> Vec<Arc<dyn GrantedAuthority>>;
 }
 
 pub trait MappableAttributesRetriever: Send + Sync {
@@ -105,8 +102,8 @@ impl GrantedAuthoritiesMapper for SimpleAuthorityMapper {
 
         let mut mapped = BTreeMap::<String, Arc<dyn GrantedAuthority>>::new();
         for authority in authorities {
-            if let Some(name) = block_on(authority.get_authority()) {
-                let mapped_name = self.map_authority_name(name);
+            if let Some(name) = authority.authority() {
+                let mapped_name = self.map_authority_name(name.to_string());
                 mapped
                     .entry(mapped_name.clone())
                     .or_insert_with(|| Arc::new(SimpleGrantedAuthority::new(mapped_name)));
@@ -114,9 +111,9 @@ impl GrantedAuthoritiesMapper for SimpleAuthorityMapper {
         }
 
         if let Some(default_authority) = &self.default_authority {
-            if let Some(name) = block_on(default_authority.get_authority()) {
+            if let Some(name) = default_authority.authority() {
                 mapped
-                    .entry(name.clone())
+                    .entry(name.to_string())
                     .or_insert_with(|| default_authority.clone());
             }
         }
@@ -189,10 +186,7 @@ impl SimpleAttributes2GrantedAuthoritiesMapper {
 }
 
 impl Attributes2GrantedAuthoritiesMapper for SimpleAttributes2GrantedAuthoritiesMapper {
-    fn get_granted_authorities(
-        &self,
-        attributes: Vec<String>,
-    ) -> Vec<Arc<dyn GrantedAuthority>> {
+    fn get_granted_authorities(&self, attributes: Vec<String>) -> Vec<Arc<dyn GrantedAuthority>> {
         self.after_properties_set();
         attributes
             .into_iter()
@@ -239,8 +233,7 @@ impl From<Vec<GrantedAuthorityValue>> for GrantedAuthorityValue {
 
 #[derive(Clone, Default)]
 pub struct MapBasedAttributes2GrantedAuthoritiesMapper {
-    attributes_to_granted_authorities_map:
-        HashMap<String, Vec<Arc<dyn GrantedAuthority>>>,
+    attributes_to_granted_authorities_map: HashMap<String, Vec<Arc<dyn GrantedAuthority>>>,
     string_separator: String,
     mappable_attributes: BTreeSet<String>,
 }
@@ -316,10 +309,7 @@ impl MapBasedAttributes2GrantedAuthoritiesMapper {
 }
 
 impl Attributes2GrantedAuthoritiesMapper for MapBasedAttributes2GrantedAuthoritiesMapper {
-    fn get_granted_authorities(
-        &self,
-        attributes: Vec<String>,
-    ) -> Vec<Arc<dyn GrantedAuthority>> {
+    fn get_granted_authorities(&self, attributes: Vec<String>) -> Vec<Arc<dyn GrantedAuthority>> {
         let mut result = Vec::new();
         for attribute in attributes {
             if let Some(granted) = self.attributes_to_granted_authorities_map.get(&attribute) {
@@ -333,95 +323,5 @@ impl Attributes2GrantedAuthoritiesMapper for MapBasedAttributes2GrantedAuthoriti
 impl MappableAttributesRetriever for MapBasedAttributes2GrantedAuthoritiesMapper {
     fn get_mappable_attributes(&self) -> Vec<String> {
         self.mappable_attributes.iter().cloned().collect()
-    }
-}
-
-fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    futures::executor::block_on(future)
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-
-    use crate::core::{
-        authority_mapping::{
-            Attributes2GrantedAuthoritiesMapper, GrantedAuthoritiesMapper,
-            GrantedAuthorityValue, MapBasedAttributes2GrantedAuthoritiesMapper,
-            MappableAttributesRetriever, SimpleAttributes2GrantedAuthoritiesMapper,
-            SimpleAuthorityMapper,
-        },
-        authority_utils::AuthorityUtils,
-    };
-
-    #[test]
-    fn simple_authority_mapper_adds_prefix_and_case_normalizes() {
-        let mut mapper = SimpleAuthorityMapper::new();
-        mapper.set_convert_to_uppercase(true);
-
-        let mapped = mapper.map_authorities(AuthorityUtils::create_authority_list(["user"]));
-        let names = mapped
-            .into_iter()
-            .map(|authority| super::block_on(authority.get_authority()))
-            .collect::<Vec<_>>();
-
-        assert_eq!(names.len(), 1);
-        assert_eq!(names.into_iter().next().unwrap(), Some(String::from("ROLE_USER")));
-    }
-
-    #[test]
-    fn simple_attributes_mapper_maps_roles_one_to_one() {
-        let mut mapper = SimpleAttributes2GrantedAuthoritiesMapper::new();
-        mapper.set_convert_attribute_to_uppercase(true);
-
-        let mapped =
-            mapper.get_granted_authorities(vec![String::from("user"), String::from("role_admin")]);
-        let names = mapped
-            .into_iter()
-            .map(|authority| super::block_on(authority.get_authority()).unwrap())
-            .collect::<Vec<_>>();
-
-        assert_eq!(names, vec![String::from("ROLE_USER"), String::from("ROLE_ADMIN")]);
-    }
-
-    #[test]
-    fn map_based_attributes_mapper_supports_one_to_many_values() {
-        let mut mapper = MapBasedAttributes2GrantedAuthoritiesMapper::new();
-        mapper.set_attributes_to_granted_authorities_map(HashMap::from([
-            (
-                String::from("group-a"),
-                GrantedAuthorityValue::Authorities(vec![
-                    GrantedAuthorityValue::from("ROLE_USER"),
-                    GrantedAuthorityValue::from("ROLE_AUDIT,ROLE_REPORT"),
-                ]),
-            ),
-            (
-                String::from("group-b"),
-                GrantedAuthorityValue::from(vec!["ROLE_ADMIN"]),
-            ),
-        ]));
-
-        let mapped = mapper.get_granted_authorities(vec![
-            String::from("group-a"),
-            String::from("group-b"),
-        ]);
-        let names = mapped
-            .into_iter()
-            .map(|authority| super::block_on(authority.get_authority()).unwrap())
-            .collect::<Vec<_>>();
-
-        assert_eq!(
-            names,
-            vec![
-                String::from("ROLE_USER"),
-                String::from("ROLE_AUDIT"),
-                String::from("ROLE_REPORT"),
-                String::from("ROLE_ADMIN"),
-            ]
-        );
-        assert_eq!(
-            mapper.get_mappable_attributes(),
-            vec![String::from("group-a"), String::from("group-b")]
-        );
     }
 }

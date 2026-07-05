@@ -29,7 +29,7 @@ impl LogoutHandler for CsrfLogoutHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        authentication: Option<&dyn Authentication>,
+        authentication: Option<&Arc<dyn Authentication>>,
     ) {
         self.csrf_token_repository
             .save_token(None, request, response)

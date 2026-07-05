@@ -11,7 +11,7 @@ pub struct DefaultRequestDispatcher {}
 impl RequestDispatcher for DefaultRequestDispatcher {
     fn forward(
         &self,
-        request: &mut dyn HttpRequest,
+        request: &dyn HttpRequest,
         response: &mut dyn HttpResponse,
     ) -> Result<(), BoxError> {
         Ok(())

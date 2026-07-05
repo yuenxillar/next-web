@@ -7,7 +7,6 @@ use super::application_event::ApplicationEvent;
 /// 应用事件发布者
 ///
 /// Application event publisher
-
 #[async_trait]
 pub trait ApplicationEventPublisher
 where

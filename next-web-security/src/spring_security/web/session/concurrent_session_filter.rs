@@ -140,7 +140,7 @@ impl ConcurrentSessionFilter {
             .and_then(|ctx| ctx.get_authentication());
 
         self.logout_handlers
-            .logout(request, response, auth.as_deref())
+            .logout(request, response, auth.as_ref())
             .await;
     }
 }
@@ -154,8 +154,8 @@ impl HttpFilter for ConcurrentSessionFilter {
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
         // Check if the request has an existing session.
-        if let Some(session) = request.session(false) {
-            let session_id = session.get_id().to_string();
+        if let Some(session) = request.session() {
+            let session_id = session.id().to_string();
             let info = self.session_registry.session_information(&session_id);
 
             if let Some(ref info) = info {

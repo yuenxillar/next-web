@@ -47,36 +47,35 @@ impl LdapUserDetailsImpl {
     }
 }
 
-#[async_trait]
 impl UserDetails for LdapUserDetailsImpl {
-    async fn get_authorities(&self) -> Vec<&dyn GrantedAuthority> {
+    fn authorities(&self) -> Vec<&dyn GrantedAuthority> {
         self.authorities
             .iter()
             .map(|authority| authority.as_ref() as &dyn GrantedAuthority)
             .collect()
     }
 
-    async fn get_password(&self) -> String {
-        self.password.clone()
+    fn password(&self) -> Option<&str> {
+        Some(self.password.as_str())
     }
 
-    async fn get_username(&self) -> String {
-        self.username.clone()
+    fn username(&self) -> &str {
+        self.username.as_str()
     }
 
-    async fn is_account_non_expired(&self) -> bool {
+    fn is_account_non_expired(&self) -> bool {
         self.account_non_expired
     }
 
-    async fn is_account_non_locked(&self) -> bool {
+    fn is_account_non_locked(&self) -> bool {
         self.account_non_locked
     }
 
-    async fn is_credentials_non_expired(&self) -> bool {
+    fn is_credentials_non_expired(&self) -> bool {
         self.credentials_non_expired
     }
 
-    async fn is_enabled(&self) -> bool {
+    fn is_enabled(&self) -> bool {
         self.enabled
     }
 }

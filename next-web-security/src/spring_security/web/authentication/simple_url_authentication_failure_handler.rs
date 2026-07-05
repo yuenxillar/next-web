@@ -43,7 +43,7 @@ impl SimpleUrlAuthenticationFailureHandler {
         if self.forward_to_destination {
             request.set_attribute("NEXT_SECURITY_LAST_ERROR", error.clone().into());
         } else {
-            let session = request.session(false);
+            let session = request.session();
             if session.is_some() || self.allow_session_creation {
                 // Set Error in session
                 // session.unwrap().set("NEXT_SECURITY_LAST_ERROR", error.clone().into_boxed());

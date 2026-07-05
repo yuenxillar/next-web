@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use next_web_core::{
-    http::cookie::Cookie,
+    http::Cookie,
     util::{http_method::HttpMethod, locale::Locale},
 };
 

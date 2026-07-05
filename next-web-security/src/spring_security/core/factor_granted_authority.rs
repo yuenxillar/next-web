@@ -52,10 +52,9 @@ impl FactorGrantedAuthority {
     }
 }
 
-#[async_trait]
 impl GrantedAuthority for FactorGrantedAuthority {
-    async fn get_authority(&self) -> Option<String> {
-        Some(self.authority.clone())
+    fn authority(&self) -> Option<&str> {
+        Some(self.authority.as_str())
     }
 }
 

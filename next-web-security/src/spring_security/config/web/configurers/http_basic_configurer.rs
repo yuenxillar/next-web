@@ -18,8 +18,8 @@ use crate::{
             basic_authentication_entry_point::BasicAuthenticationEntryPoint,
             basic_authentication_filter::BasicAuthenticationFilter,
         },
-        authentication_entry_point::AuthenticationEntryPoint,
         default_security_filter_chain::DefaultSecurityFilterChain,
+        AuthenticationEntryPoint,
     },
 };
 
@@ -59,14 +59,10 @@ where
         self
     }
 
-    fn get_authentication_entry_point(
-        &self,
-    ) -> Arc<dyn AuthenticationEntryPoint> {
+    fn get_authentication_entry_point(&self) -> Arc<dyn AuthenticationEntryPoint> {
         self.authentication_entry_point
             .clone()
-            .unwrap_or_else(|| {
-                Arc::new(BasicAuthenticationEntryPoint::new(&self.realm_name))
-            })
+            .unwrap_or_else(|| Arc::new(BasicAuthenticationEntryPoint::new(&self.realm_name)))
     }
 }
 
@@ -107,9 +103,7 @@ where
         self.base_http_configurer.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base_http_configurer.get_mut_object()
     }
 }
@@ -126,19 +120,17 @@ where
     fn configure(&mut self, http: &mut H) {
         // Obtain the AuthenticationManager from shared objects.
         // The AuthenticationManager is set by HttpSecurity.before_configure().
-        let auth_manager: Arc<dyn AuthenticationManager> = match http
-            .get_shared_object::<Arc<dyn AuthenticationManager>>()
-        {
-            Some(m) => m.clone(),
-            None => panic!(
-                "AuthenticationManager is required for HttpBasicConfigurer. \
+        let auth_manager: Arc<dyn AuthenticationManager> =
+            match http.shared_object::<Arc<dyn AuthenticationManager>>() {
+                Some(m) => m.clone(),
+                None => panic!(
+                    "AuthenticationManager is required for HttpBasicConfigurer. \
                  Ensure authentication_manager() has been configured."
-            ),
-        };
+                ),
+            };
 
         let entry_point = self.get_authentication_entry_point();
-        let filter =
-            BasicAuthenticationFilter::new(auth_manager, entry_point);
+        let filter = BasicAuthenticationFilter::new(auth_manager, entry_point);
         http.add_filter(filter);
     }
 }

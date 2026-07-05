@@ -87,8 +87,8 @@ impl LdapAuthenticationProvider {
 
         let mut mapped = Vec::new();
         for authority in authorities {
-            if let Some(authority) = authority.get_authority().await {
-                mapped.push(authority);
+            if let Some(authority) = authority.authority() {
+                mapped.push(authority.to_string());
             }
         }
 

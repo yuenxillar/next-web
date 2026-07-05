@@ -13,9 +13,7 @@ use crate::{
         },
         permission_evaluator::PermissionEvaluator,
     },
-    authorization::{
-        AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
-    },
+    authorization::{AuthenticationTrustResolver, DefaultAuthenticationTrustResolver},
     core::Authentication,
 };
 
@@ -70,7 +68,7 @@ impl SecurityExpressionRoot {
 
     fn authorities(&self) -> HashSet<String> {
         self.role_hierarchy
-            .get_reachable_granted_authorities(&self.authentication.authorities())
+            .reachable_granted_authorities(&self.authentication.authorities())
             .into_iter()
             .collect()
     }
@@ -91,7 +89,9 @@ impl SecurityExpressionOperations for SecurityExpressionRoot {
 
     fn has_any_authority(&self, authorities: &[String]) -> bool {
         let reachable = self.authorities();
-        authorities.iter().any(|authority| reachable.contains(authority))
+        authorities
+            .iter()
+            .any(|authority| reachable.contains(authority))
     }
 
     fn has_role(&self, role: &str) -> bool {
@@ -115,15 +115,18 @@ impl SecurityExpressionOperations for SecurityExpressionRoot {
     }
 
     fn is_anonymous(&self) -> bool {
-        self.trust_resolver.is_anonymous(self.authentication.as_ref())
+        self.trust_resolver
+            .is_anonymous(self.authentication.as_ref())
     }
 
     fn is_authenticated(&self) -> bool {
-        self.trust_resolver.is_authenticated(self.authentication.as_ref())
+        self.trust_resolver
+            .is_authenticated(self.authentication.as_ref())
     }
 
     fn is_remember_me(&self) -> bool {
-        self.trust_resolver.is_remember_me(self.authentication.as_ref())
+        self.trust_resolver
+            .is_remember_me(self.authentication.as_ref())
     }
 
     fn is_fully_authenticated(&self) -> bool {
@@ -158,8 +161,8 @@ mod tests {
             },
             hierarchicalroles::role_hierarchy_impl::RoleHierarchyImpl,
         },
-        core::simple_authentication::SimpleAuthentication,
         core::authority_utils::AuthorityUtils,
+        core::simple_authentication::SimpleAuthentication,
     };
 
     #[test]

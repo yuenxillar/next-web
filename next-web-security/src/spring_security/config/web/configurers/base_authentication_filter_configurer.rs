@@ -9,8 +9,7 @@ use crate::{
         security_configurer::SecurityConfigurer,
         web::{
             configurers::{
-                base_http_configurer::BaseHttpConfigurer, logout_configurer::LogoutConfigurer,
-                permit_all_support::PermitAllSupport,
+                base_http_configurer::BaseHttpConfigurer, permit_all_support::PermitAllSupport,
             },
             http_security_builder::HttpSecurityBuilder,
         },
@@ -25,8 +24,8 @@ use crate::{
             saved_request_aware_authentication_success_handler::SavedRequestAwareAuthenticationSuccessHandler,
             simple_url_authentication_failure_handler::SimpleUrlAuthenticationFailureHandler,
         },
-        authentication_entry_point::AuthenticationEntryPoint,
         default_security_filter_chain::DefaultSecurityFilterChain,
+        AuthenticationEntryPoint,
     },
 };
 
@@ -79,7 +78,7 @@ where
             auth_filter: authentication_filter,
             success_handler: default_success_handler,
 
-            base_http_configurer: BaseHttpConfigurer::new(),
+            base_http_configurer: BaseHttpConfigurer::default(),
             authentication_details_source: Default::default(),
             authentication_entry_point: Default::default(),
             custom_login_page: Default::default(),
@@ -196,14 +195,17 @@ where
         todo!()
     }
 
-    pub fn update_access_defaults(&mut self, http: &mut B) {
+    pub fn update_access_defaults(&mut self, http: &mut B)
+    where
+        B: 'static,
+    {
         if self.permit_all {
             let urls = vec![
                 self.login_page.as_ref(),
                 self.login_processing_url.as_deref().unwrap_or_default(),
                 self.failure_url.as_deref().unwrap_or_default(),
             ];
-            PermitAllSupport::permit_all(http, urls);
+            PermitAllSupport::permit_all(http, &urls);
         }
     }
 
@@ -260,6 +262,7 @@ where
     B: HttpSecurityBuilder<B>,
     B: SecurityBuilder<DefaultSecurityFilterChain>,
     B: Clone,
+    B: 'static,
     T: Required<BaseAuthenticationFilterConfigurer<B, T, F>>,
     T: Required<BaseHttpConfigurer<T, B>>,
     T: Sync + Send,

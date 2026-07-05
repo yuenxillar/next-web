@@ -4,4 +4,7 @@ pub mod configuration;
 pub mod configurers;
 pub mod http_security_builder;
 pub mod util;
-pub mod web_security_configurer;
+
+mod web_security_configurer;
+
+pub use web_security_configurer::WebSecurityConfigurer;

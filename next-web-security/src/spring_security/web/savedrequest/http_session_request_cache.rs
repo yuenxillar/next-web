@@ -1,16 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
+use next_web_core::http::Cookie;
 use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 use next_web_core::util::locale::Locale;
 use next_web_core::util::StringUtils;
 use tracing::{debug, trace, Level};
 
 use crate::web::savedrequest::request_cache::RequestCache;
-use crate::web::savedrequest::SavedRequestAwareWrapper;
 use crate::web::util::matcher::{AnyRequestMatcher, RequestMatcher};
 use crate::web::util::UrlUtils;
 
-use super::{Cookie, SavedRequest};
+use super::SavedRequest;
 
 const SAVED_REQUEST: &str = "NEXT_SECURITY_SAVED_REQUEST";
 
@@ -22,15 +22,6 @@ pub struct HttpSessionRequestCache {
 }
 
 impl HttpSessionRequestCache {
-    pub fn new() -> Self {
-        Self {
-            create_session_allowed: true,
-            request_matcher: AnyRequestMatcher::instance(),
-            session_attr_name: SAVED_REQUEST.into(),
-            matching_request_parameter_name: "continue".into(),
-        }
-    }
-
     fn request_key(request: &dyn HttpRequest) -> String {
         let uri = request.uri();
         format!("{} {}", request.method().to_string(), uri)
@@ -65,6 +56,17 @@ impl HttpSessionRequestCache {
     }
 }
 
+impl Default for HttpSessionRequestCache {
+    fn default() -> Self {
+        Self {
+            create_session_allowed: true,
+            request_matcher: AnyRequestMatcher::instance(),
+            session_attr_name: SAVED_REQUEST.into(),
+            matching_request_parameter_name: "continue".into(),
+        }
+    }
+}
+
 impl RequestCache for HttpSessionRequestCache {
     fn save_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {
         if !self.request_matcher.matches(request) {
@@ -77,7 +79,7 @@ impl RequestCache for HttpSessionRequestCache {
             return;
         }
 
-        if self.create_session_allowed || request.session(false).is_some() {
+        if self.create_session_allowed || request.session().is_some() {
             let saved_request = "";
             if tracing::enabled!(Level::TRACE) {
                 trace!("Saved request {} to session", saved_request);
@@ -94,12 +96,12 @@ impl RequestCache for HttpSessionRequestCache {
         request: &dyn HttpRequest,
         _response: &mut dyn HttpResponse,
     ) -> Option<Arc<dyn SavedRequest>> {
-        let session = match request.session(false) {
+        let session = match request.session() {
             Some(s) => s,
             None => return None,
         };
         session
-            .get_attribute(&self.session_attr_name)
+            .attribute(&self.session_attr_name)
             .map(|req| req.as_object::<Arc<dyn SavedRequest>>())
             .unwrap_or_default()
     }
@@ -149,7 +151,7 @@ impl RequestCache for HttpSessionRequestCache {
     }
 
     fn remove_request(&self, request: &dyn HttpRequest, _response: &mut dyn HttpResponse) {
-        if let Some(session) = request.session(false) {
+        if let Some(session) = request.session() {
             trace!("Removing DefaultSavedRequest from session if present");
             session.remove_attribute(&self.session_attr_name);
         }

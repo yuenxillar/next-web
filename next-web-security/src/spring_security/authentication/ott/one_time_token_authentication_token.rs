@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::anys::any_value::AnyValue;
 
-use crate::core::{Authentication, granted_authority::GrantedAuthority};
+use crate::core::{granted_authority::GrantedAuthority, Authentication};
 
 #[derive(Clone, Default)]
 pub struct OneTimeTokenAuthenticationToken {
@@ -78,7 +78,7 @@ impl Authentication for OneTimeTokenAuthenticationToken {
     fn authorities(&self) -> Vec<String> {
         self.authorities
             .iter()
-            .filter_map(|authority| futures::executor::block_on(authority.get_authority()))
+            .filter_map(|authority| authority.authority().map(ToString::to_string))
             .collect()
     }
 }
