@@ -1,12 +1,12 @@
 use next_web_core::traits::required::Required;
+use std::any::Any;
 use std::sync::Arc;
 
 use crate::config::base_configured_security_builder::BaseConfiguredSecurityBuilder;
 use crate::core::{
     authentication_error::{AuthenticationError, AuthenticationErrorKind},
-    credentials_container::CredentialsContainer,
-    userdetails::user_details_service::UserDetailsService,
-    Authentication,
+    userdetails::UserDetailsService,
+    Authentication, CredentialsContainer,
 };
 use crate::{
     authentication::{
@@ -15,7 +15,7 @@ use crate::{
             AuthenticationEventPublisher, NullAuthenticationEventPublisher,
         },
         authentication_events::{AuthenticationFailureEvent, AuthenticationSuccessEvent},
-        authentication_provider::AuthenticationProvider,
+        AuthenticationProvider,
     },
     config::{security_configurer::SecurityConfigurer, web::builders::HttpSecurity},
     web::default_security_filter_chain::DefaultSecurityFilterChain,
@@ -246,9 +246,8 @@ impl ProviderAuthenticationManager {
         if !self.erase_credentials_after_authentication {
             return authentication;
         }
-        if let Some(token) = authentication
-            .as_ref()
-            .as_any()
+        if let Some(token) = (authentication
+            .as_ref() as &dyn Any)
             .downcast_ref::<crate::core::username_password_authentication_token::UsernamePasswordAuthenticationToken>()
         {
             let mut token = token.clone();

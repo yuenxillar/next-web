@@ -5,7 +5,7 @@ use next_web_core::filter::FilterError;
 use tokio::task_local;
 
 use crate::core::context::{
-    security_context::SecurityContext,
+    deferred_security_context::DeferredSecurityContext, security_context::SecurityContext,
     security_context_holder_strategy::SecurityContextHolderStrategy, SecurityContextImpl,
 };
 

@@ -1,4 +1,5 @@
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
@@ -24,7 +25,7 @@ impl LogoutSuccessHandler for SimpleUrlLogoutSuccessHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        authentication: Option<&dyn Authentication>,
+        authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError> {
         self.handle(request, response, authentication)
     }

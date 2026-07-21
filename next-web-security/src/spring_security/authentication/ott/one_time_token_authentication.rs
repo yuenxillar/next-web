@@ -27,31 +27,31 @@ impl OneTimeTokenAuthentication {
     }
 }
 
-impl Authentication for OneTimeTokenAuthentication {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
+// impl Authentication for OneTimeTokenAuthentication {
+//     fn as_any(&self) -> &dyn std::any::Any {
+//         self
+//     }
 
-    fn authentication_type(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
+//     fn authentication_type(&self) -> &'static str {
+//         std::any::type_name::<Self>()
+//     }
 
-    fn get_details_ref(&self) -> Option<&AnyValue> {
-        self.details.as_ref()
-    }
+//     fn details_ref(&self) -> Option<&AnyValue> {
+//         self.details.as_ref()
+//     }
 
-    fn get_principal(&self) -> Option<String> {
-        Some(self.principal.clone())
-    }
+//     fn principal(&self) -> Option<String> {
+//         Some(self.principal.clone())
+//     }
 
-    fn is_authenticated(&self) -> bool {
-        true
-    }
+//     fn is_authenticated(&self) -> bool {
+//         true
+//     }
 
-    fn authorities(&self) -> Vec<String> {
-        self.authorities
-            .iter()
-            .filter_map(|authority| authority.authority().map(ToString::to_string))
-            .collect()
-    }
-}
+//     fn authorities(&self) -> Vec<String> {
+//         self.authorities
+//             .iter()
+//             .filter_map(|authority| authority.authority().map(ToString::to_string))
+//             .collect()
+//     }
+// }

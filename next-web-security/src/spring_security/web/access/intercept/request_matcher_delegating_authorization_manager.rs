@@ -72,9 +72,9 @@ impl RequestMatcherDelegatingAuthorizationManagerBuilder {
             .push(RequestMatcherEntry::new(matcher, manager));
     }
 
-    pub fn build(&self) -> Arc<dyn AuthorizationManager<RequestAuthorizationContext>> {
+    pub fn build(&mut self) -> Arc<dyn AuthorizationManager<RequestAuthorizationContext>> {
         Arc::new(RequestMatcherDelegatingAuthorizationManager::new(
-            self.mappings.clone(),
+            std::mem::take(&mut self.mappings),
         ))
     }
 }

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 
 use crate::{
@@ -5,6 +7,7 @@ use crate::{
     web::{
         authentication_entry_point::AuthenticationEntryPoint,
         redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},
+        PortMapper,
     },
 };
 
@@ -22,6 +25,8 @@ impl LoginUrlAuthenticationEntryPoint {
         let login_form_url = login_form_url.into();
         Self { login_form_url }
     }
+
+    pub fn set_port_mapper(&mut self, port_mapper: Arc<dyn PortMapper>) {}
 }
 
 impl AuthenticationEntryPoint for LoginUrlAuthenticationEntryPoint {

@@ -14,6 +14,10 @@ use next_web_core::{
     util::http_method::HttpMethod,
 };
 
+use crate::authorization::AuthenticationDetailsSource;
+use crate::core::context::SecurityContextHolderStrategy;
+use crate::web::authentication::session::SessionAuthenticationStrategy;
+use crate::web::context::SecurityContextRepository;
 use crate::{
     authorization::AuthenticationManager,
     core::{
@@ -26,8 +30,7 @@ use crate::{
             authentication_converter::AuthenticationConverter,
             authentication_failure_handler::AuthenticationFailureHandler,
             authentication_success_handler::AuthenticationSuccessHandler,
-            remember_me_services::RememberMeServices,
-            rememberme::base_remember_me_services::BaseRememberMeServices,
+            remember_me_services::RememberMeServices, rememberme::BaseRememberMeServices,
         },
         util::matcher::{PathPatternRequestMatcher, RequestMatcher},
     },
@@ -108,9 +111,9 @@ impl BaseAuthenticationProcessingFilter {
 
     pub fn set_requires_authentication_request_matcher(
         &mut self,
-        request_matcher: impl RequestMatcher + 'static,
+        request_matcher: Arc<dyn RequestMatcher>,
     ) {
-        self.requires_authentication_request_matcher = Some(Arc::new(request_matcher));
+        self.requires_authentication_request_matcher = Some(request_matcher);
     }
 
     pub fn attempt_authentication(
@@ -138,6 +141,44 @@ impl BaseAuthenticationProcessingFilter {
                 Ok(None)
             }
         }
+    }
+
+    pub fn set_session_authentication_strategy(
+        &mut self,
+        strategy: Arc<dyn SessionAuthenticationStrategy>,
+    ) {
+    }
+
+    pub fn set_remember_me_services(&mut self, remember_me_services: Arc<dyn RememberMeServices>) {}
+
+    pub fn set_authentication_details_source(
+        &mut self,
+        authentication_details_source: Arc<dyn AuthenticationDetailsSource>,
+    ) {
+    }
+
+    pub fn set_authentication_failure_handler(
+        &mut self,
+        failure_handler: Arc<dyn AuthenticationFailureHandler>,
+    ) {
+    }
+
+    pub fn set_authentication_success_handler(
+        &mut self,
+        success_handler: Arc<dyn AuthenticationSuccessHandler>,
+    ) {
+    }
+
+    pub fn set_security_context_repository(
+        &mut self,
+        security_context_repository: Arc<dyn SecurityContextRepository>,
+    ) {
+    }
+
+    pub fn set_security_context_holder_strategy(
+        &mut self,
+        security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
+    ) {
     }
 
     fn successful_authentication(
@@ -180,6 +221,12 @@ impl BaseAuthenticationProcessingFilter {
         } else {
             response.set_status_code(StatusCode::UNAUTHORIZED);
         }
+    }
+
+    pub fn set_security_context_repository(
+        &mut self,
+        security_context_repository: Arc<dyn SecurityContextRepository>,
+    ) {
     }
 }
 

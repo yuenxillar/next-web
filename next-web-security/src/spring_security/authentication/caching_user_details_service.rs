@@ -5,8 +5,7 @@ use next_web_core::async_trait;
 use crate::core::{
     user_cache::{NullUserCache, UserCache},
     userdetails::{
-        user_details::UserDetails, user_details_service::UserDetailsService,
-        username_not_found_error::UsernameNotFoundError,
+        username_not_found_error::UsernameNotFoundError, UserDetails, UserDetailsService,
     },
 };
 

@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::{traits::required::Required, ApplicationContext};
 
@@ -7,12 +10,9 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
-    core::userdetails::user_details_service::UserDetailsService,
+    core::userdetails::UserDetailsService,
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
 
@@ -30,19 +30,17 @@ use crate::{
 pub struct OneTimeTokenLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H>>,
 {
     login_processing_url: Option<String>,
     token_generating_url: Option<String>,
     user_details_service: Option<Arc<dyn UserDetailsService>>,
 
-    base_http_configurer: BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H>,
+    inner: BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H>,
 }
 
 impl<H> OneTimeTokenLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H>>,
 {
     pub fn new(ctx: &ApplicationContext) -> Self {
         Self::default()
@@ -70,29 +68,14 @@ where
 impl<H> Default for OneTimeTokenLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
             login_processing_url: None,
             token_generating_url: None,
             user_details_service: None,
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
-    }
-}
-
-impl<H> Required<BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H>>
-    for OneTimeTokenLoginConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
-
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<OneTimeTokenLoginConfigurer<H>, H> {
-        &mut self.base_http_configurer
     }
 }
 
@@ -103,11 +86,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+        self.inner.get_mut_object()
     }
 }
 
@@ -128,5 +111,25 @@ where
         //   http.add_filter(generate_filter);
         //   let auth_filter = OneTimeTokenAuthenticationFilter::new(...);
         //   http.add_filter(auth_filter);
+    }
+}
+
+impl<H> Deref for OneTimeTokenLoginConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for OneTimeTokenLoginConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

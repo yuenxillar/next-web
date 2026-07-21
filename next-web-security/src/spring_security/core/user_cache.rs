@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::core::userdetails::user_details::UserDetails;
+use crate::core::userdetails::UserDetails;
 
 pub trait UserCache: Send + Sync {
     fn get_user_from_cache(&self, username: &str) -> Option<Arc<dyn UserDetails>>;

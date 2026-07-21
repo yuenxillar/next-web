@@ -19,6 +19,7 @@ pub mod state;
 pub mod store;
 pub mod traits;
 pub mod util;
+pub mod web;
 pub mod wrapper;
 
 pub use self::autoregister::auto_register::*;
@@ -31,3 +32,6 @@ pub use dyn_clone::{DynClone, clone_box, clone_trait_object};
 pub extern crate headers;
 
 pub use urlencoding;
+
+pub type AnyObject = std::sync::Arc<dyn std::any::Any + Send + Sync>;
+pub type BoxAny = std::boxed::Box<dyn std::any::Any + Send + Sync>;

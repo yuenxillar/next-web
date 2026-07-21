@@ -34,7 +34,7 @@ impl LogoutSuccessHandler for HeaderWriterLogoutHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        _authentication: Option<&dyn Authentication>,
+        _authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError> {
         self.header_writer.write_headers(request, response);
 

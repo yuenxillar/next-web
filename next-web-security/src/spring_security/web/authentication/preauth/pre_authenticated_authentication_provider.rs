@@ -1,15 +1,15 @@
-use std::sync::Arc;
+use std::{any::TypeId, sync::Arc};
 
 use next_web_core::async_trait;
 
 use crate::{
-    authentication::authentication_provider::AuthenticationProvider,
+    authentication::AuthenticationProvider,
     core::{
         authentication_error::AuthenticationError,
         authority_utils::AuthorityUtils,
         userdetails::{
             authentication_user_details_service::AuthenticationUserDetailsService,
-            user_details_checker::UserDetailsChecker,
+            UserDetailsChecker,
         },
         Authentication,
     },
@@ -65,18 +65,17 @@ impl PreAuthenticatedAuthenticationProvider {
 impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
     async fn authenticate(
         &self,
-        authentication: &dyn Authentication,
-    ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
-        let Some(authentication) = authentication
-            .as_any()
-            .downcast_ref::<PreAuthenticatedAuthenticationToken>()
+        authentication: &Arc<dyn Authentication>,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
+        let Some(authentication) =
+            authentication.downcast_ref::<PreAuthenticatedAuthenticationToken>()
         else {
             return Err(AuthenticationError::new(
                 "Only PreAuthenticatedAuthenticationToken is supported",
             ));
         };
 
-        if authentication.get_principal().is_none() {
+        if authentication.principal().is_none() {
             if self.throw_exception_when_token_rejected {
                 return Err(pre_authenticated_credentials_not_found(
                     "No pre-authenticated principal found in request.",
@@ -120,10 +119,10 @@ impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
             AuthorityUtils::create_authority_list(authorities),
         );
         result.set_details_value(authentication.get_details_value());
-        Ok(Arc::new(result))
+        Ok(Some(Arc::new(result)))
     }
 
-    fn supports(&self, authentication: &str) -> bool {
-        authentication == std::any::type_name::<PreAuthenticatedAuthenticationToken>()
+    fn supports(&self, authentication: TypeId) -> bool {
+        authentication == TypeId::of::<PreAuthenticatedAuthenticationToken>()
     }
 }

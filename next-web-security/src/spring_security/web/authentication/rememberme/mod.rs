@@ -1,1 +1,11 @@
-pub mod base_remember_me_services;
+mod base_remember_me_services;
+mod persistent_remember_me_token;
+mod persistent_token_based_remember_me_services;
+mod persistent_token_repository;
+mod token_based_remember_me_services;
+
+pub use base_remember_me_services::{BaseRememberMeServices, BaseRememberMeServicesExt};
+pub use persistent_remember_me_token::PersistentRememberMeToken;
+pub use persistent_token_based_remember_me_services::PersistentTokenBasedRememberMeServices;
+pub use persistent_token_repository::PersistentTokenRepository;
+pub use token_based_remember_me_services::TokenBasedRememberMeServices;

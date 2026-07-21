@@ -1,58 +1,74 @@
-use std::any::Any;
+use std::{
+    any::{Any, TypeId},
+    sync::Arc,
+};
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::error::BoxError;
+
+use crate::{
+    core::{granted_authority::GrantedAuthority, Principal},
+    web::authentication::AuthPrincipal,
+};
 
 pub trait Authentication
 where
     Self: Send + Sync,
+    Self: Any,
+    Self: Principal,
 {
-    fn as_any(&self) -> &dyn Any;
+    /// Set by an AuthenticationManager to indicate the authorities that the principal has been granted.
+    /// Note that classes should not rely on this value as being valid unless it has been set by a trusted AuthenticationManager.
+    ///
+    /// Implementations should ensure that modifications to the returned collection array do not affect
+    /// the state of the Authentication object, or use an unmodifiable instance.
+    fn authorities(&self) -> &[Arc<dyn GrantedAuthority>];
 
-    fn authentication_type(&self) -> &'static str;
+    /// The credentials that prove the principal is correct. This is usually a password, but could be anything
+    /// relevant to the AuthenticationManager. Callers are expected to populate the credentials.
+    fn credentials(&self) -> Option<&AuthPrincipal>;
 
-    fn get_authorities(&self) -> Vec<String> {
-        self.authorities()
-    }
+    /// Stores additional details about the authentication request. These might be an IP address, certificate serial number etc.
+    fn details(&self) -> Option<&AuthPrincipal>;
 
-    fn get_credentials(&self) -> Option<String> {
-        None
-    }
+    /// The identity of the principal being authenticated. In the case of an authentication request with
+    /// username and password, this would be the username. Callers are expected to populate the
+    /// principal for an authentication request.
+    ///
+    /// The AuthenticationManager implementation will often return an Authentication containing
+    /// richer information as the principal for use by the application. Many of the authentication providers
+    /// will create a UserDetails object as the principal.
+    fn principal(&self) -> Option<&AuthPrincipal>;
 
-    fn get_details(&self) -> Option<String> {
-        self.get_details_ref().map(ToString::to_string)
-    }
-
-    fn get_details_value(&self) -> Option<AnyValue> {
-        self.get_details_ref().cloned()
-    }
-
-    fn get_details_ref(&self) -> Option<&AnyValue> {
-        None
-    }
-
-    fn get_principal(&self) -> Option<String> {
-        None
-    }
-
-    fn get_name(&self) -> String {
-        self.get_principal().unwrap_or_default()
-    }
-
+    /// Used to indicate to AbstractSecurityInterceptor whether it should present the authentication
+    /// token to the AuthenticationManager. Typically an AuthenticationManager (or, more often,
+    /// one of its AuthenticationProviders) will return an immutable authentication token after successful authentication,
+    /// in which case that token can safely return true to this method. Returning true will improve performance, as calling the AuthenticationManager for every
+    /// request will no longer be necessary.
+    ///
+    /// For security reasons, implementations of this interface should be very careful about returning
+    /// true from this method unless they are either immutable, or have some way of ensuring the
+    /// properties have not been changed since original creation.
     fn is_authenticated(&self) -> bool;
 
-    fn set_authenticated(&mut self, _is_authenticated: bool) -> Result<(), &'static str> {
-        Ok(())
+    /// See is_authenticated() for a full description.
+    /// Implementations should always allow this method to be called with a false parameter, as this is
+    /// used by various classes to specify the authentication token should not be trusted. If an
+    /// implementation wishes to reject an invocation with a true parameter (which would indicate the
+    /// The authentication token is trustworthy, which is a potential security risk, and the implementation should return an error
+    fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError>;
+
+    /// Return an Authentication.Builder based on this instance. By default, returns a builder that
+    /// builds a SimpleAuthentication.
+    /// Although a default method, all Authentication implementations should implement this. The
+    /// reason is to ensure that the Authentication type is preserved when Authentication.Builder.
+    /// build is invoked. This is especially important in the event that your authentication
+    /// implementation contains custom fields.
+    ///
+    /// This isn't strictly necessary since it is recommended that applications code to the Authentication
+    /// interface and that custom information is often contained in the getPrincipal value.
+    fn to_builder(&self) -> () {
+        unimplemented!()
     }
 
-    fn authorities(&self) -> Vec<String> {
-        Vec::new()
-    }
-
-    fn is_anonymous(&self) -> bool {
-        false
-    }
-
-    fn is_remember_me(&self) -> bool {
-        false
-    }
+    fn of(&self) -> TypeId;
 }

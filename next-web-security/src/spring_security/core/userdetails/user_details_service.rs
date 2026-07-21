@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::async_trait;
 
-use crate::core::userdetails::user_details::UserDetails;
+use crate::core::userdetails::UserDetails;
 
 use super::username_not_found_error::UsernameNotFoundError;
 
@@ -13,6 +13,6 @@ where
 {
     async fn load_user_by_username(
         &self,
-        username: String,
+        username: &str,
     ) -> Result<Arc<dyn UserDetails>, UsernameNotFoundError>;
 }

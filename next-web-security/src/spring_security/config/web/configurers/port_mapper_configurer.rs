@@ -1,4 +1,8 @@
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::traits::required::Required;
 
@@ -12,74 +16,65 @@ use crate::{
             http_security_builder::HttpSecurityBuilder,
         },
     },
-    web::{
-        default_security_filter_chain::DefaultSecurityFilterChain,
-        port_mapper::{PortMapper, PortMapperImpl},
-    },
+    web::{default_security_filter_chain::DefaultSecurityFilterChain, PortMapper, PortMapperImpl},
 };
 
-/// Configures a `PortMapper` shared object used by redirect filters
-/// (e.g. `HttpsRedirectConfigurer`) to determine port mappings between
-/// HTTP and HTTPS.
-///
-/// Example:
-/// ```ignore
-/// http.port_mapper(|pm| {
-///     pm.http(9090).maps_to(9443);
-/// });
-/// ```
+/// Allows configuring a shared PortMapper instance used to determine the
+/// ports when redirecting between HTTP and HTTPS. The PortMapper can be obtained from HttpSecurity::shared_object(Self).
 #[derive(Clone)]
 pub struct PortMapperConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<PortMapperConfigurer<H>, H>>,
 {
     port_mapper: Option<Arc<dyn PortMapper>>,
+    https_port_mappings: HashMap<String, String>,
 
-    base_http_configurer: BaseHttpConfigurer<PortMapperConfigurer<H>, H>,
+    inner: BaseHttpConfigurer<PortMapperConfigurer<H>, H>,
 }
 
 impl<H> PortMapperConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<PortMapperConfigurer<H>, H>>,
 {
-    /// Provide a custom `PortMapper`. If not set, `PortMapperImpl` is used.
-    pub fn port_mapper(mut self, port_mapper: Arc<dyn PortMapper>) -> Self {
+    /// Allows specifying the PortMapper instance.
+    pub fn port_mapper(&mut self, port_mapper: Arc<dyn PortMapper>) -> &mut Self {
         self.port_mapper = Some(port_mapper);
+
         self
     }
 
-    fn get_port_mapper(&self) -> Arc<dyn PortMapper> {
-        self.port_mapper
-            .clone()
-            .unwrap_or_else(|| Arc::new(PortMapperImpl::new()))
+    pub fn http<'a>(&'a mut self, http_port: u16) -> HttpPortMapping<'a, H> {
+        HttpPortMapping::new(self, http_port)
+    }
+
+    /// Gets the PortMapper to use. If portMapper(PortMapper) was not invoked,
+    /// builds a PortMapperImpl using the port mappings specified with http(int).
+    fn get_port_mapper(&mut self) -> Arc<dyn PortMapper> {
+        match self.port_mapper.as_ref().cloned() {
+            Some(port_mapper) => port_mapper,
+            None => {
+                let mut var = PortMapperImpl::default();
+                var.set_port_mappings(&self.https_port_mappings);
+                let port_mapper = Arc::new(var);
+                self.port_mapper.replace(port_mapper.clone());
+
+                port_mapper
+            }
+        }
     }
 }
 
 impl<H> Default for PortMapperConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<PortMapperConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
             port_mapper: None,
-            base_http_configurer: Default::default(),
+            https_port_mappings: Default::default(),
+
+            inner: Default::default(),
         }
-    }
-}
-
-impl<H> Required<BaseHttpConfigurer<PortMapperConfigurer<H>, H>> for PortMapperConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<PortMapperConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
-
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<PortMapperConfigurer<H>, H> {
-        &mut self.base_http_configurer
     }
 }
 
@@ -90,11 +85,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+        self.inner.get_mut_object()
     }
 }
 
@@ -103,12 +98,67 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn init(&mut self, http: &mut H) {
-        // Set PortMapper as a shared object for downstream configurers
-        let mapper = self.get_port_mapper();
-        http.set_shared_object(mapper);
+        http.set_shared_object(self.get_port_mapper());
     }
 
-    fn configure(&mut self, _http: &mut H) {
-        // No filter to add — this configurer only produces a shared object.
+    fn configure(&mut self, _http: &mut H) {}
+}
+
+/// Allows specifying the HTTPS port for a given HTTP port when redirecting between
+/// HTTP and HTTPS.
+pub struct HttpPortMapping<'a, H: HttpSecurityBuilder<H>> {
+    configurer: &'a mut PortMapperConfigurer<H>,
+    http_port: u16,
+}
+
+impl<'a, H: HttpSecurityBuilder<H>> HttpPortMapping<'a, H> {
+    /// Creates a new instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `configurer` - the parent `PortMapperConfigurer`
+    /// * `http_port` - the HTTP port
+    fn new(configurer: &'a mut PortMapperConfigurer<H>, http_port: u16) -> Self {
+        HttpPortMapping {
+            configurer,
+            http_port,
+        }
+    }
+
+    /// Maps the given HTTP port to the provided HTTPS port and vice versa.
+    ///
+    /// # Arguments
+    ///
+    /// * `https_port` - the HTTPS port to map to
+    ///
+    /// # Returns
+    ///
+    /// The `PortMapperConfigurer` for further customization.
+    pub fn maps_to(&'a mut self, https_port: u16) -> &'a mut PortMapperConfigurer<H> {
+        self.configurer
+            .https_port_mappings
+            .insert(self.http_port.to_string(), https_port.to_string());
+
+        self.configurer
+    }
+}
+
+impl<H> Deref for PortMapperConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for PortMapperConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

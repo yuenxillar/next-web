@@ -1,131 +1,131 @@
 use std::{
-    any::Any,
-    marker::PhantomData,
+    ops::{Deref, DerefMut},
     sync::{Arc, Mutex},
 };
 
-use next_web_core::{
-    traits::required::Required, util::http_method::HttpMethod, ApplicationContext,
-};
+use next_web_core::{traits::required::Required, ApplicationContext};
 
-use crate::config::web::base_request_matcher_registry::BaseRequestMatcherRegistry;
-use crate::config::web::http_security_builder::HttpSecurityBuilder;
-use crate::config::{security_builder::SecurityBuilder, web::configurers::BaseHttpConfigurer};
-use crate::web::access::intercept::AuthorizationFilter;
-use crate::web::default_security_filter_chain::DefaultSecurityFilterChain;
-use crate::web::util::matcher::RequestMatcherEntry;
 use crate::{
-    access::hierarchicalroles::role_hierarchy::RoleHierarchy, authorization::AuthorizationResult,
-    core::Authentication,
+    access::hierarchicalroles::role_hierarchy::RoleHierarchy,
+    config::core::granted_authority_defaults::GrantedAuthorityDefaults,
+};
+use crate::{
+    access::hierarchicalroles::NullRoleHierarchy, web::access::intercept::AuthorizationFilter,
 };
 use crate::{
     access::intercept::request_authorization_context::RequestAuthorizationContext,
-    authorization::{
-        AuthenticatedAuthorizationManager, AuthorityAuthorizationManager,
-        AuthorizationEventPublisher, AuthorizationManager, DefaultAuthorizationManager,
-    },
-    config::{
-        security_configurer::SecurityConfigurer,
-        security_configurer_adapter::SecurityConfigurerAdapter,
-    },
+    authorization::{AuthorizationEventPublisher, AuthorizationManager},
+    config::security_configurer::SecurityConfigurer,
     web::access::intercept::RequestMatcherDelegatingAuthorizationManagerBuilder,
-    web::util::matcher::{AntPathRequestMatcher, AnyRequestMatcher, RequestMatcher},
+    web::util::matcher::RequestMatcher,
 };
-use crate::{authorization::AuthorizationDecision, config::web::builders::HttpSecurity};
+use crate::{
+    authorization::AuthorizationManagerFactory,
+    config::web::base_request_matcher_registry::BaseRequestMatcherRegistry,
+};
+use crate::{
+    authorization::AuthorizationManagers, config::web::http_security_builder::HttpSecurityBuilder,
+};
+use crate::{
+    authorization::DefaultAuthorizationManagerFactory, config::web::configurers::BaseHttpConfigurer,
+};
+use crate::{
+    authorization::NextAuthorizationEventPublisher,
+    web::default_security_filter_chain::DefaultSecurityFilterChain,
+};
+use crate::{
+    config::web::base_request_matcher_registry::BaseRequestMatcherRegistryExt,
+    web::util::matcher::RequestMatcherEntry,
+};
 
-const ROLE_PREFIX: &str = "ROLE_";
-
-#[derive(Clone)]
-struct NullAuthorizationEventPublisher;
-
-impl AuthorizationEventPublisher for NullAuthorizationEventPublisher {
-    fn publish_authorization_event(
-        &self,
-        authentication: Arc<dyn Authentication>,
-        var: (),
-        result: Option<Box<dyn AuthorizationResult>>,
-    ) {
-    }
-}
-
-#[derive(Clone)]
-struct NullRoleHierarchy;
-
-impl RoleHierarchy for NullRoleHierarchy {
-    fn reachable_granted_authorities(&self, authorities: &[String]) -> Vec<String> {
-        authorities.iter().map(ToString::to_string).collect()
-    }
-}
-
+/// Adds a URL based authorization using AuthorizationManager.
 #[derive(Clone)]
 pub struct AuthorizeHttpRequestsConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    _marker: PhantomData<H>,
     registry: AuthorizationManagerRequestMatcherRegistry,
     publisher: Arc<dyn AuthorizationEventPublisher>,
-    role_hierarchy: Arc<dyn Fn() -> Arc<dyn RoleHierarchy> + Send + Sync>,
-    security_configurer_adapter: SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>,
+    authorization_manager_factory:
+        Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>>,
 
-    base: BaseHttpConfigurer<Self, H>,
+    inner: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> AuthorizeHttpRequestsConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    pub fn open(&self) {}
-
-    pub fn new(_context: &ApplicationContext) -> Self {
+    pub fn new(ctx: &mut ApplicationContext) -> Self {
+        let registry = AuthorizationManagerRequestMatcherRegistry::new(ctx);
+        let publisher = ctx
+            .resolve_by_type::<Arc<dyn AuthorizationEventPublisher>>()
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| Arc::new(NextAuthorizationEventPublisher::new(todo!())));
         Self {
-            _marker: PhantomData,
-            registry: AuthorizationManagerRequestMatcherRegistry::default(),
-            publisher: Arc::new(NullAuthorizationEventPublisher),
-            role_hierarchy: Arc::new(|| Arc::new(NullRoleHierarchy)),
-            security_configurer_adapter: SecurityConfigurerAdapter::default(),
+            registry,
+            publisher,
+            authorization_manager_factory: Self::get_authorization_manager_factory(ctx),
 
-            base: Default::default(),
+            inner: Default::default(),
         }
+    }
+
+    fn get_authorization_manager_factory(
+        ctx: &mut ApplicationContext,
+    ) -> Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>> {
+        let factories = ctx
+            .resolve_by_type::<Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>>>();
+        factories.into_iter().next().unwrap_or_else(|| {
+            let role_hierarchy = ctx
+                .resolve_by_type::<Arc<dyn RoleHierarchy>>()
+                .into_iter()
+                .next()
+                .unwrap_or(Arc::new(NullRoleHierarchy::default()));
+            let granted_authority_defaults = ctx.resolve_option::<GrantedAuthorityDefaults>();
+
+            let role_prefix = granted_authority_defaults
+                .as_ref()
+                .map(|s| s.role_prefix())
+                .unwrap_or("ROLE_");
+
+            let mut authorization_manager_factory = DefaultAuthorizationManagerFactory::default();
+            authorization_manager_factory.set_role_hierarchy(role_hierarchy);
+            authorization_manager_factory.set_role_prefix(role_prefix);
+
+            Arc::new(authorization_manager_factory)
+        })
     }
 
     pub fn registry(&self) -> &AuthorizationManagerRequestMatcherRegistry {
         &self.registry
     }
 
-    pub fn registry_owned(&self) -> AuthorizationManagerRequestMatcherRegistry {
-        self.registry.clone()
-    }
-
     pub fn registry_mut(&mut self) -> &mut AuthorizationManagerRequestMatcherRegistry {
         &mut self.registry
     }
 
-    pub fn permit_all_authorization_manager() -> AuthorizationDecision {
-        AuthorizationDecision::new(true)
+    pub fn add_mapping(
+        &mut self,
+        matcher: Vec<Arc<dyn RequestMatcher>>,
+        manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
+    ) -> &mut AuthorizationManagerRequestMatcherRegistry {
+        for matcher in matcher.into_iter() {
+            self.registry.add_mapping(matcher, manager.to_owned());
+        }
+
+        &mut self.registry
     }
 
     pub fn add_first(
         &mut self,
         matcher: Arc<dyn RequestMatcher>,
         manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
-    ) {
-    }
-}
+    ) -> &mut AuthorizationManagerRequestMatcherRegistry {
+        self.registry.add_first(matcher, manager);
 
-impl<H> SecurityConfigurer<AuthorizeHttpRequestsConfigurer<H>, H>
-    for AuthorizeHttpRequestsConfigurer<H>
-where
-    H: Send + Sync,
-    H: HttpSecurityBuilder<H>,
-    H: SecurityBuilder<AuthorizeHttpRequestsConfigurer<H>>,
-{
-    fn init(&mut self, _http: &mut H) {}
-
-    fn configure(&mut self, _http: &mut H) {
-        let _authorization_filter =
-            AuthorizationFilter::new(self.registry.create_authorization_manager());
-        let _publisher = self.publisher.clone();
+        &mut self.registry
     }
 }
 
@@ -139,39 +139,12 @@ where
         let authorization_manager = self.registry.create_authorization_manager();
 
         let mut authorization_filter = AuthorizationFilter::new(authorization_manager);
-        authorization_filter.set_authorization_event_publisher(self.publisher.clone());
+        authorization_filter.set_authorization_event_publisher(self.publisher.to_owned());
         authorization_filter.set_security_context_holder_strategy(
-            self.base.get_security_context_holder_strategy().clone(),
+            self.inner.get_security_context_holder_strategy().to_owned(),
         );
 
         http.add_filter(authorization_filter);
-    }
-}
-
-impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>>
-    for AuthorizeHttpRequestsConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        &self.security_configurer_adapter
-    }
-
-    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        &mut self.security_configurer_adapter
-    }
-}
-
-impl<H> Required<BaseHttpConfigurer<Self, H>> for AuthorizeHttpRequestsConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<Self, H> {
-        &self.base
-    }
-
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<Self, H> {
-        &mut self.base
     }
 }
 
@@ -199,9 +172,8 @@ impl Default for RegistryState {
 #[derive(Clone)]
 pub struct AuthorizationManagerRequestMatcherRegistry<C = AuthorizedUrl> {
     state: Arc<Mutex<RegistryState>>,
-    abstract_request_matcher_registry: BaseRequestMatcherRegistry<C>,
-    role_hierarchy: Arc<dyn RoleHierarchy>,
-    _marker: PhantomData<C>,
+
+    inner: BaseRequestMatcherRegistry<C>,
 }
 
 impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
@@ -214,88 +186,22 @@ impl Default for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     fn default() -> Self {
         Self {
             state: Arc::new(Mutex::new(RegistryState::default())),
-            abstract_request_matcher_registry: Default::default(),
-            role_hierarchy: Arc::new(NullRoleHierarchy),
-            _marker: PhantomData,
+
+            inner: Default::default(),
         }
     }
 }
 
 impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
-    pub fn any_request(&mut self) -> AuthorizedUrl {
-        {
-            let state = self
-                .state
-                .lock()
-                .expect("authorization registry lock poisoned");
-            assert!(
-                !state.any_request_configured,
-                "Can't configure anyRequest after itself"
-            );
-        }
-
-        let configurer = self.request_matchers(AnyRequestMatcher);
-        self.state
-            .lock()
-            .expect("authorization registry lock poisoned")
-            .any_request_configured = true;
-        configurer
-    }
-
-    pub fn request_matchers(&mut self, matcher: impl RequestMatcher + Any) -> AuthorizedUrl {
-        {
-            let state = self
-                .state
-                .lock()
-                .expect("authorization registry lock poisoned");
-            assert!(
-                !state.any_request_configured,
-                "Can't configure requestMatchers after anyRequest"
-            );
-        }
-
-        let mut matchers: Vec<Arc<dyn RequestMatcher>> = Vec::new();
-        let any: &dyn Any = &matcher;
-
-        let (http_method, patterns) = if let Some(http_method) = any.downcast_ref::<HttpMethod>() {
-            (Some(*http_method), vec![])
-        } else if let Some((http_method, patterns)) =
-            any.downcast_ref::<(HttpMethod, Vec<&'static str>)>()
-        {
-            (Some(*http_method), patterns.to_owned())
-        } else if let Some(patterns) = any.downcast_ref::<Vec<&'static str>>() {
-            (None, patterns.to_owned())
-        } else if any.downcast_ref::<AnyRequestMatcher>().is_some() {
-            (None, vec!["/**"])
-        } else {
-            (None, vec![])
-        };
-
-        for pattern in patterns {
-            matchers.push(Arc::new(AntPathRequestMatcher::from((
-                http_method,
-                pattern,
-            ))));
-        }
-
-        self.chain_request_matchers(matchers)
-    }
-
     fn add_mapping(
         &mut self,
         matcher: Arc<dyn RequestMatcher>,
         manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
     ) {
-        let mut state = self
-            .state
-            .lock()
-            .expect("authorization registry lock poisoned");
-        state.unmapped_matchers = None;
-        state.manager_builder.add(matcher, manager);
-        state.mapping_count += 1;
+        add_mapping(matcher, manager, &self.state);
     }
 
-    pub fn add_first(
+    fn add_first(
         &mut self,
         matcher: Arc<dyn RequestMatcher>,
         manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
@@ -315,7 +221,7 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     pub fn create_authorization_manager(
         &self,
     ) -> Arc<dyn AuthorizationManager<RequestAuthorizationContext>> {
-        let state = self
+        let mut state = self
             .state
             .lock()
             .expect("authorization registry lock poisoned");
@@ -327,122 +233,289 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
             state.mapping_count > 0,
             "At least one mapping is required (for example, authorizeHttpRequests().anyRequest().authenticated())"
         );
+
         state.manager_builder.build()
-    }
-
-    pub fn chain_request_matchers(
-        &mut self,
-        request_matchers: Vec<Arc<dyn RequestMatcher>>,
-    ) -> AuthorizedUrl {
-        self.state
-            .lock()
-            .expect("authorization registry lock poisoned")
-            .unmapped_matchers = Some(request_matchers.clone());
-
-        AuthorizedUrl {
-            matchers: request_matchers,
-            ref_matcher_registry: self.clone(),
-            role_hierarchy: self.role_hierarchy.clone(),
-        }
     }
 }
 
+impl BaseRequestMatcherRegistryExt<AuthorizedUrl>
+    for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl>
+{
+    fn chain_request_matchers(&mut self, matchers: Vec<Arc<dyn RequestMatcher>>) -> AuthorizedUrl {
+        // AuthorizedUrl::new(matchers, self.clone(), self.state.clone())
+        todo!()
+    }
+}
+
+impl Deref for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
+    type Target = BaseRequestMatcherRegistry<AuthorizedUrl>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+/// An object that allows configuring the [`AuthorizationManager`] for
+/// [`RequestMatcher`]s.
+///
+/// This is the fluent API that users interact with after specifying which
+/// requests they want to authorize.
 #[derive(Clone)]
 pub struct AuthorizedUrl {
     matchers: Vec<Arc<dyn RequestMatcher>>,
-    ref_matcher_registry: AuthorizationManagerRequestMatcherRegistry,
-    role_hierarchy: Arc<dyn RoleHierarchy>,
+    authorization_manager_factory:
+        Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>>,
+    not: bool,
+
+    inner: Arc<Mutex<RegistryState>>,
 }
 
 impl AuthorizedUrl {
-    pub fn permit_all(&mut self) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        self.access(DefaultAuthorizationManager(true))
-    }
+    /// Creates a new `AuthorizedUrl` instance.
+    pub fn new(
+        matchers: Vec<Arc<dyn RequestMatcher>>,
+        authorization_manager_factory: Arc<
+            dyn AuthorizationManagerFactory<RequestAuthorizationContext>,
+        >,
+        inner: Arc<Mutex<RegistryState>>,
+    ) -> Self {
+        Self {
+            matchers,
+            authorization_manager_factory,
+            not: false,
 
-    pub fn deny_all(&mut self) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        self.access(DefaultAuthorizationManager(false))
-    }
-
-    pub fn has_role(&mut self, role: &str) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        let manager = self.with_role_hierarchy(AuthorityAuthorizationManager::has_any_role(
-            ROLE_PREFIX,
-            [role.to_string()],
-        ));
-        self.access(manager)
-    }
-
-    pub fn has_any_role(
-        &mut self,
-        roles: impl IntoIterator<Item = &'static str>,
-    ) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        let manager = self.with_role_hierarchy(AuthorityAuthorizationManager::has_any_role(
-            ROLE_PREFIX,
-            roles.into_iter().map(ToString::to_string),
-        ));
-        self.access(manager)
-    }
-
-    pub fn has_authority(
-        &mut self,
-        authority: &str,
-    ) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        let manager =
-            self.with_role_hierarchy(AuthorityAuthorizationManager::has_authority(authority));
-        self.access(manager)
-    }
-
-    pub fn has_any_authority(
-        &mut self,
-        authorities: impl IntoIterator<Item = &'static str>,
-    ) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        let manager = self.with_role_hierarchy(AuthorityAuthorizationManager::has_any_authority(
-            authorities.into_iter().map(ToString::to_string).collect(),
-        ));
-        self.access(manager)
-    }
-
-    pub fn authenticated(&mut self) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        self.access(AuthenticatedAuthorizationManager::authenticated())
-    }
-
-    pub fn fully_authenticated(&mut self) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        self.access(AuthenticatedAuthorizationManager::fully_authenticated())
-    }
-
-    pub fn remember_me(&mut self) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        self.access(AuthenticatedAuthorizationManager::remember_me())
-    }
-
-    pub fn anonymous(&mut self) -> &mut AuthorizationManagerRequestMatcherRegistry {
-        self.access(AuthenticatedAuthorizationManager::anonymous())
-    }
-
-    pub fn access<T>(&mut self, manager: T) -> &mut AuthorizationManagerRequestMatcherRegistry
-    where
-        T: AuthorizationManager<RequestAuthorizationContext> + 'static,
-    {
-        let manager = Arc::new(manager);
-        let matchers = std::mem::take(&mut self.matchers);
-        for matcher in matchers {
-            self.ref_matcher_registry
-                .add_mapping(matcher, manager.clone());
+            inner,
         }
-        &mut self.ref_matcher_registry
     }
 
-    fn with_role_hierarchy(
+    pub fn get_matchers(&self) -> &[Arc<dyn RequestMatcher>] {
+        &self.matchers
+    }
+
+    pub fn set_authorization_manager_factory(
         &mut self,
-        mut manager: AuthorityAuthorizationManager<RequestAuthorizationContext>,
-    ) -> AuthorityAuthorizationManager<RequestAuthorizationContext> {
-        manager.set_role_hierarchy(self.role_hierarchy.clone());
-        manager
+        factory: Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>>,
+    ) {
+        self.authorization_manager_factory = factory;
+    }
+
+    /// Negates the following authorization rule.
+    pub fn not(mut self) -> Self {
+        self.not = true;
+
+        self
+    }
+
+    /// Specifies that URLs are allowed by anyone.
+    pub fn permit_all(&mut self) -> &mut Self {
+        self.access(self.authorization_manager_factory.permit_all());
+
+        self
+    }
+
+    /// Specifies that URLs are not allowed by anyone.
+    pub fn deny_all(&mut self) -> &mut Self {
+        self.access(self.authorization_manager_factory.deny_all());
+
+        self
+    }
+
+    /// Specifies that a user requires a role.
+    ///
+    /// The role is automatically prepended with "ROLE_" (configurable).
+    pub fn has_role(&mut self, role: &str) -> &mut Self {
+        self.access(self.authorization_manager_factory.has_role(role));
+
+        self
+    }
+
+    /// Specifies that a user requires one of many roles.
+    pub fn has_any_role(&mut self, roles: &[&str]) -> &mut Self {
+        self.access(
+            self.authorization_manager_factory
+                .has_any_role(&roles.iter().map(ToString::to_string).collect::<Vec<_>>()),
+        );
+
+        self
+    }
+
+    /// Specifies that a user requires all the provided roles.
+    pub fn has_all_roles(&mut self, roles: &[&str]) -> &mut Self {
+        self.access(
+            self.authorization_manager_factory
+                .has_all_roles(&roles.iter().map(ToString::to_string).collect::<Vec<_>>()),
+        );
+
+        self
+    }
+
+    /// Specifies that a user requires an authority.
+    pub fn has_authority(&mut self, authority: &str) -> &mut Self {
+        self.access(self.authorization_manager_factory.has_authority(authority));
+
+        self
+    }
+
+    /// Specifies that a user requires one of many authorities.
+    pub fn has_any_authority(&mut self, authorities: &[&str]) -> &mut Self {
+        self.access(
+            self.authorization_manager_factory.has_any_authority(
+                &authorities
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>(),
+            ),
+        );
+
+        self
+    }
+
+    /// Specifies that a user requires all the provided authorities.
+    pub fn has_all_authorities(&mut self, authorities: &[&str]) -> &mut Self {
+        self.access(
+            self.authorization_manager_factory.has_all_authorities(
+                &authorities
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>(),
+            ),
+        );
+
+        self
+    }
+
+    /// Specifies that URLs are allowed by any authenticated user.
+    pub fn authenticated(&mut self) -> &mut Self {
+        self.access(self.authorization_manager_factory.authenticated());
+
+        self
+    }
+
+    /// Specifies that URLs are allowed by users who have authenticated and were not "remembered".
+    pub fn fully_authenticated(&mut self) -> &mut Self {
+        self.access(self.authorization_manager_factory.fully_authenticated());
+
+        self
+    }
+
+    /// Specifies that URLs are allowed by users that have been remembered.
+    pub fn remember_me(&mut self) -> &mut Self {
+        self.access(self.authorization_manager_factory.remember_me());
+
+        self
+    }
+
+    /// Specifies that URLs are allowed by anonymous users.
+    pub fn anonymous(&mut self) -> &mut Self {
+        self.access(self.authorization_manager_factory.anonymous());
+
+        self
+    }
+
+    /// Specify that a path variable in URL to be compared.
+    pub fn has_variable(&mut self, variable: &str) -> AuthorizedUrlVariable {
+        AuthorizedUrlVariable::new(variable)
+    }
+
+    /// Allows specifying a custom [`AuthorizationManager`].
+    pub fn access(&mut self, manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>) {
+        if self.not {
+            let not_manager = AuthorizationManagers::not(manager);
+            for matcher in self.matchers.iter() {
+                add_mapping(matcher.clone(), Arc::new(not_manager.clone()), &self.inner);
+            }
+        } else {
+            for matcher in self.matchers.iter() {
+                add_mapping(matcher.clone(), manager.clone(), &self.inner);
+            }
+        }
     }
 }
 
-pub struct RequestMatchers;
+/// An object that allows configuring RequestMatchers with URI path variables
+pub struct AuthorizedUrlVariable {
+    /// The name of the path variable to compare.
+    variable: String,
+}
 
-impl RequestMatchers {
-    pub fn ant_matchers_as_array() -> Vec<Box<dyn RequestMatcher>> {
-        vec![]
+impl AuthorizedUrlVariable {
+    /// Creates a new `AuthorizedUrlVariable` instance.
+    ///
+    /// This is typically called by [`AuthorizedUrl::has_variable`].
+    pub fn new(variable: impl Into<String>) -> Self {
+        Self {
+            variable: variable.into(),
+        }
+    }
+
+    //     /// Compares the value of a path variable in the URI with an `Authentication` attribute.
+    //     ///
+    //     /// This method takes a function that extracts a value from the `Authentication`
+    //     /// object and compares it with the path variable value extracted from the
+    //     /// request context.
+    //     ///
+    //     /// # Type Parameters
+    //     /// * `F` - The function type that maps `Authentication` to `String`.
+    //     ///
+    //     /// # Arguments
+    //     /// * `function` - A function that extracts a `String` value from `Authentication`.
+    //     ///
+    //     /// # Returns
+    //     /// Returns a mutable reference to the parent [`AuthorizationManagerRequestMatcherRegistry`]
+    //     /// for further customization.
+    //     ///
+    //     /// # Example
+    //     /// ```rust
+    //     /// # use authorize_http_requests_configurer::*;
+    //     /// registry
+    //     ///     .request_matchers(&["/user/{username}"])
+    //     ///     .has_variable("username")
+    //     ///     .equal_to(|auth| auth.name().to_string());
+    //     /// ```
+    //     pub fn equal_to<F>(mut self, function: F) -> &'a mut AuthorizationManagerRequestMatcherRegistry<H>
+    //     where
+    //         F: Fn(&dyn Authentication) -> String,
+    //     {
+    //         let variable = self.variable.clone();
+    //         let manager = VariableEqualsAuthorizationManager::new(variable, function);
+    //         self.parent.access(Arc::new(manager));
+    //         self.parent.registry
+    //     }
+}
+
+fn add_mapping(
+    matcher: Arc<dyn RequestMatcher>,
+    manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>>,
+    state: &Arc<Mutex<RegistryState>>,
+) {
+    let mut state = state.lock().expect("authorization registry lock poisoned");
+    state.unmapped_matchers = None;
+    state.manager_builder.add(matcher, manager);
+    state.mapping_count += 1;
+}
+
+impl<H> Deref for AuthorizeHttpRequestsConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for AuthorizeHttpRequestsConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

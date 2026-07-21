@@ -120,6 +120,9 @@ mod t2 {
                 headers.xss_protection(|xss| {
                     xss.disable();
                 });
+            })
+            .port_mapper(|pm| {
+                pm.http(30).maps_to(1000).http(40).maps_to(1010);
             });
         }
     }

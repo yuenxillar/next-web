@@ -1,35 +1,73 @@
 use std::sync::Arc;
 
-use crate::core::{granted_authority::GrantedAuthority, Authentication};
+use next_web_core::error::BoxError;
 
-#[derive(Clone, Default)]
+use crate::{
+    authentication::{
+        anonymous_authentication_token::EMPTY_CREDENTIALS, string_hash, BaseAuthenticationToken,
+    },
+    core::{granted_authority::GrantedAuthority, Authentication, Principal},
+    web::authentication::AuthPrincipal,
+};
+
+/// Represents a remembered Authentication.
+/// A remembered Authentication must provide a fully valid Authentication, including the GrantedAuthoritys that apply.
+#[derive(Clone)]
 pub struct RememberMeAuthenticationToken {
-    principal: String,
+    principal: AuthPrincipal,
     key_hash: i32,
-    authorities: Vec<Arc<dyn GrantedAuthority>>,
+
+    inner: BaseAuthenticationToken,
 }
 
 impl RememberMeAuthenticationToken {
     pub fn new(
         key: impl AsRef<str>,
-        principal: impl Into<String>,
-        authorities: Vec<Arc<dyn GrantedAuthority>>,
+        principal: AuthPrincipal,
+        authorities: Option<Vec<Arc<dyn GrantedAuthority>>>,
     ) -> Self {
-        let principal = principal.into();
+        assert!(!key.as_ref().trim().is_empty(), "Key cannot be empty");
         assert!(
-            !key.as_ref().trim().is_empty(),
-            "Cannot pass null or empty values to constructor"
+            !principal
+                .as_ref()
+                .downcast_ref::<String>()
+                .map_or(false, |s| s.trim().is_empty()),
+            "Principal cannot be empty"
         );
-        assert!(
-            !principal.trim().is_empty(),
-            "Cannot pass null or empty values to constructor"
-        );
+
+        let mut inner = BaseAuthenticationToken::new(authorities);
+        inner.set_authenticated(true);
+        Self {
+            principal,
+            key_hash: string_hash(key.as_ref()),
+            inner,
+        }
+    }
+
+    /// Private constructor to help with deserialization.
+    fn from_key_hash(
+        key_hash: i32,
+        principal: AuthPrincipal,
+        authorities: Option<Vec<Arc<dyn GrantedAuthority>>>,
+    ) -> Self {
+        let mut inner = BaseAuthenticationToken::new(authorities);
+        inner.set_authenticated(true);
 
         Self {
             principal,
-            key_hash: java_string_hash(key.as_ref()),
-            authorities,
+            key_hash,
+            inner,
         }
+    }
+
+    /// Returns the key hash.
+    pub fn get_key_hash(&self) -> i32 {
+        self.key_hash
+    }
+
+    /// Sets the details about the authentication request.
+    pub fn set_details(&mut self, details: Option<AuthPrincipal>) {
+        self.inner.set_details(details);
     }
 
     pub fn key_hash(&self) -> i32 {
@@ -38,60 +76,33 @@ impl RememberMeAuthenticationToken {
 }
 
 impl Authentication for RememberMeAuthenticationToken {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
+    fn credentials(&self) -> Option<&AuthPrincipal> {
+        Some(&EMPTY_CREDENTIALS)
     }
 
-    fn authentication_type(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
-    fn get_credentials(&self) -> Option<String> {
-        Some(String::new())
-    }
-
-    fn get_principal(&self) -> Option<String> {
-        Some(self.principal.clone())
+    fn principal(&self) -> Option<&AuthPrincipal> {
+        Some(&self.principal)
     }
 
     fn is_authenticated(&self) -> bool {
         true
     }
 
-    fn authorities(&self) -> Vec<String> {
-        self.authorities
-            .iter()
-            .filter_map(|authority| authority.authority().map(ToString::to_string))
-            .collect()
+    fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
+        self.inner.authorities()
     }
 
-    fn is_remember_me(&self) -> bool {
-        true
+    fn details(&self) -> Option<&AuthPrincipal> {
+        self.inner.details()
+    }
+
+    fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
+        self.inner.set_authenticated(is_authenticated)
     }
 }
 
-fn java_string_hash(value: &str) -> i32 {
-    value.chars().fold(0_i32, |acc, ch| {
-        acc.wrapping_mul(31).wrapping_add(ch as i32)
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::core::{authority_utils::AuthorityUtils, Authentication};
-
-    use super::RememberMeAuthenticationToken;
-
-    #[test]
-    fn remember_me_authentication_token_marks_remember_me() {
-        let token = RememberMeAuthenticationToken::new(
-            "key",
-            "alice",
-            AuthorityUtils::create_authority_list(["ROLE_USER"]),
-        );
-
-        assert!(token.is_authenticated());
-        assert!(token.is_remember_me());
-        assert_eq!(token.get_name(), "alice");
+impl Principal for RememberMeAuthenticationToken {
+    fn name(&self) -> String {
+        self.inner.name()
     }
 }

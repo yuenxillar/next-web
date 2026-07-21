@@ -10,8 +10,8 @@ use crate::core::{
 pub trait GrantedAuthoritiesMapper: Send + Sync {
     fn map_authorities(
         &self,
-        authorities: Vec<Arc<dyn GrantedAuthority>>,
-    ) -> Vec<Arc<dyn GrantedAuthority>>;
+        authorities: &[Arc<dyn GrantedAuthority>],
+    ) -> &[Arc<dyn GrantedAuthority>];
 }
 
 #[derive(Clone, Default)]
@@ -20,8 +20,8 @@ pub struct NullAuthoritiesMapper;
 impl GrantedAuthoritiesMapper for NullAuthoritiesMapper {
     fn map_authorities(
         &self,
-        authorities: Vec<Arc<dyn GrantedAuthority>>,
-    ) -> Vec<Arc<dyn GrantedAuthority>> {
+        authorities: &[Arc<dyn GrantedAuthority>],
+    ) -> &[Arc<dyn GrantedAuthority>] {
         authorities
     }
 }

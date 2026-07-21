@@ -4,6 +4,8 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
+use std::sync::Arc;
+
 use crate::core::Authentication;
 
 /// Strategy that is called after a successful logout by the LogoutFilter, to handle redirection or forwarding to the appropriate destination.
@@ -17,6 +19,6 @@ where
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        authentication: Option<&dyn Authentication>,
+        authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError>;
 }

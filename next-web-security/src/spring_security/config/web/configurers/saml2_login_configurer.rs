@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use next_web_core::traits::required::Required;
 
 use crate::{
@@ -5,10 +7,7 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
@@ -27,18 +26,16 @@ use crate::{
 pub struct Saml2LoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<Saml2LoginConfigurer<H>, H>>,
 {
     login_page: Option<String>,
     login_processing_url: Option<String>,
 
-    base_http_configurer: BaseHttpConfigurer<Saml2LoginConfigurer<H>, H>,
+    inner: BaseHttpConfigurer<Saml2LoginConfigurer<H>, H>,
 }
 
 impl<H> Saml2LoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<Saml2LoginConfigurer<H>, H>>,
 {
     /// Set the login page URL.
     pub fn login_page(mut self, page: &str) -> Self {
@@ -57,30 +54,13 @@ where
 impl<H> Default for Saml2LoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<Saml2LoginConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
             login_page: None,
             login_processing_url: None,
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
-    }
-}
-
-impl<H> Required<BaseHttpConfigurer<Saml2LoginConfigurer<H>, H>>
-    for Saml2LoginConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<Saml2LoginConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
-
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut BaseHttpConfigurer<Saml2LoginConfigurer<H>, H> {
-        &mut self.base_http_configurer
     }
 }
 
@@ -91,13 +71,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+        self.inner.get_mut_object()
     }
 }
 
@@ -112,5 +90,25 @@ where
     fn configure(&mut self, _http: &mut H) {
         // Stub: Will create Saml2WebSsoAuthenticationRequestFilter +
         // Saml2WebSsoAuthenticationFilter when SAML2 infrastructure is ready.
+    }
+}
+
+impl<H> Deref for Saml2LoginConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for Saml2LoginConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

@@ -5,20 +5,18 @@ use next_web_core::{filter::CorsFilter, traits::filter::HttpFilter};
 use crate::web::{
     access::{intercept::AuthorizationFilter, ErrorTranslationFilter},
     authentication::{
-        anonymous_authentication_filter::AnonymousAuthenticationFilter,
+        base_authentication_filter::BasicAuthenticationFilter,
         base_authentication_processing_filter::BaseAuthenticationProcessingFilter,
-        basic_authentication_filter::BasicAuthenticationFilter,
         logout::LogoutFilter,
         ott::{GenerateOneTimeTokenFilter, OneTimeTokenAuthenticationFilter},
-        remember_me_authentication_filter::RememberMeAuthenticationFilter,
         switchuser::SwitchUserFilter,
         ui::{
             DefaultLoginPageGeneratingFilter, DefaultLogoutPageGeneratingFilter,
             DefaultOneTimeTokenSubmitPageGeneratingFilter, DefaultResourcesFilter,
         },
-        username_password_authentication_filter::UsernamePasswordAuthenticationFilter,
         www::DigestAuthenticationFilter,
-        AuthenticationFilter,
+        AnonymousAuthenticationFilter, AuthenticationFilter, RememberMeAuthenticationFilter,
+        UsernamePasswordAuthenticationFilter,
     },
     context::SecurityContextHolderFilter,
     csrf::CsrfFilter,

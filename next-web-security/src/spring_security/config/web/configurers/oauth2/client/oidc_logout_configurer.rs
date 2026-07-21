@@ -1,4 +1,4 @@
-use next_web_core::traits::required::Required;
+use std::ops::{Deref, DerefMut};
 
 use crate::{
     config::{
@@ -13,7 +13,7 @@ pub struct OidcLogoutConfigurer<B>
 where
     B: HttpSecurityBuilder<B>,
 {
-    base: BaseHttpConfigurer<Self, B>,
+    inner: BaseHttpConfigurer<Self, B>,
 }
 
 impl<B> Default for OidcLogoutConfigurer<B>
@@ -22,7 +22,7 @@ where
 {
     fn default() -> Self {
         Self {
-            base: Default::default(),
+            inner: Default::default(),
         }
     }
 }
@@ -40,15 +40,22 @@ where
     }
 }
 
-impl<B> Required<BaseHttpConfigurer<Self, B>> for OidcLogoutConfigurer<B>
+impl<B> Deref for OidcLogoutConfigurer<B>
 where
     B: HttpSecurityBuilder<B>,
 {
-    fn get_object(&self) -> &BaseHttpConfigurer<Self, B> {
-        &self.base
-    }
+    type Target = BaseHttpConfigurer<Self, B>;
 
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<Self, B> {
-        &mut self.base
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<B> DerefMut for OidcLogoutConfigurer<B>
+where
+    B: HttpSecurityBuilder<B>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

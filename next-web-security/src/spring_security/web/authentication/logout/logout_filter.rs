@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     core::context::{
-        security_context_holder::SecurityContextHolder,
-        security_context_holder_strategy::SecurityContextHolderStrategy,
+        security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy,
     },
     web::{
         authentication::logout::{
@@ -127,18 +126,15 @@ impl HttpFilter for LogoutFilter {
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
         if self.requires_logout(request) {
-            if let Some(auth) = self
-                .security_context_holder_strategy
-                .get_context()
-                .map(|ctx| ctx.get_authentication())
-            {
+            if let Some(ctx) = self.security_context_holder_strategy.get_context() {
+                let auth = ctx.get_authentication();
                 if tracing::enabled!(Level::DEBUG) {
-                    debug!("Logging out [{:?}]", auth.as_ref().map(|s| s.get_name()));
+                    debug!("Logging out [{:?}]", auth.as_ref().map(|s| s.name()));
                 }
 
-                self.handler.logout(request, response, auth.as_ref()).await;
+                self.handler.logout(request, response, auth).await;
                 self.logout_success_handler
-                    .on_logout_success(request, response, auth.as_deref())
+                    .on_logout_success(request, response, auth)
                     .await?;
 
                 return Ok(());

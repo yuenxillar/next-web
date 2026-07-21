@@ -4,7 +4,7 @@ use next_web_core::async_trait;
 
 use crate::{
     authorization::{
-        authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
+        authorization_manager::AuthorizationManager,
         factor_authorization_decision::FactorAuthorizationDecision,
         required_factor::RequiredFactor, required_factor_error::RequiredFactorError,
         AuthorizationResult,

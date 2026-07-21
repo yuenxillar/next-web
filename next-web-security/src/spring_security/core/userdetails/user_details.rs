@@ -1,11 +1,14 @@
+use std::{any::Any, sync::Arc};
+
 use crate::core::granted_authority::GrantedAuthority;
 
 pub trait UserDetails
 where
     Self: Send + Sync,
+    Self: Any,
 {
     /// Returns the authorities granted to the user.
-    fn authorities(&self) -> Vec<&dyn GrantedAuthority>;
+    fn authorities(&self) -> &[Arc<dyn GrantedAuthority>];
 
     /// Returns the password used to authenticate the user.
     fn password(&self) -> Option<&str>;

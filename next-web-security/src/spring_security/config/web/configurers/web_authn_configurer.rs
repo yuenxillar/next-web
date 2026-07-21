@@ -1,4 +1,4 @@
-use next_web_core::traits::required::Required;
+use std::ops::{Deref, DerefMut};
 
 use crate::{
     config::{
@@ -16,7 +16,7 @@ pub struct WebAuthnConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    base: BaseHttpConfigurer<Self, H>,
+    inner: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> Default for WebAuthnConfigurer<H>
@@ -25,7 +25,7 @@ where
 {
     fn default() -> Self {
         Self {
-            base: Default::default(),
+            inner: Default::default(),
         }
     }
 }
@@ -43,15 +43,22 @@ where
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<Self, H>> for WebAuthnConfigurer<H>
+impl<H> Deref for WebAuthnConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn get_object(&self) -> &BaseHttpConfigurer<Self, H> {
-        &self.base
-    }
+    type Target = BaseHttpConfigurer<Self, H>;
 
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<Self, H> {
-        &mut self.base
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for WebAuthnConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

@@ -20,7 +20,7 @@ impl SidImpl {
     }
 
     pub fn principal_from_authentication(authentication: &dyn Authentication) -> Self {
-        Self::principal(authentication.get_name())
+        Self::principal(authentication.name())
     }
 
     pub fn granted_authority(authority: impl Into<String>) -> Self {

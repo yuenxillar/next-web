@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::traits::required::Required;
 
@@ -7,10 +10,7 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::{
         default_security_filter_chain::DefaultSecurityFilterChain,
@@ -62,7 +62,7 @@ where
     cross_origin_embedder_policy: CrossOriginEmbedderPolicyConfig,
     cross_origin_resource_policy: CrossOriginResourcePolicyConfig,
 
-    base_http_configurer: BaseHttpConfigurer<Self, H>,
+    inner: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> HeadersConfigurer<H>
@@ -322,21 +322,29 @@ where
             cross_origin_opener_policy: Default::default(),
             cross_origin_embedder_policy: Default::default(),
             cross_origin_resource_policy: Default::default(),
-            base_http_configurer: Default::default(),
+
+            inner: Default::default(),
         }
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<HeadersConfigurer<H>, H>> for HeadersConfigurer<H>
+impl<H> Deref for HeadersConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn get_object(&self) -> &BaseHttpConfigurer<HeadersConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
+    type Target = BaseHttpConfigurer<Self, H>;
 
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<HeadersConfigurer<H>, H> {
-        &mut self.base_http_configurer
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for HeadersConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }
 
@@ -346,11 +354,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+        self.inner.get_mut_object()
     }
 }
 

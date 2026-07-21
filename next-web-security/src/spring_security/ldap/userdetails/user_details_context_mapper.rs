@@ -3,7 +3,7 @@ use std::sync::Arc;
 use next_web_core::async_trait;
 
 use crate::{
-    core::userdetails::user_details::UserDetails,
+    core::userdetails::UserDetails,
     ldap::{
         dir_context_operations::DirContextOperations,
         userdetails::{

@@ -64,7 +64,7 @@ impl<T> AllAuthoritiesAuthorizationManager<T> {
         }
         let granted = self
             .role_hierarchy
-            .reachable_granted_authorities(&authentication.authorities())
+            .reachable_granted_authorities(authentication.authorities())
             .into_iter()
             .collect::<BTreeSet<_>>();
         self.required_authorities

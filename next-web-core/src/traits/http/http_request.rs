@@ -3,7 +3,7 @@ use axum::{
     http::{Uri, Version, uri::Scheme},
 };
 use headers::{HeaderMapExt, Host};
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, net::SocketAddr, str::FromStr};
 
 use crate::{
     anys::any_value::AnyValue,
@@ -48,6 +48,8 @@ where
 
     fn parameters(&self) -> Option<Vec<(&str, &str)>>;
 
+    fn parameter_values(&self, name: &str) -> Option<Vec<&str>>;
+
     fn path(&self) -> &str;
 
     fn host(&self) -> Option<&str>;
@@ -75,6 +77,8 @@ where
     fn clean_up(&mut self);
 
     fn is_secure(&self) -> bool;
+
+    fn remote_addr(&self) -> Option<&SocketAddr>;
 }
 
 pub type OneMap = HashMap<String, AnyValue>;
@@ -187,6 +191,16 @@ impl HttpRequest for Request {
         })
     }
 
+    fn parameter_values(&self, name: &str) -> Option<Vec<&str>> {
+        self.parameters().map(|params| {
+            params
+                .into_iter()
+                .filter(|(key, _)| *key == name)
+                .map(|(_, value)| value)
+                .collect()
+        })
+    }
+
     fn path(&self) -> &str {
         self.uri().path()
     }
@@ -252,5 +266,9 @@ impl HttpRequest for Request {
 
     fn is_secure(&self) -> bool {
         self.uri().scheme() == Some(&Scheme::HTTPS)
+    }
+
+    fn remote_addr(&self) -> Option<&SocketAddr> {
+        self.extensions().get::<SocketAddr>()
     }
 }

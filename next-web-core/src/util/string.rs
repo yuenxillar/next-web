@@ -4,11 +4,12 @@ pub struct StringUtils;
 
 impl StringUtils {
     /// Determine whether the string has text content (not blank)
-    pub fn has_text<S>(s: S) -> bool
-    where
-        S: AsRef<str>,
-    {
-        !Self::is_blank(s.as_ref())
+    pub fn has_text(s: &str) -> bool {
+        !Self::is_blank(s)
+    }
+
+    pub fn has_length(s: &str) -> bool {
+        !s.is_empty()
     }
 
     /// Determine whether the string is null or empty

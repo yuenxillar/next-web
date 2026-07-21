@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use next_web_core::{
     async_trait,
     error::BoxError,
@@ -29,7 +31,7 @@ impl LogoutSuccessHandler for HttpStatusReturningLogoutSuccessHandler {
         &self,
         _request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        _authentication: Option<&dyn Authentication>,
+        _authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError> {
         response.set_status_code(self.http_status_to_return);
         response.finish();

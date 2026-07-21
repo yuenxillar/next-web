@@ -1,9 +1,7 @@
 use std::fmt;
 
-use chrono::{DateTime, Utc};
-use next_web_core::async_trait;
-
 use crate::core::granted_authority::GrantedAuthority;
+use chrono::{DateTime, Utc};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct FactorGrantedAuthority {

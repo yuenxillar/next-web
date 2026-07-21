@@ -20,7 +20,7 @@ use next_web_core::{
 };
 
 use crate::{
-    authentication::authentication_provider::AuthenticationProvider,
+    authentication::AuthenticationProvider,
     authorization::AuthenticationManager,
     config::{
         authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
@@ -47,7 +47,7 @@ use crate::{
             http_security_builder::HttpSecurityBuilder,
         },
     },
-    core::userdetails::user_details_service::UserDetailsService,
+    core::userdetails::UserDetailsService,
     web::{
         default_security_filter_chain::DefaultSecurityFilterChain,
         util::matcher::{AnyRequestMatcher, Builder, OrRequestMatcher, RequestMatcher},
@@ -92,8 +92,9 @@ impl HttpSecurity {
         http
     }
 
-    fn get_context(&self) -> &ApplicationContext {
-        self.get_shared_object::<ApplicationContext>().unwrap()
+    fn get_context(&self) -> &mut ApplicationContext {
+        // self.get_shared_object::<ApplicationContext>().unwrap()
+        todo!()
     }
 
     /// If a configurer of type `C` is already registered, clone and return it.
@@ -159,6 +160,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn port_mapper<F>(&mut self, port_mapper: F) -> &mut Self
     where
         F: FnMut(&mut PortMapperConfigurer<Self>),
@@ -168,6 +170,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn remember_me<F>(&mut self, remember_me: F) -> &mut Self
     where
         F: FnMut(&mut RememberMeConfigurer<Self>),
@@ -207,6 +210,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn security_context<F>(&mut self, security_context: F) -> &mut Self
     where
         F: FnMut(&mut SecurityContextConfigurer<Self>),
@@ -225,6 +229,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn logout<F>(&mut self, logout: F) -> &mut Self
     where
         F: FnMut(&mut LogoutConfigurer<Self>),
@@ -234,6 +239,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn anonymous<F>(&mut self, anonymous: F) -> &mut Self
     where
         F: FnMut(&mut AnonymousConfigurer<Self>),
@@ -508,12 +514,12 @@ impl HttpSecurityBuilder<Self> for HttpSecurity {
         self.base.remove_configurer()
     }
 
-    fn authentication_provider<T>(&mut self, authentication_provider: T)
-    where
-        T: AuthenticationProvider + 'static,
-    {
+    fn authentication_provider(
+        &mut self,
+        authentication_provider: Arc<dyn AuthenticationProvider>,
+    ) {
         self.get_authentication_registry()
-            .map(|r| r.authentication_provider(Arc::new(authentication_provider)));
+            .map(|r| r.authentication_provider(authentication_provider));
     }
 
     fn user_details_service<T>(&mut self, user_details_service: T)

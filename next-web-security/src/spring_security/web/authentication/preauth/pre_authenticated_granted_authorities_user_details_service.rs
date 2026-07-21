@@ -6,7 +6,7 @@ use crate::core::{
     granted_authorities_container::GrantedAuthoritiesContainer,
     userdetails::{
         authentication_user_details_service::AuthenticationUserDetailsService, user::User,
-        user_details::UserDetails, username_not_found_error::UsernameNotFoundError,
+        username_not_found_error::UsernameNotFoundError, UserDetails,
     },
     Authentication,
 };

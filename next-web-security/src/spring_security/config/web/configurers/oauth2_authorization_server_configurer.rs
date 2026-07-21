@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use next_web_core::traits::required::Required;
 
 use crate::{
@@ -5,10 +7,7 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
@@ -38,19 +37,17 @@ use crate::{
 pub struct OAuth2AuthorizationServerConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H>>,
 {
-    base_http_configurer: BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H>,
+    inner: BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H>,
 }
 
 impl<H> Default for OAuth2AuthorizationServerConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
     }
 }
@@ -61,13 +58,13 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn get_object(&self) -> &BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H> {
-        &self.base_http_configurer
+        &self.inner
     }
 
     fn get_mut_object(
         &mut self,
     ) -> &mut BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H> {
-        &mut self.base_http_configurer
+        &mut self.inner
     }
 }
 
@@ -78,18 +75,15 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+        self.inner.get_mut_object()
     }
 }
 
-impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H>
-    for OAuth2AuthorizationServerConfigurer<H>
+impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for OAuth2AuthorizationServerConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
@@ -106,5 +100,25 @@ where
         // Stub: Will create AuthorizationServerContextFilter,
         // NimbusJwkSetEndpointFilter, and all endpoint filters
         // when OAuth2 infrastructure is ready.
+    }
+}
+
+impl<H> Deref for OAuth2AuthorizationServerConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for OAuth2AuthorizationServerConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

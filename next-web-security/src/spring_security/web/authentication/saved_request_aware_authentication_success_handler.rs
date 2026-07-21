@@ -17,34 +17,28 @@ use crate::{
     },
 };
 
+#[derive(Clone)]
 pub struct SavedRequestAwareAuthenticationSuccessHandler {
     request_cache: Arc<dyn RequestCache>,
 
-    base_authentication_target_url_request_handler: BaseAuthenticationTargetUrlRequestHandler,
+    inner: BaseAuthenticationTargetUrlRequestHandler,
 }
 
 impl Deref for SavedRequestAwareAuthenticationSuccessHandler {
     type Target = BaseAuthenticationTargetUrlRequestHandler;
 
     fn deref(&self) -> &Self::Target {
-        &self.base_authentication_target_url_request_handler
+        &self.inner
     }
 }
 
 impl DerefMut for SavedRequestAwareAuthenticationSuccessHandler {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base_authentication_target_url_request_handler
+        &mut self.inner
     }
 }
 
 impl SavedRequestAwareAuthenticationSuccessHandler {
-    pub fn new() -> Self {
-        Self {
-            request_cache: Arc::new(HttpSessionRequestCache::default()),
-            base_authentication_target_url_request_handler: Default::default(),
-        }
-    }
-
     pub fn on_authentication_success(
         &self,
         request: &dyn HttpRequest,
@@ -69,13 +63,12 @@ impl SavedRequestAwareAuthenticationSuccessHandler {
     }
 
     pub fn set_default_target_url(&mut self, default_success_url: impl ToString) {
-        self.base_authentication_target_url_request_handler
+        self.inner
             .set_default_target_url(default_success_url.to_string());
     }
 
     pub fn set_always_use_default_target_url(&mut self, always_use: bool) {
-        self.base_authentication_target_url_request_handler
-            .set_always_use_default_target_url(always_use);
+        self.inner.set_always_use_default_target_url(always_use);
     }
 }
 
@@ -98,12 +91,21 @@ impl AuthenticationSuccessHandler for SavedRequestAwareAuthenticationSuccessHand
             return;
         }
 
-        self.base_authentication_target_url_request_handler.handle(
-            request,
-            response,
-            Some(authentication),
-        );
+        // self.inner.handle(
+        //     request,
+        //     response,
+        //     Some(authentication),
+        // );
 
         todo!()
+    }
+}
+
+impl Default for SavedRequestAwareAuthenticationSuccessHandler {
+    fn default() -> Self {
+        Self {
+            request_cache: Arc::new(HttpSessionRequestCache::default()),
+            inner: Default::default(),
+        }
     }
 }

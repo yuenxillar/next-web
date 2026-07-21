@@ -16,12 +16,9 @@ use tracing::debug;
 use crate::{
     core::{
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
-        context::{
-            security_context_holder::SecurityContextHolder,
-            security_context_holder_strategy::SecurityContextHolderStrategy,
-        },
+        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
         user_cache::{NullUserCache, UserCache},
-        userdetails::{user_details::UserDetails, user_details_service::UserDetailsService},
+        userdetails::{UserDetails, UserDetailsService},
         username_password_authentication_token::UsernamePasswordAuthenticationToken,
     },
     web::{
@@ -413,7 +410,7 @@ impl HttpFilter for DigestAuthenticationFilter {
         self.security_context_holder_strategy
             .set_context(context.clone());
         if let Some(repo) = &self.security_context_repository {
-            repo.save_context(context.as_ref(), request, response).await;
+            repo.save_context(&context, request, response).await;
         }
 
         filter_chain.do_filter(request, response).await

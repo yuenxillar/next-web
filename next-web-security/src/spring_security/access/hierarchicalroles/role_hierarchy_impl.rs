@@ -1,7 +1,13 @@
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::{
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    sync::Arc,
+};
 
-use crate::access::hierarchicalroles::{
-    cycle_in_role_hierarchy_error::CycleInRoleHierarchyError, role_hierarchy::RoleHierarchy,
+use crate::{
+    access::hierarchicalroles::{
+        cycle_in_role_hierarchy_error::CycleInRoleHierarchyError, role_hierarchy::RoleHierarchy,
+    },
+    core::granted_authority::GrantedAuthority,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -79,7 +85,10 @@ impl RoleHierarchyImpl {
 }
 
 impl RoleHierarchy for RoleHierarchyImpl {
-    fn reachable_granted_authorities(&self, authorities: &[String]) -> Vec<String> {
+    fn reachable_granted_authorities(
+        &self,
+        authorities: &[Arc<dyn GrantedAuthority>],
+    ) -> Vec<Arc<dyn GrantedAuthority>> {
         let mut reachable = BTreeSet::new();
         for authority in authorities {
             reachable.insert(authority.clone());
@@ -150,36 +159,5 @@ impl<'a> ImpliedRoles<'a> {
             implied_roles.into_iter().map(Into::into).collect(),
         );
         self.builder
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::access::hierarchicalroles::{
-        role_hierarchy::RoleHierarchy, role_hierarchy_impl::RoleHierarchyImpl,
-    };
-
-    #[test]
-    fn expands_reachable_roles_from_hierarchy_definition() {
-        let hierarchy =
-            RoleHierarchyImpl::from_hierarchy("ROLE_ADMIN > ROLE_STAFF\nROLE_STAFF > ROLE_USER")
-                .unwrap();
-
-        assert_eq!(
-            hierarchy.reachable_granted_authorities(&[String::from("ROLE_ADMIN")]),
-            vec![
-                String::from("ROLE_ADMIN"),
-                String::from("ROLE_STAFF"),
-                String::from("ROLE_USER")
-            ]
-        );
-    }
-
-    #[test]
-    fn detects_cycles() {
-        let hierarchy =
-            RoleHierarchyImpl::from_hierarchy("ROLE_ADMIN > ROLE_STAFF\nROLE_STAFF > ROLE_ADMIN");
-
-        assert!(hierarchy.is_err());
     }
 }

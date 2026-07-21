@@ -35,20 +35,20 @@ impl LdapAuthenticationRequest {
     }
 }
 
-impl Authentication for LdapAuthenticationRequest {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
+// impl Authentication for LdapAuthenticationRequest {
+//     fn as_any(&self) -> &dyn std::any::Any {
+//         self
+//     }
 
-    fn authentication_type(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
+//     fn authentication_type(&self) -> &'static str {
+//         std::any::type_name::<Self>()
+//     }
 
-    fn is_authenticated(&self) -> bool {
-        self.authenticated
-    }
+//     fn is_authenticated(&self) -> bool {
+//         self.authenticated
+//     }
 
-    fn authorities(&self) -> Vec<String> {
-        self.authorities.clone()
-    }
-}
+//     fn authorities(&self) -> Vec<String> {
+//         self.authorities.clone()
+//     }
+// }

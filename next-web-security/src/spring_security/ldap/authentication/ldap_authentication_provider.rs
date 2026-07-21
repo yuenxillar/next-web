@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::{any::TypeId, sync::Arc};
 
 use next_web_core::async_trait;
 
 use crate::{
-    authentication::authentication_provider::AuthenticationProvider,
+    authentication::AuthenticationProvider,
     core::{
         authentication_error::AuthenticationError,
         authority_mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
@@ -100,8 +100,8 @@ impl LdapAuthenticationProvider {
 impl AuthenticationProvider for LdapAuthenticationProvider {
     async fn authenticate(
         &self,
-        authentication: &dyn Authentication,
-    ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
+        authentication: &Arc<dyn Authentication>,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
         let Some(authentication) = authentication
             .as_any()
             .downcast_ref::<LdapAuthenticationRequest>()
@@ -115,10 +115,10 @@ impl AuthenticationProvider for LdapAuthenticationProvider {
         let mut authenticated = authentication.clone();
         authenticated.set_authenticated(true);
         authenticated.set_authorities(authorities);
-        Ok(Arc::new(authenticated))
+        Ok(Some(Arc::new(authenticated)))
     }
 
-    fn supports(&self, authentication: &str) -> bool {
-        authentication == std::any::type_name::<LdapAuthenticationRequest>()
+    fn supports(&self, authentication: TypeId) -> bool {
+        authentication == TypeId::of::<LdapAuthenticationRequest>()
     }
 }

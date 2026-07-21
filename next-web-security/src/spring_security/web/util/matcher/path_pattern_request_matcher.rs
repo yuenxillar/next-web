@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
+use std::{collections::HashMap, sync::OnceLock};
 
 use next_web_core::{
     traits::http::http_request::HttpRequest,
@@ -211,6 +211,8 @@ impl fmt::Display for PathPattern {
         write!(f, "{}", self.pattern_string)
     }
 }
+
+pub static DEFAULT_BUILDER: OnceLock<Builder> = OnceLock::new();
 
 /// A builder for specifying various elements of a request for the purpose
 /// of creating a `PathPatternRequestMatcher`.

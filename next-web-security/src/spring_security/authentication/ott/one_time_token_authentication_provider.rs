@@ -16,7 +16,7 @@ use crate::{
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
         authority_utils::AuthorityUtils,
         factor_granted_authority::FactorGrantedAuthority,
-        userdetails::user_details_service::UserDetailsService,
+        userdetails::UserDetailsService,
         Authentication,
     },
 };
@@ -38,56 +38,56 @@ impl OneTimeTokenAuthenticationProvider {
     }
 }
 
-#[async_trait]
-impl AuthenticationProvider for OneTimeTokenAuthenticationProvider {
-    async fn authenticate(
-        &self,
-        authentication: &dyn Authentication,
-    ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
-        let Some(token) = authentication
-            .as_any()
-            .downcast_ref::<OneTimeTokenAuthenticationToken>()
-        else {
-            return Err(AuthenticationError::new(
-                "Only OneTimeTokenAuthenticationToken is supported",
-            ));
-        };
+// #[async_trait]
+// impl AuthenticationProvider for OneTimeTokenAuthenticationProvider {
+//     async fn authenticate(
+//         &self,
+//         authentication: &dyn Authentication,
+//     ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
+//         let Some(token) = authentication
+//             .as_any()
+//             .downcast_ref::<OneTimeTokenAuthenticationToken>()
+//         else {
+//             return Err(AuthenticationError::new(
+//                 "Only OneTimeTokenAuthenticationToken is supported",
+//             ));
+//         };
 
-        let consumed = self
-            .one_time_token_service
-            .consume(token)
-            .ok_or_else(|| invalid_one_time_token("Invalid token"))?;
+//         let consumed = self
+//             .one_time_token_service
+//             .consume(token)
+//             .ok_or_else(|| invalid_one_time_token("Invalid token"))?;
 
-        let user = self
-            .user_details_service
-            .load_user_by_username(consumed.username().to_string())
-            .await
-            .map_err(|_| {
-                AuthenticationError::with_kind(
-                    "Failed to authenticate the one-time token",
-                    AuthenticationErrorKind::BadCredentials,
-                )
-            })?;
+//         let user = self
+//             .user_details_service
+//             .load_user_by_username(consumed.username().to_string())
+//             .await
+//             .map_err(|_| {
+//                 AuthenticationError::with_kind(
+//                     "Failed to authenticate the one-time token",
+//                     AuthenticationErrorKind::BadCredentials,
+//                 )
+//             })?;
 
-        let mut authorities = user
-            .authorities()
-            .into_iter()
-            .filter_map(|authority| authority.authority().map(ToString::to_string))
-            .collect::<Vec<_>>();
-        authorities.push(FactorGrantedAuthority::OTT_AUTHORITY.to_string());
+//         let mut authorities = user
+//             .authorities()
+//             .into_iter()
+//             .filter_map(|authority| authority.authority().map(ToString::to_string))
+//             .collect::<Vec<_>>();
+//         authorities.push(FactorGrantedAuthority::OTT_AUTHORITY.to_string());
 
-        let mut result = OneTimeTokenAuthentication::new(
-            user.username(),
-            AuthorityUtils::create_authority_list(authorities),
-        );
-        result.set_details_value(authentication.get_details_value());
-        Ok(Arc::new(result))
-    }
+//         let mut result = OneTimeTokenAuthentication::new(
+//             user.username(),
+//             AuthorityUtils::create_authority_list(authorities),
+//         );
+//         result.set_details_value(authentication.get_details_value());
+//         Ok(Arc::new(result))
+//     }
 
-    fn supports(&self, authentication: &str) -> bool {
-        authentication == std::any::type_name::<OneTimeTokenAuthenticationToken>()
-    }
-}
+//     fn supports(&self, authentication: &str) -> bool {
+//         authentication == std::any::type_name::<OneTimeTokenAuthenticationToken>()
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -109,8 +109,7 @@ mod tests {
             authority_utils::AuthorityUtils,
             factor_granted_authority::FactorGrantedAuthority,
             userdetails::{
-                map_user_details_service::MapUserDetailsService, user::User,
-                user_details::UserDetails,
+                map_user_details_service::MapUserDetailsService, user::User, UserDetails,
             },
         },
     };

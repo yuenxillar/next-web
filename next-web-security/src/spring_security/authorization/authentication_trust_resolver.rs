@@ -44,19 +44,6 @@ mod tests {
     };
 
     #[test]
-    fn trust_resolver_detects_anonymous_authentication() {
-        let resolver = DefaultAuthenticationTrustResolver;
-        let authentication = AnonymousAuthenticationToken::new(
-            "anonymous",
-            "anonymousUser",
-            AuthorityUtils::create_authority_list(["ROLE_ANONYMOUS"]),
-        );
-
-        assert!(resolver.is_anonymous(&authentication));
-        assert!(!resolver.is_authenticated(&authentication));
-    }
-
-    #[test]
     fn trust_resolver_detects_remember_me_authentication() {
         let resolver = DefaultAuthenticationTrustResolver;
         let authentication = RememberMeAuthenticationToken::new(

@@ -1,36 +1,47 @@
 use std::sync::Arc;
 
+use next_web_context::ApplicationEvent;
+use next_web_core::BoxAny;
+
 use crate::{
-    authorization::{authorization_result::AuthorizationResult, event::authorization_event::AuthorizationEvent},
+    authorization::{
+        authorization_result::AuthorizationResult, event::authorization_event::AuthorizationEvent,
+    },
     core::Authentication,
 };
 
 /// Event published when authorization is denied.
 #[derive(Clone)]
 pub struct AuthorizationDeniedEvent {
-    event: AuthorizationEvent,
+    inner: AuthorizationEvent,
 }
 
 impl AuthorizationDeniedEvent {
     pub fn new(
         authentication: Arc<dyn Authentication>,
-        secured_object_description: impl Into<String>,
-        result: Arc<dyn AuthorizationResult>,
+        object: BoxAny,
+        result: Box<dyn AuthorizationResult>,
     ) -> Self {
         Self {
-            event: AuthorizationEvent::new(authentication, secured_object_description, result),
+            inner: AuthorizationEvent::new(authentication, object, result),
         }
     }
 
     pub fn authentication(&self) -> Arc<dyn Authentication> {
-        self.event.authentication()
+        self.inner.authentication()
     }
 
-    pub fn secured_object_description(&self) -> &str {
-        self.event.secured_object_description()
+    pub fn authorization_result(&self) -> &dyn AuthorizationResult {
+        self.inner.authorization_result()
+    }
+}
+
+impl ApplicationEvent for AuthorizationDeniedEvent {
+    fn timestamp(&self) -> u64 {
+        self.inner.timestamp()
     }
 
-    pub fn authorization_result(&self) -> Arc<dyn AuthorizationResult> {
-        self.event.authorization_result()
+    fn source(&self) -> &dyn std::any::Any {
+        self.inner.source()
     }
 }

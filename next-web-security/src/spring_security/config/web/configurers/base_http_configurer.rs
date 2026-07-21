@@ -8,8 +8,7 @@ use crate::{
         web::http_security_builder::HttpSecurityBuilder,
     },
     core::context::{
-        security_context_holder::SecurityContextHolder,
-        security_context_holder_strategy::SecurityContextHolderStrategy,
+        security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy,
     },
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
@@ -17,9 +16,7 @@ use crate::{
 #[derive(Clone)]
 pub struct BaseHttpConfigurer<T, B>
 where
-    T: Required<BaseHttpConfigurer<T, B>>,
     B: HttpSecurityBuilder<B>,
-    Self: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>,
 {
     security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
 
@@ -29,9 +26,7 @@ where
 
 impl<T, B> BaseHttpConfigurer<T, B>
 where
-    T: Required<BaseHttpConfigurer<T, B>>,
     B: HttpSecurityBuilder<B>,
-    Self: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>,
 {
     pub fn get_security_context_holder_strategy(&self) -> &Arc<dyn SecurityContextHolderStrategy> {
         &self.security_context_holder_strategy
@@ -40,9 +35,7 @@ where
 
 impl<T, B> Default for BaseHttpConfigurer<T, B>
 where
-    T: Required<BaseHttpConfigurer<T, B>>,
     B: HttpSecurityBuilder<B>,
-    Self: Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>,
 {
     fn default() -> Self {
         Self {
@@ -56,7 +49,6 @@ where
 impl<T, B> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>
     for BaseHttpConfigurer<T, B>
 where
-    T: Required<BaseHttpConfigurer<T, B>>,
     B: HttpSecurityBuilder<B>,
     B: SecurityBuilder<DefaultSecurityFilterChain>,
 {

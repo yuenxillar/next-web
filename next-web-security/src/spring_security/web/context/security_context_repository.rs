@@ -5,20 +5,23 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
-use crate::core::context::SecurityContext;
+use crate::core::context::{DeferredSecurityContext, SecurityContext};
 
 #[async_trait]
 pub trait SecurityContextRepository
 where
     Self: Send + Sync,
 {
-    fn load_context(&self, request: &mut dyn HttpRequest) -> Arc<dyn SecurityContext>;
+    fn load_deferred_context(
+        &self,
+        request: &mut dyn HttpRequest,
+    ) -> Box<dyn DeferredSecurityContext>;
 
     /// Stores the security context on completion of a request.
     /// context the non-null context which was obtained from the holder.
     async fn save_context(
         &self,
-        context: &dyn SecurityContext,
+        context: &Arc<dyn SecurityContext>,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
     );

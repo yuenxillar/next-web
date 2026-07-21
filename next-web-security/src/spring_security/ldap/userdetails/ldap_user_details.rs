@@ -1,6 +1,6 @@
 use next_web_core::async_trait;
 
-use crate::core::userdetails::user_details::UserDetails;
+use crate::core::userdetails::UserDetails;
 
 #[async_trait]
 pub trait LdapUserDetails: UserDetails {

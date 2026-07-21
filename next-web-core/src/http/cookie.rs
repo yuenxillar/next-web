@@ -16,6 +16,8 @@ impl Cookie {
 
     pub fn set_http_only(&mut self, http_only: bool) {}
 
+    pub fn set_domain(&mut self, domain: impl Into<String>) {}
+
     pub fn name(&self) -> &str {
         todo!()
     }

@@ -2,7 +2,7 @@ use std::{fmt, sync::Arc};
 
 use crate::core::{
     credentials_container::CredentialsContainer, granted_authority::GrantedAuthority,
-    userdetails::user_details::UserDetails,
+    userdetails::UserDetails,
 };
 
 #[derive(Clone)]
@@ -56,11 +56,8 @@ impl User {
 }
 
 impl UserDetails for User {
-    fn authorities(&self) -> Vec<&dyn GrantedAuthority> {
-        self.authorities
-            .iter()
-            .map(|authority| authority.as_ref() as &dyn GrantedAuthority)
-            .collect()
+    fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
+        &self.authorities
     }
 
     fn password(&self) -> Option<&str> {
@@ -89,8 +86,9 @@ impl UserDetails for User {
 }
 
 impl CredentialsContainer for User {
-    fn erase_credentials(&mut self) {
-        self.password = None;
+    fn erase_credentials(&self) {
+        // self.password = None;
+        todo!()
     }
 }
 

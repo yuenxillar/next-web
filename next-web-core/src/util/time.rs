@@ -1,4 +1,7 @@
-use std::str::FromStr;
+use std::{
+    str::FromStr,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 /// Represents a unit of time for expressing durations and delays.
 /// providing standard time units from nanoseconds to days.
@@ -54,4 +57,11 @@ impl TimeUnit {
             TimeUnit::Days => std::time::Duration::from_secs(value * 86400),
         }
     }
+}
+
+pub fn current_time_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
 }

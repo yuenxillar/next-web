@@ -15,8 +15,7 @@ use tracing::debug;
 use crate::{
     authorization::{AuthenticationTrustResolver, DefaultAuthenticationTrustResolver},
     core::context::{
-        security_context_holder::SecurityContextHolder,
-        security_context_holder_strategy::SecurityContextHolderStrategy,
+        security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy,
     },
     web::{
         authentication::{
@@ -184,10 +183,8 @@ impl HttpFilter for SessionManagementFilter {
         request.set_attribute(Self::FILTER_APPLIED, AnyValue::Boolean(true));
 
         if !self.security_context_repository.contains_context(request) {
-            let authentication = self
-                .security_context_holder_strategy
-                .get_context()
-                .and_then(|ctx| ctx.get_authentication());
+            let context = self.security_context_holder_strategy.get_context();
+            let authentication = context.as_ref().and_then(|s| s.get_authentication());
 
             if let Some(auth) = authentication {
                 if self.trust_resolver.is_authenticated(auth.as_ref()) {
@@ -206,7 +203,7 @@ impl HttpFilter for SessionManagementFilter {
                                 self.security_context_holder_strategy.get_context()
                             {
                                 self.security_context_repository
-                                    .save_context(context.as_ref(), request, response)
+                                    .save_context(&context, request, response)
                                     .await;
                             }
                         }

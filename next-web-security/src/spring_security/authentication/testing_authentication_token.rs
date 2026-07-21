@@ -32,19 +32,15 @@ impl TestingAuthenticationToken {
 }
 
 impl Authentication for TestingAuthenticationToken {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn authentication_type(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
 
-    fn get_credentials(&self) -> Option<String> {
+    fn credentials(&self) -> Option<String> {
         self.credentials.clone()
     }
 
-    fn get_principal(&self) -> Option<String> {
+    fn principal(&self) -> Option<String> {
         Some(self.principal.clone())
     }
 

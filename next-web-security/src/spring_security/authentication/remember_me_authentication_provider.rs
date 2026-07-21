@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{any::TypeId, sync::Arc};
 
 use next_web_core::async_trait;
 
@@ -32,8 +32,8 @@ impl RememberMeAuthenticationProvider {
 impl AuthenticationProvider for RememberMeAuthenticationProvider {
     async fn authenticate(
         &self,
-        authentication: &dyn Authentication,
-    ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
+        authentication: &Arc<dyn Authentication>,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
         let Some(authentication) = authentication
             .as_any()
             .downcast_ref::<RememberMeAuthenticationToken>()
@@ -47,11 +47,11 @@ impl AuthenticationProvider for RememberMeAuthenticationProvider {
             return Err(bad_credentials());
         }
 
-        Ok(Arc::new(authentication.clone()))
+        Ok(Some(Arc::new(authentication.clone())))
     }
 
-    fn supports(&self, authentication: &str) -> bool {
-        authentication == std::any::type_name::<RememberMeAuthenticationToken>()
+    fn supports(&self, authentication: TypeId) -> bool {
+        authentication == TypeId::of::<RememberMeAuthenticationToken>()
     }
 }
 

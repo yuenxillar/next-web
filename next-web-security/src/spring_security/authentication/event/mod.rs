@@ -1,5 +1,7 @@
 mod base_authentication_event;
+mod interactive_authentication_success_event;
 mod logout_success_event;
 
 pub use base_authentication_event::BaseAuthenticationEvent;
+pub use interactive_authentication_success_event::InteractiveAuthenticationSuccessEvent;
 pub use logout_success_event::LogoutSuccessEvent;

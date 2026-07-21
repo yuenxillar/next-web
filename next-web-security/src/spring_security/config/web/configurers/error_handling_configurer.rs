@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::traits::required::Required;
 
@@ -7,18 +11,17 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::{
         access::{
             AccessDeniedHandler, AccessDeniedHandlerImpl, Builder,
             RequestMatcherDelegatingAccessDeniedHandler,
         },
+        authentication::DelegatingAuthenticationEntryPointBuilder,
         default_security_filter_chain::DefaultSecurityFilterChain,
         savedrequest::{HttpSessionRequestCache, RequestCache},
+        util::matcher::RequestMatcher,
         AuthenticationEntryPoint,
     },
 };
@@ -42,7 +45,7 @@ where
     default_denied_handler_mappings: BTreeMap<String, Arc<dyn AccessDeniedHandler>>,
     missing_authorities_handler_builder: Option<Builder>,
 
-    base_http_configurer: BaseHttpConfigurer<Self, H>,
+    inner: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> ErrorHandlingConfigurer<H>
@@ -113,6 +116,26 @@ where
             .map(Clone::clone)
             .unwrap_or(Arc::new(HttpSessionRequestCache::default()))
     }
+
+    pub fn default_denied_handler_for_missing_authority<F>(
+        &mut self,
+        f: F,
+        authority: impl Into<String>,
+    ) -> &mut Self
+    where
+        F: FnOnce(&mut DelegatingAuthenticationEntryPointBuilder),
+    {
+        // self.missing_authorities_handler_builder.map(|s| s.add_entry_point_for(entry_point, missing_authority))
+        self
+    }
+
+    pub fn default_authentication_entry_point_for(
+        &mut self,
+        entry_point: Arc<dyn AuthenticationEntryPoint>,
+        preferred_matcher: Arc<dyn RequestMatcher>,
+    ) -> &mut Self {
+        self
+    }
 }
 
 impl<H> Default for ErrorHandlingConfigurer<H>
@@ -127,20 +150,28 @@ where
             default_denied_handler_mappings: BTreeMap::new(),
             missing_authorities_handler_builder: None,
 
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<ErrorHandlingConfigurer<H>, H>> for ErrorHandlingConfigurer<H>
+impl<H> Deref for ErrorHandlingConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn get_object(&self) -> &BaseHttpConfigurer<ErrorHandlingConfigurer<H>, H> {
-        &self.base_http_configurer
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<ErrorHandlingConfigurer<H>, H> {
-        &mut self.base_http_configurer
+}
+
+impl<H> DerefMut for ErrorHandlingConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }
 
@@ -151,10 +182,10 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+        self.inner.get_mut_object()
     }
 }
 

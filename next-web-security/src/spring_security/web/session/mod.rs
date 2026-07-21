@@ -1,4 +1,5 @@
 mod concurrent_session_filter;
+mod force_eager_session_creation_filter;
 mod invalid_session_access_denied_handler;
 mod invalid_session_strategy;
 mod session_information_expired_event;
@@ -6,6 +7,7 @@ mod session_information_expired_strategy;
 mod session_management_filter;
 
 pub use concurrent_session_filter::ConcurrentSessionFilter;
+pub use force_eager_session_creation_filter::ForceEagerSessionCreationFilter;
 pub use invalid_session_access_denied_handler::InvalidSessionAccessDeniedHandler;
 pub use invalid_session_strategy::InvalidSessionStrategy;
 pub use session_information_expired_event::SessionInformationExpiredEvent;

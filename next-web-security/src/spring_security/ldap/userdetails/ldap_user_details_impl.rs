@@ -3,7 +3,7 @@ use std::sync::Arc;
 use next_web_core::async_trait;
 
 use crate::{
-    core::{granted_authority::GrantedAuthority, userdetails::user_details::UserDetails},
+    core::{granted_authority::GrantedAuthority, userdetails::UserDetails},
     ldap::userdetails::{
         ldap_granted_authority::LdapGrantedAuthority, ldap_user_details::LdapUserDetails,
     },
@@ -48,11 +48,12 @@ impl LdapUserDetailsImpl {
 }
 
 impl UserDetails for LdapUserDetailsImpl {
-    fn authorities(&self) -> Vec<&dyn GrantedAuthority> {
-        self.authorities
-            .iter()
-            .map(|authority| authority.as_ref() as &dyn GrantedAuthority)
-            .collect()
+    fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
+        // self.authorities
+        //     .iter()
+        //     .map(|authority| authority.as_ref() as &dyn GrantedAuthority)
+        //     .collect()
+        todo!()
     }
 
     fn password(&self) -> Option<&str> {

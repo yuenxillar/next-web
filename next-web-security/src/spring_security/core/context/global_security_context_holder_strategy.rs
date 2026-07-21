@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use futures::future::BoxFuture;
-use next_web_core::{error::BoxError, filter::FilterError};
+use next_web_core::filter::FilterError;
 
 use crate::core::context::{
     security_context::SecurityContext,

@@ -7,7 +7,7 @@ use crate::{
         authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
         AuthorizationResult,
     },
-    core::{simple_authentication::SimpleAuthentication, Authentication},
+    core::Authentication,
 };
 
 pub struct AuthorizationManagers;
@@ -141,6 +141,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct NotAuthorizationManager<T> {
     manager: Arc<dyn AuthorizationManager<T>>,
     _marker: PhantomData<T>,

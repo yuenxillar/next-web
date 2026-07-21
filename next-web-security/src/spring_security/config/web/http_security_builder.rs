@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use next_web_core::traits::{any_clone::AnyClone, filter::HttpFilter};
 
 use crate::{
-    authentication::authentication_provider::AuthenticationProvider,
+    authentication::AuthenticationProvider,
     config::{security_builder::SecurityBuilder, security_configurer::SecurityConfigurer},
-    core::userdetails::user_details_service::UserDetailsService,
+    core::userdetails::UserDetailsService,
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
 
@@ -40,9 +42,7 @@ where
     where
         T: AnyClone;
 
-    fn authentication_provider<T>(&mut self, authentication_provider: T)
-    where
-        T: AuthenticationProvider + 'static;
+    fn authentication_provider(&mut self, authentication_provider: Arc<dyn AuthenticationProvider>);
 
     fn user_details_service<T>(&mut self, user_details_service: T)
     where

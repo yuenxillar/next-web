@@ -35,7 +35,7 @@ pub use authorize_http_requests_configurer::{
     AuthorizationManagerRequestMatcherRegistry, AuthorizeHttpRequestsConfigurer,
 };
 pub use base_authentication_filter_configurer::{
-    AuthenticationFilterConfigurer, BaseAuthenticationFilterConfigurer,
+    BaseAuthenticationFilterConfigurer, BaseAuthenticationFilterConfigurerExt,
 };
 pub use base_http_configurer::BaseHttpConfigurer;
 pub use cors_configurer::CorsConfigurer;

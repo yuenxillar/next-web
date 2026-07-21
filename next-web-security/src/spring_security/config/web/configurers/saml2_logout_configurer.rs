@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use next_web_core::{traits::required::Required, ApplicationContext};
 
 use crate::{
@@ -5,10 +7,7 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
@@ -26,17 +25,15 @@ use crate::{
 pub struct Saml2LogoutConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>>,
 {
     logout_url: Option<String>,
 
-    base_http_configurer: BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>,
+    inner: BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>,
 }
 
 impl<H> Saml2LogoutConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>>,
 {
     pub fn new(ctx: &ApplicationContext) -> Self {
         Self::default()
@@ -53,26 +50,12 @@ where
 impl<H> Default for Saml2LogoutConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
             logout_url: None,
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
-    }
-}
-
-impl<H> Required<BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>> for Saml2LogoutConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
-
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H> {
-        &mut self.base_http_configurer
     }
 }
 
@@ -83,11 +66,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+        self.inner.get_mut_object()
     }
 }
 
@@ -102,5 +85,25 @@ where
     fn configure(&mut self, _http: &mut H) {
         // Stub: Will create Saml2LogoutRequestFilter, Saml2LogoutResponseFilter,
         // and Saml2RelyingPartyInitiatedLogoutFilter when SAML2 infra is ready.
+    }
+}
+
+impl<H> Deref for Saml2LogoutConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for Saml2LogoutConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

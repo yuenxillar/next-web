@@ -18,7 +18,7 @@ where
     fn scope_with_context<'a>(
         &'a self,
         context: Arc<dyn SecurityContext>,
-        f: BoxFuture<'a, Result<(), FilterError>>,
+        func: BoxFuture<'a, Result<(), FilterError>>,
     ) -> BoxFuture<'a, Result<(), FilterError>>;
 
     fn create_empty_context(&self) -> Arc<dyn SecurityContext>;

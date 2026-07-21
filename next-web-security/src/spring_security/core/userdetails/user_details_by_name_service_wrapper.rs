@@ -48,7 +48,7 @@ where
         token: &T,
     ) -> Result<Arc<dyn UserDetails>, UsernameNotFoundError> {
         self.user_details_service
-            .load_user_by_username(token.get_name())
+            .load_user_by_username(&token.name())
             .await
     }
 }

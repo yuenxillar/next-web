@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::ops::{Deref, DerefMut};
 
 use next_web_core::traits::required::Required;
 
@@ -7,10 +7,7 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
@@ -23,50 +20,52 @@ use crate::{
 pub struct CorsConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<CorsConfigurer<H>, H>>,
 {
-    base_http_configurer: BaseHttpConfigurer<CorsConfigurer<H>, H>,
+    inner: BaseHttpConfigurer<CorsConfigurer<H>, H>,
 }
 
 impl<H> Default for CorsConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<CorsConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<CorsConfigurer<H>, H>> for CorsConfigurer<H>
+impl<H> Deref for CorsConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn get_object(&self) -> &BaseHttpConfigurer<CorsConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
+    type Target = BaseHttpConfigurer<Self, H>;
 
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<CorsConfigurer<H>, H> {
-        &mut self.base_http_configurer
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
-impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>>
-    for CorsConfigurer<H>
+impl<H> DerefMut for CorsConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>> for CorsConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+        self.inner.get_mut_object()
     }
 }
 

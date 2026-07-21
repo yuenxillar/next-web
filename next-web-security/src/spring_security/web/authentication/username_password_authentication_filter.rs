@@ -1,3 +1,6 @@
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+
 use next_web_core::http::StatusCode;
 use next_web_core::{
     async_trait,
@@ -11,6 +14,7 @@ use next_web_core::{
     util::http_method::HttpMethod,
 };
 
+use crate::web::util::matcher::RequestMatcher;
 use crate::{
     core::username_password_authentication_token::UsernamePasswordAuthenticationToken,
     web::authentication::base_authentication_processing_filter::BaseAuthenticationProcessingFilter,
@@ -21,7 +25,8 @@ pub struct UsernamePasswordAuthenticationFilter {
     username_parameter: Box<str>,
     password_parameter: Box<str>,
     post_only: bool,
-    abstract_authentication_processing_filter: BaseAuthenticationProcessingFilter,
+
+    inner: BaseAuthenticationProcessingFilter,
 }
 
 impl Default for UsernamePasswordAuthenticationFilter {
@@ -30,8 +35,8 @@ impl Default for UsernamePasswordAuthenticationFilter {
             username_parameter: "username".into(),
             password_parameter: "password".into(),
             post_only: true,
-            abstract_authentication_processing_filter: BaseAuthenticationProcessingFilter::default(
-            ),
+
+            inner: BaseAuthenticationProcessingFilter::default(),
         }
     }
 }
@@ -60,14 +65,35 @@ impl UsernamePasswordAuthenticationFilter {
     pub fn get_password_parameter(&self) -> &str {
         &self.password_parameter
     }
+
+    pub fn set_requires_authentication_request_matcher(
+        &mut self,
+        requires_authentication_request_matcher: Arc<dyn RequestMatcher>,
+    ) {
+    }
 }
+
 impl Required<BaseAuthenticationProcessingFilter> for UsernamePasswordAuthenticationFilter {
     fn get_object(&self) -> &BaseAuthenticationProcessingFilter {
-        &self.abstract_authentication_processing_filter
+        &self.inner
     }
 
     fn get_mut_object(&mut self) -> &mut BaseAuthenticationProcessingFilter {
-        &mut self.abstract_authentication_processing_filter
+        &mut self.inner
+    }
+}
+
+impl Deref for UsernamePasswordAuthenticationFilter {
+    type Target = BaseAuthenticationProcessingFilter;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for UsernamePasswordAuthenticationFilter {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }
 
@@ -79,10 +105,7 @@ impl HttpFilter for UsernamePasswordAuthenticationFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        if !self
-            .abstract_authentication_processing_filter
-            .requires_authentication(request)
-        {
+        if !self.inner.requires_authentication(request) {
             return Ok(());
         }
 
@@ -98,7 +121,7 @@ impl HttpFilter for UsernamePasswordAuthenticationFilter {
             password,
         );
 
-        self.abstract_authentication_processing_filter
+        self.inner
             .attempt_authentication(request, response, &token)?;
         Ok(())
     }

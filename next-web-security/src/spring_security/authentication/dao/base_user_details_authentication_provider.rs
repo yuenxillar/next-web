@@ -10,7 +10,7 @@ use crate::{
         authority_mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
         authority_utils::AuthorityUtils,
         user_cache::{NullUserCache, UserCache},
-        userdetails::{user_details::UserDetails, user_details_checker::UserDetailsChecker},
+        userdetails::{UserDetails, UserDetailsChecker},
         username_password_authentication_token::UsernamePasswordAuthenticationToken,
         Authentication,
     },
@@ -43,9 +43,9 @@ impl Default for BaseUserDetailsAuthenticationProviderSupport {
 
 impl BaseUserDetailsAuthenticationProviderSupport {
     pub fn determine_username(&self, authentication: &dyn Authentication) -> String {
-        let username = authentication.get_name();
+        let username = authentication.name();
         if username.is_empty() {
-            String::from("NONE_PROVIDED")
+            "NONE_PROVIDED"
         } else {
             username
         }
@@ -136,10 +136,10 @@ impl BaseUserDetailsAuthenticationProviderSupport {
             .map_authorities(AuthorityUtils::create_authority_list(authority_names));
         let mut result = UsernamePasswordAuthenticationToken::authenticated(
             principal.into(),
-            authentication.get_credentials(),
+            authentication.credentials(),
             mapped,
         );
-        result.set_details_value(authentication.get_details_value());
+        result.set_details_value(authentication.details_value());
         Ok(Arc::new(result))
     }
 }
@@ -147,9 +147,8 @@ impl BaseUserDetailsAuthenticationProviderSupport {
 #[derive(Clone, Default)]
 struct CredentialsNonExpiredChecker;
 
-#[next_web_core::async_trait]
 impl UserDetailsChecker for CredentialsNonExpiredChecker {
-    async fn check(&self, to_check: &dyn UserDetails) -> Result<(), AuthenticationError> {
+    fn check(&self, to_check: &dyn UserDetails) -> Result<(), AuthenticationError> {
         if !to_check.is_credentials_non_expired() {
             return Err(credentials_expired());
         }

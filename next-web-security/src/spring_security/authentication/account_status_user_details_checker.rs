@@ -6,7 +6,7 @@ use crate::{
     },
     core::{
         authentication_error::AuthenticationError,
-        userdetails::{user_details::UserDetails, user_details_checker::UserDetailsChecker},
+        userdetails::{UserDetails, UserDetailsChecker},
     },
 };
 
@@ -15,7 +15,7 @@ pub struct AccountStatusUserDetailsChecker;
 
 #[async_trait]
 impl UserDetailsChecker for AccountStatusUserDetailsChecker {
-    async fn check(&self, to_check: &dyn UserDetails) -> Result<(), AuthenticationError> {
+    fn check(&self, to_check: &dyn UserDetails) -> Result<(), AuthenticationError> {
         if !to_check.is_account_non_locked() {
             return Err(locked());
         }

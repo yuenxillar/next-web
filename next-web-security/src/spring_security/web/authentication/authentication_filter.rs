@@ -19,10 +19,8 @@ use crate::{
     authorization::AuthenticationManager,
     core::{
         authentication_error::AuthenticationError,
-        context::{
-            security_context_holder::SecurityContextHolder,
-            security_context_holder_strategy::SecurityContextHolderStrategy,
-        },
+        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
+        Authentication,
     },
     web::{
         authentication::{
@@ -279,8 +277,8 @@ impl AuthenticationFilter {
     /// but the actual merging is deferred (see TODO in `do_filter`).
     fn should_perform_mfa(
         &self,
-        current: Option<&dyn crate::core::Authentication>,
-        authentication_result: &dyn crate::core::Authentication,
+        current: Option<&Arc<dyn Authentication>>,
+        authentication_result: &dyn Authentication,
     ) -> bool {
         if !self.mfa_enabled {
             return false;
@@ -293,7 +291,7 @@ impl AuthenticationFilter {
         }
         // Only perform MFA merging if both authentications refer to
         // the same principal.
-        current.get_name() == authentication_result.get_name()
+        current.name() == authentication_result.name()
     }
 
     /// Handles successful authentication: creates a new security context,
@@ -310,7 +308,7 @@ impl AuthenticationFilter {
         self.security_context_holder_strategy
             .set_context(context.clone());
         if let Some(repo) = &self.security_context_repository {
-            repo.save_context(context.as_ref(), request, response).await;
+            repo.save_context(&context, request, response).await;
         }
         self.success_handler
             .on_authentication_success(request, response, authentication.as_ref());

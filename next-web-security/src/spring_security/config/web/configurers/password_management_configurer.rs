@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use next_web_core::traits::required::Required;
 
 use crate::{
@@ -5,10 +7,7 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
@@ -22,16 +21,14 @@ use crate::{
 pub struct PasswordManagementConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<PasswordManagementConfigurer<H>, H>>,
 {
     change_password_page: String,
-    base_http_configurer: BaseHttpConfigurer<PasswordManagementConfigurer<H>, H>,
+    inner: BaseHttpConfigurer<PasswordManagementConfigurer<H>, H>,
 }
 
 impl<H> PasswordManagementConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<PasswordManagementConfigurer<H>, H>>,
 {
     /// Set the change password page URL. Default: `"/change-password"`.
     pub fn change_password_page(mut self, page: &str) -> Self {
@@ -43,29 +40,12 @@ where
 impl<H> Default for PasswordManagementConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<PasswordManagementConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
             change_password_page: "/change-password".to_string(),
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
-    }
-}
-
-impl<H> Required<BaseHttpConfigurer<PasswordManagementConfigurer<H>, H>>
-    for PasswordManagementConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<PasswordManagementConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
-
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut BaseHttpConfigurer<PasswordManagementConfigurer<H>, H> {
-        &mut self.base_http_configurer
     }
 }
 
@@ -76,18 +56,15 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+        self.inner.get_mut_object()
     }
 }
 
-impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H>
-    for PasswordManagementConfigurer<H>
+impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for PasswordManagementConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
@@ -99,5 +76,25 @@ where
         //   let filter = RequestMatcherRedirectFilter::new(
         //       "/.well-known/change-password", &self.change_password_page);
         //   http.add_filter_before::<_, UsernamePasswordAuthenticationFilter>(filter);
+    }
+}
+
+impl<H> Deref for PasswordManagementConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for PasswordManagementConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

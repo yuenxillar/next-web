@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::{any::Any, marker::PhantomData, sync::Arc};
 
 use next_web_core::util::http_method::HttpMethod;
 use tracing::warn;
@@ -22,8 +22,9 @@ impl<C> Default for BaseRequestMatcherRegistry<C> {
         Self {
             any_request_configured: false,
             request_matcher_builder: None,
-            _marker: PhantomData,
             _req_matchers: Default::default(),
+
+            _marker: PhantomData,
         }
     }
 }
@@ -38,13 +39,13 @@ impl<C> BaseRequestMatcherRegistry<C> {
         );
 
         self.any_request_configured = true;
-        self._request_matchers(vec![AnyRequestMatcher::instance()])
+        self._extend_matchers(vec![AnyRequestMatcher::instance()])
     }
 
     /// Associates a list of RequestMatcher instances with the AbstractRequestMatcherRegistry
     /// request_matchers - the RequestMatcher instances
     /// Returns the object that is chained after creating the RequestMatcher
-    fn _request_matchers(&mut self, request_matchers: Vec<Arc<dyn RequestMatcher>>) -> &mut Self {
+    fn _extend_matchers(&mut self, request_matchers: Vec<Arc<dyn RequestMatcher>>) -> &mut Self {
         assert!(
             !self.any_request_configured,
             "Can't configure requestMatchers after anyRequest"
@@ -60,7 +61,31 @@ impl<C> BaseRequestMatcherRegistry<C> {
     /// method - the HttpMethod to use or None for any HttpMethod.
     /// patterns - the patterns to match on
     /// Returns the object that is chained after creating the RequestMatcher.
-    pub fn request_matchers(&mut self, method: Option<HttpMethod>, patterns: &[&str]) -> &mut Self {
+    pub fn request_matchers<T>(&mut self, mut matcher: T) -> &mut Self
+    where
+        T: Any,
+    {
+        let any = &mut matcher as &mut dyn Any;
+
+        let (http_method, patterns) =
+            if let Some(matchers) = any.downcast_mut::<Vec<Arc<dyn RequestMatcher>>>() {
+                return self._extend_matchers(std::mem::take(matchers));
+            } else if let Some((http_method, patterns)) =
+                any.downcast_ref::<(HttpMethod, Vec<&'static str>)>()
+            {
+                (Some(*http_method), patterns.to_owned())
+            } else if let Some(patterns) = any.downcast_ref::<Vec<&'static str>>() {
+                (None, patterns.to_owned())
+            } else if let Some(http_method) = any.downcast_ref::<HttpMethod>() {
+                (Some(*http_method), vec!["/**"])
+            } else {
+                unimplemented!("Unsupported matcher type: {}", std::any::type_name::<T>())
+            };
+
+        self._request_matchers(http_method, &patterns)
+    }
+
+    fn _request_matchers(&mut self, method: Option<HttpMethod>, patterns: &[&str]) -> &mut Self {
         if any_paths_dont_start_with_leading_slash(patterns) {
             warn!(
                 "One of the patterns in {:?} is missing a leading slash. This is discouraged; \
@@ -79,7 +104,7 @@ impl<C> BaseRequestMatcherRegistry<C> {
             .iter()
             .map(|pattern| Arc::new(builder.matcher(method, pattern)) as Arc<dyn RequestMatcher>)
             .collect();
-        self._request_matchers(matchers)
+        self._extend_matchers(matchers)
     }
 
     /// Match when the request URI matches one of `patterns`.
@@ -88,7 +113,7 @@ impl<C> BaseRequestMatcherRegistry<C> {
     /// patterns - the patterns to match on
     /// Returns the object that is chained after creating the RequestMatcher.
     pub fn request_matchers_with_patterns(&mut self, patterns: &[&str]) -> &mut Self {
-        self.request_matchers(None, patterns)
+        self._request_matchers(None, patterns)
     }
 
     /// Match when the HttpMethod is `method`
@@ -96,7 +121,7 @@ impl<C> BaseRequestMatcherRegistry<C> {
     /// method - the HttpMethod to use or None for any HttpMethod.
     /// Returns the object that is chained after creating the RequestMatcher.
     pub fn request_matchers_with_method(&mut self, method: HttpMethod) -> &mut Self {
-        self.request_matchers(Some(method), &["/**"])
+        self._request_matchers(Some(method), &["/**"])
     }
 
     /// Sets the request matcher builder to use for creating RequestMatchers.
@@ -114,6 +139,10 @@ impl<C> BaseRequestMatcherRegistry<C> {
             .as_ref()
             .expect("Builder not found. Ensure it is registered with the ApplicationContext.")
     }
+}
+
+pub trait BaseRequestMatcherRegistryExt<C> {
+    fn chain_request_matchers(&mut self, request_matchers: Vec<Arc<dyn RequestMatcher>>) -> C;
 }
 
 // Helper function

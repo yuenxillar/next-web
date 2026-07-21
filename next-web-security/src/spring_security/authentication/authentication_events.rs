@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{Authentication, authentication_error::AuthenticationError};
+use crate::core::{authentication_error::AuthenticationError, Authentication};
 
 #[derive(Clone)]
 pub struct AuthenticationSuccessEvent {
@@ -37,21 +37,6 @@ impl AuthenticationFailureEvent {
 
     pub fn error(&self) -> &AuthenticationError {
         &self.error
-    }
-}
-
-#[derive(Clone)]
-pub struct InteractiveAuthenticationSuccessEvent {
-    authentication: Arc<dyn Authentication>,
-}
-
-impl InteractiveAuthenticationSuccessEvent {
-    pub fn new(authentication: Arc<dyn Authentication>) -> Self {
-        Self { authentication }
-    }
-
-    pub fn authentication(&self) -> Arc<dyn Authentication> {
-        self.authentication.clone()
     }
 }
 

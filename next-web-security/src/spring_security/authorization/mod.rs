@@ -21,28 +21,29 @@ mod conditional_authorization_manager;
 mod default_authorization_manager_factory;
 mod expression_authorization_decision;
 mod factor_authorization_decision;
+mod next_authorization_event_publisher;
 mod reactive_authorization_manager;
 mod required_authorities_authorization_manager;
 mod required_authorities_repository;
 mod required_factor;
 mod required_factor_error;
 mod single_result_authorization_manager;
-mod spring_authorization_event_publisher;
-
 
 pub use all_authorities_authorization_manager::AllAuthoritiesAuthorizationManager;
 pub use all_required_factors_authorization_manager::AllRequiredFactorsAuthorizationManager;
 pub use authenticated_authorization_manager::AuthenticatedAuthorizationManager;
 pub use authentication_details_source::AuthenticationDetailsSource;
 pub use authentication_manager::AuthenticationManager;
-pub use authentication_trust_resolver::{DefaultAuthenticationTrustResolver, AuthenticationTrustResolver};
+pub use authentication_trust_resolver::{
+    AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
+};
 pub use authorities_authorization_manager::AuthoritiesAuthorizationManager;
 pub use authority_authorization_decision::AuthorityAuthorizationDecision;
 pub use authority_authorization_manager::AuthorityAuthorizationManager;
 pub use authorization_decision::AuthorizationDecision;
 pub use authorization_denied_error::AuthorizationDeniedError;
 pub use authorization_event_publisher::AuthorizationEventPublisher;
-pub use authorization_manager::{DefaultAuthorizationManager, AuthorizationManager};
+pub use authorization_manager::{AuthorizationManager, DefaultAuthorizationManager};
 pub use authorization_manager_factories::AuthorizationManagerFactories;
 pub use authorization_manager_factory::AuthorizationManagerFactory;
 pub use authorization_managers::AuthorizationManagers;
@@ -51,10 +52,10 @@ pub use conditional_authorization_manager::ConditionalAuthorizationManager;
 pub use default_authorization_manager_factory::DefaultAuthorizationManagerFactory;
 pub use expression_authorization_decision::ExpressionAuthorizationDecision;
 pub use factor_authorization_decision::FactorAuthorizationDecision;
+pub use next_authorization_event_publisher::NextAuthorizationEventPublisher;
 pub use reactive_authorization_manager::ReactiveAuthorizationManager;
 pub use required_authorities_authorization_manager::RequiredAuthoritiesAuthorizationManager;
 pub use required_authorities_repository::RequiredAuthoritiesRepository;
 pub use required_factor::RequiredFactor;
 pub use required_factor_error::RequiredFactorError;
 pub use single_result_authorization_manager::SingleResultAuthorizationManager;
-pub use spring_authorization_event_publisher::SpringAuthorizationEventPublisher;

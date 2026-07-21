@@ -29,7 +29,7 @@ impl BaseAuthenticationTargetUrlRequestHandler {
         &self,
         request: &dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        authentication: Option<&dyn Authentication>,
+        authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError> {
         let target_url = self.determine_target_url(request, response, authentication);
 
@@ -50,7 +50,7 @@ impl BaseAuthenticationTargetUrlRequestHandler {
         &self,
         request: &dyn HttpRequest,
         _response: &mut dyn HttpResponse,
-        _authentication: Option<&dyn Authentication>,
+        _authentication: Option<&Arc<dyn Authentication>>,
     ) -> String {
         if self.always_use_default_target_url {
             return self.default_target_url.to_string();

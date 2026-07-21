@@ -1,16 +1,26 @@
-use std::sync::Arc;
+use std::{
+    any::{Any, TypeId},
+    sync::Arc,
+};
 
 use next_web_core::async_trait;
 
 use crate::{
     authentication::{
-        account_status_user_details_exceptions::bad_credentials,
         anonymous_authentication_token::AnonymousAuthenticationToken,
-        authentication_provider::AuthenticationProvider,
+        authentication_provider::AuthenticationProvider, string_hash,
     },
-    core::{authentication_error::AuthenticationError, Authentication},
+    core::{
+        authentication_error::{
+            AuthenticationError,
+            AuthenticationErrorKind::{self},
+        },
+        Authentication,
+    },
 };
 
+/// An AuthenticationProvider implementation that validates AnonymousAuthenticationTokens.
+/// To be successfully validated, the AnonymousAuthenticationToken.getKeyHash() must match this class' get_key().
 #[derive(Clone)]
 pub struct AnonymousAuthenticationProvider {
     key: String,
@@ -32,31 +42,21 @@ impl AnonymousAuthenticationProvider {
 impl AuthenticationProvider for AnonymousAuthenticationProvider {
     async fn authenticate(
         &self,
-        authentication: &dyn Authentication,
-    ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
-        let Some(authentication) = authentication
-            .as_any()
-            .downcast_ref::<AnonymousAuthenticationToken>()
-        else {
-            return Err(AuthenticationError::new(
-                "Only AnonymousAuthenticationToken is supported",
-            ));
+        authentication: &Arc<dyn Authentication>,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
+        match (authentication as &dyn Any).downcast_ref::<AnonymousAuthenticationToken>() {
+            Some(authentication) => {
+                if string_hash(&self.key) != authentication.key_hash() {
+                    return Err(AuthenticationError::with_kind("The presented AnonymousAuthenticationToken does not contain the expected key", AuthenticationErrorKind::BadCredentials));
+                }
+            }
+            None => return Ok(None),
         };
 
-        if java_string_hash(&self.key) != authentication.key_hash() {
-            return Err(bad_credentials());
-        }
-
-        Ok(Arc::new(authentication.clone()))
+        Ok(Some(authentication.clone()))
     }
 
-    fn supports(&self, authentication: &str) -> bool {
-        authentication == std::any::type_name::<AnonymousAuthenticationToken>()
+    fn supports(&self, authentication: TypeId) -> bool {
+        authentication == TypeId::of::<AnonymousAuthenticationToken>()
     }
-}
-
-fn java_string_hash(value: &str) -> i32 {
-    value.chars().fold(0_i32, |acc, ch| {
-        acc.wrapping_mul(31).wrapping_add(ch as i32)
-    })
 }

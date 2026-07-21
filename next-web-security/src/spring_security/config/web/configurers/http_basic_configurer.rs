@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::traits::required::Required;
 
@@ -8,15 +11,12 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::{
         authentication::{
+            base_authentication_filter::BasicAuthenticationFilter,
             basic_authentication_entry_point::BasicAuthenticationEntryPoint,
-            basic_authentication_filter::BasicAuthenticationFilter,
         },
         default_security_filter_chain::DefaultSecurityFilterChain,
         AuthenticationEntryPoint,
@@ -30,18 +30,16 @@ use crate::{
 pub struct HttpBasicConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<HttpBasicConfigurer<H>, H>>,
 {
     realm_name: String,
     authentication_entry_point: Option<Arc<dyn AuthenticationEntryPoint>>,
 
-    base_http_configurer: BaseHttpConfigurer<HttpBasicConfigurer<H>, H>,
+    inner: BaseHttpConfigurer<HttpBasicConfigurer<H>, H>,
 }
 
 impl<H> HttpBasicConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<HttpBasicConfigurer<H>, H>>,
 {
     /// Set the HTTP Basic realm name. Default: `"Realm"`.
     pub fn realm_name(mut self, realm_name: &str) -> Self {
@@ -69,27 +67,13 @@ where
 impl<H> Default for HttpBasicConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<HttpBasicConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
             realm_name: "Realm".to_string(),
             authentication_entry_point: None,
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
-    }
-}
-
-impl<H> Required<BaseHttpConfigurer<HttpBasicConfigurer<H>, H>> for HttpBasicConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<HttpBasicConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
-
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<HttpBasicConfigurer<H>, H> {
-        &mut self.base_http_configurer
     }
 }
 
@@ -100,11 +84,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+        self.inner.get_mut_object()
     }
 }
 
@@ -132,5 +116,25 @@ where
         let entry_point = self.get_authentication_entry_point();
         let filter = BasicAuthenticationFilter::new(auth_manager, entry_point);
         http.add_filter(filter);
+    }
+}
+
+impl<H> Deref for HttpBasicConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for HttpBasicConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

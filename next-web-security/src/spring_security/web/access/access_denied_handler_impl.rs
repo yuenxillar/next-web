@@ -42,7 +42,7 @@ impl AccessDeniedHandler for AccessDeniedHandlerImpl {
         if !self
             .error_page
             .as_ref()
-            .map(StringUtils::has_text)
+            .map(|s| StringUtils::has_text(s.as_str()))
             .unwrap_or_default()
         {
             debug!("Responding with 403 status code");

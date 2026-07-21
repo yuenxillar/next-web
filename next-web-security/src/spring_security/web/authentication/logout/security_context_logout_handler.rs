@@ -7,10 +7,7 @@ use tracing::debug;
 
 use crate::{
     core::{
-        context::{
-            security_context_holder::SecurityContextHolder,
-            security_context_holder_strategy::SecurityContextHolderStrategy,
-        },
+        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
         Authentication,
     },
     web::{
@@ -113,7 +110,7 @@ impl LogoutHandler for SecurityContextLogoutHandler {
 
         let empty_context = self.security_context_holder_strategy.create_empty_context();
         self.security_context_repository
-            .save_context(empty_context.as_ref(), request, response)
+            .save_context(&empty_context, request, response)
             .await;
     }
 }

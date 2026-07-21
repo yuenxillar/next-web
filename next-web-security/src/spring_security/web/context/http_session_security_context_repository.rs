@@ -1,29 +1,26 @@
 use next_web_core::{
+    anys::any_value::AnyValue,
     async_trait,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse, HttpSession},
 };
-use std::any::Any;
 use std::sync::Arc;
 use tracing::{debug, enabled, trace, warn, Level};
 
 use crate::{
     authentication::AuthenticationTrustResolverImpl,
     authorization::AuthenticationTrustResolver,
-    core::{
-        context::{
-            security_context_holder::SecurityContextHolder,
-            security_context_holder_strategy::SecurityContextHolderStrategy, SecurityContext,
-        },
-        Authentication,
+    core::context::{
+        security_context_holder::SecurityContextHolder, DeferredSecurityContext, SecurityContext,
+        SecurityContextHolderStrategy,
     },
-    web::context::SecurityContextRepository,
+    web::context::{SecurityContextRepository, SuppliedDeferredSecurityContext},
 };
 
 /// A `SecurityContextRepository` implementation which stores the security context in
 /// the `HttpSession` between requests.
 ///
 /// The `HttpSession` will be queried to retrieve the `SecurityContext` in the
-/// `load_context` method (using the key `SPRING_SECURITY_CONTEXT_KEY` by
+/// `load_context` method (using the key `NEXT_SECURITY_CONTEXT_KEY` by
 /// default). If a valid `SecurityContext` cannot be obtained from the
 /// `HttpSession` for whatever reason, a fresh `SecurityContext` will be
 /// created by calling `SecurityContextHolder::create_empty_context()` and this
@@ -69,122 +66,53 @@ impl HttpSessionSecurityContextRepository {
     /// The default key under which the security context will be stored in the session.
     pub const NEXT_SECURITY_CONTEXT_KEY: &'static str = "NEXT_SECURITY_CONTEXT";
 
-    /// Gets the security context for the current request (if available) and returns it.
-    ///
-    /// If the session is null, the context object is null or the context object stored in
-    /// the session is not an instance of `SecurityContext`, a new context object
-    /// will be generated and returned.
-    #[deprecated(note = "please see `SecurityContextRepository::load_context`")]
-    pub fn load_context(
-        &self,
-        request_response_holder: &mut HttpRequestResponseHolder,
-    ) -> Arc<dyn SecurityContext> {
-        let request = request_response_holder.get_request();
-        let response = request_response_holder.get_response();
-        let http_session = request.get_session(false);
-
-        let mut context = self.read_security_context_from_session(http_session.as_ref());
-        if context.is_none() {
-            context = Some(self.generate_new_context());
-            if enabled!(Level::Trace) {
-                trace!("Created {:?}", context);
-            }
-        }
-
-        let context = context.unwrap();
-
-        if let Some(response) = response {
-            let http_session_existed = http_session.is_some();
-            let mut wrapped_response = SaveToSessionResponseWrapper::new(
-                response,
-                request.clone(),
-                http_session_existed,
-                context.clone(),
-            );
-            wrapped_response.set_security_context_holder_strategy(
-                self.security_context_holder_strategy.clone(),
-            );
-
-            request_response_holder.set_response(Arc::new(wrapped_response));
-            request_response_holder.set_request(Arc::new(SaveToSessionRequestWrapper::new(
-                request.clone(), /* wrapped_response */
-            )));
-        }
-
-        context
-    }
-
-    /// Loads a deferred security context for the given request.
-    pub fn load_deferred_context(
-        &self,
-        request: &dyn HttpServletRequest,
-    ) -> Box<dyn DeferredSecurityContext> {
-        let spring_security_context_key = self.spring_security_context_key_value.clone();
-        let supplier = move || {
-            let session = request.get_session(false);
-            // We need to capture and return Option here, but Supplier expects SecurityContext
-            // This would need adjustment based on your exact trait definitions
-            todo!("Implement read_security_context_from_session in supplier")
-        };
-
-        Box::new(SupplierDeferredSecurityContext::new(
-            supplier,
-            self.security_context_holder_strategy.clone(),
-        ))
-    }
-
-    /// Saves the security context to the HTTP session if necessary.
-    pub fn save_context(
-        &self,
-        context: &dyn SecurityContext,
-        request: &dyn HttpRequest,
-        response: &dyn HttpResponse,
-    ) {
-        // Check if response is a SaveContextOnUpdateOrErrorResponseWrapper
-        // This would require downcasting, which depends on your type system
-        // Simplified implementation:
-        self.save_context_in_http_session(context, request);
-    }
-
     fn save_context_in_http_session(
         &self,
-        context: &dyn SecurityContext,
-        request: &dyn HttpRequest,
+        context: &Arc<dyn SecurityContext>,
+        request: &mut dyn HttpRequest,
     ) {
-        if self.is_transient(context) || self.is_transient(context.get_authentication().as_ref()) {
+        if context.get_authentication().is_none() {
             return;
         }
 
         let empty_context = self.generate_new_context();
-        if empty_context.equals(context) {
-            let session = request.get_session(false);
-            self.remove_context_from_session(context, session.as_ref());
+        if Arc::ptr_eq(&empty_context, context) {
+            let session = request.session();
+            self.remove_context_from_session(context.as_ref(), session);
         } else {
-            let create_session = self.allow_session_creation;
-            let session = request.get_session(create_session);
-            self.set_context_in_session(context, session.as_ref());
+            let session = request.session_mut(self.allow_session_creation);
+            self.set_context_in_session(context, session);
         }
     }
 
     fn set_context_in_session(
         &self,
-        context: &dyn SecurityContext,
-        session: Option<&dyn HttpSession>,
+        context: &Arc<dyn SecurityContext>,
+        session: Option<&mut dyn HttpSession>,
     ) {
         if let Some(session) = session {
-            session.set_attribute(&self.spring_security_context_key_value, context);
-            debug!("Stored {:?} to HttpSession [{:?}]", context, session);
+            session.set_attribute(
+                &self.next_security_context_key,
+                AnyValue::Object(Box::new(context.to_owned())),
+            );
+            debug!(
+                "Stored SecurityContext to HttpSession [{}]",
+                session.to_string()
+            );
         }
     }
 
     fn remove_context_from_session(
         &self,
-        context: &dyn SecurityContext,
+        _context: &dyn SecurityContext,
         session: Option<&dyn HttpSession>,
     ) {
         if let Some(session) = session {
-            session.remove_attribute(&self.spring_security_context_key_value);
-            debug!("Removed {:?} from HttpSession [{:?}]", context, session);
+            session.remove_attribute(&self.next_security_context_key);
+            debug!(
+                "Removed SecurityContext from HttpSession [{}]",
+                session.id()
+            );
         }
     }
 
@@ -197,43 +125,51 @@ impl HttpSessionSecurityContextRepository {
         &self,
         http_session: Option<&dyn HttpSession>,
     ) -> Option<Arc<dyn SecurityContext>> {
-        let http_session = http_session?;
+        let http_session = if let Some(http_session) = http_session {
+            trace!("No HttpSession currently exists");
+            http_session
+        } else {
+            return None;
+        };
 
         // Session exists, so try to obtain a context from it.
-        let context_from_session =
-            http_session.get_attribute(&self.spring_security_context_key_value);
-
-        if context_from_session.is_none() {
-            trace!(
-                "Did not find SecurityContext in HttpSession {} using the SPRING_SECURITY_CONTEXT session attribute",
-                http_session.id()
-            );
-            return None;
-        }
-
-        let context_from_session = context_from_session.unwrap();
+        let context_from_session = match http_session.attribute(&self.next_security_context_key) {
+            Some(ctx) => ctx,
+            None => {
+                trace!(
+                   "Did not find SecurityContext in HttpSession {} using the NEXT_SECURITY_CONTEXT session attribute",
+                   http_session.id()
+               );
+                return None;
+            }
+        };
 
         // We now have the security context object from the session.
         // Check if it's actually a SecurityContext (would need Any downcast in Rust)
         // For now, assume it's properly typed
-        if !self.is_security_context(&context_from_session) {
-            warn!(
-                "{} did not contain a SecurityContext but contained: '{:?}'; are you improperly \
-                 modifying the HttpSession directly (you should always use SecurityContextHolder) \
-                 or using the HttpSession attribute reserved for this class?",
-                self.spring_security_context_key_value, context_from_session
+        let context_from_session = match context_from_session
+            .as_ref_object::<Arc<dyn SecurityContext>>()
+        {
+            Some(s) => s,
+            None => {
+                warn!(
+                    "{} did not contain a SecurityContext but contained: '{:?}'; are you improperly \
+                     modifying the HttpSession directly (you should always use SecurityContextHolder) \
+                     or using the HttpSession attribute reserved for this class?",
+                    self.next_security_context_key, context_from_session
+                );
+                return None;
+            }
+        };
+
+        if enabled!(Level::TRACE) {
+            trace!(
+                "Retrieved ContextFromSession from {}",
+                self.next_security_context_key
             );
-            return None;
         }
 
-        trace!(
-            "Retrieved {:?} from {}",
-            context_from_session,
-            self.spring_security_context_key_value
-        );
-
-        // Everything OK. The only non-null return from this method.
-        Some(/* cast to Arc<dyn SecurityContext> */)
+        Some(context_from_session.to_owned())
     }
 
     /// By default, calls `SecurityContextHolder::create_empty_context()` to obtain a
@@ -278,14 +214,15 @@ impl HttpSessionSecurityContextRepository {
     ///
     /// # Arguments
     ///
-    /// * `spring_security_context_key` - the key under which the security context will be
-    ///   stored. Defaults to `SPRING_SECURITY_CONTEXT_KEY`.
-    pub fn set_spring_security_context_key(&mut self, spring_security_context_key: String) {
+    /// * `next_security_context_key` - the key under which the security context will be
+    ///   stored. Defaults to `NEXT_SECURITY_CONTEXT_KEY`.
+    pub fn set_next_security_context_key(&mut self, next_security_context_key: impl Into<String>) {
+        let next_security_context_key = next_security_context_key.into();
         assert!(
-            !spring_security_context_key.is_empty(),
-            "springSecurityContextKey cannot be empty"
+            !next_security_context_key.is_empty(),
+            "NextSecurityContextKey cannot be empty"
         );
-        self.spring_security_context_key_value = spring_security_context_key;
+        self.next_security_context_key = next_security_context_key.into();
     }
 
     /// Sets the `SecurityContextHolderStrategy` to use. The default action is to use
@@ -302,17 +239,6 @@ impl HttpSessionSecurityContextRepository {
         self.security_context_holder_strategy = strategy;
     }
 
-    fn is_transient(&self, object: Option<&dyn Any>) -> bool {
-        match object {
-            None => false,
-            Some(obj) => {
-                // Check for @Transient annotation equivalent
-                // This would depend on your annotation/reflection system
-                false // Simplified
-            }
-        }
-    }
-
     /// Sets the `AuthenticationTrustResolver` to be used. The default is
     /// `AuthenticationTrustResolverImpl`.
     ///
@@ -322,33 +248,33 @@ impl HttpSessionSecurityContextRepository {
     pub fn set_trust_resolver(&mut self, trust_resolver: Arc<dyn AuthenticationTrustResolver>) {
         self.trust_resolver = trust_resolver;
     }
-
-    // Helper method to check if object is a SecurityContext
-    fn is_security_context(&self, object: &dyn Any) -> bool {
-        // Downcast to SecurityContext would be needed here
-        // This depends on your type system implementation
-        true // Simplified
-    }
 }
 
 #[async_trait]
 impl SecurityContextRepository for HttpSessionSecurityContextRepository {
-    fn load_context(&self, request: &mut dyn HttpRequest) -> Arc<dyn SecurityContext> {
-        todo!()
+    fn load_deferred_context(
+        &self,
+        request: &mut dyn HttpRequest,
+    ) -> Box<dyn DeferredSecurityContext> {
+        let security_context = self.read_security_context_from_session(request.session());
+
+        Box::new(SuppliedDeferredSecurityContext::new(
+            security_context,
+            self.security_context_holder_strategy.to_owned(),
+        ))
     }
 
     async fn save_context(
         &self,
-        context: &dyn SecurityContext,
+        context: &Arc<dyn SecurityContext>,
         request: &mut dyn HttpRequest,
-        response: &mut dyn HttpResponse,
+        _response: &mut dyn HttpResponse,
     ) {
-        todo!()
+        self.save_context_in_http_session(context, request);
     }
 
     fn contains_context(&self, request: &mut dyn HttpRequest) -> bool {
-        let session = request.session();
-        match session {
+        match request.session() {
             Some(session) => session.attribute(&self.next_security_context_key).is_some(),
             None => false,
         }
@@ -368,253 +294,5 @@ impl Default for HttpSessionSecurityContextRepository {
             next_security_context_key: Self::NEXT_SECURITY_CONTEXT_KEY.to_string(),
             trust_resolver: Arc::new(AuthenticationTrustResolverImpl::default()),
         }
-    }
-}
-
-/// Wrapper that is applied to every request/response to update the
-/// `HttpSession` with the `SecurityContext` when a `send_error()` or
-/// `send_redirect` happens. See SEC-398.
-///
-/// Stores the necessary state from the start of the request in order to make a
-/// decision about whether the security context has changed before saving it.
-struct SaveToSessionRequestWrapper {
-    inner: Arc<dyn HttpServletRequestWrapper>,
-    response: Arc<SaveContextOnUpdateOrErrorResponseWrapper>,
-}
-
-impl SaveToSessionRequestWrapper {
-    fn new(
-        request: Arc<dyn HttpRequest>,
-        response: Arc<SaveContextOnUpdateOrErrorResponseWrapper>,
-    ) -> Self {
-        Self {
-            inner: Arc::new(/* HttpServletRequestWrapper::new(request) */),
-            response,
-        }
-    }
-
-    fn start_async(&self) -> Box<dyn Any> {
-        self.response.disable_save_on_response_committed();
-        // self.inner.start_async()
-        todo!()
-    }
-
-    fn start_async_with_request_response(
-        &self,
-        servlet_request: &dyn Any,
-        servlet_response: &dyn Any,
-    ) -> Box<dyn Any> {
-        self.response.disable_save_on_response_committed();
-        // self.inner.start_async(servlet_request, servlet_response)
-        todo!()
-    }
-}
-
-/// Wrapper that is applied to every request/response to update the
-/// `HttpSession` with the `SecurityContext` when a `send_error()` or
-/// `send_redirect` happens. See SEC-398.
-///
-/// Stores the necessary state from the start of the request in order to make a
-/// decision about whether the security context has changed before saving it.
-struct SaveToSessionResponseWrapper {
-    inner: SaveContextOnUpdateOrErrorResponseWrapper,
-    request: Arc<dyn HttpRequest>,
-    http_session_existed_at_start_of_request: bool,
-    context_before_execution: Arc<dyn SecurityContext>,
-    auth_before_execution: Option<Arc<dyn Authentication>>,
-    is_save_context_invoked: bool,
-    security_context_holder_strategy: Option<Arc<dyn SecurityContextHolderStrategy>>,
-}
-
-impl SaveToSessionResponseWrapper {
-    /// Takes the parameters required to call `save_context()` successfully
-    /// in addition to the request and the response object we are wrapping.
-    ///
-    /// # Arguments
-    ///
-    /// * `response` - the response object we are wrapping
-    /// * `request` - the request object (used to obtain the session, if one exists)
-    /// * `http_session_existed_at_start_of_request` - indicates whether there was a session
-    ///   in place before the filter chain executed. If this is true, and the session is
-    ///   found to be null, this indicates that it was invalidated during the request and
-    ///   a new session will now be created.
-    /// * `context` - the context before the filter chain executed. The context will
-    ///   only be stored if it or its contents changed during the request.
-    fn new(
-        response: Arc<dyn HttpResponse>,
-        request: Arc<dyn HttpRequest>,
-        http_session_existed_at_start_of_request: bool,
-        context: Arc<dyn SecurityContext>,
-    ) -> Self {
-        let disable_url_rewriting = false; // This would come from the outer repository
-        let auth_before_execution = context.get_authentication();
-
-        Self {
-            inner: SaveContextOnUpdateOrErrorResponseWrapper::new(response, disable_url_rewriting),
-            request,
-            http_session_existed_at_start_of_request,
-            context_before_execution: context,
-            auth_before_execution,
-            is_save_context_invoked: false,
-            security_context_holder_strategy: None,
-        }
-    }
-
-    fn set_security_context_holder_strategy(
-        &mut self,
-        strategy: Arc<dyn SecurityContextHolderStrategy>,
-    ) {
-        self.security_context_holder_strategy = Some(strategy);
-    }
-
-    /// Stores the supplied security context in the session (if available) and if it
-    /// has changed since it was set at the start of the request. If the
-    /// AuthenticationTrustResolver identifies the current user as anonymous, then the
-    /// context will not be stored.
-    ///
-    /// # Arguments
-    ///
-    /// * `context` - the context object obtained from the SecurityContextHolder after
-    ///   the request has been processed by the filter chain.
-    ///   SecurityContextHolder.get_context() cannot be used to obtain the context as it
-    ///   has already been cleared by the time this method is called.
-    fn save_context(&mut self, context: Arc<dyn SecurityContext>) {
-        // Check if transient
-        if self.is_transient(Some(&context)) {
-            return;
-        }
-
-        let authentication = context.get_authentication();
-
-        if self.is_transient(authentication.as_ref().map(|a| a.as_ref() as &dyn Any)) {
-            return;
-        }
-
-        let mut http_session = self.request.get_session(false);
-        let spring_security_context_key = "SPRING_SECURITY_CONTEXT"; // Should come from outer repository
-
-        // See SEC-776
-        if authentication.is_none() || self.is_anonymous(authentication.as_ref()) {
-            if http_session.is_some() && self.auth_before_execution.is_some() {
-                // SEC-1587 A non-anonymous context may still be in the session
-                // SEC-1735 remove if the contextBeforeExecution was not anonymous
-                if let Some(ref session) = http_session {
-                    session.remove_attribute(spring_security_context_key);
-                }
-                self.is_save_context_invoked = true;
-            }
-
-            debug!(
-                "Did not store {} SecurityContext",
-                if authentication.is_none() {
-                    "empty"
-                } else {
-                    "anonymous"
-                }
-            );
-            return;
-        }
-
-        // If no session exists, try to create one if allowed
-        if http_session.is_none() {
-            http_session = self.create_new_session_if_allowed(&context);
-        }
-
-        // If HttpSession exists, store current SecurityContext but only if it has
-        // actually changed in this thread (see SEC-37, SEC-1307, SEC-1528)
-        if let Some(ref session) = http_session {
-            // We may have a new session, so check also whether the context attribute is set SEC-1561
-            if self.context_changed(&context)
-                || session.get_attribute(spring_security_context_key).is_none()
-            {
-                // HttpSessionSecurityContextRepository.saveContextInHttpSession(context, request)
-                self.is_save_context_invoked = true;
-            }
-        }
-    }
-
-    fn context_changed(&self, context: &Arc<dyn SecurityContext>) -> bool {
-        self.is_save_context_invoked
-            || !Arc::ptr_eq(context, &self.context_before_execution)
-            || context.get_authentication().as_ref().map(|a| a.as_ref())
-                != self.auth_before_execution.as_ref().map(|a| a.as_ref())
-    }
-
-    fn create_new_session_if_allowed(
-        &self,
-        context: &Arc<dyn SecurityContext>,
-    ) -> Option<Arc<dyn HttpSession>> {
-        if self.http_session_existed_at_start_of_request {
-            debug!(
-                "HttpSession is now null, but was not null at start of request; \
-                 session was invalidated, so do not create a new session"
-            );
-            return None;
-        }
-
-        if !self.allow_session_creation() {
-            debug!(
-                "The HttpSession is currently null, and the HttpSessionSecurityContextRepository \
-                 is prohibited from creating an HttpSession (because the allowSessionCreation property \
-                 is false) - SecurityContext thus not stored for next request"
-            );
-            return None;
-        }
-
-        // Generate a HttpSession only if we need to
-        if self.is_empty_context(context) {
-            debug!(
-                "HttpSession is null, but SecurityContext has not changed from default empty \
-                 context {:?} so not creating HttpSession or storing SecurityContext",
-                context
-            );
-            return None;
-        }
-
-        match self.request.get_session(true) {
-            Some(session) => {
-                debug!("Created HttpSession as SecurityContext is non-default");
-                Some(session)
-            }
-            None => {
-                // Response must already be committed, therefore can't create a new session
-                warn!(
-                    "Failed to create a session, as response has been committed. \
-                     Unable to store SecurityContext."
-                );
-                None
-            }
-        }
-    }
-
-    fn is_transient(&self, object: Option<&dyn Any>) -> bool {
-        match object {
-            None => false,
-            Some(_obj) => {
-                // Check for @Transient annotation equivalent
-                false // Simplified
-            }
-        }
-    }
-
-    fn is_anonymous(&self, authentication: Option<&Arc<dyn Authentication>>) -> bool {
-        match authentication {
-            Some(auth) => {
-                // Use trust_resolver to check if anonymous
-                // self.trust_resolver.is_anonymous(auth.as_ref())
-                false // Simplified
-            }
-            None => true,
-        }
-    }
-
-    fn allow_session_creation(&self) -> bool {
-        // This should reference the outer repository's setting
-        true // Simplified
-    }
-
-    fn is_empty_context(&self, context: &Arc<dyn SecurityContext>) -> bool {
-        // Compare with empty context from the repository
-        false // Simplified
     }
 }

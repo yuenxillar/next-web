@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::traits::required::Required;
 
@@ -7,16 +10,13 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::{
         default_security_filter_chain::DefaultSecurityFilterChain,
-        port_mapper::PortMapper,
         transport::HttpsRedirectFilter,
         util::matcher::{OrRequestMatcher, RequestMatcher},
+        PortMapper,
     },
 };
 
@@ -26,16 +26,14 @@ use crate::{
 pub struct HttpsRedirectConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>>,
 {
     request_matchers: Vec<Arc<dyn RequestMatcher>>,
-    base_http_configurer: BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>,
+    inner: BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>,
 }
 
 impl<H> HttpsRedirectConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>>,
 {
     pub fn request_matchers(mut self, m: Vec<Arc<dyn RequestMatcher>>) -> Self {
         self.request_matchers.extend(m);
@@ -46,25 +44,12 @@ where
 impl<H> Default for HttpsRedirectConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
             request_matchers: Vec::new(),
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
-    }
-}
-
-impl<H> Required<BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>> for HttpsRedirectConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H> {
-        &mut self.base_http_configurer
     }
 }
 
@@ -75,10 +60,10 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+        self.inner.get_mut_object()
     }
 }
 
@@ -100,5 +85,25 @@ where
             filter.set_port_mapper(mapper.clone());
         }
         http.add_filter(filter);
+    }
+}
+
+impl<H> Deref for HttpsRedirectConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for HttpsRedirectConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

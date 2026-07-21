@@ -1,10 +1,13 @@
 use std::sync::Arc;
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::{anys::any_value::AnyValue, error::BoxError};
 
-use crate::core::{
-    credentials_container::CredentialsContainer, granted_authority::GrantedAuthority,
-    Authentication,
+use crate::{
+    core::{
+        credentials_container::CredentialsContainer, granted_authority::GrantedAuthority,
+        Authentication,
+    },
+    web::authentication::AuthPrincipal,
 };
 
 #[derive(Clone, Default)]
@@ -58,54 +61,48 @@ impl UsernamePasswordAuthenticationToken {
 }
 
 impl Authentication for UsernamePasswordAuthenticationToken {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
+    fn credentials(&self) -> Option<&AuthPrincipal> {
+        self.credentials
     }
 
-    fn authentication_type(&self) -> &'static str {
-        std::any::type_name::<Self>()
+    fn details(&self) -> Option<&AuthPrincipal> {
+        self.details
     }
 
-    fn get_credentials(&self) -> Option<String> {
-        self.credentials.clone()
-    }
-
-    fn get_details_ref(&self) -> Option<&AnyValue> {
-        self.details.as_ref()
-    }
-
-    fn get_principal(&self) -> Option<String> {
-        self.principal.clone()
+    fn principal(&self) -> Option<&AuthPrincipal> {
+        self.principal
     }
 
     fn is_authenticated(&self) -> bool {
         self.authenticated
     }
 
-    fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), &'static str> {
+    fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
         if is_authenticated {
             return Err(
-                "Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead",
+                "Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead".into()
             );
         }
         self.authenticated = false;
+
         Ok(())
     }
 
-    fn authorities(&self) -> Vec<String> {
-        let mut authorities = Vec::with_capacity(self.authorities.len());
-        for authority in &self.authorities {
-            if let Some(authority) = authority.authority() {
-                authorities.push(authority.to_string());
-            }
-        }
-        authorities
+    fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
+        // let mut authorities = Vec::with_capacity(self.authorities.len());
+        // for authority in &self.authorities {
+        //     if let Some(authority) = authority.authority() {
+        //         authorities.push(authority.to_string());
+        //     }
+        // }
+        todo!()
     }
 }
 
 impl CredentialsContainer for UsernamePasswordAuthenticationToken {
-    fn erase_credentials(&mut self) {
-        self.credentials = None;
+    fn erase_credentials(&self) {
+        // self.credentials = None;
+        todo!()
     }
 }
 

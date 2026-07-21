@@ -43,7 +43,7 @@ impl LogoutSuccessHandler for DelegatingLogoutSuccessHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        authentication: Option<&dyn Authentication>,
+        authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError> {
         for (matcher, handler) in self.matcher_to_handler.iter() {
             if matcher.matches(request) {

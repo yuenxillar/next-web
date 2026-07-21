@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use next_web_context::EventAttributes;
 
@@ -24,8 +24,10 @@ impl BaseAuthenticationEvent {
     }
 }
 
-impl AsRef<EventAttributes<Arc<dyn Authentication>>> for BaseAuthenticationEvent {
-    fn as_ref(&self) -> &EventAttributes<Arc<dyn Authentication>> {
+impl Deref for BaseAuthenticationEvent {
+    type Target = EventAttributes<Arc<dyn Authentication>>;
+
+    fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }

@@ -78,13 +78,13 @@ impl MapUserDetailsService {
 impl UserDetailsService for MapUserDetailsService {
     async fn load_user_by_username(
         &self,
-        username: String,
+        username: &str,
     ) -> Result<Arc<dyn UserDetails>, UsernameNotFoundError> {
         self.users
             .read()
             .ok()
             .and_then(|users| users.get(&Self::key(&username)).cloned())
-            .ok_or(UsernameNotFoundError(username))
+            .ok_or(UsernameNotFoundError(username.to_owned()))
     }
 }
 

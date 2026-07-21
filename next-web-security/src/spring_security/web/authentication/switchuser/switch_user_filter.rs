@@ -13,19 +13,13 @@ use next_web_core::{
 use tracing::debug;
 
 use crate::{
-    authentication::account_status_user_details_checker::AccountStatusUserDetailsChecker,
+    authentication::AccountStatusUserDetailsChecker,
     core::{
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
-        context::{
-            security_context_holder::SecurityContextHolder,
-            security_context_holder_strategy::SecurityContextHolderStrategy,
-        },
+        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
         granted_authority::GrantedAuthority,
         simple_granted_authority::SimpleGrantedAuthority,
-        userdetails::{
-            user_details::UserDetails, user_details_checker::UserDetailsChecker,
-            user_details_service::UserDetailsService,
-        },
+        userdetails::{UserDetails, UserDetailsChecker, UserDetailsService},
         username_password_authentication_token::UsernamePasswordAuthenticationToken,
     },
     web::{
@@ -286,20 +280,20 @@ impl SwitchUserFilter {
     ) -> Option<Arc<dyn crate::core::Authentication>> {
         // Downcast to UsernamePasswordAuthenticationToken to access the
         // underlying authority objects.
-        let upat = current
-            .as_any()
-            .downcast_ref::<UsernamePasswordAuthenticationToken>()?;
-        for authority in upat.authorities_objects() {
-            // if let Some(source) = authority.as_switch_user_source() {
-            //     debug!(
-            //         "Found original switch user granted authority [{:?}]",
-            //         source.get_name()
-            //     );
-            //     return Some(source);
-            // }
-            todo!()
-        }
-        None
+        // let upat = current
+        //     .as_any()
+        //     .downcast_ref::<UsernamePasswordAuthenticationToken>()?;
+        // for authority in upat.authorities_objects() {
+        //     // if let Some(source) = authority.as_switch_user_source() {
+        //     //     debug!(
+        //     //         "Found original switch user granted authority [{:?}]",
+        //     //         source.get_name()
+        //     //     );
+        //     //     return Some(source);
+        //     // }
+        // }
+
+        todo!()
     }
 
     /// Retrieves the current `Authentication`, attempting to find the original
@@ -311,7 +305,7 @@ impl SwitchUserFilter {
             Err(_) => self
                 .security_context_holder_strategy
                 .get_context()
-                .and_then(|ctx| ctx.get_authentication()),
+                .and_then(|ctx| ctx.get_authentication().cloned()),
         }
     }
 
@@ -389,7 +383,7 @@ impl SwitchUserFilter {
 
         let target_user = self
             .user_details_service
-            .load_user_by_username(username)
+            .load_user_by_username(&username)
             .await
             .map_err(|e| {
                 AuthenticationError::with_kind(
@@ -423,7 +417,7 @@ impl SwitchUserFilter {
         let current = self
             .security_context_holder_strategy
             .get_context()
-            .and_then(|ctx| ctx.get_authentication())
+            .and_then(|ctx| ctx.get_authentication().cloned())
             .ok_or_else(|| {
                 AuthenticationError::with_kind(
                     "No current user associated with this request",
@@ -460,7 +454,7 @@ impl SwitchUserFilter {
             .set_context(context.clone());
         debug!("Set SecurityContextHolder to {}", authentication.get_name());
         if let Some(repo) = &self.security_context_repository {
-            repo.save_context(context.as_ref(), request, response).await;
+            repo.save_context(&context, request, response).await;
         }
         self.success_handler
             .on_authentication_success(request, response, authentication.as_ref());

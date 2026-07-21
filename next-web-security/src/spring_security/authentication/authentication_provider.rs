@@ -1,18 +1,19 @@
-use std::sync::Arc;
+use std::{any::TypeId, sync::Arc};
 
 use next_web_core::async_trait;
 
-use crate::core::{Authentication, authentication_error::AuthenticationError};
+use crate::core::{authentication_error::AuthenticationError, Authentication};
 
 #[async_trait]
 pub trait AuthenticationProvider
 where
     Self: Send + Sync,
 {
+    /// Performs authentication with the same contract as AuthenticationManager.authenticate(Authentication) .
     async fn authenticate(
         &self,
-        authentication: &dyn Authentication,
-    ) -> Result<Arc<dyn Authentication>, AuthenticationError>;
+        authentication: &Arc<dyn Authentication>,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError>;
 
-    fn supports(&self, authentication: &str) -> bool;
+    fn supports(&self, authentication: TypeId) -> bool;
 }

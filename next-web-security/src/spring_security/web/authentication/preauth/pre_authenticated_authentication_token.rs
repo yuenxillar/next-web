@@ -47,38 +47,38 @@ impl PreAuthenticatedAuthenticationToken {
     }
 }
 
-impl Authentication for PreAuthenticatedAuthenticationToken {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
+// impl Authentication for PreAuthenticatedAuthenticationToken {
+//     fn as_any(&self) -> &dyn std::any::Any {
+//         self
+//     }
 
-    fn authentication_type(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
+//     fn authentication_type(&self) -> &'static str {
+//         std::any::type_name::<Self>()
+//     }
 
-    fn get_credentials(&self) -> Option<String> {
-        self.credentials.clone()
-    }
+//     fn get_credentials(&self) -> Option<String> {
+//         self.credentials.clone()
+//     }
 
-    fn get_details_ref(&self) -> Option<&AnyValue> {
-        self.details.as_ref()
-    }
+//     fn get_details_ref(&self) -> Option<&AnyValue> {
+//         self.details.as_ref()
+//     }
 
-    fn get_principal(&self) -> Option<String> {
-        self.principal.clone()
-    }
+//     fn get_principal(&self) -> Option<String> {
+//         self.principal.clone()
+//     }
 
-    fn is_authenticated(&self) -> bool {
-        self.authenticated
-    }
+//     fn is_authenticated(&self) -> bool {
+//         self.authenticated
+//     }
 
-    fn authorities(&self) -> Vec<String> {
-        self.authorities
-            .iter()
-            .filter_map(|authority| authority.authority().map(ToString::to_string))
-            .collect()
-    }
-}
+//     fn authorities(&self) -> Vec<String> {
+//         self.authorities
+//             .iter()
+//             .filter_map(|authority| authority.authority().map(ToString::to_string))
+//             .collect()
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

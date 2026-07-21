@@ -1,4 +1,8 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::traits::required::Required;
 
@@ -8,10 +12,7 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     core::session::SessionRegistry,
     web::{
@@ -40,7 +41,7 @@ where
     session_policy: Option<SessionCreationPolicy>,
     properties_that_require_implicit_authentication: HashSet<String>,
 
-    base_http_configurer: BaseHttpConfigurer<Self, H>,
+    inner: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> SessionManagementConfigurer<H>
@@ -106,18 +107,29 @@ where
         self.session_registry = Some(Arc::new(r));
         self
     }
+
+    pub fn get_session_creation_policy(&self) -> SessionCreationPolicy {
+        todo!()
+    }
 }
 
-impl<H> Required<BaseHttpConfigurer<SessionManagementConfigurer<H>, H>>
-    for SessionManagementConfigurer<H>
+impl<H> Deref for SessionManagementConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn get_object(&self) -> &BaseHttpConfigurer<SessionManagementConfigurer<H>, H> {
-        &self.base_http_configurer
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<SessionManagementConfigurer<H>, H> {
-        &mut self.base_http_configurer
+}
+
+impl<H> DerefMut for SessionManagementConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }
 
@@ -128,10 +140,10 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+        self.inner.get_mut_object()
     }
 }
 
@@ -177,7 +189,7 @@ where
             session_policy: None,
             properties_that_require_implicit_authentication: HashSet::new(),
 
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
     }
 }

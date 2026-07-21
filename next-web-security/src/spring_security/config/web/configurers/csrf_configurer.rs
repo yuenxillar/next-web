@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::{
     traits::{
@@ -15,8 +19,8 @@ use crate::{
         web::{
             base_request_matcher_registry::BaseRequestMatcherRegistry,
             configurers::{
-                base_http_configurer::BaseHttpConfigurer, logout_configurer::LogoutConfigurer,
-                ErrorHandlingConfigurer, SessionManagementConfigurer,
+                logout_configurer::LogoutConfigurer, BaseHttpConfigurer, ErrorHandlingConfigurer,
+                SessionManagementConfigurer,
             },
             http_security_builder::HttpSecurityBuilder,
         },
@@ -49,7 +53,7 @@ where
     session_authentication_strategy: Option<Arc<dyn SessionAuthenticationStrategy>>,
     request_handler: Option<Arc<dyn CsrfTokenRequestHandler>>,
 
-    base_http_configurer: BaseHttpConfigurer<Self, H>,
+    inner: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> CsrfConfigurer<H>
@@ -64,7 +68,7 @@ where
             session_authentication_strategy: Default::default(),
             request_handler: Default::default(),
 
-            base_http_configurer: Default::default(),
+            inner: Default::default(),
         }
     }
 
@@ -245,8 +249,9 @@ where
 
         let logout_configurer = http.configurer_mut::<LogoutConfigurer<H>>();
         if let Some(logout_configurer) = logout_configurer {
-            logout_configurer
-                .add_logout_handler(CsrfLogoutHandler::new(self.csrf_token_repository.clone()));
+            logout_configurer.add_logout_handler(Arc::new(CsrfLogoutHandler::new(
+                self.csrf_token_repository.clone(),
+            )));
         }
 
         let session_configurer = http.configurer_mut::<SessionManagementConfigurer<H>>();
@@ -259,24 +264,29 @@ where
             filter.set_request_handler(request_handler);
         }
 
-        self.base_http_configurer
-            .get_mut_object()
-            .post_process(&mut filter);
+        self.inner.get_mut_object().post_process(&mut filter);
 
         http.add_filter(filter);
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<CsrfConfigurer<H>, H>> for CsrfConfigurer<H>
+impl<H> Deref for CsrfConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    fn get_object(&self) -> &BaseHttpConfigurer<CsrfConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
+    type Target = BaseHttpConfigurer<Self, H>;
 
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<CsrfConfigurer<H>, H> {
-        &mut self.base_http_configurer
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for CsrfConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }
 

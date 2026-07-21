@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
 use crate::authorization::{
-    all_authorities_authorization_manager::AllAuthoritiesAuthorizationManager,
-    authenticated_authorization_manager::AuthenticatedAuthorizationManager,
-    authority_authorization_manager::AuthorityAuthorizationManager,
     authorization_manager::AuthorizationManager,
     single_result_authorization_manager::SingleResultAuthorizationManager,
 };
 
 /// A factory for creating different kinds of AuthorizationManager instances.
-pub trait AuthorizationManagerFactory<T>: Send + Sync
+pub trait AuthorizationManagerFactory<T>
 where
+    Self: Send + Sync,
     T: Clone + Send + Sync + 'static,
 {
     fn permit_all(&self) -> Arc<dyn AuthorizationManager<T>> {

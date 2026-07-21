@@ -64,6 +64,8 @@ impl AuthenticationSuccessHandler for SimpleUrlAuthenticationSuccessHandler {
         response: &mut dyn HttpResponse,
         authentication: &dyn Authentication,
     ) {
-        let _ = self.base.handle(request, response, Some(authentication));
+        // let _ = self.base.handle(request, response, Some(authentication));
+        //
+        todo!()
     }
 }

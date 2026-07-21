@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
-    error::BoxError,
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
@@ -103,8 +102,8 @@ impl HttpFilter for BasicAuthenticationFilter {
 
         // If still no authentication, let the entry point handle it
         let is_authenticated = SecurityContextHolder::get_context()
-            .and_then(|ctx| ctx.get_authentication())
-            .is_some();
+            .map(|ctx| ctx.get_authentication().is_some())
+            .unwrap_or_default();
 
         if !is_authenticated {
             // Challenge the client for credentials

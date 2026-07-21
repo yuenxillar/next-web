@@ -1,28 +1,30 @@
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
-use crate::{
-    authorization::authorization_result::AuthorizationResult,
-    core::Authentication,
-};
+use next_web_context::{ApplicationEvent, EventAttributes};
+use next_web_core::BoxAny;
+
+use crate::{authorization::authorization_result::AuthorizationResult, core::Authentication};
 
 /// Base event for authorization results.
-#[derive(Clone)]
 pub struct AuthorizationEvent {
     authentication: Arc<dyn Authentication>,
-    secured_object_description: String,
-    result: Arc<dyn AuthorizationResult>,
+    result: Box<dyn AuthorizationResult>,
+
+    inner: EventAttributes<BoxAny>,
 }
 
 impl AuthorizationEvent {
     pub fn new(
         authentication: Arc<dyn Authentication>,
-        secured_object_description: impl Into<String>,
-        result: Arc<dyn AuthorizationResult>,
+        source: BoxAny,
+
+        result: Box<dyn AuthorizationResult>,
     ) -> Self {
         Self {
             authentication,
-            secured_object_description: secured_object_description.into(),
             result,
+
+            inner: EventAttributes::new(source),
         }
     }
 
@@ -30,11 +32,17 @@ impl AuthorizationEvent {
         self.authentication.clone()
     }
 
-    pub fn secured_object_description(&self) -> &str {
-        &self.secured_object_description
+    pub fn authorization_result(&self) -> &dyn AuthorizationResult {
+        self.result.as_ref()
+    }
+}
+
+impl ApplicationEvent for AuthorizationEvent {
+    fn timestamp(&self) -> u64 {
+        self.inner.timestamp()
     }
 
-    pub fn authorization_result(&self) -> Arc<dyn AuthorizationResult> {
-        self.result.clone()
+    fn source(&self) -> &dyn Any {
+        self.inner.source()
     }
 }

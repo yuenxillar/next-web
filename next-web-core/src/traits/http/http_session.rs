@@ -2,7 +2,11 @@ use std::sync::Arc;
 
 use crate::anys::any_value::AnyValue;
 
-pub trait HttpSession {
+pub trait HttpSession
+where
+    Self: ToString,
+    Self: Send + Sync,
+{
     /// 返回此 session 创建的时间，以毫秒表示
     /// 自 1970 年 1 月 1 日 GMT 以来的毫秒数
     fn creation_time(&self) -> u64;
@@ -11,7 +15,7 @@ pub trait HttpSession {
     fn id(&self) -> &str;
 
     /// 返回客户端最后一次与此 session 关联的请求时间
-    fn get_last_accessed_time(&self) -> u64;
+    fn last_accessed_time(&self) -> u64;
 
     /// 指定在 servlet 容器使此 session 失效之前
     /// 客户端请求之间的时间（以秒为单位）

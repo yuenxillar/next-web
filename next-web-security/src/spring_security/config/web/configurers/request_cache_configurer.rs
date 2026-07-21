@@ -1,4 +1,7 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::traits::required::Required;
 
@@ -7,10 +10,7 @@ use crate::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::base_http_configurer::BaseHttpConfigurer,
-            http_security_builder::HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
     },
     web::{
         default_security_filter_chain::DefaultSecurityFilterChain,
@@ -27,17 +27,14 @@ use crate::{
 pub struct RequestCacheConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<RequestCacheConfigurer<H>, H>>,
 {
     request_cache: Option<Arc<dyn RequestCache>>,
-    base_http_configurer: BaseHttpConfigurer<RequestCacheConfigurer<H>, H>,
-    _marker: PhantomData<H>,
+    inner: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> RequestCacheConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<RequestCacheConfigurer<H>, H>>,
 {
     /// Set a custom `RequestCache`. If not set, defaults to `HttpSessionRequestCache`.
     pub fn request_cache(mut self, request_cache: Arc<dyn RequestCache>) -> Self {
@@ -55,27 +52,12 @@ where
 impl<H> Default for RequestCacheConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
-    Self: Required<BaseHttpConfigurer<RequestCacheConfigurer<H>, H>>,
 {
     fn default() -> Self {
         Self {
             request_cache: None,
-            base_http_configurer: Default::default(),
-            _marker: PhantomData,
+            inner: Default::default(),
         }
-    }
-}
-
-impl<H> Required<BaseHttpConfigurer<RequestCacheConfigurer<H>, H>> for RequestCacheConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<RequestCacheConfigurer<H>, H> {
-        &self.base_http_configurer
-    }
-
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<RequestCacheConfigurer<H>, H> {
-        &mut self.base_http_configurer
     }
 }
 
@@ -86,11 +68,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_object()
+        self.inner.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.base_http_configurer.get_mut_object()
+        self.inner.get_mut_object()
     }
 }
 
@@ -107,9 +89,27 @@ where
     fn configure(&mut self, http: &mut H) {
         let request_cache = self.get_request_cache(http);
         let mut filter = RequestCacheAwareFilter::new(request_cache);
-        self.base_http_configurer
-            .get_mut_object()
-            .post_process(&mut filter);
+        self.inner.get_mut_object().post_process(&mut filter);
         http.add_filter(filter);
+    }
+}
+
+impl<H> Deref for RequestCacheConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for RequestCacheConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

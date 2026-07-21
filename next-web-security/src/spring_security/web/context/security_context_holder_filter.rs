@@ -3,7 +3,6 @@ use std::sync::Arc;
 use next_web_core::{
     anys::any_value::AnyValue,
     async_trait,
-    error::BoxError,
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
@@ -14,8 +13,7 @@ use next_web_core::{
 
 use crate::{
     core::context::{
-        security_context_holder::SecurityContextHolder,
-        security_context_holder_strategy::SecurityContextHolderStrategy,
+        security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy,
     },
     web::context::SecurityContextRepository,
 };
@@ -35,6 +33,15 @@ impl SecurityContextHolderFilter {
             security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
         }
     }
+
+    /// Sets the SecurityContextHolderStrategy to use.
+    /// The default action is to use the SecurityContextHolderStrategy stored in SecurityContextHolder.
+    pub fn set_security_context_holder_strategy(
+        &mut self,
+        security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
+    ) {
+        self.security_context_holder_strategy = security_context_holder_strategy;
+    }
 }
 
 #[async_trait]
@@ -51,13 +58,16 @@ impl HttpFilter for SecurityContextHolderFilter {
 
         request.set_attribute(Self::FILTER_APPLIED, AnyValue::Boolean(true));
 
-        let context = self.security_context_repository.load_context(request);
+        let mut context = self
+            .security_context_repository
+            .load_deferred_context(request);
 
         self.security_context_holder_strategy
             .scope_with_context(
-                context,
+                context.get().unwrap(),
                 Box::pin(async {
                     filter_chain.do_filter(request, response).await?;
+                    self.security_context_holder_strategy.clear_context();
                     request.remove_attribute(Self::FILTER_APPLIED);
 
                     Ok(())

@@ -14,10 +14,7 @@ use tracing::debug;
 
 use crate::{
     core::{
-        context::{
-            security_context_holder::SecurityContextHolder,
-            security_context_holder_strategy::SecurityContextHolderStrategy,
-        },
+        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
         session::SessionRegistry,
     },
     web::{
@@ -134,14 +131,11 @@ impl ConcurrentSessionFilter {
     /// Performs logout by invoking the configured logout handlers with the
     /// current authentication from the security context.
     async fn do_logout(&self, request: &mut dyn HttpRequest, response: &mut dyn HttpResponse) {
-        let auth = self
-            .security_context_holder_strategy
-            .get_context()
-            .and_then(|ctx| ctx.get_authentication());
-
-        self.logout_handlers
-            .logout(request, response, auth.as_ref())
-            .await;
+        if let Some(ctx) = self.security_context_holder_strategy.get_context() {
+            self.logout_handlers
+                .logout(request, response, ctx.get_authentication())
+                .await;
+        }
     }
 }
 

@@ -16,10 +16,7 @@ use crate::{
     access::intercept::request_authorization_context::RequestAuthorizationContext,
     authorization::{AuthorizationEventPublisher, AuthorizationManager},
     core::{
-        context::{
-            security_context_holder::SecurityContextHolder,
-            security_context_holder_strategy::SecurityContextHolderStrategy,
-        },
+        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
         Authentication,
     },
 };
@@ -63,7 +60,7 @@ impl AuthorizationFilter {
 
     pub fn set_authorization_event_publisher(
         &mut self,
-        event_publisher: Arc<dyn AuthorizationEventPublisher<()>>,
+        event_publisher: Arc<dyn AuthorizationEventPublisher>,
     ) {
         self.event_publisher = Some(event_publisher);
     }
@@ -92,8 +89,7 @@ impl AuthorizationFilter {
         match self
             .security_context_holder_strategy
             .get_context()
-            .map(|ctx| ctx.get_authentication())
-            .unwrap_or_default()
+            .and_then(|ctx| ctx.get_authentication().cloned())
         {
             Some(authentication) => Ok(authentication),
             None => Err("An Authentication object was not found in the SecurityContext"),
@@ -127,9 +123,9 @@ impl HttpFilter for AuthorizationFilter {
             .authorization_manager
             .authorize(authentication.as_ref(), var)
             .await;
-        self.event_publisher
-            .as_ref()
-            .map(|publisher| publisher.publish_authorization_event(authentication, (), result));
+        self.event_publisher.as_ref().map(|publisher| {
+            publisher.publish_authorization_event(authentication, todo!(), result)
+        });
 
         if result.as_ref().map(|s| s.is_granted()).unwrap_or(true) {
             return Err(FilterError::Custom("Access Denied".into()));

@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    any::TypeId,
+    sync::{Arc, Mutex},
+};
 
 use next_web_core::async_trait;
 
@@ -14,11 +17,10 @@ use crate::{
     core::{
         authentication_error::AuthenticationError,
         userdetails::{
-            user_details::UserDetails,
             user_details_password_service::{
                 NoopUserDetailsPasswordService, UserDetailsPasswordService,
             },
-            user_details_service::UserDetailsService,
+            UserDetails, UserDetailsService,
         },
         username_password_authentication_token::UsernamePasswordAuthenticationToken,
         Authentication,
@@ -77,7 +79,7 @@ impl DaoAuthenticationProvider {
         user_details: Arc<dyn UserDetails>,
         authentication: &UsernamePasswordAuthenticationToken,
     ) -> Result<(), AuthenticationError> {
-        let Some(presented_password) = authentication.get_credentials() else {
+        let Some(presented_password) = authentication.credentials() else {
             return Err(bad_credentials());
         };
 
@@ -187,74 +189,75 @@ impl DaoAuthenticationProvider {
 impl AuthenticationProvider for DaoAuthenticationProvider {
     async fn authenticate(
         &self,
-        authentication: &dyn Authentication,
-    ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
-        let Some(authentication) = authentication
-            .as_any()
-            .downcast_ref::<UsernamePasswordAuthenticationToken>()
-        else {
-            return Err(AuthenticationError::new(
-                "Only UsernamePasswordAuthenticationToken is supported",
-            ));
-        };
+        authentication: &Arc<dyn Authentication>,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
+        // let Some(authentication) = authentication
+        //     .as_any()
+        //     .downcast_ref::<UsernamePasswordAuthenticationToken>()
+        // else {
+        //     return Err(AuthenticationError::new(
+        //         "Only UsernamePasswordAuthenticationToken is supported",
+        //     ));
+        // };
 
-        let username = self.support.determine_username(authentication);
-        let cached_user = self.support.user_cache().get_user_from_cache(&username);
-        let mut cache_was_used = cached_user.is_some();
-        let mut user = if let Some(user) = cached_user {
-            user
-        } else {
-            self.retrieve_user(&username, authentication).await?
-        };
+        // let username = self.support.determine_username(authentication);
+        // let cached_user = self.support.user_cache().get_user_from_cache(&username);
+        // let mut cache_was_used = cached_user.is_some();
+        // let mut user = if let Some(user) = cached_user {
+        //     user
+        // } else {
+        //     self.retrieve_user(&username, authentication).await?
+        // };
 
-        let check_result = self
-            .support
-            .perform_pre_authentication_checks(user.as_ref())
-            .await;
+        // let check_result = self
+        //     .support
+        //     .perform_pre_authentication_checks(user.as_ref())
+        //     .await;
 
-        if let Err(error) = check_result {
-            if self.support.always_perform_additional_checks_on_user() {
-                let _ = self
-                    .additional_authentication_checks(user.clone(), authentication)
-                    .await;
-            }
-            if !cache_was_used {
-                return Err(error);
-            }
-            cache_was_used = false;
-            user = self.retrieve_user(&username, authentication).await?;
-            self.support
-                .perform_pre_authentication_checks(user.as_ref())
-                .await?;
-            self.additional_authentication_checks(user.clone(), authentication)
-                .await?;
-        } else {
-            self.additional_authentication_checks(user.clone(), authentication)
-                .await?;
-        }
+        // if let Err(error) = check_result {
+        //     if self.support.always_perform_additional_checks_on_user() {
+        //         let _ = self
+        //             .additional_authentication_checks(user.clone(), authentication)
+        //             .await;
+        //     }
+        //     if !cache_was_used {
+        //         return Err(error);
+        //     }
+        //     cache_was_used = false;
+        //     user = self.retrieve_user(&username, authentication).await?;
+        //     self.support
+        //         .perform_pre_authentication_checks(user.as_ref())
+        //         .await?;
+        //     self.additional_authentication_checks(user.clone(), authentication)
+        //         .await?;
+        // } else {
+        //     self.additional_authentication_checks(user.clone(), authentication)
+        //         .await?;
+        // }
 
-        self.support
-            .perform_post_authentication_checks(user.as_ref())
-            .await?;
+        // self.support
+        //     .perform_post_authentication_checks(user.as_ref())
+        //     .await?;
 
-        if !cache_was_used {
-            self.support
-                .user_cache()
-                .put_user_in_cache(username.clone(), user.clone());
-        }
+        // if !cache_was_used {
+        //     self.support
+        //         .user_cache()
+        //         .put_user_in_cache(username.clone(), user.clone());
+        // }
 
-        let presented_password = authentication.get_credentials();
-        self.check_compromised_password(presented_password.as_deref())?;
-        let user = self
-            .maybe_upgrade_password(user, presented_password.clone())
-            .await;
+        // let presented_password = authentication.get_credentials();
+        // self.check_compromised_password(presented_password.as_deref())?;
+        // let user = self
+        //     .maybe_upgrade_password(user, presented_password.clone())
+        //     .await;
 
-        self.support
-            .create_success_authentication(user.username(), authentication, user.as_ref())
-            .await
+        // self.support
+        //     .create_success_authentication(user.username(), authentication, user.as_ref())
+        //     .await
+        todo!()
     }
 
-    fn supports(&self, authentication: &str) -> bool {
-        authentication == std::any::type_name::<UsernamePasswordAuthenticationToken>()
+    fn supports(&self, authentication: TypeId) -> bool {
+        authentication == TypeId::of::<UsernamePasswordAuthenticationToken>()
     }
 }

@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::{traits::required::Required, util::http_method::HttpMethod};
 
@@ -55,12 +58,8 @@ where
 {
     /// Adds a LogoutHandler. SecurityContextLogoutHandler and
     /// LogoutSuccessEventPublishingLogoutHandler are added as last LogoutHandler instances by default.
-    pub fn add_logout_handler<T>(&mut self, logout_handler: T) -> &mut Self
-    where
-        T: LogoutHandler,
-        T: 'static,
-    {
-        self.logout_handlers.push(Arc::new(logout_handler));
+    pub fn add_logout_handler(&mut self, logout_handler: Arc<dyn LogoutHandler>) -> &mut Self {
+        self.logout_handlers.push(logout_handler);
 
         self
     }
@@ -127,12 +126,12 @@ where
         T: IntoIterator<Item = I>,
         I: ToString,
     {
-        self.add_logout_handler(CookieClearingLogoutHandler::new(
+        self.add_logout_handler(Arc::new(CookieClearingLogoutHandler::new(
             cookie_names_to_clear
                 .into_iter()
                 .map(|name| name.to_string())
                 .collect(),
-        ));
+        )));
 
         self
     }
@@ -269,19 +268,6 @@ where
     }
 }
 
-impl<H> Required<BaseHttpConfigurer<LogoutConfigurer<H>, H>> for LogoutConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn get_object(&self) -> &BaseHttpConfigurer<LogoutConfigurer<H>, H> {
-        &self.inner
-    }
-
-    fn get_mut_object(&mut self) -> &mut BaseHttpConfigurer<LogoutConfigurer<H>, H> {
-        &mut self.inner
-    }
-}
-
 impl<H> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, H>> for LogoutConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
@@ -347,5 +333,25 @@ where
 
             inner: Default::default(),
         }
+    }
+}
+
+impl<H> Deref for LogoutConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    type Target = BaseHttpConfigurer<Self, H>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<H> DerefMut for LogoutConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }

@@ -11,6 +11,7 @@ pub enum AnyValue {
     Map(HashMap<String, AnyValue>),
     List(Vec<AnyValue>),
     Object(Box<dyn AnyClone>),
+
     #[default]
     Null,
 }
@@ -138,6 +139,16 @@ impl AnyValue {
         if let AnyValue::Object(obj) = self {
             let any_obj: &dyn Any = obj.as_ref();
             any_obj.downcast_ref()
+        } else {
+            None
+        }
+    }
+
+    /// Get a mutable reference to the object value.
+    pub fn as_mut_object<T: Any>(&mut self) -> Option<&mut T> {
+        if let AnyValue::Object(obj) = self {
+            let any_obj: &mut dyn Any = obj.as_mut();
+            any_obj.downcast_mut()
         } else {
             None
         }

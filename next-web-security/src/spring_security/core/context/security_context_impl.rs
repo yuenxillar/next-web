@@ -8,7 +8,7 @@ pub struct SecurityContextImpl {
 }
 
 impl SecurityContext for SecurityContextImpl {
-    fn get_authentication(&self) -> Option<Arc<dyn Authentication>> {
+    fn get_authentication(&self) -> Option<&Arc<dyn Authentication>> {
         todo!()
     }
 

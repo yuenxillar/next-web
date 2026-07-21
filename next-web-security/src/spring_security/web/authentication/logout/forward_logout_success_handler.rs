@@ -3,6 +3,7 @@ use next_web_core::{
     error::BoxError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
+use std::sync::Arc;
 
 use crate::{
     core::Authentication,
@@ -35,7 +36,7 @@ impl LogoutSuccessHandler for ForwardLogoutSuccessHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        _authentication: Option<&dyn Authentication>,
+        _authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError> {
         if let Some(rd) = request.request_dispatcher(&self.target_url) {
             rd.forward(request, response)?;
