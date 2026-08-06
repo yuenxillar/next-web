@@ -29,6 +29,7 @@ members = [
     "next-web-cloud",
     "next-web-cloud/next-web-cloud-jingyue",
     "next-web-context",
+    "next-web-singletons",
 ]
 exclude = ["next-web-code-generator"]
 resolver = "2"
@@ -71,9 +72,10 @@ todo = "warn"
 
 [workspace.dependencies]
 # next dependencies
-next-web = { version = "0.1.7", path = "./next-web" }
-next-web-core = { version = "0.1.5", path = "./next-web-core" }
-next-web-context = { version = "0.1.0", path = "./next-web-context" }
+next-web            = { version = "0.1.7", path = "./next-web"            }
+next-web-core       = { version = "0.1.5", path = "./next-web-core"       }
+next-web-context    = { version = "0.1.0", path = "./next-web-context"    }
+next-web-singletons = { version = "0.1.0", path = "./next-web-singletons" }
 
 next-web-ai = { version = "0.1.0", path = "./next-web-ai" }
 next-web-api-doc = { version = "0.1.0", path = "./next-web-api-doc" }

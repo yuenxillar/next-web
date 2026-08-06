@@ -3,10 +3,7 @@ use std::sync::{Arc, RwLock};
 use futures::future::BoxFuture;
 use next_web_core::filter::FilterError;
 
-use crate::core::context::{
-    security_context::SecurityContext,
-    security_context_holder_strategy::SecurityContextHolderStrategy,
-};
+use crate::core::context::{security_context::SecurityContext, SecurityContextHolderStrategy};
 
 static GLOBAL_CONTEXT: RwLock<Option<Arc<dyn SecurityContext>>> = RwLock::new(None);
 

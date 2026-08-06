@@ -5,8 +5,6 @@ use next_web_core::{filter::CorsFilter, traits::filter::HttpFilter};
 use crate::web::{
     access::{intercept::AuthorizationFilter, ErrorTranslationFilter},
     authentication::{
-        base_authentication_filter::BasicAuthenticationFilter,
-        base_authentication_processing_filter::BaseAuthenticationProcessingFilter,
         logout::LogoutFilter,
         ott::{GenerateOneTimeTokenFilter, OneTimeTokenAuthenticationFilter},
         switchuser::SwitchUserFilter,
@@ -15,7 +13,8 @@ use crate::web::{
             DefaultOneTimeTokenSubmitPageGeneratingFilter, DefaultResourcesFilter,
         },
         www::DigestAuthenticationFilter,
-        AnonymousAuthenticationFilter, AuthenticationFilter, RememberMeAuthenticationFilter,
+        AnonymousAuthenticationFilter, AuthenticationFilter, BaseAuthenticationProcessingFilter,
+        BasicAuthenticationFilter, RememberMeAuthenticationFilter,
         UsernamePasswordAuthenticationFilter,
     },
     context::SecurityContextHolderFilter,

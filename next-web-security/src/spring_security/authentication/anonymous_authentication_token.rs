@@ -1,4 +1,8 @@
-use std::sync::{Arc, LazyLock};
+use std::{
+    any::TypeId,
+    ops::{Deref, DerefMut},
+    sync::{Arc, LazyLock},
+};
 
 use next_web_core::error::BoxError;
 
@@ -8,8 +12,7 @@ use crate::{
     web::authentication::AuthPrincipal,
 };
 
-pub(crate) static EMPTY_CREDENTIALS: LazyLock<AuthPrincipal> =
-    LazyLock::new(|| Arc::new(String::new()));
+pub static EMPTY_STRING: LazyLock<AuthPrincipal> = LazyLock::new(|| Arc::new(String::new()));
 
 /// Represents an anonymous Authentication.
 #[derive(Clone)]
@@ -52,10 +55,6 @@ impl AnonymousAuthenticationToken {
     pub fn key_hash(&self) -> i32 {
         self.key_hash
     }
-
-    pub fn set_details(&mut self, details: Option<AuthPrincipal>) {
-        self.inner.set_details(details);
-    }
 }
 
 impl Authentication for AnonymousAuthenticationToken {
@@ -64,7 +63,7 @@ impl Authentication for AnonymousAuthenticationToken {
     }
 
     fn credentials(&self) -> Option<&AuthPrincipal> {
-        Some(&EMPTY_CREDENTIALS)
+        Some(&EMPTY_STRING)
     }
 
     fn details(&self) -> Option<&AuthPrincipal> {
@@ -82,11 +81,33 @@ impl Authentication for AnonymousAuthenticationToken {
     fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
         self.inner.set_authenticated(is_authenticated)
     }
+
+    fn to_builder(&self) -> Box<dyn crate::core::AuthenticationBuilder> {
+        self.inner.to_builder()
+    }
+
+    fn of(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
 }
 
 impl Principal for AnonymousAuthenticationToken {
     fn name(&self) -> &str {
         self.inner.name()
+    }
+}
+
+impl Deref for AnonymousAuthenticationToken {
+    type Target = BaseAuthenticationToken;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for AnonymousAuthenticationToken {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }
 

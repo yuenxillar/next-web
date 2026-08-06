@@ -3,8 +3,12 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
-use crate::web::authentication::authentication_failure_handler::AuthenticationFailureHandler;
+use crate::web::{
+    authentication::authentication_failure_handler::AuthenticationFailureHandler, util::UrlUtils,
+    WebAttributes,
+};
 
+/// Forward Authentication Failure Handler
 #[derive(Clone)]
 pub struct ForwardAuthenticationFailureHandler {
     pub(crate) forward_url: Box<str>,
@@ -14,7 +18,7 @@ impl ForwardAuthenticationFailureHandler {
     pub fn new(forward_url: impl Into<Box<str>>) -> Self {
         let forward_url = forward_url.into();
         assert!(
-            forward_url.starts_with("/"),
+            UrlUtils::is_valid_redirect_url(forward_url.as_ref()),
             "{} is not a valid forward URL",
             forward_url.as_ref()
         );
@@ -29,11 +33,11 @@ impl AuthenticationFailureHandler for ForwardAuthenticationFailureHandler {
         response: &mut dyn HttpResponse,
         error: &crate::core::authentication_error::AuthenticationError,
     ) -> Result<(), BoxError> {
-        request.set_attribute("NEXT_SECURITY_LAST_ERROR", error.clone().into());
-        // TODO: request_dispatcher always returns None currently;
-        // forward will be implemented when RequestDispatcher is wired up.
-        let _ = response;
+        request.set_attribute(WebAttributes::AUTHENTICATION_ERROR, error.clone().into());
+        if let Some(request_dispatcher) = request.request_dispatcher(&self.forward_url) {
+            return request_dispatcher.forward(request, response);
+        }
 
-        todo!()
+        Ok(())
     }
 }

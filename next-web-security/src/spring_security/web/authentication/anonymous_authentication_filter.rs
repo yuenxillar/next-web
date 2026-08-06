@@ -17,10 +17,7 @@ use crate::{
     authorization::AuthenticationDetailsSource,
     core::{
         authority_utils::AuthorityUtils,
-        context::{
-            security_context_holder::SecurityContextHolder, SecurityContext,
-            SecurityContextHolderStrategy,
-        },
+        context::{SecurityContext, SecurityContextHolder, SecurityContextHolderStrategy},
         granted_authority::GrantedAuthority,
         Authentication,
     },

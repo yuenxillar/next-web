@@ -1,5 +1,19 @@
+mod base_session_fixation_protection_strategy;
+mod change_session_id_authentication_strategy;
+mod composite_session_authentication_strategy;
+mod concurrent_session_control_authentication_strategy;
+mod register_session_authentication_strategy;
 mod session_authentication_strategy;
+mod session_fixation_protection_event;
 mod session_limit;
 
+pub use self::base_session_fixation_protection_strategy::{
+    BaseSessionFixationProtectionStrategy, BaseSessionFixationProtectionStrategyExt,
+};
+pub use self::change_session_id_authentication_strategy::ChangeSessionIdAuthenticationStrategy;
+pub use self::composite_session_authentication_strategy::CompositeSessionAuthenticationStrategy;
+pub use self::concurrent_session_control_authentication_strategy::ConcurrentSessionControlAuthenticationStrategy;
+pub use self::register_session_authentication_strategy::RegisterSessionAuthenticationStrategy;
 pub use self::session_authentication_strategy::SessionAuthenticationStrategy;
+pub use self::session_fixation_protection_event::SessionFixationProtectionEvent;
 pub use self::session_limit::{session_limit_of, SessionLimit};

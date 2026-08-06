@@ -1,20 +1,23 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use next_web_core::{
     error::BoxError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
-use crate::web::access::{AccessDeniedError, AccessDeniedHandler};
+use crate::web::{
+    access::{AccessDeniedError, AccessDeniedHandler},
+    util::matcher::RequestMatcher,
+};
 
 pub struct RequestMatcherDelegatingAccessDeniedHandler {
-    handlers: BTreeMap<String, Arc<dyn AccessDeniedHandler>>,
+    handlers: Vec<(Arc<dyn RequestMatcher>, Arc<dyn AccessDeniedHandler>)>,
     default_handler: Arc<dyn AccessDeniedHandler>,
 }
 
 impl RequestMatcherDelegatingAccessDeniedHandler {
     pub fn new(
-        handlers: BTreeMap<String, Arc<dyn AccessDeniedHandler>>,
+        handlers: Vec<(Arc<dyn RequestMatcher>, Arc<dyn AccessDeniedHandler>)>,
         default_handler: Arc<dyn AccessDeniedHandler>,
     ) -> Self {
         Self {
@@ -29,7 +32,7 @@ impl AccessDeniedHandler for RequestMatcherDelegatingAccessDeniedHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        access_denied_error: AccessDeniedError,
+        access_denied_error: &AccessDeniedError,
     ) -> Result<(), BoxError> {
         todo!()
     }

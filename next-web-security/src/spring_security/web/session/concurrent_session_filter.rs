@@ -14,7 +14,7 @@ use tracing::debug;
 
 use crate::{
     core::{
-        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
+        context::{SecurityContextHolder, SecurityContextHolderStrategy},
         session::SessionRegistry,
     },
     web::{

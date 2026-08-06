@@ -1,4 +1,4 @@
-use std::{any::TypeId, collections::HashMap, fs::File, io::Read, sync::Arc};
+use std::{any::TypeId, borrow::Cow, collections::HashMap, fs::File, io::Read, sync::Arc};
 
 use axum::{response::Html, routing::get};
 use next_web::{
@@ -64,6 +64,7 @@ impl Application for TestApplication {
         &self,
         ctx: &mut ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        let a: HashMap<Cow<'static, str>, i32> = HashMap::new();
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
 
         let web_security_configurers = ctx.resolve_by_type::<Box<dyn WebSecurityConfigurer>>();

@@ -4,6 +4,7 @@ pub mod authentication;
 pub mod authorization;
 pub mod cas;
 pub mod config;
+pub mod context;
 pub mod core;
 pub mod crypto;
 pub mod data;

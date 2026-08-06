@@ -13,7 +13,8 @@ pub use access_denied_handler::AccessDeniedHandler;
 pub use access_denied_handler_impl::AccessDeniedHandlerImpl;
 pub use delegating_access_denied_handler::DelegatingAccessDeniedHandler;
 pub use delegating_missing_authority_access_denied_handler::{
-    Builder, DelegatingMissingAuthorityAccessDeniedHandler,
+    DelegatingMissingAuthorityAccessDeniedHandler,
+    DelegatingMissingAuthorityAccessDeniedHandlerBuilder,
 };
 pub use error_translation_filter::ErrorTranslationFilter;
 pub use request_matcher_delegating_access_denied_handler::RequestMatcherDelegatingAccessDeniedHandler;

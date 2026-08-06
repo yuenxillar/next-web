@@ -16,7 +16,7 @@ use crate::{
     access::intercept::request_authorization_context::RequestAuthorizationContext,
     authorization::{AuthorizationEventPublisher, AuthorizationManager},
     core::{
-        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
+        context::{SecurityContextHolder, SecurityContextHolderStrategy},
         Authentication,
     },
 };

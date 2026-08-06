@@ -5,6 +5,8 @@ mod invalid_session_strategy;
 mod session_information_expired_event;
 mod session_information_expired_strategy;
 mod session_management_filter;
+mod simple_redirect_invalid_session_strategy;
+mod simple_redirect_session_information_expired_strategy;
 
 pub use concurrent_session_filter::ConcurrentSessionFilter;
 pub use force_eager_session_creation_filter::ForceEagerSessionCreationFilter;
@@ -13,3 +15,5 @@ pub use invalid_session_strategy::InvalidSessionStrategy;
 pub use session_information_expired_event::SessionInformationExpiredEvent;
 pub use session_information_expired_strategy::SessionInformationExpiredStrategy;
 pub use session_management_filter::SessionManagementFilter;
+pub use simple_redirect_invalid_session_strategy::SimpleRedirectInvalidSessionStrategy;
+pub use simple_redirect_session_information_expired_strategy::SimpleRedirectSessionInformationExpiredStrategy;

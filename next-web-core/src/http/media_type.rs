@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use crate::util::{MimeType, MimeTypeUtils};
 
@@ -107,133 +107,111 @@ impl MediaType {
     pub const TEXT_XML_VALUE: &'static str = "text/xml";
 
     /// Media type for "*&#42;*", including all media ranges.
-
     pub fn all() -> MediaType {
         MediaType::with_subtype(MimeType::WILDCARD_TYPE, MimeType::WILDCARD_TYPE)
     }
 
     /// Media type for `application/atom+xml`.
-
     pub fn application_atom_xml() -> MediaType {
         MediaType::with_subtype("application", "atom+xml")
     }
 
     /// Media type for `application/cbor`.
-
     pub fn application_cbor() -> MediaType {
         MediaType::with_subtype("application", "cbor")
     }
 
     /// Media type for `application/x-www-form-urlencoded`.
-
     pub fn application_form_urlencoded() -> MediaType {
         MediaType::with_subtype("application", "x-www-form-urlencoded")
     }
 
     /// Media type for `application/graphql-response+json`.
-
     pub fn application_graphql_response() -> MediaType {
         MediaType::with_subtype("application", "graphql-response+json")
     }
 
     /// Media type for `application/json`.
-
     pub fn application_json() -> MediaType {
         MediaType::with_subtype("application", "json")
     }
 
     /// Media type for `application/octet-stream`.
-
     pub fn application_octet_stream() -> MediaType {
         MediaType::with_subtype("application", "octet-stream")
     }
 
     /// Media type for `application/pdf`.
-
     pub fn application_pdf() -> MediaType {
         MediaType::with_subtype("application", "pdf")
     }
 
     /// Media type for `application/problem+json`.
-
     pub fn application_problem_json() -> MediaType {
         MediaType::with_subtype("application", "problem+json")
     }
 
     /// Media type for `application/problem+xml`.
-
     pub fn application_problem_xml() -> MediaType {
         MediaType::with_subtype("application", "problem+xml")
     }
 
     /// Media type for `application/x-protobuf`.
-
     pub fn application_protobuf() -> MediaType {
         MediaType::with_subtype("application", "x-protobuf")
     }
 
     /// Media type for `application/rss+xml`.
-
     pub fn application_rss_xml() -> MediaType {
         MediaType::with_subtype("application", "rss+xml")
     }
 
     /// Media type for `application/x-ndjson`.
-
     pub fn application_ndjson() -> MediaType {
         MediaType::with_subtype("application", "x-ndjson")
     }
 
     /// Media type for `application/xhtml+xml`.
-
     pub fn application_xhtml_xml() -> MediaType {
         MediaType::with_subtype("application", "xhtml+xml")
     }
 
     /// Media type for `application/xml`.
-
     pub fn application_xml() -> MediaType {
         MediaType::with_subtype("application", "xml")
     }
 
     /// Media type for `application/yaml`.
-
     pub fn application_yaml() -> MediaType {
         MediaType::with_subtype("application", "yaml")
     }
 
     /// Media type for `image/gif`.
-
     pub fn image_gif() -> MediaType {
         MediaType::with_subtype("image", "gif")
     }
 
     /// Media type for `image/jpeg`.
-
     pub fn image_jpeg() -> MediaType {
         MediaType::with_subtype("image", "jpeg")
     }
 
     /// Media type for `image/png`.
-
     pub fn image_png() -> MediaType {
         MediaType::with_subtype("image", "png")
     }
 
     /// Media type for `multipart/form-data`.
-
     pub fn multipart_form_data() -> MediaType {
         MediaType::with_subtype("multipart", "form-data")
     }
 
     /// Media type for `multipart/mixed`.
-
     pub fn multipart_mixed() -> MediaType {
         MediaType::with_subtype("multipart", "mixed")
     }
 
     /// Media type for `multipart/related`.
-
     pub fn multipart_related() -> MediaType {
         MediaType::with_subtype("multipart", "related")
     }
@@ -250,21 +228,23 @@ impl MediaType {
     }
 
     /// Media type for `text/markdown`.
-
     pub fn text_markdown() -> MediaType {
         MediaType::with_subtype("text", "markdown")
     }
 
     /// Media type for `text/plain`.
-
     pub fn text_plain() -> MediaType {
         MediaType::with_subtype("text", "plain")
     }
 
     /// Media type for `text/xml`.
-
     pub fn text_xml() -> MediaType {
         MediaType::with_subtype("text", "xml")
+    }
+
+    /// Returns a list of all media types that match `*/*`.
+    pub fn media_type_all_list() -> Vec<MediaType> {
+        vec![MediaType::all()]
     }
 
     /// Create a new `MediaType` for the given primary type.
@@ -716,7 +696,7 @@ impl MediaType {
     /// # Returns
     ///
     /// The list of media types
-    pub fn parse_media_types_from_list(media_types: Option<&[String]>) -> Vec<MediaType> {
+    pub fn parse_media_types_from_string_list(media_types: Option<&[String]>) -> Vec<MediaType> {
         let media_types = match media_types {
             Some(list) if !list.is_empty() => list,
             _ => return Vec::new(),
@@ -726,7 +706,33 @@ impl MediaType {
             return MediaType::parse_media_types(Some(&media_types[0]));
         }
 
-        let mut result = Vec::new();
+        let mut result = Vec::with_capacity(media_types.len());
+        for media_type in media_types {
+            result.extend(MediaType::parse_media_types(Some(media_type)));
+        }
+        result
+    }
+
+    /// Parses a list of media types from a list of strings.
+    ///
+    /// # Arguments
+    ///
+    /// * `media_types` - the list of strings to parse
+    ///
+    /// # Returns
+    ///
+    /// The list of media types
+    pub fn parse_media_types_from_str_list(media_types: Option<&Vec<&str>>) -> Vec<MediaType> {
+        let media_types = match media_types {
+            Some(list) if !list.is_empty() => list,
+            _ => return Vec::new(),
+        };
+
+        if media_types.len() == 1 {
+            return MediaType::parse_media_types(Some(&media_types[0]));
+        }
+
+        let mut result = Vec::with_capacity(media_types.len());
         for media_type in media_types {
             result.extend(MediaType::parse_media_types(Some(media_type)));
         }
@@ -790,5 +796,13 @@ impl MediaType {
 impl std::fmt::Display for MediaType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.mime_type)
+    }
+}
+
+impl Deref for MediaType {
+    type Target = MimeType;
+
+    fn deref(&self) -> &Self::Target {
+        &self.mime_type
     }
 }

@@ -1,0 +1,7 @@
+[package]
+name = "next-web-singletons"
+version = "0.1.0"
+keywords = ["next-web", "singletons"]
+readme = "README.md"
+
+[dependencies]

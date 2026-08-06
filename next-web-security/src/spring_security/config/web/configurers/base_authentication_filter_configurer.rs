@@ -20,18 +20,15 @@ use crate::{
                 permit_all_support::PermitAllSupport, BaseHttpConfigurer, ErrorHandlingConfigurer,
                 LogoutConfigurer, SecurityContextConfigurer,
             },
-            http_security_builder::HttpSecurityBuilder,
+            HttpSecurityBuilder,
         },
     },
     web::{
         authentication::{
-            authentication_failure_handler::AuthenticationFailureHandler,
-            base_authentication_processing_filter::BaseAuthenticationProcessingFilter,
-            login_url_authentication_entry_point::LoginUrlAuthenticationEntryPoint,
-            session::SessionAuthenticationStrategy,
-            simple_url_authentication_failure_handler::SimpleUrlAuthenticationFailureHandler,
-            AuthenticationSuccessHandler, RememberMeServices,
-            SavedRequestAwareAuthenticationSuccessHandler,
+            session::SessionAuthenticationStrategy, AuthenticationFailureHandler,
+            AuthenticationSuccessHandler, BaseAuthenticationProcessingFilter,
+            LoginUrlAuthenticationEntryPoint, RememberMeServices,
+            SavedRequestAwareAuthenticationSuccessHandler, SimpleUrlAuthenticationFailureHandler,
         },
         context::SecurityContextRepository,
         default_security_filter_chain::DefaultSecurityFilterChain,
@@ -73,6 +70,7 @@ where
 impl<B, T, F> BaseAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
+    B: 'static,
 
     T: Deref<Target = Self>,
     T: DerefMut,
@@ -127,8 +125,6 @@ where
 
     /// Specifies a custom `AuthenticationDetailsSource`. The default is
     /// `WebAuthenticationDetailsSource`.
-    ///
-
     pub fn authentication_details_source(
         &mut self,
         authentication_details_source: Arc<dyn AuthenticationDetailsSource>,
@@ -174,17 +170,6 @@ where
         self.auth_filter
             .as_mut()
             .map(|filter| filter.set_failure_handler(authentication_failure_handler));
-    }
-
-    /// Specifies the URL to send users to if login is required. If used with EnableWebSecurity a default login page
-    /// will be generated when this attribute is not specified.
-    ///
-    /// If a URL is specified or this is not being used in conjunction with EnableWebSecurity,
-    /// users are required to process the specified URL to generate a login page.
-    pub fn login_page(&mut self, login_page: impl Into<Box<str>>) {
-        self.set_login_page(login_page);
-        self.update_authentication_defaults(todo!());
-        self.custom_login_page = true;
     }
 
     /// Registers the default authentication entry point.
@@ -241,7 +226,7 @@ where
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| Arc::new(HeaderContentNegotiationStrategy::default()));
 
-        let mut media_matcher = MediaTypeRequestMatcher::new(
+        let mut media_matcher = MediaTypeRequestMatcher::with_strategy(
             content_negotiation_strategy,
             vec![
                 MediaType::application_xhtml_xml(),
@@ -339,8 +324,9 @@ where
     /// Sets the login_page and updates the `AuthenticationEntryPoint`.
     fn set_login_page(&mut self, login_page: impl Into<Box<str>>) {
         self.login_page = login_page.into();
-        self.authentication_entry_point =
-            Some(LoginUrlAuthenticationEntryPoint::new(&self.login_page));
+        self.authentication_entry_point = Some(LoginUrlAuthenticationEntryPoint::new(
+            self.login_page.as_ref(),
+        ));
     }
 }
 
@@ -374,9 +360,11 @@ where
     }
 }
 
-impl<B, T, F> BaseAuthenticationFilterConfigurerExt for BaseAuthenticationFilterConfigurer<B, T, F>
+impl<B, T, F> BaseAuthenticationFilterConfigurerExt<B>
+    for BaseAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
+    B: 'static,
 
     T: Deref<Target = Self>,
     T: DerefMut,
@@ -392,9 +380,14 @@ where
             .map(|filter| filter.set_requires_authentication_request_matcher(matcher));
     }
 
-    fn login_page(&mut self, login_page: &str) {
+    /// Specifies the URL to send users to if login is required. If used with EnableWebSecurity a default login page
+    /// will be generated when this attribute is not specified.
+    ///
+    /// If a URL is specified or this is not being used in conjunction with EnableWebSecurity,
+    /// users are required to process the specified URL to generate a login page.
+    fn login_page(&mut self, login_page: &str, http: &mut B) {
         self.set_login_page(login_page);
-        self.update_authentication_defaults(todo!());
+        self.update_authentication_defaults(http);
         self.custom_login_page = true;
     }
 }
@@ -502,6 +495,7 @@ where
 impl<B, T, F> Default for BaseAuthenticationFilterConfigurer<B, T, F>
 where
     B: HttpSecurityBuilder<B>,
+    B: 'static,
 
     T: Deref<Target = Self>,
     T: DerefMut,
@@ -532,10 +526,13 @@ where
     }
 }
 
-pub trait BaseAuthenticationFilterConfigurerExt {
+pub trait BaseAuthenticationFilterConfigurerExt<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
     fn login_processing_url(&mut self, login_processing_url: &str);
 
-    fn login_page(&mut self, login_page: &str);
+    fn login_page(&mut self, login_page: &str, http: &mut H);
 
     fn create_login_processing_url_matcher(
         &self,

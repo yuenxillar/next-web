@@ -1,5 +1,6 @@
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::fmt;
+use std::ops::DerefMut;
 use std::sync::Arc;
 
 use next_web_core::error::BoxError;
@@ -7,9 +8,9 @@ use next_web_core::error::BoxError;
 use crate::core::granted_authority::GrantedAuthority;
 use crate::core::userdetails::user::User;
 use crate::core::userdetails::UserDetails;
-use crate::core::username_password_authentication_token::UsernamePasswordAuthenticationToken;
 use crate::core::{AuthenticatedPrincipal, Principal};
 use crate::core::{Authentication, CredentialsContainer};
+use crate::core::{SimpleAuthenticationBuilder, UsernamePasswordAuthenticationToken};
 use crate::web::authentication::AuthPrincipal;
 
 #[derive(Clone)]
@@ -44,7 +45,10 @@ impl BaseAuthenticationToken {
     /// # Arguments
     ///
     /// * `builder` - the builder containing the token configuration
-    pub fn from_builder(mut builder: BaseAuthenticationBuilder) -> Self {
+    pub fn from_builder<T>(builder: &mut T) -> Self
+    where
+        T: DerefMut<Target = BaseAuthenticationBuilder>,
+    {
         Self {
             authorities: std::mem::take(&mut builder.authorities),
             details: builder.details.take(),
@@ -88,12 +92,19 @@ impl Authentication for BaseAuthenticationToken {
 
     fn set_authenticated(&mut self, authenticated: bool) -> Result<(), BoxError> {
         self.authenticated = authenticated;
-
         Ok(())
     }
 
     fn details(&self) -> Option<&AuthPrincipal> {
         self.details.as_ref()
+    }
+
+    fn to_builder(&self) -> Box<dyn crate::core::AuthenticationBuilder> {
+        Box::new(SimpleAuthenticationBuilder::new(self))
+    }
+
+    fn of(&self) -> TypeId {
+        TypeId::of::<Self>()
     }
 }
 
@@ -227,9 +238,24 @@ impl BaseAuthenticationBuilder {
     /// # Arguments
     ///
     /// * `token` - the token to initialize the builder from
-    pub fn new(token: &BaseAuthenticationToken) -> Self {
+    pub fn new<T>(token: &mut T) -> Self
+    where
+        T: DerefMut<Target = BaseAuthenticationToken>,
+    {
         Self {
-            authorities: token.authorities.clone(),
+            authorities: std::mem::take(&mut token.authorities),
+            authenticated: token.is_authenticated(),
+            details: token.details.take(),
+        }
+    }
+
+    /// Creates a new builder from an existing token.
+    pub fn with_token<T>(token: &T) -> Self
+    where
+        T: DerefMut<Target = BaseAuthenticationToken>,
+    {
+        Self {
+            authorities: token.authorities.to_vec(),
             authenticated: token.is_authenticated(),
             details: token.details.clone(),
         }
@@ -244,7 +270,7 @@ impl BaseAuthenticationBuilder {
     /// # Returns
     ///
     /// The builder for method chaining
-    pub fn authenticated(mut self, authenticated: bool) -> Self {
+    pub fn authenticated(&mut self, authenticated: bool) -> &mut Self {
         self.authenticated = authenticated;
         self
     }
@@ -258,7 +284,7 @@ impl BaseAuthenticationBuilder {
     /// # Returns
     ///
     /// The builder for method chaining
-    pub fn details(mut self, details: Option<AuthPrincipal>) -> Self {
+    pub fn details(&mut self, details: Option<AuthPrincipal>) -> &mut Self {
         self.details = details;
         self
     }
@@ -272,12 +298,22 @@ impl BaseAuthenticationBuilder {
     /// # Returns
     ///
     /// The builder for method chaining
-    pub fn authorities<F>(mut self, authorities: F) -> Self
+    pub fn authorities<F>(&mut self, authorities: F) -> &mut Self
     where
         F: FnOnce(&mut Vec<Arc<dyn GrantedAuthority>>),
     {
         authorities(&mut self.authorities);
         self.authenticated = true;
         self
+    }
+}
+
+impl Default for BaseAuthenticationToken {
+    fn default() -> Self {
+        Self {
+            authorities: Vec::new(),
+            authenticated: false,
+            details: None,
+        }
     }
 }

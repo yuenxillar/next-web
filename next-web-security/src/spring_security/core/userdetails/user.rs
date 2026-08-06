@@ -1,11 +1,16 @@
-use std::{fmt, sync::Arc};
+use std::{
+    fmt,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use crate::core::{
     credentials_container::CredentialsContainer, granted_authority::GrantedAuthority,
     userdetails::UserDetails,
 };
 
-#[derive(Clone)]
 pub struct User {
     password: Option<String>,
     username: String,
@@ -14,6 +19,8 @@ pub struct User {
     account_non_locked: bool,
     credentials_non_expired: bool,
     enabled: bool,
+
+    cleared: AtomicBool,
 }
 
 impl User {
@@ -47,6 +54,7 @@ impl User {
             account_non_locked,
             credentials_non_expired,
             enabled,
+            cleared: AtomicBool::new(false),
         }
     }
 
@@ -61,6 +69,9 @@ impl UserDetails for User {
     }
 
     fn password(&self) -> Option<&str> {
+        if self.cleared.load(Ordering::Acquire) {
+            return None;
+        }
         self.password.as_deref()
     }
 
@@ -87,8 +98,7 @@ impl UserDetails for User {
 
 impl CredentialsContainer for User {
     fn erase_credentials(&self) {
-        // self.password = None;
-        todo!()
+        self.cleared.store(true, Ordering::Release);
     }
 }
 
@@ -116,6 +126,22 @@ impl fmt::Debug for User {
             .field("credentials_non_expired", &self.credentials_non_expired)
             .field("account_non_locked", &self.account_non_locked)
             .field("authorities_len", &self.authorities.len())
+            .field("cleared", &self.cleared.load(Ordering::Acquire))
             .finish()
+    }
+}
+
+impl Clone for User {
+    fn clone(&self) -> Self {
+        Self {
+            password: self.password.clone(),
+            username: self.username.clone(),
+            authorities: self.authorities.clone(),
+            account_non_expired: self.account_non_expired,
+            account_non_locked: self.account_non_locked,
+            credentials_non_expired: self.credentials_non_expired,
+            enabled: self.enabled,
+            cleared: AtomicBool::new(self.cleared.load(Ordering::Acquire)),
+        }
     }
 }

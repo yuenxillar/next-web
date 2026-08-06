@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::core::factor_granted_authority::FactorGrantedAuthority;
+use crate::core::authority::FactorGrantedAuthority;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct RequiredFactor {

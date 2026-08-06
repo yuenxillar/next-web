@@ -1,7 +1,7 @@
 use crate::authorization::required_factor::RequiredFactor;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum RequiredFactorErrorKind {
+pub enum RequiredFactorErrorReason {
     Missing,
     Expired,
 }
@@ -9,21 +9,21 @@ pub enum RequiredFactorErrorKind {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct RequiredFactorError {
     required_factor: RequiredFactor,
-    kind: RequiredFactorErrorKind,
+    reason: RequiredFactorErrorReason,
 }
 
 impl RequiredFactorError {
     pub fn create_missing(required_factor: RequiredFactor) -> Self {
         Self {
             required_factor,
-            kind: RequiredFactorErrorKind::Missing,
+            reason: RequiredFactorErrorReason::Missing,
         }
     }
 
     pub fn create_expired(required_factor: RequiredFactor) -> Self {
         Self {
             required_factor,
-            kind: RequiredFactorErrorKind::Expired,
+            reason: RequiredFactorErrorReason::Expired,
         }
     }
 
@@ -31,7 +31,11 @@ impl RequiredFactorError {
         &self.required_factor
     }
 
-    pub fn kind(&self) -> &RequiredFactorErrorKind {
-        &self.kind
+    pub fn reason(&self) -> &RequiredFactorErrorReason {
+        &self.reason
+    }
+
+    pub fn is_expired(&self) -> bool {
+        matches!(self.reason, RequiredFactorErrorReason::Expired)
     }
 }

@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use super::session_information::SessionInformation;
 
 pub trait SessionRegistry
@@ -8,7 +10,7 @@ where
 
     fn all_sessions(
         &self,
-        principal: &str,
+        principal: &dyn Any,
         include_expired_sessions: bool,
     ) -> Vec<SessionInformation>;
 
@@ -16,7 +18,7 @@ where
 
     fn refresh_last_request(&self, session_id: &str);
 
-    fn register_new_session(&self, session_id: &str, principal: &str);
+    fn register_new_session(&self, session_id: &str, principal: &dyn Any);
 
     fn remove_session_information(&self, session_id: &str);
 }

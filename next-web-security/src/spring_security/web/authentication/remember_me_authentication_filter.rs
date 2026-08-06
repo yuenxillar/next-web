@@ -16,9 +16,7 @@ use tracing::debug;
 use crate::{
     authentication::event::InteractiveAuthenticationSuccessEvent,
     authorization::AuthenticationManager,
-    core::context::{
-        security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy,
-    },
+    core::context::{SecurityContextHolder, SecurityContextHolderStrategy},
     web::{
         authentication::{
             remember_me_services::RememberMeServices, session::SessionAuthenticationStrategy,
@@ -160,7 +158,7 @@ impl HttpFilter for RememberMeAuthenticationFilter {
                     .authenticate(rememberme_token.as_ref())?;
                 if let Some(session_strategy) = self.session_strategy.as_ref() {
                     session_strategy
-                        .on_authentication(remember_me_auth.as_ref(), request, response)
+                        .on_authentication(&remember_me_auth, request, response)
                         .await?;
                 }
                 // Store to SecurityContextHolder

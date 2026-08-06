@@ -26,6 +26,10 @@ where
 
     fn session_mut(&mut self, create: bool) -> Option<&mut dyn HttpSession>;
 
+    fn change_session_id(&mut self) -> String;
+
+    fn is_requested_session_id_valid(&self) -> bool;
+
     fn auth_type(&self) -> AuthType;
 
     fn cookie(&self) -> Option<&Cookie>;
@@ -39,6 +43,10 @@ where
     fn version(&self) -> Version;
 
     fn header(&self, header_name: &str) -> Option<&str>;
+
+    fn header_values(&self, header_name: &str) -> Vec<&str>;
+
+    fn header_names(&self) -> Vec<&str>;
 
     fn uri(&self) -> &Uri;
 
@@ -102,6 +110,14 @@ impl HttpRequest for Request {
         todo!()
     }
 
+    fn change_session_id(&mut self) -> String {
+        todo!()
+    }
+
+    fn is_requested_session_id_valid(&self) -> bool {
+        todo!()
+    }
+
     fn cookie(&self) -> Option<&Cookie> {
         todo!()
     }
@@ -158,6 +174,22 @@ impl HttpRequest for Request {
         self.headers()
             .get(header_name)
             .map(|value| value.to_str().ok().unwrap_or_default())
+    }
+
+    fn header_values(&self, header_name: &str) -> Vec<&str> {
+        self.headers()
+            .get_all(header_name)
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .collect()
+    }
+
+    fn header_names(&self) -> Vec<&str> {
+        self.headers()
+            .keys()
+            .into_iter()
+            .map(|k| k.as_str())
+            .collect()
     }
 
     fn uri(&self) -> &Uri {

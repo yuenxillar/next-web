@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use next_web_core::{traits::required::Required, ApplicationContext};
+use next_web_core::ApplicationContext;
 
 use crate::{
     access::hierarchicalroles::role_hierarchy::RoleHierarchy,

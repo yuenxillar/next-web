@@ -3724,7 +3724,6 @@ impl<T> Single<T> {
 }
 
 /// Represents a [`Single`] that erased its type.
-
 pub struct DynSingle {
     origin: Arc<dyn Any + Send + Sync>,
 }

@@ -19,16 +19,14 @@ use crate::{
     authorization::AuthenticationManager,
     core::{
         authentication_error::AuthenticationError,
-        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
+        context::{SecurityContextHolder, SecurityContextHolderStrategy},
         Authentication,
     },
     web::{
         authentication::{
-            authentication_converter::AuthenticationConverter,
-            authentication_failure_handler::AuthenticationFailureHandler,
-            authentication_success_handler::AuthenticationSuccessHandler,
-            saved_request_aware_authentication_success_handler::SavedRequestAwareAuthenticationSuccessHandler,
-            simple_url_authentication_failure_handler::SimpleUrlAuthenticationFailureHandler,
+            authentication_converter::AuthenticationConverter, AuthenticationFailureHandler,
+            AuthenticationSuccessHandler, SavedRequestAwareAuthenticationSuccessHandler,
+            SimpleUrlAuthenticationFailureHandler,
         },
         context::SecurityContextRepository,
         util::matcher::{AnyRequestMatcher, RequestMatcher},
@@ -391,7 +389,7 @@ impl HttpFilter for AuthenticationFilter {
                     // mechanism on the Authentication trait when available.
                     debug!(
                         "MFA authority merging requested for user '{}'",
-                        authentication_result.get_name()
+                        authentication_result.name()
                     );
                 }
 

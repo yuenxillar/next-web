@@ -13,6 +13,6 @@ where
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        auth_error: Option<AuthenticationError>,
+        auth_error: &AuthenticationError,
     ) -> Result<(), BoxError>;
 }

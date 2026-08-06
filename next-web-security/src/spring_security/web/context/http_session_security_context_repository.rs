@@ -10,7 +10,7 @@ use crate::{
     authentication::AuthenticationTrustResolverImpl,
     authorization::AuthenticationTrustResolver,
     core::context::{
-        security_context_holder::SecurityContextHolder, DeferredSecurityContext, SecurityContext,
+        DeferredSecurityContext, SecurityContext, SecurityContextHolder,
         SecurityContextHolderStrategy,
     },
     web::context::{SecurityContextRepository, SuppliedDeferredSecurityContext},

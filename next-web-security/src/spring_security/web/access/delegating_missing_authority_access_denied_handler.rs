@@ -13,6 +13,7 @@ use crate::{
     },
     web::{
         access::{AccessDeniedError, AccessDeniedHandler, AccessDeniedHandlerImpl},
+        authentication::DelegatingAuthenticationEntryPointBuilder,
         savedrequest::RequestCache,
         AuthenticationEntryPoint, WebAttributes,
     },
@@ -45,11 +46,11 @@ impl DelegatingMissingAuthorityAccessDeniedHandler {
         self.request_cache = Some(request_cache);
     }
 
-    pub fn builder() -> Builder {
-        Builder::default()
+    pub fn builder() -> DelegatingMissingAuthorityAccessDeniedHandlerBuilder {
+        DelegatingMissingAuthorityAccessDeniedHandlerBuilder::default()
     }
 
-    fn authority_errors(&self, err: AccessDeniedError) -> Vec<AuthorityRequiredFactorErrorEntry> {
+    fn authority_errors(&self, err: &AccessDeniedError) -> Vec<AuthorityRequiredFactorErrorEntry> {
         let denied = match err.authorization_denied_error() {
             Some(denied) => denied.authorization_result(),
             None => return Default::default(),
@@ -97,7 +98,7 @@ impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        denied: AccessDeniedError,
+        denied: &AccessDeniedError,
     ) -> Result<(), BoxError> {
         let error_entries = self.authority_errors(denied);
 
@@ -143,14 +144,14 @@ impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
 }
 
 #[derive(Clone, Default)]
-pub struct Builder {
+pub struct DelegatingMissingAuthorityAccessDeniedHandlerBuilder {
     entry_point_builder_by_authority: BTreeMap<String, ()>,
 }
 
-impl Builder {
+impl DelegatingMissingAuthorityAccessDeniedHandlerBuilder {
     pub fn add_entry_point_for(
         &mut self,
-        entry_point: impl AuthenticationEntryPoint,
+        entry_point: Arc<dyn AuthenticationEntryPoint>,
         missing_authority: impl Into<String>,
     ) -> &mut Self {
         self.entry_point_builder_by_authority
@@ -158,6 +159,18 @@ impl Builder {
 
         self
     }
+
+    pub fn add_entry_point_for_with_builder<F>(
+        &mut self,
+        entry_point_builder_fn: F,
+        missing_authority: impl Into<String>,
+    ) -> &mut Self
+    where
+        F: FnOnce(&mut DelegatingAuthenticationEntryPointBuilder),
+    {
+        self
+    }
+
     pub fn build(&self) -> DelegatingMissingAuthorityAccessDeniedHandler {
         // let entry_points: BTreeMap<String, Box<dyn AuthenticationEntryPoint>> = self
         //     .entry_point_builder_by_authority

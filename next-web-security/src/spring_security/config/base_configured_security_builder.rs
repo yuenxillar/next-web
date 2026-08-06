@@ -168,7 +168,7 @@ where
 
     pub fn remove_configurer<C>(&mut self) -> Option<C>
     where
-        C: AnyClone + 'static,
+        C: 'static,
         C: SecurityConfigurer<O, B>,
     {
         let key = TypeId::of::<C>();
@@ -187,7 +187,7 @@ where
 
     fn remove_from_configurers_added_in_initializing<C>(&mut self)
     where
-        C: AnyClone + 'static,
+        C: 'static,
         C: SecurityConfigurer<O, B>,
     {
         self.configurers_added_in_initializing.retain(|c| {

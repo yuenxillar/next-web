@@ -10,6 +10,6 @@ pub trait AccessDeniedHandler: Send + Sync {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        access_denied_error: AccessDeniedError,
+        access_denied_error: &AccessDeniedError,
     ) -> Result<(), BoxError>;
 }

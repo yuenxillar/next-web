@@ -94,14 +94,14 @@ where
         let security_context_repository = self.get_security_context_repository(http);
 
         if self.require_explicit_save {
-            let mut security_context_holder_filter =
+            let mut SecurityContextHolder_filter =
                 SecurityContextHolderFilter::new(security_context_repository);
-            security_context_holder_filter.set_security_context_holder_strategy(
+            SecurityContextHolder_filter.set_security_context_holder_strategy(
                 self.inner.get_security_context_holder_strategy().to_owned(),
             );
 
-            // let filter = self.post_process(security_context_holder_filter);
-            http.add_filter(security_context_holder_filter);
+            // let filter = self.post_process(SecurityContextHolder_filter);
+            http.add_filter(SecurityContextHolder_filter);
         } else {
             // // Use SecurityContextPersistenceFilter for implicit save mode
             // let mut security_context_filter =

@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    fmt::Display,
     sync::Arc,
 };
 
@@ -15,6 +16,7 @@ where
     Self: Send + Sync,
     Self: Any,
     Self: Principal,
+    Self: Display,
 {
     /// Set by an AuthenticationManager to indicate the authorities that the principal has been granted.
     /// Note that classes should not rely on this value as being valid unless it has been set by a trusted AuthenticationManager.
@@ -57,18 +59,31 @@ where
     /// The authentication token is trustworthy, which is a potential security risk, and the implementation should return an error
     fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError>;
 
-    /// Return an Authentication.Builder based on this instance. By default, returns a builder that
-    /// builds a SimpleAuthentication.
-    /// Although a default method, all Authentication implementations should implement this. The
-    /// reason is to ensure that the Authentication type is preserved when Authentication.Builder.
-    /// build is invoked. This is especially important in the event that your authentication
-    /// implementation contains custom fields.
+    /// Return an Authentication.Builder based on this instance. By default, returns a builder that builds a SimpleAuthentication.
+    /// Although a default method, all Authentication implementations should implement this.
+    /// The reason is to ensure that the Authentication type is preserved when Authentication.Builder.
+    /// build is invoked. This is especially important in the event that your authentication implementation contains custom fields.
     ///
-    /// This isn't strictly necessary since it is recommended that applications code to the Authentication
-    /// interface and that custom information is often contained in the getPrincipal value.
-    fn to_builder(&self) -> () {
-        unimplemented!()
-    }
+    /// This isn't strictly necessary since it is recommended that applications code to the Authentication interface and that
+    /// custom information is often contained in the getPrincipal value.
+    fn to_builder(&self) -> Box<dyn AuthenticationBuilder>;
+    // Box::new(SimpleAuthenticationBuilder::new(self))
 
+    /// Returns the TypeId of this Authentication instance.
     fn of(&self) -> TypeId;
+}
+
+/// A builder based on a given Authentication instance
+pub trait AuthenticationBuilder {
+    fn authorities(&mut self, authorities: Box<dyn FnOnce(&mut Vec<Arc<dyn GrantedAuthority>>)>);
+
+    fn credentials(&mut self, credentials: Option<AuthPrincipal>);
+
+    fn details(&mut self, details: Option<AuthPrincipal>);
+
+    fn principal(&mut self, principal: Option<AuthPrincipal>);
+
+    fn authenticated(&mut self, authenticated: bool);
+
+    fn build(&mut self) -> Arc<dyn Authentication>;
 }

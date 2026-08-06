@@ -29,7 +29,7 @@ impl AccessDeniedHandler for DelegatingAccessDeniedHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        access_denied_error: super::AccessDeniedError,
+        access_denied_error: &super::AccessDeniedError,
     ) -> Result<(), BoxError> {
         todo!()
     }

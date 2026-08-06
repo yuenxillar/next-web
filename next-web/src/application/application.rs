@@ -70,11 +70,7 @@ use next_web_core::scheduler::{InMemoryScheduledJobRepository, ScheduledJobRegis
 use next_web_core::traits::schedule::scheduled_task::ScheduledTask;
 
 #[async_trait]
-pub trait Application
-where
-    Self: Send + Sync,
-    Self: 'static,
-{
+pub trait Application {
     /// The error solver for the application.
     /// Apply it to the `catch_panic` function
     type ErrorSolve: ErrorSolver;

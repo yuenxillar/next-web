@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::{
     core::context::{
-        security_context_holder::SecurityContextHolder, DeferredSecurityContext, SecurityContext,
+        DeferredSecurityContext, SecurityContext, SecurityContextHolder,
         SecurityContextHolderStrategy,
     },
     web::context::{SecurityContextRepository, SuppliedDeferredSecurityContext},
@@ -22,7 +22,7 @@ pub struct RequestAttributeSecurityContextRepository {
 
 impl RequestAttributeSecurityContextRepository {
     pub const DEFAULT_REQUEST_ATTR_NAME: &str =
-        "RequestAttributeSecurityContextRepository.SPRING_SECURITY_CONTEXT";
+        "RequestAttributeSecurityContextRepository.NEXT_SECURITY_CONTEXT";
 
     /// Creates a new instance with the specified request attribute name.
     pub fn new(request_attribute_name: impl Into<String>) -> Self {

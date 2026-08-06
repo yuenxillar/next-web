@@ -12,6 +12,9 @@ pub enum AuthenticationErrorKind {
     InternalService,
     ProviderNotFound,
     InsufficientAuthentication,
+    AuthenticationService,
+    InternalAuthentication,
+    SessionAuthentication,
 }
 
 #[derive(Debug, Clone)]

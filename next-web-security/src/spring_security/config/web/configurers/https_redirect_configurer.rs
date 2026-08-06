@@ -20,23 +20,24 @@ use crate::{
     },
 };
 
-/// Configures HTTP-to-HTTPS redirect. Uses `PortMapper` (if available
-/// as a shared object) to map ports during redirects.
+/// Specifies for what requests the application should redirect to HTTPS.
+///  When this configurer is added, it redirects all HTTP requests by default to HTTPS.
 #[derive(Clone)]
 pub struct HttpsRedirectConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    request_matchers: Vec<Arc<dyn RequestMatcher>>,
-    inner: BaseHttpConfigurer<HttpsRedirectConfigurer<H>, H>,
+    request_matchers: Option<Arc<dyn RequestMatcher>>,
+
+    inner: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> HttpsRedirectConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    pub fn request_matchers(mut self, m: Vec<Arc<dyn RequestMatcher>>) -> Self {
-        self.request_matchers.extend(m);
+    pub fn request_matchers(&mut self, matchers: Vec<Arc<dyn RequestMatcher>>) -> &mut Self {
+        self.request_matchers = Some(Arc::new(OrRequestMatcher::new(matchers)));
         self
     }
 }
@@ -47,7 +48,8 @@ where
 {
     fn default() -> Self {
         Self {
-            request_matchers: Vec::new(),
+            request_matchers: Default::default(),
+
             inner: Default::default(),
         }
     }
@@ -74,11 +76,9 @@ where
     fn init(&mut self, _http: &mut H) {}
 
     fn configure(&mut self, http: &mut H) {
-        let mut filter = HttpsRedirectFilter::new();
-        if !self.request_matchers.is_empty() {
-            filter.set_request_matcher(Arc::new(OrRequestMatcher::new(
-                self.request_matchers.clone(),
-            )));
+        let mut filter = HttpsRedirectFilter::default();
+        if let Some(matchers) = self.request_matchers.take() {
+            filter.set_request_matcher(matchers);
         }
         // Read PortMapper from shared objects if available
         if let Some(mapper) = http.shared_object::<Arc<dyn PortMapper>>() {

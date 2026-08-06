@@ -4,15 +4,15 @@ pub trait AuthenticationTrustResolver
 where
     Self: Send + Sync,
 {
-    fn is_anonymous(&self, authentication: &dyn Authentication) -> bool;
+    fn is_anonymous(&self, authentication: Option<&dyn Authentication>) -> bool;
 
-    fn is_remember_me(&self, authentication: &dyn Authentication) -> bool;
+    fn is_remember_me(&self, authentication: Option<&dyn Authentication>) -> bool;
 
-    fn is_fully_authenticated(&self, authentication: &dyn Authentication) -> bool {
+    fn is_fully_authenticated(&self, authentication: Option<&dyn Authentication>) -> bool {
         self.is_authenticated(authentication) && !self.is_remember_me(authentication)
     }
 
-    fn is_authenticated(&self, authentication: &dyn Authentication) -> bool {
+    fn is_authenticated(&self, authentication: Option<&dyn Authentication>) -> bool {
         authentication.is_authenticated() && !self.is_anonymous(authentication)
     }
 }
@@ -21,22 +21,19 @@ where
 pub struct DefaultAuthenticationTrustResolver;
 
 impl AuthenticationTrustResolver for DefaultAuthenticationTrustResolver {
-    fn is_anonymous(&self, authentication: &dyn Authentication) -> bool {
-        authentication.is_anonymous()
+    fn is_anonymous(&self, authentication: Option<&dyn Authentication>) -> bool {
+        todo!()
     }
 
-    fn is_remember_me(&self, authentication: &dyn Authentication) -> bool {
-        authentication.is_remember_me()
+    fn is_remember_me(&self, authentication: Option<&dyn Authentication>) -> bool {
+        todo!()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        authentication::{
-            anonymous_authentication_token::AnonymousAuthenticationToken,
-            remember_me_authentication_token::RememberMeAuthenticationToken,
-        },
+        authentication::{AnonymousAuthenticationToken, RememberMeAuthenticationToken},
         authorization::authentication_trust_resolver::{
             AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
         },

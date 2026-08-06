@@ -15,8 +15,7 @@ use next_web_core::{
 use crate::{
     authorization::AuthenticationManager,
     core::{
-        authentication_error::AuthenticationError,
-        context::security_context_holder::SecurityContextHolder, Authentication,
+        authentication_error::AuthenticationError, context::SecurityContextHolder, Authentication,
     },
 };
 

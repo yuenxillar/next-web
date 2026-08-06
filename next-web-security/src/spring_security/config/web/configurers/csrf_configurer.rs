@@ -171,7 +171,7 @@ where
     /// Gets the default AccessDeniedHandler from the ErrorHandlingConfigurer::get_access_denied_handler(HttpSecurityBuilder) or create a AccessDeniedHandlerImpl if not available.
     fn get_default_access_denied_handler(&self, http: &mut H) -> Arc<dyn AccessDeniedHandler> {
         http.configurer::<ErrorHandlingConfigurer<H>>()
-            .map(|exception_config| exception_config.get_access_denied_handler(http))
+            .and_then(|error_config| error_config.get_access_denied_handler().map(Clone::clone))
             .unwrap_or(Arc::new(AccessDeniedHandlerImpl::default()))
     }
 
@@ -180,7 +180,7 @@ where
         &self,
         http: &mut H,
     ) -> Option<Arc<dyn InvalidSessionStrategy>> {
-        http.configurer::<SessionManagementConfigurer<H>>()?
+        http.configurer_mut::<SessionManagementConfigurer<H>>()?
             .get_invalid_session_strategy()
     }
 

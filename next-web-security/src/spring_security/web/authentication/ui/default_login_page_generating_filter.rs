@@ -9,7 +9,7 @@ use next_web_core::traits::http::http_response::HttpResponse;
 use next_web_core::traits::named::Named;
 use next_web_core::util::http_method::HttpMethod;
 
-use crate::core::context::security_context_holder::SecurityContextHolder;
+use crate::core::context::SecurityContextHolder;
 use crate::core::context::SecurityContextHolderStrategy;
 use crate::web::authentication::ui::HtmlTemplates;
 use crate::web::authentication::UsernamePasswordAuthenticationFilter;

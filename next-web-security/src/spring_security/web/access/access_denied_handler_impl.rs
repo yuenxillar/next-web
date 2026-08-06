@@ -32,7 +32,7 @@ impl AccessDeniedHandler for AccessDeniedHandlerImpl {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        access_denied_error: AccessDeniedError,
+        access_denied_error: &AccessDeniedError,
     ) -> Result<(), BoxError> {
         if response.is_committed() {
             trace!("Did not write to response since already committed");

@@ -16,11 +16,11 @@ use crate::{
     authentication::AccountStatusUserDetailsChecker,
     core::{
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
-        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
+        context::{SecurityContextHolder, SecurityContextHolderStrategy},
         granted_authority::GrantedAuthority,
         simple_granted_authority::SimpleGrantedAuthority,
         userdetails::{UserDetails, UserDetailsChecker, UserDetailsService},
-        username_password_authentication_token::UsernamePasswordAuthenticationToken,
+        UsernamePasswordAuthenticationToken,
     },
     web::{
         authentication::{
@@ -392,9 +392,7 @@ impl SwitchUserFilter {
                 )
             })?;
 
-        self.user_details_checker
-            .check(target_user.as_ref())
-            .await?;
+        self.user_details_checker.check(target_user.as_ref())?;
 
         // Create the switch user token.
         let token = self.create_switch_user_token(target_user.as_ref()).await;
@@ -452,7 +450,7 @@ impl SwitchUserFilter {
         context.set_authentication(Some(authentication.clone()));
         self.security_context_holder_strategy
             .set_context(context.clone());
-        debug!("Set SecurityContextHolder to {}", authentication.get_name());
+        debug!("Set SecurityContextHolder to {}", authentication.name());
         if let Some(repo) = &self.security_context_repository {
             repo.save_context(&context, request, response).await;
         }

@@ -14,14 +14,11 @@ use tracing::debug;
 
 use crate::{
     authorization::{AuthenticationTrustResolver, DefaultAuthenticationTrustResolver},
-    core::context::{
-        security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy,
-    },
+    core::context::{SecurityContextHolder, SecurityContextHolderStrategy},
     web::{
         authentication::{
-            authentication_failure_handler::AuthenticationFailureHandler,
-            session::SessionAuthenticationStrategy,
-            simple_url_authentication_failure_handler::SimpleUrlAuthenticationFailureHandler,
+            session::SessionAuthenticationStrategy, AuthenticationFailureHandler,
+            SimpleUrlAuthenticationFailureHandler,
         },
         context::SecurityContextRepository,
         session::InvalidSessionStrategy,

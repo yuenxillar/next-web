@@ -16,10 +16,10 @@ use tracing::debug;
 use crate::{
     core::{
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
-        context::{security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy},
+        context::{SecurityContextHolder, SecurityContextHolderStrategy},
         user_cache::{NullUserCache, UserCache},
         userdetails::{UserDetails, UserDetailsService},
-        username_password_authentication_token::UsernamePasswordAuthenticationToken,
+        UsernamePasswordAuthenticationToken,
     },
     web::{
         authentication::www::{

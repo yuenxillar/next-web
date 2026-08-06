@@ -11,8 +11,7 @@ use crate::{
         authority_utils::AuthorityUtils,
         user_cache::{NullUserCache, UserCache},
         userdetails::{UserDetails, UserDetailsChecker},
-        username_password_authentication_token::UsernamePasswordAuthenticationToken,
-        Authentication,
+        Authentication, UsernamePasswordAuthenticationToken,
     },
 };
 

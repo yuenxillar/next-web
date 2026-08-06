@@ -19,9 +19,8 @@ use crate::{
     core::authority::FactorGrantedAuthority,
     web::{
         authentication::{
-            forward_authentication_failure_handler::ForwardAuthenticationFailureHandler,
-            forward_authentication_success_handler::ForwardAuthenticationSuccessHandler,
-            ui::DefaultLoginPageGeneratingFilter, UsernamePasswordAuthenticationFilter,
+            ui::DefaultLoginPageGeneratingFilter, ForwardAuthenticationFailureHandler,
+            ForwardAuthenticationSuccessHandler, UsernamePasswordAuthenticationFilter,
         },
         default_security_filter_chain::DefaultSecurityFilterChain,
         util::matcher::{RequestMatcher, DEFAULT_BUILDER},
@@ -41,6 +40,7 @@ where
 impl<H> FormLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
+    H: 'static,
 {
     /// The HTTP parameter to look for the username when performing authentication. Default
     /// is `"username"`.
@@ -174,10 +174,11 @@ where
         if let Some(error_handling_configurer) = http.configurer_mut::<ErrorHandlingConfigurer<H>>()
         {
             let entry_point = self.get_authentication_entry_point();
-            error_handling_configurer.default_denied_handler_for_missing_authority(
+            error_handling_configurer.default_denied_handler_for_missing_authority_with_builder(
                 |builer| {
-                    entry_point
-                        .map(|ep| builer.add_entry_point_for(ep.to_owned(), request_matcher));
+                    entry_point.map(|ep| {
+                        builer.add_entry_point_for(Arc::new(ep.to_owned()), request_matcher)
+                    });
                 },
                 FactorGrantedAuthority::PASSWORD_AUTHORITY,
             );
@@ -189,7 +190,7 @@ where
     }
 }
 
-impl<H> BaseAuthenticationFilterConfigurerExt for FormLoginConfigurer<H>
+impl<H> BaseAuthenticationFilterConfigurerExt<H> for FormLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
     H: 'static,
@@ -236,8 +237,8 @@ where
     /// # Returns
     ///
     /// The `FormLoginConfigurer` for additional customization
-    fn login_page(&mut self, login_page: &str) {
-        self.inner.login_page(login_page);
+    fn login_page(&mut self, login_page: &str, http: &mut H) {
+        self.inner.login_page(login_page, http);
     }
 
     fn login_processing_url(&mut self, login_processing_url: &str) {
@@ -267,6 +268,7 @@ where
 impl<H> Default for FormLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
+    H: 'static,
 {
     fn default() -> Self {
         let mut configurer = Self {

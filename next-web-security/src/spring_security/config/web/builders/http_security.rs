@@ -249,6 +249,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn form_login<F>(&mut self, form_login: F) -> &mut Self
     where
         F: FnMut(&mut FormLoginConfigurer<Self>),
@@ -351,6 +352,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn redirect_to_https<F>(&mut self, redirect_to_https: F) -> &mut Self
     where
         F: FnMut(&mut HttpsRedirectConfigurer<Self>),
@@ -360,6 +362,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn http_basic<F>(&mut self, http_basic: F) -> &mut Self
     where
         F: FnMut(&mut HttpBasicConfigurer<Self>),
@@ -369,6 +372,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn password_management<F>(&mut self, password_management: F) -> &mut Self
     where
         F: FnMut(&mut PasswordManagementConfigurer<Self>),
@@ -509,7 +513,7 @@ impl HttpSecurityBuilder<Self> for HttpSecurity {
     fn remove_configurer<C>(&mut self) -> Option<C>
     where
         C: SecurityConfigurer<DefaultSecurityFilterChain, Self>,
-        C: AnyClone + 'static,
+        C: 'static,
     {
         self.base.remove_configurer()
     }

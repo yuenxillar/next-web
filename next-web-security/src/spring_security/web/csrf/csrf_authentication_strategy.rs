@@ -35,7 +35,7 @@ impl CsrfAuthenticationStrategy {
 impl SessionAuthenticationStrategy for CsrfAuthenticationStrategy {
     async fn on_authentication(
         &self,
-        authentication: &dyn Authentication,
+        authentication: &Arc<dyn Authentication>,
         req: &mut dyn HttpRequest,
         resp: &mut dyn HttpResponse,
     ) -> Result<(), AuthenticationError> {

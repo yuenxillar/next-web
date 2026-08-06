@@ -28,7 +28,7 @@ where
     fn remove_configurer<C>(&mut self) -> Option<C>
     where
         C: SecurityConfigurer<DefaultSecurityFilterChain, H>,
-        C: AnyClone + 'static;
+        C: 'static;
 
     fn set_shared_object<C>(&mut self, object: C)
     where

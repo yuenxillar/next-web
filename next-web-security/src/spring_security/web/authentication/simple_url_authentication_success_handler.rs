@@ -1,45 +1,53 @@
-use std::{
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use std::ops::{Deref, DerefMut};
 
 use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
 
 use crate::{
     core::Authentication,
-    web::authentication::{
-        authentication_success_handler::AuthenticationSuccessHandler,
-        BaseAuthenticationTargetUrlRequestHandler,
+    web::{
+        authentication::{
+            authentication_success_handler::AuthenticationSuccessHandler,
+            BaseAuthenticationTargetUrlRequestHandler,
+        },
+        WebAttributes,
     },
 };
 
-/// A simple `AuthenticationSuccessHandler` that redirects to the given URL
-/// on successful authentication.
-///
-/// This is the equivalent of Spring Security's `SimpleUrlAuthenticationSuccessHandler`.
+/// AuthenticationSuccessHandler which can be configured with a default URL which users should be sent to upon successful authentication.
 #[derive(Clone)]
 pub struct SimpleUrlAuthenticationSuccessHandler {
-    base: BaseAuthenticationTargetUrlRequestHandler,
+    inner: BaseAuthenticationTargetUrlRequestHandler,
 }
 
 impl SimpleUrlAuthenticationSuccessHandler {
     /// Creates a new `SimpleUrlAuthenticationSuccessHandler` with the given
     /// default target URL.
     pub fn new(default_target_url: &str) -> Self {
-        let mut base = BaseAuthenticationTargetUrlRequestHandler::default();
-        base.set_default_target_url(default_target_url);
-        base.set_always_use_default_target_url(true);
-        Self { base }
+        let mut inner = BaseAuthenticationTargetUrlRequestHandler::default();
+        inner.set_default_target_url(default_target_url);
+
+        Self { inner }
     }
 
-    /// Sets the default target URL.
-    pub fn set_default_target_url(&mut self, default_target_url: impl Into<Box<str>>) {
-        self.base.set_default_target_url(default_target_url);
+    /// Removes temporary authentication-related data which may have been stored in the session during the authentication process.
+    pub fn clear_authentication_attributes(&self, request: &mut dyn HttpRequest) {
+        request.session().map(|session| {
+            session.remove_attribute(WebAttributes::AUTHENTICATION_ERROR);
+        });
     }
+}
 
-    /// Sets whether to always use the default target URL.
-    pub fn set_always_use_default_target_url(&mut self, always_use: bool) {
-        self.base.set_always_use_default_target_url(always_use);
+impl AuthenticationSuccessHandler for SimpleUrlAuthenticationSuccessHandler {
+    /// Calls the parent class handle() method to forward or redirect to the target URL, and then calls
+    /// clearAuthenticationAttributes() to remove any leftover session data.
+    fn on_authentication_success(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        authentication: &dyn Authentication,
+    ) {
+        self.inner.handle(request, response, Some(authentication));
+        self.clear_authentication_attributes(request);
     }
 }
 
@@ -47,25 +55,20 @@ impl Deref for SimpleUrlAuthenticationSuccessHandler {
     type Target = BaseAuthenticationTargetUrlRequestHandler;
 
     fn deref(&self) -> &Self::Target {
-        &self.base
+        &self.inner
     }
 }
 
 impl DerefMut for SimpleUrlAuthenticationSuccessHandler {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
+        &mut self.inner
     }
 }
 
-impl AuthenticationSuccessHandler for SimpleUrlAuthenticationSuccessHandler {
-    fn on_authentication_success(
-        &self,
-        request: &mut dyn HttpRequest,
-        response: &mut dyn HttpResponse,
-        authentication: &dyn Authentication,
-    ) {
-        // let _ = self.base.handle(request, response, Some(authentication));
-        //
-        todo!()
+impl Default for SimpleUrlAuthenticationSuccessHandler {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+        }
     }
 }

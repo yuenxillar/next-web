@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::any::{Any, TypeId};
 
 use dyn_clone::{DynClone, clone_trait_object};
 
@@ -38,6 +38,10 @@ where
 
     /// Returns the source of the event as a `dyn Any` reference.
     fn source(&self) -> &dyn Any;
+
+    fn event_type(&self) -> TypeId;
+
+    fn source_type(&self) -> TypeId;
 }
 
 clone_trait_object!(ApplicationEvent);
@@ -46,6 +50,8 @@ clone_trait_object!(ApplicationEvent);
 pub struct EventAttributes<S> {
     timestamp: u64,
     source: S,
+
+    source_type: TypeId,
 }
 
 impl<S> EventAttributes<S>
@@ -57,7 +63,11 @@ where
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        Self { timestamp, source }
+        Self {
+            timestamp,
+            source,
+            source_type: TypeId::of::<S>(),
+        }
     }
 
     pub fn timestamp(&self) -> u64 {
@@ -66,5 +76,28 @@ where
 
     pub fn source(&self) -> &dyn Any {
         &self.source
+    }
+
+    pub fn source_type(&self) -> TypeId {
+        self.source_type
+    }
+}
+
+impl ApplicationEvent for Box<dyn ApplicationEvent> {
+    fn timestamp(&self) -> u64 {
+        self.as_ref().timestamp()
+    }
+
+    /// Returns the source of the event as a `dyn Any` reference.
+    fn source(&self) -> &dyn Any {
+        self.as_ref().source()
+    }
+
+    fn event_type(&self) -> TypeId {
+        self.as_ref().event_type()
+    }
+
+    fn source_type(&self) -> TypeId {
+        self.as_ref().source_type()
     }
 }

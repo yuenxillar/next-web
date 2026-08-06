@@ -12,9 +12,7 @@ use next_web_core::{
 };
 
 use crate::{
-    core::context::{
-        security_context_holder::SecurityContextHolder, SecurityContextHolderStrategy,
-    },
+    core::context::{SecurityContextHolder, SecurityContextHolderStrategy},
     web::context::SecurityContextRepository,
 };
 

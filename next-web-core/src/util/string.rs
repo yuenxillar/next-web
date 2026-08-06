@@ -108,4 +108,16 @@ impl StringUtils {
         }
         freq
     }
+
+    /// Check if a string starts with a given prefix, ignoring case
+    pub fn starts_with_ignore_case(s: &str, prefix: &str) -> bool {
+        if prefix.len() > s.len() {
+            return false;
+        }
+
+        s.as_bytes()[..prefix.len()]
+            .iter()
+            .zip(prefix.as_bytes())
+            .all(|(&a, &b)| a.to_ascii_lowercase() == b.to_ascii_lowercase())
+    }
 }

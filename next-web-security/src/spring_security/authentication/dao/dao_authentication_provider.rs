@@ -22,8 +22,7 @@ use crate::{
             },
             UserDetails, UserDetailsService,
         },
-        username_password_authentication_token::UsernamePasswordAuthenticationToken,
-        Authentication,
+        Authentication, UsernamePasswordAuthenticationToken,
     },
     crypto::{bcrypt::BCryptPasswordEncoder, password::PasswordEncoder},
 };
