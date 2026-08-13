@@ -4,7 +4,7 @@ use next_web_core::async_trait;
 
 use crate::{
     authorization::{
-        authorization_decision::AuthorizationDecision, authorization_manager::AuthorizationManager,
+        authorization_manager::AuthorizationManager,
         single_result_authorization_manager::SingleResultAuthorizationManager, AuthorizationResult,
     },
     core::Authentication,
@@ -55,9 +55,13 @@ impl<T: Send + Sync + 'static> AuthorizationManager<T> for ConditionalAuthorizat
     async fn authorize(
         &self,
         authentication: &dyn Authentication,
-        var: &mut T,
+        var: &T,
     ) -> Option<Box<dyn AuthorizationResult>> {
-        todo!()
+        if (self.condition)(authentication) {
+            self.when_true.authorize(authentication, var).await
+        } else {
+            self.when_false.authorize(authentication, var).await
+        }
     }
 }
 

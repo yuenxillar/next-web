@@ -14,7 +14,8 @@ use crate::web::{
         },
         www::DigestAuthenticationFilter,
         AnonymousAuthenticationFilter, AuthenticationFilter, BaseAuthenticationProcessingFilter,
-        BasicAuthenticationFilter, RememberMeAuthenticationFilter,
+        BasicAuthenticationFilter, OAuth2AuthorizationRequestRedirectFilter,
+        OAuth2LoginAuthenticationFilter, RememberMeAuthenticationFilter,
         UsernamePasswordAuthenticationFilter,
     },
     context::SecurityContextHolderFilter,
@@ -71,6 +72,8 @@ impl Default for FilterOrderRegistration {
         filter_order.put::<BaseAuthenticationProcessingFilter>(order.next());
         filter_order.put::<UsernamePasswordAuthenticationFilter>(order.next());
         filter_order.put::<OneTimeTokenAuthenticationFilter>(order.next());
+        filter_order.put::<OAuth2AuthorizationRequestRedirectFilter>(order.next());
+        filter_order.put::<OAuth2LoginAuthenticationFilter>(order.next());
         order.next();
         filter_order.put::<DefaultResourcesFilter>(order.next());
         filter_order.put::<DefaultLoginPageGeneratingFilter>(order.next());

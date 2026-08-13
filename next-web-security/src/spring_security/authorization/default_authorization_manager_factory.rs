@@ -1,26 +1,20 @@
 use std::sync::Arc;
 
 use crate::{
-    access::hierarchicalroles::{
-        null_role_hierarchy::NullRoleHierarchy, role_hierarchy::RoleHierarchy,
-    },
+    access::hierarchicalroles::{NullRoleHierarchy, RoleHierarchy},
+    authentication::AuthenticationTrustResolverImpl,
     authorization::{
-        all_authorities_authorization_manager::AllAuthoritiesAuthorizationManager,
-        authenticated_authorization_manager::AuthenticatedAuthorizationManager,
-        authentication_trust_resolver::{
-            AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
-        },
-        authority_authorization_manager::AuthorityAuthorizationManager,
-        authorization_decision::AuthorizationDecision,
-        authorization_manager::AuthorizationManager,
-        authorization_manager_factory::AuthorizationManagerFactory,
-        authorization_managers::AuthorizationManagers,
+        AllAuthoritiesAuthorizationManager, AuthenticatedAuthorizationManager,
+        AuthenticationTrustResolver, AuthorityAuthorizationManager, AuthorizationManager,
+        AuthorizationManagerFactory, AuthorizationManagers,
     },
 };
 
-const DEFAULT_ROLE_PREFIX: &str = "ROLE_";
-
-pub struct DefaultAuthorizationManagerFactory<T: Clone + Send + Sync + 'static> {
+/// A factory for creating different kinds of AuthorizationManager instances
+pub struct DefaultAuthorizationManagerFactory<T>
+where
+    T: Clone + Send + Sync + 'static,
+{
     trust_resolver: Arc<dyn AuthenticationTrustResolver>,
     role_hierarchy: Arc<dyn RoleHierarchy>,
     role_prefix: String,
@@ -28,27 +22,22 @@ pub struct DefaultAuthorizationManagerFactory<T: Clone + Send + Sync + 'static> 
 }
 
 impl<T: Clone + Send + Sync + 'static> DefaultAuthorizationManagerFactory<T> {
-    pub fn new() -> Self {
-        Self {
-            trust_resolver: Arc::new(DefaultAuthenticationTrustResolver::default()),
-            role_hierarchy: Arc::new(NullRoleHierarchy),
-            role_prefix: DEFAULT_ROLE_PREFIX.to_string(),
-            additional_authorization: None,
-        }
-    }
-
+    /// Sets the AuthenticationTrustResolver used to check the user's authentication.
     pub fn set_trust_resolver(&mut self, trust_resolver: Arc<dyn AuthenticationTrustResolver>) {
         self.trust_resolver = trust_resolver;
     }
 
+    /// Sets the RoleHierarchy used to discover reachable authorities.
     pub fn set_role_hierarchy(&mut self, role_hierarchy: Arc<dyn RoleHierarchy>) {
         self.role_hierarchy = role_hierarchy;
     }
 
+    /// Sets the prefix used to create an authority name from a role name. Can be an empty string.
     pub fn set_role_prefix(&mut self, role_prefix: impl Into<String>) {
         self.role_prefix = role_prefix.into();
     }
 
+    /// Sets additional authorization to be applied to the returned AuthorizationManager for the following methods:
     pub fn set_additional_authorization(
         &mut self,
         additional_authorization: Option<Arc<dyn AuthorizationManager<T>>>,
@@ -72,7 +61,12 @@ impl<T: Clone + Send + Sync + 'static> DefaultAuthorizationManagerFactory<T> {
 
 impl<T: Clone + Send + Sync + 'static> Default for DefaultAuthorizationManagerFactory<T> {
     fn default() -> Self {
-        Self::new()
+        Self {
+            trust_resolver: Arc::new(AuthenticationTrustResolverImpl::default()),
+            role_hierarchy: Arc::new(NullRoleHierarchy),
+            role_prefix: "ROLE_".to_string(),
+            additional_authorization: None,
+        }
     }
 }
 
@@ -80,33 +74,30 @@ impl<T: Clone + Send + Sync + 'static> AuthorizationManagerFactory<T>
     for DefaultAuthorizationManagerFactory<T>
 {
     fn has_any_role(&self, roles: &[String]) -> Arc<dyn AuthorizationManager<T>> {
-        let manager =
+        let mut manager =
             AuthorityAuthorizationManager::<T>::has_any_role(&self.role_prefix, roles.to_vec());
-        let mut manager = manager;
         manager.set_role_hierarchy(self.role_hierarchy.clone());
         self.with_additional(Arc::new(manager))
     }
 
     fn has_all_roles(&self, roles: &[String]) -> Arc<dyn AuthorizationManager<T>> {
-        let authorities: Vec<String> = roles
-            .iter()
-            .map(|r| format!("{}{}", self.role_prefix, r))
-            .collect();
-        let mut manager = AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(authorities);
+        let mut manager = AllAuthoritiesAuthorizationManager::<T>::has_all_prefixed_authorities(
+            &self.role_prefix,
+            roles,
+        );
         manager.set_role_hierarchy(self.role_hierarchy.clone());
         self.with_additional(Arc::new(manager))
     }
 
     fn has_authority(&self, authority: &str) -> Arc<dyn AuthorizationManager<T>> {
-        let manager = AuthorityAuthorizationManager::<T>::has_authority(authority);
-        let mut manager = manager;
+        let mut manager = AuthorityAuthorizationManager::<T>::has_authority(authority);
         manager.set_role_hierarchy(self.role_hierarchy.clone());
         self.with_additional(Arc::new(manager))
     }
 
     fn has_any_authority(&self, authorities: &[String]) -> Arc<dyn AuthorizationManager<T>> {
-        let manager = AuthorityAuthorizationManager::<T>::has_any_authority(authorities.to_vec());
-        let mut manager = manager;
+        let mut manager =
+            AuthorityAuthorizationManager::<T>::has_any_authority(authorities.to_vec());
         manager.set_role_hierarchy(self.role_hierarchy.clone());
         self.with_additional(Arc::new(manager))
     }
@@ -119,22 +110,26 @@ impl<T: Clone + Send + Sync + 'static> AuthorizationManagerFactory<T>
     }
 
     fn authenticated(&self) -> Arc<dyn AuthorizationManager<T>> {
-        let manager = AuthenticatedAuthorizationManager::authenticated();
+        let mut manager = AuthenticatedAuthorizationManager::authenticated();
+        manager.set_trust_resolver(self.trust_resolver.clone());
         self.with_additional(Arc::new(manager))
     }
 
     fn fully_authenticated(&self) -> Arc<dyn AuthorizationManager<T>> {
-        let manager = AuthenticatedAuthorizationManager::fully_authenticated();
+        let mut manager = AuthenticatedAuthorizationManager::fully_authenticated();
+        manager.set_trust_resolver(self.trust_resolver.clone());
         self.with_additional(Arc::new(manager))
     }
 
     fn remember_me(&self) -> Arc<dyn AuthorizationManager<T>> {
-        let manager = AuthenticatedAuthorizationManager::remember_me();
+        let mut manager = AuthenticatedAuthorizationManager::remember_me();
+        manager.set_trust_resolver(self.trust_resolver.clone());
         self.with_additional(Arc::new(manager))
     }
 
     fn anonymous(&self) -> Arc<dyn AuthorizationManager<T>> {
-        let manager = AuthenticatedAuthorizationManager::anonymous();
+        let mut manager = AuthenticatedAuthorizationManager::anonymous();
+        manager.set_trust_resolver(self.trust_resolver.clone());
         self.with_additional(Arc::new(manager))
     }
 }

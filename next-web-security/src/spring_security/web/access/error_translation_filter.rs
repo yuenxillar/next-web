@@ -1,4 +1,4 @@
-use std::{ops::DerefMut, sync::Arc};
+use std::sync::Arc;
 use tracing::{enabled, trace, Level};
 
 use next_web_context::{support::MessageSourceAccessor, MessageSource};
@@ -15,18 +15,17 @@ use next_web_core::{
 
 use crate::{
     access::AccessDeniedError,
-    authentication::{AuthenticationTrustResolverImpl, InsufficientAuthenticationError},
+    authentication::AuthenticationTrustResolverImpl,
     authorization::AuthenticationTrustResolver,
     core::{
-        authentication_error::AuthenticationError,
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
-        NextSecurityMessageSource,
+        NextSecurityMessageSource, {AuthenticationError, AuthenticationErrorKind},
     },
     web::{
         access::{AccessDeniedHandler, AccessDeniedHandlerImpl},
         authentication_entry_point::AuthenticationEntryPoint,
         savedrequest::{HttpSessionRequestCache, RequestCache},
-        util::ErrorChainAnalyzer,
+        util::{BaseErrorChainAnalyzer, ErrorChainAnalyzer},
     },
 };
 
@@ -56,31 +55,26 @@ use crate::{
 ///   authentication process in order that it may be retrieved and reused once the user
 ///   has authenticated. The default implementation is `HttpSessionRequestCache`.
 #[derive(Clone)]
-pub struct ErrorTranslationFilter<T = DefaultErrorChainAnalyzer> {
+pub struct ErrorTranslationFilter {
     security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
     access_denied_handler: Arc<dyn AccessDeniedHandler>,
     authentication_entry_point: Arc<dyn AuthenticationEntryPoint>,
     authentication_trust_resolver: Arc<dyn AuthenticationTrustResolver>,
-    error_chain_analyzer: T,
+    error_chain_analyzer: Box<dyn ErrorChainAnalyzer>,
     request_cache: Arc<dyn RequestCache>,
     messages: MessageSourceAccessor,
 }
 
-impl<T> ErrorTranslationFilter<T> {
+impl ErrorTranslationFilter {
     pub fn new(
         authentication_entry_point: Arc<dyn AuthenticationEntryPoint>,
         request_cache: Arc<dyn RequestCache>,
-    ) -> Self
-    where
-        T: DerefMut<Target = ErrorChainAnalyzer>,
-        T: Default,
-        T: Clone,
-    {
+    ) -> Self {
         Self {
             security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
             access_denied_handler: Arc::new(AccessDeniedHandlerImpl::default()),
             authentication_trust_resolver: Arc::new(AuthenticationTrustResolverImpl::default()),
-            error_chain_analyzer: T::default(),
+            error_chain_analyzer: Box::new(DefaultErrorChainAnalyzer::default()),
             messages: NextSecurityMessageSource::get_accessor(),
             authentication_entry_point,
             request_cache,
@@ -89,12 +83,7 @@ impl<T> ErrorTranslationFilter<T> {
 
     pub fn with_authentication_entry_point(
         authentication_entry_point: Arc<dyn AuthenticationEntryPoint>,
-    ) -> Self
-    where
-        T: DerefMut<Target = ErrorChainAnalyzer>,
-        T: Default,
-        T: Clone,
-    {
+    ) -> Self {
         Self::new(
             authentication_entry_point,
             Arc::new(HttpSessionRequestCache::default()),
@@ -108,7 +97,7 @@ impl<T> ErrorTranslationFilter<T> {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         chain: &mut dyn HttpFilterChain,
-        error: &AccessDeniedError,
+        error: &AuthenticationError,
     ) -> Result<(), BoxError> {
         trace!(
             "Sending to authentication entry point since authentication failed: {}",
@@ -128,7 +117,8 @@ impl<T> ErrorTranslationFilter<T> {
         error: &AccessDeniedError,
     ) -> Result<(), BoxError> {
         if let Some(ctx) = self.security_context_holder_strategy.get_context() {
-            let _auth = ctx.get_authentication().map(AsRef::as_ref);
+            let authentication = ctx.get_authentication();
+            let _auth = authentication.map(AsRef::as_ref);
 
             if self.authentication_trust_resolver.is_anonymous(_auth)
                 || self.authentication_trust_resolver.is_remember_me(_auth)
@@ -143,14 +133,16 @@ impl<T> ErrorTranslationFilter<T> {
                     }
                 });
 
-                let msg = self.messages.message_or_default(
-                    "ExceptionTranslationFilter.insufficientAuthentication",
-                    None,
-                    "Full authentication is required to access this resource",
+                let mut ex = AuthenticationError::with_kind(
+                    self.messages.message_or_default(
+                        "ErrorTranslationFilter.insufficientAuthentication",
+                        None,
+                        "Full authentication is required to access this resource",
+                    ),
+                    AuthenticationErrorKind::InsufficientAuthentication,
                 );
-                let mut ex =
-                    InsufficientAuthenticationError::new(&msg, Some(Box::new(exception.clone())));
-                ex.set_authentication_request(authentication);
+
+                authentication.map(|auth| ex.set_authentication_request(auth.clone()));
                 return self.send_start_authentication(request, response, chain, &ex);
             } else {
                 _auth.map(|authentication| {
@@ -215,8 +207,13 @@ impl<T> ErrorTranslationFilter<T> {
     }
 
     /// Sets the `ErrorChainAnalyzer` to use.
-    pub fn set_error_chain_analyzer(&mut self, error_chain_analyzer: T) {
-        self.error_chain_analyzer = error_chain_analyzer;
+    pub fn set_error_chain_analyzer<T>(&mut self, error_chain_analyzer: T)
+    where
+        T: ErrorChainAnalyzer,
+        T: Clone,
+        T: 'static,
+    {
+        self.error_chain_analyzer = Box::new(error_chain_analyzer);
     }
 
     /// Sets the `MessageSource` for localized messages.
@@ -243,15 +240,7 @@ impl<T> ErrorTranslationFilter<T> {
 }
 
 #[async_trait]
-impl<T> HttpFilter for ErrorTranslationFilter<T>
-where
-    T: Send + Sync,
-    T: 'static,
-
-    T: DerefMut<Target = ErrorChainAnalyzer>,
-    T: Default,
-    T: Clone,
-{
+impl HttpFilter for ErrorTranslationFilter {
     async fn do_filter(
         &self,
         request: &mut dyn HttpRequest,
@@ -263,6 +252,9 @@ where
             Err(filter_error) => {
                 match filter_error {
                     FilterError::Io(io_err) => return Err(FilterError::Io(io_err)),
+                    FilterError::Chain(chain_err) => {
+                        // self.error_chain_analyzer
+                    }
                     _ => {}
                 };
 
@@ -272,12 +264,37 @@ where
     }
 }
 
-impl<T> Named for ErrorTranslationFilter<T> {
+impl Named for ErrorTranslationFilter {
     fn name(&self) -> &str {
         "ErrorTranslationFilter"
     }
 }
 
-struct DefaultErrorChainAnalyzer {
-    inner: ErrorChainAnalyzer,
+#[derive(Clone)]
+struct DefaultErrorChainAnalyzer<T = BaseErrorChainAnalyzer> {
+    inner: T,
+}
+
+impl<T> DefaultErrorChainAnalyzer<T> {
+    pub fn new(inner: T) -> Self {
+        Self { inner }
+    }
+}
+
+impl<T> ErrorChainAnalyzer for DefaultErrorChainAnalyzer<T>
+where
+    T: ErrorChainAnalyzer,
+    T: Clone,
+{
+    fn init_extractor_map(&mut self) {
+        self.inner.init_extractor_map();
+    }
+}
+
+impl Default for DefaultErrorChainAnalyzer {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+        }
+    }
 }

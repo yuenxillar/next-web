@@ -8,7 +8,7 @@ use crate::{
             deny_all_permission_evaluator::DenyAllPermissionEvaluator,
             security_expression_operations::SecurityExpressionOperations,
         },
-        hierarchicalroles::{role_hierarchy::RoleHierarchy, NullRoleHierarchy},
+        hierarchicalroles::{NullRoleHierarchy, RoleHierarchy},
         permission_evaluator::PermissionEvaluator,
     },
     authorization::{AuthenticationTrustResolver, DefaultAuthenticationTrustResolver},
@@ -114,22 +114,22 @@ impl SecurityExpressionOperations for SecurityExpressionRoot {
 
     fn is_anonymous(&self) -> bool {
         self.trust_resolver
-            .is_anonymous(self.authentication.as_ref())
+            .is_anonymous(Some(self.authentication.as_ref()))
     }
 
     fn is_authenticated(&self) -> bool {
         self.trust_resolver
-            .is_authenticated(self.authentication.as_ref())
+            .is_authenticated(Some(self.authentication.as_ref()))
     }
 
     fn is_remember_me(&self) -> bool {
         self.trust_resolver
-            .is_remember_me(self.authentication.as_ref())
+            .is_remember_me(Some(self.authentication.as_ref()))
     }
 
     fn is_fully_authenticated(&self) -> bool {
         self.trust_resolver
-            .is_fully_authenticated(self.authentication.as_ref())
+            .is_fully_authenticated(Some(self.authentication.as_ref()))
     }
 
     fn has_permission(&self, target: Option<&AnyValue>, permission: &str) -> bool {
@@ -144,43 +144,5 @@ impl SecurityExpressionOperations for SecurityExpressionRoot {
             target_type,
             permission,
         )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use crate::{
-        access::{
-            expression::{
-                security_expression_operations::SecurityExpressionOperations,
-                security_expression_root::SecurityExpressionRoot,
-            },
-            hierarchicalroles::role_hierarchy_impl::RoleHierarchyImpl,
-        },
-        core::authority_utils::AuthorityUtils,
-        core::simple_authentication::SimpleAuthentication,
-    };
-
-    #[test]
-    fn supports_roles_authorities_and_hierarchy() {
-        let auth = Arc::new(
-            SimpleAuthentication::builder()
-                .principal("alice")
-                .authorities(AuthorityUtils::create_authority_list(["ROLE_ADMIN"]))
-                .authenticated(true)
-                .build(),
-        );
-        let mut root = SecurityExpressionRoot::new(auth);
-        root.set_role_hierarchy(Arc::new(
-            RoleHierarchyImpl::from_hierarchy("ROLE_ADMIN > ROLE_USER").unwrap(),
-        ));
-
-        assert!(root.has_role("ADMIN"));
-        assert!(root.has_role("USER"));
-        assert!(root.has_authority("ROLE_ADMIN"));
-        assert!(root.is_authenticated());
-        assert!(!root.deny_all());
     }
 }

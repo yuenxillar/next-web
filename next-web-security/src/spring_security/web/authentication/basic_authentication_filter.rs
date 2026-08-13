@@ -16,9 +16,8 @@ use crate::{
     authentication::AnonymousAuthenticationToken,
     authorization::{AuthenticationDetailsSource, AuthenticationManager},
     core::{
-        authentication_error::AuthenticationError,
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
-        Authentication,
+        Authentication, AuthenticationError,
     },
     web::{
         authentication::{

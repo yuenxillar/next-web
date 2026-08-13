@@ -2,9 +2,7 @@ use std::{fmt, sync::Arc};
 
 use next_web_core::traits::http::http_request::HttpRequest;
 
-use crate::core::{
-    granted_authorities_container::GrantedAuthoritiesContainer, granted_authority::GrantedAuthority,
-};
+use crate::core::{granted_authorities_container::GrantedAuthoritiesContainer, GrantedAuthority};
 
 #[derive(Clone, Default)]
 pub struct PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails {

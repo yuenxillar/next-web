@@ -24,7 +24,6 @@ mod anonymous_authentication_token;
 mod authentication_provider;
 mod authentication_trust_resolver_impl;
 mod base_authentication_token;
-mod insufficient_authentication_error;
 mod remember_me_authentication_token;
 
 pub use account_status_user_details_checker::AccountStatusUserDetailsChecker;
@@ -32,5 +31,4 @@ pub use anonymous_authentication_token::{string_hash, AnonymousAuthenticationTok
 pub use authentication_provider::AuthenticationProvider;
 pub use authentication_trust_resolver_impl::AuthenticationTrustResolverImpl;
 pub use base_authentication_token::{BaseAuthenticationBuilder, BaseAuthenticationToken};
-pub use insufficient_authentication_error::InsufficientAuthenticationError;
 pub use remember_me_authentication_token::RememberMeAuthenticationToken;

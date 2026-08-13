@@ -1,1 +1,3 @@
-pub mod request_authorization_context;
+mod request_authorization_context;
+
+pub use request_authorization_context::RequestAuthorizationContext;

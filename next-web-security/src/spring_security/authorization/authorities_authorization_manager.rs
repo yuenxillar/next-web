@@ -2,46 +2,71 @@ use std::sync::Arc;
 
 use std::collections::HashSet;
 
+use next_web_core::async_trait;
+
 use crate::{
-    access::hierarchicalroles::{
-        null_role_hierarchy::NullRoleHierarchy, role_hierarchy::RoleHierarchy,
-    },
-    core::Authentication,
+    access::hierarchicalroles::RoleHierarchy,
+    authorization::{AuthorityAuthorizationDecision, AuthorizationManager, AuthorizationResult},
+    core::{authority_utils::AuthorityUtils, Authentication},
 };
 
+/// An AuthorizationManager that determines if the current user is authorized by evaluating if the
+/// Authentication contains any of the specified authorities.
+#[derive(Clone)]
 pub struct AuthoritiesAuthorizationManager {
-    role_hierarchy: Arc<dyn RoleHierarchy>,
+    role_hierarchy: Option<Arc<dyn RoleHierarchy>>,
 }
 
 impl AuthoritiesAuthorizationManager {
-    pub fn new() -> Self {
-        Self {
-            role_hierarchy: Arc::new(NullRoleHierarchy),
-        }
+    /// Sets the RoleHierarchy to be used. Default is None
+    pub fn set_role_hierarchy(&mut self, role_hierarchy: Arc<dyn RoleHierarchy>) {
+        self.role_hierarchy = Some(role_hierarchy);
     }
 
-    pub fn set_role_hierarchy(&mut self, role_hierarchy: Arc<dyn RoleHierarchy>) {
-        self.role_hierarchy = role_hierarchy;
+    fn is_granted(&self, authentication: &dyn Authentication, authority: &HashSet<String>) -> bool {
+        self.is_authorized(authentication, authority)
     }
 
     pub fn is_authorized(
         &self,
         authentication: &dyn Authentication,
-        required_authorities: &HashSet<String>,
+        authorities: &HashSet<String>,
     ) -> bool {
-        if required_authorities.is_empty() {
+        if authorities.is_empty() {
             return false;
         }
 
-        self.role_hierarchy
-            .reachable_granted_authorities(&authentication.authorities())
-            .into_iter()
-            .any(|authority| required_authorities.contains(&authority))
+        self.role_hierarchy.as_ref().map_or(false, |rh| {
+            rh.reachable_granted_authorities(authentication.authorities())
+                .iter()
+                .any(|ga| {
+                    ga.authority()
+                        .map_or(false, |auth| authorities.contains(auth))
+                })
+        })
+    }
+}
+#[async_trait]
+impl AuthorizationManager<HashSet<String>> for AuthoritiesAuthorizationManager {
+    /// Determines if the current user is authorized by evaluating if the
+    /// Authentication contains any of specified authorities.
+    async fn authorize(
+        &self,
+        authentication: &dyn Authentication,
+        authorities: &HashSet<String>,
+    ) -> Option<Box<dyn AuthorizationResult>> {
+        let granted = self.is_granted(authentication, authorities);
+        Some(Box::new(AuthorityAuthorizationDecision::new(
+            granted,
+            AuthorityUtils::create_authority_list(authorities),
+        )))
     }
 }
 
 impl Default for AuthoritiesAuthorizationManager {
     fn default() -> Self {
-        Self::new()
+        Self {
+            role_hierarchy: None,
+        }
     }
 }

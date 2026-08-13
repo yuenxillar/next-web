@@ -71,7 +71,7 @@ impl RequestAttributeAuthenticationFilter {
     pub fn pre_authenticated_principal(
         &self,
         request: &dyn HttpRequest,
-    ) -> Result<Option<String>, crate::core::authentication_error::AuthenticationError> {
+    ) -> Result<Option<String>, crate::core::AuthenticationError> {
         let principal = request_attribute(request, &self.principal_environment_variable);
         if principal.is_none() && self.exception_if_variable_missing {
             return Err(pre_authenticated_credentials_not_found(format!(

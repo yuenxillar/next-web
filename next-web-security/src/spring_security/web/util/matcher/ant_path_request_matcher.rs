@@ -1,4 +1,4 @@
-use next_web_core::{traits::http::http_request::HttpRequest, util::http_method::HttpMethod};
+use next_web_core::{http::HttpMethod, traits::http::http_request::HttpRequest};
 
 use crate::web::util::matcher::RequestMatcher;
 
@@ -23,7 +23,7 @@ impl AntPathRequestMatcher {
 
 impl RequestMatcher for AntPathRequestMatcher {
     fn matches(&self, request: &dyn HttpRequest) -> bool {
-        if let Some(http_method) = self.http_method {
+        if let Some(http_method) = self.http_method.as_ref() {
             if request.method() != http_method {
                 return false;
             }

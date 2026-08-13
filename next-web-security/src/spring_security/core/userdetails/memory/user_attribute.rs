@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{
-    granted_authority::GrantedAuthority, simple_granted_authority::SimpleGrantedAuthority,
-};
+use crate::core::{simple_granted_authority::SimpleGrantedAuthority, GrantedAuthority};
 
 #[derive(Clone, Default)]
 pub struct UserAttribute {

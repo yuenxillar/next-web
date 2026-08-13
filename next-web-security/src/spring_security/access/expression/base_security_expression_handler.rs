@@ -7,7 +7,7 @@ use crate::{
             security_expression_handler::SecurityExpressionHandler,
             security_expression_operations::SecurityExpressionOperations,
         },
-        hierarchicalroles::{role_hierarchy::RoleHierarchy, NullRoleHierarchy},
+        hierarchicalroles::{NullRoleHierarchy, RoleHierarchy},
         permission_evaluator::PermissionEvaluator,
     },
     authorization::{AuthenticationTrustResolver, DefaultAuthenticationTrustResolver},

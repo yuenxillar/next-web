@@ -2,7 +2,7 @@ use std::{any::TypeId, sync::Arc};
 
 use next_web_core::async_trait;
 
-use crate::core::{authentication_error::AuthenticationError, Authentication};
+use crate::core::{Authentication, AuthenticationError};
 
 #[async_trait]
 pub trait AuthenticationProvider

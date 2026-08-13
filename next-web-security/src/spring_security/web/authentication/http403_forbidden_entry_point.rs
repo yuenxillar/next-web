@@ -5,7 +5,7 @@ use next_web_core::{
 };
 use tracing::debug;
 
-use crate::{core::authentication_error::AuthenticationError, web::AuthenticationEntryPoint};
+use crate::{core::AuthenticationError, web::AuthenticationEntryPoint};
 
 /// In the pre-authenticated authentication case (unlike CAS, for example) the user will already have been
 /// identified through some external mechanism and a secure context established by the time the

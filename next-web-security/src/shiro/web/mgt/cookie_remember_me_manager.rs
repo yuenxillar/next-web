@@ -13,8 +13,8 @@ use tracing::{debug, error, trace, warn};
 use crate::{
     core::{
         authc::{
-            authentication_error::AuthenticationError, authentication_info::AuthenticationInfo,
-            authentication_token::AuthenticationToken,
+            authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
+            AuthenticationError,
         },
         mgt::{
             default_remember_me_manager::{DefaultRememberMeManager, DefaultRememberMeManagerExt},

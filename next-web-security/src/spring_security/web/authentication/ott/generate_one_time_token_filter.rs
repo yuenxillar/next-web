@@ -7,12 +7,12 @@ use next_web_core::{
     anys::any_value::AnyValue,
     async_trait,
     filter::FilterError,
+    http::HttpMethod,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
-    util::http_method::HttpMethod,
 };
 use tracing::trace;
 
@@ -93,7 +93,7 @@ impl GenerateOneTimeTokenFilter {
             token_service,
             token_generation_success_handler,
             request_matcher: Arc::new(PathPatternRequestMatcher::path_pattern(
-                Some(HttpMethod::Post),
+                Some(HttpMethod::POST),
                 Self::DEFAULT_GENERATE_URL,
             )),
             request_resolver: Arc::new(DefaultGenerateOneTimeTokenRequestResolver::default()),

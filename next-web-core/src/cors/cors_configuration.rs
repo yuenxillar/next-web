@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::util::http_method::HttpMethod;
+use crate::http::HttpMethod;
 
 /// Configuration for CORS processing
 #[derive(Debug, Clone)]
@@ -18,7 +18,7 @@ impl CorsConfiguration {
     pub fn new() -> Self {
         Self {
             allowed_origins: Vec::new(),
-            allowed_methods: vec![HttpMethod::Get, HttpMethod::Head, HttpMethod::Post],
+            allowed_methods: vec![HttpMethod::GET, HttpMethod::HEAD, HttpMethod::POST],
             allowed_headers: Vec::new(),
             exposed_headers: Vec::new(),
             allow_credentials: false,

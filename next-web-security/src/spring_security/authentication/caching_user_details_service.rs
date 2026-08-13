@@ -35,16 +35,13 @@ impl CachingUserDetailsService {
 impl UserDetailsService for CachingUserDetailsService {
     async fn load_user_by_username(
         &self,
-        username: String,
+        username: &str,
     ) -> Result<Arc<dyn UserDetails>, UsernameNotFoundError> {
-        if let Some(user) = self.user_cache.get_user_from_cache(&username) {
+        if let Some(user) = self.user_cache.get_user_from_cache(username) {
             return Ok(user);
         }
 
-        let user = self
-            .delegate
-            .load_user_by_username(username.clone())
-            .await?;
+        let user = self.delegate.await?;
         let cache_key = user.username();
         self.user_cache
             .put_user_in_cache(cache_key.to_string(), user.clone());

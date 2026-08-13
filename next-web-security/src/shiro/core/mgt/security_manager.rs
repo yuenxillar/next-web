@@ -6,8 +6,8 @@ use next_web_core::{async_trait, error::BoxError};
 
 use crate::core::{
     authc::{
-        authentication_error::AuthenticationError, authentication_token::AuthenticationToken,
-        authenticator::Authenticator,
+        authentication_token::AuthenticationToken, authenticator::Authenticator,
+        AuthenticationError,
     },
     authz::authorizer::Authorizer,
     session::mgt::session_manager::SessionManager,

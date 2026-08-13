@@ -3,6 +3,7 @@ use std::any::Any;
 use std::sync::Arc;
 
 use crate::config::base_configured_security_builder::BaseConfiguredSecurityBuilder;
+use crate::core::UsernamePasswordAuthenticationToken;
 use crate::core::{
     authentication_error::{AuthenticationError, AuthenticationErrorKind},
     userdetails::UserDetailsService,
@@ -246,9 +247,8 @@ impl ProviderAuthenticationManager {
         if !self.erase_credentials_after_authentication {
             return authentication;
         }
-        if let Some(token) = (authentication
-            .as_ref() as &dyn Any)
-            .downcast_ref::<crate::core::username_password_authentication_token::UsernamePasswordAuthenticationToken>()
+        if let Some(token) = (authentication.as_ref() as &dyn Any)
+            .downcast_ref::<UsernamePasswordAuthenticationToken>()
         {
             let mut token = token.clone();
             CredentialsContainer::erase_credentials(&mut token);

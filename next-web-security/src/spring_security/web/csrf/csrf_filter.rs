@@ -4,21 +4,20 @@ use std::{
 };
 
 use next_web_core::{
-    anys::any_value::AnyValue,
     async_trait,
     filter::FilterError,
+    http::HttpMethod,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
-    util::http_method::HttpMethod,
 };
 use tracing::{debug, trace};
 use tracing::{enabled, Level};
 
 use crate::web::{
-    access::{AccessDeniedError, AccessDeniedHandler, AccessDeniedHandlerImpl},
+    access::{AccessDeniedHandler, AccessDeniedHandlerImpl},
     csrf::{
         csrf_token_repository::load_deferred_token, CsrfTokenRepository, CsrfTokenRequestHandler,
         DeferredCsrfToken, XorCsrfTokenRequestAttributeHandler,
@@ -207,7 +206,7 @@ impl RequestMatcher for DefaultRequiresCsrfMatcher {
         // Safe methods (GET, HEAD, OPTIONS, TRACE) are excluded.
         !matches!(
             request.method(),
-            HttpMethod::Get | HttpMethod::Head | HttpMethod::Trace | HttpMethod::Options
+            HttpMethod::GET | HttpMethod::HEAD | HttpMethod::TRACE | HttpMethod::OPTIONS
         )
     }
 }

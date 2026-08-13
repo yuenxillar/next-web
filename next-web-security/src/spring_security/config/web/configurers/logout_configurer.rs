@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use next_web_core::{traits::required::Required, util::http_method::HttpMethod};
+use next_web_core::{http::HttpMethod, traits::required::Required};
 
 use crate::{
     config::{
@@ -249,14 +249,14 @@ where
     fn create_logout_request_matcher(&self, http: &H) -> Arc<dyn RequestMatcher> {
         http.shared_object::<Builder>()
             .map(|builder| {
-                let post = builder.matcher(Some(HttpMethod::Post), &self.logout_url);
+                let post = builder.matcher(Some(HttpMethod::POST), &self.logout_url);
                 if http.configurer::<CsrfConfigurer<H>>().is_some() {
                     return Arc::new(post) as Arc<dyn RequestMatcher>;
                 }
 
-                let get = builder.matcher(Some(HttpMethod::Get), &self.logout_url);
-                let put = builder.matcher(Some(HttpMethod::Put), &self.logout_url);
-                let delete = builder.matcher(Some(HttpMethod::Delete), &self.logout_url);
+                let get = builder.matcher(Some(HttpMethod::GET), &self.logout_url);
+                let put = builder.matcher(Some(HttpMethod::PUT), &self.logout_url);
+                let delete = builder.matcher(Some(HttpMethod::DELETE), &self.logout_url);
 
                 let ele = [get, post, put, delete]
                     .into_iter()

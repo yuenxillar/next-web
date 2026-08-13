@@ -1,11 +1,14 @@
-use crate::core::authentication_error::{AuthenticationError, AuthenticationErrorKind};
+use crate::core::{AuthenticationError, AuthenticationErrorKind};
 
 pub fn bad_credentials() -> AuthenticationError {
     AuthenticationError::with_kind("Bad credentials", AuthenticationErrorKind::BadCredentials)
 }
 
 pub fn locked() -> AuthenticationError {
-    AuthenticationError::with_kind("User account is locked", AuthenticationErrorKind::AccountStatus)
+    AuthenticationError::with_kind(
+        "User account is locked",
+        AuthenticationErrorKind::AccountStatus,
+    )
 }
 
 pub fn disabled() -> AuthenticationError {
@@ -13,7 +16,10 @@ pub fn disabled() -> AuthenticationError {
 }
 
 pub fn account_expired() -> AuthenticationError {
-    AuthenticationError::with_kind("User account has expired", AuthenticationErrorKind::AccountStatus)
+    AuthenticationError::with_kind(
+        "User account has expired",
+        AuthenticationErrorKind::AccountStatus,
+    )
 }
 
 pub fn credentials_expired() -> AuthenticationError {

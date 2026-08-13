@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{authentication_error::AuthenticationError, Authentication};
+use crate::core::{Authentication, AuthenticationError};
 
 #[derive(Clone)]
 pub struct AuthenticationSuccessEvent {

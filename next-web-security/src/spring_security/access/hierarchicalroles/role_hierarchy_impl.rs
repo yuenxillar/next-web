@@ -7,7 +7,7 @@ use crate::{
     access::hierarchicalroles::{
         cycle_in_role_hierarchy_error::CycleInRoleHierarchyError, role_hierarchy::RoleHierarchy,
     },
-    core::granted_authority::GrantedAuthority,
+    core::GrantedAuthority,
 };
 
 #[derive(Clone, Debug, Default)]

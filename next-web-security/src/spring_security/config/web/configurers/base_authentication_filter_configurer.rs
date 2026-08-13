@@ -4,9 +4,9 @@ use std::{
 };
 
 use next_web_core::{
+    http::HttpMethod,
     http::MediaType,
     traits::filter::HttpFilter,
-    util::http_method::HttpMethod,
     web::accept::{ContentNegotiationStrategy, HeaderContentNegotiationStrategy},
 };
 
@@ -539,7 +539,7 @@ where
         login_processing_url: &str,
     ) -> Arc<dyn RequestMatcher> {
         Arc::new(AntPathRequestMatcher::from((
-            HttpMethod::Post,
+            HttpMethod::POST,
             login_processing_url,
         )))
     }

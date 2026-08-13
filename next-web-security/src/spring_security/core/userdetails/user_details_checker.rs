@@ -1,4 +1,4 @@
-use crate::core::{authentication_error::AuthenticationError, userdetails::UserDetails};
+use crate::core::{userdetails::UserDetails, AuthenticationError};
 
 pub trait UserDetailsChecker
 where

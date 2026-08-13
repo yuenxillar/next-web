@@ -1,7 +1,7 @@
 use next_web_core::async_trait;
 
 use crate::{
-    core::authentication_error::AuthenticationError,
+    core::AuthenticationError,
     ldap::{
         authentication::ldap_authentication_request::LdapAuthenticationRequest,
         dir_context_operations::DirContextOperations,

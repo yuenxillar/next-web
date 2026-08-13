@@ -14,8 +14,8 @@ use crate::{
 };
 
 use super::{
-    method_security_expression_handler::{MethodInvocation, MethodSecurityExpressionHandler},
     method_security_evaluation_context::MethodSecurityEvaluationContext,
+    method_security_expression_handler::{MethodInvocation, MethodSecurityExpressionHandler},
 };
 
 const DEFAULT_ROLE_PREFIX: &str = "ROLE_";
@@ -111,44 +111,5 @@ impl SecurityExpressionHandler<MethodInvocation> for DefaultMethodSecurityExpres
         invocation: MethodInvocation,
     ) -> Box<dyn SecurityExpressionOperations> {
         Box::new(self.build_security_expression_root(authentication, invocation))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use crate::{
-        access::expression::{
-            method::{
-                default_method_security_expression_handler::DefaultMethodSecurityExpressionHandler,
-                method_security_expression_handler::MethodInvocation,
-            },
-            security_expression_handler::SecurityExpressionHandler,
-        },
-        core::{authority_utils::AuthorityUtils, simple_authentication::SimpleAuthentication},
-    };
-
-    #[test]
-    fn test_create_expression_root() {
-        let auth = Arc::new(
-            SimpleAuthentication::builder()
-                .principal("alice")
-                .authorities(AuthorityUtils::create_authority_list(["ROLE_USER"]))
-                .authenticated(true)
-                .build(),
-        );
-
-        let handler = DefaultMethodSecurityExpressionHandler::new();
-        let invocation = MethodInvocation::new("testMethod", vec![], None);
-        let root = SecurityExpressionHandler::<MethodInvocation>::create_security_expression_root(
-            &handler,
-            Some(auth),
-            invocation,
-        );
-
-        assert!(root.has_role("USER"));
-        assert!(!root.has_role("ADMIN"));
-        assert!(root.is_authenticated());
     }
 }

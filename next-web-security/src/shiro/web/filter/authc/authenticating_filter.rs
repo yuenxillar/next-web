@@ -12,8 +12,8 @@ use next_web_core::{
 use crate::{
     core::{
         authc::{
-            authentication_error::AuthenticationError, authentication_token::AuthenticationToken,
-            username_password_token::UsernamePasswordToken,
+            authentication_token::AuthenticationToken,
+            username_password_token::UsernamePasswordToken, AuthenticationError,
         },
         subject::Subject,
         util::object::Object,

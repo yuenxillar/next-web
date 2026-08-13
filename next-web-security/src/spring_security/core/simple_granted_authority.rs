@@ -1,4 +1,4 @@
-use crate::core::granted_authority::GrantedAuthority;
+use crate::core::GrantedAuthority;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct SimpleGrantedAuthority {

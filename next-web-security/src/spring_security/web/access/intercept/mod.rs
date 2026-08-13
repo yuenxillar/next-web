@@ -2,4 +2,7 @@ mod authorization_filter;
 mod request_matcher_delegating_authorization_manager;
 
 pub use authorization_filter::AuthorizationFilter;
-pub use request_matcher_delegating_authorization_manager::{RequestMatcherDelegatingAuthorizationManagerBuilder, RequestMatcherDelegatingAuthorizationManager};
+pub use request_matcher_delegating_authorization_manager::{
+    RequestMatcherDelegatingAuthorizationManager,
+    RequestMatcherDelegatingAuthorizationManagerBuilder,
+};

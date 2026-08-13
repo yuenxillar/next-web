@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{granted_authority::GrantedAuthority, Authentication};
+use crate::core::{Authentication, GrantedAuthority};
 
 #[derive(Clone, Default)]
 pub struct TestingAuthenticationToken {

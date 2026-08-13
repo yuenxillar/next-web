@@ -183,13 +183,16 @@ impl HttpFilter for SessionManagementFilter {
             let context = self.security_context_holder_strategy.get_context();
             let authentication = context.as_ref().and_then(|s| s.get_authentication());
 
-            if let Some(auth) = authentication {
-                if self.trust_resolver.is_authenticated(auth.as_ref()) {
-                    // The user has been authenticated during the current request, so
-                    // call the session strategy.
+            if self
+                .trust_resolver
+                .is_authenticated(authentication.map(|auth| auth.as_ref()))
+            {
+                // The user has been authenticated during the current request, so
+                // call the session strategy.
+                if let Some(authentication) = authentication {
                     match self
                         .session_authentication_strategy
-                        .on_authentication(auth.as_ref(), request, response)
+                        .on_authentication(authentication, request, response)
                         .await
                     {
                         Ok(()) => {
@@ -216,26 +219,10 @@ impl HttpFilter for SessionManagementFilter {
                             return Ok(());
                         }
                     }
-                } else {
-                    // No security context or authentication present. Check for a
-                    // session timeout.
-                    if self.has_invalid_session_id(request) {
-                        if let Some(invalid_session_strategy) = &self.invalid_session_strategy {
-                            debug!(
-                                "Request requested invalid session id {:?}",
-                                request
-                                    .get_attribute(Self::REQUESTED_SESSION_ID_ATTR)
-                                    .and_then(|v| v.as_str())
-                            );
-                            invalid_session_strategy
-                                .on_invalid_session_detected(request, response)
-                                .map_err(FilterError::from)?;
-                            return Ok(());
-                        }
-                    }
                 }
             } else {
-                // No security context at all. Check for a session timeout.
+                // No security context or authentication present. Check for a
+                // session timeout.
                 if self.has_invalid_session_id(request) {
                     if let Some(invalid_session_strategy) = &self.invalid_session_strategy {
                         debug!(

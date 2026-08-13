@@ -18,8 +18,7 @@ use crate::{
     core::{
         authority_utils::AuthorityUtils,
         context::{SecurityContext, SecurityContextHolder, SecurityContextHolderStrategy},
-        granted_authority::GrantedAuthority,
-        Authentication,
+        Authentication, GrantedAuthority,
     },
     web::authentication::{AuthPrincipal, WebAuthenticationDetailsSource},
 };

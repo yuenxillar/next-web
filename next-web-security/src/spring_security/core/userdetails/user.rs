@@ -7,8 +7,7 @@ use std::{
 };
 
 use crate::core::{
-    credentials_container::CredentialsContainer, granted_authority::GrantedAuthority,
-    userdetails::UserDetails,
+    credentials_container::CredentialsContainer, userdetails::UserDetails, GrantedAuthority,
 };
 
 pub struct User {

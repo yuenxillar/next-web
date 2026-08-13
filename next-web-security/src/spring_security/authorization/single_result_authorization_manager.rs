@@ -45,9 +45,9 @@ impl<T: Send + Sync + 'static> AuthorizationManager<T> for SingleResultAuthoriza
 
     async fn authorize(
         &self,
-        authentication: &dyn Authentication,
-        var: &mut T,
+        _authentication: &dyn Authentication,
+        _var: &T,
     ) -> Option<Box<dyn AuthorizationResult>> {
-        todo!()
+        Some(Box::new(self.result.clone()))
     }
 }

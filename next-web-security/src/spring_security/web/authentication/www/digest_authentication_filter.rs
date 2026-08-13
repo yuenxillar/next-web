@@ -265,8 +265,7 @@ impl DigestAuthenticationFilter {
             let username = user.username();
             let password = user.password();
             let authorities = user.authorities();
-            let mut auth_list: Vec<Arc<dyn crate::core::granted_authority::GrantedAuthority>> =
-                Vec::new();
+            let mut auth_list: Vec<Arc<dyn crate::core::GrantedAuthority>> = Vec::new();
             for auth in authorities {
                 let name = auth.authority().unwrap_or_default();
                 auth_list.push(Arc::new(

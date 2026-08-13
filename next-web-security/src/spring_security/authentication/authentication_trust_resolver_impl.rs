@@ -32,12 +32,16 @@ impl AuthenticationTrustResolverImpl {
     }
 }
 impl AuthenticationTrustResolver for AuthenticationTrustResolverImpl {
-    fn is_anonymous(&self, authentication: &dyn Authentication) -> bool {
-        self.anonymous_type == authentication.of()
+    fn is_anonymous(&self, authentication: Option<&dyn Authentication>) -> bool {
+        authentication
+            .map(|authentication| self.anonymous_type == authentication.of())
+            .unwrap_or(false)
     }
 
-    fn is_remember_me(&self, authentication: &dyn Authentication) -> bool {
-        self.remember_me_type == authentication.of()
+    fn is_remember_me(&self, authentication: Option<&dyn Authentication>) -> bool {
+        authentication
+            .map(|authentication| self.remember_me_type == authentication.of())
+            .unwrap_or(false)
     }
 }
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::granted_authority::GrantedAuthority;
+use crate::{authorization::AuthorizationResult, core::GrantedAuthority};
 
 #[derive(Clone)]
 pub struct AuthorityAuthorizationDecision {
@@ -22,5 +22,11 @@ impl AuthorityAuthorizationDecision {
 
     pub fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
         &self.authorities
+    }
+}
+
+impl AuthorizationResult for AuthorityAuthorizationDecision {
+    fn is_granted(&self) -> bool {
+        self.is_granted()
     }
 }

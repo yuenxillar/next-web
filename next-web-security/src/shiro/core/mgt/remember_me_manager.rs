@@ -5,8 +5,8 @@ use next_web_core::traits::http::{http_request::HttpRequest, http_response::Http
 
 use crate::core::{
     authc::{
-        authentication_error::AuthenticationError, authentication_info::AuthenticationInfo,
-        authentication_token::AuthenticationToken,
+        authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
+        AuthenticationError,
     },
     subject::principal_collection::PrincipalCollection,
 };

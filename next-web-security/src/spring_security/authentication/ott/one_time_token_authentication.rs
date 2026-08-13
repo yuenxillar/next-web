@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::anys::any_value::AnyValue;
 
-use crate::core::{granted_authority::GrantedAuthority, Authentication};
+use crate::core::{Authentication, GrantedAuthority};
 
 #[derive(Clone)]
 pub struct OneTimeTokenAuthentication {

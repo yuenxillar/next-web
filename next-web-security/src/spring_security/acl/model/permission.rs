@@ -34,7 +34,11 @@ impl Permission for SimplePermission {
         let mut result = String::with_capacity(32);
         for bit in (0..32).rev() {
             let active = (self.mask & (1_i32 << bit)) != 0;
-            result.push(if active { self.code } else { Self::RESERVED_OFF });
+            result.push(if active {
+                self.code
+            } else {
+                Self::RESERVED_OFF
+            });
         }
         result
     }

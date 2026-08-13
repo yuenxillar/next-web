@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::granted_authority::GrantedAuthority;
+use crate::core::GrantedAuthority;
 
 pub trait RoleHierarchy
 where

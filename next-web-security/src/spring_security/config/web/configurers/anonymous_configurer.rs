@@ -19,7 +19,7 @@ use crate::{
             http_security_builder::HttpSecurityBuilder,
         },
     },
-    core::{authority_utils::AuthorityUtils, granted_authority::GrantedAuthority},
+    core::{authority_utils::AuthorityUtils, GrantedAuthority},
     web::{
         authentication::AnonymousAuthenticationFilter,
         default_security_filter_chain::DefaultSecurityFilterChain,

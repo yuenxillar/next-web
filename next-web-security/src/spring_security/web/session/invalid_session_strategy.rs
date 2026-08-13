@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use next_web_core::{
     error::BoxError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -10,6 +12,7 @@ use next_web_core::{
 pub trait InvalidSessionStrategy
 where
     Self: Send + Sync,
+    Self: Debug,
 {
     /// Called when an invalid session ID is detected in the request.
     /// Implementations typically redirect to a login page or show an error.

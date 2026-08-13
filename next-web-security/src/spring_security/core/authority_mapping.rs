@@ -3,9 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::core::{
-    granted_authority::GrantedAuthority, simple_granted_authority::SimpleGrantedAuthority,
-};
+use crate::core::{simple_granted_authority::SimpleGrantedAuthority, GrantedAuthority};
 
 pub trait GrantedAuthoritiesMapper: Send + Sync {
     fn map_authorities(
@@ -96,8 +94,8 @@ impl SimpleAuthorityMapper {
 impl GrantedAuthoritiesMapper for SimpleAuthorityMapper {
     fn map_authorities(
         &self,
-        authorities: Vec<Arc<dyn GrantedAuthority>>,
-    ) -> Vec<Arc<dyn GrantedAuthority>> {
+        authorities: &[Arc<dyn GrantedAuthority>],
+    ) -> &[Arc<dyn GrantedAuthority>] {
         self.after_properties_set();
 
         let mut mapped = BTreeMap::<String, Arc<dyn GrantedAuthority>>::new();
@@ -118,7 +116,7 @@ impl GrantedAuthoritiesMapper for SimpleAuthorityMapper {
             }
         }
 
-        mapped.into_values().collect()
+        mapped.values()
     }
 }
 

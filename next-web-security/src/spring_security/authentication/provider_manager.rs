@@ -11,8 +11,7 @@ use crate::{
     },
     authorization::AuthenticationManager,
     core::{
-        Authentication,
-        authentication_error::{AuthenticationError, AuthenticationErrorKind},
+        Authentication, {AuthenticationError, AuthenticationErrorKind},
     },
 };
 
@@ -120,8 +119,9 @@ impl AuthenticationManager for ProviderManager {
 
             // Publish success event (only if parent didn't already do it)
             if parent_result.is_none() {
-                self.event_publisher
-                    .publish_authentication_success(AuthenticationSuccessEvent::new(auth_result.clone()));
+                self.event_publisher.publish_authentication_success(
+                    AuthenticationSuccessEvent::new(auth_result.clone()),
+                );
             }
 
             return Ok(auth_result.clone());

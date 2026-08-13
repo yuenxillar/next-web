@@ -31,6 +31,7 @@ urlencoding     = { workspace = true }
 inventory       = { workspace = true }
 chrono          = { workspace = true, features = ["serde"] }
 arc-swap        = { workspace = true }
+dashmap         = { workspace = true }
 uuid            = { workspace = true }
 
 # tower-layer = "0.3.3"

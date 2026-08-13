@@ -7,7 +7,7 @@ use next_web_core::{
 use tracing::debug;
 
 use crate::{
-    core::authentication_error::AuthenticationError,
+    core::AuthenticationError,
     web::{
         util::matcher::{RequestMatcher, RequestMatcherEntry},
         AuthenticationEntryPoint,

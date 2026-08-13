@@ -17,7 +17,7 @@ use principal_collection::PrincipalCollection;
 use crate::web::subject::web_subject::WebSubject;
 
 use super::{
-    authc::{authentication_error::AuthenticationError, authentication_token::AuthenticationToken},
+    authc::{authentication_token::AuthenticationToken, AuthenticationError},
     authz::authorization_error::AuthorizationError,
     session::Session,
     util::object::Object,

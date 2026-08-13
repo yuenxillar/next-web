@@ -8,7 +8,7 @@ use next_web_core::{
 use tracing::{debug, enabled, warn, Level};
 
 use crate::{
-    core::{authentication_error::AuthenticationError, Authentication},
+    core::{Authentication, AuthenticationError},
     web::authentication::session::{SessionAuthenticationStrategy, SessionFixationProtectionEvent},
 };
 

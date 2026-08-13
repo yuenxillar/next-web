@@ -5,6 +5,7 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
+use crate::access::AccessDeniedError;
 use crate::web::access::AccessDeniedHandler;
 
 pub struct DelegatingAccessDeniedHandler {
@@ -29,8 +30,10 @@ impl AccessDeniedHandler for DelegatingAccessDeniedHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        access_denied_error: &super::AccessDeniedError,
+        access_denied_error: &AccessDeniedError,
     ) -> Result<(), BoxError> {
-        todo!()
+        let _ = &self.handlers;
+        self.default_handler
+            .handle(request, response, access_denied_error)
     }
 }

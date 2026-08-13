@@ -10,7 +10,7 @@ use tracing::{debug, enabled, trace, Level};
 use crate::web::util::UrlUtils;
 use crate::web::WebAttributes;
 use crate::{
-    core::authentication_error::AuthenticationError,
+    core::AuthenticationError,
     web::{
         authentication::authentication_failure_handler::AuthenticationFailureHandler,
         redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},

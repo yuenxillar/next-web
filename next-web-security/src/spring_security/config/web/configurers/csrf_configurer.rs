@@ -115,9 +115,12 @@ where
     }
 
     /// Allows specifying HttpRequest that should not use CSRF Protection even if they match the require_csrf_protection_matcher(request_matcher).
-    pub fn ignored_csrf_protection_matchers_with_string(mut self, patterns: &[&str]) -> Self {
+    pub fn ignored_csrf_protection_matchers_with_string(
+        mut self,
+        patterns: Vec<&'static str>,
+    ) -> Self {
         let request_matchers = BaseRequestMatcherRegistry::<()>::default()
-            .request_matchers_with_patterns(patterns)
+            .request_matchers(patterns)
             .take_request_matchers();
         self.ignored_csrf_protection_matchers
             .extend(request_matchers);

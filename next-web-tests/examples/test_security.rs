@@ -87,8 +87,11 @@ impl Application for TestApplication {
 
 mod t2 {
     use next_web::macros::bind::singleton;
-    use next_web_core::util::http_method::HttpMethod;
-    use next_web_security::config::web::{WebSecurityConfigurer, builders::HttpSecurity};
+    use next_web_core::util::HttpMethod;
+    use next_web_security::{
+        config::web::{WebSecurityConfigurer, builders::HttpSecurity},
+        web::util::matcher::MatcherInput,
+    };
 
     #[singleton(binds = [Self::into_web_security_configure])]
     #[derive(Clone)]

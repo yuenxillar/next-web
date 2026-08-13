@@ -14,7 +14,11 @@ impl MapRequiredAuthoritiesRepository {
         Self { authorities }
     }
 
-    pub fn set_required_authorities(&mut self, username: impl Into<String>, authorities: Vec<String>) {
+    pub fn set_required_authorities(
+        &mut self,
+        username: impl Into<String>,
+        authorities: Vec<String>,
+    ) {
         self.authorities.insert(username.into(), authorities);
     }
 }

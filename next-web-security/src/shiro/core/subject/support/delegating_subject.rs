@@ -10,9 +10,7 @@ use tracing::debug;
 #[cfg(feature = "web")]
 use crate::{
     core::{
-        authc::{
-            authentication_error::AuthenticationError, authentication_token::AuthenticationToken,
-        },
+        authc::{authentication_token::AuthenticationToken, AuthenticationError},
         authz::authorization_error::AuthorizationError,
         session::{
             mgt::{

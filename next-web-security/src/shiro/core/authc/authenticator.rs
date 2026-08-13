@@ -1,6 +1,6 @@
 use super::{
-    authentication_error::AuthenticationError, authentication_info::AuthenticationInfo,
-    authentication_token::AuthenticationToken,
+    authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
+    AuthenticationError,
 };
 
 pub trait Authenticator

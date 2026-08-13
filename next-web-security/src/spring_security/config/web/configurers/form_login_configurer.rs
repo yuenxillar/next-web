@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use next_web_core::util::http_method::HttpMethod;
+use next_web_core::http::HttpMethod;
 
 use crate::{
     config::{
@@ -260,7 +260,7 @@ where
         Arc::new(
             DEFAULT_BUILDER
                 .get_or_init(|| Default::default())
-                .matcher(Some(HttpMethod::Post), login_processing_url),
+                .matcher(Some(HttpMethod::POST), login_processing_url),
         )
     }
 }

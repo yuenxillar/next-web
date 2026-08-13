@@ -1,9 +1,6 @@
 use next_web_core::anys::any_value::AnyValue;
 
-use crate::{
-    access::permission_evaluator::PermissionEvaluator,
-    core::Authentication,
-};
+use crate::{access::permission_evaluator::PermissionEvaluator, core::Authentication};
 
 #[derive(Clone, Debug, Default)]
 pub struct DenyAllPermissionEvaluator;

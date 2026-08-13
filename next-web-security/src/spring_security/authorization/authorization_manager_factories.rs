@@ -45,7 +45,7 @@ impl<T: Clone + Send + Sync + 'static> MultiFactorBuilder<T> {
     }
 
     pub fn build(self) -> DefaultAuthorizationManagerFactory<T> {
-        let mut factory = DefaultAuthorizationManagerFactory::<T>::new();
+        let mut factory = DefaultAuthorizationManagerFactory::<T>::default();
         let _ = self.required_factors;
         let _ = self.when_condition;
         factory

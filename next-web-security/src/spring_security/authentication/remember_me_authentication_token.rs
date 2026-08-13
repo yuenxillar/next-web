@@ -1,12 +1,12 @@
-use std::sync::Arc;
+use std::{any::TypeId, sync::Arc};
 
 use next_web_core::error::BoxError;
 
 use crate::{
     authentication::{
-        anonymous_authentication_token::EMPTY_CREDENTIALS, string_hash, BaseAuthenticationToken,
+        anonymous_authentication_token::EMPTY_STRING, string_hash, BaseAuthenticationToken,
     },
-    core::{granted_authority::GrantedAuthority, Authentication, Principal},
+    core::{Authentication, GrantedAuthority, Principal},
     web::authentication::AuthPrincipal,
 };
 
@@ -77,7 +77,7 @@ impl RememberMeAuthenticationToken {
 
 impl Authentication for RememberMeAuthenticationToken {
     fn credentials(&self) -> Option<&AuthPrincipal> {
-        Some(&EMPTY_CREDENTIALS)
+        Some(&*EMPTY_STRING)
     }
 
     fn principal(&self) -> Option<&AuthPrincipal> {
@@ -99,10 +99,31 @@ impl Authentication for RememberMeAuthenticationToken {
     fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
         self.inner.set_authenticated(is_authenticated)
     }
+
+    fn to_builder(&self) -> Box<dyn crate::core::AuthenticationBuilder> {
+        self.inner.to_builder()
+    }
+
+    fn of(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
 }
 
 impl Principal for RememberMeAuthenticationToken {
-    fn name(&self) -> String {
-        self.inner.name()
+    fn name(&self) -> &str {
+        self.principal
+            .downcast_ref::<String>()
+            .map(|principal| principal.as_str())
+            .unwrap_or_else(|| self.inner.name())
+    }
+}
+
+impl std::fmt::Display for RememberMeAuthenticationToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "RememberMeAuthenticationToken [Principal={}]",
+            self.name()
+        )
     }
 }

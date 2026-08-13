@@ -3,7 +3,7 @@ use std::{any::TypeId, sync::Arc};
 use next_web_core::error::BoxError;
 
 use crate::{
-    core::{granted_authority::GrantedAuthority, Authentication, AuthenticationBuilder, Principal},
+    core::{Authentication, AuthenticationBuilder, GrantedAuthority, Principal},
     web::authentication::AuthPrincipal,
 };
 
@@ -25,6 +25,10 @@ impl SimpleAuthentication {
             details: builder.details,
             authenticated: builder.authenticated,
         }
+    }
+
+    pub fn builder() -> SimpleAuthenticationBuilder {
+        SimpleAuthenticationBuilder::default()
     }
 }
 
@@ -68,6 +72,17 @@ impl Principal for SimpleAuthentication {
             .as_ref()
             .and_then(|p| p.downcast_ref::<String>().map(|s| s.as_str()))
             .unwrap_or_default()
+    }
+}
+
+impl std::fmt::Display for SimpleAuthentication {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "SimpleAuthentication [Principal={}, Authenticated={}]",
+            self.name(),
+            self.is_authenticated()
+        )
     }
 }
 

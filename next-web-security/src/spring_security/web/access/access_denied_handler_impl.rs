@@ -7,9 +7,9 @@ use next_web_core::{
 };
 use tracing::{debug, enabled, trace, Level};
 
-use crate::web::{
-    access::{AccessDeniedError, AccessDeniedHandler},
-    WebAttributes,
+use crate::{
+    access::AccessDeniedError,
+    web::{access::AccessDeniedHandler, WebAttributes},
 };
 
 #[derive(Default)]
@@ -54,7 +54,7 @@ impl AccessDeniedHandler for AccessDeniedHandlerImpl {
         // Put exception into request scope (perhaps of use to a view)
         request.set_attribute(
             WebAttributes::ACCESS_DENIED_403,
-            AnyValue::String(access_denied_error.msg().to_string()),
+            AnyValue::String(access_denied_error.to_string()),
         );
         // Set the 403 status code.
         response.set_status_code(StatusCode::FORBIDDEN);

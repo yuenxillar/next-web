@@ -1,10 +1,7 @@
 use next_web_core::async_trait;
 
 use crate::{
-    access::{
-        access_denied_error::AccessDeniedError,
-        intercept::request_authorization_context::RequestAuthorizationContext,
-    },
+    access::{intercept::RequestAuthorizationContext, AccessDeniedError},
     authorization::AuthorizationResult,
     core::Authentication,
 };
@@ -18,13 +15,13 @@ where
     async fn authorize(
         &self,
         authentication: &dyn Authentication,
-        var: &mut T,
+        var: &T,
     ) -> Option<Box<dyn AuthorizationResult>>;
 
     async fn verify(
         &self,
         authentication: &dyn Authentication,
-        var: &mut T,
+        var: &T,
     ) -> Result<(), AccessDeniedError> {
         let decision = self.authorize(authentication, var).await;
         if let Some(decision) = decision {
@@ -44,9 +41,11 @@ impl AuthorizationManager<RequestAuthorizationContext> for DefaultAuthorizationM
     #[allow(unused_variables)]
     async fn authorize(
         &self,
-        authentication: &dyn Authentication,
-        var: &mut RequestAuthorizationContext,
+        _authentication: &dyn Authentication,
+        _var: &RequestAuthorizationContext,
     ) -> Option<Box<dyn AuthorizationResult>> {
-        todo!()
+        Some(Box::new(crate::authorization::AuthorizationDecision::new(
+            self.0,
+        )))
     }
 }

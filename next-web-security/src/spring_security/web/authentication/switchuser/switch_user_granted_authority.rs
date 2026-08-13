@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::async_trait;
 
-use crate::core::{granted_authority::GrantedAuthority, Authentication};
+use crate::core::{Authentication, GrantedAuthority};
 
 /// A `GrantedAuthority` that stores the original `Authentication` for use
 /// when exiting a switched user context.

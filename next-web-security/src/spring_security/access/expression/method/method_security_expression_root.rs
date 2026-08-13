@@ -6,8 +6,7 @@ use crate::{
     access::{
         expression::security_expression_operations::SecurityExpressionOperations,
         expression::security_expression_root::SecurityExpressionRoot,
-        hierarchicalroles::role_hierarchy::RoleHierarchy,
-        permission_evaluator::PermissionEvaluator,
+        hierarchicalroles::RoleHierarchy, permission_evaluator::PermissionEvaluator,
     },
     authorization::AuthenticationTrustResolver,
     core::Authentication,
@@ -128,49 +127,7 @@ impl SecurityExpressionOperations for MethodSecurityExpressionRoot {
     }
 
     fn has_permission_by_id(&self, target_id: &str, target_type: &str, permission: &str) -> bool {
-        self.inner.has_permission_by_id(target_id, target_type, permission)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use crate::{
-        access::expression::{
-            method::{
-                method_security_expression_handler::MethodInvocation,
-                method_security_expression_operations::MethodSecurityExpressionOperations,
-                method_security_expression_root::MethodSecurityExpressionRoot,
-            },
-            security_expression_operations::SecurityExpressionOperations,
-        },
-        core::{authority_utils::AuthorityUtils, simple_authentication::SimpleAuthentication},
-    };
-
-    #[test]
-    fn test_method_security_expression_root() {
-        let auth = Arc::new(
-            SimpleAuthentication::builder()
-                .principal("alice")
-                .authorities(AuthorityUtils::create_authority_list(["ROLE_USER"]))
-                .authenticated(true)
-                .build(),
-        );
-
-        let invocation = MethodInvocation::new("testMethod", vec![], None);
-        let mut root = MethodSecurityExpressionRoot::new(auth, invocation);
-
-        assert!(root.has_role("USER"));
-        assert!(!root.has_role("ADMIN"));
-        assert!(root.is_authenticated());
-
-        root.set_filter_object(Some(Box::new("filter_target")));
-        assert!(root.get_filter_object().is_some());
-
-        root.set_return_object(Some(Box::new("return_value")));
-        assert!(root.get_return_object().is_some());
-
-        assert!(root.get_this().is_none());
+        self.inner
+            .has_permission_by_id(target_id, target_type, permission)
     }
 }

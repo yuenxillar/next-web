@@ -56,3 +56,15 @@ impl Display for AccessDeniedError {
         write!(f, "{}", self.as_str())
     }
 }
+
+impl From<&str> for AccessDeniedError {
+    fn from(value: &str) -> Self {
+        Self::AuthorizationService(value.to_string())
+    }
+}
+
+impl From<String> for AccessDeniedError {
+    fn from(value: String) -> Self {
+        Self::AuthorizationService(value)
+    }
+}

@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 
 use crate::{
     authorization::RequiredFactorError,
-    core::authentication_error::AuthenticationError,
+    core::AuthenticationError,
     web::{
         authentication_entry_point::AuthenticationEntryPoint,
         redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},

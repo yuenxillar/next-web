@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use crate::{
-    access::hierarchicalroles::role_hierarchy::RoleHierarchy,
-    core::granted_authority::GrantedAuthority,
-};
+use crate::{access::hierarchicalroles::role_hierarchy::RoleHierarchy, core::GrantedAuthority};
 
 #[derive(Clone, Debug, Default)]
 pub struct NullRoleHierarchy;

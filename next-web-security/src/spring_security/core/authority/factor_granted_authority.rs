@@ -1,6 +1,6 @@
 use std::{fmt, time::Instant};
 
-use crate::core::granted_authority::GrantedAuthority;
+use crate::core::GrantedAuthority;
 
 /// A `GrantedAuthority` specifically used for indicating the factor used at time of
 /// authentication.

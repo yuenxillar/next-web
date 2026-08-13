@@ -101,7 +101,8 @@ pub trait MutableAcl: Acl {
         granting: bool,
     );
 
-    fn update_ace(&mut self, ace_index: usize, permission: &dyn Permission) -> Result<(), AclError>;
+    fn update_ace(&mut self, ace_index: usize, permission: &dyn Permission)
+        -> Result<(), AclError>;
 
     fn delete_ace(&mut self, ace_index: usize) -> Result<(), AclError>;
 }

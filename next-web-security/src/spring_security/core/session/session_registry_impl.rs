@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     collections::{HashMap, HashSet},
     sync::{Arc, RwLock},
 };
@@ -49,7 +50,7 @@ impl SessionRegistry for SessionRegistryImpl {
 
     fn all_sessions(
         &self,
-        principal: &str,
+        principal: &dyn Any,
         include_expired_sessions: bool,
     ) -> Vec<SessionInformation> {
         let session_ids = self

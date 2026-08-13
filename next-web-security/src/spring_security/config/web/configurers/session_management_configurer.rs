@@ -194,7 +194,7 @@ where
         self.properties_that_require_implicit_authentication
             .insert(format!(
                 "session_authentication_failure_handler = {:?}",
-                session_authentication_failure_handler
+                session_authentication_failure_handler.as_ref()
             ));
         self.session_authentication_failure_handler = Some(session_authentication_failure_handler);
         self
@@ -258,7 +258,7 @@ where
         self.properties_that_require_implicit_authentication
             .insert(format!(
                 "session_authentication_strategy = {:?}",
-                session_authentication_strategy
+                session_authentication_strategy.as_ref()
             ));
         self.provided_session_authentication_strategy = Some(session_authentication_strategy);
         self
@@ -571,7 +571,7 @@ where
         }
 
         let session_registry = SessionRegistryImpl::default();
-        self.register_delegate_application_listener(http, session_registry.clone());
+        // self.register_delegate_application_listener(http, session_registry.clone());
         let registry = Arc::new(session_registry);
         self.session_registry = Some(registry.clone());
         registry

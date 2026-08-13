@@ -1,16 +1,18 @@
+use crate::http::HttpVersion;
 use axum::{
     extract::Request,
-    http::{Uri, Version, uri::Scheme},
+    http::{HeaderMap, HeaderValue, Uri, uri::Scheme},
 };
+
 use headers::{HeaderMapExt, Host};
-use std::{collections::HashMap, net::SocketAddr, str::FromStr};
+use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
     anys::any_value::AnyValue,
     autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES,
-    http::{Cookie, auth_type::AuthType},
+    http::{Cookie, HttpMethod, auth_type::AuthType},
     traits::http::{HttpSession, request_dispatcher::RequestDispatcher},
-    util::{http_method::HttpMethod, locale::Locale},
+    util::locale::Locale,
 };
 
 pub const IDENTITY_REMOVED_KEY: &str = stringify!(format!(
@@ -40,7 +42,9 @@ where
 
     fn method(&self) -> HttpMethod;
 
-    fn version(&self) -> Version;
+    fn version(&self) -> HttpVersion;
+
+    fn headers(&self) -> &HeaderMap<HeaderValue>;
 
     fn header(&self, header_name: &str) -> Option<&str>;
 
@@ -163,11 +167,15 @@ impl HttpRequest for Request {
     }
 
     fn method(&self) -> HttpMethod {
-        HttpMethod::from_str(self.method().as_str()).unwrap_or_default()
+        self.method().to_owned()
     }
 
-    fn version(&self) -> Version {
+    fn version(&self) -> HttpVersion {
         self.version()
+    }
+
+    fn headers(&self) -> &HeaderMap<HeaderValue> {
+        self.headers()
     }
 
     fn header(&self, header_name: &str) -> Option<&str> {

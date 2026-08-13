@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 use crate::authorization::{authorization_decision::AuthorizationDecision, AuthorizationResult};
 
+/// An AuthorizationDeniedError that contains the AuthorizationResult
 #[derive(Clone)]
 pub struct AuthorizationDeniedError {
     msg: String,
@@ -9,23 +10,22 @@ pub struct AuthorizationDeniedError {
 }
 
 impl AuthorizationDeniedError {
-    pub fn new<R>(msg: impl Into<String>, authorization_result: R) -> Self
-    where
-        R: AuthorizationResult,
-    {
+    pub fn new(msg: impl Into<String>, authorization_result: Box<dyn AuthorizationResult>) -> Self {
         assert!(
             !authorization_result.is_granted(),
             "Granted authorization results are not supported"
         );
-        let result = Box::new(authorization_result);
         Self {
             msg: msg.into(),
-            result,
+            result: authorization_result,
         }
     }
 
-    pub fn decision(&self) -> &AuthorizationDecision {
-        todo!()
+    pub fn with_message(msg: impl Into<String>) -> Self {
+        Self {
+            msg: msg.into(),
+            result: Box::new(AuthorizationDecision::new(false)),
+        }
     }
 
     pub fn authorization_result(&self) -> &dyn AuthorizationResult {
@@ -34,6 +34,12 @@ impl AuthorizationDeniedError {
 
     pub fn msg(&self) -> &str {
         self.msg.as_str()
+    }
+}
+
+impl AuthorizationResult for AuthorizationDeniedError {
+    fn is_granted(&self) -> bool {
+        false
     }
 }
 
@@ -48,7 +54,6 @@ impl std::error::Error for AuthorizationDeniedError {}
 impl Debug for AuthorizationDeniedError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AuthorizationDeniedError")
-            .field("decision", &self.decision())
             .field("result", &"<dyn AuthorizationResult>") // trait object 可能无法 Debug
             .finish()
     }

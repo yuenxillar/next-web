@@ -140,8 +140,7 @@ mod tests {
     fn consume_when_token_exists_then_returns_it_once() {
         let service = InMemoryOneTimeTokenService::new();
         let generated = service.generate(GenerateOneTimeTokenRequest::new("user"));
-        let authentication_token =
-            OneTimeTokenAuthenticationToken::new(generated.token_value());
+        let authentication_token = OneTimeTokenAuthenticationToken::new(generated.token_value());
 
         let consumed = service.consume(&authentication_token).unwrap();
 
@@ -157,8 +156,7 @@ mod tests {
         let generated = service.generate(GenerateOneTimeTokenRequest::new("user"));
 
         service.set_clock(move || now + Duration::minutes(10));
-        let authentication_token =
-            OneTimeTokenAuthenticationToken::new(generated.token_value());
+        let authentication_token = OneTimeTokenAuthenticationToken::new(generated.token_value());
 
         assert!(service.consume(&authentication_token).is_none());
     }

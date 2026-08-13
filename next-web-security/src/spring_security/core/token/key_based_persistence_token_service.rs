@@ -45,7 +45,10 @@ impl KeyBasedPersistenceTokenService {
     }
 
     pub fn after_properties_set(&self) {
-        assert!(!self.server_secret.trim().is_empty(), "Server secret required");
+        assert!(
+            !self.server_secret.trim().is_empty(),
+            "Server secret required"
+        );
         assert!(self.server_integer.is_some(), "Server integer required");
     }
 
@@ -137,8 +140,7 @@ impl TokenService for KeyBasedPersistenceTokenService {
             self.parse_key_payload(key)?;
         let server_secret = self.compute_server_secret_applicable_at(creation_time)?;
         let content = format!("{creation_time}:{pseudo_random_number}:{extended_information}");
-        let expected_sha512_hex =
-            Sha512DigestUtils::sha_hex(format!("{content}:{server_secret}"));
+        let expected_sha512_hex = Sha512DigestUtils::sha_hex(format!("{content}:{server_secret}"));
 
         if expected_sha512_hex != presented_sha512_hex {
             return None;

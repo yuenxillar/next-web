@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{Authentication, authentication_error::AuthenticationError};
+use crate::core::{Authentication, AuthenticationError};
 
 pub trait AuthenticationManager: Send + Sync {
     fn authenticate(

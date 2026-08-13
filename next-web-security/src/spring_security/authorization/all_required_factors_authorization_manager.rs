@@ -50,6 +50,7 @@ impl<T> AllRequiredFactorsAuthorizationManager<T> {
         let authorities = authentication
             .authorities()
             .into_iter()
+            .filter_map(|authority| authority.authority().map(ToString::to_string))
             .collect::<BTreeSet<_>>();
         let factor_errors = self
             .required_factors
@@ -76,9 +77,9 @@ where
     async fn authorize(
         &self,
         authentication: &dyn Authentication,
-        var: &mut T,
+        _var: &T,
     ) -> Option<Box<dyn AuthorizationResult>> {
-        todo!()
+        Some(Box::new(self.authorize_factors(authentication)))
     }
 }
 

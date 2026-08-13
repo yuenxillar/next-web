@@ -23,4 +23,8 @@ impl<T> RequestMatcherEntry<T> {
     pub fn entry(&self) -> &T {
         &self.entry
     }
+
+    pub fn entry_mut(&mut self) -> &mut T {
+        &mut self.entry
+    }
 }

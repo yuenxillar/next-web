@@ -5,8 +5,8 @@ use crate::{
         account_expired, credentials_expired, disabled, locked,
     },
     core::{
-        authentication_error::AuthenticationError,
         userdetails::{UserDetails, UserDetailsChecker},
+        AuthenticationError,
     },
 };
 

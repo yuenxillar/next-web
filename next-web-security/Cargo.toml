@@ -30,3 +30,6 @@ T1 = ["web"]
 T2 = []
 
 web = []
+
+[dev-dependencies]
+axum.workspace = true

@@ -65,7 +65,7 @@ impl RequestHeaderAuthenticationFilter {
     pub fn pre_authenticated_principal(
         &self,
         request: &dyn HttpRequest,
-    ) -> Result<Option<String>, crate::core::authentication_error::AuthenticationError> {
+    ) -> Result<Option<String>, crate::core::AuthenticationError> {
         let principal = request
             .header(&self.principal_request_header)
             .map(ToOwned::to_owned);

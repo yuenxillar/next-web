@@ -8,7 +8,7 @@ use next_web_core::error::BoxError;
 
 use crate::{
     authentication::BaseAuthenticationToken,
-    core::{granted_authority::GrantedAuthority, Authentication, Principal},
+    core::{Authentication, GrantedAuthority, Principal},
     web::authentication::AuthPrincipal,
 };
 
@@ -94,6 +94,16 @@ impl Authentication for AnonymousAuthenticationToken {
 impl Principal for AnonymousAuthenticationToken {
     fn name(&self) -> &str {
         self.inner.name()
+    }
+}
+
+impl std::fmt::Display for AnonymousAuthenticationToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "AnonymousAuthenticationToken [Principal={}]",
+            self.name()
+        )
     }
 }
 

@@ -12,9 +12,9 @@ use tracing::{debug, trace};
 
 use crate::core::{
     authc::{
-        authentication_error::AuthenticationError, authentication_info::AuthenticationInfo,
-        authentication_token::AuthenticationToken,
+        authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
         credential::credentials_matcher::CredentialsMatcher, logout_aware::LogoutAware,
+        AuthenticationError,
     },
     cache::{
         cache_manager::CacheManager, cache_manager_aware::CacheManagerAware,

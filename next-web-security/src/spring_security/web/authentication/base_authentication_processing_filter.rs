@@ -28,9 +28,7 @@ use crate::web::authentication::{
 use crate::web::context::{RequestAttributeSecurityContextRepository, SecurityContextRepository};
 use crate::{
     authorization::AuthenticationManager,
-    core::{
-        authentication_error::AuthenticationError, context::SecurityContextHolder, Authentication,
-    },
+    core::{context::SecurityContextHolder, Authentication, AuthenticationError},
     web::{
         authentication::{
             authentication_converter::AuthenticationConverter,

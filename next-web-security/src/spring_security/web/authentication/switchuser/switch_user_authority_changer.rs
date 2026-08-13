@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::{granted_authority::GrantedAuthority, userdetails::UserDetails, Authentication};
+use crate::core::{userdetails::UserDetails, Authentication, GrantedAuthority};
 
 /// Allows subclasses to fine-tune the authorities granted to the target user
 /// during a switch user operation.

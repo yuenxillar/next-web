@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    authorization::{authorization_result::AuthorizationResult, event::authorization_event::AuthorizationEvent},
+    authorization::{
+        authorization_result::AuthorizationResult, event::authorization_event::AuthorizationEvent,
+    },
     core::Authentication,
 };
 

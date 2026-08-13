@@ -23,6 +23,8 @@ mod forward_authentication_success_handler;
 mod http403_forbidden_entry_point;
 mod http_status_entry_point;
 mod login_url_authentication_entry_point;
+mod oauth2_authorization_request_redirect_filter;
+mod oauth2_login_authentication_filter;
 mod remember_me_authentication_filter;
 mod remember_me_services;
 mod saved_request_aware_authentication_success_handler;
@@ -49,6 +51,10 @@ pub use forward_authentication_success_handler::ForwardAuthenticationSuccessHand
 pub use http403_forbidden_entry_point::Http403ForbiddenEntryPoint;
 pub use http_status_entry_point::HttpStatusEntryPoint;
 pub use login_url_authentication_entry_point::LoginUrlAuthenticationEntryPoint;
+pub use oauth2_authorization_request_redirect_filter::OAuth2AuthorizationRequestRedirectFilter;
+pub use oauth2_login_authentication_filter::{
+    OAuth2LoginAuthenticationFilter, OAuth2LoginRequestMatcher,
+};
 pub use remember_me_authentication_filter::RememberMeAuthenticationFilter;
 pub use remember_me_services::RememberMeServices;
 pub use saved_request_aware_authentication_success_handler::SavedRequestAwareAuthenticationSuccessHandler;

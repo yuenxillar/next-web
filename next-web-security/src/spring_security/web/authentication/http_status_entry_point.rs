@@ -4,7 +4,7 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
-use crate::{core::authentication_error::AuthenticationError, web::AuthenticationEntryPoint};
+use crate::{core::AuthenticationError, web::AuthenticationEntryPoint};
 
 /// An AuthenticationEntryPoint that sends a generic HttpStatus as a response. Useful for JavaScript
 /// clients which cannot use Basic authentication since the browser intercepts the response

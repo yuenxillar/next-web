@@ -3,7 +3,7 @@ use std::sync::Arc;
 use next_web_core::async_trait;
 
 use crate::{
-    core::{granted_authority::GrantedAuthority, userdetails::UserDetails},
+    core::{userdetails::UserDetails, GrantedAuthority},
     ldap::userdetails::{
         ldap_granted_authority::LdapGrantedAuthority, ldap_user_details::LdapUserDetails,
     },

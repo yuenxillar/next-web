@@ -1,3 +1,6 @@
+use std::any::TypeId;
+
+use crate::authentication::{AnonymousAuthenticationToken, RememberMeAuthenticationToken};
 use crate::core::Authentication;
 
 pub trait AuthenticationTrustResolver
@@ -13,7 +16,10 @@ where
     }
 
     fn is_authenticated(&self, authentication: Option<&dyn Authentication>) -> bool {
-        authentication.is_authenticated() && !self.is_anonymous(authentication)
+        authentication
+            .map(|authentication| authentication.is_authenticated())
+            .unwrap_or(false)
+            && !self.is_anonymous(authentication)
     }
 }
 
@@ -22,18 +28,26 @@ pub struct DefaultAuthenticationTrustResolver;
 
 impl AuthenticationTrustResolver for DefaultAuthenticationTrustResolver {
     fn is_anonymous(&self, authentication: Option<&dyn Authentication>) -> bool {
-        todo!()
+        authentication
+            .map(|authentication| {
+                authentication.of() == TypeId::of::<AnonymousAuthenticationToken>()
+            })
+            .unwrap_or(false)
     }
 
     fn is_remember_me(&self, authentication: Option<&dyn Authentication>) -> bool {
-        todo!()
+        authentication
+            .map(|authentication| {
+                authentication.of() == TypeId::of::<RememberMeAuthenticationToken>()
+            })
+            .unwrap_or(false)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        authentication::{AnonymousAuthenticationToken, RememberMeAuthenticationToken},
+        authentication::RememberMeAuthenticationToken,
         authorization::authentication_trust_resolver::{
             AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
         },
@@ -45,12 +59,12 @@ mod tests {
         let resolver = DefaultAuthenticationTrustResolver;
         let authentication = RememberMeAuthenticationToken::new(
             "remember",
-            "alice",
-            AuthorityUtils::create_authority_list(["ROLE_USER"]),
+            std::sync::Arc::new(String::from("alice")),
+            Some(AuthorityUtils::create_authority_list(["ROLE_USER"])),
         );
 
-        assert!(resolver.is_remember_me(&authentication));
-        assert!(resolver.is_authenticated(&authentication));
-        assert!(!resolver.is_fully_authenticated(&authentication));
+        assert!(resolver.is_remember_me(Some(&authentication)));
+        assert!(resolver.is_authenticated(Some(&authentication)));
+        assert!(!resolver.is_fully_authenticated(Some(&authentication)));
     }
 }

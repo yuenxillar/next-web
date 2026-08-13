@@ -7,7 +7,7 @@ use std::{
 use next_web_core::error::BoxError;
 
 use crate::{
-    core::{granted_authority::GrantedAuthority, Principal},
+    core::{GrantedAuthority, Principal},
     web::authentication::AuthPrincipal,
 };
 

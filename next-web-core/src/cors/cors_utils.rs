@@ -1,4 +1,4 @@
-use crate::{traits::http::http_request::HttpRequest, util::http_method::HttpMethod};
+use crate::{http::HttpMethod, traits::http::http_request::HttpRequest};
 use reqwest::{
     Url,
     header::{ACCESS_CONTROL_REQUEST_METHOD, ORIGIN},
@@ -48,7 +48,7 @@ impl CorsUtils {
     }
 
     pub fn is_pre_flight_request(request: &dyn HttpRequest) -> bool {
-        request.method() == HttpMethod::Options
+        request.method() == HttpMethod::OPTIONS
             && request.header(ORIGIN.as_str()).is_some()
             && request
                 .header(ACCESS_CONTROL_REQUEST_METHOD.as_str())

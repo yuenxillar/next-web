@@ -8,15 +8,13 @@ use next_web_core::{
         named::Named,
         required::Required,
     },
-    util::http_method::HttpMethod,
+    util::HttpMethod,
 };
 use tracing::{debug, trace};
 
 use crate::{
     core::{
-        authc::{
-            authentication_error::AuthenticationError, authentication_token::AuthenticationToken,
-        },
+        authc::{authentication_token::AuthenticationToken, AuthenticationError},
         subject::Subject,
         util::{object::Object, web::WebUtils},
     },

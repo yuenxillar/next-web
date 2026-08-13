@@ -7,7 +7,7 @@ use crate::{
         authentication_provider::AuthenticationProvider,
         testing_authentication_token::TestingAuthenticationToken,
     },
-    core::{authentication_error::AuthenticationError, Authentication},
+    core::{Authentication, AuthenticationError},
 };
 
 #[derive(Clone, Default)]

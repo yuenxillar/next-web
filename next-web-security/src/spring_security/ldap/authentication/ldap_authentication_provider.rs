@@ -5,9 +5,8 @@ use next_web_core::async_trait;
 use crate::{
     authentication::AuthenticationProvider,
     core::{
-        authentication_error::AuthenticationError,
         authority_mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
-        Authentication,
+        Authentication, AuthenticationError,
     },
     ldap::{
         authentication::{
@@ -79,9 +78,7 @@ impl LdapAuthenticationProvider {
         let authorities = self.authorities_mapper.map_authorities(
             authorities
                 .into_iter()
-                .map(|authority| {
-                    authority as Arc<dyn crate::core::granted_authority::GrantedAuthority>
-                })
+                .map(|authority| authority as Arc<dyn crate::core::GrantedAuthority>)
                 .collect(),
         );
 

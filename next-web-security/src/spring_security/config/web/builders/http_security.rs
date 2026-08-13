@@ -92,9 +92,10 @@ impl HttpSecurity {
         http
     }
 
-    fn get_context(&self) -> &mut ApplicationContext {
-        // self.get_shared_object::<ApplicationContext>().unwrap()
-        todo!()
+    fn get_context(&mut self) -> &mut ApplicationContext {
+        self.base
+            .get_mut_shared_object::<ApplicationContext>()
+            .expect("ApplicationContext must be registered as a HttpSecurity shared object")
     }
 
     /// If a configurer of type `C` is already registered, clone and return it.
@@ -131,7 +132,7 @@ impl HttpSecurity {
 }
 
 impl HttpSecurity {
-    /// ok
+    /// Ok
     /// Adds the Security headers to the response.
     pub fn headers<F>(&mut self, headers: F) -> &mut Self
     where
@@ -180,6 +181,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn authorize_http_requests<F>(&mut self, mut authorize_http_requests: F) -> &mut Self
     where
         F: FnMut(&mut AuthorizationManagerRequestMatcherRegistry),
@@ -224,7 +226,8 @@ impl HttpSecurity {
     where
         F: FnMut(&mut CsrfConfigurer<Self>),
     {
-        self.get_or_apply(CsrfConfigurer::new(self.get_context()), csrf);
+        let configurer = CsrfConfigurer::new(self.get_context());
+        self.get_or_apply(configurer, csrf);
 
         self
     }
@@ -272,7 +275,8 @@ impl HttpSecurity {
     where
         F: FnMut(&mut Saml2LogoutConfigurer<Self>),
     {
-        self.get_or_apply(Saml2LogoutConfigurer::new(self.get_context()), saml2_logout);
+        let configurer = Saml2LogoutConfigurer::new(self.get_context());
+        self.get_or_apply(configurer, saml2_logout);
 
         self
     }
@@ -281,10 +285,8 @@ impl HttpSecurity {
     where
         F: FnMut(&mut Saml2MetadataConfigurer<Self>),
     {
-        self.get_or_apply(
-            Saml2MetadataConfigurer::new(self.get_context()),
-            saml2_metadata,
-        );
+        let configurer = Saml2MetadataConfigurer::new(self.get_context());
+        self.get_or_apply(configurer, saml2_metadata);
 
         self
     }
@@ -320,10 +322,8 @@ impl HttpSecurity {
     where
         F: FnMut(&mut OAuth2ResourceServerConfigurer<Self>),
     {
-        self.get_or_apply(
-            OAuth2ResourceServerConfigurer::new(self.get_context()),
-            oauth2_resource_server,
-        );
+        let configurer = OAuth2ResourceServerConfigurer::new(self.get_context());
+        self.get_or_apply(configurer, oauth2_resource_server);
 
         self
     }
@@ -344,10 +344,8 @@ impl HttpSecurity {
     where
         F: FnMut(&mut OneTimeTokenLoginConfigurer<Self>),
     {
-        self.get_or_apply(
-            OneTimeTokenLoginConfigurer::new(self.get_context()),
-            one_time_token_login,
-        );
+        let configurer = OneTimeTokenLoginConfigurer::new(self.get_context());
+        self.get_or_apply(configurer, one_time_token_login);
 
         self
     }

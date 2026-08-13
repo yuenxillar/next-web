@@ -6,8 +6,7 @@ use crate::{
         authentication_events::{AuthenticationFailureEvent, AuthenticationSuccessEvent},
     },
     core::{
-        Authentication,
-        authentication_error::{AuthenticationError, AuthenticationErrorKind},
+        Authentication, {AuthenticationError, AuthenticationErrorKind},
     },
 };
 
@@ -42,10 +41,14 @@ impl DefaultAuthenticationEventPublisher {
             .insert(AuthenticationErrorKind::BadCredentials, "BadCredentials");
         self.exception_mappings
             .insert(AuthenticationErrorKind::AccountStatus, "AccountExpired");
-        self.exception_mappings
-            .insert(AuthenticationErrorKind::CredentialsNotFound, "BadCredentials");
-        self.exception_mappings
-            .insert(AuthenticationErrorKind::ProviderNotFound, "ProviderNotFound");
+        self.exception_mappings.insert(
+            AuthenticationErrorKind::CredentialsNotFound,
+            "BadCredentials",
+        );
+        self.exception_mappings.insert(
+            AuthenticationErrorKind::ProviderNotFound,
+            "ProviderNotFound",
+        );
         self.exception_mappings
             .insert(AuthenticationErrorKind::Service, "ServiceException");
         self.exception_mappings

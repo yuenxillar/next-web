@@ -31,7 +31,9 @@ mod single_result_authorization_manager;
 
 pub use all_authorities_authorization_manager::AllAuthoritiesAuthorizationManager;
 pub use all_required_factors_authorization_manager::AllRequiredFactorsAuthorizationManager;
-pub use authenticated_authorization_manager::AuthenticatedAuthorizationManager;
+pub use authenticated_authorization_manager::{
+    AuthenticatedAuthorizationManager, BaseAuthorizationStrategy, BaseAuthorizationStrategyExt,
+};
 pub use authentication_details_source::AuthenticationDetailsSource;
 pub use authentication_manager::AuthenticationManager;
 pub use authentication_trust_resolver::{

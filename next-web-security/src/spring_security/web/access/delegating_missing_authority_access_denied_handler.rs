@@ -7,12 +7,13 @@ use next_web_core::{
 };
 
 use crate::{
+    access::AccessDeniedError,
     authorization::{
         AuthorityAuthorizationDecision, FactorAuthorizationDecision, RequiredFactor,
         RequiredFactorError,
     },
     web::{
-        access::{AccessDeniedError, AccessDeniedHandler, AccessDeniedHandlerImpl},
+        access::{AccessDeniedHandler, AccessDeniedHandlerImpl},
         authentication::DelegatingAuthenticationEntryPointBuilder,
         savedrequest::RequestCache,
         AuthenticationEntryPoint, WebAttributes,

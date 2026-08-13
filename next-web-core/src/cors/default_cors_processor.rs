@@ -13,8 +13,8 @@ use tracing::{debug, trace};
 use crate::{
     cors::{CorsConfiguration, CorsProcessor, CorsUtils},
     error::BoxError,
+    http::HttpMethod,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
-    util::http_method::HttpMethod,
 };
 
 /// Constants for CORS header fields
@@ -141,7 +141,7 @@ impl DefaultCorsProcessor {
                 .get(header::ACCESS_CONTROL_REQUEST_METHOD)
                 .and_then(|v| v.to_str().ok())
                 .and_then(|m| HttpMethod::from_str(m).ok())
-                .unwrap_or(HttpMethod::Options)
+                .unwrap_or(HttpMethod::OPTIONS)
         } else {
             method.clone()
         }

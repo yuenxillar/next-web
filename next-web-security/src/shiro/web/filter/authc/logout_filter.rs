@@ -8,7 +8,7 @@ use next_web_core::{
         named::Named,
         required::Required,
     },
-    util::http_method::HttpMethod,
+    util::HttpMethod,
 };
 use tracing::error;
 

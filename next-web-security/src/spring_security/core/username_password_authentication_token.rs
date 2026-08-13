@@ -11,8 +11,8 @@ use next_web_core::{error::BoxError, AnyObject};
 use crate::{
     authentication::{BaseAuthenticationBuilder, BaseAuthenticationToken},
     core::{
-        credentials_container::CredentialsContainer, granted_authority::GrantedAuthority,
-        Authentication, AuthenticationBuilder, Principal,
+        credentials_container::CredentialsContainer, Authentication, AuthenticationBuilder,
+        GrantedAuthority, Principal,
     },
     web::authentication::AuthPrincipal,
 };

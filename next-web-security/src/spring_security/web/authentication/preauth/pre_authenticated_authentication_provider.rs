@@ -5,13 +5,12 @@ use next_web_core::async_trait;
 use crate::{
     authentication::AuthenticationProvider,
     core::{
-        authentication_error::AuthenticationError,
         authority_utils::AuthorityUtils,
         userdetails::{
             authentication_user_details_service::AuthenticationUserDetailsService,
             UserDetailsChecker,
         },
-        Authentication,
+        Authentication, AuthenticationError,
     },
     web::authentication::preauth::{
         pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,

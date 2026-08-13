@@ -3,10 +3,7 @@ use next_web_core::traits::http::http_response::HttpResponse;
 use next_web_core::util::StringUtils;
 use next_web_core::{error::BoxError, traits::http::http_request::HttpRequest};
 
-use crate::{
-    core::authentication_error::AuthenticationError,
-    web::authentication_entry_point::AuthenticationEntryPoint,
-};
+use crate::{core::AuthenticationError, web::authentication_entry_point::AuthenticationEntryPoint};
 
 /// Used by the ExceptionTranslationFilter to commence authentication via the BasicAuthenticationFilter.
 /// Once a user agent is authenticated using BASIC authentication, logout requires that the browser be closed or an unauthorized (401) header be sent.

@@ -3,7 +3,7 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
-use crate::core::authentication_error::AuthenticationError;
+use crate::core::AuthenticationError;
 
 pub trait AuthenticationEntryPoint
 where

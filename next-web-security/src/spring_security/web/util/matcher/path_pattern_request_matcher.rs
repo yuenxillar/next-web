@@ -2,13 +2,11 @@ use std::fmt;
 use std::sync::Arc;
 use std::{collections::HashMap, sync::OnceLock};
 
-use next_web_core::{
-    traits::http::http_request::HttpRequest,
-    util::{http_method::HttpMethod, pattern::PathPatternParser},
-};
+use next_web_core::{traits::http::http_request::HttpRequest, util::pattern::PathPatternParser};
 use regex::Regex;
 
 use crate::web::util::matcher::{AnyRequestMatcher, MatchResult, RequestMatcher};
+use next_web_core::http::HttpMethod;
 
 /// A request matcher that uses path patterns to match against each request.
 ///

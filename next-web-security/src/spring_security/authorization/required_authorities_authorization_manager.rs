@@ -49,8 +49,17 @@ where
     async fn authorize(
         &self,
         authentication: &dyn Authentication,
-        var: &mut T,
+        var: &T,
     ) -> Option<Box<dyn AuthorizationResult>> {
-        todo!()
+        let required = self
+            .authorities
+            .find_required_authorities(authentication.name());
+        if required.is_empty() {
+            return Some(Box::new(AuthorizationDecision::new(true)));
+        }
+
+        AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(required)
+            .authorize(authentication, var)
+            .await
     }
 }

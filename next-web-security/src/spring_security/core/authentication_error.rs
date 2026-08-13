@@ -1,6 +1,12 @@
-use std::{error::Error, fmt::Display};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 use next_web_core::anys::{any_error::AnyError, any_value::AnyValue};
+
+use crate::core::Authentication;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum AuthenticationErrorKind {
@@ -17,11 +23,12 @@ pub enum AuthenticationErrorKind {
     SessionAuthentication,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AuthenticationError {
     msg: String,
     kind: AuthenticationErrorKind,
     cause: Option<Box<dyn AnyError>>,
+    authentication_request: Option<Arc<dyn Authentication>>,
 }
 
 impl AuthenticationError {
@@ -34,15 +41,20 @@ impl AuthenticationError {
             msg: msg.into(),
             kind,
             cause: None,
+            authentication_request: None,
         }
     }
 
-    pub fn get_message(&self) -> &str {
+    pub fn message(&self) -> &str {
         &self.msg
     }
 
     pub fn kind(&self) -> AuthenticationErrorKind {
         self.kind
+    }
+
+    pub fn set_authentication_request(&mut self, authentication_request: Arc<dyn Authentication>) {
+        self.authentication_request = Some(authentication_request);
     }
 
     pub fn is_account_status_error(&self) -> bool {
@@ -60,6 +72,12 @@ impl Display for AuthenticationError {
 }
 
 impl Error for AuthenticationError {}
+
+impl Debug for AuthenticationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Authentication Error: {}", self.msg)
+    }
+}
 
 impl Into<AnyValue> for AuthenticationError {
     fn into(self) -> AnyValue {

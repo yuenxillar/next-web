@@ -13,10 +13,9 @@ use crate::{
         },
     },
     core::{
-        authentication_error::{AuthenticationError, AuthenticationErrorKind},
         authority_utils::AuthorityUtils,
         userdetails::UserDetailsService,
-        Authentication, FactorGrantedAuthority,
+        Authentication, {AuthenticationError, AuthenticationErrorKind},
     },
 };
 
@@ -105,8 +104,8 @@ mod tests {
             },
         },
         core::{
+            authority::FactorGrantedAuthority,
             authority_utils::AuthorityUtils,
-            factor_granted_authority::FactorGrantedAuthority,
             userdetails::{
                 map_user_details_service::MapUserDetailsService, user::User, UserDetails,
             },
@@ -155,7 +154,7 @@ mod tests {
 
         assert_eq!(
             error.kind(),
-            crate::core::authentication_error::AuthenticationErrorKind::BadCredentials
+            crate::core::AuthenticationErrorKind::BadCredentials
         );
     }
 }

@@ -24,7 +24,6 @@ pub mod wrapper;
 
 pub use self::autoregister::auto_register::*;
 pub use self::context::application_context::*;
-pub use arc_swap::ArcSwap;
 pub use async_trait::async_trait;
 pub use dyn_clone::{DynClone, clone_box, clone_trait_object};
 

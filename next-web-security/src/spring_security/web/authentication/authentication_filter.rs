@@ -18,9 +18,8 @@ use tracing::{debug, trace};
 use crate::{
     authorization::AuthenticationManager,
     core::{
-        authentication_error::AuthenticationError,
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
-        Authentication,
+        Authentication, AuthenticationError,
     },
     web::{
         authentication::{

@@ -1,8 +1,5 @@
 use crate::core::{
-    authc::{
-        authentication_error::AuthenticationError, authenticator::Authenticator,
-        logout_aware::LogoutAware,
-    },
+    authc::{authenticator::Authenticator, logout_aware::LogoutAware, AuthenticationError},
     realm::Realm,
 };
 use tracing::warn;
@@ -27,7 +24,7 @@ impl Authenticator for ModularRealmAuthenticator {
         authentication_token: &dyn crate::core::authc::authentication_token::AuthenticationToken,
     ) -> Result<
         Box<dyn crate::core::authc::authentication_info::AuthenticationInfo>,
-        crate::core::authc::authentication_error::AuthenticationError,
+        crate::core::authc::AuthenticationError,
     > {
         Err(AuthenticationError::NotImplemented(
             "ModularRealmAuthenticator::authenticate is not implemented".to_string(),

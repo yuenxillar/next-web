@@ -11,7 +11,7 @@ use next_web_core::{
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
-    util::http_method::HttpMethod,
+    util::HttpMethod,
 };
 
 use crate::authentication::EMPTY_STRING;

@@ -8,9 +8,9 @@ use next_web_core::{
 use crate::{
     core::{
         authc::{
-            authentication_error::AuthenticationError, authentication_info::AuthenticationInfo,
-            authentication_token::AuthenticationToken, authenticator::Authenticator,
-            pam::modular_realm_authenticator::ModularRealmAuthenticator,
+            authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
+            authenticator::Authenticator,
+            pam::modular_realm_authenticator::ModularRealmAuthenticator, AuthenticationError,
         },
         authz::{
             authorization_error::AuthorizationError, authorizer::Authorizer,

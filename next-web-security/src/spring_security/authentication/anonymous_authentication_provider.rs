@@ -11,11 +11,11 @@ use crate::{
         authentication_provider::AuthenticationProvider, string_hash,
     },
     core::{
-        authentication_error::{
+        Authentication,
+        {
             AuthenticationError,
             AuthenticationErrorKind::{self},
         },
-        Authentication,
     },
 };
 

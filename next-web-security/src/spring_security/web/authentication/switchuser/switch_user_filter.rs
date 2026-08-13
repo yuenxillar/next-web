@@ -8,7 +8,7 @@ use next_web_core::{
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
-    util::http_method::HttpMethod,
+    util::HttpMethod,
 };
 use tracing::debug;
 
@@ -17,10 +17,9 @@ use crate::{
     core::{
         authentication_error::{AuthenticationError, AuthenticationErrorKind},
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
-        granted_authority::GrantedAuthority,
         simple_granted_authority::SimpleGrantedAuthority,
         userdetails::{UserDetails, UserDetailsChecker, UserDetailsService},
-        UsernamePasswordAuthenticationToken,
+        GrantedAuthority, UsernamePasswordAuthenticationToken,
     },
     web::{
         authentication::{

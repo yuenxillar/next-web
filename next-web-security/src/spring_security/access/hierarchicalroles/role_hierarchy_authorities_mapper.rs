@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     access::hierarchicalroles::role_hierarchy::RoleHierarchy,
-    core::{
-        authority_mapping::GrantedAuthoritiesMapper, granted_authority::GrantedAuthority,
-        simple_granted_authority::SimpleGrantedAuthority,
-    },
+    core::{authority_mapping::GrantedAuthoritiesMapper, GrantedAuthority},
 };
 
 pub struct RoleHierarchyAuthoritiesMapper {

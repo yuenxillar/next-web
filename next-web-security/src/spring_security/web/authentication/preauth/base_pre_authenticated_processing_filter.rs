@@ -14,9 +14,7 @@ use next_web_core::{
 
 use crate::{
     authorization::AuthenticationManager,
-    core::{
-        authentication_error::AuthenticationError, context::SecurityContextHolder, Authentication,
-    },
+    core::{context::SecurityContextHolder, Authentication, AuthenticationError},
 };
 
 pub const NEXT_SECURITY_AUTHENTICATION: &str = "NEXT_SECURITY_AUTHENTICATION";

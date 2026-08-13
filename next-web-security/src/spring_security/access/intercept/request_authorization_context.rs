@@ -1,28 +1,40 @@
-use next_web_core::traits::http::http_request::HttpRequest;
+use std::collections::BTreeMap;
 
-#[derive(Clone, Default)]
+use next_web_core::{http::HttpRequestShare, traits::http::http_request::HttpRequest};
+
+/// An HttpServletRequest authorization context.
+#[derive(Clone)]
 pub struct RequestAuthorizationContext {
-    path: String,
-    method: String,
+    variables: Option<BTreeMap<String, String>>,
+    request: HttpRequestShare,
 }
 
 impl RequestAuthorizationContext {
-    pub fn new(path: impl Into<String>, method: impl Into<String>) -> Self {
+    /// Creates an instance.
+    pub fn new(request: HttpRequestShare, variables: Option<BTreeMap<String, String>>) -> Self {
+        Self { variables, request }
+    }
+
+    /// Returns the request.
+    pub fn request(&self) -> &HttpRequestShare {
+        &self.request
+    }
+
+    /// Returns the extracted variable values where the key is the variable name and the value is the variable value.
+    pub fn variables(&self) -> Option<&BTreeMap<String, String>> {
+        self.variables.as_ref()
+    }
+
+    pub fn set_variables(&mut self, variables: Option<BTreeMap<String, String>>) {
+        self.variables = variables;
+    }
+}
+
+impl From<&dyn HttpRequest> for RequestAuthorizationContext {
+    fn from(req: &dyn HttpRequest) -> Self {
         Self {
-            path: path.into(),
-            method: method.into(),
+            variables: None,
+            request: HttpRequestShare::from(req),
         }
-    }
-
-    pub fn from_request(request: &dyn HttpRequest) -> Self {
-        Self::new(request.path(), request.method().to_string())
-    }
-
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
-    pub fn method(&self) -> &str {
-        &self.method
     }
 }

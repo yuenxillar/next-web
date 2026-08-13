@@ -9,7 +9,7 @@ use next_web_core::{
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
-    util::http_method::HttpMethod,
+    util::HttpMethod,
 };
 
 use crate::web::util::matcher::{PathPatternRequestMatcher, RequestMatcher};
@@ -90,10 +90,7 @@ impl DefaultOneTimeTokenSubmitPageGeneratingFilter {
     /// Sets the function used to resolve a Map of the hidden inputs where the
     /// key is the name of the input and the value is the value of the input.
     /// Typically this is used to resolve the CSRF token.
-    pub fn set_resolve_hidden_inputs(
-        &mut self,
-        resolve_hidden_inputs: ResolveHiddenInputsFn,
-    ) {
+    pub fn set_resolve_hidden_inputs(&mut self, resolve_hidden_inputs: ResolveHiddenInputsFn) {
         self.resolve_hidden_inputs = resolve_hidden_inputs;
     }
 
@@ -102,9 +99,7 @@ impl DefaultOneTimeTokenSubmitPageGeneratingFilter {
         let context_path = request.context_path().unwrap_or_default();
 
         // Read the `token` query parameter to pre-fill the form
-        let token_value = request
-            .parameter("token")
-            .unwrap_or_default();
+        let token_value = request.parameter("token").unwrap_or_default();
 
         let hidden_inputs_html = self.render_hidden_inputs(request);
 

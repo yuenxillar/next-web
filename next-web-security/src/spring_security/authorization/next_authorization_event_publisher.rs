@@ -21,6 +21,7 @@ pub struct NextAuthorizationEventPublisher {
 }
 
 impl NextAuthorizationEventPublisher {
+    /// Construct this publisher using ApplicationEventPublisher
     pub fn new(event_publisher: Arc<dyn ApplicationEventPublisher>) -> Self {
         Self {
             event_publisher,
@@ -30,15 +31,19 @@ impl NextAuthorizationEventPublisher {
         }
     }
 
-    pub fn set_should_publish_result(
-        &mut self,
-        should_publish: impl Fn(&dyn AuthorizationResult) -> bool + Send + Sync + 'static,
-    ) {
+    /// Use this predicate to test whether to publish an event.
+    pub fn set_should_publish_result<F>(&mut self, should_publish: F)
+    where
+        F: Fn(&dyn AuthorizationResult) -> bool + Send + Sync + 'static,
+    {
         self.should_publish_result = Box::new(should_publish);
     }
 }
 
 impl AuthorizationEventPublisher for NextAuthorizationEventPublisher {
+    /// Publish the given details in the form of an event, typically AuthorizationGrantedEvent or AuthorizationDeniedEvent.
+    /// Note that success events can be very noisy if enabled by default.
+    /// Because of this implementations may choose to drop success events by default.
     fn publish_authorization_event(
         &self,
         authentication: Arc<dyn Authentication>,

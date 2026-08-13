@@ -1,4 +1,3 @@
-pub mod http_method;
 pub mod locale;
 pub mod pattern;
 pub mod pattern_match;

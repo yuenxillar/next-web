@@ -6,7 +6,7 @@ use next_web_core::{
 };
 
 use crate::{
-    core::{authentication_error::AuthenticationError, Authentication},
+    core::{Authentication, AuthenticationError},
     web::{
         authentication::session::SessionAuthenticationStrategy,
         csrf::{CsrfTokenRepository, CsrfTokenRequestHandler},

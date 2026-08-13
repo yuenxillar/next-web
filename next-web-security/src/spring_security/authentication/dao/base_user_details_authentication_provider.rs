@@ -6,12 +6,11 @@ use crate::{
         account_status_user_details_exceptions::credentials_expired,
     },
     core::{
-        authentication_error::AuthenticationError,
         authority_mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
         authority_utils::AuthorityUtils,
         user_cache::{NullUserCache, UserCache},
         userdetails::{UserDetails, UserDetailsChecker},
-        Authentication, UsernamePasswordAuthenticationToken,
+        Authentication, AuthenticationError, UsernamePasswordAuthenticationToken,
     },
 };
 

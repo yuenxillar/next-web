@@ -42,9 +42,11 @@ impl HttpFilter for CorsFilter {
     ) -> Result<(), FilterError> {
         let cors_configuration = self.config_source.cors_configuration(request);
 
-        let is_valid = self
-            .processor
-            .process_request(cors_configuration, request, response)?;
+        // let is_valid = self
+        //     .processor
+        //     .process_request(cors_configuration, request, response)?;
+
+        let is_valid = false;
 
         if !is_valid || CorsUtils::is_pre_flight_request(request) {
             return Ok(());
