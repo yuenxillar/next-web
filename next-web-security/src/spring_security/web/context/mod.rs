@@ -1,5 +1,6 @@
 mod delegating_security_context_repository;
 mod http_session_security_context_repository;
+mod null_security_context_repository;
 mod request_attribute_security_context_repository;
 mod security_context_holder_filter;
 mod security_context_persistence_filter;
@@ -8,6 +9,7 @@ mod supplier_deferred_security_context;
 
 pub use delegating_security_context_repository::DelegatingSecurityContextRepository;
 pub use http_session_security_context_repository::HttpSessionSecurityContextRepository;
+pub use null_security_context_repository::NullSecurityContextRepository;
 pub use request_attribute_security_context_repository::RequestAttributeSecurityContextRepository;
 pub use security_context_holder_filter::SecurityContextHolderFilter;
 pub use security_context_persistence_filter::SecurityContextPersistenceFilter;

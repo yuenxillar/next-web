@@ -1,4 +1,4 @@
-use crate::core::authentication_error::{AuthenticationError, AuthenticationErrorKind};
+use crate::core::{AuthenticationError, AuthenticationErrorKind};
 
 /// Thrown if an authentication request is rejected because the digest nonce
 /// has expired.

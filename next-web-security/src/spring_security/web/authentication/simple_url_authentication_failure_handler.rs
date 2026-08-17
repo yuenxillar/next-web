@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use next_web_core::http::StatusCode;
@@ -17,6 +18,12 @@ use crate::{
     },
 };
 
+/// AuthenticationFailureHandler which performs a redirect to the value of the defaultFailureUrl
+/// property when the onAuthenticationFailure method is called. If the property has not been set it will
+/// send a 401 response to the client, with the error message from the AuthenticationException which caused the failure.
+///
+/// If the useForward property is set, a RequestDispatcher.forward call will be made to the destination
+/// instead of a redirect.
 #[derive(Clone)]
 pub struct SimpleUrlAuthenticationFailureHandler {
     default_failure_url: Option<Box<str>>,
@@ -131,6 +138,17 @@ impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
         }
 
         Ok(())
+    }
+}
+
+impl Debug for SimpleUrlAuthenticationFailureHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SimpleUrlAuthenticationFailureHandler")
+            .field("default_failure_url", &self.default_failure_url)
+            .field("forward_to_destination", &self.forward_to_destination)
+            .field("allow_session_creation", &self.allow_session_creation)
+            .field("redirect_strategy", &"none")
+            .finish()
     }
 }
 

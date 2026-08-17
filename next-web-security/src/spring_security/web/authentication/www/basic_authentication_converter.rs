@@ -1,8 +1,8 @@
 use crate::{
     authorization::AuthenticationDetailsSource,
     core::{
-        authentication_error::{AuthenticationError, AuthenticationErrorKind},
         Authentication, UsernamePasswordAuthenticationToken,
+        {AuthenticationError, AuthenticationErrorKind},
     },
     web::authentication::{AuthenticationConverter, WebAuthenticationDetailsSource},
 };

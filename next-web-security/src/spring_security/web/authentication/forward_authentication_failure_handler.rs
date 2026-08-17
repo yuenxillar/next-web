@@ -9,7 +9,7 @@ use crate::web::{
 };
 
 /// Forward Authentication Failure Handler
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ForwardAuthenticationFailureHandler {
     pub(crate) forward_url: Box<str>,
 }

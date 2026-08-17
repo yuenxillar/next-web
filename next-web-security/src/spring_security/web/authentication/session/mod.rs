@@ -5,6 +5,7 @@ mod concurrent_session_control_authentication_strategy;
 mod register_session_authentication_strategy;
 mod session_authentication_strategy;
 mod session_fixation_protection_event;
+mod session_fixation_protection_strategy;
 mod session_limit;
 
 pub use self::base_session_fixation_protection_strategy::{
@@ -16,4 +17,5 @@ pub use self::concurrent_session_control_authentication_strategy::ConcurrentSess
 pub use self::register_session_authentication_strategy::RegisterSessionAuthenticationStrategy;
 pub use self::session_authentication_strategy::SessionAuthenticationStrategy;
 pub use self::session_fixation_protection_event::SessionFixationProtectionEvent;
+pub use self::session_fixation_protection_strategy::SessionFixationProtectionStrategy;
 pub use self::session_limit::{session_limit_of, SessionLimit};

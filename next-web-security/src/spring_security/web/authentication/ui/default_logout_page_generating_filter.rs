@@ -4,12 +4,12 @@ use std::sync::Arc;
 use next_web_core::{
     async_trait,
     filter::FilterError,
+    http::HttpMethod,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
-    util::HttpMethod,
 };
 use tracing::trace;
 

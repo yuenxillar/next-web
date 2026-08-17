@@ -303,11 +303,7 @@ impl HttpFilter for BasicAuthenticationFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        let auth_request = match self
-            .authentication_converter
-            .convert(request)
-            .map_err(|err| FilterError::Chain(Box::new(err)))?
-        {
+        let auth_request = match self.authentication_converter.convert(request)? {
             Some(auth_request) => auth_request,
             None => {
                 trace!("Did not process authentication request since failed to find username and password in Basic Authorization header");

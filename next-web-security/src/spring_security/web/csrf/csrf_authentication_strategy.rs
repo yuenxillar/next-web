@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use next_web_core::{
     async_trait,
@@ -40,5 +40,14 @@ impl SessionAuthenticationStrategy for CsrfAuthenticationStrategy {
         resp: &mut dyn HttpResponse,
     ) -> Result<(), AuthenticationError> {
         todo!()
+    }
+}
+
+impl Debug for CsrfAuthenticationStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CsrfAuthenticationStrategy")
+            .field("token_repository", &"none")
+            .field("request_handler", &"none")
+            .finish()
     }
 }

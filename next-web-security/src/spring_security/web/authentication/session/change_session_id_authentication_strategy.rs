@@ -1,4 +1,7 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use next_web_core::traits::http::{http_request::HttpRequest, HttpSession};
 
@@ -32,6 +35,13 @@ impl Deref for ChangeSessionIdAuthenticationStrategy {
 impl DerefMut for ChangeSessionIdAuthenticationStrategy {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl Debug for ChangeSessionIdAuthenticationStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChangeSessionIdAuthenticationStrategy")
+            .finish()
     }
 }
 

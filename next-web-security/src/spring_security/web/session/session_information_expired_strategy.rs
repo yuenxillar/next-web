@@ -8,6 +8,6 @@ where
 {
     fn on_expired_session_detected(
         &self,
-        event: &SessionInformationExpiredEvent,
+        event: &mut SessionInformationExpiredEvent,
     ) -> Result<(), BoxError>;
 }

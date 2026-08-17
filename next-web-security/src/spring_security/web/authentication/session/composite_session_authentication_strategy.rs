@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use next_web_core::{
     async_trait,
@@ -76,5 +76,13 @@ impl SessionAuthenticationStrategy for CompositeSessionAuthenticationStrategy {
                 .await?;
         }
         Ok(())
+    }
+}
+
+impl Debug for CompositeSessionAuthenticationStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CompositeSessionAuthenticationStrategy")
+            .field("delegate_strategies", &self.delegate_strategies)
+            .finish()
     }
 }

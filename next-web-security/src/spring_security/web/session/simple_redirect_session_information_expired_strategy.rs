@@ -70,15 +70,12 @@ impl SimpleRedirectSessionInformationExpiredStrategy {
 impl SessionInformationExpiredStrategy for SimpleRedirectSessionInformationExpiredStrategy {
     fn on_expired_session_detected(
         &self,
-        event: &SessionInformationExpiredEvent,
+        event: &mut SessionInformationExpiredEvent,
     ) -> Result<(), BoxError> {
         debug!("Redirecting to '{}'", &self.destination_url);
-        // self.redirect_strategy.send_redirect(
-        //     event.get_request(),
-        //     event.get_response(),
-        //     &self.destination_url,
-        // )?;
-        // Ok(())
-        todo!()
+
+        let (req, resp) = event.parts_mut();
+        self.redirect_strategy
+            .send_redirect(req, resp, &self.destination_url)
     }
 }

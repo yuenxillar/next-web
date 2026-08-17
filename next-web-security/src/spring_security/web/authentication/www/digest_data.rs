@@ -1,4 +1,4 @@
-use crate::core::authentication_error::{AuthenticationError, AuthenticationErrorKind};
+use crate::core::{AuthenticationError, AuthenticationErrorKind};
 
 use super::digest_auth_utils;
 

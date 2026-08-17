@@ -6,12 +6,12 @@ use next_web_core::AnyObject;
 use next_web_core::{
     async_trait,
     filter::FilterError,
+    http::HttpMethod,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
-    util::HttpMethod,
 };
 
 use crate::authentication::EMPTY_STRING;
@@ -53,7 +53,7 @@ impl UsernamePasswordAuthenticationFilter {
         request: &dyn HttpRequest,
         _response: &mut dyn HttpResponse,
     ) -> Result<Option<Arc<dyn Authentication>>, BoxError> {
-        if self.post_only && request.method() != HttpMethod::Post {
+        if self.post_only && request.method() != HttpMethod::POST {
             return Err(format!(
                 "Authentication method not supported: {:?}",
                 request.method()
@@ -145,7 +145,7 @@ impl UsernamePasswordAuthenticationFilter {
 
     fn default_path_request_matcher() -> Arc<dyn RequestMatcher> {
         Arc::new(
-            PathPatternRequestMatcher::with_defaults().matcher(Some(HttpMethod::Post), "/login"),
+            PathPatternRequestMatcher::with_defaults().matcher(Some(HttpMethod::POST), "/login"),
         )
     }
 }

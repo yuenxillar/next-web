@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
-    filter::FilterError,
+    filter::{FilterChainError, FilterError},
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -98,11 +98,10 @@ impl HttpFilter for AuthorizationFilter {
             );
         }
 
-        if let Some(result) = result.as_ref() {
+        if let Some(result) = result {
             if !result.is_granted() {
-                return Err(FilterError::Chain(Box::new(AuthorizationDeniedError::new(
-                    "Access Denied",
-                    *result,
+                return Err(FilterError::Chain(FilterChainError::AnyError(Box::new(
+                    AuthorizationDeniedError::new("Access Denied", result),
                 ))));
             }
         }

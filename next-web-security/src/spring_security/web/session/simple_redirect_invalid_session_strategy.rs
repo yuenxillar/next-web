@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use next_web_core::{
     error::BoxError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -74,5 +76,14 @@ impl InvalidSessionStrategy for SimpleRedirectInvalidSessionStrategy {
         self.redirect_strategy
             .send_redirect(request, response, &self.destination_url)?;
         Ok(())
+    }
+}
+
+impl Debug for SimpleRedirectInvalidSessionStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SimpleRedirectInvalidSessionStrategy")
+            .field("destination_url", &self.destination_url)
+            .field("create_new_session", &self.create_new_session)
+            .finish()
     }
 }

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use next_web_core::{
     async_trait,
@@ -52,8 +52,17 @@ impl SessionAuthenticationStrategy for RegisterSessionAuthenticationStrategy {
 
         let session_id = request.session_mut(true).map(|s| s.id());
         self.session_registry
-            .register_new_session(session_id.unwrap_or_default(), principal.as_ref());
+            .register_new_session(session_id.unwrap_or_default(), principal.as_ref())
+            .await;
 
         Ok(())
+    }
+}
+
+impl Debug for RegisterSessionAuthenticationStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegisterSessionAuthenticationStrategy")
+            .field("session_registry", &"none")
+            .finish()
     }
 }

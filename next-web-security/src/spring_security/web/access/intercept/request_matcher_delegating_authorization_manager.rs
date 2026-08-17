@@ -332,10 +332,10 @@ mod tests {
     fn authentication(granted: &[&str]) -> Arc<dyn Authentication> {
         let mut builder = SimpleAuthentication::default().to_builder();
         builder.principal(Some(Arc::new(String::from("alice"))));
+
+        let array = AuthorityUtils::create_authority_list(granted.iter().copied());
         builder.authorities(Box::new(|authorities| {
-            authorities.extend(AuthorityUtils::create_authority_list(
-                granted.iter().copied(),
-            ));
+            authorities.extend(array);
         }));
         builder.authenticated(true);
         builder.build()

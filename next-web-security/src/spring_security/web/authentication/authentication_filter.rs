@@ -54,10 +54,6 @@ type AuthenticationManagerResolverFn =
 /// * If authentication is successful, {@link AuthenticationSuccessHandler} is invoked
 ///   and the authentication is set on {@link SecurityContextHolder}, else
 ///   {@link AuthenticationFailureHandler} is invoked
-///
-/// @author Sergey Bespalov
-/// @author Andrey Litvitski
-
 #[derive(Clone)]
 pub struct AuthenticationFilter {
     /// Unique per-instance attribute key to ensure this filter runs only once
@@ -134,7 +130,7 @@ impl AuthenticationFilter {
             security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
             request_matcher: AnyRequestMatcher::instance(),
             authentication_converter,
-            success_handler: Arc::new(SavedRequestAwareAuthenticationSuccessHandler::new()),
+            success_handler: Arc::new(SavedRequestAwareAuthenticationSuccessHandler::default()),
             failure_handler: Arc::new(SimpleUrlAuthenticationFailureHandler::new("/login")),
             security_context_repository: None,
             authentication_manager_resolver,

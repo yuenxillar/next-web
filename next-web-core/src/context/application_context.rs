@@ -1762,6 +1762,10 @@ impl ApplicationContext {
         self.get_single_option_with_name("")
     }
 
+    pub fn get_single_option_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        todo!()
+    }
+
     /// Returns an optional reference to a [`Singleton`](crate::Scope::Singleton) or [`SingleOwner`](crate::Scope::SingleOwner) instance based on the given type and name.
     ///
     /// # Example

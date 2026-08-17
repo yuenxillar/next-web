@@ -4,6 +4,7 @@ use next_web_core::{
     async_trait,
     error::BoxError,
     filter::FilterError,
+    http::{HttpFilterChainShare, HttpRequestShare, HttpResponseShare},
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -21,29 +22,9 @@ use crate::{
         authentication::logout::{
             CompositeLogoutHandler, LogoutHandler, SecurityContextLogoutHandler,
         },
-        session::{
-            session_information_expired_event::SessionInformationExpiredEvent,
-            session_information_expired_strategy::SessionInformationExpiredStrategy,
-        },
+        session::{SessionInformationExpiredEvent, SessionInformationExpiredStrategy},
     },
 };
-
-/// A `SessionInformationExpiredStrategy` that writes an error message to the
-/// response body. This is the default strategy used by
-/// `ConcurrentSessionFilter`.
-#[derive(Clone)]
-struct ResponseBodySessionInformationExpiredStrategy;
-
-impl SessionInformationExpiredStrategy for ResponseBodySessionInformationExpiredStrategy {
-    fn on_expired_session_detected(
-        &self,
-        _event: &SessionInformationExpiredEvent,
-    ) -> Result<(), BoxError> {
-        // In the Java implementation this writes to the servlet response.
-        // In Rust, the response is handled by the filter after this call.
-        Ok(())
-    }
-}
 
 /// Filter required by concurrent session handling package.
 ///
@@ -57,17 +38,10 @@ impl SessionInformationExpiredStrategy for ResponseBodySessionInformationExpired
 ///    The `SessionInformationExpiredStrategy` is then invoked.
 #[derive(Clone)]
 pub struct ConcurrentSessionFilter {
-    /// The security context holder strategy.
     security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
-
-    /// The session registry used to look up session information.
     session_registry: Arc<dyn SessionRegistry>,
-
-    /// The strategy invoked when an expired session is detected.
-    session_information_expired_strategy: Arc<dyn SessionInformationExpiredStrategy>,
-
-    /// The logout handler called before the expired strategy.
     logout_handlers: Arc<dyn LogoutHandler>,
+    session_information_expired_strategy: Arc<dyn SessionInformationExpiredStrategy>,
 }
 
 impl ConcurrentSessionFilter {
@@ -110,8 +84,6 @@ impl ConcurrentSessionFilter {
         }
     }
 
-    // --- Setters ---
-
     /// Sets the `SecurityContextHolderStrategy`.
     pub fn set_security_context_holder_strategy(
         &mut self,
@@ -125,8 +97,6 @@ impl ConcurrentSessionFilter {
     pub fn set_logout_handlers(&mut self, handlers: Vec<Arc<dyn LogoutHandler>>) {
         self.logout_handlers = Arc::new(CompositeLogoutHandler::new(handlers));
     }
-
-    // --- Internal methods ---
 
     /// Performs logout by invoking the configured logout handlers with the
     /// current authentication from the security context.
@@ -150,26 +120,34 @@ impl HttpFilter for ConcurrentSessionFilter {
         // Check if the request has an existing session.
         if let Some(session) = request.session() {
             let session_id = session.id().to_string();
-            let info = self.session_registry.session_information(&session_id);
-
-            if let Some(ref info) = info {
+            if let Some(info) = self
+                .session_registry
+                .session_information(&session_id)
+                .await
+                .map(Clone::clone)
+            {
                 if info.is_expired() {
                     // Expired — abort processing.
                     debug!("Requested session ID {} has expired.", session_id);
 
                     self.do_logout(request, response).await;
 
-                    let event = SessionInformationExpiredEvent::new(info.clone());
+                    let mut event = SessionInformationExpiredEvent::new(
+                        info,
+                        HttpRequestShare::from(&*request),
+                        HttpResponseShare::from(&*response),
+                        Some(HttpFilterChainShare::from(filter_chain)),
+                    );
                     self.session_information_expired_strategy
-                        .on_expired_session_detected(&event)
-                        .map_err(|e| FilterError::custom(e.to_string()))?;
+                        .on_expired_session_detected(&mut event)?;
 
                     return Ok(());
                 }
 
                 // Non-expired — update last request date/time.
                 self.session_registry
-                    .refresh_last_request(info.session_id());
+                    .refresh_last_request(info.session_id())
+                    .await;
             }
         }
 
@@ -180,5 +158,23 @@ impl HttpFilter for ConcurrentSessionFilter {
 impl Named for ConcurrentSessionFilter {
     fn name(&self) -> &str {
         "ConcurrentSessionFilter"
+    }
+}
+
+/// A `SessionInformationExpiredStrategy` that writes an error message to the
+/// response body. This is the default strategy used by
+/// `ConcurrentSessionFilter`.
+#[derive(Clone)]
+struct ResponseBodySessionInformationExpiredStrategy;
+
+impl SessionInformationExpiredStrategy for ResponseBodySessionInformationExpiredStrategy {
+    fn on_expired_session_detected(
+        &self,
+        event: &mut SessionInformationExpiredEvent,
+    ) -> Result<(), BoxError> {
+        let resp = event.response();
+        resp.set_body(b"This session has been expired (possibly due to multiple concurrent logins being attempted as the same user).".to_vec());
+
+        Ok(())
     }
 }

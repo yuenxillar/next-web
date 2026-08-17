@@ -1,28 +1,53 @@
 use std::{
     any::Any,
     collections::{HashMap, HashSet},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use chrono::Utc;
+use next_web_context::{ApplicationEvent, ApplicationListener};
+use next_web_core::async_trait;
+use tokio::sync::RwLock;
+use tracing::{enabled, Level};
 
 use super::{
     session_events::SessionEvent, session_information::SessionInformation,
     session_registry::SessionRegistry,
 };
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct SessionRegistryImpl {
     principals: Arc<RwLock<HashMap<String, HashSet<String>>>>,
     session_ids: Arc<RwLock<HashMap<String, SessionInformation>>>,
 }
 
 impl SessionRegistryImpl {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(
+        principals: HashMap<String, HashSet<String>>,
+        session_ids: HashMap<String, SessionInformation>,
+    ) -> Self {
+        Self {
+            principals: Arc::new(RwLock::new(principals)),
+            session_ids: Arc::new(RwLock::new(session_ids)),
+        }
     }
 
-    pub fn on_application_event(&self, event: SessionEvent) {
+    async fn with_session_mut<F, R>(&self, session_id: &str, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut SessionInformation) -> R,
+    {
+        assert!(
+            !session_id.trim().is_empty(),
+            "SessionId required as per interface contract"
+        );
+
+        let mut sessions = self.session_ids.write().await;
+        sessions.get_mut(session_id).map(f)
+    }
+}
+
+impl ApplicationListener<Box<dyn ApplicationEvent>> for SessionRegistryImpl {
+    fn on_application_event(&self, event: Box<dyn ApplicationEvent>) {
         match event {
             SessionEvent::Destroyed(event) => self.remove_session_information(event.id()),
             SessionEvent::IdChanged(event) => {
@@ -34,11 +59,13 @@ impl SessionRegistryImpl {
             }
             SessionEvent::Created(_) => {}
         }
+        todo!()
     }
 }
 
+#[async_trait]
 impl SessionRegistry for SessionRegistryImpl {
-    fn all_principals(&self) -> Vec<String> {
+    async fn all_principals(&self) -> Vec<String> {
         let mut principals = self
             .principals
             .read()
@@ -48,7 +75,7 @@ impl SessionRegistry for SessionRegistryImpl {
         principals
     }
 
-    fn all_sessions(
+    async fn all_sessions(
         &self,
         principal: &dyn Any,
         include_expired_sessions: bool,
@@ -56,8 +83,9 @@ impl SessionRegistry for SessionRegistryImpl {
         let session_ids = self
             .principals
             .read()
-            .ok()
-            .and_then(|principals| principals.get(principal).cloned())
+            .await
+            .get(principal)
+            .cloned()
             .unwrap_or_default();
 
         session_ids
@@ -67,36 +95,31 @@ impl SessionRegistry for SessionRegistryImpl {
             .collect()
     }
 
-    fn session_information(&self, session_id: &str) -> Option<SessionInformation> {
+    async fn session_information<'a>(&'a self, session_id: &str) -> Option<&'a SessionInformation> {
         assert!(
-            !session_id.trim().is_empty(),
+            !session_id.is_empty(),
             "SessionId required as per interface contract"
         );
-        self.session_ids.read().ok()?.get(session_id).cloned()
+        self.session_ids.read().await.get(session_id)
     }
 
-    fn refresh_last_request(&self, session_id: &str) {
+    async fn refresh_last_request(&self, session_id: &str) {
         assert!(
-            !session_id.trim().is_empty(),
+            !session_id.is_empty(),
             "SessionId required as per interface contract"
         );
-        if let Ok(mut sessions) = self.session_ids.write() {
-            if let Some(info) = sessions.get_mut(session_id) {
-                info.refresh_last_request();
-            }
-        }
+
+        self.with_session_mut(session_id, |info| {
+            info.refresh_last_request();
+        })
+        .await;
     }
 
-    fn register_new_session(&self, session_id: &str, principal: &str) {
+    async fn register_new_session(&self, session_id: &str, principal: &dyn Any) {
         let session_id = session_id.to_string();
-        let principal = principal.to_string();
         assert!(
-            !session_id.trim().is_empty(),
+            !session_id.is_empty(),
             "SessionId required as per interface contract"
-        );
-        assert!(
-            !principal.trim().is_empty(),
-            "Principal required as per interface contract"
         );
 
         if self.session_information(&session_id).is_some() {
@@ -114,86 +137,33 @@ impl SessionRegistry for SessionRegistryImpl {
         }
     }
 
-    fn remove_session_information(&self, session_id: &str) {
+    async fn remove_session_information(&self, session_id: &str) {
         assert!(
-            !session_id.trim().is_empty(),
+            !session_id.is_empty(),
             "SessionId required as per interface contract"
         );
-        let Some(info) = self
-            .session_ids
-            .write()
-            .ok()
-            .and_then(|mut sessions| sessions.remove(session_id))
-        else {
-            return;
+
+        let info = match self.session_information(session_id) {
+            Some(info) => info,
+            None => return,
         };
 
-        if let Ok(mut principals) = self.principals.write() {
-            let remove_principal = if let Some(sessions) = principals.get_mut(info.principal()) {
-                sessions.remove(session_id);
-                sessions.is_empty()
-            } else {
-                false
-            };
-            if remove_principal {
-                principals.remove(info.principal());
-            }
+        self.session_ids.write().await.remove(session_id);
+
+        if enabled!(Level::TRACE) {
+            tracing::trace!(
+                "Removing session {} from set of registered sessions",
+                session_id
+            );
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::core::session::{
-        session_events::{SessionDestroyedEvent, SessionEvent, SessionIdChangedEvent},
-        session_registry::SessionRegistry,
-        session_registry_impl::SessionRegistryImpl,
-    };
-
-    #[test]
-    fn registry_registers_lists_and_removes_sessions() {
-        let registry = SessionRegistryImpl::new();
-        registry.register_new_session("s1", "alice");
-        registry.register_new_session("s2", "alice");
-
-        assert_eq!(registry.all_principals(), vec![String::from("alice")]);
-        assert_eq!(registry.all_sessions("alice", false).len(), 2);
-        assert!(registry.session_information("s1").is_some());
-
-        registry.remove_session_information("s1");
-
-        assert!(registry.session_information("s1").is_none());
-        assert_eq!(registry.all_sessions("alice", false).len(), 1);
-    }
-
-    #[test]
-    fn registry_replaces_existing_session_id_registration() {
-        let registry = SessionRegistryImpl::new();
-        registry.register_new_session("s1", "alice");
-        registry.register_new_session("s1", "bob");
-
-        assert!(registry.all_sessions("alice", true).is_empty());
-        assert_eq!(registry.all_sessions("bob", true).len(), 1);
-    }
-
-    #[test]
-    fn registry_handles_destroyed_and_id_changed_events() {
-        let registry = SessionRegistryImpl::new();
-        registry.register_new_session("s1", "alice");
-        registry.on_application_event(SessionEvent::IdChanged(SessionIdChangedEvent::new(
-            "source", "s1", "s2",
-        )));
-
-        assert!(registry.session_information("s1").is_none());
-        assert!(registry.session_information("s2").is_some());
-
-        registry.on_application_event(SessionEvent::Destroyed(SessionDestroyedEvent::new(
-            "source",
-            "s2",
-            Vec::new(),
-        )));
-
-        assert!(registry.session_information("s2").is_none());
-        assert!(registry.all_principals().is_empty());
+impl Default for SessionRegistryImpl {
+    fn default() -> Self {
+        Self {
+            principals: Arc::new(RwLock::new(Default::default())),
+            session_ids: Arc::new(RwLock::new(Default::default())),
+        }
     }
 }

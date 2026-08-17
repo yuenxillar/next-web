@@ -76,10 +76,9 @@ where
     T: Clone + Debug + Send + Sync,
 {
     fn matches(&self, request: &dyn HttpRequest) -> bool {
-        self.1
-            .clone()
-            .into_iter()
-            .any(|pattern| AntPathRequestMatcher::from((Some(self.0), pattern)).matches(request))
+        self.1.clone().into_iter().any(|pattern| {
+            AntPathRequestMatcher::from((Some(self.0.clone()), pattern)).matches(request)
+        })
     }
 }
 

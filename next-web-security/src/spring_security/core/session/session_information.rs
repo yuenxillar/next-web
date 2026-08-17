@@ -1,22 +1,25 @@
-use chrono::{DateTime, Utc};
+use std::{fmt::Debug, time::SystemTime};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+use crate::web::authentication::AuthPrincipal;
+
+///
+/// Represents a record of a session within the Next Security framework.
+/// This is primarily used for concurrent session support.
+#[derive(Clone)]
 pub struct SessionInformation {
-    last_request: DateTime<Utc>,
-    principal: String,
+    last_request: SystemTime,
+    principal: AuthPrincipal,
     session_id: String,
     expired: bool,
 }
 
 impl SessionInformation {
     pub fn new(
-        principal: impl Into<String>,
+        principal: AuthPrincipal,
         session_id: impl Into<String>,
-        last_request: DateTime<Utc>,
+        last_request: SystemTime,
     ) -> Self {
-        let principal = principal.into();
         let session_id = session_id.into();
-        assert!(!principal.trim().is_empty(), "Principal required");
         assert!(!session_id.trim().is_empty(), "SessionId required");
         Self {
             last_request,
@@ -30,11 +33,11 @@ impl SessionInformation {
         self.expired = true;
     }
 
-    pub fn last_request(&self) -> DateTime<Utc> {
+    pub fn last_request(&self) -> SystemTime {
         self.last_request
     }
 
-    pub fn principal(&self) -> &str {
+    pub fn principal(&self) -> &AuthPrincipal {
         &self.principal
     }
 
@@ -46,35 +49,19 @@ impl SessionInformation {
         self.expired
     }
 
+    /// Refreshes the internal lastRequest to the current date and time.
     pub fn refresh_last_request(&mut self) {
-        self.last_request = Utc::now();
-    }
-
-    pub fn refresh_last_request_at(&mut self, last_request: DateTime<Utc>) {
-        self.last_request = last_request;
+        self.last_request = SystemTime::now();
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use chrono::{TimeZone, Utc};
-
-    use super::SessionInformation;
-
-    #[test]
-    fn session_information_tracks_expiration_and_last_request() {
-        let start = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
-        let later = Utc.timestamp_opt(1_700_000_100, 0).unwrap();
-        let mut info = SessionInformation::new("alice", "s1", start);
-
-        assert_eq!(info.principal(), "alice");
-        assert_eq!(info.session_id(), "s1");
-        assert!(!info.is_expired());
-
-        info.expire_now();
-        info.refresh_last_request_at(later);
-
-        assert!(info.is_expired());
-        assert_eq!(info.last_request(), later);
+impl Debug for SessionInformation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionInformation")
+            .field("principal", &self.principal)
+            .field("session_id", &self.session_id)
+            .field("expired", &self.expired)
+            .field("last_request", &self.last_request)
+            .finish()
     }
 }

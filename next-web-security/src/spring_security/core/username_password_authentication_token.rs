@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     ops::{Deref, DerefMut},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -148,6 +149,12 @@ impl CredentialsContainer for UsernamePasswordAuthenticationToken {
     fn erase_credentials(&self) {
         self.inner.erase_credentials();
         self.cleared.store(true, Ordering::Release);
+    }
+}
+
+impl Display for UsernamePasswordAuthenticationToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
     }
 }
 

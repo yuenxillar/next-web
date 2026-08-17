@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use next_web_core::{
-    http::Cookie,
-    util::{http_method::HttpMethod, locale::Locale},
+    http::{Cookie, HttpMethod},
+    util::locale::Locale,
 };
 
 use crate::web::savedrequest::SavedRequest;

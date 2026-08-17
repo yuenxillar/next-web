@@ -5,18 +5,12 @@ use next_web_context::{event::SmartApplicationListener, ApplicationEvent, Applic
 /// Used for delegating to a number of `SmartApplicationListener` instances. This is
 /// useful when needing to register a `SmartApplicationListener` with the
 /// `ApplicationContext` programmatically.
+#[derive(Clone)]
 pub struct DelegatingApplicationListener {
     listeners: Vec<Arc<dyn SmartApplicationListener>>,
 }
 
 impl DelegatingApplicationListener {
-    /// Creates a new instance with an empty listener list.
-    pub fn new() -> Self {
-        Self {
-            listeners: Vec::new(),
-        }
-    }
-
     /// Adds a new `SmartApplicationListener` to use.
     ///
     /// # Arguments
@@ -30,7 +24,9 @@ impl DelegatingApplicationListener {
 
 impl Default for DelegatingApplicationListener {
     fn default() -> Self {
-        Self::new()
+        Self {
+            listeners: Vec::new(),
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use next_web_core::anys::any_value::AnyValue;
 
@@ -70,6 +70,12 @@ impl Authentication for PreAuthenticatedAuthenticationToken {
     //         .filter_map(|authority| authority.authority().map(ToString::to_string))
     //         .collect()
     // }
+}
+
+impl Display for PreAuthenticatedAuthenticationToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 #[cfg(test)]

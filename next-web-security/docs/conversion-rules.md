@@ -18,6 +18,7 @@
 - 使用 async_trait 宏处理异步 trait
 - 实现 From trait 简化错误转换
 - 多功能复用的函数需要写上测试用例
+- Java无参构造函数对应的是rust Default函数
 
 ## 3. 模块管理
 - 当定义多个模块时可使用 `mod access_denied_error;  pub use access_denied_error::AccessDeniedError;` 这种方式可以避免 用户导入时候冗余的导入

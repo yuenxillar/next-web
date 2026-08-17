@@ -8,7 +8,6 @@ use crate::core::{
         authentication_user_details_service::AuthenticationUserDetailsService, user::User,
         username_not_found_error::UsernameNotFoundError, UserDetails,
     },
-    Authentication,
 };
 
 use super::{

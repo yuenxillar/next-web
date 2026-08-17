@@ -4,8 +4,10 @@ use std::{
     sync::Arc,
 };
 
-use next_web_context::{ApplicationEvent, ApplicationListener};
-use next_web_core::traits::required::Required;
+use next_web_context::{
+    event::GenericApplicationListenerAdapter, ApplicationEvent, ApplicationListener,
+};
+use next_web_core::{traits::required::Required, ApplicationContext};
 
 use crate::{
     authorization::AuthenticationTrustResolver,
@@ -27,16 +29,18 @@ use crate::{
                 session_limit_of, ChangeSessionIdAuthenticationStrategy,
                 CompositeSessionAuthenticationStrategy,
                 ConcurrentSessionControlAuthenticationStrategy,
-                RegisterSessionAuthenticationStrategy, SessionAuthenticationStrategy, SessionLimit,
+                RegisterSessionAuthenticationStrategy, SessionAuthenticationStrategy,
+                SessionFixationProtectionStrategy, SessionLimit,
             },
             AuthenticationFailureHandler, SimpleUrlAuthenticationFailureHandler,
         },
         context::{
             DelegatingSecurityContextRepository, HttpSessionSecurityContextRepository,
-            RequestAttributeSecurityContextRepository, SecurityContextRepository,
+            NullSecurityContextRepository, RequestAttributeSecurityContextRepository,
+            SecurityContextRepository,
         },
         default_security_filter_chain::DefaultSecurityFilterChain,
-        savedrequest::RequestCache,
+        savedrequest::{NullRequestCache, RequestCache},
         session::{
             ConcurrentSessionFilter, ForceEagerSessionCreationFilter, InvalidSessionStrategy,
             SessionInformationExpiredStrategy, SessionManagementFilter,
@@ -75,7 +79,8 @@ where
     H: HttpSecurityBuilder<H>,
 {
     default_session_fixation_strategy: Arc<dyn SessionAuthenticationStrategy>,
-    session_fixation_authentication_strategy: Option<Arc<dyn SessionAuthenticationStrategy>>,
+    pub(super) session_fixation_authentication_strategy:
+        Option<Arc<dyn SessionAuthenticationStrategy>>,
     session_authentication_strategy: Option<Arc<dyn SessionAuthenticationStrategy>>,
     provided_session_authentication_strategy: Option<Arc<dyn SessionAuthenticationStrategy>>,
     invalid_session_strategy: Option<Arc<dyn InvalidSessionStrategy>>,
@@ -377,19 +382,17 @@ where
             self.get_session_authentication_strategy(http),
         );
 
-        if let Some(ref error_url) = self.session_authentication_error_url {
+        if let Some(error_url) = self.session_authentication_error_url.as_ref() {
             session_management_filter.set_authentication_failure_handler(Arc::new(
                 SimpleUrlAuthenticationFailureHandler::new(error_url),
             ));
         }
 
-        let strategy = self.get_invalid_session_strategy();
-        if let Some(strategy) = strategy {
+        if let Some(strategy) = self.get_invalid_session_strategy() {
             session_management_filter.set_invalid_session_strategy(strategy);
         }
 
-        let failure_handler = self.get_session_authentication_failure_handler();
-        if let Some(failure_handler) = failure_handler {
+        if let Some(failure_handler) = self.get_session_authentication_failure_handler() {
             session_management_filter.set_authentication_failure_handler(failure_handler);
         }
 
@@ -406,7 +409,10 @@ where
     }
 
     /// Creates the `ConcurrentSessionFilter` for concurrency control.
-    fn create_concurrency_filter(&mut self, http: &mut H) -> ConcurrentSessionFilter {
+    fn create_concurrency_filter(&mut self, http: &mut H) -> ConcurrentSessionFilter
+    where
+        H: 'static,
+    {
         let expire_strategy = self.get_expired_session_strategy();
         let session_registry = self.get_session_registry(http);
         let mut concurrent_session_filter = if let Some(expire_strategy) = expire_strategy {
@@ -518,11 +524,11 @@ where
         let mut delegate_strategies = self.session_authentication_strategies.clone();
         let default_session_authentication_strategy =
             if let Some(ref provided) = self.provided_session_authentication_strategy {
-                provided.clone()
+                Some(provided.clone())
             } else {
                 // If the user did not provide a SessionAuthenticationStrategy
-                // then default to session_fixation_authentication_strategy
-                self.inner.post_process()
+                // then default to sessionFixationAuthenticationStrategy
+                self.session_fixation_authentication_strategy.clone()
             };
 
         if self.is_concurrent_session_control_enabled() {
@@ -530,30 +536,26 @@ where
             let mut concurrent_session_control_strategy =
                 ConcurrentSessionControlAuthenticationStrategy::new(session_registry.clone());
             if let Some(ref session_limit) = self.session_limit {
-                concurrent_session_control_strategy.set_maximum_sessions(todo!());
+                concurrent_session_control_strategy
+                    .set_maximum_sessions_with_limit(session_limit.clone());
             }
             concurrent_session_control_strategy
-                .set_exception_if_maximum_exceeded(self.max_sessions_prevents_login);
-            let concurrent_session_control_strategy = self
-                .inner
-                .post_process(Arc::new(concurrent_session_control_strategy));
-
+                .set_error_if_maximum_exceeded(self.max_sessions_prevents_login);
             let register_session_strategy =
                 RegisterSessionAuthenticationStrategy::new(session_registry);
-            let register_session_strategy =
-                self.inner.post_process(Arc::new(register_session_strategy));
 
-            delegate_strategies.push(concurrent_session_control_strategy);
-            delegate_strategies.push(default_session_authentication_strategy);
-            delegate_strategies.push(register_session_strategy);
+            delegate_strategies.push(Arc::new(concurrent_session_control_strategy));
+            default_session_authentication_strategy
+                .map(|strategy| delegate_strategies.push(strategy));
+            delegate_strategies.push(Arc::new(register_session_strategy));
         } else {
-            delegate_strategies.push(default_session_authentication_strategy);
+            default_session_authentication_strategy
+                .map(|strategy| delegate_strategies.push(strategy));
         }
 
         let strategy = Arc::new(CompositeSessionAuthenticationStrategy::new(
             delegate_strategies,
         ));
-        let strategy = self.inner.post_process(strategy);
         self.session_authentication_strategy = Some(strategy.clone());
         strategy
     }
@@ -564,14 +566,17 @@ where
             return registry.clone();
         }
 
-        let registry = self.inner.get_bean_or_null::<SessionRegistry>();
+        let registry = http.shared_object::<ApplicationContext>().and_then(|ctx| {
+            ctx.get_single_option::<Arc<dyn SessionRegistry>>()
+                .map(Clone::clone)
+        });
         if let Some(registry) = registry {
             self.session_registry = Some(registry.clone());
             return registry;
         }
 
         let session_registry = SessionRegistryImpl::default();
-        // self.register_delegate_application_listener(http, session_registry.clone());
+        self.register_delegate_application_listener(http, Arc::new(session_registry.clone()));
         let registry = Arc::new(session_registry);
         self.session_registry = Some(registry.clone());
         registry
@@ -583,9 +588,9 @@ where
         http: &mut H,
         delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
     ) {
-        let delegating = self
-            .inner
-            .get_bean_or_null::<DelegatingApplicationListener>();
+        let delegating = http
+            .shared_object_mut::<ApplicationContext>()
+            .and_then(|ctx| ctx.get_single_option_mut::<DelegatingApplicationListener>());
         if let Some(delegating) = delegating {
             let smart_listener = GenericApplicationListenerAdapter::new(delegate);
             delegating.add_listener(Arc::new(smart_listener));
@@ -641,6 +646,7 @@ where
 impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for SessionManagementConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
+    H: 'static,
 {
     fn init(&mut self, http: &mut H) {
         let security_context_repository =
@@ -653,7 +659,7 @@ where
                     RequestAttributeSecurityContextRepository::default(),
                 ));
                 self.session_management_security_context_repository =
-                    Some(Arc::new(NullSecurityContextRepository::new()));
+                    Some(Arc::new(NullSecurityContextRepository::default()));
             } else {
                 let mut http_security_repository = HttpSessionSecurityContextRepository::default();
                 http_security_repository
@@ -680,11 +686,12 @@ where
 
         let request_cache = http.shared_object::<Arc<dyn RequestCache>>();
         if request_cache.is_none() && stateless {
-            http.set_shared_object::<Arc<dyn RequestCache>>(Arc::new(NullRequestCache::new()));
+            http.set_shared_object::<Arc<dyn RequestCache>>(Arc::new(NullRequestCache::default()));
         }
 
+        let session_authentication_strategy = self.get_session_authentication_strategy(http);
         http.set_shared_object::<Arc<dyn SessionAuthenticationStrategy>>(
-            self.get_session_authentication_strategy(http),
+            session_authentication_strategy,
         );
 
         if let Some(invalid_session_strategy) = self.get_invalid_session_strategy() {
@@ -693,17 +700,13 @@ where
     }
 
     fn configure(&mut self, http: &mut H) {
-        let session_management_filter = self.create_session_management_filter(http);
-        if let Some(filter) = session_management_filter {
+        if let Some(filter) = self.create_session_management_filter(http) {
             http.add_filter(filter);
         }
         if self.is_concurrent_session_control_enabled() {
             let concurrent_session_filter = self.create_concurrency_filter(http);
             // let concurrent_session_filter = self.inner.post_process(concurrent_session_filter);
             http.add_filter(concurrent_session_filter);
-        }
-        if !self.enable_session_url_rewriting {
-            http.add_filter(DisableEncodeUrlFilter::new());
         }
         if self.session_policy == Some(SessionCreationPolicy::Always) {
             http.add_filter(ForceEagerSessionCreationFilter::default());
@@ -736,7 +739,9 @@ where
             session_authentication_failure_handler: None,
             properties_that_require_implicit_authentication: HashSet::new(),
             require_explicit_authentication_strategy: None,
-            session_management_security_context_repository: None,
+            session_management_security_context_repository: Some(Arc::new(
+                HttpSessionSecurityContextRepository::default(),
+            )),
 
             inner: Default::default(),
         }
@@ -762,10 +767,12 @@ where
     /// Specifies that a new session should be created, but the session attributes from
     /// the original `HttpSession` should not be retained.
     pub fn new_session(&mut self) -> &mut SessionManagementConfigurer<H> {
-        let mut strategy = SessionFixationProtectionStrategy::new();
-        strategy.set_migrate_session_attributes(false);
+        let mut session_fixation_protection_strategy = SessionFixationProtectionStrategy::default();
+        session_fixation_protection_strategy.set_migrate_session_attributes(false);
         self.parent
-            .set_session_fixation_authentication_strategy(Arc::new(strategy));
+            .set_session_fixation_authentication_strategy(Arc::new(
+                session_fixation_protection_strategy,
+            ));
         self.parent
     }
 
@@ -774,7 +781,7 @@ where
     pub fn migrate_session(&mut self) -> &mut SessionManagementConfigurer<H> {
         self.parent
             .set_session_fixation_authentication_strategy(Arc::new(
-                SessionFixationProtectionStrategy::new(),
+                SessionFixationProtectionStrategy::default(),
             ));
         self.parent
     }
@@ -786,7 +793,7 @@ where
     pub fn change_session_id(&mut self) -> &mut SessionManagementConfigurer<H> {
         self.parent
             .set_session_fixation_authentication_strategy(Arc::new(
-                ChangeSessionIdAuthenticationStrategy::new(),
+                ChangeSessionIdAuthenticationStrategy::default(),
             ));
         self.parent
     }
@@ -796,10 +803,7 @@ where
     /// For example, if application container session fixation protection is already in
     /// use. Otherwise, this option is not recommended.
     pub fn none(&mut self) -> &mut SessionManagementConfigurer<H> {
-        self.parent
-            .set_session_fixation_authentication_strategy(Arc::new(
-                NullAuthenticatedSessionStrategy::new(),
-            ));
+        self.parent.session_fixation_authentication_strategy = None;
         self.parent
     }
 }
@@ -826,8 +830,8 @@ where
     /// # Arguments
     ///
     /// * `maximum_sessions` - The maximum number of sessions for a user.
-    pub fn maximum_sessions(mut self, maximum_sessions: u32) -> Self {
-        self.parent.session_limit = Some(SessionLimit::of(maximum_sessions));
+    pub fn maximum_sessions(self, maximum_sessions: i32) -> Self {
+        self.parent.session_limit = Some(session_limit_of(maximum_sessions));
         self
     }
 
@@ -837,7 +841,7 @@ where
     ///
     /// * `session_limit` - The `SessionLimit` to check the maximum number of sessions
     ///   for a user.
-    pub fn maximum_sessions_with_limit(mut self, session_limit: SessionLimit) -> Self {
+    pub fn maximum_sessions_with_limit(self, session_limit: SessionLimit) -> Self {
         self.parent.session_limit = Some(session_limit);
         self
     }
@@ -849,8 +853,8 @@ where
     /// # Arguments
     ///
     /// * `expired_url` - The URL to redirect to.
-    pub fn expired_url(mut self, expired_url: &str) -> Self {
-        self.parent.expired_url = Some(expired_url.to_string());
+    pub fn expired_url(self, expired_url: impl Into<String>) -> Self {
+        self.parent.expired_url = Some(expired_url.into());
         self
     }
 
@@ -861,7 +865,7 @@ where
     /// * `expired_session_strategy` - The `SessionInformationExpiredStrategy` to use
     ///   when an expired session is detected.
     pub fn expired_session_strategy(
-        mut self,
+        self,
         expired_session_strategy: Arc<dyn SessionInformationExpiredStrategy>,
     ) -> Self {
         self.parent.expired_session_strategy = Some(expired_session_strategy);
@@ -879,7 +883,7 @@ where
     ///
     /// * `max_sessions_prevents_login` - true to have an error at time of authentication,
     ///   else false (default).
-    pub fn max_sessions_prevents_login(mut self, max_sessions_prevents_login: bool) -> Self {
+    pub fn max_sessions_prevents_login(self, max_sessions_prevents_login: bool) -> Self {
         self.parent.max_sessions_prevents_login = max_sessions_prevents_login;
         self
     }
@@ -890,7 +894,7 @@ where
     /// # Arguments
     ///
     /// * `session_registry` - The `SessionRegistry` to use.
-    pub fn session_registry(mut self, session_registry: Arc<dyn SessionRegistry>) -> Self {
+    pub fn session_registry(self, session_registry: Arc<dyn SessionRegistry>) -> Self {
         self.parent.session_registry = Some(session_registry);
         self
     }

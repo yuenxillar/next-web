@@ -78,6 +78,10 @@ where
         &self.source
     }
 
+    pub fn value(&self) -> &S {
+        &self.source
+    }
+
     pub fn source_type(&self) -> TypeId {
         self.source_type
     }

@@ -546,8 +546,7 @@ impl HttpFilter for BaseAuthenticationProcessingFilter {
                 if let Some(session_strategy) = self.session_strategy.as_ref() {
                     session_strategy
                         .on_authentication(&authentication_result, request, response)
-                        .await
-                        .map_err(|err| FilterError::Chain(Box::new(err)))?;
+                        .await?;
                 }
 
                 // Authentication success

@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 use next_web_context::ApplicationEventPublisher;
 use next_web_core::{
@@ -75,6 +75,7 @@ impl<T> SessionAuthenticationStrategy for T
 where
     T: BaseSessionFixationProtectionStrategyExt,
     T: Deref<Target = BaseSessionFixationProtectionStrategy>,
+    T: Debug,
 {
     async fn on_authentication(
         &self,
@@ -89,14 +90,15 @@ where
             return Ok(());
         }
 
+        let _ = request.session_mut(true);
         // Create new session if necessary
-        let mut session = request.session_mut(true);
         if had_session_already && request.is_requested_session_id_valid() {
-            let original_session_id = session.map(|s| s.id());
+            let mut session = request.session_mut(true);
+            let original_session_id = session.map(|s| s.id().to_string());
             session = self.apply_session_fixation(request);
-            let new_session_id = session.map(|s| s.id());
+            let new_session_id = session.as_ref().map(|s| s.id());
 
-            if original_session_id == new_session_id {
+            if original_session_id.as_deref() == new_session_id {
                 warn!(
                            "Your servlet container did not change the session ID when a new session \
                             was created. You will not be adequately protected against session-fixation attacks",
@@ -108,7 +110,7 @@ where
             }
 
             self.on_session_change(
-                original_session_id.unwrap_or_default(),
+                original_session_id.as_deref().unwrap_or_default(),
                 session,
                 authentication.to_owned(),
             );

@@ -5,9 +5,8 @@ use std::sync::Arc;
 use crate::config::base_configured_security_builder::BaseConfiguredSecurityBuilder;
 use crate::core::UsernamePasswordAuthenticationToken;
 use crate::core::{
-    authentication_error::{AuthenticationError, AuthenticationErrorKind},
     userdetails::UserDetailsService,
-    Authentication, CredentialsContainer,
+    Authentication, CredentialsContainer, {AuthenticationError, AuthenticationErrorKind},
 };
 use crate::{
     authentication::{

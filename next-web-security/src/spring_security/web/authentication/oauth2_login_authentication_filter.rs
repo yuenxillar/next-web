@@ -16,9 +16,8 @@ use next_web_core::{
 
 use crate::{
     core::{
-        authentication_error::{AuthenticationError, AuthenticationErrorKind},
         context::SecurityContextHolderStrategy,
-        Authentication,
+        Authentication, {AuthenticationError, AuthenticationErrorKind},
     },
     oauth2::{
         request_parameter, AuthorizationRequestRepository, ClientRegistrationRepository,

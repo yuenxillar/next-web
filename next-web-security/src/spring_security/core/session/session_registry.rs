@@ -1,24 +1,27 @@
 use std::any::Any;
 
+use next_web_core::async_trait;
+
 use super::session_information::SessionInformation;
 
+#[async_trait]
 pub trait SessionRegistry
 where
     Self: Send + Sync,
 {
-    fn all_principals(&self) -> Vec<String>;
+    async fn all_principals(&self) -> Vec<String>;
 
-    fn all_sessions(
+    async fn all_sessions(
         &self,
         principal: &dyn Any,
         include_expired_sessions: bool,
     ) -> Vec<SessionInformation>;
 
-    fn session_information(&self, session_id: &str) -> Option<SessionInformation>;
+    async fn session_information<'a>(&'a self, session_id: &str) -> Option<&'a SessionInformation>;
 
-    fn refresh_last_request(&self, session_id: &str);
+    async fn refresh_last_request(&self, session_id: &str);
 
-    fn register_new_session(&self, session_id: &str, principal: &dyn Any);
+    async fn register_new_session(&self, session_id: &str, principal: &dyn Any);
 
-    fn remove_session_information(&self, session_id: &str);
+    async fn remove_session_information(&self, session_id: &str);
 }

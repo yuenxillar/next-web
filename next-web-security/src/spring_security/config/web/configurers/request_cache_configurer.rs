@@ -3,18 +3,31 @@ use std::{
     sync::Arc,
 };
 
-use next_web_core::traits::required::Required;
+use next_web_core::{
+    http::{HttpMethod, MediaType},
+    traits::required::Required,
+    web::accept::{ContentNegotiationStrategy, HeaderContentNegotiationStrategy},
+};
 
 use crate::{
     config::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{configurers::BaseHttpConfigurer, http_security_builder::HttpSecurityBuilder},
+        web::{
+            configurers::{BaseHttpConfigurer, CsrfConfigurer},
+            http_security_builder::HttpSecurityBuilder,
+        },
     },
     web::{
         default_security_filter_chain::DefaultSecurityFilterChain,
-        savedrequest::{HttpSessionRequestCache, RequestCache, RequestCacheAwareFilter},
+        savedrequest::{
+            HttpSessionRequestCache, NullRequestCache, RequestCache, RequestCacheAwareFilter,
+        },
+        util::matcher::{
+            AndRequestMatcher, Builder, MediaTypeRequestMatcher, NegatedRequestMatcher,
+            RequestHeaderRequestMatcher, RequestMatcher,
+        },
     },
 };
 
@@ -42,22 +55,87 @@ where
         self
     }
 
-    fn get_request_cache(&self, _http: &H) -> Arc<dyn RequestCache> {
-        self.request_cache
-            .clone()
-            .unwrap_or_else(|| Arc::new(HttpSessionRequestCache::default()))
+    /// Disables the request cache. A `NullRequestCache` is used so that no request
+    /// is saved or replayed.
+    pub fn disable(&mut self) {
+        self.request_cache = Some(Arc::new(NullRequestCache));
     }
-}
 
-impl<H> Default for RequestCacheConfigurer<H>
-where
-    H: HttpSecurityBuilder<H>,
-{
-    fn default() -> Self {
-        Self {
-            request_cache: None,
-            inner: Default::default(),
+    /// Gets the `RequestCache` to use. If one is defined using `request_cache`, then it
+    /// is used. Otherwise, an attempt to find a `RequestCache` shared object is made. If
+    /// that fails, an `HttpSessionRequestCache` is used.
+    ///
+    /// # Arguments
+    ///
+    /// * `http` - the builder to attempt to find the shared object
+    fn get_request_cache(&self, http: &H) -> Arc<dyn RequestCache>
+    where
+        H: 'static,
+    {
+        if let Some(cache) = &self.request_cache {
+            return cache.clone();
         }
+        if let Some(cache) = http.shared_object::<Arc<dyn RequestCache>>() {
+            return cache.clone();
+        }
+        let mut default_cache = HttpSessionRequestCache::default();
+        default_cache.set_request_matcher(self.create_default_saved_request_matcher(http));
+        Arc::new(default_cache)
+    }
+
+    /// Creates the default `RequestMatcher` used by the default `HttpSessionRequestCache`.
+    /// Requests matching this matcher are the only ones eligible to be saved and
+    /// replayed. The matcher excludes favicon requests, requests with the
+    /// `X-Requested-With: XMLHttpRequest` header, websocket requests, and requests
+    /// matching JSON, multipart and text/event-stream media types. When CSRF is enabled
+    /// only GET requests are saved.
+    fn create_default_saved_request_matcher(&self, http: &H) -> Arc<dyn RequestMatcher>
+    where
+        H: 'static,
+    {
+        let builder = http
+            .shared_object::<Builder>()
+            .map(Clone::clone)
+            .unwrap_or_default();
+
+        let favicon_request_matcher = builder.matcher(None, "/favicon.*");
+        let not_fav_icon = Arc::new(NegatedRequestMatcher::new(favicon_request_matcher));
+        let not_x_requested_with = Arc::new(NegatedRequestMatcher::new(
+            RequestHeaderRequestMatcher::new("X-Requested-With", Some("XMLHttpRequest".into())),
+        ));
+        let not_web_socket = Arc::new(NegatedRequestMatcher::new(
+            RequestHeaderRequestMatcher::new("Upgrade", Some("websocket".into())),
+        ));
+
+        let is_csrf_enabled = http.configurer::<CsrfConfigurer<H>>().is_some();
+        let mut matchers: Vec<Arc<dyn RequestMatcher>> = Vec::new();
+        if is_csrf_enabled {
+            matchers.push(Arc::new(builder.matcher(Some(HttpMethod::GET), "/**")));
+        }
+        matchers.push(not_fav_icon);
+        matchers.push(self.not_matching_media_type(http, MediaType::application_json()));
+        matchers.push(not_x_requested_with);
+        matchers.push(self.not_matching_media_type(http, MediaType::multipart_form_data()));
+        matchers.push(self.not_matching_media_type(http, MediaType::text_event_stream()));
+        matchers.push(not_web_socket);
+
+        Arc::new(AndRequestMatcher::new(matchers))
+    }
+
+    /// Creates a matcher that matches any request whose media type does not equal the
+    /// given media type.
+    fn not_matching_media_type(&self, http: &H, media_type: MediaType) -> Arc<dyn RequestMatcher>
+    where
+        H: 'static,
+    {
+        let content_negotiation_strategy = http
+            .shared_object::<Arc<dyn ContentNegotiationStrategy>>()
+            .map(Clone::clone)
+            .unwrap_or_else(|| Arc::new(HeaderContentNegotiationStrategy::default()));
+        let mut media_request =
+            MediaTypeRequestMatcher::with_strategy(content_negotiation_strategy, vec![media_type]);
+        media_request.set_ignored_media_types(vec![MediaType::all()]);
+        Arc::new(NegatedRequestMatcher::new(media_request))
     }
 }
 
@@ -79,11 +157,12 @@ where
 impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for RequestCacheConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
+    H: 'static,
 {
     fn init(&mut self, http: &mut H) {
         // Set the RequestCache as a shared object
         let cache = self.get_request_cache(http);
-        http.set_shared_object(cache);
+        http.set_shared_object::<Arc<dyn RequestCache>>(cache);
     }
 
     fn configure(&mut self, http: &mut H) {
@@ -111,5 +190,17 @@ where
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
+    }
+}
+
+impl<H> Default for RequestCacheConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn default() -> Self {
+        Self {
+            request_cache: None,
+            inner: Default::default(),
+        }
     }
 }

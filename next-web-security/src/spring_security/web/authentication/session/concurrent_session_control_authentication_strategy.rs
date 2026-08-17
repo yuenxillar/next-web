@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use next_web_context::{support::MessageSourceAccessor, MessageSource};
 use next_web_core::{
@@ -8,9 +8,8 @@ use next_web_core::{
 
 use crate::{
     core::{
-        authentication_error::{AuthenticationError, AuthenticationErrorKind},
         session::{session_information::SessionInformation, SessionRegistry},
-        Authentication, NextSecurityMessageSource,
+        Authentication, NextSecurityMessageSource, {AuthenticationError, AuthenticationErrorKind},
     },
     web::authentication::session::{session_limit_of, SessionAuthenticationStrategy, SessionLimit},
 };
@@ -181,7 +180,8 @@ impl SessionAuthenticationStrategy for ConcurrentSessionControlAuthenticationStr
 
         let sessions = self
             .session_registry
-            .all_sessions(principal.as_ref(), false);
+            .all_sessions(principal.as_ref(), false)
+            .await;
         let session_count = sessions.len() as i32;
 
         if session_count < allowed_sessions {
@@ -205,5 +205,16 @@ impl SessionAuthenticationStrategy for ConcurrentSessionControlAuthenticationStr
         }
 
         self.allowable_sessions_exceeded(sessions, allowed_sessions, &self.session_registry)
+    }
+}
+
+impl Debug for ConcurrentSessionControlAuthenticationStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConcurrentSessionControlAuthenticationStrategy")
+            .field("messages", &"none")
+            .field("session_registry", &"none")
+            .field("error_if_maximum_exceeded", &self.error_if_maximum_exceeded)
+            .field("session_limit", &"none")
+            .finish()
     }
 }

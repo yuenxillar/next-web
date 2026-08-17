@@ -4,7 +4,10 @@ use std::{
     sync::Arc,
 };
 
-use next_web_core::anys::{any_error::AnyError, any_value::AnyValue};
+use next_web_core::{
+    anys::{any_error::AnyError, any_value::AnyValue},
+    filter::{FilterChainError, FilterError},
+};
 
 use crate::core::Authentication;
 
@@ -82,5 +85,11 @@ impl Debug for AuthenticationError {
 impl Into<AnyValue> for AuthenticationError {
     fn into(self) -> AnyValue {
         AnyValue::Object(Box::new(self))
+    }
+}
+
+impl From<AuthenticationError> for FilterError {
+    fn from(value: AuthenticationError) -> Self {
+        FilterError::Chain(FilterChainError::AnyError(Box::new(value)))
     }
 }
