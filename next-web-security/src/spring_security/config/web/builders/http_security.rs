@@ -152,6 +152,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn session_management<F>(&mut self, session_management: F) -> &mut Self
     where
         F: FnMut(&mut SessionManagementConfigurer<Self>),
@@ -194,6 +195,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn request_cache<F>(&mut self, request_cache: F) -> &mut Self
     where
         F: FnMut(&mut RequestCacheConfigurer<Self>),

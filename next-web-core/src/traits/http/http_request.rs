@@ -32,6 +32,8 @@ where
 
     fn is_requested_session_id_valid(&self) -> bool;
 
+    fn requested_session_id(&self) -> Option<&str>;
+
     fn auth_type(&self) -> AuthType;
 
     fn cookie(&self) -> Option<&Cookie>;
@@ -119,6 +121,10 @@ impl HttpRequest for Request {
     }
 
     fn is_requested_session_id_valid(&self) -> bool {
+        todo!()
+    }
+
+    fn requested_session_id(&self) -> Option<&str> {
         todo!()
     }
 

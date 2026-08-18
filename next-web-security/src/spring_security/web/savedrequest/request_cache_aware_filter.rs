@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
-    error::BoxError,
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
@@ -11,17 +10,21 @@ use next_web_core::{
     },
 };
 
-use crate::web::savedrequest::RequestCache;
+use crate::web::savedrequest::{HttpSessionRequestCache, RequestCache};
 
+/// Responsible for reconstituting the saved request if one is cached and it matches the current request.
+/// It will call get_matching_request on the configured RequestCache. If the method returns a value (a
+/// wrapper of the saved request), it will pass this to the filter chain's doFilter method. If null is returned by
+/// the cache, the original request is used and the filter has no effect.
 #[derive(Clone)]
 pub struct RequestCacheAwareFilter {
-    request_cache: Option<Arc<dyn RequestCache>>,
+    request_cache: Arc<dyn RequestCache>,
 }
 
 impl RequestCacheAwareFilter {
     pub fn new(request_cache: Arc<dyn RequestCache>) -> Self {
         Self {
-            request_cache: Some(request_cache),
+            request_cache: request_cache,
         }
     }
 }
@@ -34,17 +37,15 @@ impl HttpFilter for RequestCacheAwareFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        match self.request_cache.as_ref() {
-            Some(cache) => {
-                let mut wrapped_saved_request = cache.get_matching_request(request, response);
-                filter_chain
-                    .do_filter(
-                        wrapped_saved_request.as_deref_mut().unwrap_or(request),
-                        response,
-                    )
-                    .await
-            }
-            None => filter_chain.do_filter(request, response).await,
+        let mut wrapped_saved_request = self.request_cache.get_matching_request(request, response);
+        if let Some(wrapped_request) = wrapped_saved_request.as_mut() {
+            filter_chain
+                .do_filter(&mut **wrapped_request, response)
+                .await
+        } else {
+            drop(wrapped_saved_request);
+
+            filter_chain.do_filter(request, response).await
         }
     }
 }
@@ -52,5 +53,13 @@ impl HttpFilter for RequestCacheAwareFilter {
 impl Named for RequestCacheAwareFilter {
     fn name(&self) -> &str {
         "RequestCacheAwareFilter"
+    }
+}
+
+impl Default for RequestCacheAwareFilter {
+    fn default() -> Self {
+        Self {
+            request_cache: Arc::new(HttpSessionRequestCache::default()),
+        }
     }
 }

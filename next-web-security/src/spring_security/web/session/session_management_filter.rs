@@ -13,12 +13,13 @@ use next_web_core::{
 use tracing::debug;
 
 use crate::{
-    authorization::{AuthenticationTrustResolver, DefaultAuthenticationTrustResolver},
+    authentication::AuthenticationTrustResolverImpl,
+    authorization::AuthenticationTrustResolver,
     core::context::{SecurityContextHolder, SecurityContextHolderStrategy},
     web::{
         authentication::{
-            session::SessionAuthenticationStrategy, AuthenticationFailureHandler,
-            SimpleUrlAuthenticationFailureHandler,
+            session::{SessionAuthenticationStrategy, SessionFixationProtectionStrategy},
+            AuthenticationFailureHandler, SimpleUrlAuthenticationFailureHandler,
         },
         context::SecurityContextRepository,
         session::InvalidSessionStrategy,
@@ -41,7 +42,7 @@ pub struct SessionManagementFilter {
     session_authentication_strategy: Arc<dyn SessionAuthenticationStrategy>,
 
     /// The trust resolver used to determine if an authentication is authenticated.
-    /// Defaults to `DefaultAuthenticationTrustResolver`.
+    /// Defaults to `AuthenticationTrustResolverImpl`.
     trust_resolver: Arc<dyn AuthenticationTrustResolver>,
 
     /// Optional strategy to handle invalid (expired) session IDs.
@@ -57,18 +58,6 @@ pub struct SessionManagementFilter {
 impl SessionManagementFilter {
     /// Constant used to ensure a single invocation of this filter per request.
     const FILTER_APPLIED: &'static str = "__next_web_security_session_mgmt_filter_applied";
-
-    /// Attribute key used to store the ID of the session referenced by the client
-    /// (e.g., from a cookie or URL rewriting). Session managers should set this
-    /// attribute so that `SessionManagementFilter` can detect invalid/expired
-    /// session IDs.
-    const REQUESTED_SESSION_ID_ATTR: &'static str = "__next_web_security_requested_session_id";
-
-    /// Attribute key indicating whether the session ID referenced by the client
-    /// is valid (i.e., the session exists and has not expired). Session managers
-    /// should set this attribute accordingly.
-    const REQUESTED_SESSION_ID_VALID_ATTR: &'static str =
-        "__next_web_security_requested_session_id_valid";
 
     /// Creates a new `SessionManagementFilter` with the given security context repository
     /// and session authentication strategy.
@@ -87,10 +76,21 @@ impl SessionManagementFilter {
             security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
             security_context_repository,
             session_authentication_strategy,
-            trust_resolver: Arc::new(DefaultAuthenticationTrustResolver),
+            trust_resolver: Arc::new(AuthenticationTrustResolverImpl::default()),
             invalid_session_strategy: None,
             failure_handler: Arc::new(SimpleUrlAuthenticationFailureHandler::new("/login")),
         }
+    }
+
+    /// Creates a new `SessionManagementFilter` with the given security context repository,
+    /// using the default session fixation protection strategy.
+    pub fn with_security_context_repository(
+        security_context_repository: Arc<dyn SecurityContextRepository>,
+    ) -> Self {
+        Self::new(
+            security_context_repository,
+            Arc::new(SessionFixationProtectionStrategy::default()),
+        )
     }
 
     /// Sets the strategy which will be invoked instead of allowing the filter chain to
@@ -119,7 +119,7 @@ impl SessionManagementFilter {
     }
 
     /// Sets the `AuthenticationTrustResolver` to be used. The default is
-    /// `DefaultAuthenticationTrustResolver`.
+    /// `AuthenticationTrustResolverImpl`.
     ///
     /// # Parameters
     /// * `trust_resolver` - The `AuthenticationTrustResolver` to use. Cannot be null.
@@ -137,30 +137,6 @@ impl SessionManagementFilter {
         security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
     ) {
         self.security_context_holder_strategy = security_context_holder_strategy;
-    }
-
-    /// Determines whether the client has sent a request for a session ID that is no
-    /// longer valid (e.g., the session has expired or been invalidated).
-    ///
-    /// This mirrors the Servlet API's `HttpServletRequest.getRequestedSessionId()` and
-    /// `HttpServletRequest.isRequestedSessionIdValid()` pattern by reading attributes
-    /// set by the session management infrastructure.
-    fn has_invalid_session_id(&self, request: &dyn HttpRequest) -> bool {
-        let referenced_session_id = request
-            .get_attribute(Self::REQUESTED_SESSION_ID_ATTR)
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-
-        if referenced_session_id.is_none() {
-            return false;
-        }
-
-        let is_valid = request
-            .get_attribute(Self::REQUESTED_SESSION_ID_VALID_ATTR)
-            .and_then(|v| v.as_boolean())
-            .unwrap_or(false);
-
-        !is_valid
     }
 }
 
@@ -215,7 +191,7 @@ impl HttpFilter for SessionManagementFilter {
                             );
                             self.security_context_holder_strategy.clear_context();
                             self.failure_handler
-                                .on_authentication_failure(request, response, &ex);
+                                .on_authentication_failure(request, response, &ex)?;
                             return Ok(());
                         }
                     }
@@ -223,17 +199,15 @@ impl HttpFilter for SessionManagementFilter {
             } else {
                 // No security context or authentication present. Check for a
                 // session timeout.
-                if self.has_invalid_session_id(request) {
-                    if let Some(invalid_session_strategy) = &self.invalid_session_strategy {
-                        debug!(
-                            "Request requested invalid session id {:?}",
-                            request
-                                .get_attribute(Self::REQUESTED_SESSION_ID_ATTR)
-                                .and_then(|v| v.as_str())
-                        );
-                        invalid_session_strategy
-                            .on_invalid_session_detected(request, response)
-                            .map_err(FilterError::from)?;
+                if request.requested_session_id().is_some()
+                    && !request.is_requested_session_id_valid()
+                {
+                    if let Some(invalid_session_strategy) = self.invalid_session_strategy.as_ref() {
+                        request
+                            .requested_session_id()
+                            .map(|sid| debug!("Request requested invalid session id {}", sid));
+
+                        invalid_session_strategy.on_invalid_session_detected(request, response)?;
                         return Ok(());
                     }
                 }

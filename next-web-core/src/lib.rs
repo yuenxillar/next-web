@@ -34,6 +34,7 @@ pub use urlencoding;
 
 pub type AnyObject = std::sync::Arc<dyn std::any::Any + Send + Sync>;
 pub type BoxAny = std::boxed::Box<dyn std::any::Any + Send + Sync>;
+pub type BoxFuture<'a, T> = core::pin::Pin<std::boxed::Box<dyn Future<Output = T> + Send + 'a>>;
 
 mod ordered;
 

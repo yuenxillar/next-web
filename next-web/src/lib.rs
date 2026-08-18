@@ -11,10 +11,9 @@ pub mod extract;
 pub mod interceptor;
 pub mod macros;
 pub mod manager;
+pub mod signal;
 pub mod stream;
 pub mod util;
-pub mod signal;
-
 
 pub use crate::extract::required_header::header_names;
 

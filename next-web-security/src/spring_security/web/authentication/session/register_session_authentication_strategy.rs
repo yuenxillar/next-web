@@ -52,7 +52,7 @@ impl SessionAuthenticationStrategy for RegisterSessionAuthenticationStrategy {
 
         let session_id = request.session_mut(true).map(|s| s.id());
         self.session_registry
-            .register_new_session(session_id.unwrap_or_default(), principal.as_ref())
+            .register_new_session(session_id.unwrap_or_default(), principal)
             .await;
 
         Ok(())

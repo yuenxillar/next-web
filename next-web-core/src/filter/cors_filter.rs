@@ -12,6 +12,10 @@ use crate::{
     },
 };
 
+///
+/// HttpFilter to handle CORS pre-flight requests and intercept CORS simple and actual
+/// requests with a CorsProcessor, and to update the response, for example, with CORS response headers,
+/// based on the policy matched through the provided CorsConfigurationSource.
 #[derive(Clone)]
 pub struct CorsFilter {
     config_source: Arc<dyn CorsConfigurationSource>,
@@ -19,6 +23,7 @@ pub struct CorsFilter {
 }
 
 impl CorsFilter {
+    /// Constructor accepting a CorsConfigurationSource used by the filter to find the CorsConfiguration to use for each incoming request.
     pub fn new(config_source: Arc<dyn CorsConfigurationSource>) -> Self {
         let processor = Arc::new(DefaultCorsProcessor::default());
         Self {
@@ -27,6 +32,7 @@ impl CorsFilter {
         }
     }
 
+    /// Configure a custom CorsProcessor to use to apply the matched CorsConfiguration for a request.
     pub fn set_processor(&mut self, processor: Arc<dyn CorsProcessor>) {
         self.processor = processor;
     }
@@ -42,11 +48,9 @@ impl HttpFilter for CorsFilter {
     ) -> Result<(), FilterError> {
         let cors_configuration = self.config_source.cors_configuration(request);
 
-        // let is_valid = self
-        //     .processor
-        //     .process_request(cors_configuration, request, response)?;
-
-        let is_valid = false;
+        let is_valid = self
+            .processor
+            .process_request(cors_configuration, request, response)?;
 
         if !is_valid || CorsUtils::is_pre_flight_request(request) {
             return Ok(());

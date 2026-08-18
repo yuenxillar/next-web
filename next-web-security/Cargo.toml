@@ -23,7 +23,7 @@ rand.workspace          = true
 md5.workspace           = true
 sha2.workspace          = true
 regex.workspace         = true
-dashmap.workspace       = true
+# dashmap.workspace       = true
 
 [features]
 default = ["T2"]

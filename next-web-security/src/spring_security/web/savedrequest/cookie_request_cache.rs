@@ -11,7 +11,9 @@ use std::sync::Arc;
 use tracing::debug;
 
 use crate::web::{
-    savedrequest::{DefaultSavedRequest, RequestCache, SavedRequest},
+    savedrequest::{
+        DefaultSavedRequest, RequestCache, SavedRequest, SavedRequestAwareWrapper,
+    },
     util::{
         matcher::{AnyRequestMatcher, RequestMatcher},
         UrlUtils,
@@ -94,7 +96,7 @@ impl CookieRequestCache {
 }
 
 impl RequestCache for CookieRequestCache {
-    fn save_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {
+    fn save_request(&self, request: &mut dyn HttpRequest, response: &mut dyn HttpResponse) {
         if !self.request_matcher.matches(request) {
             debug!("Request not saved as configured RequestMatcher did not match");
             return;
@@ -137,11 +139,11 @@ impl RequestCache for CookieRequestCache {
         Some(Arc::new(saved))
     }
 
-    fn get_matching_request(
+    fn get_matching_request<'a>(
         &self,
-        request: &dyn HttpRequest,
+        request: &'a mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    ) -> Option<Box<dyn HttpRequest>> {
+    ) -> Option<Box<dyn HttpRequest + 'a>> {
         let saved = self.get_request(request, response);
 
         if !self.matches_saved_request(request, saved.as_ref().map(|s| s.as_ref())) {
@@ -156,9 +158,8 @@ impl RequestCache for CookieRequestCache {
             Some(s) => s,
             None => return None,
         };
-        // Some(Box::new(SavedRequestAwareWrapper::new(saved)))
-        //
-        todo!()
+
+        Some(Box::new(SavedRequestAwareWrapper::new(saved, request)))
     }
 
     fn remove_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {

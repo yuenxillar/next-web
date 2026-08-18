@@ -50,7 +50,7 @@ where
     H: HttpSecurityBuilder<H>,
 {
     /// Set a custom `RequestCache`. If not set, defaults to `HttpSessionRequestCache`.
-    pub fn request_cache(mut self, request_cache: Arc<dyn RequestCache>) -> Self {
+    pub fn request_cache(&mut self, request_cache: Arc<dyn RequestCache>) -> &mut Self {
         self.request_cache = Some(request_cache);
         self
     }
@@ -161,8 +161,7 @@ where
 {
     fn init(&mut self, http: &mut H) {
         // Set the RequestCache as a shared object
-        let cache = self.get_request_cache(http);
-        http.set_shared_object::<Arc<dyn RequestCache>>(cache);
+        http.set_shared_object::<Arc<dyn RequestCache>>(self.get_request_cache(http));
     }
 
     fn configure(&mut self, http: &mut H) {

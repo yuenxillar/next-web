@@ -6,6 +6,7 @@ use crate::{
     core::Authentication,
 };
 
+///
 /// Basic implementation of AuthenticationTrustResolver.
 /// Make trust decisions based on whether the authentication passed is an instance of a defined structure.
 #[derive(Clone)]

@@ -26,3 +26,6 @@ impl std::fmt::Display for Locale {
         write!(f, "en")
     }
 }
+
+pub(crate) type BoxFuture<'a, T> =
+    core::pin::Pin<std::boxed::Box<dyn Future<Output = T> + Send + 'a>>;

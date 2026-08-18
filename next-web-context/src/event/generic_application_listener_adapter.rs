@@ -1,7 +1,7 @@
 use std::{any::TypeId, sync::Arc};
 
 use crate::{
-    ApplicationEvent, ApplicationListener,
+    ApplicationEvent, ApplicationListener, BoxFuture,
     event::{GenericApplicationListener, SmartApplicationListener},
 };
 
@@ -19,8 +19,10 @@ impl GenericApplicationListenerAdapter {
 }
 
 impl ApplicationListener<Box<dyn ApplicationEvent>> for GenericApplicationListenerAdapter {
-    fn on_application_event(&self, event: Box<dyn ApplicationEvent>) {
-        self.delegate.on_application_event(event);
+    fn on_application_event<'a>(&'a self, event: Box<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+        Box::pin(async {
+            self.delegate.on_application_event(event).await;
+        })
     }
 }
 

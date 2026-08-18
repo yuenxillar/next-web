@@ -8,7 +8,7 @@ pub trait RequestCache
 where
     Self: Send + Sync,
 {
-    fn save_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse);
+    fn save_request(&self, request: &mut dyn HttpRequest, response: &mut dyn HttpResponse);
 
     fn get_request(
         &self,
@@ -16,11 +16,11 @@ where
         response: &mut dyn HttpResponse,
     ) -> Option<Arc<dyn SavedRequest>>;
 
-    fn get_matching_request(
+    fn get_matching_request<'a>(
         &self,
-        request: &dyn HttpRequest,
+        request: &'a mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    ) -> Option<Box<dyn HttpRequest>>;
+    ) -> Option<Box<dyn HttpRequest + 'a>>;
 
     fn remove_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse);
 }

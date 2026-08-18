@@ -10,7 +10,7 @@ pub struct NullRequestCache;
 
 impl RequestCache for NullRequestCache {
     #[allow(unused_variables)]
-    fn save_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {}
+    fn save_request(&self, request: &mut dyn HttpRequest, response: &mut dyn HttpResponse) {}
 
     #[allow(unused_variables)]
     fn get_request(
@@ -25,11 +25,11 @@ impl RequestCache for NullRequestCache {
     fn remove_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {}
 
     #[allow(unused_variables)]
-    fn get_matching_request(
+    fn get_matching_request<'a>(
         &self,
-        request: &dyn HttpRequest,
+        request: &'a mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    ) -> Option<Box<dyn HttpRequest>> {
+    ) -> Option<Box<dyn HttpRequest + 'a>> {
         None
     }
 }

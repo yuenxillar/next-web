@@ -8,7 +8,7 @@ use next_web_core::{
 
 use crate::{
     core::{
-        session::{session_information::SessionInformation, SessionRegistry},
+        session::{SessionInformation, SessionRegistry},
         Authentication, NextSecurityMessageSource, {AuthenticationError, AuthenticationErrorKind},
     },
     web::authentication::session::{session_limit_of, SessionAuthenticationStrategy, SessionLimit},
@@ -180,7 +180,7 @@ impl SessionAuthenticationStrategy for ConcurrentSessionControlAuthenticationStr
 
         let sessions = self
             .session_registry
-            .all_sessions(principal.as_ref(), false)
+            .all_sessions(principal, false)
             .await;
         let session_count = sessions.len() as i32;
 

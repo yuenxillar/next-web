@@ -43,6 +43,10 @@ impl HttpRequest for HttpRequestShare {
         todo!()
     }
 
+    fn requested_session_id(&self) -> Option<&str> {
+        todo!()
+    }
+
     fn auth_type(&self) -> AuthType {
         todo!()
     }

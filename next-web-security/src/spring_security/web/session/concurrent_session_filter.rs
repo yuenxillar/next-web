@@ -124,7 +124,6 @@ impl HttpFilter for ConcurrentSessionFilter {
                 .session_registry
                 .session_information(&session_id)
                 .await
-                .map(Clone::clone)
             {
                 if info.is_expired() {
                     // Expired — abort processing.

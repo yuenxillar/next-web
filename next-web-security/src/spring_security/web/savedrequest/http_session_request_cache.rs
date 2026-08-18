@@ -1,19 +1,24 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use next_web_core::http::Cookie;
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
-use next_web_core::util::locale::Locale;
-use next_web_core::util::StringUtils;
+use next_web_core::{
+    anys::any_value::AnyValue,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    util::StringUtils,
+};
 use tracing::{debug, trace, Level};
 
-use crate::web::savedrequest::request_cache::RequestCache;
-use crate::web::util::matcher::{AnyRequestMatcher, RequestMatcher};
-use crate::web::util::UrlUtils;
-
-use super::SavedRequest;
+use crate::web::{
+    savedrequest::request_cache::RequestCache,
+    savedrequest::{DefaultSavedRequest, SavedRequest, SavedRequestAwareWrapper},
+    util::matcher::{AnyRequestMatcher, RequestMatcher},
+    util::UrlUtils,
+};
 
 const SAVED_REQUEST: &str = "NEXT_SECURITY_SAVED_REQUEST";
 
+///
+/// RequestCache which stores the SavedRequest in the HttpSession.
+/// The DefaultSavedRequest class is used as the implementation.
 pub struct HttpSessionRequestCache {
     create_session_allowed: bool,
     request_matcher: Arc<dyn RequestMatcher>,
@@ -22,28 +27,32 @@ pub struct HttpSessionRequestCache {
 }
 
 impl HttpSessionRequestCache {
-    fn request_key(request: &dyn HttpRequest) -> String {
-        let uri = request.uri();
-        format!("{} {}", request.method().to_string(), uri)
+    /// Allows selective use of saved requests for a subset of requests. By default any request will be cached by the saveRequest method.
+    /// If set, only matching requests will be cached.
+    pub fn set_request_matcher(&mut self, request_matcher: Arc<dyn RequestMatcher>) {
+        self.request_matcher = request_matcher;
     }
 
+    /// If true, indicates that it is permitted to store the target URL and exception information in a new
+    /// HttpSession (the default). In situations where you do not wish to unnecessarily
+    /// create HttpSessions - because the user agent will know the failed URL, such as with BASIC or Digest
+    /// authentication - you may wish to set this property to false.
+    pub fn set_create_session_allowed(&mut self, create_session_allowed: bool) {
+        self.create_session_allowed = create_session_allowed;
+    }
+
+    /// If the sessionAttrName property is set, the request is stored in the session using this attribute
+    /// name. Default is "NEXT_SECURITY_SAVED_REQUEST".
     pub fn set_session_attr_name(&mut self, session_attr_name: impl Into<Box<str>>) {
         self.session_attr_name = session_attr_name.into();
     }
 
+    /// Specify the name of a query parameter that is added to the URL that specifies the request cache should be checked in get_matching_request(HttpRequest, HttpResponse)
     pub fn set_matching_request_parameter_name(
         &mut self,
         matching_request_parameter_name: impl Into<Box<str>>,
     ) {
         self.matching_request_parameter_name = matching_request_parameter_name.into();
-    }
-
-    pub fn set_request_matcher(&mut self, request_matcher: Arc<dyn RequestMatcher>) {
-        self.request_matcher = request_matcher;
-    }
-
-    pub fn set_create_session_allowed(&mut self, create_session_allowed: bool) {
-        self.create_session_allowed = create_session_allowed;
     }
 
     fn matches_saved_request(
@@ -68,7 +77,7 @@ impl Default for HttpSessionRequestCache {
 }
 
 impl RequestCache for HttpSessionRequestCache {
-    fn save_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {
+    fn save_request(&self, request: &mut dyn HttpRequest, _response: &mut dyn HttpResponse) {
         if !self.request_matcher.matches(request) {
             if tracing::enabled!(Level::TRACE) {
                 trace!(
@@ -80,9 +89,18 @@ impl RequestCache for HttpSessionRequestCache {
         }
 
         if self.create_session_allowed || request.session().is_some() {
-            let saved_request = "";
-            if tracing::enabled!(Level::TRACE) {
-                trace!("Saved request {} to session", saved_request);
+            let saved_request = DefaultSavedRequest::from_request(
+                request,
+                Some(&self.matching_request_parameter_name),
+            );
+            if let Some(session) = request.session_mut(true) {
+                session.set_attribute(
+                    &self.session_attr_name,
+                    AnyValue::Object(Box::new(Arc::new(saved_request) as Arc<dyn SavedRequest>)),
+                );
+            }
+            if tracing::enabled!(Level::DEBUG) {
+                debug!("Saved request to session");
             }
         } else {
             trace!(
@@ -102,15 +120,14 @@ impl RequestCache for HttpSessionRequestCache {
         };
         session
             .attribute(&self.session_attr_name)
-            .map(|req| req.as_object::<Arc<dyn SavedRequest>>())
-            .unwrap_or_default()
+            .and_then(|req| req.as_object::<Arc<dyn SavedRequest>>())
     }
 
-    fn get_matching_request(
+    fn get_matching_request<'a>(
         &self,
-        request: &dyn HttpRequest,
+        request: &'a mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    ) -> Option<Box<dyn HttpRequest>> {
+    ) -> Option<Box<dyn HttpRequest + 'a>> {
         if let Some(query) = request.query() {
             if !StringUtils::has_text(query)
                 || request
@@ -147,7 +164,7 @@ impl RequestCache for HttpSessionRequestCache {
             debug!("Loaded matching saved request {}", saved.get_redirect_url());
         }
 
-        todo!()
+        Some(Box::new(SavedRequestAwareWrapper::new(saved, request)))
     }
 
     fn remove_request(&self, request: &dyn HttpRequest, _response: &mut dyn HttpResponse) {
@@ -156,83 +173,4 @@ impl RequestCache for HttpSessionRequestCache {
             session.remove_attribute(&self.session_attr_name);
         }
     }
-}
-
-#[derive(Debug, Clone)]
-struct DefaultSavedRequest {
-    redirect_url: String,
-    method: String,
-    headers: HashMap<String, Vec<String>>,
-    parameters: HashMap<String, Vec<String>>,
-}
-
-impl DefaultSavedRequest {
-    fn from_request(request: &dyn HttpRequest) -> Self {
-        let parameters = request.query().map(parse_query).unwrap_or_default();
-
-        let redirect_url = request.uri().to_string();
-        let method = request.method().to_string();
-
-        Self {
-            redirect_url,
-            method,
-            headers: HashMap::new(),
-            parameters,
-        }
-    }
-}
-
-impl SavedRequest for DefaultSavedRequest {
-    fn get_redirect_url(&self) -> String {
-        self.redirect_url.clone()
-    }
-
-    fn get_cookies(&self) -> Vec<Cookie> {
-        Vec::new()
-    }
-
-    fn get_method(&self) -> String {
-        self.method.clone()
-    }
-
-    fn get_header_values(&self, name: &str) -> Vec<String> {
-        self.headers
-            .get(&name.to_ascii_lowercase())
-            .cloned()
-            .or_else(|| self.headers.get(name).cloned())
-            .unwrap_or_default()
-    }
-
-    fn get_header_names(&self) -> Vec<String> {
-        self.headers.keys().cloned().collect()
-    }
-
-    fn get_locales(&self) -> Vec<Locale> {
-        Vec::new()
-    }
-
-    fn get_parameter_values(&self, name: &str) -> Vec<String> {
-        self.parameters.get(name).cloned().unwrap_or_default()
-    }
-
-    fn get_parameter_map(&self) -> HashMap<String, Vec<String>> {
-        self.parameters.clone()
-    }
-}
-
-fn parse_query(query: &str) -> HashMap<String, Vec<String>> {
-    let mut parameters = HashMap::new();
-    for pair in query.split('&').filter(|pair| !pair.is_empty()) {
-        let mut parts = pair.splitn(2, '=');
-        let name = parts.next().unwrap_or_default();
-        let value = parts.next().unwrap_or_default();
-        let name = urlencoding::decode(name)
-            .map(|name| name.into_owned())
-            .unwrap_or_else(|_| name.to_string());
-        let value = urlencoding::decode(value)
-            .map(|value| value.into_owned())
-            .unwrap_or_else(|_| value.to_string());
-        parameters.entry(name).or_insert_with(Vec::new).push(value);
-    }
-    parameters
 }

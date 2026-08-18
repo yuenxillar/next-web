@@ -33,6 +33,7 @@ chrono          = { workspace = true, features = ["serde"] }
 arc-swap        = { workspace = true }
 dashmap         = { workspace = true }
 uuid            = { workspace = true }
+regex           = { workspace = true }
 
 # tower-layer = "0.3.3"
 # tower-service = "0.3.3"

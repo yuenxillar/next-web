@@ -1,5 +1,7 @@
 mod concurrent_session_filter;
 mod force_eager_session_creation_filter;
+mod http_session_destroyed_event;
+mod http_session_id_changed_event;
 mod invalid_session_access_denied_handler;
 mod invalid_session_strategy;
 mod session_information_expired_event;
@@ -10,6 +12,8 @@ mod simple_redirect_session_information_expired_strategy;
 
 pub use concurrent_session_filter::ConcurrentSessionFilter;
 pub use force_eager_session_creation_filter::ForceEagerSessionCreationFilter;
+pub use http_session_destroyed_event::HttpSessionDestroyedEvent;
+pub use http_session_id_changed_event::HttpSessionIdChangedEvent;
 pub use invalid_session_access_denied_handler::InvalidSessionAccessDeniedHandler;
 pub use invalid_session_strategy::InvalidSessionStrategy;
 pub use session_information_expired_event::SessionInformationExpiredEvent;
