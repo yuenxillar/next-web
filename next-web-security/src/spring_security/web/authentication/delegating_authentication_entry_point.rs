@@ -150,7 +150,7 @@ impl DelegatingAuthenticationEntryPointBuilder {
             None => {
                 assert!(
                     !self.entry_points.is_empty(),
-                    "entry_points cannot be empty if default_entry_point is null"
+                    "entry_points cannot be empty if default_entry_point is none"
                 );
                 let first_authentication_entry_point = self.entry_points[0].entry().clone();
                 if self.entry_points.len() == 1 {

@@ -8,7 +8,10 @@ use crate::{Locale, MessageSourceResolvable, NoSuchMessageError};
 /// Implementations can be backed by various sources:
 /// * `ResourceBundleMessageSource` - built on top of standard resource bundles
 /// * `ReloadableResourceBundleMessageSource` - highly configurable with reloading support
-pub trait MessageSource {
+pub trait MessageSource
+where
+    Self: Send + Sync,
+{
     /// Try to resolve the message. Return default message if no message was found.
     ///
     /// # Arguments

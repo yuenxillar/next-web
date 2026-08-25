@@ -10,12 +10,15 @@ use crate::{
     web::{access::AccessDeniedHandler, util::matcher::RequestMatcher},
 };
 
+/// An AccessDeniedHandler that delegates to other AccessDeniedHandler instances based upon the
+/// type of HttpRequest passed into handle(HttpRequest, HttptResponse, AccessDeniedError)
 pub struct RequestMatcherDelegatingAccessDeniedHandler {
     handlers: Vec<(Arc<dyn RequestMatcher>, Arc<dyn AccessDeniedHandler>)>,
     default_handler: Arc<dyn AccessDeniedHandler>,
 }
 
 impl RequestMatcherDelegatingAccessDeniedHandler {
+    /// Creates a new instance
     pub fn new(
         handlers: Vec<(Arc<dyn RequestMatcher>, Arc<dyn AccessDeniedHandler>)>,
         default_handler: Arc<dyn AccessDeniedHandler>,
@@ -34,6 +37,13 @@ impl AccessDeniedHandler for RequestMatcherDelegatingAccessDeniedHandler {
         response: &mut dyn HttpResponse,
         access_denied_error: &AccessDeniedError,
     ) -> Result<(), BoxError> {
-        todo!()
+        for (matcher, handler) in self.handlers.iter() {
+            if matcher.matches(request) {
+                return handler.handle(request, response, access_denied_error);
+            }
+        }
+
+        self.default_handler
+            .handle(request, response, access_denied_error)
     }
 }

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Display};
 
-use crate::authorization::AuthorizationResult;
+use crate::authorization::AuthorizationDeniedError;
 
 /// If the authentication object does not have the required permissions, an error occurs
 #[derive(Clone)]
@@ -8,10 +8,7 @@ pub enum AccessDeniedError {
     /// An error occurs when invalid or missing CsrfToken is found in HttpRequest
     Csrf(String),
     /// An AccessDeniedError that contains the AuthorizationResult
-    AuthorizationDenied {
-        msg: String,
-        result: Box<dyn AuthorizationResult>,
-    },
+    AuthorizationDenied(AuthorizationDeniedError),
     /// If the authorization request cannot be processed due to system issues, an error occurs.
     /// For example, if the AccessDecisionManager implementation cannot find the required method parameters, an error may occur.
     AuthorizationService(String),
@@ -38,7 +35,7 @@ impl AccessDeniedError {
     pub fn as_str<'a>(&'a self) -> Cow<'a, str> {
         match self {
             Self::Csrf(msg) => Cow::Borrowed(msg.as_str()),
-            Self::AuthorizationDenied { msg, .. } => Cow::Borrowed(msg.as_str()),
+            Self::AuthorizationDenied(err) => Cow::Borrowed(err.msg()),
             Self::AuthorizationService(msg) => Cow::Borrowed(msg.as_str()),
             Self::InvalidCsrfToken {
                 expected_access_token,

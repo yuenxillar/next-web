@@ -13,6 +13,7 @@ use std::{
 use next_web_core::{
     anys::any_value::AnyValue,
     async_trait,
+    filter::{FilterChainError, FilterError},
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 use uuid::Uuid;
@@ -179,6 +180,7 @@ pub struct OAuth2AuthorizationRequest {
     state: String,
     redirect_uri: Option<String>,
     scopes: Vec<String>,
+    grant_type: AuthorizationGrantType,
 }
 
 impl OAuth2AuthorizationRequest {
@@ -195,7 +197,15 @@ impl OAuth2AuthorizationRequest {
             state: state.into(),
             redirect_uri,
             scopes,
+            grant_type: AuthorizationGrantType::AuthorizationCode,
         }
+    }
+
+    /// Builder-style setter for the authorization grant type.
+    /// Defaults to `AuthorizationCode`, mirroring the Java builder.
+    pub fn set_grant_type(mut self, grant_type: AuthorizationGrantType) -> Self {
+        self.grant_type = grant_type;
+        self
     }
 
     pub fn registration_id(&self) -> &str {
@@ -216,6 +226,10 @@ impl OAuth2AuthorizationRequest {
 
     pub fn scopes(&self) -> &[String] {
         &self.scopes
+    }
+
+    pub fn grant_type(&self) -> &AuthorizationGrantType {
+        &self.grant_type
     }
 }
 
@@ -297,8 +311,54 @@ impl OAuth2AuthorizationExchange {
     }
 }
 
+/// Indicates that an OAuth 2.0 Client is required to obtain authorization
+/// from the Resource Owner.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClientAuthorizationRequiredError {
+    client_registration_id: String,
+}
+
+impl ClientAuthorizationRequiredError {
+    pub fn new(client_registration_id: impl Into<String>) -> Self {
+        Self {
+            client_registration_id: client_registration_id.into(),
+        }
+    }
+
+    pub fn client_registration_id(&self) -> &str {
+        &self.client_registration_id
+    }
+}
+
+impl fmt::Display for ClientAuthorizationRequiredError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Authorization required for Client Registration Id: {}",
+            self.client_registration_id
+        )
+    }
+}
+
+impl std::error::Error for ClientAuthorizationRequiredError {}
+
+impl From<ClientAuthorizationRequiredError> for FilterError {
+    fn from(error: ClientAuthorizationRequiredError) -> Self {
+        FilterError::Chain(FilterChainError::AnyError(Box::new(error)))
+    }
+}
+
 pub trait OAuth2AuthorizationRequestResolver: Send + Sync {
-    fn resolve(&self, request: &dyn HttpRequest) -> Option<OAuth2AuthorizationRequest>;
+    fn resolve(
+        &self,
+        request: &dyn HttpRequest,
+    ) -> Result<Option<OAuth2AuthorizationRequest>, AuthenticationError>;
+
+    fn resolve_with_registration_id(
+        &self,
+        request: &dyn HttpRequest,
+        client_registration_id: &str,
+    ) -> Result<Option<OAuth2AuthorizationRequest>, AuthenticationError>;
 }
 
 #[derive(Clone)]
@@ -344,15 +404,37 @@ impl DefaultOAuth2AuthorizationRequestResolver {
 }
 
 impl OAuth2AuthorizationRequestResolver for DefaultOAuth2AuthorizationRequestResolver {
-    fn resolve(&self, request: &dyn HttpRequest) -> Option<OAuth2AuthorizationRequest> {
-        let registration_id = self.registration_id(request)?;
+    fn resolve(
+        &self,
+        request: &dyn HttpRequest,
+    ) -> Result<Option<OAuth2AuthorizationRequest>, AuthenticationError> {
+        let Some(registration_id) = self.registration_id(request) else {
+            // Not an authorization request URI: let the filter chain continue.
+            return Ok(None);
+        };
+        self.resolve_with_registration_id(request, &registration_id)
+    }
+
+    fn resolve_with_registration_id(
+        &self,
+        _request: &dyn HttpRequest,
+        client_registration_id: &str,
+    ) -> Result<Option<OAuth2AuthorizationRequest>, AuthenticationError> {
         let registration = self
             .client_registration_repository
-            .find_by_registration_id(&registration_id)?;
+            .find_by_registration_id(client_registration_id)
+            .ok_or_else(|| {
+                AuthenticationError::with_kind(
+                    format!("Invalid Client Registration with Id: {}", client_registration_id),
+                    AuthenticationErrorKind::InvalidClientRegistrationId,
+                )
+            })?;
+        // The Java resolver throws IllegalArgumentException for non-authorization-code
+        // grants; returning Ok(None) is a documented simplification of this port.
         if !registration.is_authorization_code() {
-            return None;
+            return Ok(None);
         }
-        Some(self.authorization_request_for(registration))
+        Ok(Some(self.authorization_request_for(registration)))
     }
 }
 
@@ -1016,4 +1098,99 @@ fn decode(value: &str) -> String {
     urlencoding::decode(value)
         .map(|value| value.into_owned())
         .unwrap_or_else(|_| value.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{body::Body, extract::Request as AxumRequest};
+
+    use super::*;
+
+    fn client_registration(
+        registration_id: &str,
+        grant_type: AuthorizationGrantType,
+    ) -> ClientRegistration {
+        ClientRegistration::new(
+            registration_id,
+            "Test Client",
+            "https://example.com/login/oauth/authorize",
+        )
+        .set_client_id("client-id")
+        .set_authorization_grant_type(grant_type)
+    }
+
+    fn resolver() -> DefaultOAuth2AuthorizationRequestResolver {
+        DefaultOAuth2AuthorizationRequestResolver::new(
+            Arc::new(InMemoryClientRegistrationRepository::new([
+                client_registration("registration-id", AuthorizationGrantType::AuthorizationCode),
+                client_registration(
+                    "client-credentials",
+                    AuthorizationGrantType::Other("client_credentials".to_string()),
+                ),
+            ])),
+            "/oauth2/authorization",
+        )
+    }
+
+    fn get_request(path: &str) -> AxumRequest {
+        let mut request = AxumRequest::builder()
+            .uri(path)
+            .body(Body::empty())
+            .unwrap();
+        request.ready();
+        request
+    }
+
+    #[test]
+    fn resolve_returns_none_when_not_authorization_request_uri() {
+        let resolver = resolver();
+        let request = get_request("/path");
+        assert!(resolver.resolve(&request).unwrap().is_none());
+    }
+
+    #[test]
+    fn resolve_errors_when_registration_id_is_unknown() {
+        let resolver = resolver();
+        let request = get_request("/oauth2/authorization/missing");
+        let error = resolver.resolve(&request).unwrap_err();
+        assert_eq!(
+            error.kind(),
+            AuthenticationErrorKind::InvalidClientRegistrationId
+        );
+        assert_eq!(
+            error.message(),
+            "Invalid Client Registration with Id: missing"
+        );
+    }
+
+    #[test]
+    fn resolve_returns_authorization_request_for_authorization_code_client() {
+        let resolver = resolver();
+        let request = get_request("/oauth2/authorization/registration-id");
+        let authorization_request = resolver.resolve(&request).unwrap().unwrap();
+        assert_eq!(authorization_request.registration_id(), "registration-id");
+        assert_eq!(
+            authorization_request.grant_type(),
+            &AuthorizationGrantType::AuthorizationCode
+        );
+    }
+
+    #[test]
+    fn resolve_returns_none_for_non_authorization_code_client() {
+        let resolver = resolver();
+        let request = get_request("/oauth2/authorization/client-credentials");
+        assert!(resolver.resolve(&request).unwrap().is_none());
+    }
+
+    #[test]
+    fn resolve_with_registration_id_uses_provided_id() {
+        let resolver = resolver();
+        // The request path is ignored by resolve_with_registration_id.
+        let request = get_request("/path");
+        let authorization_request = resolver
+            .resolve_with_registration_id(&request, "registration-id")
+            .unwrap()
+            .unwrap();
+        assert_eq!(authorization_request.registration_id(), "registration-id");
+    }
 }

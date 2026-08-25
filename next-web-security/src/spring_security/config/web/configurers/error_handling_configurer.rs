@@ -222,9 +222,9 @@ where
 
     /// Gets the `AccessDeniedHandler` according to the rules specified by
     /// `access_denied_handler`.
-    fn get_access_denied_handler_internal(&self, http: &mut H) -> Arc<dyn AccessDeniedHandler> {
-        if let Some(denied_handler) = self.access_denied_handler.as_ref() {
-            return denied_handler.clone();
+    fn get_access_denied_handler_internal(&mut self, http: &mut H) -> Arc<dyn AccessDeniedHandler> {
+        if let Some(denied_handler) = self.access_denied_handler.take() {
+            return denied_handler;
         }
         self.create_default_denied_handler(http)
     }
@@ -235,16 +235,16 @@ where
         &mut self,
         http: &mut H,
     ) -> Arc<dyn AuthenticationEntryPoint> {
-        if let Some(entry_point) = self.authentication_entry_point.as_ref() {
+        if let Some(entry_point) = self.authentication_entry_point.take() {
             return entry_point.clone();
         }
         self.create_default_entry_point(http)
     }
 
     /// Creates the default `AccessDeniedHandler`.
-    fn create_default_denied_handler(&self, http: &mut H) -> Arc<dyn AccessDeniedHandler> {
+    fn create_default_denied_handler(&mut self, http: &mut H) -> Arc<dyn AccessDeniedHandler> {
         let defaults = self.create_default_access_denied_handler(http);
-        match self.missing_authorities_handler_builder.as_ref() {
+        match self.missing_authorities_handler_builder.as_mut() {
             None => defaults,
             Some(builder) => {
                 let mut denied_handler = builder.build();
@@ -256,7 +256,10 @@ where
     }
 
     /// Creates the default `AccessDeniedHandler` from the configured mappings.
-    fn create_default_access_denied_handler(&self, _http: &mut H) -> Arc<dyn AccessDeniedHandler> {
+    fn create_default_access_denied_handler(
+        &mut self,
+        _http: &mut H,
+    ) -> Arc<dyn AccessDeniedHandler> {
         if self.default_denied_handler_mappings.is_empty() {
             return Arc::new(AccessDeniedHandlerImpl::default());
         }
@@ -264,7 +267,7 @@ where
             return self.default_denied_handler_mappings[0].1.clone();
         }
         Arc::new(RequestMatcherDelegatingAccessDeniedHandler::new(
-            self.default_denied_handler_mappings.to_vec(),
+            std::mem::take(&mut self.default_denied_handler_mappings),
             Arc::new(AccessDeniedHandlerImpl::default()),
         ))
     }

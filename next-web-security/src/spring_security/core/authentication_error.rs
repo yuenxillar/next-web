@@ -24,6 +24,7 @@ pub enum AuthenticationErrorKind {
     AuthenticationService,
     InternalAuthentication,
     SessionAuthentication,
+    InvalidClientRegistrationId,
 }
 
 #[derive(Clone)]

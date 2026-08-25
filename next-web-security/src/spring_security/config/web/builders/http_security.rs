@@ -206,6 +206,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn error_handling<F>(&mut self, error_handling: F) -> &mut Self
     where
         F: FnMut(&mut ErrorHandlingConfigurer<Self>),
@@ -295,6 +296,7 @@ impl HttpSecurity {
         self
     }
 
+    /// now
     pub fn oauth2_login<F>(&mut self, oauth2_login: F) -> &mut Self
     where
         F: FnMut(&mut OAuth2LoginConfigurer<Self>),

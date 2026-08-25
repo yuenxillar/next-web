@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 use tracing::{enabled, trace, Level};
 
 use next_web_context::{support::MessageSourceAccessor, MessageSource};
 use next_web_core::{
     async_trait,
     error::BoxError,
-    filter::FilterError,
+    filter::{FilterChainError, FilterError},
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -25,7 +25,6 @@ use crate::{
         access::{AccessDeniedHandler, AccessDeniedHandlerImpl},
         authentication_entry_point::AuthenticationEntryPoint,
         savedrequest::{HttpSessionRequestCache, RequestCache},
-        util::{BaseErrorChainAnalyzer, ErrorChainAnalyzer},
     },
 };
 
@@ -60,7 +59,6 @@ pub struct ErrorTranslationFilter {
     access_denied_handler: Arc<dyn AccessDeniedHandler>,
     authentication_entry_point: Arc<dyn AuthenticationEntryPoint>,
     authentication_trust_resolver: Arc<dyn AuthenticationTrustResolver>,
-    error_chain_analyzer: Box<dyn ErrorChainAnalyzer>,
     request_cache: Arc<dyn RequestCache>,
     messages: MessageSourceAccessor,
 }
@@ -74,7 +72,6 @@ impl ErrorTranslationFilter {
             security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
             access_denied_handler: Arc::new(AccessDeniedHandlerImpl::default()),
             authentication_trust_resolver: Arc::new(AuthenticationTrustResolverImpl::default()),
-            error_chain_analyzer: Box::new(DefaultErrorChainAnalyzer::default()),
             messages: NextSecurityMessageSource::get_accessor(),
             authentication_entry_point,
             request_cache,
@@ -90,13 +87,13 @@ impl ErrorTranslationFilter {
         )
     }
 
-    /// Handles an `AuthenticationException` by sending to the authentication entry
+    /// Handles an `AuthenticationError` by sending to the authentication entry
     /// point.
-    fn handle_authentication_exception(
+    fn handle_authentication_error(
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        chain: &mut dyn HttpFilterChain,
+        chain: &dyn HttpFilterChain,
         error: &AuthenticationError,
     ) -> Result<(), BoxError> {
         trace!(
@@ -113,7 +110,7 @@ impl ErrorTranslationFilter {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        chain: &mut dyn HttpFilterChain,
+        chain: &dyn HttpFilterChain,
         error: &AccessDeniedError,
     ) -> Result<(), BoxError> {
         if let Some(ctx) = self.security_context_holder_strategy.get_context() {
@@ -168,7 +165,7 @@ impl ErrorTranslationFilter {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        _chain: &mut dyn HttpFilterChain,
+        _chain: &dyn HttpFilterChain,
         reason: &AuthenticationError,
     ) -> Result<(), BoxError> {
         // SEC-112: Clear the SecurityContextHolder's Authentication, as the
@@ -206,16 +203,6 @@ impl ErrorTranslationFilter {
         self.authentication_trust_resolver = authentication_trust_resolver;
     }
 
-    /// Sets the `ErrorChainAnalyzer` to use.
-    pub fn set_error_chain_analyzer<T>(&mut self, error_chain_analyzer: T)
-    where
-        T: ErrorChainAnalyzer,
-        T: Clone,
-        T: 'static,
-    {
-        self.error_chain_analyzer = Box::new(error_chain_analyzer);
-    }
-
     /// Sets the `MessageSource` for localized messages.
     ///
     /// # Arguments
@@ -247,54 +234,52 @@ impl HttpFilter for ErrorTranslationFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        match filter_chain.do_filter(request, response).await {
-            Ok(()) => return Ok(()),
-            Err(filter_error) => {
-                match filter_error {
-                    FilterError::Io(io_err) => return Err(FilterError::Io(io_err)),
-                    FilterError::Chain(chain_err) => {
-                        // self.error_chain_analyzer
+        if let Err(filter_error) = filter_chain.do_filter(request, response).await {
+            match filter_error {
+                FilterError::Io(io_err) => return Err(FilterError::Io(io_err)),
+                FilterError::Custom(msg) => return Err(FilterError::Custom(msg)),
+                FilterError::Chain(chain_err) => match chain_err {
+                    FilterChainError::Boxed(err) => {
+                        return Err(FilterError::Chain(FilterChainError::Boxed(err)))
                     }
-                    _ => {}
-                };
-
-                todo!()
-            }
+                    FilterChainError::AnyError(err) => {
+                        if response.is_committed() {
+                            return Err(FilterError::Custom(
+                                    "Unable to handle the Next Security Error because the response is already committed.".to_string()
+                                ));
+                        }
+                        let any_err = err.as_ref() as &dyn Any;
+                        if let Some(auth_err) = any_err.downcast_ref::<AuthenticationError>() {
+                            return self
+                                .handle_authentication_error(
+                                    request,
+                                    response,
+                                    filter_chain,
+                                    auth_err,
+                                )
+                                .map_err(Into::into);
+                        }
+                        if let Some(auth_err) = any_err.downcast_ref::<AccessDeniedError>() {
+                            return self
+                                .handle_access_denied_error(
+                                    request,
+                                    response,
+                                    filter_chain,
+                                    auth_err,
+                                )
+                                .map_err(Into::into);
+                        }
+                    }
+                },
+            };
         }
+
+        Ok(())
     }
 }
 
 impl Named for ErrorTranslationFilter {
     fn name(&self) -> &str {
         "ErrorTranslationFilter"
-    }
-}
-
-#[derive(Clone)]
-struct DefaultErrorChainAnalyzer<T = BaseErrorChainAnalyzer> {
-    inner: T,
-}
-
-impl<T> DefaultErrorChainAnalyzer<T> {
-    pub fn new(inner: T) -> Self {
-        Self { inner }
-    }
-}
-
-impl<T> ErrorChainAnalyzer for DefaultErrorChainAnalyzer<T>
-where
-    T: ErrorChainAnalyzer,
-    T: Clone,
-{
-    fn init_extractor_map(&mut self) {
-        self.inner.init_extractor_map();
-    }
-}
-
-impl Default for DefaultErrorChainAnalyzer {
-    fn default() -> Self {
-        Self {
-            inner: Default::default(),
-        }
     }
 }

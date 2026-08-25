@@ -9,8 +9,8 @@ use next_web_core::{
 use crate::{
     access::AccessDeniedError,
     authorization::{
-        AuthorityAuthorizationDecision, AuthorizationDeniedError, FactorAuthorizationDecision,
-        RequiredFactor, RequiredFactorError,
+        AuthorityAuthorizationDecision, FactorAuthorizationDecision, RequiredFactor,
+        RequiredFactorError,
     },
     core::{AuthenticationError, AuthenticationErrorKind},
     web::{
@@ -57,13 +57,15 @@ impl DelegatingMissingAuthorityAccessDeniedHandler {
     }
 
     fn authority_errors(&self, err: &AccessDeniedError) -> Vec<AuthorityRequiredFactorErrorEntry> {
-        let denied = match err.authorization_denied_error() {
-            Some(denied) => denied.authorization_result(),
-            None => return Default::default(),
+        let denied = match err {
+            AccessDeniedError::AuthorizationDenied(authorization_denied_error) => {
+                authorization_denied_error
+            }
+            _ => return Vec::new(),
         };
 
-        let denied = denied as &dyn Any;
-        match denied.downcast_ref::<FactorAuthorizationDecision>() {
+        let authorization_result = denied.authorization_result();
+        match (authorization_result as &dyn Any).downcast_ref::<FactorAuthorizationDecision>() {
             Some(factor_decision) => {
                 return factor_decision
                     .factor_errors()
@@ -76,7 +78,9 @@ impl DelegatingMissingAuthorityAccessDeniedHandler {
                     })
                     .collect();
             }
-            None => match denied.downcast_ref::<AuthorityAuthorizationDecision>() {
+            None => match (authorization_result as &dyn Any)
+                .downcast_ref::<AuthorityAuthorizationDecision>()
+            {
                 Some(authority_decision) => authority_decision
                     .authorities()
                     .iter()
@@ -97,17 +101,6 @@ impl DelegatingMissingAuthorityAccessDeniedHandler {
             },
         }
     }
-
-    fn find_authorization_denied_error(
-        &self,
-        err: &AccessDeniedError,
-    ) -> Option<&AuthorizationDeniedError> {
-        if let AccessDeniedError::AuthorizationDenied { msg, result } = err {
-            return Some(AuthorizationDeniedError::new(msg.clone(), result.clone()));
-        }
-
-        todo!()
-    }
 }
 
 impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
@@ -121,10 +114,10 @@ impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
 
         let errors = error_entries
             .iter()
-            .flat_map(|entry| entry.error())
+            .flat_map(|entry| entry.error().cloned())
             .collect::<Vec<_>>();
 
-        for authority_error in error_entries {
+        for authority_error in error_entries.iter() {
             let required_authority = authority_error.authority();
             match self.entry_points.get(required_authority) {
                 Some(entry_point) => {
@@ -151,9 +144,7 @@ impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
         }
 
         self.default_access_denied_handler
-            .handle(request, response, denied)?;
-
-        Ok(())
+            .handle(request, response, denied)
     }
 }
 
@@ -172,10 +163,8 @@ impl DelegatingMissingAuthorityAccessDeniedHandlerBuilder {
     ) -> &mut Self {
         let mut builder = DelegatingAuthenticationEntryPointBuilder::default();
         builder.add_entry_point_for(entry_point, AnyRequestMatcher::instance());
-
         self.entry_point_builder_by_authority
             .insert(missing_authority.into(), builder);
-
         self
     }
 
@@ -188,20 +177,20 @@ impl DelegatingMissingAuthorityAccessDeniedHandlerBuilder {
     where
         F: FnOnce(&mut DelegatingAuthenticationEntryPointBuilder),
     {
-        let authority = missing_authority.into();
+        let missing_authority = missing_authority.into();
         entry_point_builder_fn(
             self.entry_point_builder_by_authority
-                .entry(authority)
+                .entry(missing_authority)
                 .or_insert_with(|| DelegatingAuthenticationEntryPointBuilder::default()),
         );
         self
     }
 
-    pub fn build(self) -> DelegatingMissingAuthorityAccessDeniedHandler {
+    pub fn build(&mut self) -> DelegatingMissingAuthorityAccessDeniedHandler {
         let entry_point_by_authority: BTreeMap<String, Arc<dyn AuthenticationEntryPoint>> = self
             .entry_point_builder_by_authority
-            .into_iter()
-            .map(|(key, mut value)| (key, value.build()))
+            .iter_mut()
+            .map(|(key, value)| (key.clone(), value.build()))
             .collect::<_>();
         DelegatingMissingAuthorityAccessDeniedHandler::new(entry_point_by_authority)
     }

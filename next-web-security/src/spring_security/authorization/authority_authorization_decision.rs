@@ -1,23 +1,21 @@
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
-use crate::{authorization::AuthorizationResult, core::GrantedAuthority};
+use crate::{authorization::AuthorizationDecision, core::GrantedAuthority};
 
+/// Represents an AuthorizationDecision based on a collection of authorities
 #[derive(Clone)]
 pub struct AuthorityAuthorizationDecision {
-    granted: bool,
     authorities: Vec<Arc<dyn GrantedAuthority>>,
+
+    base: AuthorizationDecision,
 }
 
 impl AuthorityAuthorizationDecision {
     pub fn new(granted: bool, authorities: Vec<Arc<dyn GrantedAuthority>>) -> Self {
         Self {
-            granted,
             authorities,
+            base: AuthorizationDecision::new(granted),
         }
-    }
-
-    pub fn is_granted(&self) -> bool {
-        self.granted
     }
 
     pub fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
@@ -25,8 +23,10 @@ impl AuthorityAuthorizationDecision {
     }
 }
 
-impl AuthorizationResult for AuthorityAuthorizationDecision {
-    fn is_granted(&self) -> bool {
-        self.is_granted()
+impl Deref for AuthorityAuthorizationDecision {
+    type Target = AuthorizationDecision;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
     }
 }
