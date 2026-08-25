@@ -3,6 +3,7 @@ use std::{borrow::Cow, fmt::Display};
 use crate::authorization::AuthorizationResult;
 
 /// If the authentication object does not have the required permissions, an error occurs
+#[derive(Clone)]
 pub enum AccessDeniedError {
     /// An error occurs when invalid or missing CsrfToken is found in HttpRequest
     Csrf(String),
@@ -24,6 +25,16 @@ pub enum AccessDeniedError {
 }
 
 impl AccessDeniedError {
+    pub fn type_name(&self) -> &str {
+        match self {
+            Self::Csrf(_) => "Csrf",
+            Self::AuthorizationDenied { .. } => "AuthorizationDenied",
+            Self::AuthorizationService(_) => "AuthorizationService",
+            Self::InvalidCsrfToken { .. } => "InvalidCsrfToken",
+            Self::MissingCsrfToken => "MissingCsrfToken",
+        }
+    }
+
     pub fn as_str<'a>(&'a self) -> Cow<'a, str> {
         match self {
             Self::Csrf(msg) => Cow::Borrowed(msg.as_str()),

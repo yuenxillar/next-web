@@ -5,7 +5,7 @@ use axum::{
     response::Response,
 };
 
-use crate::http::Cookie;
+use crate::http::{Cookie, HttpResponseShare};
 
 pub trait HttpResponse
 where
@@ -38,6 +38,8 @@ where
     fn is_committed(&self) -> bool;
 
     fn finish(&mut self);
+
+    fn shared(&mut self) -> &HttpResponseShare;
 }
 
 impl HttpResponse for Response {
@@ -113,7 +115,7 @@ impl HttpResponse for Response {
     }
 
     fn add_cookie(&mut self, cookie: Cookie) {
-        todo!()
+        let _ = self.append_header("set-cookie", &cookie.to_string());
     }
 
     fn is_committed(&self) -> bool {
@@ -122,5 +124,18 @@ impl HttpResponse for Response {
 
     fn finish(&mut self) {
         todo!()
+    }
+
+    fn shared(&mut self) -> &HttpResponseShare {
+        let has_shared = self.extensions().get::<HttpResponseShare>().is_some();
+
+        if !has_shared {
+            let shared = HttpResponseShare::from(self as &dyn HttpResponse);
+            self.extensions_mut().insert(shared);
+        }
+
+        self.extensions()
+            .get::<HttpResponseShare>()
+            .expect("HttpResponseShare not found")
     }
 }

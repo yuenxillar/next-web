@@ -1,6 +1,6 @@
 use crate::web::csrf::CsrfToken;
 
-/// CSRF Token
+/// A CSRF token that is used to protect against CSRF attacks.
 #[derive(Debug, Clone)]
 pub struct DefaultCsrfToken {
     header_name: String,
@@ -9,6 +9,7 @@ pub struct DefaultCsrfToken {
 }
 
 impl DefaultCsrfToken {
+    /// Creates a new instance
     pub fn new(
         header_name: impl Into<String>,
         parameter_name: impl Into<String>,

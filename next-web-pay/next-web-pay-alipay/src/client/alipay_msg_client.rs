@@ -12,7 +12,6 @@ pub struct AlipayMsgClient {
     server_host: String,
     heartbeat_interval: Duration,
     msg_handler: Arc<dyn AlipayMsgHandler>,
-
     msg_sender: Option<Sender<Message>>,
     _client: AlipayClient,
 }
@@ -56,13 +55,11 @@ impl AlipayMsgClient {
             Protocol::Wss => (),
         };
 
-        let query = self
-            ._client
-            .signed_params("", &(), None)?;
+        let query = self._client.signed_params("", &(), None)?;
 
         let resp = Client::default()
             .get(&url)
-            .query(& query)
+            .query(&query)
             .upgrade() // Prepares the WebSocket upgrade.
             .send()
             .await
@@ -124,15 +121,12 @@ async fn on(
                         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
                             let msg_api = value["msg_api"]
                             .as_str()
-                            .map(ToString::to_string)
                             .unwrap_or_default();
                             let msg_id = value["msg_id"]
                                 .as_str()
-                                .map(ToString::to_string)
                                 .unwrap_or_default();
                             let biz_content = value["biz_content"]
                                 .as_str()
-                                .map(ToString::to_string)
                                 .unwrap_or_default();
 
                             msg_handler.on_message(msg_api, msg_id, biz_content).await;

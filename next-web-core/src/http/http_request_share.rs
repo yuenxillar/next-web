@@ -173,6 +173,10 @@ impl HttpRequest for HttpRequestShare {
     fn remote_addr(&self) -> Option<&SocketAddr> {
         todo!()
     }
+
+    fn shared(&mut self) -> &HttpRequestShare {
+        todo!()
+    }
 }
 
 impl From<&dyn HttpRequest> for HttpRequestShare {

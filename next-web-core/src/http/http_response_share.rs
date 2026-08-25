@@ -60,6 +60,10 @@ impl HttpResponse for HttpResponseShare {
     fn finish(&mut self) {
         todo!()
     }
+
+    fn shared(&mut self) -> &HttpResponseShare {
+        todo!()
+    }
 }
 
 impl Clone for HttpResponseShare {

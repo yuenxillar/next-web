@@ -23,7 +23,7 @@ const ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK: &str = "Access-Control-Allow-Private
 /// Note that when the supplied CorsConfiguration is null, this implementation does not reject CORS
 /// requests outright but simply avoids adding CORS headers to the response. CORS processing is also
 /// skipped if the response already contains CORS headers.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct DefaultCorsProcessor;
 
 impl DefaultCorsProcessor {

@@ -24,6 +24,7 @@ pub struct AlipayTradeBillDownloadurlQueryResponse {
 ///
 /// # 错误码来源
 /// 参考支付宝开放平台文档：https://opendocs.alipay.com/open/e81ed5f1_alipay.data.dataservice.bill.downloadurl.query?pathHash=52c7a081&scene=common&ref=api
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AlipayTradeBillDownloadurlQueryBusinessErrorCode {
     /// BILL_DATE_BEFORE_REGISTRATION

@@ -1,7 +1,4 @@
-use base64::{
-    engine::general_purpose::{self, STANDARD},
-    Engine as _,
-};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use next_web_core::{
     http::Cookie,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -11,9 +8,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 use crate::web::{
-    savedrequest::{
-        DefaultSavedRequest, RequestCache, SavedRequest, SavedRequestAwareWrapper,
-    },
+    savedrequest::{DefaultSavedRequest, RequestCache, SavedRequest, SavedRequestAwareWrapper},
     util::{
         matcher::{AnyRequestMatcher, RequestMatcher},
         UrlUtils,
@@ -21,13 +16,12 @@ use crate::web::{
 };
 
 const COOKIE_NAME: &str = "REDIRECT_URI";
-const COOKIE_MAX_AGE: i32 = -1;
 
 /// An Implementation of `RequestCache` which saves the original request URI in a cookie.
 #[derive(Clone)]
 pub struct CookieRequestCache {
     request_matcher: Arc<dyn RequestMatcher>,
-    cookie_customizer: Arc<dyn Fn(&mut Cookie) + Send + Sync>,
+    cookie_customizer: Option<Arc<dyn Fn(&mut Cookie) + Send + Sync>>,
 }
 
 impl CookieRequestCache {
@@ -41,7 +35,7 @@ impl CookieRequestCache {
     where
         F: Fn(&mut Cookie) + Send + Sync + 'static,
     {
-        self.cookie_customizer = Arc::new(cookie_customizer);
+        self.cookie_customizer = Some(Arc::new(cookie_customizer));
     }
 
     fn encode_cookie(cookie_value: &str) -> String {
@@ -59,12 +53,15 @@ impl CookieRequestCache {
     }
 
     fn get_cookie_path(request: &dyn HttpRequest) -> String {
-        let context_path = request.context_path().unwrap_or_default();
-        if !context_path.is_empty() {
-            context_path.to_string()
-        } else {
-            "/".to_string()
-        }
+        request
+            .context_path()
+            .filter(|s| !s.is_empty())
+            .unwrap_or("/")
+            .to_string()
+    }
+
+    fn is_relative_path(uri: &str) -> bool {
+        uri.starts_with('/') && !uri.starts_with("//")
     }
 
     fn matches_saved_request(
@@ -102,14 +99,19 @@ impl RequestCache for CookieRequestCache {
             return;
         }
 
-        let redirect_url = UrlUtils::build_full_request_url(request);
+        let redirect_url = request
+            .uri()
+            .path_and_query()
+            .map(|qap| qap.as_str())
+            .unwrap_or_default();
         let mut saved_cookie = Cookie::new(COOKIE_NAME, Some(Self::encode_cookie(&redirect_url)));
-        saved_cookie.set_max_age(COOKIE_MAX_AGE);
         saved_cookie.set_secure(request.is_secure());
         saved_cookie.set_path(Self::get_cookie_path(request));
         saved_cookie.set_http_only(true);
 
-        (self.cookie_customizer)(&mut saved_cookie);
+        self.cookie_customizer
+            .as_ref()
+            .map(|f| f(&mut saved_cookie));
 
         response.add_cookie(saved_cookie);
     }
@@ -117,13 +119,17 @@ impl RequestCache for CookieRequestCache {
     fn get_request(
         &self,
         request: &dyn HttpRequest,
-        response: &mut dyn HttpResponse,
+        _response: &mut dyn HttpResponse,
     ) -> Option<Arc<dyn SavedRequest>> {
         let saved_request_cookie = WebUtils::get_cookie(request, COOKIE_NAME)?;
         let original_uri = self.decode_cookie(saved_request_cookie.value())?;
 
-        let port = Self::get_port(request);
+        if !Self::is_relative_path(&original_uri) {
+            debug!("Did not use saved request since cookie did not contain a relative path");
+            return None;
+        }
 
+        let port = Self::get_port(request);
         let mut builder = DefaultSavedRequest::builder();
         let saved = builder
             .set_scheme(request.scheme().map(|s| s.to_string()))
@@ -154,12 +160,7 @@ impl RequestCache for CookieRequestCache {
         self.remove_request(request, response);
 
         // We know saved is non-null because matches_saved_request returned true
-        let saved = match saved {
-            Some(s) => s,
-            None => return None,
-        };
-
-        Some(Box::new(SavedRequestAwareWrapper::new(saved, request)))
+        Some(Box::new(SavedRequestAwareWrapper::new(saved?, request)))
     }
 
     fn remove_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {
@@ -167,7 +168,7 @@ impl RequestCache for CookieRequestCache {
         remove_saved_request_cookie.set_secure(request.is_secure());
         remove_saved_request_cookie.set_http_only(true);
         remove_saved_request_cookie.set_path(Self::get_cookie_path(request));
-        remove_saved_request_cookie.set_max_age(0);
+        remove_saved_request_cookie.set_max_age_secs(0);
         response.add_cookie(remove_saved_request_cookie);
     }
 }
@@ -176,7 +177,7 @@ impl Default for CookieRequestCache {
     fn default() -> Self {
         Self {
             request_matcher: AnyRequestMatcher::instance(),
-            cookie_customizer: Arc::new(|_| {}),
+            cookie_customizer: None,
         }
     }
 }

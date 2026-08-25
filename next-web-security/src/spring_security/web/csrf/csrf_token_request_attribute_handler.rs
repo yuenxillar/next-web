@@ -1,12 +1,13 @@
-use std::sync::Arc;
-
 use next_web_core::{
     anys::any_value::AnyValue,
+    async_trait,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 use tracing::trace;
 
-use crate::web::csrf::{CsrfToken, CsrfTokenRequestHandler, CsrfTokenRequestResolver};
+use crate::web::csrf::{
+    CsrfToken, CsrfTokenRequestHandler, CsrfTokenRequestResolver, DeferredCsrfToken,
+};
 
 /// An implementation of the CsrfTokenRequestHandler interface that is capable of making the
 /// CsrfToken available as a request attribute and resolving the token value as either a header or
@@ -28,14 +29,15 @@ impl CsrfTokenRequestAttributeHandler {
     }
 }
 
+#[async_trait]
 impl CsrfTokenRequestHandler for CsrfTokenRequestAttributeHandler {
-    fn handle(
+    async fn handle(
         &self,
         request: &mut dyn HttpRequest,
         _response: &mut dyn HttpResponse,
-        deferred_csrf_token: &dyn Fn() -> Arc<dyn CsrfToken>,
+        deferred_csrf_token: &mut dyn DeferredCsrfToken,
     ) {
-        let csrf_token = deferred_csrf_token();
+        let csrf_token = deferred_csrf_token.token().await;
 
         let type_name = std::any::type_name::<&dyn CsrfToken>();
         request.set_attribute(type_name, AnyValue::Object(Box::new(csrf_token.clone())));

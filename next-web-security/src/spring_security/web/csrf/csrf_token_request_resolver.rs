@@ -1,9 +1,12 @@
-use next_web_core::traits::http::http_request::HttpRequest;
 use tracing::trace;
 
 use crate::web::csrf::CsrfToken;
+use next_web_core::traits::http::http_request::HttpRequest;
 
+/// Implementations of this interface are capable of resolving the token value of a CsrfToken from the
+/// provided HttpRequest. Used by the CsrfFilter.
 pub trait CsrfTokenRequestResolver {
+    /// Returns the token value resolved from the provided HttpRequest and CsrfToken or Option::None if not available.
     fn resolve_csrf_token_value(
         &self,
         request: &mut dyn HttpRequest,

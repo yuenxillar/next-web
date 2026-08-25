@@ -1,11 +1,15 @@
-use crate::http::HttpVersion;
+use crate::http::{HttpRequestShare, HttpVersion};
 use axum::{
     extract::Request,
     http::{HeaderMap, HeaderValue, Uri, uri::Scheme},
 };
 
-use headers::{HeaderMapExt, Host};
-use std::{collections::HashMap, net::SocketAddr};
+use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
+use std::{
+    collections::{HashMap, hash_map},
+    net::SocketAddr,
+    sync::OnceLock,
+};
 
 use crate::{
     anys::any_value::AnyValue,
@@ -93,6 +97,8 @@ where
     fn is_secure(&self) -> bool;
 
     fn remote_addr(&self) -> Option<&SocketAddr>;
+
+    fn shared(&mut self) -> &HttpRequestShare;
 }
 
 pub type OneMap = HashMap<String, AnyValue>;
@@ -129,11 +135,12 @@ impl HttpRequest for Request {
     }
 
     fn cookie(&self) -> Option<&Cookie> {
-        todo!()
+        self.cookies()?.first()
     }
 
     fn cookies(&self) -> Option<&[Cookie]> {
-        todo!()
+        let lock = self.extensions().get::<OnceLock<Vec<Cookie>>>()?;
+        Some(lock.get_or_init(|| parse_cookies(self)).as_slice())
     }
 
     fn request_dispatcher(&self, mut path: &str) -> Option<&dyn RequestDispatcher> {
@@ -304,6 +311,7 @@ impl HttpRequest for Request {
 
     fn ready(&mut self) {
         self.extensions_mut().insert(OneMap::new());
+        self.extensions_mut().insert(OnceLock::<Vec<Cookie>>::new());
     }
 
     fn clean_up(&mut self) {
@@ -317,4 +325,27 @@ impl HttpRequest for Request {
     fn remote_addr(&self) -> Option<&SocketAddr> {
         self.extensions().get::<SocketAddr>()
     }
+
+    fn shared(&mut self) -> &HttpRequestShare {
+        let has_shared = self.extensions().get::<HttpRequestShare>().is_some();
+
+        if !has_shared {
+            let shared = HttpRequestShare::from(self as &dyn HttpRequest);
+            self.extensions_mut().insert(shared);
+        }
+
+        self.extensions()
+            .get::<HttpRequestShare>()
+            .expect("HttpRequestShare not found")
+    }
+}
+
+fn parse_cookies(request: &Request) -> Vec<Cookie> {
+    let Some(cookie_header) = request.headers().typed_get::<HeaderCookie>() else {
+        return Vec::new();
+    };
+    cookie_header
+        .iter()
+        .map(|(name, value)| Cookie::new(name, Some(value.to_string())))
+        .collect()
 }

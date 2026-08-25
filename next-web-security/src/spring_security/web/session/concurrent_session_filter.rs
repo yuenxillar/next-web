@@ -4,7 +4,7 @@ use next_web_core::{
     async_trait,
     error::BoxError,
     filter::FilterError,
-    http::{HttpFilterChainShare, HttpRequestShare, HttpResponseShare},
+    http::HttpFilterChainShare,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -120,11 +120,7 @@ impl HttpFilter for ConcurrentSessionFilter {
         // Check if the request has an existing session.
         if let Some(session) = request.session() {
             let session_id = session.id().to_string();
-            if let Some(info) = self
-                .session_registry
-                .session_information(&session_id)
-                .await
-            {
+            if let Some(info) = self.session_registry.session_information(&session_id).await {
                 if info.is_expired() {
                     // Expired — abort processing.
                     debug!("Requested session ID {} has expired.", session_id);
@@ -133,8 +129,8 @@ impl HttpFilter for ConcurrentSessionFilter {
 
                     let mut event = SessionInformationExpiredEvent::new(
                         info,
-                        HttpRequestShare::from(&*request),
-                        HttpResponseShare::from(&*response),
+                        request.shared().clone(),
+                        response.shared().clone(),
                         Some(HttpFilterChainShare::from(filter_chain)),
                     );
                     self.session_information_expired_strategy

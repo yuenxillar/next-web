@@ -1,3 +1,4 @@
+/// Provides the information about an expected CSRF token.
 pub trait CsrfToken
 where
     Self: Send + Sync,

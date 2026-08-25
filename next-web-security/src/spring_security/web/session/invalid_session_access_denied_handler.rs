@@ -7,11 +7,13 @@ use crate::{
     web::{access::AccessDeniedHandler, session::InvalidSessionStrategy},
 };
 
+/// An adapter of InvalidSessionStrategy to AccessDeniedHandler
 pub struct InvalidSessionAccessDeniedHandler {
     invalid_session_strategy: Arc<dyn InvalidSessionStrategy>,
 }
 
 impl InvalidSessionAccessDeniedHandler {
+    /// Creates a new instance
     pub fn new(invalid_session_strategy: Arc<dyn InvalidSessionStrategy>) -> Self {
         Self {
             invalid_session_strategy,
@@ -24,8 +26,9 @@ impl AccessDeniedHandler for InvalidSessionAccessDeniedHandler {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        access_denied_error: &AccessDeniedError,
+        _access_denied_error: &AccessDeniedError,
     ) -> Result<(), next_web_core::error::BoxError> {
-        todo!()
+        self.invalid_session_strategy
+            .on_invalid_session_detected(request, response)
     }
 }

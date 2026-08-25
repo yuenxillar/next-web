@@ -1,4 +1,5 @@
 use next_web_core::anys::any_value::AnyValue;
+use next_web_core::error::BoxError;
 use next_web_core::traits::http::http_request::HttpRequest;
 use next_web_core::{async_trait, traits::http::http_response::HttpResponse};
 use std::sync::Arc;
@@ -6,7 +7,7 @@ use uuid::Uuid;
 
 use crate::web::csrf::{CsrfToken, CsrfTokenRepository, DefaultCsrfToken};
 
-/// 基于 HTTP Session 的 CSRF Token Repository
+/// A CsrfTokenRepository that stores the CsrfToken in the HttpSession.
 #[derive(Clone)]
 pub struct HttpSessionCsrfTokenRepository {
     parameter_name: String,
@@ -15,52 +16,35 @@ pub struct HttpSessionCsrfTokenRepository {
 }
 
 impl HttpSessionCsrfTokenRepository {
-    // 默认常量
     const DEFAULT_CSRF_PARAMETER_NAME: &'static str = "_csrf";
     const DEFAULT_CSRF_HEADER_NAME: &'static str = "X-CSRF-TOKEN";
+    const DEFAULT_CSRF_TOKEN_ATTR_NAME: &str =
+        "next-web-security.web.csrf.HttpSessionCsrfTokenRepository.CSRF_TOKEN";
 
-    /// 创建新的实例，使用默认配置
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// 设置 CSRF Token 在请求参数中的名称
-    ///
-    /// # Panics
-    /// 如果 parameter_name 为空字符串
-    pub fn set_parameter_name(&mut self, parameter_name: String) {
-        assert!(
-            !parameter_name.is_empty(),
-            "parameterName cannot be null or empty"
-        );
+    /// Sets the HttpRequest parameter name that the CsrfToken is expected to appear on
+    pub fn set_parameter_name(&mut self, parameter_name: impl Into<String>) {
+        let parameter_name = parameter_name.into();
+        assert!(!parameter_name.is_empty(), "parameterName cannot be  empty");
         self.parameter_name = parameter_name;
     }
 
-    /// 设置 CSRF Token 在请求头中的名称
-    ///
-    /// # Panics
-    /// 如果 header_name 为空字符串
-    pub fn set_header_name(&mut self, header_name: String) {
-        assert!(
-            !header_name.is_empty(),
-            "headerName cannot be null or empty"
-        );
+    /// Sets the header name that the CsrfToken is expected to appear on and the header that the response will contain the CsrfToken.
+    pub fn set_header_name(&mut self, header_name: impl Into<String>) {
+        let header_name = header_name.into();
+        assert!(!header_name.is_empty(), "headerName cannot be empty");
         self.header_name = header_name;
     }
 
-    /// 设置 CSRF Token 在 Session 中的属性名称
-    ///
-    /// # Panics
-    /// 如果 session_attribute_name 为空字符串
-    pub fn set_session_attribute_name(&mut self, session_attribute_name: String) {
+    /// Sets the HttpSession attribute name that the CsrfToken is stored in
+    pub fn set_session_attribute_name(&mut self, session_attribute_name: impl Into<String>) {
+        let session_attribute_name = session_attribute_name.into();
         assert!(
             !session_attribute_name.is_empty(),
-            "sessionAttributeName cannot be null or empty"
+            "sessionAttributeName cannot be empty"
         );
         self.session_attribute_name = session_attribute_name;
     }
 
-    /// 创建新的 CSRF Token
     fn create_new_token() -> String {
         Uuid::new_v4().to_string()
     }
@@ -80,15 +64,10 @@ impl HttpSessionCsrfTokenRepository {
 
 impl Default for HttpSessionCsrfTokenRepository {
     fn default() -> Self {
-        let default_attr_name = format!(
-            "{}.CSRF_TOKEN",
-            std::any::type_name::<HttpSessionCsrfTokenRepository>()
-        );
-
         Self {
             parameter_name: Self::DEFAULT_CSRF_PARAMETER_NAME.to_string(),
             header_name: Self::DEFAULT_CSRF_HEADER_NAME.to_string(),
-            session_attribute_name: default_attr_name,
+            session_attribute_name: Self::DEFAULT_CSRF_TOKEN_ATTR_NAME.to_string(),
         }
     }
 }
@@ -108,7 +87,7 @@ impl CsrfTokenRepository for HttpSessionCsrfTokenRepository {
         token: Option<&Arc<dyn CsrfToken>>,
         request: &mut dyn HttpRequest,
         _: &mut dyn HttpResponse,
-    ) {
+    ) -> Result<(), BoxError> {
         match token {
             None => {
                 if let Some(session) = request.session() {
@@ -117,7 +96,7 @@ impl CsrfTokenRepository for HttpSessionCsrfTokenRepository {
             }
             Some(token) => {
                 let Some(session) = request.session_mut(true) else {
-                    return;
+                    return Ok(());
                 };
                 session.set_attribute(
                     &self.session_attribute_name,
@@ -125,15 +104,14 @@ impl CsrfTokenRepository for HttpSessionCsrfTokenRepository {
                 );
             }
         }
+
+        Ok(())
     }
 
     async fn load_token(&self, request: &mut dyn HttpRequest) -> Option<Arc<dyn CsrfToken>> {
-        match request.session() {
-            None => return None,
-            Some(session) => session
-                .attribute(&self.session_attribute_name)
-                .map(|value| value.as_object::<Arc<dyn CsrfToken>>())
-                .unwrap_or_default(),
-        }
+        let session = request.session()?;
+        session
+            .attribute(&self.session_attribute_name)
+            .and_then(|value| value.as_object::<Arc<dyn CsrfToken>>())
     }
 }

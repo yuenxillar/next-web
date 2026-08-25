@@ -12,12 +12,20 @@ use crate::{
     web::{access::AccessDeniedHandler, WebAttributes},
 };
 
+/// Base implementation of AccessDeniedHandler.
+///
+/// This implementation sends a 403 (SC_FORBIDDEN) HTTP error code. In addition,
+/// if an errorPage is defined, the implementation will perform a request dispatcher "forward"
+/// to the specified error page view. Being a "forward", the SecurityContextHolder will
+/// remain populated. This is of benefit if the view (or a tag library or macro) wishes to access the SecurityContextHolder.
+/// The request scope will also be populated with the exception itself, available from the key WebAttributes.ACCESS_DENIED_403.
 #[derive(Default)]
 pub struct AccessDeniedHandlerImpl {
     error_page: Option<String>,
 }
 
 impl AccessDeniedHandlerImpl {
+    /// The error page to use. Must begin with a "/" and is interpreted relative to the current context root.
     pub fn set_error_page(&mut self, error_page: impl Into<String>) {
         let error_page = error_page.into();
         assert!(
@@ -48,13 +56,14 @@ impl AccessDeniedHandler for AccessDeniedHandlerImpl {
             debug!("Responding with 403 status code");
 
             response.set_status_code(StatusCode::FORBIDDEN);
+            response.set_body(b"Forbidden".to_vec());
             return Ok(());
         }
 
         // Put exception into request scope (perhaps of use to a view)
         request.set_attribute(
             WebAttributes::ACCESS_DENIED_403,
-            AnyValue::String(access_denied_error.to_string()),
+            AnyValue::Object(Box::new(access_denied_error.clone())),
         );
         // Set the 403 status code.
         response.set_status_code(StatusCode::FORBIDDEN);

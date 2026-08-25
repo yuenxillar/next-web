@@ -8,12 +8,15 @@ use next_web_core::{
 use crate::access::AccessDeniedError;
 use crate::web::access::AccessDeniedHandler;
 
+/// An AccessDeniedHandler that delegates to other AccessDeniedHandler instances based upon the type of
+/// AccessDeniedError passed into handle(HttpRequest, HttpResponse, AccessDeniedError).
 pub struct DelegatingAccessDeniedHandler {
     handlers: BTreeMap<&'static str, Arc<dyn AccessDeniedHandler>>,
     default_handler: Arc<dyn AccessDeniedHandler>,
 }
 
 impl DelegatingAccessDeniedHandler {
+    /// Creates a new instance
     pub fn new(
         handlers: BTreeMap<&'static str, Arc<dyn AccessDeniedHandler>>,
         default_handler: Arc<dyn AccessDeniedHandler>,
@@ -32,7 +35,12 @@ impl AccessDeniedHandler for DelegatingAccessDeniedHandler {
         response: &mut dyn HttpResponse,
         access_denied_error: &AccessDeniedError,
     ) -> Result<(), BoxError> {
-        let _ = &self.handlers;
+        for (handler_type, handler) in self.handlers.iter() {
+            if *handler_type == access_denied_error.type_name() {
+                return handler.handle(request, response, access_denied_error);
+            }
+        }
+
         self.default_handler
             .handle(request, response, access_denied_error)
     }

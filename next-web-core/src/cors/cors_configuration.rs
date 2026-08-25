@@ -134,7 +134,7 @@ impl CorsConfiguration {
                             .into_iter()
                             .map(ToString::to_string)
                             .collect(),
-                    ));
+                    ))?;
                 }
             }
             None => {
@@ -303,7 +303,7 @@ impl CorsConfiguration {
                             .into_iter()
                             .map(ToString::to_string)
                             .collect(),
-                    ));
+                    ))?;
                 }
             }
             None => {

@@ -245,7 +245,7 @@ pub struct ExtUserInfo {
     pub identity_hash: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize,PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CertType {
     /// 身份证
@@ -308,6 +308,7 @@ pub struct InvoiceKeyInfo {
 }
 
 /// 开票内容项
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct InvoiceDetail {
     /// 商品编码

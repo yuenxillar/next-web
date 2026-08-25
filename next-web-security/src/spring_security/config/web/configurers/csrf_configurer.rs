@@ -5,6 +5,7 @@ use std::{
 };
 
 use next_web_core::{
+    async_trait,
     traits::{
         http::{http_request::HttpRequest, http_response::HttpResponse},
         required::Required,
@@ -17,12 +18,12 @@ use crate::{
     config::{
         security_configurer::SecurityConfigurer,
         web::{
-            base_request_matcher_registry::BaseRequestMatcherRegistry,
             configurers::{
-                logout_configurer::LogoutConfigurer, BaseHttpConfigurer, ErrorHandlingConfigurer,
+                BaseHttpConfigurer, ErrorHandlingConfigurer, LogoutConfigurer,
                 SessionManagementConfigurer,
             },
             http_security_builder::HttpSecurityBuilder,
+            BaseRequestMatcherRegistry,
         },
     },
     web::{
@@ -31,8 +32,8 @@ use crate::{
         csrf::{
             CookieCsrfTokenRepository, CsrfAuthenticationStrategy, CsrfFilter, CsrfLogoutHandler,
             CsrfToken, CsrfTokenRepository, CsrfTokenRequestAttributeHandler,
-            CsrfTokenRequestHandler, CsrfTokenRequestResolver, HttpSessionCsrfTokenRepository,
-            MissingCsrfTokenError,
+            CsrfTokenRequestHandler, CsrfTokenRequestResolver, DeferredCsrfToken,
+            HttpSessionCsrfTokenRepository,
         },
         default_security_filter_chain::DefaultSecurityFilterChain,
         session::{InvalidSessionAccessDeniedHandler, InvalidSessionStrategy},
@@ -203,7 +204,7 @@ where
 
         let mut handlers = BTreeMap::new();
         handlers.insert(
-            std::any::type_name::<MissingCsrfTokenError>(),
+            "MissingCsrfToken",
             Arc::new(invalid_session_denied_handler) as Arc<dyn AccessDeniedHandler>,
         );
 
@@ -220,7 +221,7 @@ where
                 let mut csrf_authentication_strategy =
                     CsrfAuthenticationStrategy::new(self.csrf_token_repository.clone());
                 if let Some(request_handler) = self.request_handler.as_ref() {
-                    csrf_authentication_strategy.set_request_handler(request_handler);
+                    csrf_authentication_strategy.set_request_handler(request_handler.clone());
                 }
 
                 return Arc::new(csrf_authentication_strategy);
@@ -266,7 +267,6 @@ where
         if let Some(request_handler) = self.request_handler.take() {
             filter.set_request_handler(request_handler);
         }
-
         self.inner.get_mut_object().post_process(&mut filter);
 
         http.add_filter(filter);
@@ -298,12 +298,13 @@ struct SpaCsrfTokenRequestHandler {
     xor: CsrfTokenRequestAttributeHandler,
 }
 
+#[async_trait]
 impl CsrfTokenRequestHandler for SpaCsrfTokenRequestHandler {
-    fn handle(
+    async fn handle(
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        csrf_token: &dyn Fn() -> Arc<dyn CsrfToken>,
+        csrf_token: &mut dyn DeferredCsrfToken,
     ) {
         self.xor.handle(request, response, csrf_token);
     }

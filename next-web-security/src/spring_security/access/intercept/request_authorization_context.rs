@@ -30,11 +30,11 @@ impl RequestAuthorizationContext {
     }
 }
 
-impl From<&dyn HttpRequest> for RequestAuthorizationContext {
-    fn from(req: &dyn HttpRequest) -> Self {
+impl From<&mut dyn HttpRequest> for RequestAuthorizationContext {
+    fn from(req: &mut dyn HttpRequest) -> Self {
         Self {
             variables: None,
-            request: HttpRequestShare::from(req),
+            request: req.shared().clone(),
         }
     }
 }

@@ -10,7 +10,6 @@ mod csrf_token_request_resolver;
 mod default_csrf_token;
 mod deferred_csrf_token;
 mod http_session_csrf_token_repository;
-mod missing_csrf_token_error;
 mod repository_deferred_csrf_token;
 mod xor_csrf_token_request_attribute_handler;
 
@@ -26,5 +25,4 @@ pub use csrf_token_request_resolver::CsrfTokenRequestResolver;
 pub use default_csrf_token::DefaultCsrfToken;
 pub use deferred_csrf_token::DeferredCsrfToken;
 pub use http_session_csrf_token_repository::HttpSessionCsrfTokenRepository;
-pub use missing_csrf_token_error::MissingCsrfTokenError;
 pub use xor_csrf_token_request_attribute_handler::XorCsrfTokenRequestAttributeHandler;

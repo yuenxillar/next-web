@@ -9,17 +9,21 @@ use next_web_core::{
 use crate::{
     access::AccessDeniedError,
     authorization::{
-        AuthorityAuthorizationDecision, FactorAuthorizationDecision, RequiredFactor,
-        RequiredFactorError,
+        AuthorityAuthorizationDecision, AuthorizationDeniedError, FactorAuthorizationDecision,
+        RequiredFactor, RequiredFactorError,
     },
+    core::{AuthenticationError, AuthenticationErrorKind},
     web::{
         access::{AccessDeniedHandler, AccessDeniedHandlerImpl},
         authentication::DelegatingAuthenticationEntryPointBuilder,
         savedrequest::RequestCache,
+        util::matcher::AnyRequestMatcher,
         AuthenticationEntryPoint, WebAttributes,
     },
 };
 
+/// An AccessDeniedHandler that adapts AuthenticationEntryPoints based on missing
+/// GrantedAuthoritys. These authorities are specified in an AuthorityAuthorizationDecision inside an AuthorizationDeniedException.
 #[derive(Clone)]
 pub struct DelegatingMissingAuthorityAccessDeniedHandler {
     entry_points: BTreeMap<String, Arc<dyn AuthenticationEntryPoint>>,
@@ -36,7 +40,8 @@ impl DelegatingMissingAuthorityAccessDeniedHandler {
         }
     }
 
-    /// Use this AccessDeniedHandler for AccessDeniedError that this handler doesn't support. By default, this uses AccessDeniedHandlerImpl.
+    /// Use this AccessDeniedHandler for AccessDeniedError that this handler doesn't support.
+    /// By default, this uses AccessDeniedHandlerImpl.
     pub fn set_default_access_denied_handler(&mut self, handler: Arc<dyn AccessDeniedHandler>) {
         self.default_access_denied_handler = handler;
     }
@@ -92,6 +97,17 @@ impl DelegatingMissingAuthorityAccessDeniedHandler {
             },
         }
     }
+
+    fn find_authorization_denied_error(
+        &self,
+        err: &AccessDeniedError,
+    ) -> Option<&AuthorizationDeniedError> {
+        if let AccessDeniedError::AuthorizationDenied { msg, result } = err {
+            return Some(AuthorizationDeniedError::new(msg.clone(), result.clone()));
+        }
+
+        todo!()
+    }
 }
 
 impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
@@ -105,8 +121,7 @@ impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
 
         let errors = error_entries
             .iter()
-            .map(|entry| entry.error())
-            .filter_map(|opt| opt)
+            .flat_map(|entry| entry.error())
             .collect::<Vec<_>>();
 
         for authority_error in error_entries {
@@ -124,43 +139,47 @@ impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
                         );
                     }
 
-                    // let err = InsufficientAuthenticationError::new(
-                    //     format!("Missing Authorities {}", required_authority),
-                    //     denied,
-                    // );
-                    // entry_point.commence(request, response, Some(err))?;
-                    // return Ok(());
-                    todo!()
+                    let err = AuthenticationError::with_kind(
+                        format!("Missing Authorities {}", required_authority),
+                        AuthenticationErrorKind::InsufficientAuthentication,
+                    );
+                    entry_point.commence(request, response, &err)?;
+                    return Ok(());
                 }
                 None => continue,
             }
         }
 
-        // self.default_access_denied_handler
-        //     .handle(request, response, denied);
-        // Ok(())
+        self.default_access_denied_handler
+            .handle(request, response, denied)?;
 
-        todo!()
+        Ok(())
     }
 }
 
+/// A builder for configuring the set of authority/entry-point pairs
 #[derive(Clone, Default)]
 pub struct DelegatingMissingAuthorityAccessDeniedHandlerBuilder {
-    entry_point_builder_by_authority: BTreeMap<String, ()>,
+    entry_point_builder_by_authority: BTreeMap<String, DelegatingAuthenticationEntryPointBuilder>,
 }
 
 impl DelegatingMissingAuthorityAccessDeniedHandlerBuilder {
+    /// Use this AuthenticationEntryPoint when the given missingAuthority is missing from the authenticated user
     pub fn add_entry_point_for(
         &mut self,
         entry_point: Arc<dyn AuthenticationEntryPoint>,
         missing_authority: impl Into<String>,
     ) -> &mut Self {
+        let mut builder = DelegatingAuthenticationEntryPointBuilder::default();
+        builder.add_entry_point_for(entry_point, AnyRequestMatcher::instance());
+
         self.entry_point_builder_by_authority
-            .insert(missing_authority.into(), ());
+            .insert(missing_authority.into(), builder);
 
         self
     }
 
+    /// Use this AuthenticationEntryPoint when the given missingAuthority is missing from the authenticated user
     pub fn add_entry_point_for_with_builder<F>(
         &mut self,
         entry_point_builder_fn: F,
@@ -169,21 +188,26 @@ impl DelegatingMissingAuthorityAccessDeniedHandlerBuilder {
     where
         F: FnOnce(&mut DelegatingAuthenticationEntryPointBuilder),
     {
+        let authority = missing_authority.into();
+        entry_point_builder_fn(
+            self.entry_point_builder_by_authority
+                .entry(authority)
+                .or_insert_with(|| DelegatingAuthenticationEntryPointBuilder::default()),
+        );
         self
     }
 
-    pub fn build(&self) -> DelegatingMissingAuthorityAccessDeniedHandler {
-        // let entry_points: BTreeMap<String, Box<dyn AuthenticationEntryPoint>> = self
-        //     .entry_point_builder_by_authority
-        //     .iter()
-        //     .map(|(k, _)| (k.clone(),))
-        //     .collect();
-        // DelegatingMissingAuthorityAccessDeniedHandler::new(entry_points)
-        //
-        todo!()
+    pub fn build(self) -> DelegatingMissingAuthorityAccessDeniedHandler {
+        let entry_point_by_authority: BTreeMap<String, Arc<dyn AuthenticationEntryPoint>> = self
+            .entry_point_builder_by_authority
+            .into_iter()
+            .map(|(key, mut value)| (key, value.build()))
+            .collect::<_>();
+        DelegatingMissingAuthorityAccessDeniedHandler::new(entry_point_by_authority)
     }
 }
 
+/// A mapping of a GrantedAuthority.get_authority() to a possibly None RequiredFactorError.
 struct AuthorityRequiredFactorErrorEntry {
     authority: String,
     error: Option<RequiredFactorError>,
@@ -197,8 +221,8 @@ impl AuthorityRequiredFactorErrorEntry {
         }
     }
 
-    fn error(&self) -> Option<RequiredFactorError> {
-        todo!()
+    fn error(&self) -> Option<&RequiredFactorError> {
+        self.error.as_ref()
     }
 
     fn authority(&self) -> &str {

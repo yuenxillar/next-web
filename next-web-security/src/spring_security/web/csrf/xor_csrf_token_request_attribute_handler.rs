@@ -1,14 +1,17 @@
 use std::sync::Arc;
 
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::{
+    async_trait,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use tracing::trace;
 
 use crate::web::csrf::{
     CsrfToken, CsrfTokenRequestAttributeHandler, CsrfTokenRequestHandler, CsrfTokenRequestResolver,
-    DefaultCsrfToken,
+    DefaultCsrfToken, DeferredCsrfToken,
 };
 
 /// An implementation of the CsrfTokenRequestHandler interface that is capable of
@@ -20,18 +23,13 @@ pub struct XorCsrfTokenRequestAttributeHandler {
 }
 
 impl XorCsrfTokenRequestAttributeHandler {
-    fn defer_csrf_token_update(
-        &self,
-        csrf_token_supplier: &dyn Fn() -> Arc<dyn CsrfToken>,
-    ) -> CachedCsrfTokenSupplier {
-        let csrf_token = csrf_token_supplier();
-        let updated_token = Self::create_xored_csrf_token(&mut OsRng, csrf_token.token());
-
-        CachedCsrfTokenSupplier::new(Arc::new(move || {
+    fn defer_csrf_token_update(&self, csrf_token: Arc<dyn CsrfToken>) -> CachedDeferredCsrfToken {
+        CachedDeferredCsrfToken::new(Arc::new(move || {
+            let updated_token = Self::create_xored_csrf_token(&mut OsRng, csrf_token.token());
             Arc::new(DefaultCsrfToken::new(
-                csrf_token.header_name().to_string(),
-                csrf_token.parameter_name().to_string(),
-                updated_token.clone(),
+                csrf_token.header_name(),
+                csrf_token.parameter_name(),
+                updated_token,
             ))
         }))
     }
@@ -135,17 +133,19 @@ impl XorCsrfTokenRequestAttributeHandler {
         xored_csrf
     }
 }
+
+#[async_trait]
 impl CsrfTokenRequestHandler for XorCsrfTokenRequestAttributeHandler {
-    fn handle(
+    async fn handle(
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        deferred_csrf_token: &dyn Fn() -> Arc<dyn CsrfToken>,
+        deferred_csrf_token: &mut dyn DeferredCsrfToken,
     ) {
-        let updated_csrf_token = self.defer_csrf_token_update(deferred_csrf_token);
-
-        let supplier = || updated_csrf_token.get();
-        self.inner.handle(request, response, &supplier);
+        let csrf_token = deferred_csrf_token.token().await;
+        let mut updated_csrf_token = self.defer_csrf_token_update(csrf_token);
+        self.inner
+            .handle(request, response, &mut updated_csrf_token);
     }
 }
 
@@ -164,28 +164,26 @@ impl CsrfTokenRequestResolver for XorCsrfTokenRequestAttributeHandler {
 ///
 /// This ensures the CSRF token is only generated once per request,
 /// even if the supplier is called multiple times.
-struct CachedCsrfTokenSupplier {
-    csrf_token: Arc<dyn CsrfToken>,
+struct CachedDeferredCsrfToken {
+    csrf_token_supplier: Arc<dyn Fn() -> Arc<dyn CsrfToken> + Send + Sync>,
 }
 
-impl CachedCsrfTokenSupplier {
+impl CachedDeferredCsrfToken {
     /// Creates a new CachedCsrfTokenSupplier.
-    ///
-    /// # Arguments
-    ///
-    /// * `delegate` - The supplier function to cache results from.
-    fn new(delegate: Arc<dyn Fn() -> Arc<dyn CsrfToken>>) -> Self {
+    fn new(csrf_token_supplier: Arc<dyn Fn() -> Arc<dyn CsrfToken> + Send + Sync>) -> Self {
         Self {
-            csrf_token: delegate(),
+            csrf_token_supplier,
         }
     }
+}
 
-    /// Gets the cached CSRF token, generating it if not yet cached.
-    ///
-    /// # Returns
-    ///
-    /// The CSRF token.
-    fn get(&self) -> Arc<dyn CsrfToken> {
-        self.csrf_token.clone()
+#[async_trait]
+impl DeferredCsrfToken for CachedDeferredCsrfToken {
+    async fn token(&mut self) -> Arc<dyn CsrfToken> {
+        (self.csrf_token_supplier)()
+    }
+
+    async fn is_generated(&mut self) -> bool {
+        panic!("CachedDeferredCsrfToken is not generated")
     }
 }

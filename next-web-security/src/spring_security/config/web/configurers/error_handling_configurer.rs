@@ -77,11 +77,6 @@ where
     /// # Arguments
     ///
     /// * `access_denied_url` - The URL to the access denied page (i.e. /errors/401).
-    ///
-    /// # See Also
-    ///
-    /// * `AccessDeniedHandlerImpl`
-    /// * `access_denied_handler`
     pub fn access_denied_page(&mut self, access_denied_url: impl Into<String>) -> &mut Self {
         let mut access_denied_handler = AccessDeniedHandlerImpl::default();
         access_denied_handler.set_error_page(access_denied_url);
@@ -130,10 +125,10 @@ where
     /// * `entry_point` - The `AuthenticationEntryPoint` to use for the given authority.
     /// * `authority` - The authority string.
     pub fn default_denied_handler_for_missing_authority(
-        mut self,
+        &mut self,
         entry_point: Arc<dyn AuthenticationEntryPoint>,
         authority: impl Into<String>,
-    ) -> Self {
+    ) -> &mut Self {
         if self.missing_authorities_handler_builder.is_none() {
             self.missing_authorities_handler_builder =
                 Some(DelegatingMissingAuthorityAccessDeniedHandler::builder());
@@ -182,9 +177,9 @@ where
     ///
     /// * `authentication_entry_point` - The `AuthenticationEntryPoint` to use.
     pub fn authentication_entry_point(
-        mut self,
+        &mut self,
         authentication_entry_point: Arc<dyn AuthenticationEntryPoint>,
-    ) -> Self {
+    ) -> &mut Self {
         self.authentication_entry_point = Some(authentication_entry_point);
         self
     }

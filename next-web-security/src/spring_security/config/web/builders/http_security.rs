@@ -143,6 +143,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn cors<F>(&mut self, cors: F) -> &mut Self
     where
         F: FnMut(&mut CorsConfigurer<Self>),
@@ -224,6 +225,7 @@ impl HttpSecurity {
         self
     }
 
+    /// Ok
     pub fn csrf<F>(&mut self, csrf: F) -> &mut Self
     where
         F: FnMut(&mut CsrfConfigurer<Self>),

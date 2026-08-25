@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
+    error::BoxError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
@@ -34,7 +35,7 @@ where
         token: Option<&Arc<dyn CsrfToken>>,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-    );
+    ) -> Result<(), BoxError>;
 
     /// Loads the CSRF Token from the request.
     ///
@@ -56,7 +57,10 @@ where
 ///
 /// # Returns
 /// A `DeferredCsrfToken` instance.
-#[allow(dead_code)]
-pub fn load_deferred_token(_self: Arc<dyn CsrfTokenRepository>) -> RepositoryDeferredCsrfToken {
-    RepositoryDeferredCsrfToken::new(_self)
+pub fn load_deferred_token(
+    this: Arc<dyn CsrfTokenRepository>,
+    request: &mut dyn HttpRequest,
+    response: &mut dyn HttpResponse,
+) -> RepositoryDeferredCsrfToken {
+    RepositoryDeferredCsrfToken::new(this, request, response)
 }
