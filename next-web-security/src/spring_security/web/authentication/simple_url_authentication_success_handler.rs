@@ -16,7 +16,7 @@ use crate::{
 /// AuthenticationSuccessHandler which can be configured with a default URL which users should be sent to upon successful authentication.
 #[derive(Clone)]
 pub struct SimpleUrlAuthenticationSuccessHandler {
-    inner: BaseAuthenticationTargetUrlRequestHandler,
+    base: BaseAuthenticationTargetUrlRequestHandler,
 }
 
 impl SimpleUrlAuthenticationSuccessHandler {
@@ -46,7 +46,7 @@ impl AuthenticationSuccessHandler for SimpleUrlAuthenticationSuccessHandler {
         response: &mut dyn HttpResponse,
         authentication: &dyn Authentication,
     ) {
-        self.inner.handle(request, response, Some(authentication));
+        self.base.handle(request, response, Some(authentication));
         self.clear_authentication_attributes(request);
     }
 }
@@ -55,20 +55,20 @@ impl Deref for SimpleUrlAuthenticationSuccessHandler {
     type Target = BaseAuthenticationTargetUrlRequestHandler;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for SimpleUrlAuthenticationSuccessHandler {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
 impl Default for SimpleUrlAuthenticationSuccessHandler {
     fn default() -> Self {
         Self {
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }

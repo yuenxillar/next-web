@@ -1,2 +1,5 @@
-pub mod base_user_details_authentication_provider;
-pub mod dao_authentication_provider;
+mod base_user_details_authentication_provider;
+mod dao_authentication_provider;
+
+pub use base_user_details_authentication_provider::*;
+pub use dao_authentication_provider::*;

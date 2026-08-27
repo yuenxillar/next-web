@@ -75,7 +75,7 @@ where
     basic_auth_entry_point: BasicAuthenticationEntryPoint,
     security_context_repository: Option<Arc<dyn SecurityContextRepository>>,
 
-    inner: BaseHttpConfigurer<Self, B>,
+    base: BaseHttpConfigurer<Self, B>,
 }
 
 impl<B> HttpBasicConfigurer<B>
@@ -244,11 +244,11 @@ where
     B: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, B> {
-        self.inner.get_object()
+        self.base.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, B> {
-        self.inner.get_mut_object()
+        self.base.get_mut_object()
     }
 }
 
@@ -296,7 +296,7 @@ where
             });
 
         basic_authentication_filter.set_security_context_holder_strategy(
-            self.inner.get_security_context_holder_strategy().clone(),
+            self.base.get_security_context_holder_strategy().clone(),
         );
 
         http.add_filter(basic_authentication_filter);
@@ -310,7 +310,7 @@ where
     type Target = BaseHttpConfigurer<Self, B>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -319,7 +319,7 @@ where
     B: HttpSecurityBuilder<B>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -334,7 +334,7 @@ where
             basic_auth_entry_point: Default::default(),
             security_context_repository: None,
 
-            inner: Default::default(),
+            base: Default::default(),
         };
         http_basic_configurer.realm_name(Self::DEFAULT_REALM);
 

@@ -1,12 +1,14 @@
 use std::{collections::HashSet, fmt::Debug, marker::PhantomData, sync::Arc};
 
-use next_web_core::async_trait;
+use next_web_core::{async_trait, error::BoxError};
 
 use crate::{
     access::hierarchicalroles::RoleHierarchy,
     authorization::{AuthoritiesAuthorizationManager, AuthorizationManager, AuthorizationResult},
     core::Authentication,
 };
+
+pub(crate) const ROLE_PREFIX: &str = "ROLE_";
 
 /// An AuthorizationManager that determines if the current user is authorized by evaluating if the
 /// Authentication contains a specified authority.
@@ -18,8 +20,7 @@ pub struct AuthorityAuthorizationManager<T> {
 }
 
 impl<T> AuthorityAuthorizationManager<T> {
-    const ROLE_PREFIX: &str = "ROLE_";
-
+    /// Creates a new AuthorityAuthorizationManager with the provided authorities.
     pub fn new<I, V>(authorities: I) -> Self
     where
         I: IntoIterator<Item = V>,
@@ -45,11 +46,11 @@ impl<T> AuthorityAuthorizationManager<T> {
     /// Creates an instance of AuthorityAuthorizationManager with the provided authority.
     pub fn has_role(role: &str) -> AuthorityAuthorizationManager<T> {
         assert!(
-            !role.starts_with(Self::ROLE_PREFIX),
+            !role.starts_with(ROLE_PREFIX),
             "{} should not start with {} since {} is automatically prepended when using hasRole. Consider using hasAuthority instead.",
-            role, Self::ROLE_PREFIX, Self::ROLE_PREFIX
+            role, ROLE_PREFIX, ROLE_PREFIX
         );
-        Self::has_authority(&format!("{}{}", Self::ROLE_PREFIX, role))
+        Self::has_authority(&format!("{}{}", ROLE_PREFIX, role))
     }
 
     /// Creates an instance of AuthorityAuthorizationManager with the provided authority.
@@ -59,11 +60,7 @@ impl<T> AuthorityAuthorizationManager<T> {
     }
 
     /// Creates an instance of AuthorityAuthorizationManager with the provided authority.
-    pub fn has_any_role(
-        role_prefix: &str,
-        roles: impl IntoIterator<Item = String>,
-    ) -> AuthorityAuthorizationManager<T> {
-        let roles = roles.into_iter().collect::<Vec<_>>();
+    pub fn has_any_role(role_prefix: &str, roles: Vec<String>) -> AuthorityAuthorizationManager<T> {
         assert!(roles.len() > 0, "roles cannot be empty");
         Self::has_any_authority(Self::to_named_roles_array(role_prefix, roles))
     }
@@ -98,7 +95,7 @@ where
         &self,
         authentication: &dyn Authentication,
         _var: &T,
-    ) -> Option<Box<dyn AuthorizationResult>> {
+    ) -> Result<Option<Arc<dyn AuthorizationResult>>, BoxError> {
         self.delegate
             .authorize(authentication, &self.authorities)
             .await

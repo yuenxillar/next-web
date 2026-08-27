@@ -1,5 +1,7 @@
 //! Minimal Rust translation surface for Spring Security OAuth2 login.
 
+pub mod client;
+
 use std::{
     any::TypeId,
     collections::HashMap,
@@ -425,7 +427,10 @@ impl OAuth2AuthorizationRequestResolver for DefaultOAuth2AuthorizationRequestRes
             .find_by_registration_id(client_registration_id)
             .ok_or_else(|| {
                 AuthenticationError::with_kind(
-                    format!("Invalid Client Registration with Id: {}", client_registration_id),
+                    format!(
+                        "Invalid Client Registration with Id: {}",
+                        client_registration_id
+                    ),
                     AuthenticationErrorKind::InvalidClientRegistrationId,
                 )
             })?;
@@ -533,7 +538,34 @@ impl AuthorizationRequestRepository for HttpSessionOAuth2AuthorizationRequestRep
 
 pub trait OAuth2AuthorizedClientService: Send + Sync {}
 
-pub trait OAuth2AuthorizedClientRepository: Send + Sync {}
+pub trait OAuth2AuthorizedClientRepository: Send + Sync {
+    fn save_authorized_client(
+        &self,
+        _authorized_client: OAuth2AuthorizedClient,
+        _principal: &dyn Authentication,
+        _request: &dyn HttpRequest,
+        _response: &mut dyn HttpResponse,
+    ) {
+    }
+
+    fn load_authorized_client(
+        &self,
+        _client_registration_id: &str,
+        _principal: &dyn Authentication,
+        _request: &dyn HttpRequest,
+    ) -> Option<OAuth2AuthorizedClient> {
+        None
+    }
+
+    fn remove_authorized_client(
+        &self,
+        _client_registration_id: &str,
+        _principal: &dyn Authentication,
+        _request: &dyn HttpRequest,
+        _response: &mut dyn HttpResponse,
+    ) {
+    }
+}
 
 #[derive(Clone)]
 pub struct AuthenticatedPrincipalOAuth2AuthorizedClientRepository {
@@ -717,7 +749,7 @@ pub struct OAuth2LoginAuthenticationToken {
     client_registration: ClientRegistration,
     authorization_exchange: OAuth2AuthorizationExchange,
     cleared: AtomicBool,
-    inner: BaseAuthenticationToken,
+    base: BaseAuthenticationToken,
 }
 
 impl OAuth2LoginAuthenticationToken {
@@ -732,7 +764,7 @@ impl OAuth2LoginAuthenticationToken {
             client_registration,
             authorization_exchange,
             cleared: AtomicBool::new(false),
-            inner: BaseAuthenticationToken::new(None),
+            base: BaseAuthenticationToken::new(None),
         };
         token
             .set_authenticated(false)
@@ -756,7 +788,7 @@ impl OAuth2LoginAuthenticationToken {
             client_registration,
             authorization_exchange,
             cleared: AtomicBool::new(false),
-            inner,
+            base: inner,
         }
     }
 
@@ -775,7 +807,7 @@ impl OAuth2LoginAuthenticationToken {
             client_registration: builder.client_registration.clone(),
             authorization_exchange: builder.authorization_exchange.clone(),
             cleared: AtomicBool::new(false),
-            inner: BaseAuthenticationToken::from_builder(builder),
+            base: BaseAuthenticationToken::from_builder(builder),
         }
     }
 }
@@ -788,14 +820,14 @@ impl Clone for OAuth2LoginAuthenticationToken {
             client_registration: self.client_registration.clone(),
             authorization_exchange: self.authorization_exchange.clone(),
             cleared: AtomicBool::new(self.cleared.load(Ordering::Acquire)),
-            inner: self.inner.clone(),
+            base: self.base.clone(),
         }
     }
 }
 
 impl Authentication for OAuth2LoginAuthenticationToken {
     fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
-        self.inner.authorities()
+        self.base.authorities()
     }
 
     fn credentials(&self) -> Option<&AuthPrincipal> {
@@ -806,7 +838,7 @@ impl Authentication for OAuth2LoginAuthenticationToken {
     }
 
     fn details(&self) -> Option<&AuthPrincipal> {
-        self.inner.details()
+        self.base.details()
     }
 
     fn principal(&self) -> Option<&AuthPrincipal> {
@@ -814,7 +846,7 @@ impl Authentication for OAuth2LoginAuthenticationToken {
     }
 
     fn is_authenticated(&self) -> bool {
-        self.inner.is_authenticated()
+        self.base.is_authenticated()
     }
 
     fn set_authenticated(
@@ -824,7 +856,7 @@ impl Authentication for OAuth2LoginAuthenticationToken {
         if is_authenticated {
             return Err("Cannot set this token to trusted - use authenticated()".into());
         }
-        self.inner.set_authenticated(false)
+        self.base.set_authenticated(false)
     }
 
     fn to_builder(&self) -> Box<dyn AuthenticationBuilder> {
@@ -863,7 +895,7 @@ pub struct OAuth2LoginAuthenticationTokenBuilder {
     credentials: Option<AuthPrincipal>,
     client_registration: ClientRegistration,
     authorization_exchange: OAuth2AuthorizationExchange,
-    inner: BaseAuthenticationBuilder,
+    base: BaseAuthenticationBuilder,
 }
 
 impl OAuth2LoginAuthenticationTokenBuilder {
@@ -873,14 +905,14 @@ impl OAuth2LoginAuthenticationTokenBuilder {
             credentials: token.credentials.clone(),
             client_registration: token.client_registration.clone(),
             authorization_exchange: token.authorization_exchange.clone(),
-            inner: BaseAuthenticationBuilder::with_token(token),
+            base: BaseAuthenticationBuilder::with_token(token),
         }
     }
 }
 
 impl AuthenticationBuilder for OAuth2LoginAuthenticationTokenBuilder {
     fn authorities(&mut self, authorities: Box<dyn FnOnce(&mut Vec<Arc<dyn GrantedAuthority>>)>) {
-        self.inner.authorities(authorities);
+        self.base.authorities(authorities);
     }
 
     fn credentials(&mut self, credentials: Option<AuthPrincipal>) {
@@ -888,7 +920,7 @@ impl AuthenticationBuilder for OAuth2LoginAuthenticationTokenBuilder {
     }
 
     fn details(&mut self, details: Option<AuthPrincipal>) {
-        self.inner.details(details);
+        self.base.details(details);
     }
 
     fn principal(&mut self, principal: Option<AuthPrincipal>) {
@@ -896,7 +928,7 @@ impl AuthenticationBuilder for OAuth2LoginAuthenticationTokenBuilder {
     }
 
     fn authenticated(&mut self, authenticated: bool) {
-        self.inner.authenticated(authenticated);
+        self.base.authenticated(authenticated);
     }
 
     fn build(&mut self) -> Arc<dyn Authentication> {
@@ -908,13 +940,13 @@ impl std::ops::Deref for OAuth2LoginAuthenticationToken {
     type Target = BaseAuthenticationToken;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl std::ops::DerefMut for OAuth2LoginAuthenticationToken {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -922,13 +954,13 @@ impl std::ops::Deref for OAuth2LoginAuthenticationTokenBuilder {
     type Target = BaseAuthenticationBuilder;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl std::ops::DerefMut for OAuth2LoginAuthenticationTokenBuilder {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -1098,6 +1130,499 @@ fn decode(value: &str) -> String {
     urlencoding::decode(value)
         .map(|value| value.into_owned())
         .unwrap_or_else(|_| value.to_string())
+}
+
+/// An OAuth 2.0 Access Token.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OAuth2AccessToken {
+    token_type: String,
+    scopes: Vec<String>,
+    expires_at: Option<u64>,
+    value: String,
+}
+
+impl OAuth2AccessToken {
+    /// The default token type used by most providers.
+    pub const BEARER_TOKEN_TYPE: &'static str = "Bearer";
+
+    /// Creates a bearer access token with the given value.
+    pub fn new(value: impl Into<String>) -> Self {
+        Self {
+            token_type: Self::BEARER_TOKEN_TYPE.to_string(),
+            scopes: Vec::new(),
+            expires_at: None,
+            value: value.into(),
+        }
+    }
+
+    /// Creates an access token with full details.
+    pub fn with_details(
+        value: impl Into<String>,
+        token_type: impl Into<String>,
+        scopes: impl IntoIterator<Item = impl Into<String>>,
+        expires_at: Option<u64>,
+    ) -> Self {
+        Self {
+            token_type: token_type.into(),
+            scopes: scopes.into_iter().map(Into::into).collect(),
+            expires_at,
+            value: value.into(),
+        }
+    }
+
+    /// Builds an access token from an `OAuth2AccessTokenResponse`.
+    pub fn from_response(response: &OAuth2AccessTokenResponse) -> Self {
+        Self::new(response.access_token())
+    }
+
+    pub fn token_type(&self) -> &str {
+        &self.token_type
+    }
+
+    pub fn scopes(&self) -> &[String] {
+        &self.scopes
+    }
+
+    pub fn expires_at(&self) -> Option<u64> {
+        self.expires_at
+    }
+
+    pub fn token_value(&self) -> &str {
+        &self.value
+    }
+}
+
+/// An OAuth 2.0 Refresh Token.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OAuth2RefreshToken {
+    value: String,
+    expires_at: Option<u64>,
+}
+
+impl OAuth2RefreshToken {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+            expires_at: None,
+        }
+    }
+
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    pub fn expires_at(&self) -> Option<u64> {
+        self.expires_at
+    }
+}
+
+/// A client that has been authorized to access a protected resource on behalf
+/// of a principal, together with the issued access (and optional refresh) token.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OAuth2AuthorizedClient {
+    client_registration: ClientRegistration,
+    principal_name: String,
+    access_token: OAuth2AccessToken,
+    refresh_token: Option<OAuth2RefreshToken>,
+}
+
+impl OAuth2AuthorizedClient {
+    pub fn new(
+        client_registration: ClientRegistration,
+        principal_name: impl Into<String>,
+        access_token: OAuth2AccessToken,
+    ) -> Self {
+        Self {
+            client_registration,
+            principal_name: principal_name.into(),
+            access_token,
+            refresh_token: None,
+        }
+    }
+
+    pub fn with_refresh_token(mut self, refresh_token: OAuth2RefreshToken) -> Self {
+        self.refresh_token = Some(refresh_token);
+        self
+    }
+
+    pub fn client_registration(&self) -> &ClientRegistration {
+        &self.client_registration
+    }
+
+    pub fn principal_name(&self) -> &str {
+        &self.principal_name
+    }
+
+    pub fn access_token(&self) -> &OAuth2AccessToken {
+        &self.access_token
+    }
+
+    pub fn refresh_token(&self) -> Option<&OAuth2RefreshToken> {
+        self.refresh_token.as_ref()
+    }
+}
+
+/// Carries the `ClientRegistration` and `OAuth2AuthorizationExchange` through
+/// the authentication pipeline. Stored in the token's `credentials` so the
+/// `OAuth2AuthorizationCodeAuthenticationProvider` can recover it from a
+/// `&dyn Authentication`.
+#[derive(Clone)]
+struct OAuth2AuthorizationCodeRequestData {
+    client_registration: ClientRegistration,
+    authorization_exchange: OAuth2AuthorizationExchange,
+}
+
+/// An `Authentication` representing the result of the OAuth 2.0 Authorization
+/// Code Grant. While unauthenticated it carries the authorization request/
+/// response exchange; once authenticated it carries the issued access token
+/// and the persisted `OAuth2AuthorizedClient`.
+pub struct OAuth2AuthorizationCodeAuthenticationToken {
+    principal: Option<AuthPrincipal>,
+    credentials: Option<AuthPrincipal>,
+    principal_name: String,
+    client_registration: ClientRegistration,
+    authorization_exchange: OAuth2AuthorizationExchange,
+    access_token: Option<OAuth2AccessToken>,
+    authorized_client: Option<OAuth2AuthorizedClient>,
+    base: BaseAuthenticationToken,
+}
+
+impl OAuth2AuthorizationCodeAuthenticationToken {
+    pub fn unauthenticated(
+        client_registration: ClientRegistration,
+        authorization_exchange: OAuth2AuthorizationExchange,
+    ) -> Self {
+        let credentials = Arc::new(OAuth2AuthorizationCodeRequestData {
+            client_registration: client_registration.clone(),
+            authorization_exchange: authorization_exchange.clone(),
+        }) as AuthPrincipal;
+        let mut token = Self {
+            principal: None,
+            credentials: Some(credentials),
+            principal_name: String::new(),
+            client_registration,
+            authorization_exchange,
+            access_token: None,
+            authorized_client: None,
+            base: BaseAuthenticationToken::new(None),
+        };
+        token
+            .set_authenticated(false)
+            .expect("OAuth2AuthorizationCodeAuthenticationToken cannot be set trusted directly");
+        token
+    }
+
+    pub fn authenticated(
+        principal_name: impl Into<String>,
+        client_registration: ClientRegistration,
+        authorization_exchange: OAuth2AuthorizationExchange,
+        access_token: OAuth2AccessToken,
+        authorized_client: OAuth2AuthorizedClient,
+        authorities: Vec<Arc<dyn GrantedAuthority>>,
+    ) -> Self {
+        let mut inner = BaseAuthenticationToken::new(Some(authorities));
+        inner
+            .set_authenticated(true)
+            .expect("authenticated OAuth2 code token should accept trusted state");
+        let principal_name = principal_name.into();
+        let credentials = Arc::new(access_token.clone()) as AuthPrincipal;
+        let principal = Arc::new(authorized_client.clone()) as AuthPrincipal;
+        Self {
+            principal: Some(principal),
+            credentials: Some(credentials),
+            principal_name,
+            client_registration,
+            authorization_exchange,
+            access_token: Some(access_token),
+            authorized_client: Some(authorized_client),
+            base: inner,
+        }
+    }
+
+    pub fn client_registration(&self) -> &ClientRegistration {
+        &self.client_registration
+    }
+
+    pub fn authorization_exchange(&self) -> &OAuth2AuthorizationExchange {
+        &self.authorization_exchange
+    }
+
+    pub fn access_token(&self) -> Option<&OAuth2AccessToken> {
+        self.access_token.as_ref()
+    }
+
+    pub fn authorized_client(&self) -> Option<&OAuth2AuthorizedClient> {
+        self.authorized_client.as_ref()
+    }
+
+    fn from_builder(builder: &mut OAuth2AuthorizationCodeAuthenticationTokenBuilder) -> Self {
+        Self {
+            principal: builder.principal.take(),
+            credentials: builder.credentials.take(),
+            principal_name: builder.principal_name.clone(),
+            client_registration: builder.client_registration.clone(),
+            authorization_exchange: builder.authorization_exchange.clone(),
+            access_token: builder.access_token.clone(),
+            authorized_client: builder.authorized_client.clone(),
+            base: BaseAuthenticationToken::from_builder(builder),
+        }
+    }
+}
+
+impl Clone for OAuth2AuthorizationCodeAuthenticationToken {
+    fn clone(&self) -> Self {
+        Self {
+            principal: self.principal.clone(),
+            credentials: self.credentials.clone(),
+            principal_name: self.principal_name.clone(),
+            client_registration: self.client_registration.clone(),
+            authorization_exchange: self.authorization_exchange.clone(),
+            access_token: self.access_token.clone(),
+            authorized_client: self.authorized_client.clone(),
+            base: self.base.clone(),
+        }
+    }
+}
+
+impl Authentication for OAuth2AuthorizationCodeAuthenticationToken {
+    fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
+        self.base.authorities()
+    }
+
+    fn credentials(&self) -> Option<&AuthPrincipal> {
+        self.credentials.as_ref()
+    }
+
+    fn details(&self) -> Option<&AuthPrincipal> {
+        self.base.details()
+    }
+
+    fn principal(&self) -> Option<&AuthPrincipal> {
+        self.principal.as_ref()
+    }
+
+    fn is_authenticated(&self) -> bool {
+        self.base.is_authenticated()
+    }
+
+    fn set_authenticated(
+        &mut self,
+        is_authenticated: bool,
+    ) -> Result<(), next_web_core::error::BoxError> {
+        if is_authenticated {
+            return Err(
+                "Cannot set this token to trusted - use authenticated()".into(),
+            );
+        }
+        self.base.set_authenticated(false)
+    }
+
+    fn to_builder(&self) -> Box<dyn AuthenticationBuilder> {
+        Box::new(OAuth2AuthorizationCodeAuthenticationTokenBuilder::with_token(self))
+    }
+
+    fn of(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+}
+
+impl Principal for OAuth2AuthorizationCodeAuthenticationToken {
+    fn name(&self) -> &str {
+        if self.principal_name.is_empty() {
+            self.client_registration.registration_id()
+        } else {
+            &self.principal_name
+        }
+    }
+}
+
+impl fmt::Display for OAuth2AuthorizationCodeAuthenticationToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} [Principal={}, Authenticated={}, ClientRegistration={}]",
+            std::any::type_name::<Self>(),
+            self.name(),
+            self.is_authenticated(),
+            self.client_registration.registration_id()
+        )
+    }
+}
+
+pub struct OAuth2AuthorizationCodeAuthenticationTokenBuilder {
+    principal: Option<AuthPrincipal>,
+    credentials: Option<AuthPrincipal>,
+    principal_name: String,
+    client_registration: ClientRegistration,
+    authorization_exchange: OAuth2AuthorizationExchange,
+    access_token: Option<OAuth2AccessToken>,
+    authorized_client: Option<OAuth2AuthorizedClient>,
+    base: BaseAuthenticationBuilder,
+}
+
+impl OAuth2AuthorizationCodeAuthenticationTokenBuilder {
+    fn with_token(token: &OAuth2AuthorizationCodeAuthenticationToken) -> Self {
+        Self {
+            principal: token.principal.clone(),
+            credentials: token.credentials.clone(),
+            principal_name: token.principal_name.clone(),
+            client_registration: token.client_registration.clone(),
+            authorization_exchange: token.authorization_exchange.clone(),
+            access_token: token.access_token.clone(),
+            authorized_client: token.authorized_client.clone(),
+            base: BaseAuthenticationBuilder::with_token(token),
+        }
+    }
+}
+
+impl AuthenticationBuilder for OAuth2AuthorizationCodeAuthenticationTokenBuilder {
+    fn authorities(&mut self, authorities: Box<dyn FnOnce(&mut Vec<Arc<dyn GrantedAuthority>>)>) {
+        self.base.authorities(authorities);
+    }
+
+    fn credentials(&mut self, credentials: Option<AuthPrincipal>) {
+        self.credentials = credentials;
+    }
+
+    fn details(&mut self, details: Option<AuthPrincipal>) {
+        self.base.details(details);
+    }
+
+    fn principal(&mut self, principal: Option<AuthPrincipal>) {
+        self.principal = principal;
+    }
+
+    fn authenticated(&mut self, authenticated: bool) {
+        self.base.authenticated(authenticated);
+    }
+
+    fn build(&mut self) -> Arc<dyn Authentication> {
+        Arc::new(OAuth2AuthorizationCodeAuthenticationToken::from_builder(self))
+    }
+}
+
+impl std::ops::Deref for OAuth2AuthorizationCodeAuthenticationToken {
+    type Target = BaseAuthenticationToken;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl std::ops::DerefMut for OAuth2AuthorizationCodeAuthenticationToken {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
+impl std::ops::Deref for OAuth2AuthorizationCodeAuthenticationTokenBuilder {
+    type Target = BaseAuthenticationBuilder;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl std::ops::DerefMut for OAuth2AuthorizationCodeAuthenticationTokenBuilder {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
+/// An `AuthenticationProvider` for the OAuth 2.0 Authorization Code Grant.
+///
+/// Delegates the token-endpoint exchange to an `OAuth2AccessTokenResponseClient`
+/// and, on success, returns an authenticated
+/// `OAuth2AuthorizationCodeAuthenticationToken` carrying the issued access token
+/// and authorized client.
+#[derive(Clone)]
+pub struct OAuth2AuthorizationCodeAuthenticationProvider {
+    access_token_response_client:
+        Arc<dyn OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>>,
+    authorities_mapper: Option<Arc<dyn GrantedAuthoritiesMapper>>,
+}
+
+impl OAuth2AuthorizationCodeAuthenticationProvider {
+    pub fn new(
+        access_token_response_client: Arc<
+            dyn OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>,
+        >,
+    ) -> Self {
+        Self {
+            access_token_response_client,
+            authorities_mapper: None,
+        }
+    }
+
+    pub fn set_authorities_mapper(
+        &mut self,
+        authorities_mapper: Arc<dyn GrantedAuthoritiesMapper>,
+    ) {
+        self.authorities_mapper = Some(authorities_mapper);
+    }
+}
+
+#[async_trait]
+impl AuthenticationProvider for OAuth2AuthorizationCodeAuthenticationProvider {
+    async fn authenticate(
+        &self,
+        authentication: &Arc<dyn Authentication>,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
+        if authentication.of() != TypeId::of::<OAuth2AuthorizationCodeAuthenticationToken>() {
+            return Ok(None);
+        }
+        let request_data = authentication
+            .credentials()
+            .and_then(|credentials| credentials.downcast_ref::<OAuth2AuthorizationCodeRequestData>())
+            .ok_or_else(|| {
+                AuthenticationError::with_kind(
+                    "OAuth2 authorization code request data is missing",
+                    AuthenticationErrorKind::AuthenticationService,
+                )
+            })?;
+        let exchange = request_data.authorization_exchange.clone();
+        if let Some(error_code) = exchange.authorization_response().error_code() {
+            return Err(AuthenticationError::with_kind(
+                format!(
+                    "OAuth2 authorization response contained error: {}",
+                    error_code
+                ),
+                AuthenticationErrorKind::BadCredentials,
+            ));
+        }
+
+        let client_registration = request_data.client_registration.clone();
+        let grant_request =
+            OAuth2AuthorizationCodeGrantRequest::new(client_registration.clone(), exchange);
+        let response = self.access_token_response_client.get_token_response(&grant_request)?;
+        let access_token = OAuth2AccessToken::from_response(&response);
+        let principal_name = client_registration.registration_id().to_string();
+        let authorized_client = OAuth2AuthorizedClient::new(
+            client_registration.clone(),
+            principal_name.clone(),
+            access_token.clone(),
+        );
+
+        let authorities: Vec<Arc<dyn GrantedAuthority>> = self
+            .authorities_mapper
+            .as_ref()
+            .map(|_mapper| Vec::new())
+            .unwrap_or_default();
+
+        let authenticated = OAuth2AuthorizationCodeAuthenticationToken::authenticated(
+            principal_name,
+            client_registration,
+            grant_request.authorization_exchange().clone(),
+            access_token,
+            authorized_client,
+            authorities,
+        );
+        Ok(Some(Arc::new(authenticated)))
+    }
+
+    fn supports(&self, authentication: TypeId) -> bool {
+        authentication == TypeId::of::<OAuth2AuthorizationCodeAuthenticationToken>()
+    }
 }
 
 #[cfg(test)]

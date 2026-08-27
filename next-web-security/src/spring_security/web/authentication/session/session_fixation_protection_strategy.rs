@@ -30,7 +30,7 @@ pub struct SessionFixationProtectionStrategy {
     /// Indicates that the session attributes of an existing session should be migrated to the new session. Defaults to true.
     migrate_session_attributes: bool,
 
-    inner: BaseSessionFixationProtectionStrategy,
+    base: BaseSessionFixationProtectionStrategy,
 }
 
 impl SessionFixationProtectionStrategy {
@@ -126,13 +126,13 @@ impl Deref for SessionFixationProtectionStrategy {
     type Target = BaseSessionFixationProtectionStrategy;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for SessionFixationProtectionStrategy {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -152,7 +152,7 @@ impl Default for SessionFixationProtectionStrategy {
     fn default() -> Self {
         Self {
             migrate_session_attributes: true,
-            inner: BaseSessionFixationProtectionStrategy::default(),
+            base: BaseSessionFixationProtectionStrategy::default(),
         }
     }
 }

@@ -50,7 +50,7 @@ impl DefaultResourcesFilter {
     pub fn css() -> Self {
         Self::new(
             Arc::new(PathPatternRequestMatcher::path_pattern(
-                Some(HttpMethod::Get),
+                Some(HttpMethod::GET),
                 "/default-ui.css",
             )),
             DEFAULT_CSS,
@@ -67,7 +67,7 @@ impl DefaultResourcesFilter {
     pub fn webauthn() -> Self {
         Self::new(
             Arc::new(PathPatternRequestMatcher::path_pattern(
-                Some(HttpMethod::Get),
+                Some(HttpMethod::GET),
                 "/login/webauthn.js",
             )),
             DEFAULT_WEBAUTHN_JS,

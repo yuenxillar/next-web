@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, sync::Arc};
 
-use next_web_core::async_trait;
+use next_web_core::{async_trait, error::BoxError};
 
 use crate::{
     authorization::{
@@ -11,17 +11,24 @@ use crate::{
     core::Authentication,
 };
 
+/// An AuthorizationManager that requires all the authorities returned by a RequiredAuthoritiesRepository implementation.
 pub struct RequiredAuthoritiesAuthorizationManager<T> {
     authorities: Arc<dyn RequiredAuthoritiesRepository>,
     _marker: PhantomData<T>,
 }
 
 impl<T> RequiredAuthoritiesAuthorizationManager<T> {
+    /// Creates a new instance.
     pub fn new(authorities: Arc<dyn RequiredAuthoritiesRepository>) -> Self {
         Self {
             authorities,
             _marker: PhantomData,
         }
+    }
+
+    fn find_authorities(&self, authentication: &dyn Authentication) -> Vec<&str> {
+        let username = authentication.name();
+        self.authorities.find_required_authorities(username)
     }
 }
 
@@ -30,35 +37,17 @@ impl<T> AuthorizationManager<T> for RequiredAuthoritiesAuthorizationManager<T>
 where
     T: Send + Sync + 'static,
 {
-    // async fn check(
-    //     &self,
-    //     authentication: Box<dyn Authentication>,
-    //     object: T,
-    // ) -> Option<AuthorizationDecision> {
-    //     let required = self
-    //         .authorities
-    //         .find_required_authorities(&authentication.get_name());
-    //     if required.is_empty() {
-    //         return Some(AuthorizationDecision::new(true));
-    //     }
-    //     AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(required)
-    //         .check(authentication, object)
-    //         .await
-    // }
-
     async fn authorize(
         &self,
         authentication: &dyn Authentication,
         var: &T,
-    ) -> Option<Box<dyn AuthorizationResult>> {
-        let required = self
-            .authorities
-            .find_required_authorities(authentication.name());
-        if required.is_empty() {
-            return Some(Box::new(AuthorizationDecision::new(true)));
+    ) -> Result<Option<Arc<dyn AuthorizationResult>>, BoxError> {
+        let authorities = self.find_authorities(authentication);
+        if authorities.is_empty() {
+            return Ok(Some(Arc::new(AuthorizationDecision::new(true))));
         }
 
-        AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(required)
+        AllAuthoritiesAuthorizationManager::<T>::has_all_authorities(authorities)
             .authorize(authentication, var)
             .await
     }

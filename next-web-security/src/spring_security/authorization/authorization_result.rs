@@ -1,14 +1,12 @@
 use std::any::Any;
 
-use next_web_core::{clone_trait_object, DynClone};
-
+/// Represents an authorization result
 pub trait AuthorizationResult
 where
     Self: Send + Sync,
-    Self: DynClone,
     Self: Any,
 {
+    /// Returns:
+    /// whether the access has been granted
     fn is_granted(&self) -> bool;
 }
-
-clone_trait_object!(AuthorizationResult where Self: Send + Sync + Any);

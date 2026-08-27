@@ -9,13 +9,17 @@ impl AuthorityUtils {
         Vec::new()
     }
 
-    pub fn create_authority_list(
-        authorities: impl IntoIterator<Item = impl Into<String>>,
-    ) -> Vec<Arc<dyn GrantedAuthority>> {
+    pub fn create_authority_list<S>(
+        authorities: impl IntoIterator<Item = S>,
+    ) -> Vec<Arc<dyn GrantedAuthority>>
+    where
+        S: AsRef<str>,
+    {
         authorities
             .into_iter()
             .map(|authority| {
-                Arc::new(SimpleGrantedAuthority::new(authority)) as Arc<dyn GrantedAuthority>
+                Arc::new(SimpleGrantedAuthority::new(authority.as_ref()))
+                    as Arc<dyn GrantedAuthority>
             })
             .collect()
     }

@@ -12,6 +12,7 @@ pub mod kerberos;
 pub mod ldap;
 pub mod messaging;
 pub mod oauth2;
+pub mod oauth2_resource_server;
 pub mod permission;
 pub mod rsocket;
 pub mod saml2;

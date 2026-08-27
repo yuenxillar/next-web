@@ -64,7 +64,7 @@ where
     permit_all: bool,
     failure_url: Option<Box<str>>,
 
-    pub(super) inner: BaseHttpConfigurer<T, B>,
+    pub(super) base: BaseHttpConfigurer<T, B>,
 }
 
 impl<B, T, F> BaseAuthenticationFilterConfigurer<B, T, F>
@@ -342,7 +342,7 @@ where
     type Target = BaseHttpConfigurer<T, B>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -356,7 +356,7 @@ where
     F: DerefMut,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -517,7 +517,7 @@ where
             permit_all: false,
             failure_url: None,
 
-            inner: Default::default(),
+            base: Default::default(),
         };
 
         configurer.set_login_page("/login");

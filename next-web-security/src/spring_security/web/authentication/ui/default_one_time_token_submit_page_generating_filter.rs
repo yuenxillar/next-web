@@ -67,7 +67,7 @@ impl DefaultOneTimeTokenSubmitPageGeneratingFilter {
     pub fn new() -> Self {
         Self {
             request_matcher: Arc::new(PathPatternRequestMatcher::path_pattern(
-                Some(HttpMethod::Get),
+                Some(HttpMethod::GET),
                 DEFAULT_SUBMIT_PAGE_URL,
             )),
             resolve_hidden_inputs: Arc::new(|_| HashMap::new()),

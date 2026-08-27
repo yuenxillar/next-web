@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::{
     async_trait,
@@ -18,6 +21,20 @@ use crate::web::authentication::{
 #[derive(Clone)]
 pub struct OneTimeTokenAuthenticationFilter {
     base: BaseAuthenticationProcessingFilter,
+}
+
+impl Deref for OneTimeTokenAuthenticationFilter {
+    type Target = BaseAuthenticationProcessingFilter;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl DerefMut for OneTimeTokenAuthenticationFilter {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
 }
 
 impl OneTimeTokenAuthenticationFilter {

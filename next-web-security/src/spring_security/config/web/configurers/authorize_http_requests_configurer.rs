@@ -45,7 +45,7 @@ where
     authorization_manager_factory:
         Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>>,
 
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> AuthorizeHttpRequestsConfigurer<H>
@@ -59,7 +59,7 @@ where
             AuthorizationManagerRequestMatcherRegistry::with_authorization_manager_factory(
                 authorization_manager_factory.clone(),
             );
-        registry.inner.set_request_matcher_builder(
+        registry.base.set_request_matcher_builder(
             ctx.get_single_option::<Builder>()
                 .map(Clone::clone)
                 .unwrap_or_default(),
@@ -71,7 +71,7 @@ where
             publisher,
             authorization_manager_factory,
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 
@@ -145,7 +145,7 @@ where
         let mut authorization_filter = AuthorizationFilter::new(authorization_manager);
         authorization_filter.set_authorization_event_publisher(self.publisher.to_owned());
         authorization_filter.set_security_context_holder_strategy(
-            self.inner.get_security_context_holder_strategy().to_owned(),
+            self.base.get_security_context_holder_strategy().to_owned(),
         );
 
         http.add_filter(authorization_filter);
@@ -177,7 +177,7 @@ pub struct AuthorizationManagerRequestMatcherRegistry<C = AuthorizedUrl> {
     authorization_manager_factory:
         Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>>,
 
-    inner: BaseRequestMatcherRegistry<C>,
+    base: BaseRequestMatcherRegistry<C>,
 }
 
 impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
@@ -194,7 +194,7 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
             state: Arc::new(Mutex::new(RegistryState::default())),
             authorization_manager_factory,
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }
@@ -205,7 +205,7 @@ impl Default for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
             state: Arc::new(Mutex::new(RegistryState::default())),
             authorization_manager_factory: Arc::new(DefaultAuthorizationManagerFactory::default()),
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }
@@ -266,8 +266,8 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
                 "Can't configure anyRequest after itself"
             );
         }
-        self.inner.any_request();
-        let matchers = self.inner.take_request_matchers();
+        self.base.any_request();
+        let matchers = self.base.take_request_matchers();
         let authorized_url = self.chain_request_matchers(matchers);
         let mut state = self
             .state
@@ -284,8 +284,8 @@ impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
         T: Into<MatcherInput>,
     {
         self.assert_can_add_matchers();
-        self.inner.request_matchers(matcher);
-        let matchers = self.inner.take_request_matchers();
+        self.base.request_matchers(matcher);
+        let matchers = self.base.take_request_matchers();
         self.chain_request_matchers(matchers)
     }
 
@@ -324,13 +324,13 @@ impl Deref for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     type Target = BaseRequestMatcherRegistry<AuthorizedUrl>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -603,7 +603,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -612,6 +612,6 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

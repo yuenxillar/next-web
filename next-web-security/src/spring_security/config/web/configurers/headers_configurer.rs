@@ -62,7 +62,7 @@ where
     cross_origin_embedder_policy: CrossOriginEmbedderPolicyConfig,
     cross_origin_resource_policy: CrossOriginResourcePolicyConfig,
 
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> HeadersConfigurer<H>
@@ -323,7 +323,7 @@ where
             cross_origin_embedder_policy: Default::default(),
             cross_origin_resource_policy: Default::default(),
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }
@@ -335,7 +335,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -344,7 +344,7 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -354,11 +354,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_object()
+        self.base.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_mut_object()
+        self.base.get_mut_object()
     }
 }
 

@@ -28,7 +28,7 @@ where
 {
     logout_url: Option<String>,
 
-    inner: BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>,
+    base: BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>,
 }
 
 impl<H> Saml2LogoutConfigurer<H>
@@ -54,7 +54,7 @@ where
     fn default() -> Self {
         Self {
             logout_url: None,
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }
@@ -66,11 +66,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_object()
+        self.base.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_mut_object()
+        self.base.get_mut_object()
     }
 }
 
@@ -95,7 +95,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -104,6 +104,6 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

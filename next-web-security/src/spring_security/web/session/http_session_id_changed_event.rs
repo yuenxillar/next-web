@@ -40,14 +40,14 @@ impl ApplicationEvent for HttpSessionIdChangedEvent {
     }
 
     fn source_type(&self) -> TypeId {
-        self.inner.source_type()
+        self.base.source_type()
     }
 
     fn source(&self) -> &dyn Any {
-        self.inner.source()
+        self.base.source()
     }
 
     fn timestamp(&self) -> u64 {
-        self.inner.timestamp()
+        self.base.timestamp()
     }
 }

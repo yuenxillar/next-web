@@ -7,13 +7,13 @@ use crate::{authentication::event::BaseAuthenticationEvent, core::Authentication
 /// Application event which indicates successful logout
 #[derive(Clone)]
 pub struct LogoutSuccessEvent {
-    inner: BaseAuthenticationEvent,
+    base: BaseAuthenticationEvent,
 }
 
 impl LogoutSuccessEvent {
     pub fn new(authentication: Arc<dyn Authentication>) -> Self {
         Self {
-            inner: BaseAuthenticationEvent::new(authentication),
+            base: BaseAuthenticationEvent::new(authentication),
         }
     }
 }
@@ -32,6 +32,6 @@ impl Deref for LogoutSuccessEvent {
     type Target = BaseAuthenticationEvent;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }

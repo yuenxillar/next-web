@@ -12,7 +12,7 @@ use crate::{
         },
         authentication_provider::AuthenticationProvider,
         dao::base_user_details_authentication_provider::BaseUserDetailsAuthenticationProviderSupport,
-        password::compromised_password_checker::CompromisedPasswordChecker,
+        password::CompromisedPasswordChecker,
     },
     core::{
         userdetails::{
@@ -21,37 +21,50 @@ use crate::{
             },
             UserDetails, UserDetailsService,
         },
-        Authentication, AuthenticationError, UsernamePasswordAuthenticationToken,
+        Authentication, AuthenticationError, AuthenticationErrorKind,
+        UsernamePasswordAuthenticationToken,
     },
     crypto::{bcrypt::BCryptPasswordEncoder, password::PasswordEncoder},
 };
 
+/// An AuthenticationProvider implementation that retrieves user details from a UserDetailsService.
 pub struct DaoAuthenticationProvider {
     user_details_service: Arc<dyn UserDetailsService>,
     password_encoder: Arc<dyn PasswordEncoder>,
-    user_not_found_encoded_password: Mutex<Option<String>>,
+    user_not_found_encoded_password: Option<String>,
     user_details_password_service: Arc<dyn UserDetailsPasswordService>,
     compromised_password_checker: Option<Arc<dyn CompromisedPasswordChecker>>,
     support: BaseUserDetailsAuthenticationProviderSupport,
 }
 
 impl DaoAuthenticationProvider {
+    /// The plaintext password used to perform PasswordEncoder.matches(CharSequence, String) on when the user is not found to avoid SEC-2056.
+    const USER_NOT_FOUND_PASSWORD: &str = "userNotFoundPassword";
+
     pub fn new(user_details_service: Arc<dyn UserDetailsService>) -> Self {
         Self {
             user_details_service,
             password_encoder: Arc::new(BCryptPasswordEncoder),
-            user_not_found_encoded_password: Mutex::new(None),
+            user_not_found_encoded_password: None,
             user_details_password_service: Arc::new(NoopUserDetailsPasswordService),
             compromised_password_checker: None,
             support: BaseUserDetailsAuthenticationProviderSupport::default(),
         }
     }
 
+    /// Sets the PasswordEncoder instance to be used to encode and validate passwords.
+    ///  If not set, the password will be compared using PasswordEncoderFactories.create_delegating_password_encoder()
     pub fn set_password_encoder(&mut self, password_encoder: Arc<dyn PasswordEncoder>) {
         self.password_encoder = password_encoder;
-        if let Ok(mut encoded_password) = self.user_not_found_encoded_password.lock() {
-            *encoded_password = None;
-        }
+        self.user_not_found_encoded_password = None;
+    }
+
+    pub fn password_encoder(&self) -> &dyn PasswordEncoder {
+        self.password_encoder.as_ref()
+    }
+
+    pub fn user_details_service(&self) -> &dyn UserDetailsService {
+        self.user_details_service.as_ref()
     }
 
     pub fn set_user_details_password_service(
@@ -61,6 +74,7 @@ impl DaoAuthenticationProvider {
         self.user_details_password_service = user_details_password_service;
     }
 
+    /// Sets the CompromisedPasswordChecker to be used before creating a successful authentication. Defaults to none.
     pub fn set_compromised_password_checker(
         &mut self,
         compromised_password_checker: Arc<dyn CompromisedPasswordChecker>,
@@ -114,31 +128,33 @@ impl DaoAuthenticationProvider {
         }
     }
 
-    fn prepare_timing_attack_protection(&self) -> Result<(), AuthenticationError> {
-        let mut encoded_password = self.user_not_found_encoded_password.lock().map_err(|_| {
-            internal_authentication_service("User-not-found password cache was poisoned")
-        })?;
-        if encoded_password.is_none() {
-            *encoded_password = Some(
+    fn prepare_timing_attack_protection(&mut self) -> Result<(), AuthenticationError> {
+        if self.user_not_found_encoded_password.is_none() {
+            self.user_not_found_encoded_password = Some(
                 self.password_encoder
-                    .encode("userNotFoundPassword")
-                    .map_err(|error| internal_authentication_service(error.to_string()))?,
+                    .encode(Self::USER_NOT_FOUND_PASSWORD)
+                    .map_err(|error| {
+                        AuthenticationError::with_kind(
+                            error.to_string(),
+                            AuthenticationErrorKind::InternalAuthentication,
+                        )
+                    })?,
             );
         }
+
         Ok(())
     }
 
     fn mitigate_against_timing_attack(&self, authentication: &UsernamePasswordAuthenticationToken) {
-        let Some(credentials) = authentication.get_credentials() else {
+        let Some(credentials) = authentication.credentials() else {
             return;
         };
-        let Ok(encoded_password) = self.user_not_found_encoded_password.lock() else {
+        let Some(encoded_password) = self.user_not_found_encoded_password.as_deref() else {
             return;
         };
-        if let Some(encoded_password) = encoded_password.as_deref() {
-            let _ = self
-                .password_encoder
-                .matches(&credentials, encoded_password);
+        if let Some(presented_password) = credentials.as_ref().downcast_ref::<String>().as_deref() {
+            self.password_encoder
+                .matches(&presented_password, encoded_password);
         }
     }
 

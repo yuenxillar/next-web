@@ -55,6 +55,6 @@ impl SessionInformationExpiredEvent {
     }
 
     pub fn session_information(&self) -> &SessionInformation {
-        self.inner.value()
+        self.base.value()
     }
 }

@@ -80,7 +80,7 @@ pub struct TokenBasedRememberMeServices {
     encoding_algorithm: RememberMeTokenAlgorithm,
     matching_algorithm: RememberMeTokenAlgorithm,
 
-    inner: BaseRememberMeServices,
+    base: BaseRememberMeServices,
 }
 
 impl TokenBasedRememberMeServices {
@@ -101,7 +101,7 @@ impl TokenBasedRememberMeServices {
             encoding_algorithm,
             matching_algorithm: DEFAULT_MATCHING_ALGORITHM,
 
-            inner: BaseRememberMeServices::new(key, user_details_service),
+            base: BaseRememberMeServices::new(key, user_details_service),
         }
     }
 
@@ -234,7 +234,7 @@ impl LogoutHandler for TokenBasedRememberMeServices {
         response: &mut dyn HttpResponse,
         authentication: Option<&Arc<dyn Authentication>>,
     ) {
-        self.inner.logout(request, response, authentication).await
+        self.base.logout(request, response, authentication).await
     }
 }
 
@@ -384,13 +384,13 @@ impl Deref for TokenBasedRememberMeServices {
     type Target = BaseRememberMeServices;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for TokenBasedRememberMeServices {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 

@@ -16,7 +16,7 @@ pub struct WebAuthnConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> Default for WebAuthnConfigurer<H>
@@ -25,7 +25,7 @@ where
 {
     fn default() -> Self {
         Self {
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }
@@ -50,7 +50,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -59,6 +59,6 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

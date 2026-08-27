@@ -59,7 +59,7 @@ where
     authorized_client_repository: Option<Arc<dyn OAuth2AuthorizedClientRepository>>,
     security_context_repository: Option<Arc<dyn SecurityContextRepository>>,
 
-    inner: BaseAuthenticationFilterConfigurer<H, Self, OAuth2LoginAuthenticationFilter>,
+    base: BaseAuthenticationFilterConfigurer<H, Self, OAuth2LoginAuthenticationFilter>,
 }
 
 impl<H> OAuth2LoginConfigurer<H>
@@ -104,7 +104,7 @@ where
             "login_processing_url cannot be empty"
         );
         self.login_processing_url = login_processing_url.into();
-        self.inner.login_processing_url(login_processing_url);
+        self.base.login_processing_url(login_processing_url);
         self
     }
 
@@ -113,7 +113,7 @@ where
         security_context_repository: Arc<dyn SecurityContextRepository>,
     ) -> &mut Self {
         self.security_context_repository = Some(security_context_repository.clone());
-        if let Some(authentication_filter) = self.inner.get_authentication_filter_mut() {
+        if let Some(authentication_filter) = self.base.get_authentication_filter_mut() {
             authentication_filter.set_security_context_repository(security_context_repository);
         }
         self
@@ -272,8 +272,8 @@ where
         {
             login_page_generating_filter.set_oauth2_login_enabled(true);
             login_page_generating_filter.set_oauth2_authentication_url_to_client_name(login_links);
-            login_page_generating_filter.set_login_page_url(self.inner.get_login_page());
-            if let Some(failure_url) = self.inner.get_failure_url() {
+            login_page_generating_filter.set_login_page_url(self.base.get_login_page());
+            if let Some(failure_url) = self.base.get_failure_url() {
                 login_page_generating_filter.set_failure_url(failure_url);
             }
         }
@@ -305,22 +305,22 @@ where
         authentication_filter
             .set_authorization_request_repository(authorization_request_repository.clone());
         authentication_filter.set_security_context_holder_strategy(
-            self.inner.get_security_context_holder_strategy().to_owned(),
+            self.base.get_security_context_holder_strategy().to_owned(),
         );
         if let Some(security_context_repository) = self.security_context_repository.as_ref() {
             authentication_filter
                 .set_security_context_repository(security_context_repository.clone());
         }
-        self.inner.set_authentication_filter(authentication_filter);
-        self.inner
+        self.base.set_authentication_filter(authentication_filter);
+        self.base
             .login_processing_url(self.login_processing_url.as_ref());
 
         let login_links = self.get_login_links(&client_registration_repository);
         if let Some(login_page) = self.login_page.as_deref() {
-            self.inner.login_page(login_page, http);
+            self.base.login_page(login_page, http);
         } else if login_links.len() == 1 {
             if let Some(provider_login_page) = login_links.keys().next() {
-                self.inner.register_authentication_entry_point(
+                self.base.register_authentication_entry_point(
                     http,
                     Arc::new(LoginUrlAuthenticationEntryPoint::new(
                         provider_login_page.as_str(),
@@ -350,7 +350,7 @@ where
         http.authentication_provider(Arc::new(oauth2_login_authentication_provider));
         http.authentication_provider(Arc::new(OidcAuthenticationRequestChecker::default()));
 
-        self.inner.init(http);
+        self.base.init(http);
         self.init_default_login_filter(http, login_links);
     }
 
@@ -373,7 +373,7 @@ where
         }
         http.add_filter(authorization_request_filter);
 
-        if let Some(authentication_filter) = self.inner.get_authentication_filter_mut() {
+        if let Some(authentication_filter) = self.base.get_authentication_filter_mut() {
             authentication_filter
                 .set_authorization_request_repository(authorization_request_repository);
             if let Some(authorization_response_base_uri) = self
@@ -387,7 +387,7 @@ where
             }
         }
 
-        self.inner.configure(http);
+        self.base.configure(http);
     }
 }
 
@@ -408,10 +408,10 @@ where
             client_registration_repository: None,
             authorized_client_repository: None,
             security_context_repository: None,
-            inner: BaseAuthenticationFilterConfigurer::default(),
+            base: BaseAuthenticationFilterConfigurer::default(),
         };
         configurer
-            .inner
+            .base
             .login_processing_url(OAuth2LoginAuthenticationFilter::DEFAULT_FILTER_PROCESSES_URI);
         configurer
     }
@@ -424,7 +424,7 @@ where
     type Target = BaseAuthenticationFilterConfigurer<H, Self, OAuth2LoginAuthenticationFilter>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -433,7 +433,7 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 

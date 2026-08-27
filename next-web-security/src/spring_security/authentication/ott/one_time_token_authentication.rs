@@ -1,57 +1,177 @@
-use std::sync::Arc;
+use std::{
+    any::TypeId,
+    fmt::Display,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::{error::BoxError, AnyObject};
 
-use crate::core::{Authentication, GrantedAuthority};
+use crate::{
+    authentication::{BaseAuthenticationBuilder, BaseAuthenticationToken},
+    core::{Authentication, AuthenticationBuilder, GrantedAuthority, Principal},
+    web::authentication::AuthPrincipal,
+};
 
+/// The authenticated `Authentication` produced after a one-time token has been
+/// successfully consumed. It carries the resolved principal (username) together
+/// with the authorities, including `FactorGrantedAuthority.OTT_AUTHORITY`.
 #[derive(Clone)]
 pub struct OneTimeTokenAuthentication {
-    principal: String,
-    authorities: Vec<Arc<dyn GrantedAuthority>>,
-    details: Option<AnyValue>,
+    principal: AnyObject,
+    base: BaseAuthenticationToken,
 }
 
 impl OneTimeTokenAuthentication {
     pub fn new(principal: impl Into<String>, authorities: Vec<Arc<dyn GrantedAuthority>>) -> Self {
-        let principal = principal.into();
-        assert!(!principal.trim().is_empty(), "principal cannot be empty");
+        let mut inner = BaseAuthenticationToken::new(Some(authorities));
+        inner.set_authenticated(true);
+
         Self {
-            principal,
-            authorities,
-            details: None,
+            principal: Arc::new(principal.into()),
+            base: inner,
         }
     }
 
-    pub fn set_details_value(&mut self, details: Option<AnyValue>) {
-        self.details = details;
+    pub fn set_details_value(&mut self, details: Option<AuthPrincipal>) {
+        self.base.set_details(details);
+    }
+
+    pub fn from_builder(builder: &mut OneTimeTokenAuthenticationBuilder) -> Self {
+        Self {
+            principal: builder.principal.take().expect("principal is required"),
+            base: BaseAuthenticationToken::from_builder(builder),
+        }
     }
 }
 
-// impl Authentication for OneTimeTokenAuthentication {
-//     fn as_any(&self) -> &dyn std::any::Any {
-//         self
-//     }
+impl Authentication for OneTimeTokenAuthentication {
+    fn credentials(&self) -> Option<&AuthPrincipal> {
+        None
+    }
 
-//     fn authentication_type(&self) -> &'static str {
-//         std::any::type_name::<Self>()
-//     }
+    fn details(&self) -> Option<&AuthPrincipal> {
+        self.base.details()
+    }
 
-//     fn details_ref(&self) -> Option<&AnyValue> {
-//         self.details.as_ref()
-//     }
+    fn principal(&self) -> Option<&AuthPrincipal> {
+        Some(&self.principal)
+    }
 
-//     fn principal(&self) -> Option<String> {
-//         Some(self.principal.clone())
-//     }
+    fn is_authenticated(&self) -> bool {
+        self.base.is_authenticated()
+    }
 
-//     fn is_authenticated(&self) -> bool {
-//         true
-//     }
+    fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
+        if is_authenticated {
+            return Err("Cannot set this token to trusted - use the new constructor instead".into());
+        }
+        self.base.set_authenticated(false);
+        Ok(())
+    }
 
-//     fn authorities(&self) -> Vec<String> {
-//         self.authorities
-//             .iter()
-//             .filter_map(|authority| authority.authority().map(ToString::to_string))
-//             .collect()
-//     }
-// }
+    fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
+        self.base.authorities()
+    }
+
+    fn to_builder(&self) -> Box<dyn AuthenticationBuilder> {
+        Box::new(OneTimeTokenAuthenticationBuilder::with_token(self))
+    }
+
+    fn of(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+}
+
+impl Principal for OneTimeTokenAuthentication {
+    fn name(&self) -> &str {
+        self.principal
+            .downcast_ref::<String>()
+            .map(|s| s.as_str())
+            .unwrap_or_default()
+    }
+}
+
+impl Display for OneTimeTokenAuthentication {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} [Principal={:?}, Authenticated={}, Authorities={:?}]",
+            std::any::type_name::<Self>(),
+            self.principal(),
+            self.is_authenticated(),
+            self.base
+                .authorities()
+                .iter()
+                .map(|a| a.authority())
+                .collect::<Vec<_>>()
+        )
+    }
+}
+
+/// A builder of `OneTimeTokenAuthentication` instances.
+pub struct OneTimeTokenAuthenticationBuilder {
+    principal: Option<AnyObject>,
+    base: BaseAuthenticationBuilder,
+}
+
+impl OneTimeTokenAuthenticationBuilder {
+    fn with_token(token: &OneTimeTokenAuthentication) -> Self {
+        Self {
+            principal: Some(token.principal.clone()),
+            base: BaseAuthenticationBuilder::with_token(token),
+        }
+    }
+}
+
+impl AuthenticationBuilder for OneTimeTokenAuthenticationBuilder {
+    fn authorities(&mut self, authorities: Box<dyn FnOnce(&mut Vec<Arc<dyn GrantedAuthority>>)>) {
+        self.base.authorities(authorities);
+    }
+
+    fn details(&mut self, details: Option<AuthPrincipal>) {
+        self.base.details(details);
+    }
+
+    fn principal(&mut self, principal: Option<AuthPrincipal>) {
+        self.principal = principal;
+    }
+
+    fn credentials(&mut self, _credentials: Option<AuthPrincipal>) {}
+
+    fn authenticated(&mut self, authenticated: bool) {
+        self.base.authenticated(authenticated);
+    }
+
+    fn build(&mut self) -> Arc<dyn Authentication> {
+        Arc::new(OneTimeTokenAuthentication::from_builder(self))
+    }
+}
+
+impl Deref for OneTimeTokenAuthentication {
+    type Target = BaseAuthenticationToken;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl DerefMut for OneTimeTokenAuthentication {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
+impl Deref for OneTimeTokenAuthenticationBuilder {
+    type Target = BaseAuthenticationBuilder;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl DerefMut for OneTimeTokenAuthenticationBuilder {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}

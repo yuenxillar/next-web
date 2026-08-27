@@ -30,7 +30,7 @@ pub struct UsernamePasswordAuthenticationToken {
     credentials: Option<AnyObject>,
 
     cleared: AtomicBool,
-    inner: BaseAuthenticationToken,
+    base: BaseAuthenticationToken,
 }
 
 impl UsernamePasswordAuthenticationToken {
@@ -78,7 +78,7 @@ impl UsernamePasswordAuthenticationToken {
             credentials: credentials.into(),
             cleared: AtomicBool::new(false),
 
-            inner: BaseAuthenticationToken::new(None),
+            base: BaseAuthenticationToken::new(None),
         };
         token.set_authenticated(false).expect("Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead");
         token
@@ -90,7 +90,7 @@ impl UsernamePasswordAuthenticationToken {
             credentials: builder.credentials.take(),
             cleared: AtomicBool::new(false),
 
-            inner: BaseAuthenticationToken::from_builder(builder),
+            base: BaseAuthenticationToken::from_builder(builder),
         }
     }
 }
@@ -104,7 +104,7 @@ impl Authentication for UsernamePasswordAuthenticationToken {
     }
 
     fn details(&self) -> Option<&AuthPrincipal> {
-        self.inner.details()
+        self.base.details()
     }
 
     fn principal(&self) -> Option<&AuthPrincipal> {
@@ -112,7 +112,7 @@ impl Authentication for UsernamePasswordAuthenticationToken {
     }
 
     fn is_authenticated(&self) -> bool {
-        self.inner.is_authenticated()
+        self.base.is_authenticated()
     }
 
     fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
@@ -121,13 +121,13 @@ impl Authentication for UsernamePasswordAuthenticationToken {
                 "Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead".into()
             );
         }
-        self.inner.set_authenticated(false);
+        self.base.set_authenticated(false);
 
         Ok(())
     }
 
     fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
-        self.inner.authorities()
+        self.base.authorities()
     }
 
     fn to_builder(&self) -> Box<dyn AuthenticationBuilder> {
@@ -141,13 +141,13 @@ impl Authentication for UsernamePasswordAuthenticationToken {
 
 impl Principal for UsernamePasswordAuthenticationToken {
     fn name(&self) -> &str {
-        self.inner.name()
+        self.base.name()
     }
 }
 
 impl CredentialsContainer for UsernamePasswordAuthenticationToken {
     fn erase_credentials(&self) {
-        self.inner.erase_credentials();
+        self.base.erase_credentials();
         self.cleared.store(true, Ordering::Release);
     }
 }
@@ -165,7 +165,7 @@ impl Clone for UsernamePasswordAuthenticationToken {
             credentials: self.credentials.clone(),
             cleared: AtomicBool::new(self.cleared.load(Ordering::Acquire)),
 
-            inner: self.inner.clone(),
+            inner: self.base.clone(),
         }
     }
 }
@@ -175,7 +175,7 @@ pub struct UsernamePasswordAuthenticationTokenBuilder {
     principal: Option<AnyObject>,
     credentials: Option<AnyObject>,
 
-    inner: BaseAuthenticationBuilder,
+    base: BaseAuthenticationBuilder,
 }
 
 impl UsernamePasswordAuthenticationTokenBuilder {
@@ -184,7 +184,7 @@ impl UsernamePasswordAuthenticationTokenBuilder {
             principal: token.principal.take(),
             credentials: token.credentials.take(),
 
-            inner: BaseAuthenticationBuilder::new(token),
+            base: BaseAuthenticationBuilder::new(token),
         }
     }
 
@@ -193,18 +193,18 @@ impl UsernamePasswordAuthenticationTokenBuilder {
             principal: token.principal.clone(),
             credentials: token.credentials.clone(),
 
-            inner: BaseAuthenticationBuilder::with_token(token),
+            base: BaseAuthenticationBuilder::with_token(token),
         }
     }
 }
 
 impl AuthenticationBuilder for UsernamePasswordAuthenticationTokenBuilder {
     fn authorities(&mut self, authorities: Box<dyn FnOnce(&mut Vec<Arc<dyn GrantedAuthority>>)>) {
-        self.inner.authorities(authorities);
+        self.base.authorities(authorities);
     }
 
     fn details(&mut self, details: Option<AuthPrincipal>) {
-        self.inner.details(details);
+        self.base.details(details);
     }
 
     fn principal(&mut self, principal: Option<AuthPrincipal>) {
@@ -216,7 +216,7 @@ impl AuthenticationBuilder for UsernamePasswordAuthenticationTokenBuilder {
     }
 
     fn authenticated(&mut self, authenticated: bool) {
-        self.inner.authenticated(authenticated);
+        self.base.authenticated(authenticated);
     }
 
     fn build(&mut self) -> Arc<dyn Authentication> {
@@ -228,13 +228,13 @@ impl Deref for UsernamePasswordAuthenticationToken {
     type Target = BaseAuthenticationToken;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for UsernamePasswordAuthenticationToken {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -242,12 +242,12 @@ impl Deref for UsernamePasswordAuthenticationTokenBuilder {
     type Target = BaseAuthenticationBuilder;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for UsernamePasswordAuthenticationTokenBuilder {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

@@ -50,7 +50,7 @@ pub struct PersistentTokenBasedRememberMeServices {
     series_length: usize,
     token_length: usize,
 
-    inner: BaseRememberMeServices,
+    base: BaseRememberMeServices,
 }
 
 impl PersistentTokenBasedRememberMeServices {
@@ -67,7 +67,7 @@ impl PersistentTokenBasedRememberMeServices {
             series_length: Self::DEFAULT_SERIES_LENGTH,
             token_length: Self::DEFAULT_TOKEN_LENGTH,
 
-            inner: BaseRememberMeServices::new(key, user_details_service),
+            base: BaseRememberMeServices::new(key, user_details_service),
         }
     }
 
@@ -114,8 +114,7 @@ impl PersistentTokenBasedRememberMeServices {
             token_validity_seconds > 0,
             "tokenValiditySeconds must be positive for this implementation"
         );
-        self.inner
-            .set_token_validity_seconds(token_validity_seconds);
+        self.base.set_token_validity_seconds(token_validity_seconds);
     }
 }
 
@@ -235,7 +234,7 @@ impl LogoutHandler for PersistentTokenBasedRememberMeServices {
         response: &mut dyn HttpResponse,
         authentication: Option<&Arc<dyn Authentication>>,
     ) {
-        self.inner.logout(request, response, authentication).await;
+        self.base.logout(request, response, authentication).await;
 
         if let Some(auth) = authentication {
             self.token_repository.remove_user_tokens(auth.name())
@@ -247,12 +246,12 @@ impl Deref for PersistentTokenBasedRememberMeServices {
     type Target = BaseRememberMeServices;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for PersistentTokenBasedRememberMeServices {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

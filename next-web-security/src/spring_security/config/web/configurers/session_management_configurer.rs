@@ -101,7 +101,7 @@ where
     /// stateless and session management is about state management.
     session_management_security_context_repository: Option<Arc<dyn SecurityContextRepository>>,
 
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> SessionManagementConfigurer<H>
@@ -616,7 +616,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -625,7 +625,7 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -636,10 +636,10 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_object()
+        self.base.get_object()
     }
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_mut_object()
+        self.base.get_mut_object()
     }
 }
 
@@ -705,7 +705,7 @@ where
         }
         if self.is_concurrent_session_control_enabled() {
             let concurrent_session_filter = self.create_concurrency_filter(http);
-            // let concurrent_session_filter = self.inner.post_process(concurrent_session_filter);
+            // let concurrent_session_filter = self.base.post_process(concurrent_session_filter);
             http.add_filter(concurrent_session_filter);
         }
         if self.session_policy == Some(SessionCreationPolicy::Always) {
@@ -743,7 +743,7 @@ where
                 HttpSessionSecurityContextRepository::default(),
             )),
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }

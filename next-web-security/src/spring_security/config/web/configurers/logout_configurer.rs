@@ -48,7 +48,7 @@ where
     custom_logout_success: bool,
     default_logout_success_handlers: Vec<(Arc<dyn RequestMatcher>, Arc<dyn LogoutSuccessHandler>)>,
 
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> LogoutConfigurer<H>
@@ -210,7 +210,7 @@ where
     fn create_logout_filter(&mut self, http: &mut H) -> LogoutFilter {
         if let Some(mut context_logout_handler) = self.context_logout_handler.take() {
             context_logout_handler.set_security_context_holder_strategy(
-                self.inner.get_security_context_holder_strategy().to_owned(),
+                self.base.get_security_context_holder_strategy().to_owned(),
             );
             context_logout_handler
                 .set_security_context_repository(self.get_security_context_repository(http));
@@ -225,7 +225,7 @@ where
         let mut filter = LogoutFilter::new(logout_success_handler, handlers);
 
         filter.set_security_context_holder_strategy(
-            self.inner.get_security_context_holder_strategy().to_owned(),
+            self.base.get_security_context_holder_strategy().to_owned(),
         );
         filter.set_logout_request_matcher(self.get_logout_request_matcher(http));
 
@@ -274,11 +274,11 @@ where
     H: crate::config::security_builder::SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_object()
+        self.base.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_mut_object()
+        self.base.get_mut_object()
     }
 }
 
@@ -331,7 +331,7 @@ where
             custom_logout_success: false,
             default_logout_success_handlers: Default::default(),
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }
@@ -343,7 +343,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -352,6 +352,6 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

@@ -24,3 +24,9 @@ where
         self.granted
     }
 }
+
+impl AuthorizationResult for AuthorizationDecision {
+    fn is_granted(&self) -> bool {
+        self.granted
+    }
+}

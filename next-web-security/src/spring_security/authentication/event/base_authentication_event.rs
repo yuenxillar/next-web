@@ -17,7 +17,7 @@ impl BaseAuthenticationEvent {
     }
 
     pub fn authentication(&self) -> &Arc<dyn Authentication> {
-        self.inner
+        self.base
             .source()
             .downcast_ref::<Arc<dyn Authentication>>()
             .unwrap()
@@ -28,6 +28,6 @@ impl Deref for BaseAuthenticationEvent {
     type Target = EventAttributes<Arc<dyn Authentication>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }

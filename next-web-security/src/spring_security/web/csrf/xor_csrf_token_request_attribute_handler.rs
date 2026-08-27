@@ -144,8 +144,7 @@ impl CsrfTokenRequestHandler for XorCsrfTokenRequestAttributeHandler {
     ) {
         let csrf_token = deferred_csrf_token.token().await;
         let mut updated_csrf_token = self.defer_csrf_token_update(csrf_token);
-        self.inner
-            .handle(request, response, &mut updated_csrf_token);
+        self.base.handle(request, response, &mut updated_csrf_token);
     }
 }
 
@@ -155,7 +154,7 @@ impl CsrfTokenRequestResolver for XorCsrfTokenRequestAttributeHandler {
         request: &mut dyn HttpRequest,
         csrf_token: &dyn CsrfToken,
     ) -> Option<String> {
-        let actual_token = self.inner.resolve_csrf_token_value(request, csrf_token)?;
+        let actual_token = self.base.resolve_csrf_token_value(request, csrf_token)?;
         Self::get_token_value(actual_token.as_str(), csrf_token.token())
     }
 }

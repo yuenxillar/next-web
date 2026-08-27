@@ -22,7 +22,7 @@ impl HttpSessionDestroyedEvent {
     }
 
     pub fn session(&self) -> &dyn HttpSession {
-        self.inner.value().as_ref()
+        self.base.value().as_ref()
     }
 
     pub fn get_security_contexts(&self) -> Vec<Arc<dyn SecurityContext>> {
@@ -50,14 +50,14 @@ impl ApplicationEvent for HttpSessionDestroyedEvent {
     }
 
     fn source_type(&self) -> TypeId {
-        self.inner.source_type()
+        self.base.source_type()
     }
 
     fn source(&self) -> &dyn Any {
-        self.inner.source()
+        self.base.source()
     }
 
     fn timestamp(&self) -> u64 {
-        self.inner.timestamp()
+        self.base.timestamp()
     }
 }

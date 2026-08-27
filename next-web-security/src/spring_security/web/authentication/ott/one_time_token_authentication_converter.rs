@@ -4,6 +4,7 @@ use next_web_core::{traits::http::http_request::HttpRequest, util::StringUtils};
 use tracing::debug;
 
 use crate::{
+    authentication::ott::one_time_token_authentication_token::OneTimeTokenAuthenticationToken,
     core::{Authentication, AuthenticationError},
     web::authentication::authentication_converter::AuthenticationConverter,
 };
@@ -22,11 +23,9 @@ impl AuthenticationConverter for OneTimeTokenAuthenticationConverter {
             debug!("No token found in request");
             return Ok(None);
         }
-        // return Some(Box::new(OneTimeTokenAuthenticationToken::unauthenticated(
-        //     token,
-        // )));
-        //
-        todo!()
+        Ok(Some(Box::new(
+            OneTimeTokenAuthenticationToken::unauthenticated(token),
+        )))
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {

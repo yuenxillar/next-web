@@ -28,20 +28,20 @@ impl AuthorizationDeniedEvent {
     }
 
     pub fn authentication(&self) -> Arc<dyn Authentication> {
-        self.inner.authentication()
+        self.base.authentication()
     }
 
     pub fn authorization_result(&self) -> &dyn AuthorizationResult {
-        self.inner.authorization_result()
+        self.base.authorization_result()
     }
 }
 
 impl ApplicationEvent for AuthorizationDeniedEvent {
     fn timestamp(&self) -> u64 {
-        self.inner.timestamp()
+        self.base.timestamp()
     }
 
     fn source(&self) -> &dyn std::any::Any {
-        self.inner.source()
+        self.base.source()
     }
 }

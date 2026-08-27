@@ -1,30 +1,45 @@
-use std::{any::TypeId, sync::Arc};
+use std::{
+    any::{Any, TypeId},
+    sync::Arc,
+};
 
+use next_web_context::{support::MessageSourceAccessor, MessageSource};
 use next_web_core::async_trait;
 
 use crate::{
     authentication::{
-        account_status_user_details_exceptions::bad_credentials,
         authentication_provider::AuthenticationProvider,
-        remember_me_authentication_token::RememberMeAuthenticationToken,
+        remember_me_authentication_token::RememberMeAuthenticationToken, string_hash,
     },
-    core::{Authentication, AuthenticationError},
+    core::{
+        Authentication, AuthenticationError, AuthenticationErrorKind, NextSecurityMessageSource,
+    },
 };
 
+/// An AuthenticationProvider implementation that validates RememberMeAuthenticationTokens.
 #[derive(Clone)]
 pub struct RememberMeAuthenticationProvider {
+    messages: MessageSourceAccessor,
     key: String,
 }
 
 impl RememberMeAuthenticationProvider {
+    /// Creates a new RememberMeAuthenticationProvider with the given key.
     pub fn new(key: impl Into<String>) -> Self {
         let key = key.into();
         assert!(!key.trim().is_empty(), "key must have a length");
-        Self { key }
+        Self {
+            key,
+            messages: NextSecurityMessageSource::get_accessor(),
+        }
     }
 
     pub fn key(&self) -> &str {
         &self.key
+    }
+
+    pub fn set_message_source(&mut self, message_source: Arc<dyn MessageSource>) {
+        self.messages = MessageSourceAccessor::new(message_source);
     }
 }
 
@@ -34,29 +49,27 @@ impl AuthenticationProvider for RememberMeAuthenticationProvider {
         &self,
         authentication: &Arc<dyn Authentication>,
     ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
-        let Some(authentication) = authentication
-            .as_any()
-            .downcast_ref::<RememberMeAuthenticationToken>()
+        let Some(remember_me_authentication) =
+            (authentication.as_ref() as &dyn Any).downcast_ref::<RememberMeAuthenticationToken>()
         else {
-            return Err(AuthenticationError::new(
-                "Only RememberMeAuthenticationToken is supported",
-            ));
+            return Ok(None);
         };
 
-        if java_string_hash(&self.key) != authentication.key_hash() {
-            return Err(bad_credentials());
+        if string_hash(&self.key) != remember_me_authentication.key_hash() {
+            return Err(AuthenticationError::with_kind(
+                self.messages.message_or_default(
+                    "RememberMeAuthenticationProvider.incorrectKey",
+                    None,
+                    "The presented RememberMeAuthenticationToken does not contain the expected key",
+                ),
+                AuthenticationErrorKind::BadCredentials,
+            ));
         }
 
-        Ok(Some(Arc::new(authentication.clone())))
+        Ok(Some(authentication.clone()))
     }
 
     fn supports(&self, authentication: TypeId) -> bool {
         authentication == TypeId::of::<RememberMeAuthenticationToken>()
     }
-}
-
-fn java_string_hash(value: &str) -> i32 {
-    value.chars().fold(0_i32, |acc, ch| {
-        acc.wrapping_mul(31).wrapping_add(ch as i32)
-    })
 }

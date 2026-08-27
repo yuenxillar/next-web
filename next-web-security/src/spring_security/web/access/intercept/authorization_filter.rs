@@ -11,7 +11,7 @@ use next_web_core::{
 };
 
 use crate::{
-    access::intercept::RequestAuthorizationContext,
+    access::{intercept::RequestAuthorizationContext, AccessDeniedError},
     authorization::{AuthorizationDeniedError, AuthorizationEventPublisher, AuthorizationManager},
     core::{
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
@@ -83,8 +83,10 @@ impl HttpFilter for AuthorizationFilter {
         resp: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        let authentication = self.get_authentication().map_err(FilterError::custom)?;
-        let mut context = RequestAuthorizationContext::from(req as &dyn HttpRequest);
+        let authentication = self
+            .get_authentication()
+            .map_err(|err| FilterError::Chain(FilterChainError::Boxed(err.into())))?;
+        let mut context = RequestAuthorizationContext::new(req.shared().clone(), None);
         let result = self
             .authorization_manager
             .authorize(authentication.as_ref(), &mut context)
@@ -101,12 +103,15 @@ impl HttpFilter for AuthorizationFilter {
         if let Some(result) = result {
             if !result.is_granted() {
                 return Err(FilterError::Chain(FilterChainError::AnyError(Box::new(
-                    AuthorizationDeniedError::new("Access Denied", result),
+                    AccessDeniedError::AuthorizationDenied(AuthorizationDeniedError::new(
+                        "Access Denied",
+                        result,
+                    )),
                 ))));
             }
         }
 
-        return filter_chain.do_filter(req, resp).await;
+        filter_chain.do_filter(req, resp).await
     }
 }
 

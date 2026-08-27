@@ -17,7 +17,7 @@ pub struct RememberMeAuthenticationToken {
     principal: AuthPrincipal,
     key_hash: i32,
 
-    inner: BaseAuthenticationToken,
+    base: BaseAuthenticationToken,
 }
 
 impl RememberMeAuthenticationToken {
@@ -67,7 +67,7 @@ impl RememberMeAuthenticationToken {
 
     /// Sets the details about the authentication request.
     pub fn set_details(&mut self, details: Option<AuthPrincipal>) {
-        self.inner.set_details(details);
+        self.base.set_details(details);
     }
 
     pub fn key_hash(&self) -> i32 {
@@ -89,19 +89,19 @@ impl Authentication for RememberMeAuthenticationToken {
     }
 
     fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
-        self.inner.authorities()
+        self.base.authorities()
     }
 
     fn details(&self) -> Option<&AuthPrincipal> {
-        self.inner.details()
+        self.base.details()
     }
 
     fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
-        self.inner.set_authenticated(is_authenticated)
+        self.base.set_authenticated(is_authenticated)
     }
 
     fn to_builder(&self) -> Box<dyn crate::core::AuthenticationBuilder> {
-        self.inner.to_builder()
+        self.base.to_builder()
     }
 
     fn of(&self) -> TypeId {
@@ -114,7 +114,7 @@ impl Principal for RememberMeAuthenticationToken {
         self.principal
             .downcast_ref::<String>()
             .map(|principal| principal.as_str())
-            .unwrap_or_else(|| self.inner.name())
+            .unwrap_or_else(|| self.base.name())
     }
 }
 

@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    sync::Arc,
+};
 
 use crate::authorization::{authorization_decision::AuthorizationDecision, AuthorizationResult};
 
@@ -6,11 +9,11 @@ use crate::authorization::{authorization_decision::AuthorizationDecision, Author
 #[derive(Clone)]
 pub struct AuthorizationDeniedError {
     msg: String,
-    result: Box<dyn AuthorizationResult>,
+    result: Arc<dyn AuthorizationResult>,
 }
 
 impl AuthorizationDeniedError {
-    pub fn new(msg: impl Into<String>, authorization_result: Box<dyn AuthorizationResult>) -> Self {
+    pub fn new(msg: impl Into<String>, authorization_result: Arc<dyn AuthorizationResult>) -> Self {
         assert!(
             !authorization_result.is_granted(),
             "Granted authorization results are not supported"
@@ -24,7 +27,7 @@ impl AuthorizationDeniedError {
     pub fn with_message(msg: impl Into<String>) -> Self {
         Self {
             msg: msg.into(),
-            result: Box::new(AuthorizationDecision::new(false)),
+            result: Arc::new(AuthorizationDecision::new(false)),
         }
     }
 

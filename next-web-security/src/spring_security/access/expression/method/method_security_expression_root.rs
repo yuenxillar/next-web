@@ -35,19 +35,19 @@ impl MethodSecurityExpressionRoot {
     }
 
     pub fn set_permission_evaluator(&mut self, permission_evaluator: Arc<dyn PermissionEvaluator>) {
-        self.inner.set_permission_evaluator(permission_evaluator);
+        self.base.set_permission_evaluator(permission_evaluator);
     }
 
     pub fn set_role_hierarchy(&mut self, role_hierarchy: Arc<dyn RoleHierarchy>) {
-        self.inner.set_role_hierarchy(role_hierarchy);
+        self.base.set_role_hierarchy(role_hierarchy);
     }
 
     pub fn set_trust_resolver(&mut self, trust_resolver: Arc<dyn AuthenticationTrustResolver>) {
-        self.inner.set_trust_resolver(trust_resolver);
+        self.base.set_trust_resolver(trust_resolver);
     }
 
     pub fn set_default_role_prefix(&mut self, default_role_prefix: impl Into<String>) {
-        self.inner.set_default_role_prefix(default_role_prefix);
+        self.base.set_default_role_prefix(default_role_prefix);
     }
 
     pub fn set_this(&mut self, target: Option<Box<dyn std::any::Any + Send + Sync>>) {
@@ -55,7 +55,7 @@ impl MethodSecurityExpressionRoot {
     }
 
     pub fn authentication(&self) -> Arc<dyn Authentication> {
-        self.inner.authentication()
+        self.base.authentication()
     }
 }
 
@@ -83,51 +83,51 @@ impl MethodSecurityExpressionOperations for MethodSecurityExpressionRoot {
 
 impl SecurityExpressionOperations for MethodSecurityExpressionRoot {
     fn has_authority(&self, authority: &str) -> bool {
-        self.inner.has_authority(authority)
+        self.base.has_authority(authority)
     }
 
     fn has_any_authority(&self, authorities: &[String]) -> bool {
-        self.inner.has_any_authority(authorities)
+        self.base.has_any_authority(authorities)
     }
 
     fn has_role(&self, role: &str) -> bool {
-        self.inner.has_role(role)
+        self.base.has_role(role)
     }
 
     fn has_any_role(&self, roles: &[String]) -> bool {
-        self.inner.has_any_role(roles)
+        self.base.has_any_role(roles)
     }
 
     fn permit_all(&self) -> bool {
-        self.inner.permit_all()
+        self.base.permit_all()
     }
 
     fn deny_all(&self) -> bool {
-        self.inner.deny_all()
+        self.base.deny_all()
     }
 
     fn is_anonymous(&self) -> bool {
-        self.inner.is_anonymous()
+        self.base.is_anonymous()
     }
 
     fn is_authenticated(&self) -> bool {
-        self.inner.is_authenticated()
+        self.base.is_authenticated()
     }
 
     fn is_remember_me(&self) -> bool {
-        self.inner.is_remember_me()
+        self.base.is_remember_me()
     }
 
     fn is_fully_authenticated(&self) -> bool {
-        self.inner.is_fully_authenticated()
+        self.base.is_fully_authenticated()
     }
 
     fn has_permission(&self, target: Option<&AnyValue>, permission: &str) -> bool {
-        self.inner.has_permission(target, permission)
+        self.base.has_permission(target, permission)
     }
 
     fn has_permission_by_id(&self, target_id: &str, target_type: &str, permission: &str) -> bool {
-        self.inner
+        self.base
             .has_permission_by_id(target_id, target_type, permission)
     }
 }

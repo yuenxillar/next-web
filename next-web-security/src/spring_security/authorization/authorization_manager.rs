@@ -1,51 +1,41 @@
-use next_web_core::async_trait;
+use std::sync::Arc;
+
+use next_web_core::{async_trait, error::BoxError};
 
 use crate::{
-    access::{intercept::RequestAuthorizationContext, AccessDeniedError},
-    authorization::AuthorizationResult,
+    access::AccessDeniedError,
+    authorization::{AuthorizationDeniedError, AuthorizationResult},
     core::Authentication,
 };
 
+/// An Authorization manager which can determine if an Authentication has access to a specific object.
 #[async_trait]
 pub trait AuthorizationManager<T>
 where
     Self: Send + Sync,
     T: Send + Sync,
 {
+    /// Determines if access is granted for a specific authentication and object.
     async fn authorize(
         &self,
         authentication: &dyn Authentication,
         var: &T,
-    ) -> Option<Box<dyn AuthorizationResult>>;
+    ) -> Result<Option<Arc<dyn AuthorizationResult>>, BoxError>;
 
+    /// Determines if access should be granted for a specific authentication and object.
     async fn verify(
         &self,
         authentication: &dyn Authentication,
         var: &T,
     ) -> Result<(), AccessDeniedError> {
-        let decision = self.authorize(authentication, var).await;
-        if let Some(decision) = decision {
-            if !decision.is_granted() {
-                return Err(AccessDeniedError::from("Access Denied"));
+        if let Some(result) = self.authorize(authentication, var).await.ok().flatten() {
+            if !result.is_granted() {
+                return Err(AccessDeniedError::AuthorizationDenied(
+                    AuthorizationDeniedError::new("Access Denied", result),
+                ));
             }
         }
 
         Ok(())
-    }
-}
-
-pub struct DefaultAuthorizationManager(pub bool);
-
-#[async_trait]
-impl AuthorizationManager<RequestAuthorizationContext> for DefaultAuthorizationManager {
-    #[allow(unused_variables)]
-    async fn authorize(
-        &self,
-        _authentication: &dyn Authentication,
-        _var: &RequestAuthorizationContext,
-    ) -> Option<Box<dyn AuthorizationResult>> {
-        Some(Box::new(crate::authorization::AuthorizationDecision::new(
-            self.0,
-        )))
     }
 }

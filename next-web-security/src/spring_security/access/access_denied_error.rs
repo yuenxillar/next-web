@@ -1,9 +1,13 @@
-use std::{borrow::Cow, fmt::Display};
+use std::{
+    borrow::Cow,
+    error::Error,
+    fmt::{Debug, Display},
+};
 
 use crate::authorization::AuthorizationDeniedError;
 
 /// If the authentication object does not have the required permissions, an error occurs
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum AccessDeniedError {
     /// An error occurs when invalid or missing CsrfToken is found in HttpRequest
     Csrf(String),
@@ -65,14 +69,16 @@ impl Display for AccessDeniedError {
     }
 }
 
-impl From<&str> for AccessDeniedError {
-    fn from(value: &str) -> Self {
-        Self::AuthorizationService(value.to_string())
-    }
-}
+impl Error for AccessDeniedError {}
 
-impl From<String> for AccessDeniedError {
-    fn from(value: String) -> Self {
-        Self::AuthorizationService(value)
-    }
-}
+// impl From<&str> for AccessDeniedError {
+//     fn from(value: &str) -> Self {
+//         Self::AuthorizationService(value.to_string())
+//     }
+// }
+
+// impl From<String> for AccessDeniedError {
+//     fn from(value: String) -> Self {
+//         Self::AuthorizationService(value)
+//     }
+// }

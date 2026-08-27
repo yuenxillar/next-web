@@ -46,7 +46,7 @@ where
     authorities: Vec<Arc<dyn GrantedAuthority>>,
     computed_key: Option<String>,
 
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> AnonymousConfigurer<H>
@@ -195,7 +195,7 @@ where
         let filter = match self.authentication_filter.take() {
             Some(mut filter) => {
                 filter.set_security_context_holder_strategy(
-                    self.inner.get_security_context_holder_strategy().to_owned(),
+                    self.base.get_security_context_holder_strategy().to_owned(),
                 );
                 filter.after_properties_set();
 
@@ -219,11 +219,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_object()
+        self.base.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_mut_object()
+        self.base.get_mut_object()
     }
 }
 
@@ -234,7 +234,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -243,7 +243,7 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -257,10 +257,10 @@ where
             authentication_provider: None,
             authentication_filter: None,
             principal: Arc::new("anonymousUser".to_string()),
-            authorities: AuthorityUtils::create_authority_list(["ROLE_ANONYMOUS"]),
+            authorities: AuthorityUtils::create_authority_list(["ROLE_ANONYMOUS".to_string()]),
             computed_key: None,
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }

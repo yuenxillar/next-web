@@ -17,7 +17,7 @@ pub struct SessionFixationProtectionEvent {
     old_session_id: String,
     new_session_id: String,
 
-    inner: BaseAuthenticationEvent,
+    base: BaseAuthenticationEvent,
 }
 
 impl SessionFixationProtectionEvent {
@@ -49,7 +49,7 @@ impl SessionFixationProtectionEvent {
             old_session_id: old_session_id.to_string(),
             new_session_id: new_session_id.to_string(),
 
-            inner: BaseAuthenticationEvent::new(authentication),
+            base: BaseAuthenticationEvent::new(authentication),
         }
     }
 
@@ -74,11 +74,11 @@ impl SessionFixationProtectionEvent {
 
 impl ApplicationEvent for SessionFixationProtectionEvent {
     fn timestamp(&self) -> u64 {
-        self.inner.timestamp()
+        self.base.timestamp()
     }
 
     fn source(&self) -> &dyn std::any::Any {
-        self.inner.source()
+        self.base.source()
     }
 
     fn event_type(&self) -> std::any::TypeId {
@@ -86,7 +86,7 @@ impl ApplicationEvent for SessionFixationProtectionEvent {
     }
 
     fn source_type(&self) -> TypeId {
-        self.inner.source_type()
+        self.base.source_type()
     }
 }
 
@@ -95,12 +95,12 @@ impl Deref for SessionFixationProtectionEvent {
     type Target = BaseAuthenticationEvent;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for SessionFixationProtectionEvent {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

@@ -55,7 +55,7 @@ where
     use_secure_cookie: Option<bool>,
     always_remember: Option<bool>,
 
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> RememberMeConfigurer<H>
@@ -388,7 +388,7 @@ where
             use_secure_cookie: None,
             always_remember: None,
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }
@@ -447,7 +447,7 @@ where
         }
 
         remember_me_filter.set_security_context_holder_strategy(
-            self.inner.get_security_context_holder_strategy().to_owned(),
+            self.base.get_security_context_holder_strategy().to_owned(),
         );
 
         // Set session authentication strategy if available
@@ -470,7 +470,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -479,6 +479,6 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

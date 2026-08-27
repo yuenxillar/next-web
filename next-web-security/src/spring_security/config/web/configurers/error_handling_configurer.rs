@@ -64,7 +64,7 @@ where
     missing_authorities_handler_builder:
         Option<DelegatingMissingAuthorityAccessDeniedHandlerBuilder>,
 
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> ErrorHandlingConfigurer<H>
@@ -297,7 +297,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -306,7 +306,7 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -317,10 +317,10 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_object()
+        self.base.get_object()
     }
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_mut_object()
+        self.base.get_mut_object()
     }
 }
 
@@ -338,7 +338,7 @@ where
         let denied_handler = self.get_access_denied_handler_internal(http);
         error_translation_filter.set_access_denied_handler(denied_handler);
         error_translation_filter.set_security_context_holder_strategy(
-            self.inner.get_security_context_holder_strategy().to_owned(),
+            self.base.get_security_context_holder_strategy().to_owned(),
         );
 
         // let error_translation_filter = self
@@ -360,7 +360,7 @@ where
             default_denied_handler_mappings: Vec::new(),
             missing_authorities_handler_builder: None,
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }

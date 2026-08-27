@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use std::collections::HashSet;
 
-use next_web_core::async_trait;
+use next_web_core::{async_trait, error::BoxError};
 
 use crate::{
     access::hierarchicalroles::RoleHierarchy,
@@ -27,7 +27,7 @@ impl AuthoritiesAuthorizationManager {
         self.is_authorized(authentication, authority)
     }
 
-    pub fn is_authorized(
+    fn is_authorized(
         &self,
         authentication: &dyn Authentication,
         authorities: &HashSet<String>,
@@ -54,12 +54,13 @@ impl AuthorizationManager<HashSet<String>> for AuthoritiesAuthorizationManager {
         &self,
         authentication: &dyn Authentication,
         authorities: &HashSet<String>,
-    ) -> Option<Box<dyn AuthorizationResult>> {
+    ) -> Result<Option<Arc<dyn AuthorizationResult>>, BoxError> {
         let granted = self.is_granted(authentication, authorities);
-        Some(Box::new(AuthorityAuthorizationDecision::new(
+
+        Ok(Some(Arc::new(AuthorityAuthorizationDecision::new(
             granted,
-            AuthorityUtils::create_authority_list(authorities),
-        )))
+            AuthorityUtils::create_authority_list(authorities.iter()),
+        ))))
     }
 }
 

@@ -23,11 +23,11 @@ impl TransientSecurityContext {
     // }
 
     pub fn get_authentication(&self) -> Option<&Arc<dyn Authentication>> {
-        self.inner.get_authentication()
+        self.base.get_authentication()
     }
 
     pub fn set_authentication(&mut self, authentication: Option<Arc<dyn Authentication>>) {
-        self.inner.set_authentication(authentication);
+        self.base.set_authentication(authentication);
     }
 }
 

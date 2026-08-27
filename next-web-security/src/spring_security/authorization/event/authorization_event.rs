@@ -39,10 +39,10 @@ impl AuthorizationEvent {
 
 impl ApplicationEvent for AuthorizationEvent {
     fn timestamp(&self) -> u64 {
-        self.inner.timestamp()
+        self.base.timestamp()
     }
 
     fn source(&self) -> &dyn Any {
-        self.inner.source()
+        self.base.source()
     }
 }

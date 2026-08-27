@@ -54,7 +54,7 @@ where
     session_authentication_strategy: Option<Arc<dyn SessionAuthenticationStrategy>>,
     request_handler: Option<Arc<dyn CsrfTokenRequestHandler>>,
 
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> CsrfConfigurer<H>
@@ -69,7 +69,7 @@ where
             session_authentication_strategy: Default::default(),
             request_handler: Default::default(),
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 
@@ -267,7 +267,7 @@ where
         if let Some(request_handler) = self.request_handler.take() {
             filter.set_request_handler(request_handler);
         }
-        self.inner.get_mut_object().post_process(&mut filter);
+        self.base.get_mut_object().post_process(&mut filter);
 
         http.add_filter(filter);
     }
@@ -280,7 +280,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -289,7 +289,7 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 

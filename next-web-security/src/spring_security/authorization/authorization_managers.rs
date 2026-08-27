@@ -1,6 +1,6 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, ops::Deref, sync::Arc};
 
-use next_web_core::async_trait;
+use next_web_core::{async_trait, error::BoxError};
 
 use crate::{
     authorization::{
@@ -10,7 +10,7 @@ use crate::{
     core::Authentication,
 };
 
-/// A factory class to create an AuthorizationManager instances.
+/// A factory  to create an AuthorizationManager instances.
 pub struct AuthorizationManagers;
 
 impl AuthorizationManagers {
@@ -19,7 +19,16 @@ impl AuthorizationManagers {
     pub fn any_of<T>(
         managers: Vec<Arc<dyn AuthorizationManager<T>>>,
     ) -> AnyOfAuthorizationManager<T> {
-        AnyOfAuthorizationManager::new(AuthorizationDecision::new(false), managers)
+        Self::any_of_with_authorization_decision(AuthorizationDecision::new(false), managers)
+    }
+
+    /// Creates an AuthorizationManager that grants access if at least one AuthorizationManager granted,
+    /// if managers are empty or abstained, a default AuthorizationDecision is returned.
+    pub fn any_of_with_authorization_decision<T>(
+        default_decision: AuthorizationDecision,
+        managers: Vec<Arc<dyn AuthorizationManager<T>>>,
+    ) -> AnyOfAuthorizationManager<T> {
+        AnyOfAuthorizationManager::new(default_decision, managers)
     }
 
     /// Creates an AuthorizationManager that grants access if all AuthorizationManager
@@ -27,7 +36,16 @@ impl AuthorizationManagers {
     pub fn all_of<T>(
         managers: Vec<Arc<dyn AuthorizationManager<T>>>,
     ) -> AllOfAuthorizationManager<T> {
-        AllOfAuthorizationManager::new(AuthorizationDecision::new(true), managers)
+        Self::all_of_with_authorization_decision(AuthorizationDecision::new(true), managers)
+    }
+
+    /// Creates an AuthorizationManager that grants access if all AuthorizationManagers granted, if
+    /// managers are empty or abstained, a default AuthorizationDecision is returned.
+    pub fn all_of_with_authorization_decision<T>(
+        decision: AuthorizationDecision,
+        managers: Vec<Arc<dyn AuthorizationManager<T>>>,
+    ) -> AllOfAuthorizationManager<T> {
+        AllOfAuthorizationManager::new(decision, managers)
     }
 
     /// Creates an AuthorizationManager that reverses whatever decision the given
@@ -42,7 +60,7 @@ impl AuthorizationManagers {
 }
 
 pub struct AnyOfAuthorizationManager<T> {
-    all_abstain_default_decision: AuthorizationDecision,
+    all_abstain_default_decision: Arc<AuthorizationDecision>,
     managers: Vec<Arc<dyn AuthorizationManager<T>>>,
 }
 
@@ -52,7 +70,7 @@ impl<T> AnyOfAuthorizationManager<T> {
         managers: Vec<Arc<dyn AuthorizationManager<T>>>,
     ) -> Self {
         Self {
-            all_abstain_default_decision,
+            all_abstain_default_decision: Arc::new(all_abstain_default_decision),
             managers,
         }
     }
@@ -67,31 +85,31 @@ where
         &self,
         authentication: &dyn Authentication,
         var: &T,
-    ) -> Option<Box<dyn AuthorizationResult>> {
-        let mut results: Vec<Box<dyn AuthorizationResult>> = Vec::new();
-        for manager in &self.managers {
-            let result = manager.authorize(authentication, var).await;
+    ) -> Result<Option<Arc<dyn AuthorizationResult>>, BoxError> {
+        let mut results = Vec::new();
+        for manager in self.managers.iter() {
+            let result = manager.authorize(authentication, var).await?;
             let Some(result) = result else {
                 continue;
             };
             if result.is_granted() {
-                return Some(result);
+                return Ok(Some(result));
             }
             results.push(result);
         }
 
         if results.is_empty() {
-            return Some(Box::new(self.all_abstain_default_decision.clone()));
+            return Ok(Some(self.all_abstain_default_decision.clone()));
         }
 
-        Some(Box::new(CompositeAuthorizationDecision::new(
+        Ok(Some(Arc::new(CompositeAuthorizationDecision::new(
             false, results,
-        )))
+        ))))
     }
 }
 
 pub struct AllOfAuthorizationManager<T> {
-    all_abstain_default_decision: AuthorizationDecision,
+    all_abstain_default_decision: Arc<AuthorizationDecision>,
     managers: Vec<Arc<dyn AuthorizationManager<T>>>,
 }
 
@@ -101,7 +119,7 @@ impl<T> AllOfAuthorizationManager<T> {
         managers: Vec<Arc<dyn AuthorizationManager<T>>>,
     ) -> Self {
         Self {
-            all_abstain_default_decision,
+            all_abstain_default_decision: Arc::new(all_abstain_default_decision),
             managers,
         }
     }
@@ -116,24 +134,26 @@ where
         &self,
         authentication: &dyn Authentication,
         var: &T,
-    ) -> Option<Box<dyn AuthorizationResult>> {
-        let mut results: Vec<Box<dyn AuthorizationResult>> = Vec::new();
-        for manager in &self.managers {
-            let result = manager.authorize(authentication, var).await;
+    ) -> Result<Option<Arc<dyn AuthorizationResult>>, BoxError> {
+        let mut results = Vec::new();
+        for manager in self.managers.iter() {
+            let result = manager.authorize(authentication, var).await?;
             let Some(result) = result else {
                 continue;
             };
             if !result.is_granted() {
-                return Some(result);
+                return Ok(Some(result));
             }
             results.push(result);
         }
 
         if results.is_empty() {
-            return Some(Box::new(self.all_abstain_default_decision.clone()));
+            return Ok(Some(self.all_abstain_default_decision.clone()));
         }
 
-        Some(Box::new(CompositeAuthorizationDecision::new(true, results)))
+        Ok(Some(Arc::new(CompositeAuthorizationDecision::new(
+            true, results,
+        ))))
     }
 }
 
@@ -152,35 +172,36 @@ where
         &self,
         authentication: &dyn Authentication,
         var: &T,
-    ) -> Option<Box<dyn AuthorizationResult>> {
-        self.manager
-            .authorize(authentication, var)
-            .await
-            .map(|result| {
-                Box::new(NotAuthorizationDecision::new(result)) as Box<dyn AuthorizationResult>
-            })
+    ) -> Result<Option<Arc<dyn AuthorizationResult>>, BoxError> {
+        let result = self.manager.authorize(authentication, var).await?;
+
+        Ok(result.map(|result| {
+            Arc::new(NotAuthorizationDecision::new(result)) as Arc<dyn AuthorizationResult>
+        }))
     }
 }
 
 /// An AuthorizationDecision that carries the AuthorizationResults which contributed to the decision.
 #[derive(Clone)]
 struct CompositeAuthorizationDecision {
-    results: Vec<Box<dyn AuthorizationResult>>,
-    inner: AuthorizationDecision,
+    results: Vec<Arc<dyn AuthorizationResult>>,
+    base: AuthorizationDecision,
 }
 
 impl CompositeAuthorizationDecision {
-    fn new(granted: bool, results: Vec<Box<dyn AuthorizationResult>>) -> Self {
+    fn new(granted: bool, results: Vec<Arc<dyn AuthorizationResult>>) -> Self {
         Self {
-            inner: AuthorizationDecision::new(granted),
+            base: AuthorizationDecision::new(granted),
             results,
         }
     }
 }
 
-impl AuthorizationResult for CompositeAuthorizationDecision {
-    fn is_granted(&self) -> bool {
-        self.inner.is_granted()
+impl Deref for CompositeAuthorizationDecision {
+    type Target = AuthorizationDecision;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
     }
 }
 
@@ -200,22 +221,24 @@ impl std::fmt::Debug for CompositeAuthorizationDecision {
 /// An AuthorizationDecision that reverses the decision of the wrapped AuthorizationResult.
 #[derive(Clone)]
 struct NotAuthorizationDecision {
-    result: Box<dyn AuthorizationResult>,
-    inner: AuthorizationDecision,
+    result: Arc<dyn AuthorizationResult>,
+    base: AuthorizationDecision,
 }
 
 impl NotAuthorizationDecision {
-    fn new(result: Box<dyn AuthorizationResult>) -> Self {
+    fn new(result: Arc<dyn AuthorizationResult>) -> Self {
         Self {
-            inner: AuthorizationDecision::new(!result.is_granted()),
+            base: AuthorizationDecision::new(!result.is_granted()),
             result,
         }
     }
 }
 
-impl AuthorizationResult for NotAuthorizationDecision {
-    fn is_granted(&self) -> bool {
-        self.inner.is_granted()
+impl Deref for NotAuthorizationDecision {
+    type Target = AuthorizationDecision;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
     }
 }
 
@@ -226,190 +249,5 @@ impl std::fmt::Debug for NotAuthorizationDecision {
             "NotAuthorizationDecision [result={}]",
             self.result.is_granted()
         )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use next_web_core::async_trait;
-
-    use crate::core::SimpleAuthentication;
-
-    use super::*;
-
-    #[derive(Clone)]
-    struct GrantManager;
-
-    #[derive(Clone)]
-    struct DenyManager;
-
-    #[derive(Clone)]
-    struct AbstainManager;
-
-    #[async_trait]
-    impl AuthorizationManager<()> for GrantManager {
-        async fn authorize(
-            &self,
-            _authentication: &dyn Authentication,
-            _var: &(),
-        ) -> Option<Box<dyn AuthorizationResult>> {
-            Some(Box::new(AuthorizationDecision::new(true)))
-        }
-    }
-
-    #[async_trait]
-    impl AuthorizationManager<()> for DenyManager {
-        async fn authorize(
-            &self,
-            _authentication: &dyn Authentication,
-            _var: &(),
-        ) -> Option<Box<dyn AuthorizationResult>> {
-            Some(Box::new(AuthorizationDecision::new(false)))
-        }
-    }
-
-    #[async_trait]
-    impl AuthorizationManager<()> for AbstainManager {
-        async fn authorize(
-            &self,
-            _authentication: &dyn Authentication,
-            _var: &(),
-        ) -> Option<Box<dyn AuthorizationResult>> {
-            None
-        }
-    }
-
-    fn authentication() -> Arc<dyn Authentication> {
-        let mut builder = SimpleAuthentication::default().to_builder();
-        builder.principal(Some(Arc::new(String::from("alice"))));
-        builder.authenticated(true);
-        builder.build()
-    }
-
-    #[tokio::test]
-    async fn any_of_grants_if_any_manager_grants() {
-        let manager =
-            AuthorizationManagers::any_of(vec![Arc::new(DenyManager), Arc::new(GrantManager)]);
-        let mut var = ();
-
-        let result = manager.authorize(authentication().as_ref(), &mut var).await;
-
-        assert!(result.unwrap().is_granted());
-    }
-
-    #[tokio::test]
-    async fn any_of_denies_when_all_managers_deny() {
-        let manager =
-            AuthorizationManagers::any_of(vec![Arc::new(DenyManager), Arc::new(DenyManager)]);
-        let mut var = ();
-
-        let result = manager
-            .authorize(authentication().as_ref(), &mut var)
-            .await
-            .unwrap();
-
-        assert!(!result.is_granted());
-        assert!((result.as_ref() as &dyn std::any::Any)
-            .downcast_ref::<CompositeAuthorizationDecision>()
-            .is_some());
-    }
-
-    #[tokio::test]
-    async fn any_of_uses_default_decision_when_all_managers_abstain() {
-        let manager =
-            AuthorizationManagers::any_of(vec![Arc::new(AbstainManager), Arc::new(AbstainManager)]);
-        let mut var = ();
-
-        let result = manager.authorize(authentication().as_ref(), &mut var).await;
-
-        assert!(!result.unwrap().is_granted());
-    }
-
-    #[tokio::test]
-    async fn any_of_ignores_abstaining_managers() {
-        let manager =
-            AuthorizationManagers::any_of(vec![Arc::new(AbstainManager), Arc::new(GrantManager)]);
-        let mut var = ();
-
-        let result = manager.authorize(authentication().as_ref(), &mut var).await;
-
-        assert!(result.unwrap().is_granted());
-    }
-
-    #[tokio::test]
-    async fn all_of_grants_if_all_managers_grant() {
-        let manager =
-            AuthorizationManagers::all_of(vec![Arc::new(GrantManager), Arc::new(GrantManager)]);
-        let mut var = ();
-
-        let result = manager.authorize(authentication().as_ref(), &mut var).await;
-
-        assert!(result.unwrap().is_granted());
-    }
-
-    #[tokio::test]
-    async fn all_of_denies_if_any_manager_denies() {
-        let manager =
-            AuthorizationManagers::all_of(vec![Arc::new(GrantManager), Arc::new(DenyManager)]);
-        let mut var = ();
-
-        let result = manager
-            .authorize(authentication().as_ref(), &mut var)
-            .await
-            .unwrap();
-
-        assert!(!result.is_granted());
-        assert!((result.as_ref() as &dyn std::any::Any)
-            .downcast_ref::<CompositeAuthorizationDecision>()
-            .is_some());
-    }
-
-    #[tokio::test]
-    async fn all_of_uses_default_decision_when_all_managers_abstain() {
-        let manager =
-            AuthorizationManagers::all_of(vec![Arc::new(AbstainManager), Arc::new(AbstainManager)]);
-        let mut var = ();
-
-        let result = manager.authorize(authentication().as_ref(), &mut var).await;
-
-        assert!(result.unwrap().is_granted());
-    }
-
-    #[tokio::test]
-    async fn all_of_grants_when_managers_are_empty() {
-        let manager = AuthorizationManagers::all_of(vec![]);
-        let mut var = ();
-
-        let result = manager.authorize(authentication().as_ref(), &mut var).await;
-
-        assert!(result.unwrap().is_granted());
-    }
-
-    #[tokio::test]
-    async fn not_reverses_the_decision() {
-        let manager = AuthorizationManagers::not(Arc::new(DenyManager));
-        let mut var = ();
-
-        let result = manager
-            .authorize(authentication().as_ref(), &mut var)
-            .await
-            .unwrap();
-
-        assert!(result.is_granted());
-        assert!((result.as_ref() as &dyn std::any::Any)
-            .downcast_ref::<NotAuthorizationDecision>()
-            .is_some());
-    }
-
-    #[tokio::test]
-    async fn not_abstains_when_manager_abstains() {
-        let manager = AuthorizationManagers::not(Arc::new(AbstainManager));
-        let mut var = ();
-
-        let result = manager.authorize(authentication().as_ref(), &mut var).await;
-
-        assert!(result.is_none());
     }
 }

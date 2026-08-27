@@ -42,7 +42,7 @@ where
     H: HttpSecurityBuilder<H>,
 {
     request_cache: Option<Arc<dyn RequestCache>>,
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> RequestCacheConfigurer<H>
@@ -146,11 +146,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_object()
+        self.base.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_mut_object()
+        self.base.get_mut_object()
     }
 }
 
@@ -167,7 +167,7 @@ where
     fn configure(&mut self, http: &mut H) {
         let request_cache = self.get_request_cache(http);
         let mut filter = RequestCacheAwareFilter::new(request_cache);
-        self.inner.get_mut_object().post_process(&mut filter);
+        self.base.get_mut_object().post_process(&mut filter);
         http.add_filter(filter);
     }
 }
@@ -179,7 +179,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -188,7 +188,7 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -199,7 +199,7 @@ where
     fn default() -> Self {
         Self {
             request_cache: None,
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }

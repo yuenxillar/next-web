@@ -38,7 +38,7 @@ pub struct OAuth2LoginAuthenticationFilter {
     client_registration_repository: Arc<dyn ClientRegistrationRepository>,
     authorized_client_repository: Arc<dyn OAuth2AuthorizedClientRepository>,
     login_processing_url: String,
-    inner: BaseAuthenticationProcessingFilter,
+    base: BaseAuthenticationProcessingFilter,
 }
 
 impl OAuth2LoginAuthenticationFilter {
@@ -76,7 +76,7 @@ impl OAuth2LoginAuthenticationFilter {
         authorization_request_repository: Arc<dyn AuthorizationRequestRepository>,
     ) {
         self.authorization_request_repository = authorization_request_repository.clone();
-        self.inner
+        self.base
             .set_authentication_converter(Arc::new(OAuth2LoginAuthenticationConverter::new(
                 authorization_request_repository,
                 self.client_registration_repository.clone(),
@@ -87,13 +87,13 @@ impl OAuth2LoginAuthenticationFilter {
         &mut self,
         request_matcher: Arc<dyn RequestMatcher>,
     ) {
-        self.inner
+        self.base
             .set_requires_authentication_request_matcher(request_matcher);
     }
 
     pub fn set_filter_processes_url(&mut self, login_processing_url: impl Into<String>) {
         self.login_processing_url = login_processing_url.into();
-        self.inner
+        self.base
             .set_requires_authentication_request_matcher(Arc::new(OAuth2LoginRequestMatcher::new(
                 self.login_processing_url.clone(),
             )));
@@ -103,7 +103,7 @@ impl OAuth2LoginAuthenticationFilter {
         &mut self,
         security_context_repository: Arc<dyn SecurityContextRepository>,
     ) {
-        self.inner
+        self.base
             .set_security_context_repository(security_context_repository);
     }
 
@@ -111,7 +111,7 @@ impl OAuth2LoginAuthenticationFilter {
         &mut self,
         security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
     ) {
-        self.inner
+        self.base
             .set_security_context_holder_strategy(security_context_holder_strategy);
     }
 
@@ -124,13 +124,13 @@ impl Deref for OAuth2LoginAuthenticationFilter {
     type Target = BaseAuthenticationProcessingFilter;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for OAuth2LoginAuthenticationFilter {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -142,7 +142,7 @@ impl HttpFilter for OAuth2LoginAuthenticationFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        self.inner.do_filter(request, response, filter_chain).await
+        self.base.do_filter(request, response, filter_chain).await
     }
 }
 

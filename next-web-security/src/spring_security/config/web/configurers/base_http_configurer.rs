@@ -18,7 +18,7 @@ where
 {
     security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
 
-    inner: SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>,
+    base: SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>,
     _marker: PhantomData<T>,
 }
 
@@ -40,7 +40,7 @@ where
         Self {
             security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
 
-            inner: SecurityConfigurerAdapter::default(),
+            base: SecurityConfigurerAdapter::default(),
             _marker: Default::default(),
         }
     }
@@ -53,11 +53,11 @@ where
     B: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, B> {
-        &self.inner
+        &self.base
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, B> {
-        &mut self.inner
+        &mut self.base
     }
 }
 

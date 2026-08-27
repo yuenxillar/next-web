@@ -51,13 +51,13 @@ impl Deref for SavedRequestAwareAuthenticationSuccessHandler {
     type Target = SimpleUrlAuthenticationSuccessHandler;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for SavedRequestAwareAuthenticationSuccessHandler {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -88,7 +88,7 @@ impl AuthenticationSuccessHandler for SavedRequestAwareAuthenticationSuccessHand
                     .unwrap_or_default()
             {
                 self.request_cache.remove_request(request, response);
-                self.inner
+                self.base
                     .on_authentication_success(request, response, authentication);
                 return;
             }
@@ -99,7 +99,7 @@ impl AuthenticationSuccessHandler for SavedRequestAwareAuthenticationSuccessHand
             self.get_redirect_strategy()
                 .send_redirect(request, response, &target_url);
         } else {
-            self.inner
+            self.base
                 .on_authentication_success(request, response, authentication);
         }
     }
@@ -110,7 +110,7 @@ impl Default for SavedRequestAwareAuthenticationSuccessHandler {
         Self {
             request_cache: Arc::new(HttpSessionRequestCache::default()),
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }

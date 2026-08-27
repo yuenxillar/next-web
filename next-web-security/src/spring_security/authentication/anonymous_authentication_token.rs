@@ -20,7 +20,7 @@ pub struct AnonymousAuthenticationToken {
     principal: AuthPrincipal,
     key_hash: i32,
 
-    inner: BaseAuthenticationToken,
+    base: BaseAuthenticationToken,
 }
 
 impl AnonymousAuthenticationToken {
@@ -59,7 +59,7 @@ impl AnonymousAuthenticationToken {
 
 impl Authentication for AnonymousAuthenticationToken {
     fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
-        self.inner.authorities()
+        self.base.authorities()
     }
 
     fn credentials(&self) -> Option<&AuthPrincipal> {
@@ -67,7 +67,7 @@ impl Authentication for AnonymousAuthenticationToken {
     }
 
     fn details(&self) -> Option<&AuthPrincipal> {
-        self.inner.details()
+        self.base.details()
     }
 
     fn principal(&self) -> Option<&AuthPrincipal> {
@@ -75,15 +75,15 @@ impl Authentication for AnonymousAuthenticationToken {
     }
 
     fn is_authenticated(&self) -> bool {
-        self.inner.is_authenticated()
+        self.base.is_authenticated()
     }
 
     fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
-        self.inner.set_authenticated(is_authenticated)
+        self.base.set_authenticated(is_authenticated)
     }
 
     fn to_builder(&self) -> Box<dyn crate::core::AuthenticationBuilder> {
-        self.inner.to_builder()
+        self.base.to_builder()
     }
 
     fn of(&self) -> TypeId {
@@ -93,7 +93,7 @@ impl Authentication for AnonymousAuthenticationToken {
 
 impl Principal for AnonymousAuthenticationToken {
     fn name(&self) -> &str {
-        self.inner.name()
+        self.base.name()
     }
 }
 
@@ -111,13 +111,13 @@ impl Deref for AnonymousAuthenticationToken {
     type Target = BaseAuthenticationToken;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for AnonymousAuthenticationToken {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 

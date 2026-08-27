@@ -16,7 +16,7 @@ impl ExpressionAuthorizationDecision {
     }
 
     pub fn is_granted(&self) -> bool {
-        self.decision.is_granted()
+        todo!()
     }
 
     pub fn expression(&self) -> &str {

@@ -29,7 +29,7 @@ pub struct UsernamePasswordAuthenticationFilter {
     password_parameter: Box<str>,
     post_only: bool,
 
-    inner: BaseAuthenticationProcessingFilter,
+    base: BaseAuthenticationProcessingFilter,
 }
 
 impl UsernamePasswordAuthenticationFilter {
@@ -41,7 +41,7 @@ impl UsernamePasswordAuthenticationFilter {
             username_parameter: Self::NEXT_SECURITY_FORM_USERNAME_KEY.into(),
             password_parameter: Self::NEXT_SECURITY_FORM_PASSWORD_KEY.into(),
             post_only: true,
-            inner: BaseAuthenticationProcessingFilter::with_matcher_and_manager(
+            base: BaseAuthenticationProcessingFilter::with_matcher_and_manager(
                 Self::default_path_request_matcher(),
                 authentication_manager,
             ),
@@ -103,7 +103,7 @@ impl UsernamePasswordAuthenticationFilter {
         auth_request: &mut UsernamePasswordAuthenticationToken,
     ) {
         auth_request.set_details(Some(
-            self.inner
+            self.base
                 .authentication_details_source
                 .build_details(request),
         ));
@@ -154,13 +154,13 @@ impl Deref for UsernamePasswordAuthenticationFilter {
     type Target = BaseAuthenticationProcessingFilter;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
 impl DerefMut for UsernamePasswordAuthenticationFilter {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -172,7 +172,7 @@ impl HttpFilter for UsernamePasswordAuthenticationFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        self.inner.do_filter(request, response, filter_chain).await
+        self.base.do_filter(request, response, filter_chain).await
     }
 }
 
@@ -189,7 +189,7 @@ impl Default for UsernamePasswordAuthenticationFilter {
             password_parameter: Self::NEXT_SECURITY_FORM_PASSWORD_KEY.into(),
             post_only: true,
 
-            inner: BaseAuthenticationProcessingFilter::with_request_matcher(
+            base: BaseAuthenticationProcessingFilter::with_request_matcher(
                 Self::default_path_request_matcher(),
             ),
         }

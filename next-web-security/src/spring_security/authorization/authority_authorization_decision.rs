@@ -1,6 +1,9 @@
-use std::{ops::Deref, sync::Arc};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
-use crate::{authorization::AuthorizationDecision, core::GrantedAuthority};
+use crate::{
+    authorization::{AuthorizationDecision, AuthorizationResult},
+    core::GrantedAuthority,
+};
 
 /// Represents an AuthorizationDecision based on a collection of authorities
 #[derive(Clone)]
@@ -28,5 +31,21 @@ impl Deref for AuthorityAuthorizationDecision {
 
     fn deref(&self) -> &Self::Target {
         &self.base
+    }
+}
+
+impl Debug for AuthorityAuthorizationDecision {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthorityAuthorizationDecision")
+            .field("granted", &self.is_granted())
+            .field(
+                "authorities",
+                &self
+                    .authorities
+                    .iter()
+                    .map(|a| a.authority().unwrap_or_default())
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
     }
 }

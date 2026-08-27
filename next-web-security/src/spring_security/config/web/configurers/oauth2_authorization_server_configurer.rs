@@ -38,7 +38,7 @@ pub struct OAuth2AuthorizationServerConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    inner: BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H>,
+    base: BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H>,
 }
 
 impl<H> Default for OAuth2AuthorizationServerConfigurer<H>
@@ -47,7 +47,7 @@ where
 {
     fn default() -> Self {
         Self {
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }
@@ -58,13 +58,13 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn get_object(&self) -> &BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H> {
-        &self.inner
+        &self.base
     }
 
     fn get_mut_object(
         &mut self,
     ) -> &mut BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H> {
-        &mut self.inner
+        &mut self.base
     }
 }
 
@@ -75,11 +75,11 @@ where
     H: SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_object()
+        self.base.get_object()
     }
 
     fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
-        self.inner.get_mut_object()
+        self.base.get_mut_object()
     }
 }
 
@@ -110,7 +110,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -119,6 +119,6 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

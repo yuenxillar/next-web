@@ -34,7 +34,7 @@ pub struct FormLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    inner: BaseAuthenticationFilterConfigurer<H, Self, UsernamePasswordAuthenticationFilter>,
+    base: BaseAuthenticationFilterConfigurer<H, Self, UsernamePasswordAuthenticationFilter>,
 }
 
 impl<H> FormLoginConfigurer<H>
@@ -166,7 +166,7 @@ where
     H: 'static,
 {
     fn init(&mut self, http: &mut H) {
-        self.inner.init(http);
+        self.base.init(http);
         self.init_default_login_filter(http);
 
         // Configure exception handling
@@ -186,7 +186,7 @@ where
     }
 
     fn configure(&mut self, http: &mut H) {
-        self.inner.configure(http);
+        self.base.configure(http);
     }
 }
 
@@ -238,15 +238,15 @@ where
     ///
     /// The `FormLoginConfigurer` for additional customization
     fn login_page(&mut self, login_page: &str, http: &mut H) {
-        self.inner.login_page(login_page, http);
+        self.base.login_page(login_page, http);
     }
 
     fn login_processing_url(&mut self, login_processing_url: &str) {
-        self.inner.login_processing_url = Some(login_processing_url.into());
+        self.base.login_processing_url = Some(login_processing_url.into());
 
         let requires_authentication_request_matcher =
             self.create_login_processing_url_matcher(login_processing_url);
-        self.inner.auth_filter.as_mut().map(|filter| {
+        self.base.auth_filter.as_mut().map(|filter| {
             filter.set_requires_authentication_request_matcher(
                 requires_authentication_request_matcher,
             )
@@ -272,7 +272,7 @@ where
 {
     fn default() -> Self {
         let mut configurer = Self {
-            inner: BaseAuthenticationFilterConfigurer::new(
+            base: BaseAuthenticationFilterConfigurer::new(
                 UsernamePasswordAuthenticationFilter::default(),
                 None,
             ),
@@ -292,7 +292,7 @@ where
     type Target = BaseAuthenticationFilterConfigurer<H, Self, UsernamePasswordAuthenticationFilter>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -301,6 +301,6 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }

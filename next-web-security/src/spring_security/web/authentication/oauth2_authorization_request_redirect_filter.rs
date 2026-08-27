@@ -335,51 +335,51 @@ mod tests {
 
     impl HttpResponse for TestResponse {
         fn version(&self) -> Version {
-            HttpResponse::version(&self.inner)
+            HttpResponse::version(&self.base)
         }
 
         fn status_code(&self) -> StatusCode {
-            HttpResponse::status_code(&self.inner)
+            HttpResponse::status_code(&self.base)
         }
 
         fn set_status_code(&mut self, status_code: StatusCode) {
-            HttpResponse::set_status_code(&mut self.inner, status_code);
+            HttpResponse::set_status_code(&mut self.base, status_code);
         }
 
         fn header(&self, name: &str) -> Option<&str> {
-            HttpResponse::header(&self.inner, name)
+            HttpResponse::header(&self.base, name)
         }
 
         fn headers(&self, name: &str) -> Option<Vec<&str>> {
-            HttpResponse::headers(&self.inner, name)
+            HttpResponse::headers(&self.base, name)
         }
 
         fn append_header(&mut self, name: &str, value: &str) -> bool {
-            HttpResponse::append_header(&mut self.inner, name, value)
+            HttpResponse::append_header(&mut self.base, name, value)
         }
 
         fn contains_header(&self, name: &str) -> bool {
-            HttpResponse::contains_header(&self.inner, name)
+            HttpResponse::contains_header(&self.base, name)
         }
 
         fn insert_header(&mut self, name: &str, value: &str) -> Option<String> {
-            HttpResponse::insert_header(&mut self.inner, name, value)
+            HttpResponse::insert_header(&mut self.base, name, value)
         }
 
         fn remove_header(&mut self, name: &str) -> Option<String> {
-            HttpResponse::remove_header(&mut self.inner, name)
+            HttpResponse::remove_header(&mut self.base, name)
         }
 
         fn set_body(&mut self, body: Vec<u8>) {
-            HttpResponse::set_body(&mut self.inner, body);
+            HttpResponse::set_body(&mut self.base, body);
         }
 
         fn set_redirect(&mut self, url: &str) {
-            HttpResponse::set_redirect(&mut self.inner, url);
+            HttpResponse::set_redirect(&mut self.base, url);
         }
 
         fn add_cookie(&mut self, cookie: Cookie) {
-            HttpResponse::add_cookie(&mut self.inner, cookie);
+            HttpResponse::add_cookie(&mut self.base, cookie);
         }
 
         fn is_committed(&self) -> bool {
@@ -389,7 +389,7 @@ mod tests {
         fn finish(&mut self) {}
 
         fn shared(&mut self) -> &HttpResponseShare {
-            HttpResponse::shared(&mut self.inner)
+            HttpResponse::shared(&mut self.base)
         }
     }
 
@@ -490,13 +490,13 @@ mod tests {
 
     impl std::fmt::Display for NestedError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "nested: {}", self.inner)
+            write!(f, "nested: {}", self.base)
         }
     }
 
     impl Error for NestedError {
         fn source(&self) -> Option<&(dyn Error + 'static)> {
-            Some(&self.inner)
+            Some(&self.base)
         }
     }
 

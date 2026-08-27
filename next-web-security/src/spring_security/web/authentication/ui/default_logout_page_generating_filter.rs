@@ -63,7 +63,7 @@ impl DefaultLogoutPageGeneratingFilter {
     pub fn new() -> Self {
         Self {
             matcher: Arc::new(PathPatternRequestMatcher::path_pattern(
-                Some(HttpMethod::Get),
+                Some(HttpMethod::GET),
                 "/logout",
             )),
             resolve_hidden_inputs: Arc::new(|_| HashMap::new()),
@@ -81,7 +81,7 @@ impl DefaultLogoutPageGeneratingFilter {
     pub fn with_hidden_inputs_resolver(resolve_hidden_inputs: ResolveHiddenInputsFn) -> Self {
         Self {
             matcher: Arc::new(PathPatternRequestMatcher::path_pattern(
-                Some(HttpMethod::Get),
+                Some(HttpMethod::GET),
                 "/logout",
             )),
             resolve_hidden_inputs,

@@ -25,7 +25,7 @@ where
 {
     require_explicit_save: bool,
 
-    inner: BaseHttpConfigurer<Self, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> SecurityContextConfigurer<H>
@@ -97,7 +97,7 @@ where
             let mut SecurityContextHolder_filter =
                 SecurityContextHolderFilter::new(security_context_repository);
             SecurityContextHolder_filter.set_security_context_holder_strategy(
-                self.inner.get_security_context_holder_strategy().to_owned(),
+                self.base.get_security_context_holder_strategy().to_owned(),
             );
 
             // let filter = self.post_process(SecurityContextHolder_filter);
@@ -107,7 +107,7 @@ where
             // let mut security_context_filter =
             //     SecurityContextPersistenceFilter::new(security_context_repository);
             // security_context_filter.set_security_context_holder_strategy(
-            //     self.inner.get_security_context_holder_strategy().to_owned(),
+            //     self.base.get_security_context_holder_strategy().to_owned(),
             // );
             // let session_creation_policy = http
             //     .configurer::<SessionManagementConfigurer<H>>()
@@ -134,7 +134,7 @@ where
         Self {
             require_explicit_save: true,
 
-            inner: Default::default(),
+            base: Default::default(),
         }
     }
 }
@@ -146,7 +146,7 @@ where
     type Target = BaseHttpConfigurer<Self, H>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.base
     }
 }
 
@@ -155,6 +155,6 @@ where
     H: HttpSecurityBuilder<H>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.base
     }
 }
