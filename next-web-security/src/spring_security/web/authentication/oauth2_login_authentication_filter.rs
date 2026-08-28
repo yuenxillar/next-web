@@ -57,17 +57,17 @@ impl OAuth2LoginAuthenticationFilter {
             authorization_request_repository.clone(),
             client_registration_repository.clone(),
         ));
-        let mut inner = BaseAuthenticationProcessingFilter::with_request_matcher(Arc::new(
+        let mut base = BaseAuthenticationProcessingFilter::with_request_matcher(Arc::new(
             OAuth2LoginRequestMatcher::new(login_processing_url.clone()),
         ));
-        inner.set_authentication_converter(converter);
+        base.set_authentication_converter(converter);
 
         Self {
             authorization_request_repository,
             client_registration_repository,
             authorized_client_repository,
             login_processing_url,
-            inner,
+            base,
         }
     }
 

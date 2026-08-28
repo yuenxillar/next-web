@@ -23,10 +23,10 @@ impl SimpleUrlAuthenticationSuccessHandler {
     /// Creates a new `SimpleUrlAuthenticationSuccessHandler` with the given
     /// default target URL.
     pub fn new(default_target_url: &str) -> Self {
-        let mut inner = BaseAuthenticationTargetUrlRequestHandler::default();
-        inner.set_default_target_url(default_target_url);
+        let mut base = BaseAuthenticationTargetUrlRequestHandler::default();
+        base.set_default_target_url(default_target_url);
 
-        Self { inner }
+        Self { base }
     }
 
     /// Removes temporary authentication-related data which may have been stored in the session during the authentication process.

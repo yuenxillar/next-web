@@ -172,7 +172,7 @@ mod tests {
             testing_authentication_token::TestingAuthenticationToken,
         },
         authorization::AuthenticationManager,
-        core::{authority_utils::AuthorityUtils, Authentication},
+        core::{authority::AuthorityUtils, Authentication},
     };
 
     #[test]

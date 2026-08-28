@@ -5,7 +5,7 @@ use next_web_core::filter::FilterError;
 use tokio::task_local;
 
 use crate::core::context::{
-    deferred_security_context::DeferredSecurityContext, security_context::SecurityContext,
+    security_context::SecurityContext,
     security_context_holder_strategy::SecurityContextHolderStrategy, SecurityContextImpl,
 };
 
@@ -13,13 +13,12 @@ task_local! {
     static CONTEXT_HOLDER: Arc<dyn SecurityContext>
 }
 
+/// A ThreadLocal-based implementation of SecurityContextHolderStrategy.
 #[derive(Clone, Default)]
 pub struct ThreadLocalSecurityContextHolderStrategy;
 
 impl SecurityContextHolderStrategy for ThreadLocalSecurityContextHolderStrategy {
-    fn clear_context(&self) {
-        unimplemented!()
-    }
+    fn clear_context(&self) {}
 
     fn get_context(&self) -> Option<Arc<dyn SecurityContext>> {
         CONTEXT_HOLDER.try_get().ok()

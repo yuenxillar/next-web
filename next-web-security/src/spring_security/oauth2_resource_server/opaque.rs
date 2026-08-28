@@ -1,4 +1,11 @@
-use std::{any::{Any, TypeId}, collections::HashMap, fmt, ops::Deref, ops::DerefMut, sync::Arc};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    fmt,
+    ops::Deref,
+    ops::DerefMut,
+    sync::Arc,
+};
 
 use next_web_core::{async_trait, traits::required::Required};
 
@@ -7,16 +14,11 @@ use crate::{
     config::{
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::BaseHttpConfigurer,
-            HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, HttpSecurityBuilder},
     },
     core::{
-        Authentication, GrantedAuthority, Principal,
-        {AuthenticationError, AuthenticationErrorKind},
+        Authentication, GrantedAuthority, Principal, {AuthenticationError, AuthenticationErrorKind},
     },
-    core::simple_granted_authority::SimpleGrantedAuthority,
     oauth2_resource_server::bearer::BearerTokenAuthenticationToken,
     web::authentication::AuthPrincipal,
     web::default_security_filter_chain::DefaultSecurityFilterChain,
@@ -56,7 +58,12 @@ impl Principal for OAuth2AuthenticatedPrincipal {
 
 impl fmt::Display for OAuth2AuthenticatedPrincipal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "OAuth2AuthenticatedPrincipal [name={}, authorities={}]", self.name, self.authorities.len())
+        write!(
+            f,
+            "OAuth2AuthenticatedPrincipal [name={}, authorities={}]",
+            self.name,
+            self.authorities.len()
+        )
     }
 }
 
@@ -126,7 +133,10 @@ impl SpringOpaqueTokenIntrospector {
 }
 
 impl OpaqueTokenIntrospector for SpringOpaqueTokenIntrospector {
-    fn introspect(&self, _token: &str) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError> {
+    fn introspect(
+        &self,
+        _token: &str,
+    ) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError> {
         Err(AuthenticationError::with_kind(
             "Opaque token introspection is not implemented",
             AuthenticationErrorKind::BadCredentials,
@@ -176,7 +186,10 @@ impl OpaqueTokenAuthenticationProvider {
     }
 
     pub fn with_default_converter(introspector: Arc<dyn OpaqueTokenIntrospector>) -> Self {
-        Self::new(introspector, Arc::new(DefaultOpaqueTokenAuthenticationConverter::default()))
+        Self::new(
+            introspector,
+            Arc::new(DefaultOpaqueTokenAuthenticationConverter::default()),
+        )
     }
 }
 
@@ -206,11 +219,10 @@ impl AuthenticationProvider for OpaqueTokenAuthenticationProvider {
             )
         })?;
         let principal = self.introspector.introspect(bearer)?;
-        let (principal, authorities) =
-            self.authentication_converter.convert(token, &principal);
-        Ok(Some(Arc::new(BearerTokenAuthenticationToken::authenticated(
-            principal, authorities, bearer,
-        ))))
+        let (principal, authorities) = self.authentication_converter.convert(token, &principal);
+        Ok(Some(Arc::new(
+            BearerTokenAuthenticationToken::authenticated(principal, authorities, bearer),
+        )))
     }
 }
 
@@ -277,9 +289,10 @@ where
         if let Some(provider) = self.opaque_token_authentication_provider.clone() {
             return provider;
         }
-        let introspector = self.introspector.clone().unwrap_or_else(|| {
-            Arc::new(SpringOpaqueTokenIntrospector::new("", "", ""))
-        });
+        let introspector = self
+            .introspector
+            .clone()
+            .unwrap_or_else(|| Arc::new(SpringOpaqueTokenIntrospector::new("", "", "")));
         let provider = Arc::new(OpaqueTokenAuthenticationProvider::new(
             introspector,
             self.authentication_converter.clone(),

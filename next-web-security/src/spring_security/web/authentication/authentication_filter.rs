@@ -329,8 +329,8 @@ impl AuthenticationFilter {
     fn attempt_authentication(
         &self,
         request: &dyn HttpRequest,
-    ) -> Result<Option<Arc<dyn crate::core::Authentication>>, AuthenticationError> {
-        let Some(authentication) = self.authentication_converter.convert(request) else {
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
+        let Some(authentication) = self.authentication_converter.convert(request)? else {
             return Ok(None);
         };
 
@@ -370,10 +370,11 @@ impl HttpFilter for AuthenticationFilter {
                 // Multi-Factor Authentication (MFA) authority merging.
                 // In the Java implementation, this uses `Authentication.toBuilder()`
                 // to merge the current user's authorities with the new result.
-                let current_auth = self
-                    .security_context_holder_strategy
-                    .get_context()
-                    .and_then(|ctx| ctx.get_authentication());
+                let ctx = match self.security_context_holder_strategy.get_context() {
+                    Some(ctx) => ctx,
+                    None => return Ok(()),
+                };
+                let current_auth = ctx.get_authentication();
 
                 if self.should_perform_mfa(current_auth.as_deref(), authentication_result.as_ref())
                 {

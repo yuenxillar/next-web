@@ -358,7 +358,7 @@ impl HttpFilter for DigestAuthenticationFilter {
             );
             user = self
                 .user_details_service
-                .load_user_by_username(username.to_string())
+                .load_user_by_username(username)
                 .await
                 .map_err(|_| {
                     let msg = format!("Username {} not found", username);

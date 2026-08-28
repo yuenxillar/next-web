@@ -10,7 +10,7 @@ pub struct AuthorizationEvent {
     authentication: Arc<dyn Authentication>,
     result: Box<dyn AuthorizationResult>,
 
-    inner: EventAttributes<BoxAny>,
+    base: EventAttributes<BoxAny>,
 }
 
 impl AuthorizationEvent {

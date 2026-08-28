@@ -16,10 +16,8 @@ use crate::{
     },
     core::{
         userdetails::{
-            user_details_password_service::{
-                NoopUserDetailsPasswordService, UserDetailsPasswordService,
-            },
             UserDetails, UserDetailsService,
+            {NoopUserDetailsPasswordService, UserDetailsPasswordService},
         },
         Authentication, AuthenticationError, AuthenticationErrorKind,
         UsernamePasswordAuthenticationToken,

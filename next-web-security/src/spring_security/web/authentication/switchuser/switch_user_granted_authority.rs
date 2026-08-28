@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use next_web_core::async_trait;
-
 use crate::core::{Authentication, GrantedAuthority};
 
 /// A `GrantedAuthority` that stores the original `Authentication` for use
@@ -31,8 +29,8 @@ impl SwitchUserGrantedAuthority {
 
     /// Returns the source (original) `Authentication` that should be restored
     /// when the user exits the switched context.
-    pub fn get_source(&self) -> &dyn Authentication {
-        self.source.as_ref()
+    pub fn source(&self) -> &Arc<dyn Authentication> {
+        &self.source
     }
 }
 

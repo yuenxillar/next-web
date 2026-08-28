@@ -242,15 +242,29 @@ where
     /// Configures the `DefaultLoginPageGeneratingFilter` shared object so that a
     /// generated login page links to one-time token generation.
     fn init_default_login_filter(&mut self, http: &mut H) {
-        if let Some(login_page_generating_filter) =
+        let Some(login_page_generating_filter) =
             http.shared_object_mut::<DefaultLoginPageGeneratingFilter>()
-        {
-            if !self.is_custom_login_page() {
-                login_page_generating_filter.set_one_time_token_enabled(true);
-                login_page_generating_filter
-                    .set_one_time_token_generation_url(self.token_generating_url.clone());
-                login_page_generating_filter.set_login_page_url(self.get_login_page());
-            }
+        else {
+            return;
+        };
+        if self.is_custom_login_page() {
+            return;
+        }
+        login_page_generating_filter.set_one_time_token_enabled(true);
+        login_page_generating_filter
+            .set_one_time_token_generation_url(self.token_generating_url.clone());
+        if login_page_generating_filter.get_login_page_url().is_none() {
+            login_page_generating_filter
+                .set_login_page_url(DefaultLoginPageGeneratingFilter::DEFAULT_LOGIN_PAGE_URL);
+            login_page_generating_filter.set_failure_url(format!(
+                "{}?{}",
+                DefaultLoginPageGeneratingFilter::DEFAULT_LOGIN_PAGE_URL,
+                DefaultLoginPageGeneratingFilter::ERROR_PARAMETER_NAME
+            ));
+            login_page_generating_filter.set_logout_success_url(format!(
+                "{}?logout",
+                DefaultLoginPageGeneratingFilter::DEFAULT_LOGIN_PAGE_URL
+            ));
         }
     }
 

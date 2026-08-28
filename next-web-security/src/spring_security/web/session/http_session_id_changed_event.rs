@@ -12,7 +12,7 @@ pub struct HttpSessionIdChangedEvent {
     old_session_id: String,
     new_session_id: String,
 
-    inner: EventAttributes<Arc<dyn HttpSession>>,
+    base: EventAttributes<Arc<dyn HttpSession>>,
 }
 
 impl HttpSessionIdChangedEvent {
@@ -21,7 +21,7 @@ impl HttpSessionIdChangedEvent {
             old_session_id: old_session_id.into(),
             new_session_id: session.id().to_string(),
 
-            inner: EventAttributes::new(session),
+            base: EventAttributes::new(session),
         }
     }
 

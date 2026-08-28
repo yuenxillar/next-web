@@ -15,7 +15,7 @@ pub struct SessionInformationExpiredEvent {
     response: HttpResponseShare,
     filter_chain: Option<HttpFilterChainShare>,
 
-    inner: EventAttributes<SessionInformation>,
+    base: EventAttributes<SessionInformation>,
 }
 
 impl SessionInformationExpiredEvent {
@@ -30,7 +30,7 @@ impl SessionInformationExpiredEvent {
             response,
             filter_chain,
 
-            inner: EventAttributes::new(session_information),
+            base: EventAttributes::new(session_information),
         }
     }
 }

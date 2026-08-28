@@ -7,6 +7,7 @@ use crate::core::{
     userdetails::{
         username_not_found_error::UsernameNotFoundError, UserDetails, UserDetailsService,
     },
+    AuthenticationError,
 };
 
 pub struct CachingUserDetailsService {
@@ -36,7 +37,7 @@ impl UserDetailsService for CachingUserDetailsService {
     async fn load_user_by_username(
         &self,
         username: &str,
-    ) -> Result<Arc<dyn UserDetails>, UsernameNotFoundError> {
+    ) -> Result<Arc<dyn UserDetails>, AuthenticationError> {
         if let Some(user) = self.user_cache.get_user_from_cache(username) {
             return Ok(user);
         }

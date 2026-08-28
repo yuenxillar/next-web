@@ -80,7 +80,7 @@ impl Display for PreAuthenticatedAuthenticationToken {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{authority_utils::AuthorityUtils, Authentication};
+    use crate::core::{authority::AuthorityUtils, Authentication};
 
     use super::PreAuthenticatedAuthenticationToken;
 

@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::core::{simple_granted_authority::SimpleGrantedAuthority, GrantedAuthority};
+use crate::core::{authority::SimpleGrantedAuthority, GrantedAuthority};
 
 pub trait GrantedAuthoritiesMapper: Send + Sync {
     fn map_authorities(

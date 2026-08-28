@@ -56,18 +56,21 @@ impl DelegatingMissingAuthorityAccessDeniedHandler {
         DelegatingMissingAuthorityAccessDeniedHandlerBuilder::default()
     }
 
-    fn authority_errors(&self, err: &AccessDeniedError) -> Vec<AuthorityRequiredFactorErrorEntry> {
+    fn authority_errors(
+        &self,
+        err: &AccessDeniedError,
+    ) -> Result<Vec<AuthorityRequiredFactorErrorEntry>, &'static str> {
         let denied = match err {
             AccessDeniedError::AuthorizationDenied(authorization_denied_error) => {
                 authorization_denied_error
             }
-            _ => return Vec::new(),
+            _ => return Ok(Vec::new()),
         };
 
         let authorization_result = denied.authorization_result();
         match (authorization_result as &dyn Any).downcast_ref::<FactorAuthorizationDecision>() {
             Some(factor_decision) => {
-                return factor_decision
+                return Ok(factor_decision
                     .factor_errors()
                     .iter()
                     .map(|err| {
@@ -76,28 +79,32 @@ impl DelegatingMissingAuthorityAccessDeniedHandler {
                             Some(err.to_owned()),
                         )
                     })
-                    .collect();
+                    .collect());
             }
             None => match (authorization_result as &dyn Any)
                 .downcast_ref::<AuthorityAuthorizationDecision>()
             {
-                Some(authority_decision) => authority_decision
-                    .authorities()
-                    .iter()
-                    .filter_map(|ga| ga.authority())
-                    .map(|authority| {
+                Some(authority_decision) => {
+                    let mut result = Vec::new();
+                    for authority in authority_decision
+                        .authorities()
+                        .iter()
+                        .filter_map(|ga| ga.authority())
+                    {
                         if authority.starts_with("FACTOR_") {
                             let required = RequiredFactor::with_authority(authority).build();
-                            AuthorityRequiredFactorErrorEntry::new(
+                            result.push(AuthorityRequiredFactorErrorEntry::new(
                                 authority,
-                                Some(RequiredFactorError::create_missing(required)),
-                            )
+                                Some(RequiredFactorError::create_missing(required)?),
+                            ));
                         } else {
-                            AuthorityRequiredFactorErrorEntry::new(authority, None)
+                            result.push(AuthorityRequiredFactorErrorEntry::new(authority, None));
                         }
-                    })
-                    .collect(),
-                None => return Vec::new(),
+                    }
+
+                    Ok(result)
+                }
+                None => return Ok(Vec::new()),
             },
         }
     }
@@ -110,7 +117,9 @@ impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
         response: &mut dyn HttpResponse,
         denied: &AccessDeniedError,
     ) -> Result<(), BoxError> {
-        let error_entries = self.authority_errors(denied);
+        let error_entries = self
+            .authority_errors(denied)
+            .map_err(Into::<BoxError>::into)?;
 
         let errors = error_entries
             .iter()

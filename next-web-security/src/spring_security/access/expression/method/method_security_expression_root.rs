@@ -18,16 +18,17 @@ use super::{
 };
 
 pub struct MethodSecurityExpressionRoot {
-    inner: SecurityExpressionRoot,
     invocation: MethodInvocation,
     filter_object: Option<Box<dyn std::any::Any + Send + Sync>>,
     return_object: Option<Box<dyn std::any::Any + Send + Sync>>,
+
+    base: SecurityExpressionRoot,
 }
 
 impl MethodSecurityExpressionRoot {
     pub fn new(authentication: Arc<dyn Authentication>, invocation: MethodInvocation) -> Self {
         Self {
-            inner: SecurityExpressionRoot::new(authentication),
+            base: SecurityExpressionRoot::new(authentication),
             invocation,
             filter_object: None,
             return_object: None,

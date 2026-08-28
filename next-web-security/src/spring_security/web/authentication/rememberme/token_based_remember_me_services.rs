@@ -179,7 +179,7 @@ impl TokenBasedRememberMeServices {
     /// also be used to set the `max_age` property of the cookie.
     ///
     /// See SEC-485.
-    fn calculate_login_lifetime(&self, _authentication: &dyn Authentication) -> i32 {
+    fn calculate_login_lifetime(&self, _authentication: &dyn Authentication) -> u32 {
         self.get_token_validity_seconds()
     }
 

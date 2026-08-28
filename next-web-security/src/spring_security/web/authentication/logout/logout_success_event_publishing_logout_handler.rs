@@ -30,7 +30,6 @@ impl LogoutHandler for LogoutSuccessEventPublishingLogoutHandler {
                 if let Some(auth) = authentication {
                     event_publisher
                         .publish_event(Box::new(LogoutSuccessEvent::new(auth.to_owned())))
-                        .await
                         .ok();
                 }
             }

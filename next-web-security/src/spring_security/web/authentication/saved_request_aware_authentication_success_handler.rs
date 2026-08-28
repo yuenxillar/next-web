@@ -44,7 +44,7 @@ use crate::{
 pub struct SavedRequestAwareAuthenticationSuccessHandler {
     request_cache: Arc<dyn RequestCache>,
 
-    inner: SimpleUrlAuthenticationSuccessHandler,
+    base: SimpleUrlAuthenticationSuccessHandler,
 }
 
 impl Deref for SavedRequestAwareAuthenticationSuccessHandler {

@@ -51,7 +51,7 @@ mod tests {
         authorization::authentication_trust_resolver::{
             AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,
         },
-        core::authority_utils::AuthorityUtils,
+        core::authority::AuthorityUtils,
     };
 
     #[test]

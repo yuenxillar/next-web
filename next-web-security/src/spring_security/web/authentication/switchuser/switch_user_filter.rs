@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
+use axum::extract::ws::close_code::NORMAL;
 use next_web_core::{
     async_trait,
     filter::FilterError,
@@ -16,10 +17,9 @@ use crate::{
     authentication::AccountStatusUserDetailsChecker,
     core::{
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
-        simple_granted_authority::SimpleGrantedAuthority,
         userdetails::{UserDetails, UserDetailsChecker, UserDetailsService},
-        GrantedAuthority, UsernamePasswordAuthenticationToken,
-        {AuthenticationError, AuthenticationErrorKind},
+        Authentication, AuthenticationError, AuthenticationErrorKind, GrantedAuthority,
+        SimpleGrantedAuthority, UsernamePasswordAuthenticationToken,
     },
     web::{
         authentication::{
@@ -142,7 +142,7 @@ impl SwitchUserFilter {
     /// Creates a request matcher for the given URL pattern using `POST` method.
     fn create_matcher(pattern: &str) -> Arc<dyn RequestMatcher> {
         Arc::new(PathPatternRequestMatcher::path_pattern(
-            Some(HttpMethod::Post),
+            Some(HttpMethod::POST),
             pattern,
         ))
     }
@@ -275,24 +275,24 @@ impl SwitchUserFilter {
     /// `Authentication` object.
     fn get_source_authentication(
         &self,
-        current: &dyn crate::core::Authentication,
-    ) -> Option<Arc<dyn crate::core::Authentication>> {
-        // Downcast to UsernamePasswordAuthenticationToken to access the
-        // underlying authority objects.
-        // let upat = current
-        //     .as_any()
-        //     .downcast_ref::<UsernamePasswordAuthenticationToken>()?;
-        // for authority in upat.authorities_objects() {
-        //     // if let Some(source) = authority.as_switch_user_source() {
-        //     //     debug!(
-        //     //         "Found original switch user granted authority [{:?}]",
-        //     //         source.get_name()
-        //     //     );
-        //     //     return Some(source);
-        //     // }
-        // }
+        current: &dyn Authentication,
+    ) -> Option<Arc<dyn Authentication>> {
+        // iterate over granted authorities and find the 'switch user' authority
+        let mut original = None;
+        for auth in current.authorities() {
+            // check for switch user type of authority
+            if let Some(auth) =
+                (auth.as_ref() as &dyn Any).downcast_ref::<SwitchUserGrantedAuthority>()
+            {
+                original = Some(auth.source().clone());
+                debug!(
+                    "Found original switch user granted authority [{}]",
+                    original.as_ref().map_or("".into(), |a| a.to_string())
+                );
+            }
+        }
 
-        todo!()
+        original
     }
 
     /// Retrieves the current `Authentication`, attempting to find the original

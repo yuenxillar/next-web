@@ -7,7 +7,7 @@ use next_web_core::{async_trait, error::BoxError};
 use crate::{
     access::hierarchicalroles::RoleHierarchy,
     authorization::{AuthorityAuthorizationDecision, AuthorizationManager, AuthorizationResult},
-    core::{authority_utils::AuthorityUtils, Authentication},
+    core::{authority::AuthorityUtils, Authentication},
 };
 
 /// An AuthorizationManager that determines if the current user is authorized by evaluating if the

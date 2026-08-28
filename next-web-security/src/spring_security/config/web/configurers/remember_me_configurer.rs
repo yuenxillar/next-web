@@ -51,7 +51,7 @@ where
     remember_me_cookie_domain: Option<String>,
     token_repository: Option<Arc<dyn PersistentTokenRepository>>,
     user_details_service: Option<Arc<dyn UserDetailsService>>,
-    token_validity_seconds: Option<i32>,
+    token_validity_seconds: Option<u32>,
     use_secure_cookie: Option<bool>,
     always_remember: Option<bool>,
 
@@ -68,7 +68,7 @@ where
     ///
     /// # See also
     /// [`AbstractRememberMeServices::set_token_validity_seconds`]
-    pub fn token_validity_seconds(&mut self, token_validity_seconds: i32) -> &mut Self {
+    pub fn token_validity_seconds(&mut self, token_validity_seconds: u32) -> &mut Self {
         self.token_validity_seconds = Some(token_validity_seconds);
         self
     }

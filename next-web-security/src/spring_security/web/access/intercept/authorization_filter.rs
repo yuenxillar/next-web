@@ -90,7 +90,7 @@ impl HttpFilter for AuthorizationFilter {
         let result = self
             .authorization_manager
             .authorize(authentication.as_ref(), &mut context)
-            .await;
+            .await?;
 
         if let Some(publisher) = self.event_publisher.as_ref() {
             publisher.publish_authorization_event(

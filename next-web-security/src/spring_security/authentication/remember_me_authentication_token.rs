@@ -35,12 +35,12 @@ impl RememberMeAuthenticationToken {
             "Principal cannot be empty"
         );
 
-        let mut inner = BaseAuthenticationToken::new(authorities);
-        inner.set_authenticated(true);
+        let mut base = BaseAuthenticationToken::new(authorities);
+        base.set_authenticated(true);
         Self {
             principal,
             key_hash: string_hash(key.as_ref()),
-            inner,
+            base,
         }
     }
 
@@ -50,13 +50,13 @@ impl RememberMeAuthenticationToken {
         principal: AuthPrincipal,
         authorities: Option<Vec<Arc<dyn GrantedAuthority>>>,
     ) -> Self {
-        let mut inner = BaseAuthenticationToken::new(authorities);
-        inner.set_authenticated(true);
+        let mut base = BaseAuthenticationToken::new(authorities);
+        base.set_authenticated(true);
 
         Self {
             principal,
             key_hash,
-            inner,
+            base,
         }
     }
 

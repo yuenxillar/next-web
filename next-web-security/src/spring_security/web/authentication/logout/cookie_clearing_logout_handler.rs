@@ -28,7 +28,7 @@ impl CookieClearingLogoutHandler {
                         .filter(|s| StringUtils::has_text(s))
                         .unwrap_or("/");
                     cookie.set_path(path);
-                    cookie.set_max_age(0);
+                    cookie.set_max_age_secs(0);
                     cookie.set_secure(is_secure);
                     cookie
                 }) as AddCookieFn

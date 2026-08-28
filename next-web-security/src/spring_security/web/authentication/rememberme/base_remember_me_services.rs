@@ -36,7 +36,7 @@ pub struct BaseRememberMeServices {
     parameter: String,
     always_remember: bool,
     key: String,
-    token_validity_seconds: i32,
+    token_validity_seconds: u32,
     use_secure_cookie: Option<bool>,
     authorities_mapper: Option<Arc<dyn GrantedAuthoritiesMapper>>,
     cookie_customizer: Option<Arc<dyn Fn(&mut Cookie) + Send + Sync>>,
@@ -45,7 +45,7 @@ pub struct BaseRememberMeServices {
 impl BaseRememberMeServices {
     pub const NEXT_SECURITY_REMEMBER_ME_COOKIE_KEY: &str = "remember-me";
     pub const DEFAULT_PARAMETER: &str = "remember-me";
-    pub const TWO_WEEKS_S: i32 = 1209600;
+    pub const TWO_WEEKS_S: u32 = 1209600;
     const DELIMITER: &str = ":";
 
     pub fn new(key: impl Into<String>, user_details_service: Arc<dyn UserDetailsService>) -> Self {
@@ -187,7 +187,7 @@ impl BaseRememberMeServices {
     fn cancel_cookie(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {
         debug!("Cancelling cookie");
         let mut cookie = Cookie::new(&self.cookie_name, None);
-        cookie.set_max_age(0);
+        cookie.set_max_age_secs(0);
         cookie.set_path(self.get_cookie_path(request));
         if let Some(domain) = self.cookie_domain.as_ref() {
             cookie.set_domain(domain);
@@ -208,13 +208,13 @@ impl BaseRememberMeServices {
     pub(crate) fn set_cookie(
         &self,
         tokens: &[String],
-        max_age: i32,
+        max_age: u32,
         request: &dyn HttpRequest,
         response: &mut dyn HttpResponse,
     ) {
         let cookie_value = self.encode_cookie(tokens);
         let mut cookie = Cookie::new(&self.cookie_name, Some(cookie_value));
-        cookie.set_max_age(max_age);
+        cookie.set_max_age_secs(max_age);
         cookie.set_path(self.get_cookie_path(request));
         if let Some(domain) = self.cookie_domain.as_ref() {
             cookie.set_domain(domain);
@@ -282,11 +282,11 @@ impl BaseRememberMeServices {
         &self.key
     }
 
-    pub fn set_token_validity_seconds(&mut self, token_validity_seconds: i32) {
+    pub fn set_token_validity_seconds(&mut self, token_validity_seconds: u32) {
         self.token_validity_seconds = token_validity_seconds;
     }
 
-    pub fn get_token_validity_seconds(&self) -> i32 {
+    pub fn get_token_validity_seconds(&self) -> u32 {
         self.token_validity_seconds
     }
 

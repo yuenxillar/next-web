@@ -16,6 +16,6 @@ where
         &self,
         authentication: Arc<dyn Authentication>,
         value: BoxAny,
-        result: Option<Box<dyn AuthorizationResult>>,
+        result: Option<Arc<dyn AuthorizationResult>>,
     );
 }

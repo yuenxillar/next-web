@@ -243,17 +243,18 @@ impl ProviderAuthenticationManager {
         &self,
         authentication: Arc<dyn Authentication>,
     ) -> Arc<dyn Authentication> {
-        if !self.erase_credentials_after_authentication {
-            return authentication;
-        }
-        if let Some(token) = (authentication.as_ref() as &dyn Any)
-            .downcast_ref::<UsernamePasswordAuthenticationToken>()
-        {
-            let mut token = token.clone();
-            CredentialsContainer::erase_credentials(&mut token);
-            return Arc::new(token);
-        }
-        authentication
+        // if !self.erase_credentials_after_authentication {
+        //     return authentication;
+        // }
+        // if let Some(token) = (authentication.as_ref() as &dyn Any)
+        //     .downcast_ref::<UsernamePasswordAuthenticationToken>()
+        // {
+        //     let mut token = token.clone();
+        //     CredentialsContainer::erase_credentials(&mut token);
+        //     return Arc::new(token);
+        // }
+        // authentication
+        todo!()
     }
 }
 

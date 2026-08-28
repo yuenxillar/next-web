@@ -11,13 +11,13 @@ use crate::core::context::SecurityContext;
 /// Published by the HttpSessionEventPublisher when a HttpSession is removed from the container
 #[derive(Clone)]
 pub struct HttpSessionDestroyedEvent {
-    inner: EventAttributes<Arc<dyn HttpSession>>,
+    base: EventAttributes<Arc<dyn HttpSession>>,
 }
 
 impl HttpSessionDestroyedEvent {
     pub fn new(session: Arc<dyn HttpSession>) -> Self {
         Self {
-            inner: EventAttributes::new(session),
+            base: EventAttributes::new(session),
         }
     }
 

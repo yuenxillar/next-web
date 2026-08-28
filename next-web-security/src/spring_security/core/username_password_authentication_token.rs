@@ -48,15 +48,15 @@ impl UsernamePasswordAuthenticationToken {
         credentials: Option<AuthPrincipal>,
         authorities: Vec<Arc<dyn GrantedAuthority>>,
     ) -> Self {
-        let mut inner = BaseAuthenticationToken::new(Some(authorities));
-        inner.set_authenticated(true); // must use super, as we override
+        let mut base = BaseAuthenticationToken::new(Some(authorities));
+        base.set_authenticated(true); // must use super, as we override
 
         Self {
             principal: Some(principal),
             credentials: credentials,
             cleared: AtomicBool::new(false),
 
-            inner,
+            base,
         }
     }
 
@@ -165,7 +165,7 @@ impl Clone for UsernamePasswordAuthenticationToken {
             credentials: self.credentials.clone(),
             cleared: AtomicBool::new(self.cleared.load(Ordering::Acquire)),
 
-            inner: self.base.clone(),
+            base: self.base.clone(),
         }
     }
 }

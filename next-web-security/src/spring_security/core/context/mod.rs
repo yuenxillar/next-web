@@ -1,4 +1,4 @@
-pub mod global_security_context_holder_strategy;
+mod global_security_context_holder_strategy;
 pub mod security_context_changed_event;
 pub mod security_context_changed_listener;
 pub mod thread_local_security_context_holder_strategy;
@@ -11,6 +11,7 @@ mod security_context_holder_strategy;
 mod security_context_impl;
 
 pub use deferred_security_context::DeferredSecurityContext;
+pub(crate) use global_security_context_holder_strategy::GlobalSecurityContextHolderStrategy;
 pub use security_context::SecurityContext;
 pub use security_context_holder::SecurityContextHolder;
 pub use security_context_holder_strategy::SecurityContextHolderStrategy;

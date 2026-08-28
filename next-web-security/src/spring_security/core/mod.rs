@@ -1,12 +1,10 @@
 pub mod authority;
 pub mod authority_mapping;
-pub mod authority_utils;
 pub mod context;
 
 pub mod granted_authorities_container;
 pub mod session;
 
-pub mod simple_granted_authority;
 pub mod token;
 pub mod user_cache;
 pub mod userdetails;

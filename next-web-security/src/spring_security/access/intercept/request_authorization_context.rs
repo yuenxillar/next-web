@@ -25,8 +25,10 @@ impl RequestAuthorizationContext {
         self.variables.as_ref()
     }
 
-    pub fn set_variables(&mut self, variables: Option<BTreeMap<String, String>>) {
-        self.variables = variables;
+    pub fn set_variables(&self, variables: Option<BTreeMap<String, String>>) {
+        // self.variables = variables;
+
+        todo!()
     }
 }
 

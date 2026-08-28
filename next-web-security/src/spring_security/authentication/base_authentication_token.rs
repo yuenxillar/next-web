@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use next_web_core::error::BoxError;
 
-use crate::core::userdetails::user::User;
+use crate::core::userdetails::User;
 use crate::core::userdetails::UserDetails;
 use crate::core::GrantedAuthority;
 use crate::core::{AuthenticatedPrincipal, Principal};

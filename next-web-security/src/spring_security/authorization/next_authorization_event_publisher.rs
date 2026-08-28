@@ -48,7 +48,7 @@ impl AuthorizationEventPublisher for NextAuthorizationEventPublisher {
         &self,
         authentication: Arc<dyn Authentication>,
         object: BoxAny,
-        result: Option<Box<dyn AuthorizationResult>>,
+        result: Option<Arc<dyn AuthorizationResult>>,
     ) {
         let result = match result {
             Some(r) => r,

@@ -6,13 +6,13 @@ use crate::core::Authentication;
 
 #[derive(Clone)]
 pub struct BaseAuthenticationEvent {
-    inner: EventAttributes<Arc<dyn Authentication>>,
+    base: EventAttributes<Arc<dyn Authentication>>,
 }
 
 impl BaseAuthenticationEvent {
     pub fn new(authentication: Arc<dyn Authentication>) -> Self {
         Self {
-            inner: EventAttributes::new(authentication),
+            base: EventAttributes::new(authentication),
         }
     }
 

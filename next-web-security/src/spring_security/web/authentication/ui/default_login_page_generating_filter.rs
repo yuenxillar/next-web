@@ -571,7 +571,7 @@ impl DefaultLoginPageGeneratingFilter {
     }
 
     fn matches(&self, request: &dyn HttpRequest, url: &str) -> bool {
-        if request.method() != HttpMethod::Get || url.is_empty() {
+        if request.method() != HttpMethod::GET || url.is_empty() {
             return false;
         }
 

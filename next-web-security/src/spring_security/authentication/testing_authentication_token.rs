@@ -32,10 +32,6 @@ impl TestingAuthenticationToken {
 }
 
 impl Authentication for TestingAuthenticationToken {
-    fn authentication_type(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
     fn credentials(&self) -> Option<String> {
         self.credentials.clone()
     }
@@ -58,7 +54,7 @@ impl Authentication for TestingAuthenticationToken {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{authority_utils::AuthorityUtils, Authentication};
+    use crate::core::{authority::AuthorityUtils, Authentication};
 
     use super::TestingAuthenticationToken;
 

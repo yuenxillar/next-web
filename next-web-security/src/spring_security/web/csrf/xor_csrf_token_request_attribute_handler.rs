@@ -19,7 +19,7 @@ use crate::web::csrf::{
 /// value from the masked value as either a header or parameter value of the request.
 #[derive(Clone, Default)]
 pub struct XorCsrfTokenRequestAttributeHandler {
-    inner: CsrfTokenRequestAttributeHandler,
+    base: CsrfTokenRequestAttributeHandler,
 }
 
 impl XorCsrfTokenRequestAttributeHandler {

@@ -6,7 +6,7 @@ use crate::core::{context::security_context::SecurityContext, Authentication};
 /// Useful when running as a different user for part of a request.
 #[derive(Clone)]
 pub struct TransientSecurityContext {
-    inner: Arc<dyn SecurityContext>,
+    base: Arc<dyn SecurityContext>,
 }
 
 impl TransientSecurityContext {

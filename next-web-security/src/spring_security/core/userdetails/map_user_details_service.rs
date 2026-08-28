@@ -1,76 +1,62 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use next_web_core::async_trait;
+use tokio::sync::RwLock;
 
 use crate::core::{
-    authority_utils::AuthorityUtils,
-    userdetails::{
-        user::User, user_details::UserDetails,
-        user_details_password_service::UserDetailsPasswordService,
-        user_details_service::UserDetailsService, username_not_found_error::UsernameNotFoundError,
-    },
+    userdetails::{User, UserDetails, UserDetailsPasswordService, UserDetailsService},
+    AuthenticationError, AuthenticationErrorKind,
 };
 
+/// A Map based implementation of ReactiveUserDetailsService
 #[derive(Default)]
 pub struct MapUserDetailsService {
     users: RwLock<HashMap<String, Arc<dyn UserDetails>>>,
 }
 
 impl MapUserDetailsService {
-    pub fn new(users: impl IntoIterator<Item = Arc<dyn UserDetails>>) -> Self {
-        let service = Self::default();
-        for user in users {
-            service.create_user(user);
-        }
-        service
-    }
-
-    pub fn create_user(&self, user: Arc<dyn UserDetails>) {
-        let key = user.username().to_lowercase();
-        if let Ok(mut users) = self.users.write() {
-            users.insert(key, user);
+    /// Creates a new MapUserDetailsService with the given users.
+    pub fn new<I, K>(users: I) -> Self
+    where
+        I: IntoIterator<Item = (K, Arc<dyn UserDetails>)>,
+        K: Into<String>,
+    {
+        Self {
+            users: RwLock::new(users.into_iter().map(|(k, v)| (k.into(), v)).collect()),
         }
     }
 
-    pub fn user_exists(&self, username: &str) -> bool {
-        self.users
-            .read()
-            .map(|users| users.contains_key(&Self::key(username)))
-            .unwrap_or(false)
-    }
+    /// Creates a new instance
+    pub fn with_users<I>(users: I) -> Self
+    where
+        I: IntoIterator<Item = Arc<dyn UserDetails>>,
+    {
+        let users = users.into_iter().collect::<Vec<_>>();
+        assert!(!users.is_empty(), "users cannot be  empty");
 
-    pub fn delete_user(&self, username: &str) {
-        if let Ok(mut users) = self.users.write() {
-            users.remove(&Self::key(username));
+        Self {
+            users: RwLock::new(
+                users
+                    .into_iter()
+                    .map(|user| (Self::key(user.username()), user))
+                    .collect(),
+            ),
         }
     }
 
     fn key(username: &str) -> String {
-        username.to_lowercase()
+        username.to_ascii_lowercase()
     }
 
-    async fn with_new_password(
-        user: Arc<dyn UserDetails>,
+    fn with_new_password(
+        user_details: &dyn UserDetails,
         new_password: Option<String>,
     ) -> Arc<dyn UserDetails> {
-        let authorities = user
-            .authorities()
-            .into_iter()
-            .filter_map(|authority| authority.authority())
-            .collect::<Vec<_>>();
-
-        Arc::new(User::with_flags(
-            user.username(),
-            new_password,
-            user.is_enabled(),
-            user.is_account_non_expired(),
-            user.is_credentials_non_expired(),
-            user.is_account_non_locked(),
-            AuthorityUtils::create_authority_list(authorities),
-        ))
+        Arc::new(
+            User::with_user_details(user_details)
+                .password(new_password)
+                .build(),
+        )
     }
 }
 
@@ -79,12 +65,19 @@ impl UserDetailsService for MapUserDetailsService {
     async fn load_user_by_username(
         &self,
         username: &str,
-    ) -> Result<Arc<dyn UserDetails>, UsernameNotFoundError> {
+    ) -> Result<Arc<dyn UserDetails>, AuthenticationError> {
         self.users
             .read()
-            .ok()
-            .and_then(|users| users.get(&Self::key(&username)).cloned())
-            .ok_or(UsernameNotFoundError(username.to_owned()))
+            .await
+            .get(&Self::key(username))
+            .map(|user_details| {
+                Arc::new(User::with_user_details(user_details.as_ref()).build())
+                    as Arc<dyn UserDetails>
+            })
+            .ok_or(AuthenticationError::with_kind(
+                username,
+                AuthenticationErrorKind::UsernameNotFound,
+            ))
     }
 }
 
@@ -95,11 +88,10 @@ impl UserDetailsPasswordService for MapUserDetailsService {
         user: Arc<dyn UserDetails>,
         new_password: Option<String>,
     ) -> Arc<dyn UserDetails> {
-        let updated = Self::with_new_password(user.clone(), new_password).await;
-        let key = user.username().to_lowercase();
-        if let Ok(mut users) = self.users.write() {
-            users.insert(key, updated.clone());
-        }
-        updated
+        let user_details = Self::with_new_password(user.as_ref(), new_password);
+        let key = Self::key(user.username());
+        self.users.write().await.insert(key, user_details.clone());
+
+        user_details
     }
 }

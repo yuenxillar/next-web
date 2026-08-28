@@ -1,15 +1,12 @@
-use super::user_attribute::UserAttribute;
+use super::UserAttribute;
 
+/// Property editor that creates a UserAttribute from a comma separated list of values.
 #[derive(Clone, Default)]
 pub struct UserAttributeEditor {
     value: Option<UserAttribute>,
 }
 
 impl UserAttributeEditor {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn set_as_text(&mut self, text: Option<&str>) {
         let Some(text) = text else {
             self.value = None;
@@ -21,7 +18,7 @@ impl UserAttributeEditor {
         }
 
         let tokens = text.split(',').map(str::trim).collect::<Vec<_>>();
-        let mut user_attribute = UserAttribute::new();
+        let mut user_attribute = UserAttribute::default();
         let mut authorities = Vec::new();
 
         for (index, token) in tokens.into_iter().enumerate() {

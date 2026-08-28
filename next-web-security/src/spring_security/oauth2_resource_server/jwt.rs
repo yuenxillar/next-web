@@ -1,11 +1,17 @@
-use std::{any::{Any, TypeId}, collections::HashMap, ops::Deref, ops::DerefMut, sync::Arc};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    ops::Deref,
+    ops::DerefMut,
+    sync::Arc,
+};
 
 use next_web_core::{async_trait, traits::required::Required};
 
 use crate::{
     authentication::AuthenticationProvider,
-    core::{Authentication, GrantedAuthority, Principal, AuthenticationError},
-    core::simple_granted_authority::SimpleGrantedAuthority,
+    core::authority::SimpleGrantedAuthority,
+    core::{Authentication, AuthenticationError, GrantedAuthority},
     oauth2_resource_server::bearer::BearerTokenAuthenticationToken,
     web::authentication::AuthPrincipal,
 };
@@ -158,7 +164,10 @@ impl JwtAuthenticationProvider {
     }
 
     pub fn with_default_converter(jwt_decoder: Arc<dyn JwtDecoder>) -> Self {
-        Self::new(jwt_decoder, Arc::new(DefaultJwtAuthenticationConverter::default()))
+        Self::new(
+            jwt_decoder,
+            Arc::new(DefaultJwtAuthenticationConverter::default()),
+        )
     }
 }
 
@@ -189,9 +198,9 @@ impl AuthenticationProvider for JwtAuthenticationProvider {
         })?;
         let jwt = self.jwt_decoder.decode(bearer)?;
         let (principal, authorities) = self.jwt_authentication_converter.convert(&jwt)?;
-        Ok(Some(Arc::new(BearerTokenAuthenticationToken::authenticated(
-            principal, authorities, bearer,
-        ))))
+        Ok(Some(Arc::new(
+            BearerTokenAuthenticationToken::authenticated(principal, authorities, bearer),
+        )))
     }
 }
 
@@ -204,10 +213,7 @@ where
     jwt_decoder: Option<Arc<dyn JwtDecoder>>,
     jwt_authentication_converter: Arc<dyn JwtAuthenticationConverter>,
     jwt_authentication_provider: Option<Arc<JwtAuthenticationProvider>>,
-    base: crate::config::web::configurers::BaseHttpConfigurer<
-        JwtConfigurer<H>,
-        H,
-    >,
+    base: crate::config::web::configurers::BaseHttpConfigurer<JwtConfigurer<H>, H>,
 }
 
 impl<H> JwtConfigurer<H>
@@ -256,8 +262,10 @@ where
             .jwt_decoder
             .clone()
             .unwrap_or_else(|| Arc::new(NimbusJwtDecoder::default()));
-        let provider =
-            Arc::new(JwtAuthenticationProvider::new(decoder, self.jwt_authentication_converter.clone()));
+        let provider = Arc::new(JwtAuthenticationProvider::new(
+            decoder,
+            self.jwt_authentication_converter.clone(),
+        ));
         self.jwt_authentication_provider = Some(provider.clone());
         provider
     }
@@ -267,8 +275,7 @@ impl<H> Deref for JwtConfigurer<H>
 where
     H: crate::config::web::HttpSecurityBuilder<H>,
 {
-    type Target =
-        crate::config::web::configurers::BaseHttpConfigurer<JwtConfigurer<H>, H>;
+    type Target = crate::config::web::configurers::BaseHttpConfigurer<JwtConfigurer<H>, H>;
 
     fn deref(&self) -> &<Self as Deref>::Target {
         &self.base
@@ -284,12 +291,13 @@ where
     }
 }
 
-impl<H> Required<
-    crate::config::security_configurer_adapter::SecurityConfigurerAdapter<
-        crate::web::default_security_filter_chain::DefaultSecurityFilterChain,
-        H,
-    >,
-> for JwtConfigurer<H>
+impl<H>
+    Required<
+        crate::config::security_configurer_adapter::SecurityConfigurerAdapter<
+            crate::web::default_security_filter_chain::DefaultSecurityFilterChain,
+            H,
+        >,
+    > for JwtConfigurer<H>
 where
     H: crate::config::web::HttpSecurityBuilder<H>,
     H: crate::config::security_builder::SecurityBuilder<
@@ -315,10 +323,11 @@ where
     }
 }
 
-impl<H> crate::config::security_configurer::SecurityConfigurer<
-    crate::web::default_security_filter_chain::DefaultSecurityFilterChain,
-    H,
-> for JwtConfigurer<H>
+impl<H>
+    crate::config::security_configurer::SecurityConfigurer<
+        crate::web::default_security_filter_chain::DefaultSecurityFilterChain,
+        H,
+    > for JwtConfigurer<H>
 where
     H: crate::config::web::HttpSecurityBuilder<H>,
     H: crate::config::security_builder::SecurityBuilder<

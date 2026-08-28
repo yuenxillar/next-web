@@ -27,7 +27,7 @@ impl LogoutSuccessHandler for SimpleUrlLogoutSuccessHandler {
         response: &mut dyn HttpResponse,
         authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError> {
-        self.handle(request, response, authentication)
+        self.handle(request, response, authentication.map(|auth| auth.as_ref()))
     }
 }
 

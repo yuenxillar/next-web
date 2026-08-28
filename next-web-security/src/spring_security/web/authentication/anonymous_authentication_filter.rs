@@ -16,7 +16,7 @@ use crate::{
     authentication::AnonymousAuthenticationToken,
     authorization::AuthenticationDetailsSource,
     core::{
-        authority_utils::AuthorityUtils,
+        authority::AuthorityUtils,
         context::{SecurityContext, SecurityContextHolder, SecurityContextHolderStrategy},
         Authentication, GrantedAuthority,
     },

@@ -42,13 +42,13 @@ impl AnonymousAuthenticationToken {
             "authorities cannot be null or empty"
         );
 
-        let mut inner = BaseAuthenticationToken::new(Some(authorities));
-        inner.set_authenticated(true);
+        let mut base = BaseAuthenticationToken::new(Some(authorities));
+        base.set_authenticated(true);
 
         Self {
             principal,
             key_hash: string_hash(key.as_ref()),
-            inner,
+            base,
         }
     }
 

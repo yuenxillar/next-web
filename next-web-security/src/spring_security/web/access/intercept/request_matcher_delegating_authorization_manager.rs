@@ -1,6 +1,8 @@
 use std::sync::Arc;
+use std::sync::LazyLock;
 
 use next_web_core::async_trait;
+use next_web_core::error::BoxError;
 use next_web_core::traits::http::http_request::HttpRequest;
 use tracing::enabled;
 use tracing::Level;
@@ -17,6 +19,9 @@ use crate::web::util::matcher::AnyRequestMatcher;
 use crate::web::util::matcher::RequestMatcher;
 use crate::web::util::matcher::RequestMatcherEntry;
 use crate::web::util::UrlUtils;
+
+static DENY: LazyLock<Arc<dyn AuthorizationResult>> =
+    LazyLock::new(|| Arc::new(AuthorizationDecision::new(false)));
 
 /// An AuthorizationManager which delegates to a specific AuthorizationManager based on a RequestMatcher evaluation.
 #[derive(Clone)]
@@ -55,12 +60,12 @@ impl AuthorizationManager<RequestAuthorizationContext>
     async fn authorize(
         &self,
         authentication: &dyn Authentication,
-        context: &mut RequestAuthorizationContext,
-    ) -> Option<Box<dyn AuthorizationResult>> {
+        context: &RequestAuthorizationContext,
+    ) -> Result<Option<Arc<dyn AuthorizationResult>>, BoxError> {
         if enabled!(Level::TRACE) {
             tracing::trace!("Authorizing {}", Self::request_line(context));
         }
-        for mapping in &self.mappings {
+        for mapping in self.mappings.iter() {
             let matcher = mapping.request_matcher();
             let match_result = matcher.matcher(context.request());
             if match_result.is_match() {
@@ -80,7 +85,7 @@ impl AuthorizationManager<RequestAuthorizationContext>
             tracing::trace!("Denying request since did not find matching RequestMatcher");
         }
 
-        Some(Box::new(AuthorizationDecision::new(false)))
+        Ok(Some(DENY.clone()))
     }
 }
 
@@ -224,7 +229,7 @@ impl<'a> AuthorizedUrl<'a> {
         self.access(Arc::new(AuthorityAuthorizationManager::<
             RequestAuthorizationContext,
         >::has_any_role(
-            "ROLE_", [role.to_string()]
+            "ROLE_", vec![role.to_string()]
         )))
     }
 
@@ -236,7 +241,8 @@ impl<'a> AuthorizedUrl<'a> {
         self.access(Arc::new(AuthorityAuthorizationManager::<
             RequestAuthorizationContext,
         >::has_any_role(
-            "ROLE_", roles.iter().map(ToString::to_string)
+            "ROLE_",
+            roles.iter().map(ToString::to_string).collect(),
         )))
     }
 

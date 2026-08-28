@@ -109,7 +109,7 @@ impl PersistentTokenBasedRememberMeServices {
         self.token_length = token_length;
     }
 
-    fn set_token_validity_seconds(&mut self, token_validity_seconds: i32) {
+    fn set_token_validity_seconds(&mut self, token_validity_seconds: u32) {
         assert!(
             token_validity_seconds > 0,
             "tokenValiditySeconds must be positive for this implementation"
