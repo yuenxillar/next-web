@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    core::userdetails::{
-        username_not_found_error::UsernameNotFoundError, UserDetails, UserDetailsService,
+    core::{
+        userdetails::{UserDetails, UserDetailsService},
+        AuthenticationError,
     },
     ldap::{
         search::ldap_user_search::LdapUserSearch,
@@ -48,7 +49,7 @@ impl UserDetailsService for LdapUserDetailsService {
     async fn load_user_by_username(
         &self,
         username: &str,
-    ) -> Result<Arc<dyn UserDetails>, UsernameNotFoundError> {
+    ) -> Result<Arc<dyn UserDetails>, AuthenticationError> {
         let user_data = self.user_search.search_for_user(username).await?;
         let authorities = self
             .authorities_populator

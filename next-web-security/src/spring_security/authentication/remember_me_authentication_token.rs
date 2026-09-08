@@ -1,4 +1,4 @@
-use std::{any::TypeId, sync::Arc};
+use std::{any::TypeId, borrow::Cow, sync::Arc};
 
 use next_web_core::error::BoxError;
 
@@ -110,11 +110,8 @@ impl Authentication for RememberMeAuthenticationToken {
 }
 
 impl Principal for RememberMeAuthenticationToken {
-    fn name(&self) -> &str {
-        self.principal
-            .downcast_ref::<String>()
-            .map(|principal| principal.as_str())
-            .unwrap_or_else(|| self.base.name())
+    fn name(&self) -> Cow<'_, str> {
+        self.base.name()
     }
 }
 

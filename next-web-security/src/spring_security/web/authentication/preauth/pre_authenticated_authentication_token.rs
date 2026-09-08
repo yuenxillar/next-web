@@ -47,30 +47,30 @@ impl PreAuthenticatedAuthenticationToken {
     }
 }
 
-impl Authentication for PreAuthenticatedAuthenticationToken {
-    // fn credentials(&self) -> Option<String> {
-    //     self.credentials.clone()
-    // }
+// impl Authentication for PreAuthenticatedAuthenticationToken {
+// fn credentials(&self) -> Option<String> {
+//     self.credentials.clone()
+// }
 
-    // fn get_details_ref(&self) -> Option<&AnyValue> {
-    //     self.details.as_ref()
-    // }
+// fn get_details_ref(&self) -> Option<&AnyValue> {
+//     self.details.as_ref()
+// }
 
-    // fn get_principal(&self) -> Option<String> {
-    //     self.principal.clone()
-    // }
+// fn get_principal(&self) -> Option<String> {
+//     self.principal.clone()
+// }
 
-    // fn is_authenticated(&self) -> bool {
-    //     self.authenticated
-    // }
+// fn is_authenticated(&self) -> bool {
+//     self.authenticated
+// }
 
-    // fn authorities(&self) -> Vec<String> {
-    //     self.authorities
-    //         .iter()
-    //         .filter_map(|authority| authority.authority().map(ToString::to_string))
-    //         .collect()
-    // }
-}
+// fn authorities(&self) -> Vec<String> {
+//     self.authorities
+//         .iter()
+//         .filter_map(|authority| authority.authority().map(ToString::to_string))
+//         .collect()
+// }
+// }
 
 impl Display for PreAuthenticatedAuthenticationToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

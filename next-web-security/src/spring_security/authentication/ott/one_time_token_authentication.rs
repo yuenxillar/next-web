@@ -1,11 +1,12 @@
 use std::{
     any::TypeId,
+    borrow::Cow,
     fmt::Display,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
 
-use next_web_core::{error::BoxError, AnyObject};
+use next_web_core::error::BoxError;
 
 use crate::{
     authentication::{BaseAuthenticationBuilder, BaseAuthenticationToken},
@@ -18,7 +19,7 @@ use crate::{
 /// with the authorities, including `FactorGrantedAuthority.OTT_AUTHORITY`.
 #[derive(Clone)]
 pub struct OneTimeTokenAuthentication {
-    principal: AnyObject,
+    principal: AuthPrincipal,
     base: BaseAuthenticationToken,
 }
 
@@ -64,7 +65,9 @@ impl Authentication for OneTimeTokenAuthentication {
 
     fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
         if is_authenticated {
-            return Err("Cannot set this token to trusted - use the new constructor instead".into());
+            return Err(
+                "Cannot set this token to trusted - use the new constructor instead".into(),
+            );
         }
         self.base.set_authenticated(false);
         Ok(())
@@ -84,11 +87,8 @@ impl Authentication for OneTimeTokenAuthentication {
 }
 
 impl Principal for OneTimeTokenAuthentication {
-    fn name(&self) -> &str {
-        self.principal
-            .downcast_ref::<String>()
-            .map(|s| s.as_str())
-            .unwrap_or_default()
+    fn name(&self) -> Cow<'_, str> {
+        Cow::Owned(self.principal.to_string())
     }
 }
 
@@ -111,7 +111,7 @@ impl Display for OneTimeTokenAuthentication {
 
 /// A builder of `OneTimeTokenAuthentication` instances.
 pub struct OneTimeTokenAuthenticationBuilder {
-    principal: Option<AnyObject>,
+    principal: Option<AuthPrincipal>,
     base: BaseAuthenticationBuilder,
 }
 

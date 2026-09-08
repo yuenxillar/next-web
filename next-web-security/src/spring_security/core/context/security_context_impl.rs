@@ -7,12 +7,20 @@ pub struct SecurityContextImpl {
     authentication: Option<Arc<dyn Authentication>>,
 }
 
+impl SecurityContextImpl {
+    pub fn new(authentication: Arc<dyn Authentication>) -> Self {
+        Self {
+            authentication: Some(authentication),
+        }
+    }
+}
+
 impl SecurityContext for SecurityContextImpl {
     fn get_authentication(&self) -> Option<&Arc<dyn Authentication>> {
-        todo!()
+        self.authentication.as_ref()
     }
 
     fn set_authentication(&self, authentication: Option<Arc<dyn Authentication>>) {
-        todo!()
+        self.authentication = authentication;
     }
 }

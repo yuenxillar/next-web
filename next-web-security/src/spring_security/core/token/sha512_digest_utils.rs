@@ -1,12 +1,16 @@
 use sha2::{Digest, Sha512};
 
+/// Provides SHA512 digest methods.
+/// Based on Commons Codec, which does not presently provide SHA512 support.
 pub struct Sha512DigestUtils;
 
 impl Sha512DigestUtils {
+    /// Calculates the SHA digest and returns the value as a Vec<u8>.
     pub fn sha(data: impl AsRef<[u8]>) -> Vec<u8> {
         Sha512::digest(data.as_ref()).to_vec()
     }
 
+    /// Calculates the SHA512 digest and returns the value as a hex string.
     pub fn sha_hex(data: impl AsRef<[u8]>) -> String {
         hex::encode(Self::sha(data))
     }

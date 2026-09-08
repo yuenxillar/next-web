@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{any::TypeId, sync::Arc};
 
 use next_web_core::async_trait;
 
@@ -17,21 +17,23 @@ pub struct TestingAuthenticationProvider;
 impl AuthenticationProvider for TestingAuthenticationProvider {
     async fn authenticate(
         &self,
-        authentication: &dyn Authentication,
-    ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
-        let Some(authentication) = authentication
-            .as_any()
-            .downcast_ref::<TestingAuthenticationToken>()
-        else {
-            return Err(AuthenticationError::new(
-                "Only TestingAuthenticationToken is supported",
-            ));
-        };
+        authentication: &Arc<dyn Authentication>,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
+        // let Some(authentication) = authentication
+        //     .as_any()
+        //     .downcast_ref::<TestingAuthenticationToken>()
+        // else {
+        //     return Err(AuthenticationError::new(
+        //         "Only TestingAuthenticationToken is supported",
+        //     ));
+        // };
 
-        Ok(Arc::new(authentication.clone()))
+        // Ok(Arc::new(authentication.clone()))
+        //
+        todo!()
     }
 
-    fn supports(&self, authentication: &str) -> bool {
-        authentication == std::any::type_name::<TestingAuthenticationToken>()
+    fn supports(&self, authentication: TypeId) -> bool {
+        authentication == TypeId::of::<TestingAuthenticationToken>()
     }
 }

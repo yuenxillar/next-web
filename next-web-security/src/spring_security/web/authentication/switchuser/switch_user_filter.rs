@@ -1,6 +1,5 @@
 use std::{any::Any, sync::Arc};
 
-use axum::extract::ws::close_code::NORMAL;
 use next_web_core::{
     async_trait,
     filter::FilterError,
@@ -16,10 +15,11 @@ use tracing::debug;
 use crate::{
     authentication::AccountStatusUserDetailsChecker,
     core::{
+        authority::SimpleGrantedAuthority,
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
         userdetails::{UserDetails, UserDetailsChecker, UserDetailsService},
         Authentication, AuthenticationError, AuthenticationErrorKind, GrantedAuthority,
-        SimpleGrantedAuthority, UsernamePasswordAuthenticationToken,
+        UsernamePasswordAuthenticationToken,
     },
     web::{
         authentication::{

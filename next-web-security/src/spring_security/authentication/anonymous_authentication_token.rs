@@ -1,5 +1,6 @@
 use std::{
     any::TypeId,
+    borrow::Cow,
     ops::{Deref, DerefMut},
     sync::{Arc, LazyLock},
 };
@@ -92,12 +93,12 @@ impl Authentication for AnonymousAuthenticationToken {
 }
 
 impl Principal for AnonymousAuthenticationToken {
-    fn name(&self) -> &str {
+    fn name(&self) -> Cow<'_, str> {
         self.base.name()
     }
 }
 
-impl std::fmt::Display for AnonymousAuthenticationToken {
+impl std::fmt::Debug for AnonymousAuthenticationToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

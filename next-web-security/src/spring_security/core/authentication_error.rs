@@ -26,6 +26,7 @@ pub enum AuthenticationErrorKind {
     SessionAuthentication,
     InvalidClientRegistrationId,
     UsernameNotFound,
+    CompromisedPassword,
 }
 
 #[derive(Clone)]

@@ -38,10 +38,19 @@ impl FactorGrantedAuthority {
     /// The standard authority that indicates that X509 was used to authenticate.
     pub const X509_AUTHORITY: &'static str = "FACTOR_X509";
 
+    pub fn new(authority: impl Into<String>, issued_at: Instant) -> Self {
+        Self {
+            authority: authority.into(),
+            issued_at,
+        }
+    }
+
+    /// Creates a new FactorGrantedAuthority.Builder with the specified authority.
     pub fn with_authority(authority: impl Into<String>) -> FactorGrantedAuthorityBuilder {
         FactorGrantedAuthorityBuilder::new(authority)
     }
 
+    /// Creates a new FactorGrantedAuthority.Builder with the specified factor which is automatically prefixed with "FACTOR_".
     pub fn with_factor(factor: impl Into<String>) -> FactorGrantedAuthorityBuilder {
         let factor = factor.into();
         assert!(!factor.trim().is_empty(), "factor cannot be empty");
@@ -52,18 +61,17 @@ impl FactorGrantedAuthority {
         Self::with_authority(format!("FACTOR_{factor}"))
     }
 
+    /// Shortcut for with_authority(authority).build().
     pub fn from_authority(authority: impl Into<String>) -> Self {
         Self::with_authority(authority).build()
     }
 
+    /// Shortcut for with_factor(factor).build().
     pub fn from_factor(factor: impl Into<String>) -> Self {
         Self::with_factor(factor).build()
     }
 
-    pub fn authority(&self) -> &str {
-        &self.authority
-    }
-
+    /// Returns the instant when this authority was issued.
     pub fn issued_at(&self) -> Instant {
         self.issued_at
     }
@@ -104,11 +112,14 @@ impl FactorGrantedAuthorityBuilder {
         }
     }
 
+    /// Sets the instant when this authority was issued.
     pub fn issued_at(mut self, issued_at: Instant) -> Self {
         self.issued_at = Some(issued_at);
         self
     }
 
+    /// Builds a new FactorGrantedAuthority.
+    /// If issuedAt is not set, it defaults to Instant.now().
     pub fn build(self) -> FactorGrantedAuthority {
         FactorGrantedAuthority {
             authority: self.authority,

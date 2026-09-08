@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use next_web_core::async_trait;
+
 use crate::core::userdetails::UserDetails;
 
 /// Provides a cache of [`UserDetails`] objects.
@@ -15,7 +17,11 @@ use crate::core::userdetails::UserDetails;
 /// persistent storage mechanism to validate would be excessive. In this case, you would
 /// configure a cache to store the `UserDetails` information rather than loading it
 /// each time.
-pub trait UserCache {
+#[async_trait]
+pub trait UserCache
+where
+    Self: Send + Sync,
+{
     /// Obtains a [`UserDetails`] from the cache.
     ///
     /// # Parameters
@@ -24,14 +30,14 @@ pub trait UserCache {
     /// # Returns
     /// The populated `UserDetails` or `None` if the user could not be found
     /// or if the cache entry has expired
-    fn get_user_from_cache(&self, username: &str) -> Option<&Arc<dyn UserDetails>>;
+    async fn get_user_from_cache(&self, username: &str) -> Option<Arc<dyn UserDetails>>;
 
     /// Places a [`UserDetails`] in the cache. The `username` is the key
     /// used to subsequently retrieve the `UserDetails`.
     ///
     /// # Parameters
     /// * `user` - the fully populated `UserDetails` to place in the cache
-    fn put_user_in_cache(&self, user: Arc<dyn UserDetails>);
+    async fn put_user_in_cache(&self, user: Arc<dyn UserDetails>);
 
     /// Removes the specified user from the cache. The `username` is the key
     /// used to remove the user. If the user is not found, the method should simply return
@@ -43,5 +49,5 @@ pub trait UserCache {
     ///
     /// # Parameters
     /// * `username` - the username to be evicted from the cache
-    fn remove_user_from_cache(&self, username: &str);
+    async fn remove_user_from_cache(&self, username: &str);
 }

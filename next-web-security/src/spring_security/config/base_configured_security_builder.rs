@@ -51,17 +51,6 @@ where
     B: SecurityBuilder<O>,
     O: Send + Sync,
 {
-    pub fn new() -> Self {
-        Self {
-            configurers: Default::default(),
-            configurers_added_in_initializing: Default::default(),
-            shared_objects: Default::default(),
-            build_state: BuildState::UNBUILT,
-            base_security_builder: BaseSecurityBuilder::new(),
-            _marker: PhantomData,
-        }
-    }
-
     pub fn set_shared_object<T>(&mut self, object: T)
     where
         T: AnyClone,
@@ -387,9 +376,9 @@ where
     B: SecurityBuilder<O>,
     O: Send + Sync,
 {
-    fn before_init(&mut self);
+    fn before_init(&mut self) {}
 
-    fn before_configure(&mut self);
+    fn before_configure(&mut self) {}
 
     fn perform_build(&mut self) -> O;
 }

@@ -21,9 +21,7 @@ use super::{session_event::SessionEvent, session_registry::SessionRegistry, Sess
 /// must be representable as a `String`.
 #[derive(Clone)]
 pub struct SessionRegistryImpl {
-    // <principal, SessionIdSet>
     principals: Arc<RwLock<HashMap<String, HashSet<String>>>>,
-    // <sessionId, SessionInformation>
     session_ids: Arc<RwLock<HashMap<String, SessionInformation>>>,
 }
 
@@ -92,7 +90,7 @@ impl SessionRegistry for SessionRegistryImpl {
         principal: &AuthPrincipal,
         include_expired_sessions: bool,
     ) -> Vec<SessionInformation> {
-        let principal_key = principal_to_string(principal.as_ref());
+        let principal_key = principal.to_string();
 
         let mut sessions = Vec::new();
         if let Some(sessions_used_by_principal) = self.principals.read().await.get(&principal_key) {
@@ -138,7 +136,7 @@ impl SessionRegistry for SessionRegistryImpl {
             self.remove_session_information(session_id).await;
         }
 
-        let principal_key = principal_to_string(principal.as_ref());
+        let principal_key = principal.to_string();
         if enabled!(Level::DEBUG) {
             debug!(
                 "Registering session {} for principal {}",
@@ -176,7 +174,7 @@ impl SessionRegistry for SessionRegistryImpl {
         }
         self.session_ids.write().await.remove(session_id);
 
-        let principal_key = principal_to_string(info.principal().as_ref());
+        let principal_key = info.principal().to_string();
         if let Some(sessions_used_by_principal) =
             self.principals.write().await.get_mut(&principal_key)
         {
@@ -204,16 +202,6 @@ impl Default for SessionRegistryImpl {
     }
 }
 
-fn principal_to_string(principal: &dyn Any) -> String {
-    if let Some(principal) = principal.downcast_ref::<String>() {
-        principal.clone()
-    } else if let Some(principal) = principal.downcast_ref::<&str>() {
-        (*principal).to_string()
-    } else {
-        panic!("Unsupported principal type");
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,7 +224,7 @@ mod tests {
         assert_eq!(info.session_id(), "1");
         assert_eq!(
             info.principal()
-                .as_ref()
+                .as_any()
                 .downcast_ref::<String>()
                 .map(String::as_str),
             Some("admin")

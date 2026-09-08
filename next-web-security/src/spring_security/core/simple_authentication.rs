@@ -1,4 +1,4 @@
-use std::{any::TypeId, sync::Arc};
+use std::{any::TypeId, borrow::Cow, fmt::Debug, sync::Arc};
 
 use next_web_core::error::BoxError;
 
@@ -67,15 +67,15 @@ impl Authentication for SimpleAuthentication {
 }
 
 impl Principal for SimpleAuthentication {
-    fn name(&self) -> &str {
+    fn name(&self) -> Cow<'_, str> {
         self.principal
-            .as_ref()
-            .and_then(|p| p.downcast_ref::<String>().map(|s| s.as_str()))
+            .as_deref()
+            .map(|p| Cow::Owned(p.to_string()))
             .unwrap_or_default()
     }
 }
 
-impl std::fmt::Display for SimpleAuthentication {
+impl Debug for SimpleAuthentication {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

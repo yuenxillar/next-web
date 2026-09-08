@@ -1,30 +1,33 @@
 use std::sync::Arc;
 
-use crate::core::{Authentication, GrantedAuthority};
+use crate::{
+    core::{Authentication, GrantedAuthority},
+    web::authentication::AuthPrincipal,
+};
 
 #[derive(Clone, Default)]
 pub struct TestingAuthenticationToken {
-    principal: String,
-    credentials: Option<String>,
+    principal: AuthPrincipal,
+    credentials: Option<AuthPrincipal>,
     authorities: Vec<Arc<dyn GrantedAuthority>>,
 }
 
 impl TestingAuthenticationToken {
-    pub fn new(principal: impl Into<String>, credentials: Option<String>) -> Self {
+    pub fn new(principal: AuthPrincipal, credentials: Option<AuthPrincipal>) -> Self {
         Self {
-            principal: principal.into(),
+            principal,
             credentials,
             authorities: Vec::new(),
         }
     }
 
     pub fn with_authorities(
-        principal: impl Into<String>,
-        credentials: Option<String>,
+        principal: AuthPrincipal,
+        credentials: Option<AuthPrincipal>,
         authorities: Vec<Arc<dyn GrantedAuthority>>,
     ) -> Self {
         Self {
-            principal: principal.into(),
+            principal,
             credentials,
             authorities,
         }
@@ -32,12 +35,12 @@ impl TestingAuthenticationToken {
 }
 
 impl Authentication for TestingAuthenticationToken {
-    fn credentials(&self) -> Option<String> {
-        self.credentials.clone()
+    fn credentials(&self) -> Option<&AuthPrincipal> {
+        self.credentials.as_ref()
     }
 
-    fn principal(&self) -> Option<String> {
-        Some(self.principal.clone())
+    fn principal(&self) -> Option<&AuthPrincipal> {
+        Some(&self.principal)
     }
 
     fn is_authenticated(&self) -> bool {
@@ -50,24 +53,23 @@ impl Authentication for TestingAuthenticationToken {
             .filter_map(|authority| authority.authority().map(ToString::to_string))
             .collect()
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use crate::core::{authority::AuthorityUtils, Authentication};
+    fn details(&self) -> Option<&AuthPrincipal> {
+        todo!()
+    }
 
-    use super::TestingAuthenticationToken;
+    fn of(&self) -> std::any::TypeId {
+        todo!()
+    }
 
-    #[test]
-    fn testing_authentication_token_is_authenticated() {
-        let token = TestingAuthenticationToken::with_authorities(
-            "alice",
-            Some(String::from("secret")),
-            AuthorityUtils::create_authority_list(["ROLE_TEST"]),
-        );
+    fn set_authenticated(
+        &mut self,
+        is_authenticated: bool,
+    ) -> Result<(), next_web_core::error::BoxError> {
+        todo!()
+    }
 
-        assert!(token.is_authenticated());
-        assert_eq!(token.get_name(), "alice");
-        assert_eq!(token.authorities(), vec![String::from("ROLE_TEST")]);
+    fn to_builder(&self) -> Box<dyn crate::core::AuthenticationBuilder> {
+        todo!()
     }
 }

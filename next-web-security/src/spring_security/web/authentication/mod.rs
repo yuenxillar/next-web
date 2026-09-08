@@ -37,7 +37,6 @@ mod web_authentication_details;
 mod web_authentication_details_source;
 
 pub use anonymous_authentication_filter::AnonymousAuthenticationFilter;
-pub use bearer_token_authentication_filter::BearerTokenAuthenticationFilter;
 pub use authentication_converter::AuthenticationConverter;
 pub use authentication_failure_handler::AuthenticationFailureHandler;
 pub use authentication_filter::AuthenticationFilter;
@@ -46,6 +45,7 @@ pub use base_authentication_processing_filter::BaseAuthenticationProcessingFilte
 pub use base_authentication_target_url_request_handler::BaseAuthenticationTargetUrlRequestHandler;
 pub use basic_authentication_entry_point::BasicAuthenticationEntryPoint;
 pub use basic_authentication_filter::BasicAuthenticationFilter;
+pub use bearer_token_authentication_filter::BearerTokenAuthenticationFilter;
 pub use delegating_authentication_entry_point::{
     DelegatingAuthenticationEntryPoint, DelegatingAuthenticationEntryPointBuilder,
 };
@@ -68,4 +68,19 @@ pub use username_password_authentication_filter::UsernamePasswordAuthenticationF
 pub use web_authentication_details::WebAuthenticationDetails;
 pub use web_authentication_details_source::WebAuthenticationDetailsSource;
 
-pub type AuthPrincipal = std::sync::Arc<dyn std::any::Any + Send + Sync>;
+pub type AuthPrincipal = std::sync::Arc<dyn Identity>;
+
+pub trait Identity
+where
+    Self: std::any::Any,
+    Self: std::fmt::Display,
+    Self: Send + Sync,
+{
+    fn as_any(&self) -> &dyn std::any::Any;
+}
+
+impl Identity for String {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}

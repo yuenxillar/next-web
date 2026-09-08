@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use axum::response::IntoResponse;
 
 /// 解决错误并将其转化为适当响应类型的特性
@@ -53,13 +51,7 @@ use axum::response::IntoResponse;
 /// let error = "Something went wrong".to_string();
 /// let response = <() as ErrorSolver>::solve_error(error);
 /// ```
-pub trait ErrorSolver<T = String>
-where
-    T: serde::Serialize,
-    T: Debug + Clone,
-    T: Send + Sync,
-    T: IntoResponse,
-{
+pub trait ErrorSolver {
     /// 将错误字符串转换为适当的响应类型
     ///
     /// 此方法接收原始错误字符串并将其转换为所需的响应类型`T`
@@ -84,7 +76,7 @@ where
     ///
     /// Returns the transformed error as type `T`, ready to be used as an HTTP response
     ///
-    fn solve_error(error: String) -> T;
+    fn solve_error<'a>(error: &'a str) -> impl IntoResponse;
 }
 
 /// `()` 的 `ErrorSolver` 的默认实现
@@ -141,7 +133,7 @@ impl ErrorSolver for () {
     ///
     /// println!("{:?}", response);
     /// ```
-    fn solve_error(error: String) -> String {
-        error
+    fn solve_error<'a>(error: &'a str) -> impl IntoResponse {
+        error.to_string()
     }
 }

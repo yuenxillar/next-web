@@ -1,11 +1,17 @@
-use std::{any::TypeId, fmt, ops::Deref, ops::DerefMut, sync::Arc};
+use std::{
+    any::TypeId,
+    borrow::Cow,
+    fmt,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::traits::http::http_request::HttpRequest;
 
 use crate::{
     authentication::{BaseAuthenticationBuilder, BaseAuthenticationToken},
     core::{
-        Authentication, AuthenticationBuilder, GrantedAuthority, Principal, AuthenticationError,
+        Authentication, AuthenticationBuilder, AuthenticationError, GrantedAuthority, Principal,
     },
     web::{
         authentication::{AuthPrincipal, AuthenticationConverter},
@@ -155,16 +161,15 @@ impl Authentication for BearerTokenAuthenticationToken {
 }
 
 impl Principal for BearerTokenAuthenticationToken {
-    fn name(&self) -> &str {
+    fn name(&self) -> Cow<'_, str> {
         self.principal
             .as_ref()
-            .and_then(|principal| principal.downcast_ref::<String>())
-            .map(String::as_str)
-            .unwrap_or("")
+            .map(|principal| Cow::Owned(principal.to_string()))
+            .unwrap_or_default()
     }
 }
 
-impl fmt::Display for BearerTokenAuthenticationToken {
+impl fmt::Debug for BearerTokenAuthenticationToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -277,9 +282,9 @@ impl AuthenticationConverter for BearerTokenAuthenticationConverter {
             Some(token) => token,
             None => return Ok(None),
         };
-        Ok(Some(Box::new(BearerTokenAuthenticationToken::unauthenticated(
-            token,
-        ))))
+        Ok(Some(Box::new(
+            BearerTokenAuthenticationToken::unauthenticated(token),
+        )))
     }
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {

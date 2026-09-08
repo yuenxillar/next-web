@@ -1,16 +1,18 @@
 use std::any::{Any, TypeId};
+use std::borrow::Cow;
 use std::fmt;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
 use next_web_core::error::BoxError;
 
+use crate::authentication::UsernamePasswordAuthenticationToken;
 use crate::core::userdetails::User;
 use crate::core::userdetails::UserDetails;
 use crate::core::GrantedAuthority;
+use crate::core::SimpleAuthenticationBuilder;
 use crate::core::{AuthenticatedPrincipal, Principal};
 use crate::core::{Authentication, CredentialsContainer};
-use crate::core::{SimpleAuthenticationBuilder, UsernamePasswordAuthenticationToken};
 use crate::web::authentication::AuthPrincipal;
 
 #[derive(Clone)]
@@ -62,11 +64,14 @@ impl BaseAuthenticationToken {
 
     fn erase_secret(&self, secret: Option<&AuthPrincipal>) {
         if let Some(secret) = secret {
-            if let Some(user) = secret.downcast_ref::<User>() {
+            if let Some(user) = secret.as_any().downcast_ref::<User>() {
                 user.erase_credentials();
             }
 
-            if let Some(user) = secret.downcast_ref::<UsernamePasswordAuthenticationToken>() {
+            if let Some(user) = secret
+                .as_any()
+                .downcast_ref::<UsernamePasswordAuthenticationToken>()
+            {
                 user.erase_credentials();
             }
         }
@@ -114,31 +119,32 @@ impl Principal for BaseAuthenticationToken {
     /// Checks for `UserDetails`, `AuthenticatedPrincipal`, or `Principal` trait
     /// implementations to determine the name. Falls back to the string representation
     /// of the principal.
-    fn name(&self) -> &str {
+    fn name(&self) -> Cow<'_, str> {
         let principal = self.principal();
 
         // Check for UserDetails
-        if let Some(user_details) = principal.and_then(|p| p.downcast_ref::<Arc<dyn UserDetails>>())
+        if let Some(user_details) =
+            principal.and_then(|p| p.as_any().downcast_ref::<Arc<dyn UserDetails>>())
         {
-            return user_details.username();
+            return Cow::Borrowed(user_details.username());
         }
 
         // Check for AuthenticatedPrincipal
         if let Some(auth_principal) =
-            principal.and_then(|p| p.downcast_ref::<Arc<dyn AuthenticatedPrincipal>>())
+            principal.and_then(|p| p.as_any().downcast_ref::<Arc<dyn AuthenticatedPrincipal>>())
         {
-            return auth_principal.name();
+            return Cow::Borrowed(auth_principal.name());
         }
 
         // Check for standard Principal
         if let Some(standard_principal) =
-            principal.and_then(|p| p.downcast_ref::<Arc<dyn Principal>>())
+            principal.and_then(|p| p.as_any().downcast_ref::<Arc<dyn Principal>>())
         {
             return standard_principal.name();
         }
 
         principal
-            .and_then(|s| s.downcast_ref::<String>().map(|s| s.as_str()))
+            .map(|s| Cow::Owned(s.to_string()))
             .unwrap_or_default()
     }
 }
@@ -209,15 +215,15 @@ impl PartialEq for BaseAuthenticationToken {
 
 impl Eq for BaseAuthenticationToken {}
 
-impl fmt::Display for BaseAuthenticationToken {
+impl fmt::Debug for BaseAuthenticationToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{} [Principal={:?}, Credentials=[PROTECTED], Authenticated={}, Details={:?}, Granted Authorities={:?}]",
             std::any::type_name::<Self>(),
-            self.principal(),
+            self.principal().map(ToString::to_string).unwrap_or_default(),
             self.is_authenticated(),
-            self.details,
+            self.details.as_ref().map(ToString::to_string).unwrap_or_default(),
             self.authorities.iter().map(|a| a.authority()).collect::<Vec<_>>()
         )
     }

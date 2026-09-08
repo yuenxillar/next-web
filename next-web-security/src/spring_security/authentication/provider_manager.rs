@@ -55,6 +55,10 @@ impl ProviderManager {
         self.erase_credentials_after_authentication = erase;
     }
 
+    pub fn is_erase_credentials_after_authentication(&self) -> bool {
+        self.erase_credentials_after_authentication
+    }
+
     pub fn providers(&self) -> &[Arc<dyn AuthenticationProvider>] {
         &self.providers
     }

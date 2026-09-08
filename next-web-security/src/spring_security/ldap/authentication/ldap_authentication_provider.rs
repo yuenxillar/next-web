@@ -1,11 +1,14 @@
-use std::{any::TypeId, sync::Arc};
+use std::{
+    any::{Any, TypeId},
+    sync::Arc,
+};
 
 use next_web_core::async_trait;
 
 use crate::{
     authentication::AuthenticationProvider,
     core::{
-        authority_mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
+        authority::mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
         Authentication, AuthenticationError,
     },
     ldap::{
@@ -99,20 +102,20 @@ impl AuthenticationProvider for LdapAuthenticationProvider {
         &self,
         authentication: &Arc<dyn Authentication>,
     ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
-        let Some(authentication) = authentication
-            .as_any()
+        let Some(authentication) = (authentication.as_ref() as &dyn Any)
             .downcast_ref::<LdapAuthenticationRequest>()
+            .map(Clone::clone)
         else {
             return Err(AuthenticationError::new(
                 "Only LdapAuthenticationRequest is supported",
             ));
         };
 
-        let authorities = self.authenticate_request(authentication).await?;
-        let mut authenticated = authentication.clone();
-        authenticated.set_authenticated(true);
-        authenticated.set_authorities(authorities);
-        Ok(Some(Arc::new(authenticated)))
+        let authorities = self.authenticate_request(&authentication).await?;
+        authentication.set_authenticated(true);
+        authentication.set_authorities(authorities);
+
+        Ok(Some(Arc::new(authentication)))
     }
 
     fn supports(&self, authentication: TypeId) -> bool {

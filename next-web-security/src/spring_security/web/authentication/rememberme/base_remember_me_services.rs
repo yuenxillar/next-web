@@ -13,7 +13,7 @@ use crate::{
     authentication::{AccountStatusUserDetailsChecker, RememberMeAuthenticationToken},
     authorization::AuthenticationDetailsSource,
     core::{
-        authority_mapping::GrantedAuthoritiesMapper,
+        authority::mapping::GrantedAuthoritiesMapper,
         userdetails::{UserDetails, UserDetailsChecker, UserDetailsService},
         Authentication, NextSecurityMessageSource,
     },

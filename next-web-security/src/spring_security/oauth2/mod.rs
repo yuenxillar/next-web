@@ -4,6 +4,7 @@ pub mod client;
 
 use std::{
     any::TypeId,
+    borrow::Cow,
     collections::HashMap,
     fmt,
     sync::{
@@ -23,7 +24,7 @@ use uuid::Uuid;
 use crate::{
     authentication::{AuthenticationProvider, BaseAuthenticationBuilder, BaseAuthenticationToken},
     core::{
-        authority_mapping::GrantedAuthoritiesMapper,
+        authority::mapping::GrantedAuthoritiesMapper,
         Authentication, AuthenticationBuilder, GrantedAuthority, Principal,
         {AuthenticationError, AuthenticationErrorKind},
     },
@@ -869,15 +870,15 @@ impl Authentication for OAuth2LoginAuthenticationToken {
 }
 
 impl Principal for OAuth2LoginAuthenticationToken {
-    fn name(&self) -> &str {
+    fn name(&self) -> Cow<'_, str> {
         self.principal
             .as_ref()
-            .and_then(|principal| principal.downcast_ref::<String>().map(String::as_str))
-            .unwrap_or_else(|| self.client_registration.registration_id())
+            .map(|principal| Cow::Owned(principal.to_string()))
+            .unwrap_or_else(|| Cow::Borrowed(self.client_registration.registration_id()))
     }
 }
 
-impl fmt::Display for OAuth2LoginAuthenticationToken {
+impl fmt::Debug for OAuth2LoginAuthenticationToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -1410,9 +1411,7 @@ impl Authentication for OAuth2AuthorizationCodeAuthenticationToken {
         is_authenticated: bool,
     ) -> Result<(), next_web_core::error::BoxError> {
         if is_authenticated {
-            return Err(
-                "Cannot set this token to trusted - use authenticated()".into(),
-            );
+            return Err("Cannot set this token to trusted - use authenticated()".into());
         }
         self.base.set_authenticated(false)
     }
@@ -1427,16 +1426,16 @@ impl Authentication for OAuth2AuthorizationCodeAuthenticationToken {
 }
 
 impl Principal for OAuth2AuthorizationCodeAuthenticationToken {
-    fn name(&self) -> &str {
+    fn name(&self) -> Cow<'_, str> {
         if self.principal_name.is_empty() {
-            self.client_registration.registration_id()
+            Cow::Borrowed(self.client_registration.registration_id())
         } else {
-            &self.principal_name
+            Cow::Borrowed(&self.principal_name)
         }
     }
 }
 
-impl fmt::Display for OAuth2AuthorizationCodeAuthenticationToken {
+impl fmt::Debug for OAuth2AuthorizationCodeAuthenticationToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -1497,7 +1496,9 @@ impl AuthenticationBuilder for OAuth2AuthorizationCodeAuthenticationTokenBuilder
     }
 
     fn build(&mut self) -> Arc<dyn Authentication> {
-        Arc::new(OAuth2AuthorizationCodeAuthenticationToken::from_builder(self))
+        Arc::new(OAuth2AuthorizationCodeAuthenticationToken::from_builder(
+            self,
+        ))
     }
 }
 
@@ -1573,7 +1574,9 @@ impl AuthenticationProvider for OAuth2AuthorizationCodeAuthenticationProvider {
         }
         let request_data = authentication
             .credentials()
-            .and_then(|credentials| credentials.downcast_ref::<OAuth2AuthorizationCodeRequestData>())
+            .and_then(|credentials| {
+                credentials.downcast_ref::<OAuth2AuthorizationCodeRequestData>()
+            })
             .ok_or_else(|| {
                 AuthenticationError::with_kind(
                     "OAuth2 authorization code request data is missing",
@@ -1594,7 +1597,9 @@ impl AuthenticationProvider for OAuth2AuthorizationCodeAuthenticationProvider {
         let client_registration = request_data.client_registration.clone();
         let grant_request =
             OAuth2AuthorizationCodeGrantRequest::new(client_registration.clone(), exchange);
-        let response = self.access_token_response_client.get_token_response(&grant_request)?;
+        let response = self
+            .access_token_response_client
+            .get_token_response(&grant_request)?;
         let access_token = OAuth2AccessToken::from_response(&response);
         let principal_name = client_registration.registration_id().to_string();
         let authorized_client = OAuth2AuthorizedClient::new(

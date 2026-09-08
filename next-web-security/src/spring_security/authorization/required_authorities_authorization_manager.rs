@@ -28,7 +28,8 @@ impl<T> RequiredAuthoritiesAuthorizationManager<T> {
 
     fn find_authorities(&self, authentication: &dyn Authentication) -> Vec<&str> {
         let username = authentication.name();
-        self.authorities.find_required_authorities(username)
+        self.authorities
+            .find_required_authorities(username.as_ref())
     }
 }
 

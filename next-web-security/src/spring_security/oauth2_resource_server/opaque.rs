@@ -1,9 +1,9 @@
 use std::{
     any::{Any, TypeId},
+    borrow::Cow,
     collections::HashMap,
     fmt,
-    ops::Deref,
-    ops::DerefMut,
+    ops::{Deref, DerefMut},
     sync::Arc,
 };
 
@@ -51,8 +51,8 @@ impl OAuth2AuthenticatedPrincipal {
 }
 
 impl Principal for OAuth2AuthenticatedPrincipal {
-    fn name(&self) -> &str {
-        &self.name
+    fn name(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.name)
     }
 }
 

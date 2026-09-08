@@ -15,6 +15,7 @@ path = "src/lib.rs"
 
 [dependencies]
 next-web-core           = { workspace = true }
+next-web-context        = { workspace = true }
 next-web-macros         = { workspace = true }
 
 next-web-security       = { workspace = true, optional = true }
@@ -96,7 +97,7 @@ full = [
     "enable-thread-pool",
 
     "common",
-    
+
     "decrypt-properties",
     # "enable-api-doc",
     "trace-log"

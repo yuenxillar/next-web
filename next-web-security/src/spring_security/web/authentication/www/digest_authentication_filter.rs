@@ -13,10 +13,11 @@ use next_web_core::{
 };
 use tracing::debug;
 
+use crate::core::authority::SimpleGrantedAuthority;
+use crate::core::userdetails::UserCache;
 use crate::{
     core::{
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
-        user_cache::{NullUserCache, UserCache},
         userdetails::{UserDetails, UserDetailsService},
         UsernamePasswordAuthenticationToken, {AuthenticationError, AuthenticationErrorKind},
     },
@@ -238,7 +239,7 @@ impl DigestAuthenticationFilter {
             // We use a simplified check here.
         }
         // Append stale directive if nonce expired.
-        if error.get_message().contains("expired") || error.get_message().contains("Nonce") {
+        if error.message().contains("expired") || error.message().contains("Nonce") {
             authenticate_header.push_str(", stale=\"true\"");
         }
 
@@ -267,9 +268,7 @@ impl DigestAuthenticationFilter {
             let mut auth_list: Vec<Arc<dyn crate::core::GrantedAuthority>> = Vec::new();
             for auth in authorities {
                 let name = auth.authority().unwrap_or_default();
-                auth_list.push(Arc::new(
-                    crate::core::simple_granted_authority::SimpleGrantedAuthority::new(name),
-                ));
+                auth_list.push(Arc::new(SimpleGrantedAuthority::new(name)));
             }
             UsernamePasswordAuthenticationToken::authenticated(
                 username,
@@ -326,7 +325,7 @@ impl HttpFilter for DigestAuthenticationFilter {
             cache_was_used = false;
             user = Some(
                 self.user_details_service
-                    .load_user_by_username(username.to_string())
+                    .load_user_by_username(username)
                     .await
                     .map_err(|_| {
                         let msg = format!("Username {} not found", username);

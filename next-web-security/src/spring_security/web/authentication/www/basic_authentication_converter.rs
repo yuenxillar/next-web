@@ -1,9 +1,7 @@
 use crate::{
+    authentication::UsernamePasswordAuthenticationToken,
     authorization::AuthenticationDetailsSource,
-    core::{
-        Authentication, UsernamePasswordAuthenticationToken,
-        {AuthenticationError, AuthenticationErrorKind},
-    },
+    core::{Authentication, AuthenticationError, AuthenticationErrorKind},
     web::authentication::{AuthenticationConverter, WebAuthenticationDetailsSource},
 };
 use base64::Engine;

@@ -1,11 +1,12 @@
 use std::{
     any::TypeId,
+    borrow::Cow,
     fmt::Display,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
 
-use next_web_core::{error::BoxError, AnyObject};
+use next_web_core::error::BoxError;
 
 use crate::{
     authentication::{BaseAuthenticationBuilder, BaseAuthenticationToken},
@@ -20,8 +21,8 @@ use crate::{
 /// `OneTimeTokenAuthenticationProvider`.
 #[derive(Default)]
 pub struct OneTimeTokenAuthenticationToken {
-    principal: Option<AnyObject>,
-    credentials: Option<AnyObject>,
+    principal: Option<AuthPrincipal>,
+    credentials: Option<AuthPrincipal>,
     base: BaseAuthenticationToken,
 }
 
@@ -97,7 +98,8 @@ impl Authentication for OneTimeTokenAuthenticationToken {
     fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), BoxError> {
         if is_authenticated {
             return Err(
-                "Cannot set this token to trusted - use the authenticated constructor instead".into(),
+                "Cannot set this token to trusted - use the authenticated constructor instead"
+                    .into(),
             );
         }
         self.base.set_authenticated(false);
@@ -118,7 +120,7 @@ impl Authentication for OneTimeTokenAuthenticationToken {
 }
 
 impl Principal for OneTimeTokenAuthenticationToken {
-    fn name(&self) -> &str {
+    fn name(&self) -> Cow<'_, str> {
         self.base.name()
     }
 }
@@ -152,8 +154,8 @@ impl Clone for OneTimeTokenAuthenticationToken {
 
 /// A builder of `OneTimeTokenAuthenticationToken` instances.
 pub struct OneTimeTokenAuthenticationTokenBuilder {
-    principal: Option<AnyObject>,
-    credentials: Option<AnyObject>,
+    principal: Option<AuthPrincipal>,
+    credentials: Option<AuthPrincipal>,
     base: BaseAuthenticationBuilder,
 }
 

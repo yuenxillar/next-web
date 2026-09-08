@@ -50,7 +50,7 @@ where
         authentication: &T,
     ) -> Result<Arc<dyn UserDetails>, AuthenticationError> {
         self.user_details_service
-            .load_user_by_username(authentication.name())
+            .load_user_by_username(authentication.name().as_ref())
             .await
     }
 }

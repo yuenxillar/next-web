@@ -3,9 +3,11 @@ use std::sync::{Arc, RwLock};
 use futures::future::BoxFuture;
 use next_web_core::filter::FilterError;
 
-use crate::core::context::{security_context::SecurityContext, SecurityContextHolderStrategy};
+use crate::core::context::{
+    security_context::SecurityContext, SecurityContextHolderStrategy, SecurityContextImpl,
+};
 
-static GLOBAL_CONTEXT: RwLock<Option<Arc<dyn SecurityContext>>> = RwLock::new(None);
+static CONTEXT_HOLDER: RwLock<Option<Arc<dyn SecurityContext>>> = RwLock::new(None);
 
 /// A static field-based implementation of SecurityContextHolderStrategy.
 /// All instances in the JVM share the same SecurityContext.
@@ -15,30 +17,27 @@ pub struct GlobalSecurityContextHolderStrategy;
 
 impl SecurityContextHolderStrategy for GlobalSecurityContextHolderStrategy {
     fn clear_context(&self) {
-        if let Ok(mut guard) = GLOBAL_CONTEXT.write() {
+        if let Ok(mut guard) = CONTEXT_HOLDER.write() {
             *guard = None;
         }
     }
 
     fn get_context(&self) -> Option<Arc<dyn SecurityContext>> {
-        // let guard = GLOBAL_CONTEXT.read().expect("global context lock poisoned");
-        // if let Some(ref ctx) = *guard {
-        //     Some(ctx.clone())
-        // } else {
-        //     drop(guard);
-        //     let mut write_guard = GLOBAL_CONTEXT
-        //         .write()
-        //         .expect("global context lock poisoned");
-        //     if write_guard.is_none() {
-        //         *write_guard = Some(SecurityContext::default());
-        //     }
-        //     write_guard.clone()
-        // }
-        todo!()
+        if let Some(ctx) = CONTEXT_HOLDER.read().ok().and_then(|g| g.clone()) {
+            return Some(ctx);
+        }
+
+        let mut guard = CONTEXT_HOLDER.write().expect("lock poisoned");
+
+        if guard.is_none() {
+            *guard = Some(Arc::new(SecurityContextImpl::default()));
+        }
+
+        guard.clone()
     }
 
     fn set_context(&self, context: Arc<dyn SecurityContext>) {
-        if let Ok(mut guard) = GLOBAL_CONTEXT.write() {
+        if let Ok(mut guard) = CONTEXT_HOLDER.write() {
             *guard = Some(context);
         }
     }
@@ -52,6 +51,6 @@ impl SecurityContextHolderStrategy for GlobalSecurityContextHolderStrategy {
     }
 
     fn create_empty_context(&self) -> Arc<dyn SecurityContext> {
-        todo!()
+        Arc::new(SecurityContextImpl::default())
     }
 }

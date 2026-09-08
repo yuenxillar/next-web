@@ -1,5 +1,6 @@
 use std::{
-    fmt::Display,
+    borrow::Cow,
+    fmt,
     ops::{Deref, DerefMut},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -7,13 +8,12 @@ use std::{
     },
 };
 
-use next_web_core::{error::BoxError, AnyObject};
+use next_web_core::error::BoxError;
 
 use crate::{
     authentication::{BaseAuthenticationBuilder, BaseAuthenticationToken},
     core::{
-        credentials_container::CredentialsContainer, Authentication, AuthenticationBuilder,
-        GrantedAuthority, Principal,
+        Authentication, AuthenticationBuilder, CredentialsContainer, GrantedAuthority, Principal,
     },
     web::authentication::AuthPrincipal,
 };
@@ -26,8 +26,8 @@ use crate::{
 /// `String`.
 #[derive(Default)]
 pub struct UsernamePasswordAuthenticationToken {
-    principal: Option<AnyObject>,
-    credentials: Option<AnyObject>,
+    principal: Option<AuthPrincipal>,
+    credentials: Option<AuthPrincipal>,
 
     cleared: AtomicBool,
     base: BaseAuthenticationToken,
@@ -140,7 +140,7 @@ impl Authentication for UsernamePasswordAuthenticationToken {
 }
 
 impl Principal for UsernamePasswordAuthenticationToken {
-    fn name(&self) -> &str {
+    fn name(&self) -> Cow<'_, str> {
         self.base.name()
     }
 }
@@ -152,8 +152,8 @@ impl CredentialsContainer for UsernamePasswordAuthenticationToken {
     }
 }
 
-impl Display for UsernamePasswordAuthenticationToken {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for UsernamePasswordAuthenticationToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         todo!()
     }
 }
@@ -172,8 +172,8 @@ impl Clone for UsernamePasswordAuthenticationToken {
 
 /// A builder of UsernamePasswordAuthenticationToken instances
 pub struct UsernamePasswordAuthenticationTokenBuilder {
-    principal: Option<AnyObject>,
-    credentials: Option<AnyObject>,
+    principal: Option<AuthPrincipal>,
+    credentials: Option<AuthPrincipal>,
 
     base: BaseAuthenticationBuilder,
 }

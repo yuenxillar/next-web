@@ -1,6 +1,6 @@
 use std::{
     any::{Any, TypeId},
-    fmt::Display,
+    fmt::Debug,
     sync::Arc,
 };
 
@@ -11,12 +11,36 @@ use crate::{
     web::authentication::AuthPrincipal,
 };
 
+/// Represents the token for an authentication request or for an authenticated
+/// principal once the request has been processed by the
+/// [`AuthenticationManager::authenticate`] method.
+///
+/// Once the request has been authenticated, the `Authentication` will usually
+/// be stored in a thread-local `SecurityContext` managed by the
+/// `SecurityContextHolder` by the authentication mechanism which is being used.
+///
+/// An explicit authentication can be achieved, without using one of the
+/// authentication mechanisms, by creating an `Authentication` instance and
+/// using the code:
+///
+/// ```rust,ignore
+/// let mut context = SecurityContextHolder::create_empty_context();
+/// context.set_authentication(an_authentication);
+/// SecurityContextHolder::set_context(context);
+/// ```
+///
+/// Note that unless the `Authentication` has the `authenticated` property set
+/// to `true`, it will still be authenticated by any security interceptor
+/// (for method or web invocations) which encounters it.
+///
+/// In most cases, the framework transparently takes care of managing the
+/// security context and authentication objects for you.
 pub trait Authentication
 where
     Self: Send + Sync,
     Self: Any,
     Self: Principal,
-    Self: Display,
+    Self: Debug,
 {
     /// Set by an AuthenticationManager to indicate the authorities that the principal has been granted.
     /// Note that classes should not rely on this value as being valid unless it has been set by a trusted AuthenticationManager.

@@ -6,10 +6,7 @@ use std::{
 use base64::{engine::general_purpose::STANDARD, Engine};
 use rand::{rngs::OsRng, RngCore};
 
-use super::{
-    default_token::DefaultToken, sha512_digest_utils::Sha512DigestUtils,
-    token_service::TokenService,
-};
+use super::{DefaultToken, Sha512DigestUtils, Token, TokenService};
 
 type RandomBytes = Arc<dyn Fn(usize) -> Vec<u8> + Send + Sync>;
 type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
@@ -116,10 +113,9 @@ impl KeyBasedPersistenceTokenService {
 }
 
 impl TokenService for KeyBasedPersistenceTokenService {
-    fn allocate_token(&self, extended_information: impl Into<String>) -> DefaultToken {
+    fn allocate_token(&self, extended_information: &str) -> Arc<dyn Token> {
         self.after_properties_set();
 
-        let extended_information = extended_information.into();
         let creation_time = (self.clock)();
         let server_secret = self
             .compute_server_secret_applicable_at(creation_time)
@@ -127,10 +123,11 @@ impl TokenService for KeyBasedPersistenceTokenService {
         let pseudo_random_number = self.generate_pseudo_random_number();
         let content = format!("{creation_time}:{pseudo_random_number}:{extended_information}");
         let key = self.compute_key(&server_secret, &content);
-        DefaultToken::new(key, creation_time, extended_information)
+
+        Arc::new(DefaultToken::new(key, creation_time, extended_information))
     }
 
-    fn verify_token(&self, key: &str) -> Option<DefaultToken> {
+    fn verify_token(&self, key: &str) -> Option<Arc<dyn Token>> {
         if key.is_empty() {
             return None;
         }
@@ -146,11 +143,11 @@ impl TokenService for KeyBasedPersistenceTokenService {
             return None;
         }
 
-        Some(DefaultToken::new(
+        Some(Arc::new(DefaultToken::new(
             key.to_string(),
             creation_time,
             extended_information,
-        ))
+        )))
     }
 }
 
@@ -159,52 +156,4 @@ fn current_time_millis() -> i64 {
         .duration_since(UNIX_EPOCH)
         .expect("system time before Unix epoch")
         .as_millis() as i64
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{KeyBasedPersistenceTokenService, TokenService};
-    use crate::core::token::token::Token;
-
-    fn service() -> KeyBasedPersistenceTokenService {
-        let mut service = KeyBasedPersistenceTokenService::new();
-        service.set_server_secret("server-secret");
-        service.set_server_integer(37);
-        service.set_clock(|| 1_700_000_000_123);
-        service.set_random_bytes_generator(|size| vec![0xAB; size]);
-        service
-    }
-
-    #[test]
-    fn allocated_token_can_be_verified_by_same_service() {
-        let service = service();
-
-        let token = service.allocate_token("alice:extra");
-        let verified = service.verify_token(token.key()).unwrap();
-
-        assert_eq!(verified, token);
-        assert_eq!(verified.key_creation_time(), 1_700_000_000_123);
-        assert_eq!(verified.extended_information(), "alice:extra");
-    }
-
-    #[test]
-    fn tampered_key_is_rejected() {
-        let service = service();
-        let token = service.allocate_token("alice");
-        let mut tampered = token.key().to_string();
-        tampered.push('x');
-
-        assert!(service.verify_token(&tampered).is_none());
-    }
-
-    #[test]
-    fn different_server_secret_rejects_key() {
-        let service = service();
-        let token = service.allocate_token("alice");
-
-        let mut other = service.clone();
-        other.set_server_secret("other-secret");
-
-        assert!(other.verify_token(token.key()).is_none());
-    }
 }

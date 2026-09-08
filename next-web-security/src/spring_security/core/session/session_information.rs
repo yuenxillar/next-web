@@ -58,7 +58,7 @@ impl SessionInformation {
 impl Debug for SessionInformation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SessionInformation")
-            .field("principal", &self.principal)
+            .field("principal", &self.principal.to_string())
             .field("session_id", &self.session_id)
             .field("expired", &self.expired)
             .field("last_request", &self.last_request)

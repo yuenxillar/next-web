@@ -317,7 +317,7 @@ impl HttpFilter for BasicAuthenticationFilter {
             username
         );
 
-        if self.authentication_is_required(username) {
+        if self.authentication_is_required(username.as_ref()) {
             let mut func = async || -> Result<(), AuthenticationError> {
                 let mut auth_result = self
                     .authentication_manager

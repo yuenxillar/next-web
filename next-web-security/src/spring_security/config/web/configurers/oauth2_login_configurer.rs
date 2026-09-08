@@ -14,7 +14,7 @@ use crate::{
             http_security_builder::HttpSecurityBuilder,
         },
     },
-    core::authority_mapping::GrantedAuthoritiesMapper,
+    core::authority::mapping::GrantedAuthoritiesMapper,
     oauth2::{
         AuthenticatedPrincipalOAuth2AuthorizedClientRepository, AuthorizationGrantType,
         AuthorizationRequestRepository, ClientRegistrationRepository,

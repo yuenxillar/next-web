@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     access::hierarchicalroles::role_hierarchy::RoleHierarchy,
-    core::{authority_mapping::GrantedAuthoritiesMapper, GrantedAuthority},
+    core::{authority::mapping::GrantedAuthoritiesMapper, GrantedAuthority},
 };
 
 pub struct RoleHierarchyAuthoritiesMapper {
@@ -19,7 +19,7 @@ impl GrantedAuthoritiesMapper for RoleHierarchyAuthoritiesMapper {
     fn map_authorities(
         &self,
         authorities: &[Arc<dyn GrantedAuthority>],
-    ) -> &[Arc<dyn GrantedAuthority>] {
+    ) -> Vec<Arc<dyn GrantedAuthority>> {
         // let names = authorities
         //     .into_iter()
         //     .filter_map(|authority| authority.authority().map(ToString::to_string))

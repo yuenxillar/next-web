@@ -2,6 +2,7 @@ use std::fmt;
 
 use super::token::Token;
 
+/// The default implementation of Token.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct DefaultToken {
     key: String,

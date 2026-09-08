@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    borrow::Cow,
     collections::HashMap,
     fmt,
     ops::{Deref, DerefMut},
@@ -28,11 +29,10 @@ use crate::{
         request_parameter, ClientRegistration, ClientRegistrationRepository,
         InMemoryClientRegistrationRepository,
     },
-    oauth2_resource_server::jwt::{Jwt, JwtDecoder, NimbusJwtDecoder},
+    oauth2_resource_server::jwt::{Jwt, JwtDecoder},
     web::{
+        authentication::logout::LogoutHandler,
         authentication::{AuthPrincipal, AuthenticationConverter},
-        authentication::logout::{CompositeLogoutHandler, LogoutHandler, SecurityContextLogoutHandler},
-        csrf::CsrfFilter,
         util::matcher::RequestMatcher,
     },
 };
@@ -183,7 +183,10 @@ impl Authentication for OidcLogoutAuthenticationToken {
         self.base.is_authenticated()
     }
 
-    fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), next_web_core::error::BoxError> {
+    fn set_authenticated(
+        &mut self,
+        is_authenticated: bool,
+    ) -> Result<(), next_web_core::error::BoxError> {
         if is_authenticated {
             return Err("Cannot set this token to trusted - use authenticated()".into());
         }
@@ -200,16 +203,15 @@ impl Authentication for OidcLogoutAuthenticationToken {
 }
 
 impl Principal for OidcLogoutAuthenticationToken {
-    fn name(&self) -> &str {
+    fn name(&self) -> Cow<'_, str> {
         self.principal
             .as_ref()
-            .and_then(|principal| principal.downcast_ref::<String>())
-            .map(String::as_str)
-            .unwrap_or_else(|| self.client_registration.registration_id())
+            .map(|principal| Cow::Owned(principal.to_string()))
+            .unwrap_or_else(|| Cow::Borrowed(self.client_registration.registration_id()))
     }
 }
 
-impl fmt::Display for OidcLogoutAuthenticationToken {
+impl fmt::Debug for OidcLogoutAuthenticationToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -365,7 +367,10 @@ impl Authentication for OidcBackChannelLogoutAuthentication {
         self.base.is_authenticated()
     }
 
-    fn set_authenticated(&mut self, is_authenticated: bool) -> Result<(), next_web_core::error::BoxError> {
+    fn set_authenticated(
+        &mut self,
+        is_authenticated: bool,
+    ) -> Result<(), next_web_core::error::BoxError> {
         if is_authenticated {
             return Err("Cannot set this token to trusted - use authenticated()".into());
         }
@@ -382,12 +387,12 @@ impl Authentication for OidcBackChannelLogoutAuthentication {
 }
 
 impl Principal for OidcBackChannelLogoutAuthentication {
-    fn name(&self) -> &str {
-        self.client_registration.registration_id()
+    fn name(&self) -> Cow<'_, str> {
+        Cow::Borrowed(self.client_registration.registration_id())
     }
 }
 
-impl fmt::Display for OidcBackChannelLogoutAuthentication {
+impl fmt::Debug for OidcBackChannelLogoutAuthentication {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -772,7 +777,11 @@ impl HttpFilter for OidcBackChannelLogoutFilter {
             }
         };
         let authentication: Arc<dyn Authentication> = Arc::from(converted);
-        let authenticated = match self.authentication_provider.authenticate(&authentication).await {
+        let authenticated = match self
+            .authentication_provider
+            .authenticate(&authentication)
+            .await
+        {
             Ok(Some(authenticated)) => authenticated,
             _ => {
                 response.set_status_code(StatusCode::BAD_REQUEST);
@@ -802,9 +811,7 @@ impl Named for OidcBackChannelLogoutFilter {
 pub struct OAuth2ClientConfigurerUtils;
 
 impl OAuth2ClientConfigurerUtils {
-    pub fn get_client_registration_repository<B>(
-        http: &B,
-    ) -> Arc<dyn ClientRegistrationRepository>
+    pub fn get_client_registration_repository<B>(http: &B) -> Arc<dyn ClientRegistrationRepository>
     where
         B: HttpSecurityBuilder<B> + 'static,
     {

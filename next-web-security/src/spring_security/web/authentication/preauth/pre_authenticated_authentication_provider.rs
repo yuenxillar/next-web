@@ -6,10 +6,7 @@ use crate::{
     authentication::AuthenticationProvider,
     core::{
         authority::AuthorityUtils,
-        userdetails::{
-            authentication_user_details_service::AuthenticationUserDetailsService,
-            UserDetailsChecker,
-        },
+        userdetails::{AuthenticationUserDetailsService, UserDetailsChecker},
         Authentication, AuthenticationError,
     },
     web::authentication::preauth::{

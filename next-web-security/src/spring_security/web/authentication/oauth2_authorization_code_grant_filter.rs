@@ -19,9 +19,9 @@ use crate::{
     },
     oauth2::{
         request_parameter, AuthorizationRequestRepository, ClientRegistrationRepository,
-        HttpSessionOAuth2AuthorizationRequestRepository, OAuth2AuthorizedClient,
-        OAuth2AuthorizedClientRepository, OAuth2AuthorizationCodeAuthenticationToken,
-        OAuth2AuthorizationExchange, OAuth2AuthorizationResponse,
+        HttpSessionOAuth2AuthorizationRequestRepository,
+        OAuth2AuthorizationCodeAuthenticationToken, OAuth2AuthorizationExchange,
+        OAuth2AuthorizationResponse, OAuth2AuthorizedClient, OAuth2AuthorizedClientRepository,
     },
     web::{
         context::{RequestAttributeSecurityContextRepository, SecurityContextRepository},
@@ -150,7 +150,7 @@ impl OAuth2AuthorizationCodeGrantFilter {
     ) -> Result<(), FilterError> {
         if let Some(authorized_client) = authentication
             .principal()
-            .and_then(|principal| principal.downcast_ref::<OAuth2AuthorizedClient>())
+            .and_then(|principal| principal.as_any().downcast_ref::<OAuth2AuthorizedClient>())
             .cloned()
         {
             self.authorized_client_repository.save_authorized_client(
@@ -258,9 +258,7 @@ impl HttpFilter for OAuth2AuthorizationCodeGrantFilter {
                 AuthenticationError::with_kind(
                     format!(
                         "OAuth2 authorization response contained error: {}",
-                        authorization_response
-                            .error_code()
-                            .unwrap_or_default()
+                        authorization_response.error_code().unwrap_or_default()
                     ),
                     AuthenticationErrorKind::BadCredentials,
                 ),
@@ -318,9 +316,7 @@ impl HttpFilter for OAuth2AuthorizationCodeGrantFilter {
         };
 
         match authentication_manager.authenticate(&authentication) {
-            Ok(authenticated) => {
-                self.successful(request, response, &authenticated).await
-            }
+            Ok(authenticated) => self.successful(request, response, &authenticated).await,
             Err(error) => self.unsuccessful(request, response, error),
         }
     }

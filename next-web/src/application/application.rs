@@ -25,6 +25,7 @@ use next_web_core::traits::service::background_service::BackgroundService;
 use next_web_core::traits::use_router::UseRouter;
 use next_web_core::AutoRegister;
 use std::error::Error;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
@@ -69,6 +70,21 @@ use next_web_core::scheduler::{InMemoryScheduledJobRepository, ScheduledJobRegis
 #[allow(unused_imports)]
 use next_web_core::traits::schedule::scheduled_task::ScheduledTask;
 
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+type XResult = std::result::Result<(), Box<dyn std::error::Error>>;
+
+trait XApplication<Es = (), Ctx, Res>
+where
+    Es: ErrorSolver,
+    Ctx: next_web_context::ApplicationContext,
+    Res: App,
+{
+    fn ready(&mut self, ctx: &mut C) -> impl Future<Output = ()> {
+        async move {}
+    }
+}
+
 #[async_trait]
 pub trait Application {
     /// The error solver for the application.
@@ -80,18 +96,15 @@ pub trait Application {
         &self,
         ctx: &mut ApplicationContext,
         properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn Error>>;
+    ) -> Result<()>;
 
     /// Show the banner of the application.
     fn banner_show(application_resources: &ApplicationResources) {
-        if let Some(content) = application_resources.load(APPLICATION_BANNER) {
-            if let Ok(txt) = std::str::from_utf8(content.as_ref()) {
-                TopBanner::show(txt);
-                return;
-            }
-        };
-
-        TopBanner::show(DEFAULT_TOP_BANNER);
+        application_resources
+            .load(APPLICATION_BANNER)
+            .and_then(|content| std::str::from_utf8(&content).ok())
+            .map(|txt| TopBanner::show(txt))
+            .unwrap_or_else(|| TopBanner::show(DEFAULT_TOP_BANNER));
     }
 
     /// Initialize the logging.
@@ -141,7 +154,6 @@ pub trait Application {
             .with_file(true)
             .with_ansi(true)
             .with_source_location(true)
-            .with_thread_ids(true)
             .with_thread_names(true);
 
         // tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
@@ -166,35 +178,27 @@ pub trait Application {
 
     /// Before starting the application
     #[allow(unused_variables)]
-    async fn on_ready(&self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
-        Ok(())
+    fn on_ready(&self, ctx: &mut ApplicationContext) -> impl Future<Output = Result<()>> {
+        std::future::ready(Ok(()))
     }
 
     /// Suitable for capturing panic in application
     fn catch_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
-        let error = if let Some(msg) = err.downcast_ref::<String>() {
-            msg.to_string()
-        } else if let Some(msg) = err.downcast_ref::<&str>() {
-            msg.to_string()
-        } else {
-            warn!("Service panicked but `CatchPanic` was unable to downcast the panic info");
-            String::with_capacity(0)
-        };
+        let error = err
+            .downcast_ref::<String>()
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| err.downcast_ref::<&str>().unwrap_or_default());
 
-        error!("Service panicked: {}", &error);
-
+        error!("Service panicked: {}", error);
         let mut resp = Self::ErrorSolve::solve_error(error).into_response();
-
         *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-
         resp
     }
 
     /// No matching route handler
-    async fn fallback() -> Response {
-        let mut resp = Self::ErrorSolve::solve_error(String::from("Not Found")).into_response();
+    fn fallback() -> Response {
+        let mut resp = Self::ErrorSolve::solve_error("Not Found").into_response();
         *resp.status_mut() = StatusCode::NOT_FOUND;
-
         resp
     }
 
@@ -245,7 +249,7 @@ pub trait Application {
         &self,
         ctx: &mut ApplicationContext,
         application_properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         for properties in ctx.resolve_by_type::<Box<dyn Properties>>() {
             properties
                 .register(ctx, application_properties)
@@ -257,7 +261,7 @@ pub trait Application {
     }
 
     /// Auto configuration
-    async fn auto_configuration(&self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn auto_configuration(&self, ctx: &mut ApplicationContext) -> Result<()> {
         use next_web_core::autoregister::auto_configuration_autoregister::DefaultAutoConfigurationAutoregister;
 
         let mut auto_configurations = ctx.resolve_by_type::<Box<dyn AutoConfiguration>>();
@@ -283,7 +287,7 @@ pub trait Application {
         application_properties: &ApplicationProperties,
         application_args: &ApplicationArgs,
         application_resources: &ApplicationResources,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         // Register singletion
         // [properties] [args] [resources]
         ctx.insert_singleton_with_default_name(application_properties.to_owned());
@@ -310,7 +314,7 @@ pub trait Application {
         &self,
         ctx: &mut ApplicationContext,
         _application_properties: &ApplicationProperties,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         // Register application event
         let mut multicaster = DefaultApplicationEventMulticaster::default();
         for event in inventory::iter::<&dyn ApplicationEventAutoRegister>.into_iter() {
@@ -382,7 +386,7 @@ pub trait Application {
     }
 
     /// Start all background services and register the service manager
-    async fn run_services(&self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn run_services(&self, ctx: &mut ApplicationContext) -> Result<()> {
         let manager = BackgroundServiceManager::default();
         for service in ctx
             .resolve_by_type::<Arc<dyn BackgroundService>>()
@@ -454,7 +458,7 @@ pub trait Application {
         mut ctx: ApplicationContext,
         application_properties: &ApplicationProperties,
         startup_time: std::time::Instant,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         // 1. Read server configuration
         let config = application_properties.next().server();
         let context_path = config.context_path().unwrap_or("");

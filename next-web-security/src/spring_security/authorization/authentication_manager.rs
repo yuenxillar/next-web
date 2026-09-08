@@ -1,8 +1,12 @@
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
 use crate::core::{Authentication, AuthenticationError};
 
-pub trait AuthenticationManager: Send + Sync {
+pub trait AuthenticationManager
+where
+    Self: Send + Sync,
+    Self: Any,
+{
     fn authenticate(
         &self,
         authentication: &dyn Authentication,

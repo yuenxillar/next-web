@@ -186,27 +186,25 @@ impl TokenBasedRememberMeServices {
     fn retrieve_user_name(&self, authentication: &dyn Authentication) -> String {
         if let Some(user_details) = authentication
             .principal()
-            .and_then(|s| s.downcast_ref::<Arc<dyn UserDetails>>())
+            .and_then(|s| s.as_any().downcast_ref::<Arc<dyn UserDetails>>())
         {
             return user_details.username().to_string();
         }
 
         authentication
             .principal()
-            .and_then(|s| s.downcast_ref::<String>().map(ToOwned::to_owned))
+            .map(|s| s.to_string())
             .unwrap_or_default()
     }
 
     fn retrieve_password(&self, authentication: &dyn Authentication) -> Option<String> {
         if let Some(user_details) = authentication
             .principal()
-            .and_then(|s| s.downcast_ref::<Arc<dyn UserDetails>>())
+            .and_then(|s| s.as_any().downcast_ref::<Arc<dyn UserDetails>>())
         {
             return user_details.password().map(ToString::to_string);
         }
-        authentication
-            .credentials()
-            .and_then(|s| s.downcast_ref::<String>().map(ToOwned::to_owned))
+        authentication.credentials().map(|s| s.to_string())
     }
 
     /// Constant time comparison to prevent against timing attacks.

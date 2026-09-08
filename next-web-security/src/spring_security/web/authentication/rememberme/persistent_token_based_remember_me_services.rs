@@ -237,7 +237,8 @@ impl LogoutHandler for PersistentTokenBasedRememberMeServices {
         self.base.logout(request, response, authentication).await;
 
         if let Some(auth) = authentication {
-            self.token_repository.remove_user_tokens(auth.name())
+            self.token_repository
+                .remove_user_tokens(auth.name().as_ref())
         }
     }
 }

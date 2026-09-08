@@ -2,11 +2,13 @@ use std::any::{Any, TypeId};
 
 use next_web_context::ApplicationEvent;
 
-use crate::web::session::{HttpSessionDestroyedEvent, HttpSessionIdChangedEvent};
+use crate::web::session::{
+    HttpSessionCreatedEvent, HttpSessionDestroyedEvent, HttpSessionIdChangedEvent,
+};
 
 #[derive(Clone)]
 pub enum SessionEvent {
-    Created(()),
+    Created(HttpSessionCreatedEvent),
     Destroyed(HttpSessionDestroyedEvent),
     IdChanged(HttpSessionIdChangedEvent),
 }
@@ -14,7 +16,7 @@ pub enum SessionEvent {
 impl ApplicationEvent for SessionEvent {
     fn source(&self) -> &dyn Any {
         match self {
-            SessionEvent::Created(_) => self,
+            SessionEvent::Created(event) => event.source(),
             SessionEvent::Destroyed(event) => event.source(),
             SessionEvent::IdChanged(event) => event.source(),
         }

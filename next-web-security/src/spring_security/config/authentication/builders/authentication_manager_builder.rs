@@ -1,9 +1,13 @@
 use next_web_core::traits::required::Required;
 use std::any::Any;
 use std::sync::Arc;
+use tracing::debug;
 
-use crate::config::base_configured_security_builder::BaseConfiguredSecurityBuilder;
-use crate::core::UsernamePasswordAuthenticationToken;
+use crate::authentication::provider_manager::ProviderManager;
+use crate::config::base_configured_security_builder::{
+    BaseConfiguredSecurityBuilder, BaseConfiguredSecurityBuilderExt,
+};
+use crate::config::object_post_processor::ObjectPostProcessor;
 use crate::core::{
     userdetails::UserDetailsService,
     Authentication, CredentialsContainer, {AuthenticationError, AuthenticationErrorKind},
@@ -28,6 +32,9 @@ use crate::{
     },
 };
 
+/// SecurityBuilder used to create an AuthenticationManager. Allows for easily building
+/// in memory authentication, LDAP authentication, JDBC based authentication, adding UserDetailsService,
+/// and adding AuthenticationProvider's.
 #[derive(Clone)]
 pub struct AuthenticationManagerBuilder {
     authentication_manager: Option<Arc<dyn AuthenticationManager>>,
@@ -37,13 +44,12 @@ pub struct AuthenticationManagerBuilder {
     erase_credentials: Option<bool>,
     event_publisher: Arc<dyn AuthenticationEventPublisher>,
 
-    base_configured_security_builder:
-        BaseConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self>,
+    base: BaseConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self>,
 }
 
 impl AuthenticationManagerBuilder {
-    pub fn new() -> Self {
-        let base_configured_security_builder = BaseConfiguredSecurityBuilder::new();
+    /// Creates a new instance
+    pub fn new(object_post_processor: Arc<dyn ObjectPostProcessor<&mut dyn Any>>) -> Self {
         Self {
             authentication_manager: Default::default(),
             parent_authentication_manager: Default::default(),
@@ -51,7 +57,7 @@ impl AuthenticationManagerBuilder {
             default_user_details_service: Default::default(),
             erase_credentials: Default::default(),
             event_publisher: Arc::new(NullAuthenticationEventPublisher),
-            base_configured_security_builder,
+            base: BaseConfiguredSecurityBuilder::default(),
         }
     }
 
@@ -63,20 +69,51 @@ impl AuthenticationManagerBuilder {
         self
     }
 
-    pub fn parent_authentication_manager(
-        &mut self,
-        authentication_manager: Arc<dyn AuthenticationManager>,
-    ) -> &mut Self {
+    /// Allows providing a parent AuthenticationManager that will be tried if this AuthenticationManager
+    /// was unable to attempt to authenticate the provided Authentication.
+    pub fn parent_authentication_manager<T>(&mut self, authentication_manager: T) -> &mut Self
+    where
+        T: AuthenticationManager,
+        T: 'static,
+    {
+        let mut boxed_manager = Box::new(authentication_manager) as Box<dyn AuthenticationManager>;
+        if let Some(provider_manager) =
+            (boxed_manager.as_mut() as &mut dyn Any).downcast_mut::<ProviderManager>()
+        {
+            self.erase_credentials(provider_manager.is_erase_credentials_after_authentication());
+        }
+        let authentication_manager = Arc::from(boxed_manager);
         self.parent_authentication_manager = Some(authentication_manager);
         self
     }
 
-    pub fn authentication_provider(
+    /// Sets the AuthenticationEventPublisher
+    pub fn authentication_event_publisher(
         &mut self,
-        authentication_provider: Arc<dyn AuthenticationProvider>,
+        event_publisher: Arc<dyn AuthenticationEventPublisher>,
     ) -> &mut Self {
-        self.authentication_providers.push(authentication_provider);
+        self.event_publisher = event_publisher;
         self
+    }
+
+    pub fn erase_credentials(&mut self, erase_credentials: bool) -> &mut Self {
+        self.erase_credentials = Some(erase_credentials);
+        self
+    }
+
+    /// Gets the default UserDetailsService for the AuthenticationManagerBuilder. The result may be null in some circumstances.
+    pub fn default_user_details_service(&self) -> Option<&Arc<dyn UserDetailsService>> {
+        self.default_user_details_service.as_ref()
+    }
+
+    /// Determines if the AuthenticationManagerBuilder is configured to build a non null AuthenticationManager.
+    /// This means that either a non-null parent is specified or at least one AuthenticationProvider has been specified.
+    ///
+    /// When using SecurityConfigurer instances, the AuthenticationManagerBuilder will not be configured until the
+    /// SecurityConfigurer.configure(SecurityBuilder) methods. This means a SecurityConfigurer that is last could
+    /// check this method and provide a default configuration in the SecurityConfigurer.configure(SecurityBuilder) method.
+    pub fn is_configured(&self) -> bool {
+        !self.authentication_providers.is_empty() || self.parent_authentication_manager.is_some()
     }
 
     pub fn user_details_service(
@@ -86,22 +123,60 @@ impl AuthenticationManagerBuilder {
         self.default_user_details_service = Some(user_details_service);
         self
     }
+}
 
-    pub fn erase_credentials(&mut self, erase_credentials: bool) -> &mut Self {
-        self.erase_credentials = Some(erase_credentials);
-        self
-    }
+impl BaseConfiguredSecurityBuilderExt<Arc<dyn AuthenticationManager>, Self>
+    for AuthenticationManagerBuilder
+{
+    fn perform_build(&mut self) -> Arc<dyn AuthenticationManager> {
+        if !self.is_configured() {
+            debug!("No authenticationProviders and no parentAuthenticationManager defined.");
+            return;
+        }
 
-    pub fn authentication_event_publisher(
-        &mut self,
-        event_publisher: Arc<dyn AuthenticationEventPublisher>,
-    ) -> &mut Self {
-        self.event_publisher = event_publisher;
-        self
+        let mut provider_manager = ProviderManager::with_parent(
+            std::mem::take(&mut self.authentication_providers),
+            self.parent_authentication_manager.take(),
+        );
+
+        if let Some(erase_credentials) = self.erase_credentials {
+            provider_manager.set_erase_credentials_after_authentication(erase_credentials);
+        }
+
+        provider_manager.set_authentication_event_publisher(self.event_publisher);
+
+        // post_processing
+
+        Arc::new(provider_manager)
     }
 }
 
-impl ProviderManagerBuilder<Self> for AuthenticationManagerBuilder {}
+impl Default for AuthenticationManagerBuilder {
+    fn default() -> Self {
+        Self {
+            authentication_manager: Default::default(),
+            parent_authentication_manager: Default::default(),
+            authentication_providers: Default::default(),
+            default_user_details_service: Default::default(),
+            erase_credentials: Default::default(),
+            event_publisher: Arc::new(NullAuthenticationEventPublisher),
+            base: BaseConfiguredSecurityBuilder::default(),
+        }
+    }
+}
+
+impl ProviderManagerBuilder<Self> for AuthenticationManagerBuilder {
+    /// Add authentication based upon the custom AuthenticationProvider that is passed in.
+    /// Since the AuthenticationProvider implementation is unknown, all customizations must be done externally
+    /// and the AuthenticationManagerBuilder is returned immediately.
+    fn authentication_provider(
+        &mut self,
+        authentication_provider: Arc<dyn AuthenticationProvider>,
+    ) -> &mut Self {
+        self.authentication_providers.push(authentication_provider);
+        self
+    }
+}
 
 impl SecurityBuilder<Arc<dyn AuthenticationManager>> for AuthenticationManagerBuilder {
     fn build(&mut self) -> Arc<dyn AuthenticationManager> {
@@ -122,13 +197,13 @@ impl Required<BaseConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self
     for AuthenticationManagerBuilder
 {
     fn get_object(&self) -> &BaseConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self> {
-        &self.base_configured_security_builder
+        &self.base
     }
 
     fn get_mut_object(
         &mut self,
     ) -> &mut BaseConfiguredSecurityBuilder<Arc<dyn AuthenticationManager>, Self> {
-        &mut self.base_configured_security_builder
+        &mut self.base
     }
 }
 
