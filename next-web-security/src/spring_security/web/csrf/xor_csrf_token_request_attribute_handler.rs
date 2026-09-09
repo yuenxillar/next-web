@@ -144,7 +144,9 @@ impl CsrfTokenRequestHandler for XorCsrfTokenRequestAttributeHandler {
     ) {
         let csrf_token = deferred_csrf_token.token().await;
         let mut updated_csrf_token = self.defer_csrf_token_update(csrf_token);
-        self.base.handle(request, response, &mut updated_csrf_token);
+        self.base
+            .handle(request, response, &mut updated_csrf_token)
+            .await;
     }
 }
 

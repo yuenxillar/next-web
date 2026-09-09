@@ -1,7 +1,6 @@
 pub mod base_pre_authenticated_processing_filter;
 pub mod pre_authenticated_authentication_provider;
 pub mod pre_authenticated_authentication_token;
-pub mod pre_authenticated_credentials_not_found_exception;
 pub mod pre_authenticated_granted_authorities_user_details_service;
 pub mod pre_authenticated_granted_authorities_web_authentication_details;
 pub mod request_attribute_authentication_filter;

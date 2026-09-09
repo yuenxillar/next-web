@@ -13,13 +13,15 @@ use next_web_core::{
 };
 use tracing::debug;
 
+use crate::authentication::UsernamePasswordAuthenticationToken;
 use crate::core::authority::SimpleGrantedAuthority;
+use crate::core::userdetails::cache::NullUserCache;
 use crate::core::userdetails::UserCache;
 use crate::{
     core::{
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
         userdetails::{UserDetails, UserDetailsService},
-        UsernamePasswordAuthenticationToken, {AuthenticationError, AuthenticationErrorKind},
+        {AuthenticationError, AuthenticationErrorKind},
     },
     web::{
         authentication::www::{
@@ -261,7 +263,6 @@ impl DigestAuthenticationFilter {
         if create_authenticated {
             // Build an authenticated token with authorities.
             // Note: get_authorities() and get_password() are async on UserDetails,
-            // so we use block_on here since this is a sync helper.
             let username = user.username();
             let password = user.password();
             let authorities = user.authorities();
@@ -271,14 +272,16 @@ impl DigestAuthenticationFilter {
                 auth_list.push(Arc::new(SimpleGrantedAuthority::new(name)));
             }
             UsernamePasswordAuthenticationToken::authenticated(
-                username,
-                password.map(ToString::to_string),
+                Arc::new(username.to_owned()),
+                password
+                    .map(|p| Arc::new(p.to_owned()) as crate::web::authentication::AuthPrincipal),
                 auth_list,
             )
         } else {
             UsernamePasswordAuthenticationToken::unauthenticated(
-                user.username().to_string(),
-                user.password().map(ToString::to_string),
+                Some(Arc::new(user.username().to_owned())),
+                user.password()
+                    .map(|p| Arc::new(p.to_owned()) as crate::web::authentication::AuthPrincipal),
             )
         }
     }
@@ -314,11 +317,18 @@ impl HttpFilter for DigestAuthenticationFilter {
         }
 
         // Lookup password for presented username.
-        let username = digest_auth
-            .get_username()
-            .expect("username validated in validate_and_decode");
+        let username = match digest_auth.get_username() {
+            Some(username) => username,
+            None => {
+                let error = AuthenticationError::with_kind(
+                    "Username is missing",
+                    AuthenticationErrorKind::BadCredentials,
+                );
+                return self.fail(request, response, &error);
+            }
+        };
         let mut cache_was_used = true;
-        let mut user = self.user_cache.get_user_from_cache(username);
+        let mut user = self.user_cache.get_user_from_cache(username).await;
 
         // Load user from DAO if not cached.
         if user.is_none() {
@@ -333,18 +343,29 @@ impl HttpFilter for DigestAuthenticationFilter {
                     })?,
             );
             if let Some(ref u) = user {
-                self.user_cache
-                    .put_user_in_cache(username.to_string(), u.clone());
+                self.user_cache.put_user_in_cache(u.clone()).await;
             }
         }
 
-        let mut user = user.expect("user should be loaded");
+        let mut user = match user {
+            Some(user) => user,
+            None => {
+                return self.fail(
+                    request,
+                    response,
+                    &AuthenticationError::with_kind(
+                        "User not found",
+                        AuthenticationErrorKind::BadCredentials,
+                    ),
+                )
+            }
+        };
 
         // Calculate the expected server digest.
         let http_method = request.method().to_string();
         let password = user.password();
         let mut server_digest_md5 = digest_auth.calculate_server_digest(
-            password,
+            password.as_deref(),
             &http_method,
             self.password_already_encoded,
         );
@@ -363,11 +384,10 @@ impl HttpFilter for DigestAuthenticationFilter {
                     let msg = format!("Username {} not found", username);
                     FilterError::custom(msg)
                 })?;
-            self.user_cache
-                .put_user_in_cache(username.to_string(), user.clone());
+            self.user_cache.put_user_in_cache(user.clone()).await;
             let refreshed_password = user.password();
             server_digest_md5 = digest_auth.calculate_server_digest(
-                refreshed_password,
+                refreshed_password.as_deref(),
                 &http_method,
                 self.password_already_encoded,
             );

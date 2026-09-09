@@ -1,5 +1,7 @@
 use std::{error::Error, sync::Arc};
 
+#[cfg(feature = "distributed-lock")]
+use next_web_core::traits::singleton::Singleton;
 use next_web_core::{
     ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
 };
@@ -40,14 +42,21 @@ impl AutoConfiguration for RedisAutoConfiguration {
         }
 
         ctx.insert_singleton_with_default_name(redis_template.to_owned());
-        // Register distributed lock support when the feature is enabled.
-        #[cfg(feature = "lock")]
-        {
-            let url = crate::service::gen_url(&self.0, false);
-            let redis_lock_service =
-                crate::service::redis_lock_service::RedisLockService::new(vec![url]);
-            let service_name = redis_lock_service.service_name();
-            ctx.insert_singleton_with_name(redis_lock_service, service_name);
+        #[cfg(feature = "distributed-lock")]
+        if self.redis_properties.lock_enabled() {
+            let config =
+                self.redis_properties
+                    .lock_config()
+                    .map_err(|error| -> Box<dyn Error> {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, error).into()
+                    })?;
+            let lock_service =
+                crate::service::lock::RedisDistributedLockService::with_direct_client(
+                    redis_template.client().clone(),
+                    config,
+                )?;
+            let service_name = lock_service.singleton_name();
+            ctx.insert_singleton_with_name(lock_service, service_name);
         }
 
         // Register listener to Redis message listener container.

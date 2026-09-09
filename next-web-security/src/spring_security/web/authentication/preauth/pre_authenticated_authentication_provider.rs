@@ -7,12 +7,9 @@ use crate::{
     core::{
         authority::AuthorityUtils,
         userdetails::{AuthenticationUserDetailsService, UserDetailsChecker},
-        Authentication, AuthenticationError,
+        Authentication, AuthenticationError, AuthenticationErrorKind,
     },
-    web::authentication::preauth::{
-        pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
-        pre_authenticated_credentials_not_found_exception::pre_authenticated_credentials_not_found,
-    },
+    web::authentication::preauth::pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
 };
 
 pub struct PreAuthenticatedAuthenticationProvider {
@@ -20,7 +17,7 @@ pub struct PreAuthenticatedAuthenticationProvider {
         Arc<dyn AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken>>,
     user_details_checker: Arc<dyn UserDetailsChecker>,
     granted_authorities: Vec<String>,
-    throw_exception_when_token_rejected: bool,
+    error_when_token_rejected: bool,
     order: i32,
 }
 
@@ -35,13 +32,13 @@ impl PreAuthenticatedAuthenticationProvider {
             pre_authenticated_user_details_service,
             user_details_checker,
             granted_authorities: Vec::new(),
-            throw_exception_when_token_rejected: false,
+            error_when_token_rejected: false,
             order: -1,
         }
     }
 
-    pub fn set_throw_exception_when_token_rejected(&mut self, value: bool) {
-        self.throw_exception_when_token_rejected = value;
+    pub fn set_error_when_token_rejected(&mut self, value: bool) {
+        self.error_when_token_rejected = value;
     }
 
     pub fn set_granted_authorities(&mut self, authorities: Vec<String>) {
@@ -63,8 +60,8 @@ impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
         &self,
         authentication: &Arc<dyn Authentication>,
     ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
-        let Some(authentication) =
-            authentication.downcast_ref::<PreAuthenticatedAuthenticationToken>()
+        let Some(authentication) = (authentication.as_ref() as &dyn std::any::Any)
+            .downcast_ref::<PreAuthenticatedAuthenticationToken>()
         else {
             return Err(AuthenticationError::new(
                 "Only PreAuthenticatedAuthenticationToken is supported",
@@ -72,9 +69,10 @@ impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
         };
 
         if authentication.principal().is_none() {
-            if self.throw_exception_when_token_rejected {
-                return Err(pre_authenticated_credentials_not_found(
+            if self.error_when_token_rejected {
+                return Err(AuthenticationError::with_kind(
                     "No pre-authenticated principal found in request.",
+                    AuthenticationErrorKind::BadCredentials,
                 ));
             }
             return Err(AuthenticationError::new(
@@ -82,9 +80,10 @@ impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
             ));
         }
         if authentication.get_credentials().is_none() {
-            if self.throw_exception_when_token_rejected {
-                return Err(pre_authenticated_credentials_not_found(
+            if self.error_when_token_rejected {
+                return Err(AuthenticationError::with_kind(
                     "No pre-authenticated credentials found in request.",
+                    AuthenticationErrorKind::BadCredentials,
                 ));
             }
             return Err(AuthenticationError::new(
@@ -97,9 +96,7 @@ impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
             .load_user_details(authentication)
             .await
             .map_err(|error| AuthenticationError::new(error.to_string()))?;
-        self.user_details_checker
-            .check(user_details.as_ref())
-            .await?;
+        self.user_details_checker.check(user_details.as_ref())?;
 
         let mut authorities = Vec::new();
         for authority in user_details.authorities() {

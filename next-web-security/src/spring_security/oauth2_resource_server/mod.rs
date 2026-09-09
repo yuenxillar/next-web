@@ -8,15 +8,16 @@ pub use bearer::{
     BearerTokenResolver, DefaultBearerTokenResolver,
 };
 pub use entry::{
-    AuthenticationEntryPointFailureHandler, BearerTokenAccessDeniedHandler, BearerTokenAuthenticationEntryPoint,
-    DPoPConfigurer, OAuth2ProtectedResourceMetadataFilter, ProtectedResourceMetadataConfigurer,
+    AuthenticationEntryPointFailureHandler, BearerTokenAccessDeniedHandler,
+    BearerTokenAuthenticationEntryPoint, DPoPConfigurer, OAuth2ProtectedResourceMetadataFilter,
+    ProtectedResourceMetadataConfigurer,
 };
 pub use jwt::{
     DefaultJwtAuthenticationConverter, Jwt, JwtAuthenticationConverter, JwtAuthenticationProvider,
     JwtConfigurer, JwtDecoder, NimbusJwtDecoder,
 };
 pub use opaque::{
-    OAuth2AuthenticatedPrincipal, OAuth2ProtectedResourceMetadata, OpaqueTokenAuthenticationConverter,
-    OpaqueTokenAuthenticationProvider, OpaqueTokenConfigurer, OpaqueTokenIntrospector,
-    SpringOpaqueTokenIntrospector,
+    OAuth2AuthenticatedPrincipal, OAuth2ProtectedResourceMetadata,
+    OpaqueTokenAuthenticationConverter, OpaqueTokenAuthenticationProvider, OpaqueTokenConfigurer,
+    OpaqueTokenIntrospector, SpringOpaqueTokenIntrospector,
 };

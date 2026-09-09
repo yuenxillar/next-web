@@ -1,5 +1,6 @@
 use std::{
     any::Any,
+    cmp::Ordering,
     hash::{Hash, Hasher},
 };
 
@@ -43,3 +44,15 @@ impl PartialEq for dyn GrantedAuthority {
 }
 
 impl Eq for dyn GrantedAuthority {}
+
+impl Ord for dyn GrantedAuthority {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.authority().cmp(&other.authority())
+    }
+}
+
+impl PartialOrd for dyn GrantedAuthority {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.authority().partial_cmp(&other.authority())
+    }
+}

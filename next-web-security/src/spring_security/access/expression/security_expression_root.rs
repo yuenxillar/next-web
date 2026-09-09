@@ -45,7 +45,7 @@ impl SecurityExpressionRoot {
     }
 
     pub fn principal(&self) -> Option<String> {
-        self.authentication.get_principal()
+        self.authentication.principal().map(|s| s.to_string())
     }
 
     pub fn set_default_role_prefix(&mut self, default_role_prefix: impl Into<String>) {
@@ -68,6 +68,7 @@ impl SecurityExpressionRoot {
         self.role_hierarchy
             .reachable_granted_authorities(&self.authentication.authorities())
             .into_iter()
+            .filter_map(|ga| ga.authority().map(ToString::to_string))
             .collect()
     }
 

@@ -18,7 +18,7 @@ type TokenGenerator = Arc<dyn Fn() -> String + Send + Sync>;
 
 #[derive(Clone)]
 pub struct InMemoryOneTimeTokenService {
-    one_time_token_by_token: Arc<RwLock<HashMap<String, DefaultOneTimeToken>>>,
+    one_time_token_by_token: Arc<RwLock<HashMap<String, Arc<dyn OneTimeToken>>>>,
     clock: Clock,
     token_generator: TokenGenerator,
 }
@@ -53,31 +53,44 @@ impl InMemoryOneTimeTokenService {
     }
 
     pub fn len(&self) -> usize {
-        self.one_time_token_by_token
-            .read()
-            .map(|tokens| tokens.len())
-            .unwrap_or_default()
+        match self.one_time_token_by_token.read() {
+            Ok(tokens) => tokens.len(),
+            Err(poisoned) => poisoned.into_inner().len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     fn clean_expired_tokens_if_needed(&self) {
         if self.len() < 100 {
             return;
         }
-        if let Ok(mut tokens) = self.one_time_token_by_token.write() {
-            let now = (self.clock)();
-            tokens.retain(|_, token| !is_expired_at(token, now));
-        }
+        let mut tokens = match self.one_time_token_by_token.write() {
+            Ok(tokens) => tokens,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let now = (self.clock)();
+        tokens.retain(|_, token| !is_expired_at(token.as_ref(), now));
     }
 }
 
 impl OneTimeTokenService for InMemoryOneTimeTokenService {
-    fn generate(&self, request: GenerateOneTimeTokenRequest) -> DefaultOneTimeToken {
+    fn generate(&self, request: GenerateOneTimeTokenRequest) -> Arc<dyn OneTimeToken> {
         let token = (self.token_generator)();
         let expires_at = (self.clock)() + request.expires_in();
-        let ott = DefaultOneTimeToken::new(token.clone(), request.username(), expires_at);
-        if let Ok(mut tokens) = self.one_time_token_by_token.write() {
-            tokens.insert(token, ott.clone());
-        }
+        let ott: Arc<dyn OneTimeToken> = Arc::new(DefaultOneTimeToken::new(
+            token.clone(),
+            request.username(),
+            expires_at,
+        ));
+        let mut tokens = match self.one_time_token_by_token.write() {
+            Ok(tokens) => tokens,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        tokens.insert(token, ott.clone());
+        drop(tokens);
         self.clean_expired_tokens_if_needed();
         ott
     }
@@ -85,13 +98,14 @@ impl OneTimeTokenService for InMemoryOneTimeTokenService {
     fn consume(
         &self,
         authentication_token: &OneTimeTokenAuthenticationToken,
-    ) -> Option<DefaultOneTimeToken> {
-        let token = self
-            .one_time_token_by_token
-            .write()
-            .ok()?
-            .remove(authentication_token.token_value())?;
-        if is_expired_at(&token, (self.clock)()) {
+    ) -> Option<Arc<dyn OneTimeToken>> {
+        let mut tokens = match self.one_time_token_by_token.write() {
+            Ok(tokens) => tokens,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let token = tokens.remove(authentication_token.token_value())?;
+        drop(tokens);
+        if is_expired_at(token.as_ref(), (self.clock)()) {
             return None;
         }
         Some(token)
@@ -113,7 +127,6 @@ mod tests {
     use crate::authentication::ott::{
         generate_one_time_token_request::GenerateOneTimeTokenRequest,
         in_memory_one_time_token_service::InMemoryOneTimeTokenService,
-        one_time_token::OneTimeToken,
         one_time_token_authentication_token::OneTimeTokenAuthenticationToken,
         one_time_token_service::OneTimeTokenService,
     };
@@ -144,7 +157,8 @@ mod tests {
 
         let consumed = service.consume(&authentication_token).unwrap();
 
-        assert_eq!(consumed, generated);
+        assert_eq!(consumed.token_value(), generated.token_value());
+        assert_eq!(consumed.username(), generated.username());
         assert!(service.consume(&authentication_token).is_none());
     }
 

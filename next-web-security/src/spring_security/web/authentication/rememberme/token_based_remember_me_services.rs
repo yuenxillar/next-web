@@ -120,7 +120,7 @@ impl TokenBasedRememberMeServices {
 
     /// Calculates the digital signature to be put in the cookie. Default value is
     /// `encoding_algorithm` applied to ("username:tokenExpiryTime:password:key")
-    fn make_token_signature(
+    pub fn make_token_signature(
         &self,
         token_expiry_time: i64,
         username: &str,
@@ -137,7 +137,7 @@ impl TokenBasedRememberMeServices {
     }
 
     /// Calculates the digital signature to be put in the cookie.
-    fn make_token_signature_with_algorithm(
+    pub fn make_token_signature_with_algorithm(
         &self,
         token_expiry_time: i64,
         username: &str,
@@ -275,12 +275,7 @@ impl BaseRememberMeServicesExt for TokenBasedRememberMeServices {
         let token_lifetime = self.calculate_login_lifetime(successful_authentication);
         let mut expiry_time = current_time_millis();
         // SEC-949
-        expiry_time += 1000
-            * (if token_lifetime < 0 {
-                BaseRememberMeServices::TWO_WEEKS_S
-            } else {
-                token_lifetime
-            }) as i64;
+        expiry_time += 1000 * (token_lifetime) as i64;
 
         let signature_value = self.make_token_signature_with_algorithm(
             expiry_time,

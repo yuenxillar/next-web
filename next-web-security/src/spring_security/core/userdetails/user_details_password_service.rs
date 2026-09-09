@@ -11,7 +11,7 @@ pub trait UserDetailsPasswordService: Send + Sync {
     /// in the persistent user repository (database, LDAP etc).
     async fn update_password(
         &self,
-        user: &dyn UserDetails,
+        user: Arc<dyn UserDetails>,
         new_password: Option<String>,
     ) -> Arc<dyn UserDetails>;
 }
@@ -23,9 +23,9 @@ pub struct NoopUserDetailsPasswordService;
 impl UserDetailsPasswordService for NoopUserDetailsPasswordService {
     async fn update_password(
         &self,
-        user: &dyn UserDetails,
+        user: Arc<dyn UserDetails>,
         _new_password: Option<String>,
     ) -> Arc<dyn UserDetails> {
-        Arc::new(user.clone())
+        user
     }
 }

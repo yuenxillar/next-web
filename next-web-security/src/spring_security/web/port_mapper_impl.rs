@@ -68,7 +68,7 @@ impl PortMapperImpl {
 
     /// Checks if a port number is in the valid range (1-65535).
     fn is_in_port_range(port: u16) -> bool {
-        port >= 1 && port <= 65535
+        port >= 1
     }
 }
 

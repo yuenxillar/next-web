@@ -79,10 +79,10 @@ impl LdapAuthenticationProvider {
             .get_granted_authorities(&user_data, authentication.username())
             .await;
         let authorities = self.authorities_mapper.map_authorities(
-            authorities
+            &authorities
                 .into_iter()
                 .map(|authority| authority as Arc<dyn crate::core::GrantedAuthority>)
-                .collect(),
+                .collect::<Vec<_>>(),
         );
 
         let mut mapped = Vec::new();
@@ -102,7 +102,7 @@ impl AuthenticationProvider for LdapAuthenticationProvider {
         &self,
         authentication: &Arc<dyn Authentication>,
     ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
-        let Some(authentication) = (authentication.as_ref() as &dyn Any)
+        let Some(mut authentication) = (authentication.as_ref() as &dyn Any)
             .downcast_ref::<LdapAuthenticationRequest>()
             .map(Clone::clone)
         else {

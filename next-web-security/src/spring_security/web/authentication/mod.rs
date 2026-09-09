@@ -41,7 +41,9 @@ pub use authentication_converter::AuthenticationConverter;
 pub use authentication_failure_handler::AuthenticationFailureHandler;
 pub use authentication_filter::AuthenticationFilter;
 pub use authentication_success_handler::AuthenticationSuccessHandler;
-pub use base_authentication_processing_filter::BaseAuthenticationProcessingFilter;
+pub use base_authentication_processing_filter::{
+    BaseAuthenticationProcessingFilter, BaseAuthenticationProcessingFilterExt,
+};
 pub use base_authentication_target_url_request_handler::BaseAuthenticationTargetUrlRequestHandler;
 pub use basic_authentication_entry_point::BasicAuthenticationEntryPoint;
 pub use basic_authentication_filter::BasicAuthenticationFilter;

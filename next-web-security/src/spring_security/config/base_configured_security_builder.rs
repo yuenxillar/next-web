@@ -277,7 +277,7 @@ where
         builder.configurers = configurers;
     }
 
-    fn is_unbuilt(&self) -> bool {
+    pub fn is_unbuilt(&self) -> bool {
         self.build_state == BuildState::UNBUILT
     }
 }

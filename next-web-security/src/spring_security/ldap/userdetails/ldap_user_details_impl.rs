@@ -1,4 +1,8 @@
-use std::sync::Arc;
+use std::{
+    any::Any,
+    fmt::{self},
+    sync::Arc,
+};
 
 use next_web_core::async_trait;
 
@@ -7,6 +11,7 @@ use crate::{
     ldap::userdetails::{
         ldap_granted_authority::LdapGrantedAuthority, ldap_user_details::LdapUserDetails,
     },
+    web::authentication::Identity,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -85,5 +90,17 @@ impl UserDetails for LdapUserDetailsImpl {
 impl LdapUserDetails for LdapUserDetailsImpl {
     async fn get_dn(&self) -> String {
         self.dn.clone()
+    }
+}
+
+impl Identity for LdapUserDetailsImpl {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl fmt::Display for LdapUserDetailsImpl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LdapUserDetailsImpl(username={})", self.username)
     }
 }

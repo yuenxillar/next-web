@@ -30,21 +30,13 @@ impl AnonymousAuthenticationToken {
         principal: AuthPrincipal,
         authorities: Vec<Arc<dyn GrantedAuthority>>,
     ) -> Self {
-        assert!(
-            !key.as_ref().trim().is_empty(),
-            "key cannot be null or empty"
-        );
-        if let Some(s) = principal.downcast_ref::<String>().map(|s| s.as_str()) {
-            assert!(s != "", "principal cannot be null or empty");
-        }
+        assert!(!key.as_ref().trim().is_empty(), "key cannot be  empty");
+        assert!(principal.to_string() != "", "principal cannot be  empty");
 
-        assert!(
-            !authorities.is_empty(),
-            "authorities cannot be null or empty"
-        );
+        assert!(!authorities.is_empty(), "authorities cannot be  empty");
 
         let mut base = BaseAuthenticationToken::new(Some(authorities));
-        base.set_authenticated(true);
+        base.set_authenticated(true).expect("nothing");
 
         Self {
             principal,

@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     fmt,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -6,10 +7,13 @@ use std::{
     },
 };
 
-use crate::core::{
-    authority::{AuthorityUtils, SimpleGrantedAuthority},
-    userdetails::UserDetails,
-    CredentialsContainer, GrantedAuthority,
+use crate::{
+    core::{
+        authority::{AuthorityUtils, SimpleGrantedAuthority},
+        userdetails::UserDetails,
+        CredentialsContainer, GrantedAuthority,
+    },
+    web::authentication::Identity,
 };
 
 /// Models core user information retrieved by a UserDetailsService.
@@ -136,6 +140,12 @@ impl UserDetails for User {
     }
 }
 
+impl Identity for User {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 impl CredentialsContainer for User {
     fn erase_credentials(&self) {
         self.cleared.store(true, Ordering::Release);
@@ -168,6 +178,12 @@ impl fmt::Debug for User {
             .field("authorities_len", &self.authorities.len())
             .field("cleared", &self.cleared.load(Ordering::Acquire))
             .finish()
+    }
+}
+
+impl fmt::Display for User {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "User(username={})", self.username)
     }
 }
 

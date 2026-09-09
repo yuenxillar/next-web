@@ -3,26 +3,25 @@ use std::sync::Arc;
 use next_web_core::async_trait;
 
 use crate::{
-    authentication::{
-        account_status_user_details_exceptions::provider_not_found,
-        reactive_authentication_manager::ReactiveAuthenticationManager,
-    },
+    authentication::account_status_user_details_exceptions::provider_not_found,
+    authorization::AuthenticationManager,
     core::{Authentication, AuthenticationError},
 };
 
-pub struct DelegatingReactiveAuthenticationManager {
-    delegates: Vec<Arc<dyn ReactiveAuthenticationManager>>,
+#[derive(Clone)]
+pub struct DelegatingAuthenticationManager {
+    delegates: Vec<Arc<dyn AuthenticationManager>>,
 }
 
-impl DelegatingReactiveAuthenticationManager {
-    pub fn new(delegates: Vec<Arc<dyn ReactiveAuthenticationManager>>) -> Self {
+impl DelegatingAuthenticationManager {
+    pub fn new(delegates: Vec<Arc<dyn AuthenticationManager>>) -> Self {
         assert!(!delegates.is_empty(), "delegates cannot be empty");
         Self { delegates }
     }
 }
 
 #[async_trait]
-impl ReactiveAuthenticationManager for DelegatingReactiveAuthenticationManager {
+impl AuthenticationManager for DelegatingAuthenticationManager {
     async fn authenticate(
         &self,
         authentication: &dyn Authentication,

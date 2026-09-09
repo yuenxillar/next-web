@@ -97,7 +97,9 @@ impl AuthenticationSuccessHandler for SavedRequestAwareAuthenticationSuccessHand
             // Use the DefaultSavedRequest URL
             let target_url = save_request.get_redirect_url();
             self.get_redirect_strategy()
-                .send_redirect(request, response, &target_url);
+                .send_redirect(request, response, &target_url)
+                .inspect_err(|err| tracing::error!("SavedRequestAwareAuthenticationSuccessHandler on_authentication_success error: {}", err))
+                .ok();
         } else {
             self.base
                 .on_authentication_success(request, response, authentication);

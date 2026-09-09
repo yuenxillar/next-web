@@ -3,22 +3,21 @@ use std::{
     sync::Arc,
 };
 
-use next_web_core::ArcSwap;
+use next_web_core::{async_trait, ArcSwap};
 use tracing::debug;
 
 use crate::{
     authentication::{
+        dao::base_user_details_authentication_provider::BaseUserDetailsAuthenticationProviderExt,
         dao::BaseUserDetailsAuthenticationProvider, password::CompromisedPasswordChecker,
         UsernamePasswordAuthenticationToken,
     },
     core::{
-        userdetails::{
-            NoopUserDetailsPasswordService, UserDetails, UserDetailsPasswordService,
-            UserDetailsService,
-        },
+        userdetails::{UserDetails, UserDetailsPasswordService, UserDetailsService},
         Authentication, AuthenticationError, AuthenticationErrorKind,
     },
     crypto::{bcrypt::BCryptPasswordEncoder, password::PasswordEncoder},
+    web::authentication::AuthPrincipal,
 };
 
 /// An AuthenticationProvider implementation that retrieves user details from a UserDetailsService.
@@ -26,7 +25,7 @@ pub struct DaoAuthenticationProvider {
     password_encoder: Arc<dyn PasswordEncoder>,
     user_not_found_encoded_password: ArcSwap<Option<String>>,
     user_details_service: Arc<dyn UserDetailsService>,
-    user_details_password_service: Arc<dyn UserDetailsPasswordService>,
+    user_details_password_service: Option<Arc<dyn UserDetailsPasswordService>>,
     compromised_password_checker: Option<Arc<dyn CompromisedPasswordChecker>>,
 
     base: BaseUserDetailsAuthenticationProvider,
@@ -41,7 +40,7 @@ impl DaoAuthenticationProvider {
             user_details_service,
             password_encoder: Arc::new(BCryptPasswordEncoder),
             user_not_found_encoded_password: ArcSwap::from_pointee(None),
-            user_details_password_service: Arc::new(NoopUserDetailsPasswordService),
+            user_details_password_service: None,
             compromised_password_checker: None,
 
             base: Default::default(),
@@ -67,7 +66,7 @@ impl DaoAuthenticationProvider {
         &mut self,
         user_details_password_service: Arc<dyn UserDetailsPasswordService>,
     ) {
-        self.user_details_password_service = user_details_password_service;
+        self.user_details_password_service = Some(user_details_password_service);
     }
 
     /// Sets the CompromisedPasswordChecker to be used before creating a successful authentication. Defaults to none.
@@ -98,18 +97,20 @@ impl DaoAuthenticationProvider {
             }
         };
 
-        if let Some(password) = user_details.password() {
-            if !self.password_encoder.matches(&presented_password, password) {
-                debug!("Failed to authenticate since password does not match stored value");
-                return Err(AuthenticationError::with_kind(
-                    self.messages.message_or_default(
-                        "BaseUserDetailsAuthenticationProvider.badCredentials",
-                        None,
-                        "Bad credentials",
-                    ),
-                    AuthenticationErrorKind::BadCredentials,
-                ));
-            }
+        let matches = user_details
+            .password()
+            .map(|password| self.password_encoder.matches(&presented_password, password))
+            .unwrap_or(false);
+        if !matches {
+            debug!("Failed to authenticate since password does not match stored value");
+            return Err(AuthenticationError::with_kind(
+                self.messages.message_or_default(
+                    "BaseUserDetailsAuthenticationProvider.badCredentials",
+                    None,
+                    "Bad credentials",
+                ),
+                AuthenticationErrorKind::BadCredentials,
+            ));
         }
 
         Ok(())
@@ -140,9 +141,9 @@ impl DaoAuthenticationProvider {
 
     async fn create_success_authentication(
         &self,
-        principal: Arc<dyn UserDetails>,
+        principal: AuthPrincipal,
         authentication: &dyn Authentication,
-        user: &dyn UserDetails,
+        user: Arc<dyn UserDetails>,
     ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
         let presented_password = match authentication.credentials() {
             Some(val) => val.to_string(),
@@ -166,10 +167,10 @@ impl DaoAuthenticationProvider {
         }
 
         let existing_encoded_password = user.password();
-        let upgrade_encoding = existing_encoded_password
-            .as_ref()
-            .map(|s| self.password_encoder.as_ref().upgrade_encoding(s))
-            .unwrap_or_default();
+        let upgrade_encoding = self.user_details_password_service.is_some()
+            && existing_encoded_password
+                .map(|password| self.password_encoder.upgrade_encoding(password))
+                .unwrap_or(false);
 
         let mut _user = None;
         if upgrade_encoding {
@@ -178,20 +179,20 @@ impl DaoAuthenticationProvider {
                 .as_ref()
                 .encode(&presented_password)
                 .map_err(|err| AuthenticationError::new(err.to_string()))?;
-            _user = Some(
-                self.user_details_password_service
-                    .update_password(user, Some(new_password))
-                    .await,
-            );
+            if let Some(password_service) = &self.user_details_password_service {
+                _user = Some(
+                    password_service
+                        .update_password(user.clone(), Some(new_password))
+                        .await,
+                );
+            }
         }
 
-        self.base
-            .create_success_authentication(
-                principal,
-                authentication,
-                _user.as_deref().unwrap_or(user),
-            )
-            .await
+        Ok(self.base.create_success_authentication(
+            principal,
+            authentication,
+            _user.as_deref().unwrap_or(user.as_ref()),
+        ))
     }
 
     fn prepare_timing_attack_protection(&self) -> Result<(), AuthenticationError> {
@@ -225,124 +226,46 @@ impl DaoAuthenticationProvider {
             None => return,
         }
     }
-
-    // async fn maybe_upgrade_password(
-    //     &self,
-    //     user: Arc<dyn UserDetails>,
-    //     presented_password: Option<String>,
-    // ) -> Arc<dyn UserDetails> {
-    //     let Some(presented_password) = presented_password else {
-    //         return user;
-    //     };
-    //     let existing_encoded_password = user.password().unwrap_or_default();
-    //     if existing_encoded_password.is_empty()
-    //         || !self
-    //             .password_encoder
-    //             .upgrade_encoding(&existing_encoded_password)
-    //     {
-    //         return user;
-    //     }
-
-    //     let Ok(new_password) = self.password_encoder.encode(&presented_password) else {
-    //         return user;
-    //     };
-    //     self.user_details_password_service
-    //         .update_password(user, Some(new_password))
-    //         .await
-    // }
-
-    // fn check_compromised_password(
-    //     &self,
-    //     password: Option<&str>,
-    // ) -> Result<(), AuthenticationError> {
-    //     let Some(checker) = &self.compromised_password_checker else {
-    //         return Ok(());
-    //     };
-    //     if checker.check(password).is_compromised() {
-    //         return Err(compromised_password(
-    //             "The provided password is compromised, please change your password",
-    //         ));
-    //     }
-    //     Ok(())
-    // }
 }
 
-// #[async_trait]
-// impl AuthenticationProvider for DaoAuthenticationProvider {
-//     async fn authenticate(
-//         &self,
-//         authentication: &Arc<dyn Authentication>,
-//     ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
-//         // let Some(authentication) = authentication
-//         //     .as_any()
-//         //     .downcast_ref::<UsernamePasswordAuthenticationToken>()
-//         // else {
-//         //     return Err(AuthenticationError::new(
-//         //         "Only UsernamePasswordAuthenticationToken is supported",
-//         //     ));
-//         // };
+#[async_trait]
+impl BaseUserDetailsAuthenticationProviderExt for DaoAuthenticationProvider {
+    async fn additional_authentication_checks(
+        &self,
+        user_details: Arc<dyn UserDetails>,
+        authentication: &UsernamePasswordAuthenticationToken,
+    ) -> Result<(), AuthenticationError> {
+        DaoAuthenticationProvider::additional_authentication_checks(
+            self,
+            user_details,
+            authentication,
+        )
+        .await
+    }
 
-//         // let username = self.support.determine_username(authentication);
-//         // let cached_user = self.support.user_cache().get_user_from_cache(&username);
-//         // let mut cache_was_used = cached_user.is_some();
-//         // let mut user = if let Some(user) = cached_user {
-//         //     user
-//         // } else {
-//         //     self.retrieve_user(&username, authentication).await?
-//         // };
+    async fn retrieve_user(
+        &self,
+        username: &str,
+        authentication: &UsernamePasswordAuthenticationToken,
+    ) -> Result<Arc<dyn UserDetails>, AuthenticationError> {
+        DaoAuthenticationProvider::retrieve_user(self, username, authentication).await
+    }
 
-//         // let check_result = self
-//         //     .support
-//         //     .perform_pre_authentication_checks(user.as_ref())
-//         //     .await;
-
-//         // if let Err(error) = check_result {
-//         //     if self.support.always_perform_additional_checks_on_user() {
-//         //         let _ = self
-//         //             .additional_authentication_checks(user.clone(), authentication)
-//         //             .await;
-//         //     }
-//         //     if !cache_was_used {
-//         //         return Err(error);
-//         //     }
-//         //     cache_was_used = false;
-//         //     user = self.retrieve_user(&username, authentication).await?;
-//         //     self.support
-//         //         .perform_pre_authentication_checks(user.as_ref())
-//         //         .await?;
-//         //     self.additional_authentication_checks(user.clone(), authentication)
-//         //         .await?;
-//         // } else {
-//         //     self.additional_authentication_checks(user.clone(), authentication)
-//         //         .await?;
-//         // }
-
-//         // self.support
-//         //     .perform_post_authentication_checks(user.as_ref())
-//         //     .await?;
-
-//         // if !cache_was_used {
-//         //     self.support
-//         //         .user_cache()
-//         //         .put_user_in_cache(username.clone(), user.clone());
-//         // }
-
-//         // let presented_password = authentication.get_credentials();
-//         // self.check_compromised_password(presented_password.as_deref())?;
-//         // let user = self
-//         //     .maybe_upgrade_password(user, presented_password.clone())
-//         //     .await;
-
-//         // self.support
-//         //     .create_success_authentication(user.username(), authentication, user.as_ref())
-//         //     .await
-//         todo!()
-//     }
-
-//     fn supports(&self, authentication: TypeId) -> bool {
-//         authentication == TypeId::of::<UsernamePasswordAuthenticationToken>()
-//     }
-// }
+    async fn create_success_authentication(
+        &self,
+        principal: AuthPrincipal,
+        authentication: &dyn Authentication,
+        user: Arc<dyn UserDetails>,
+    ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
+        DaoAuthenticationProvider::create_success_authentication(
+            self,
+            principal,
+            authentication,
+            user,
+        )
+        .await
+    }
+}
 
 impl Deref for DaoAuthenticationProvider {
     type Target = BaseUserDetailsAuthenticationProvider;
@@ -355,5 +278,96 @@ impl Deref for DaoAuthenticationProvider {
 impl DerefMut for DaoAuthenticationProvider {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        authentication::{dao::UserDetailsPrincipal, AuthenticationProvider},
+        core::{
+            authority::{FactorGrantedAuthority, SimpleGrantedAuthority},
+            userdetails::{MapUserDetailsService, User},
+        },
+        web::authentication::AuthPrincipal,
+    };
+    use next_web_core::error::BoxError;
+
+    #[derive(Clone)]
+    struct PlainTextPasswordEncoder;
+
+    impl PasswordEncoder for PlainTextPasswordEncoder {
+        fn encode(&self, raw_password: &str) -> Result<String, BoxError> {
+            Ok(raw_password.to_owned())
+        }
+
+        fn matches(&self, raw_password: &str, encoded_password: &str) -> bool {
+            raw_password == encoded_password
+        }
+    }
+
+    fn authentication(username: &str, password: &str) -> Arc<dyn Authentication> {
+        let principal: AuthPrincipal = Arc::new(username.to_owned());
+        let credentials: AuthPrincipal = Arc::new(password.to_owned());
+        Arc::new(UsernamePasswordAuthenticationToken::unauthenticated(
+            Some(principal),
+            Some(credentials),
+        ))
+    }
+
+    fn provider() -> DaoAuthenticationProvider {
+        let user: Arc<dyn UserDetails> = Arc::new(User::new(
+            "user",
+            Some("password".to_owned()),
+            vec![Arc::new(SimpleGrantedAuthority::new("ROLE_USER"))],
+        ));
+        let service = Arc::new(MapUserDetailsService::with_users(vec![user]));
+        let mut provider = DaoAuthenticationProvider::new(service);
+        provider.set_password_encoder(Arc::new(PlainTextPasswordEncoder));
+        provider
+    }
+
+    #[tokio::test]
+    async fn authenticates_valid_credentials_and_adds_password_factor() {
+        let result = provider()
+            .authenticate(&authentication("user", "password"))
+            .await
+            .expect("authentication should not fail")
+            .expect("provider should support the token");
+
+        assert!(result.is_authenticated());
+        assert_eq!(result.name(), "user");
+        assert!(result
+            .principal()
+            .and_then(|principal| principal.as_any().downcast_ref::<UserDetailsPrincipal>())
+            .is_some());
+        assert!(result.authorities().iter().any(|authority| {
+            authority.authority() == Some(FactorGrantedAuthority::PASSWORD_AUTHORITY)
+        }));
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_credentials() {
+        let error = provider()
+            .authenticate(&authentication("user", "wrong"))
+            .await
+            .expect_err("invalid password should fail");
+
+        assert_eq!(error.kind(), AuthenticationErrorKind::BadCredentials);
+    }
+
+    #[tokio::test]
+    async fn hides_username_not_found_by_default() {
+        let service = Arc::new(MapUserDetailsService::default());
+        let mut provider = DaoAuthenticationProvider::new(service);
+        provider.set_password_encoder(Arc::new(PlainTextPasswordEncoder));
+
+        let error = provider
+            .authenticate(&authentication("missing", "password"))
+            .await
+            .expect_err("missing user should fail");
+
+        assert_eq!(error.kind(), AuthenticationErrorKind::BadCredentials);
     }
 }

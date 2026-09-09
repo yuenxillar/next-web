@@ -27,7 +27,9 @@ impl AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken>
         let details = token
             .get_details_ref()
             .and_then(|value| {
-                value.as_ref_object::<PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails>()
+                value
+                    .as_any()
+                    .downcast_ref::<PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails>()
             })
             .ok_or_else(|| {
                 AuthenticationError::with_kind(
@@ -44,7 +46,7 @@ impl AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken>
             true,
             true,
             true,
-            details.granted_authorities(),
+            details.granted_authorities().to_vec(),
         )))
     }
 }

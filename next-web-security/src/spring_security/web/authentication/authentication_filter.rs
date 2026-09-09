@@ -326,16 +326,18 @@ impl AuthenticationFilter {
     /// 1. Converts the request into an `Authentication` via the converter.
     /// 2. Resolves the appropriate `AuthenticationManager`.
     /// 3. Authenticates and returns the result.
-    fn attempt_authentication(
+    async fn attempt_authentication(
         &self,
-        request: &dyn HttpRequest,
+        request: &mut dyn HttpRequest,
     ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
         let Some(authentication) = self.authentication_converter.convert(request)? else {
             return Ok(None);
         };
 
         let authentication_manager = (self.authentication_manager_resolver)(request);
-        let authentication_result = authentication_manager.authenticate(authentication.as_ref())?;
+        let authentication_result = authentication_manager
+            .authenticate(authentication.as_ref())
+            .await?;
 
         Ok(Some(authentication_result))
     }
@@ -365,19 +367,15 @@ impl HttpFilter for AuthenticationFilter {
         }
 
         // Attempt authentication conversion and authentication.
-        match self.attempt_authentication(request) {
+        match self.attempt_authentication(request).await {
             Ok(Some(authentication_result)) => {
                 // Multi-Factor Authentication (MFA) authority merging.
                 // In the Java implementation, this uses `Authentication.toBuilder()`
                 // to merge the current user's authorities with the new result.
-                let ctx = match self.security_context_holder_strategy.get_context() {
-                    Some(ctx) => ctx,
-                    None => return Ok(()),
-                };
+                let ctx = self.security_context_holder_strategy.get_context();
                 let current_auth = ctx.get_authentication();
 
-                if self.should_perform_mfa(current_auth.as_deref(), authentication_result.as_ref())
-                {
+                if self.should_perform_mfa(current_auth.as_ref(), authentication_result.as_ref()) {
                     // Merge authorities from the current authentication into
                     // the new result. This requires the Authentication implementation
                     // to support builder-style mutation (to_builder).

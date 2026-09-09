@@ -17,8 +17,6 @@ impl DefaultOneTimeToken {
     ) -> Self {
         let token = token.into();
         let username = username.into();
-        assert!(!token.trim().is_empty(), "token cannot be empty");
-        assert!(!username.trim().is_empty(), "username cannot be empty");
         Self {
             token,
             username,

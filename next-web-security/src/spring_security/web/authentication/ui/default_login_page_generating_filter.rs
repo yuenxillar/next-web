@@ -529,11 +529,9 @@ impl DefaultLoginPageGeneratingFilter {
     fn get_username(&self) -> Option<String> {
         self.security_context_holder_strategy
             .get_context()
-            .and_then(|ctx| {
-                ctx.get_authentication()
-                    .filter(|auth| auth.is_authenticated())
-                    .map(|auth| auth.name().to_string())
-            })
+            .get_authentication()
+            .filter(|auth| auth.is_authenticated())
+            .map(|auth| auth.name().to_string())
     }
 
     fn is_logout_success(&self, request: &dyn HttpRequest) -> bool {

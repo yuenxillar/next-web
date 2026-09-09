@@ -26,19 +26,18 @@ impl SecurityContextRepository for DelegatingSecurityContextRepository {
         &self,
         request: &mut dyn HttpRequest,
     ) -> Box<dyn DeferredSecurityContext> {
-        let mut deferred_security_context = None;
+        let mut deferred_security_context: Option<Box<dyn DeferredSecurityContext>> = None;
         for delegate in self.delegates.iter() {
-            if let Some(_dsc) = deferred_security_context.take() {
-                let dsc: Box<dyn DeferredSecurityContext> =
-                    Box::new(DelegatingDeferredSecurityContext::new(
-                        _dsc,
-                        delegate.load_deferred_context(request),
-                    ));
-                deferred_security_context = Some(dsc);
-            }
+            let next = delegate.load_deferred_context(request);
+            deferred_security_context = Some(match deferred_security_context.take() {
+                Some(previous) => Box::new(DelegatingDeferredSecurityContext::new(previous, next)),
+                None => next,
+            });
         }
 
-        deferred_security_context.unwrap_or(self.delegates[0].load_deferred_context(request))
+        deferred_security_context.unwrap_or_else(|| {
+            panic!("DelegatingSecurityContextRepository requires at least one delegate")
+        })
     }
 
     /// Stores the security context on completion of a request.
@@ -82,7 +81,7 @@ impl DelegatingDeferredSecurityContext {
 }
 
 impl DeferredSecurityContext for DelegatingDeferredSecurityContext {
-    fn get(&mut self) -> Option<Arc<dyn SecurityContext>> {
+    fn get(&self) -> Arc<dyn SecurityContext> {
         let security_context = self.previous.get();
         if !self.previous.is_generated() {
             return security_context;
@@ -90,7 +89,7 @@ impl DeferredSecurityContext for DelegatingDeferredSecurityContext {
         self.next.get()
     }
 
-    fn is_generated(&mut self) -> bool {
+    fn is_generated(&self) -> bool {
         self.previous.is_generated() && self.next.is_generated()
     }
 }

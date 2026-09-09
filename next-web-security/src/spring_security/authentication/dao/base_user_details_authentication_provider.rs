@@ -1,3 +1,4 @@
+use std::fmt;
 use std::{
     any::{Any, TypeId},
     collections::HashSet,
@@ -11,20 +12,49 @@ use tracing::debug;
 
 use crate::{
     authentication::{
-        account_status_user_details_checker::AccountStatusUserDetailsChecker,
-        account_status_user_details_exceptions::credentials_expired, AuthenticationProvider,
-        UsernamePasswordAuthenticationToken,
+        account_status_user_details_exceptions::{
+            account_expired, credentials_expired, disabled, locked,
+        },
+        AuthenticationProvider, UsernamePasswordAuthenticationToken,
     },
     core::{
         authority::{
             mapping::{GrantedAuthoritiesMapper, NullAuthoritiesMapper},
-            AuthorityUtils, FactorGrantedAuthority,
+            FactorGrantedAuthority,
         },
         userdetails::{cache::NullUserCache, UserCache, UserDetails, UserDetailsChecker},
-        Authentication, AuthenticationError, NextSecurityMessageSource,
+        Authentication, AuthenticationError, AuthenticationErrorKind, NextSecurityMessageSource,
     },
-    web::authentication::AuthPrincipal,
+    web::authentication::{AuthPrincipal, Identity},
 };
+
+/// Adapts a `UserDetails` object for use as an authentication principal.
+#[derive(Clone)]
+pub struct UserDetailsPrincipal {
+    user: Arc<dyn UserDetails>,
+}
+
+impl UserDetailsPrincipal {
+    pub fn new(user: Arc<dyn UserDetails>) -> Self {
+        Self { user }
+    }
+
+    pub fn user_details(&self) -> &Arc<dyn UserDetails> {
+        &self.user
+    }
+}
+
+impl fmt::Display for UserDetailsPrincipal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.user.username())
+    }
+}
+
+impl Identity for UserDetailsPrincipal {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
 
 /// A base AuthenticationProvider that allows subclasses to override and work with UserDetails objects.
 /// The class is designed to respond to UsernamePasswordAuthenticationToken authentication requests.
@@ -112,22 +142,49 @@ impl BaseUserDetailsAuthenticationProvider {
         self.authorities_mapper = authorities_mapper;
     }
 
-    pub async fn perform_pre_authentication_checks(
+    pub fn perform_pre_authentication_checks(
         &self,
         user: &dyn UserDetails,
     ) -> Result<(), AuthenticationError> {
-        self.pre_authentication_checks.check(user).await
+        self.pre_authentication_checks.check(user)
     }
 
     pub fn always_perform_additional_checks_on_user(&self) -> bool {
         self.always_perform_additional_checks_on_user
     }
 
-    pub async fn perform_post_authentication_checks(
+    pub fn perform_post_authentication_checks(
         &self,
         user: &dyn UserDetails,
     ) -> Result<(), AuthenticationError> {
-        self.post_authentication_checks.check(user).await
+        self.post_authentication_checks.check(user)
+    }
+
+    pub fn create_success_authentication(
+        &self,
+        principal: AuthPrincipal,
+        authentication: &dyn Authentication,
+        user: &dyn UserDetails,
+    ) -> Arc<dyn Authentication> {
+        let mut authorities = self.authorities_mapper.map_authorities(user.authorities());
+        authorities.push(Arc::new(FactorGrantedAuthority::from_authority(
+            FactorGrantedAuthority::PASSWORD_AUTHORITY,
+        )));
+        let mut seen = HashSet::new();
+        authorities.retain(|authority| {
+            authority
+                .authority()
+                .map(|value| seen.insert(value.to_owned()))
+                .unwrap_or(false)
+        });
+        let mut result = UsernamePasswordAuthenticationToken::authenticated(
+            principal,
+            authentication.credentials().cloned(),
+            authorities,
+        );
+        result.set_details(authentication.details().cloned());
+        debug!("Authenticated user");
+        Arc::new(result)
     }
 }
 
@@ -161,6 +218,21 @@ impl UserDetailsChecker for DefaultPostAuthenticationChecks {
 #[derive(Clone, Default)]
 struct DefaultPreAuthenticationChecks {}
 
+impl UserDetailsChecker for DefaultPreAuthenticationChecks {
+    fn check(&self, user: &dyn UserDetails) -> Result<(), AuthenticationError> {
+        if !user.is_account_non_locked() {
+            return Err(locked());
+        }
+        if !user.is_enabled() {
+            return Err(disabled());
+        }
+        if !user.is_account_non_expired() {
+            return Err(account_expired());
+        }
+        Ok(())
+    }
+}
+
 #[async_trait]
 pub trait BaseUserDetailsAuthenticationProviderExt
 where
@@ -186,32 +258,11 @@ where
         &self,
         principal: AuthPrincipal,
         authentication: &dyn Authentication,
-        user: &dyn UserDetails,
+        user: Arc<dyn UserDetails>,
     ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
-        // Ensure we return the original credentials the user supplied,
-        // so subsequent attempts are successful even with encoded passwords.
-        // Also ensure we return the original getDetails(), so that future
-        // authentication events after cache expiry contain the details
-        let mut authorities = self.authorities_mapper.map_authorities(user.authorities());
-        authorities.push(Arc::new(FactorGrantedAuthority::from_authority(
-            FactorGrantedAuthority::PASSWORD_AUTHORITY,
-        )));
-        let mut seen = HashSet::new();
-        authorities.retain(|a| {
-            a.authority()
-                .map(|s| seen.insert(s.to_string()))
-                .unwrap_or(false)
-        });
-
-        let mut result = UsernamePasswordAuthenticationToken::authenticated(
-            principal,
-            authentication.credentials().cloned(),
-            authorities,
-        );
-        result.set_details(authentication.details().cloned());
-        debug!("Authenticated user");
-
-        Ok(Arc::new(result))
+        Ok(self
+            .deref()
+            .create_success_authentication(principal, authentication, user.as_ref()))
     }
 }
 
@@ -242,10 +293,26 @@ where
         let mut user = if let Some(user) = user {
             user
         } else {
-            self.retrieve_user(&username, authentication).await?
+            match self.retrieve_user(&username, authentication).await {
+                Ok(user) => user,
+                Err(error)
+                    if error.kind() == AuthenticationErrorKind::UsernameNotFound
+                        && self.hide_user_not_found_exceptions =>
+                {
+                    return Err(AuthenticationError::with_kind(
+                        self.messages.message_or_default(
+                            "AbstractUserDetailsAuthenticationProvider.badCredentials",
+                            None,
+                            "Bad credentials",
+                        ),
+                        AuthenticationErrorKind::BadCredentials,
+                    ));
+                }
+                Err(error) => return Err(error),
+            }
         };
 
-        let check_result = self.perform_pre_authentication_checks(user.as_ref()).await;
+        let check_result = self.perform_pre_authentication_checks(user.as_ref());
 
         if let Err(error) = check_result {
             if self.always_perform_additional_checks_on_user() {
@@ -258,8 +325,7 @@ where
             }
             cache_was_used = false;
             user = self.retrieve_user(&username, authentication).await?;
-            self.perform_pre_authentication_checks(user.as_ref())
-                .await?;
+            self.perform_pre_authentication_checks(user.as_ref())?;
             self.additional_authentication_checks(user.clone(), authentication)
                 .await?;
         } else {
@@ -267,22 +333,21 @@ where
                 .await?;
         }
 
-        self.perform_post_authentication_checks(user.as_ref())
-            .await?;
+        self.perform_post_authentication_checks(user.as_ref())?;
 
         if !cache_was_used {
-            self.user_cache
-                .put_user_in_cache(username.clone(), user.clone());
+            self.user_cache.put_user_in_cache(user.clone()).await;
         }
 
-        let presented_password = authentication.get_credentials();
-        self.check_compromised_password(presented_password.as_deref())?;
-        let user = self
-            .maybe_upgrade_password(user, presented_password.clone())
-            .await;
-
-        self.create_success_authentication(user.username(), authentication, user.as_ref())
-            .await
+        let principal: AuthPrincipal = if self.force_principal_as_string {
+            Arc::new(user.username().to_owned())
+        } else {
+            Arc::new(UserDetailsPrincipal::new(user.clone()))
+        };
+        let result = self
+            .create_success_authentication(principal, authentication, user)
+            .await?;
+        Ok(Some(result))
     }
 
     fn supports(&self, authentication: TypeId) -> bool {

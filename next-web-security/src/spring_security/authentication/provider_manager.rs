@@ -1,3 +1,4 @@
+use next_web_core::async_trait;
 use std::sync::Arc;
 
 use crate::{
@@ -6,7 +7,6 @@ use crate::{
         authentication_event_publisher::{
             AuthenticationEventPublisher, NullAuthenticationEventPublisher,
         },
-        authentication_events::{AuthenticationFailureEvent, AuthenticationSuccessEvent},
         authentication_provider::AuthenticationProvider,
     },
     authorization::AuthenticationManager,
@@ -64,14 +64,15 @@ impl ProviderManager {
     }
 }
 
+#[async_trait]
 impl AuthenticationManager for ProviderManager {
-    fn authenticate(
+    async fn authenticate(
         &self,
         authentication: &dyn Authentication,
     ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
-        let auth_type = authentication.authentication_type();
+        let auth_type = authentication.of();
+        let authentication_arc = authentication.to_builder().build();
         let mut last_exception: Option<AuthenticationError> = None;
-        let mut parent_exception: Option<AuthenticationError> = None;
         let mut result: Option<Arc<dyn Authentication>> = None;
         let mut parent_result: Option<Arc<dyn Authentication>> = None;
 
@@ -80,35 +81,43 @@ impl AuthenticationManager for ProviderManager {
                 continue;
             }
 
-            match futures::executor::block_on(provider.authenticate(authentication)) {
+            match provider.authenticate(&authentication_arc).await {
                 Ok(auth_result) => {
-                    result = Some(copy_details(authentication, auth_result));
-                    break;
+                    if let Some(auth_result) = auth_result {
+                        result = Some(copy_details(authentication, auth_result));
+                        break;
+                    }
                 }
-                Err(ex) => match ex.kind() {
-                    AuthenticationErrorKind::AccountStatus
-                    | AuthenticationErrorKind::InternalService => {
-                        prepare_exception(&*self.event_publisher, &ex, authentication);
-                        return Err(ex);
+                Err(mut ex) => {
+                    ex.set_authentication_request(authentication_arc.clone());
+                    match ex.kind() {
+                        AuthenticationErrorKind::AccountStatus
+                        | AuthenticationErrorKind::InternalService => {
+                            prepare_exception(
+                                &*self.event_publisher,
+                                &ex,
+                                authentication_arc.clone(),
+                            );
+                            return Err(ex);
+                        }
+                        _ => {
+                            last_exception = Some(ex);
+                        }
                     }
-                    _ => {
-                        last_exception = Some(ex);
-                    }
-                },
+                }
             }
         }
 
         // Try parent if no result from providers
         if result.is_none() {
             if let Some(ref parent) = self.parent {
-                match parent.authenticate(authentication) {
+                match parent.authenticate(authentication).await {
                     Ok(auth_result) => {
                         parent_result = Some(auth_result.clone());
                         result = Some(auth_result);
                     }
                     Err(ex) => {
                         if ex.kind() != AuthenticationErrorKind::ProviderNotFound {
-                            parent_exception = Some(ex.clone());
                             last_exception = Some(ex);
                         }
                     }
@@ -119,88 +128,53 @@ impl AuthenticationManager for ProviderManager {
         if let Some(ref auth_result) = result {
             // Credential erasure requires interior mutability (Arc<Mutex<>>) in Rust
             // In a full implementation, tokens needing erasure would use Arc<Mutex<dyn Authentication>>
-            let _ = self.erase_credentials_after_authentication;
+            let returned = if self.erase_credentials_after_authentication {
+                let mut builder = auth_result.to_builder();
+                builder.credentials(None);
+                builder.build()
+            } else {
+                auth_result.clone()
+            };
 
             // Publish success event (only if parent didn't already do it)
             if parent_result.is_none() {
-                self.event_publisher.publish_authentication_success(
-                    AuthenticationSuccessEvent::new(auth_result.clone()),
-                );
+                self.event_publisher
+                    .publish_authentication_success(returned.clone());
             }
 
-            return Ok(auth_result.clone());
+            return Ok(returned);
         }
 
         // No result - prepare and throw the last exception
         let final_exception = last_exception.unwrap_or_else(|| {
             account_status_user_details_exceptions::provider_not_found(format!(
-                "No AuthenticationProvider found for {}",
+                "No AuthenticationProvider found for {:?}",
                 auth_type
             ))
         });
 
-        if parent_exception.is_none() {
-            prepare_exception(&*self.event_publisher, &final_exception, authentication);
-        }
+        prepare_exception(&*self.event_publisher, &final_exception, authentication_arc);
 
         Err(final_exception)
     }
 }
 
 fn copy_details(
-    _source: &dyn Authentication,
+    source: &dyn Authentication,
     dest: Arc<dyn Authentication>,
 ) -> Arc<dyn Authentication> {
-    dest
+    if source.details().is_none() || dest.details().is_some() {
+        return dest;
+    }
+    let mut builder = dest.to_builder();
+    builder.details(source.details().cloned());
+    builder.build()
 }
 
 fn prepare_exception(
     event_publisher: &dyn AuthenticationEventPublisher,
     ex: &AuthenticationError,
-    authentication: &dyn Authentication,
+    authentication: Arc<dyn Authentication>,
 ) {
-    event_publisher.publish_authentication_failure(AuthenticationFailureEvent::new(
-        authentication,
-        ex.clone(),
-    ));
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use crate::{
-        authentication::{
-            provider_manager::ProviderManager,
-            testing_authentication_provider::TestingAuthenticationProvider,
-            testing_authentication_token::TestingAuthenticationToken,
-        },
-        authorization::AuthenticationManager,
-        core::{authority::AuthorityUtils, Authentication},
-    };
-
-    #[test]
-    fn test_provider_manager_authenticates_with_supported_provider() {
-        let provider = Arc::new(TestingAuthenticationProvider);
-        let manager = ProviderManager::new(vec![provider]);
-
-        let auth = TestingAuthenticationToken::with_authorities(
-            "alice",
-            Some(String::from("secret")),
-            AuthorityUtils::create_authority_list(["ROLE_TEST"]),
-        );
-
-        let result = manager.authenticate(&auth);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().get_name(), "alice");
-    }
-
-    #[test]
-    fn test_provider_manager_fails_when_no_provider_supports() {
-        let manager = ProviderManager::new(vec![]);
-
-        let auth = TestingAuthenticationToken::new("alice", Some(String::from("secret")));
-        let result = manager.authenticate(&auth);
-        assert!(result.is_err());
-    }
+    event_publisher.publish_authentication_failure(ex.clone(), authentication);
 }

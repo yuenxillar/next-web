@@ -35,8 +35,12 @@ pub mod autoconfigure;
 pub mod connection;
 pub mod core;
 pub mod listener;
+pub mod service;
 
-#[cfg(feature = "lock")]
-pub use service::redis_lock_service::RedisLockService;
+#[cfg(feature = "distributed-lock")]
+pub use service::lock::{
+    LockError, LockGuard, RedisDistributedLockService, RedisLock, RedisLockConfig, RedisLockMode,
+    RedisRedLock, UnlockResult,
+};
 
 pub use redis::{AsyncCommands, Commands, RedisError, aio::MultiplexedConnection};

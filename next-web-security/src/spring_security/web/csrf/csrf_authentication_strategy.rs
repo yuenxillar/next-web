@@ -48,12 +48,18 @@ impl SessionAuthenticationStrategy for CsrfAuthenticationStrategy {
     ) -> Result<(), AuthenticationError> {
         let contains_token = self.token_repository.load_token(req).await.is_some();
         if contains_token {
-            self.token_repository.save_token(None, req, resp).await;
+            self.token_repository
+                .save_token(None, req, resp)
+                .await
+                .map_err(|err| {
+                    AuthenticationError::new(format!("Failed to save CSRF token: {}", err))
+                })?;
 
             let mut deferred_csrf_token =
                 load_deferred_token(self.token_repository.clone(), req, resp);
             self.request_handler
-                .handle(req, resp, &mut deferred_csrf_token);
+                .handle(req, resp, &mut deferred_csrf_token)
+                .await;
             tracing::debug!("Replaced CSRF Token");
         }
 

@@ -7,16 +7,14 @@ use crate::{
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
         web::{
-            configurers::{
-                error_handling_configurer::ErrorHandlingConfigurer, BaseHttpConfigurer,
-            },
+            configurers::{error_handling_configurer::ErrorHandlingConfigurer, BaseHttpConfigurer},
             HttpSecurityBuilder,
         },
     },
     oauth2_resource_server::{
         bearer::{
-            BearerTokenAuthenticationConverter,
-            BearerTokenRequestMatcher, BearerTokenResolver, DefaultBearerTokenResolver,
+            BearerTokenAuthenticationConverter, BearerTokenRequestMatcher, BearerTokenResolver,
+            DefaultBearerTokenResolver,
         },
         entry::{
             BearerTokenAccessDeniedHandler, BearerTokenAuthenticationEntryPoint, DPoPConfigurer,
@@ -108,7 +106,9 @@ where
     where
         F: FnMut(&mut JwtConfigurer<H>),
     {
-        let configurer = self.jwt_configurer.get_or_insert_with(JwtConfigurer::default);
+        let configurer = self
+            .jwt_configurer
+            .get_or_insert_with(JwtConfigurer::default);
         jwt_customizer(configurer);
         self
     }
@@ -130,7 +130,9 @@ where
     where
         F: FnMut(&mut DPoPConfigurer<H>),
     {
-        let configurer = self.dpop_configurer.get_or_insert_with(DPoPConfigurer::default);
+        let configurer = self
+            .dpop_configurer
+            .get_or_insert_with(DPoPConfigurer::default);
         dpop_customizer(configurer);
         self
     }
@@ -180,15 +182,11 @@ where
     H: HttpSecurityBuilder<H>,
     H: crate::config::security_builder::SecurityBuilder<DefaultSecurityFilterChain>,
 {
-    fn get_object(
-        &self,
-    ) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base.get_mut_object()
     }
 }
@@ -200,19 +198,20 @@ where
     H: crate::config::security_builder::SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn init(&mut self, http: &mut H) {
-        let authentication_manager = match http.shared_object::<Arc<dyn crate::authorization::AuthenticationManager>>() {
-            Some(authentication_manager) => authentication_manager.clone(),
-            None => return,
-        };
+        let authentication_manager =
+            match http.shared_object::<Arc<dyn crate::authorization::AuthenticationManager>>() {
+                Some(authentication_manager) => authentication_manager.clone(),
+                None => return,
+            };
 
         let bearer_token_resolver: Arc<dyn BearerTokenResolver> = self
             .bearer_token_resolver
             .clone()
             .unwrap_or_else(|| Arc::new(DefaultBearerTokenResolver::default()));
-        let authentication_converter: Arc<dyn AuthenticationConverter> = self
-            .authentication_converter
-            .clone()
-            .unwrap_or_else(|| Arc::new(BearerTokenAuthenticationConverter::with_default_resolver()));
+        let authentication_converter: Arc<dyn AuthenticationConverter> =
+            self.authentication_converter.clone().unwrap_or_else(|| {
+                Arc::new(BearerTokenAuthenticationConverter::with_default_resolver())
+            });
         let authentication_entry_point: Arc<dyn AuthenticationEntryPoint> = self
             .authentication_entry_point
             .clone()

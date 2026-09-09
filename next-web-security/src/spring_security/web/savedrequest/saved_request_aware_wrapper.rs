@@ -1,8 +1,12 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::str::FromStr;
+use std::sync::Arc;
 
-use next_web_core::http::{HeaderMap, HeaderValue, Uri};
+use next_web_core::anys::any_value::AnyValue;
+use next_web_core::http::{HeaderMap, HeaderValue, HttpRequestShare, Uri};
+use next_web_core::traits::http::request_dispatcher::RequestDispatcher;
+use next_web_core::traits::http::HttpSession;
 use next_web_core::{
-    http::{Cookie, HttpMethod},
+    http::{header::CONTENT_TYPE, Cookie, HttpMethod},
     traits::http::http_request::HttpRequest,
     util::locale::Locale,
 };
@@ -20,12 +24,7 @@ use crate::web::savedrequest::SavedRequest;
 /// Added into a request by `RequestCacheAwareFilter`.
 pub struct SavedRequestAwareWrapper<'a> {
     request: &'a mut dyn HttpRequest,
-    cookies: Vec<Cookie>,
-    headers: HashMap<String, Vec<String>>,
-    parameters: HashMap<String, Vec<String>>,
-    locales: Vec<Locale>,
-    method: HttpMethod,
-    uri: Uri,
+    saved_request: Arc<dyn SavedRequest>,
 }
 
 impl<'a> SavedRequestAwareWrapper<'a> {
@@ -36,39 +35,20 @@ impl<'a> SavedRequestAwareWrapper<'a> {
     ///
     /// * `saved` - the saved request to source parameters, headers and cookies from
     /// * `request` - the original request being wrapped
-    pub fn new(saved: Arc<dyn SavedRequest>, request: &'a mut dyn HttpRequest) -> Self {
-        let headers = saved
-            .get_header_names()
-            .into_iter()
-            .map(|name| {
-                let key = name.to_ascii_lowercase();
-                let values = saved.get_header_values(&name);
-                (key, values)
-            })
-            .collect();
-
-        let uri = request.uri().clone();
+    pub fn new(saved_request: Arc<dyn SavedRequest>, request: &'a mut dyn HttpRequest) -> Self {
         Self {
             request,
-            cookies: saved.get_cookies(),
-            headers,
-            parameters: saved.get_parameter_map(),
-            locales: saved.get_locales(),
-            method: HttpMethod::from_str(&saved.get_method()).unwrap_or(HttpMethod::GET),
-            uri,
+            saved_request,
         }
     }
 }
 
 impl HttpRequest for SavedRequestAwareWrapper<'_> {
-    fn session(&self) -> Option<&dyn next_web_core::traits::http::HttpSession> {
+    fn session(&self) -> Option<&dyn HttpSession> {
         self.request.session()
     }
 
-    fn session_mut(
-        &mut self,
-        create: bool,
-    ) -> Option<&mut dyn next_web_core::traits::http::HttpSession> {
+    fn session_mut(&mut self, create: bool) -> Option<&mut dyn HttpSession> {
         self.request.session_mut(create)
     }
 
@@ -81,7 +61,7 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
     }
 
     fn requested_session_id(&self) -> Option<&str> {
-        todo!()
+        self.request.requested_session_id()
     }
 
     fn auth_type(&self) -> next_web_core::http::auth_type::AuthType {
@@ -89,22 +69,19 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
     }
 
     fn cookie(&self) -> Option<&Cookie> {
-        self.cookies.first()
+        self.request.cookie()
     }
 
     fn cookies(&self) -> Option<&[Cookie]> {
-        Some(self.cookies.as_slice())
+        self.request.cookies()
     }
 
-    fn request_dispatcher(
-        &self,
-        default_failure_url: &str,
-    ) -> Option<&dyn next_web_core::traits::http::request_dispatcher::RequestDispatcher> {
+    fn request_dispatcher(&self, default_failure_url: &str) -> Option<&dyn RequestDispatcher> {
         self.request.request_dispatcher(default_failure_url)
     }
 
     fn method(&self) -> HttpMethod {
-        self.method.clone()
+        HttpMethod::from_str(self.saved_request.get_method()).unwrap_or(HttpMethod::default())
     }
 
     fn version(&self) -> next_web_core::http::HttpVersion {
@@ -115,72 +92,83 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
         self.request.headers()
     }
 
-    fn header(&self, header_name: &str) -> Option<&str> {
-        self.headers
-            .get(&header_name.to_ascii_lowercase())
-            .and_then(|values| values.first())
-            .map(String::as_str)
+    fn header(&self, name: &str) -> Option<&str> {
+        self.saved_request
+            .get_header_values(name)
+            .first()
+            .map(|s| *s)
     }
 
-    fn header_values(&self, header_name: &str) -> Vec<&str> {
-        self.headers
-            .get(&header_name.to_ascii_lowercase())
-            .map(|values| values.iter().map(String::as_str).collect())
-            .unwrap_or_default()
+    fn header_values(&self, name: &str) -> Vec<&str> {
+        self.saved_request.get_header_values(name)
     }
 
     fn header_names(&self) -> Vec<&str> {
-        self.headers.keys().map(String::as_str).collect()
+        self.saved_request.get_header_names()
     }
 
     fn uri(&self) -> &Uri {
-        &self.uri
+        self.request.uri()
     }
 
     fn query(&self) -> Option<&str> {
-        self.uri.query()
+        self.request.query()
     }
 
     fn parameter(&self, name: &str) -> Option<&str> {
-        self.parameters
-            .get(name)
-            .and_then(|values| values.first())
-            .map(String::as_str)
+        self.request.parameter(name).or_else(|| {
+            self.saved_request
+                .get_parameter_values(name)
+                .and_then(|v| v.first().map(|s| *s))
+        })
     }
 
     fn parameters(&self) -> Option<Vec<(&str, &str)>> {
+        self.request.parameters()
+    }
+
+    fn parameter_values(&self, name: &str) -> Option<Vec<&str>> {
+        let saved_request_params = self.saved_request.get_parameter_values(name);
+        let wrapped_request_params = self.request.parameter_values(name);
+        let saved_request_params = match saved_request_params {
+            Some(params) => params,
+            None => return wrapped_request_params,
+        };
+
+        let wrapped_request_params = match wrapped_request_params {
+            Some(params) => params,
+            None => return Some(saved_request_params),
+        };
+
+        // We want to add all parameters of the saved request *apart from* duplicates of
+        // those already added
         Some(
-            self.parameters
+            saved_request_params
                 .iter()
-                .flat_map(|(name, values)| {
-                    values
-                        .iter()
-                        .map(move |value| (name.as_str(), value.as_str()))
-                })
+                .filter(|s| !wrapped_request_params.contains(s))
+                .cloned()
                 .collect(),
         )
     }
 
-    fn parameter_values(&self, name: &str) -> Option<Vec<&str>> {
-        self.parameters
-            .get(name)
-            .map(|values| values.iter().map(String::as_str).collect())
+    fn content_type(&self) -> Option<&str> {
+        self.header(CONTENT_TYPE.as_str())
     }
 
     fn path(&self) -> &str {
-        self.uri.path()
+        self.request.path()
     }
 
     fn host(&self) -> Option<&str> {
-        self.uri.host()
+        self.request.host()
     }
 
     fn scheme(&self) -> Option<&str> {
-        self.uri.scheme().map(|scheme| scheme.as_str())
+        self.request.scheme()
     }
 
     fn server_port(&self) -> Option<u16> {
-        self.uri.port_u16()
+        self.request.server_port()
     }
 
     fn server_name(&self) -> Option<String> {
@@ -191,15 +179,26 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
         self.request.context_path()
     }
 
-    fn locale(&self) -> Option<&Locale> {
-        self.locales.first()
+    fn locale(&self) -> Option<Locale> {
+        Some(
+            self.saved_request
+                .get_locales()
+                .first()
+                .map(Clone::clone)
+                .unwrap_or(Locale::default()),
+        )
     }
 
-    fn locales(&self) -> Option<Vec<&Locale>> {
-        Some(self.locales.iter().collect())
+    fn locales(&self) -> Option<Vec<Locale>> {
+        let mut locales = self.saved_request.get_locales();
+        if locales.is_empty() {
+            locales.push(Locale::default());
+        }
+
+        Some(locales)
     }
 
-    fn get_attribute(&self, name: &str) -> Option<&next_web_core::anys::any_value::AnyValue> {
+    fn get_attribute(&self, name: &str) -> Option<&AnyValue> {
         self.request.get_attribute(name)
     }
 
@@ -207,7 +206,7 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
         self.request.remove_attribute(name);
     }
 
-    fn set_attribute(&mut self, name: &str, value: next_web_core::anys::any_value::AnyValue) {
+    fn set_attribute(&mut self, name: &str, value: AnyValue) {
         self.request.set_attribute(name, value);
     }
 
@@ -225,5 +224,9 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
 
     fn remote_addr(&self) -> Option<&std::net::SocketAddr> {
         self.request.remote_addr()
+    }
+
+    fn shared(&mut self) -> &HttpRequestShare {
+        self.request.shared()
     }
 }

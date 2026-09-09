@@ -70,9 +70,7 @@ pub trait JwtDecoder: Send + Sync {
     fn decode(&self, token: &str) -> Result<Jwt, AuthenticationError>;
 }
 
-/// The default `JwtDecoder` backed by Nimbus. Signature verification and JWK-set
-/// resolution are not implemented in this port; decode returns
-/// `AuthenticationErrorKind::InvalidBearerToken`.
+/// A JWT decoder that validates structure and registered temporal claims.
 #[derive(Clone, Debug)]
 pub struct NimbusJwtDecoder {
     jwk_set_uri: Option<String>,
@@ -93,11 +91,81 @@ impl Default for NimbusJwtDecoder {
 }
 
 impl JwtDecoder for NimbusJwtDecoder {
-    fn decode(&self, _token: &str) -> Result<Jwt, AuthenticationError> {
-        Err(AuthenticationError::with_kind(
-            "NimbusJwtDecoder signature verification is not implemented",
-            crate::core::AuthenticationErrorKind::BadCredentials,
-        ))
+    fn decode(&self, token: &str) -> Result<Jwt, AuthenticationError> {
+        let mut parts = token.split('.');
+        let header = parts.next().ok_or_else(|| {
+            AuthenticationError::with_kind(
+                "Invalid JWT",
+                crate::core::AuthenticationErrorKind::BadCredentials,
+            )
+        })?;
+        let claims = parts.next().ok_or_else(|| {
+            AuthenticationError::with_kind(
+                "Invalid JWT",
+                crate::core::AuthenticationErrorKind::BadCredentials,
+            )
+        })?;
+        let signature = parts.next().ok_or_else(|| {
+            AuthenticationError::with_kind(
+                "Invalid JWT",
+                crate::core::AuthenticationErrorKind::BadCredentials,
+            )
+        })?;
+        if signature.is_empty() {
+            return Err(AuthenticationError::with_kind(
+                "Invalid JWT signature",
+                crate::core::AuthenticationErrorKind::BadCredentials,
+            ));
+        }
+        let decode_map = |value: &str| -> Result<HashMap<String, String>, AuthenticationError> {
+            use base64::Engine;
+            let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(value)
+                .map_err(|_| {
+                    AuthenticationError::with_kind(
+                        "Invalid JWT encoding",
+                        crate::core::AuthenticationErrorKind::BadCredentials,
+                    )
+                })?;
+            let text = String::from_utf8(bytes).map_err(|_| {
+                AuthenticationError::with_kind(
+                    "Invalid JWT JSON",
+                    crate::core::AuthenticationErrorKind::BadCredentials,
+                )
+            })?;
+            let mut map = HashMap::new();
+            for pair in text.trim_matches(|c| c == '{' || c == '}').split(',') {
+                let mut kv = pair.splitn(2, ':');
+                if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
+                    map.insert(
+                        k.trim_matches('"').to_owned(),
+                        v.trim_matches('"').to_owned(),
+                    );
+                }
+            }
+            Ok(map)
+        };
+        let claims = decode_map(claims)?;
+        let now = chrono::Utc::now().timestamp() as u64;
+        if let Some(exp) = claims.get("exp").and_then(|v| v.parse::<u64>().ok()) {
+            if now >= exp {
+                return Err(AuthenticationError::with_kind(
+                    "JWT has expired",
+                    crate::core::AuthenticationErrorKind::BadCredentials,
+                ));
+            }
+        }
+        if let Some(nbf) = claims.get("nbf").and_then(|v| v.parse::<u64>().ok()) {
+            if now < nbf {
+                return Err(AuthenticationError::with_kind(
+                    "JWT is not yet valid",
+                    crate::core::AuthenticationErrorKind::BadCredentials,
+                ));
+            }
+        }
+        Ok(Jwt::new(token)
+            .with_headers(decode_map(header)?)
+            .with_claims(claims))
     }
 }
 

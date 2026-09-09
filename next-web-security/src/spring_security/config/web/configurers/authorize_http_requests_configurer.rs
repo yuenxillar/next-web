@@ -7,7 +7,8 @@ use next_web_context::ApplicationEventPublisher;
 use next_web_core::ApplicationContext;
 
 use crate::{
-    access::hierarchicalroles::NullRoleHierarchy, web::access::intercept::AuthorizationFilter,
+    access::hierarchicalroles::NullRoleHierarchy, authorization::AuthorizationDecision,
+    web::access::intercept::AuthorizationFilter,
 };
 use crate::{
     access::hierarchicalroles::RoleHierarchy,
@@ -42,8 +43,6 @@ where
 {
     registry: AuthorizationManagerRequestMatcherRegistry,
     publisher: Arc<dyn AuthorizationEventPublisher>,
-    authorization_manager_factory:
-        Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>>,
 
     base: BaseHttpConfigurer<Self, H>,
 }
@@ -54,7 +53,7 @@ where
 {
     /// Creates an instance.
     pub fn new(ctx: &mut ApplicationContext) -> Self {
-        let authorization_manager_factory = Self::get_authorization_manager_factory(ctx);
+        let authorization_manager_factory = get_authorization_manager_factory(ctx);
         let mut registry =
             AuthorizationManagerRequestMatcherRegistry::with_authorization_manager_factory(
                 authorization_manager_factory.clone(),
@@ -69,7 +68,6 @@ where
         Self {
             registry,
             publisher,
-            authorization_manager_factory,
 
             base: Default::default(),
         }
@@ -94,12 +92,6 @@ where
                     as Arc<dyn AuthorizationEventPublisher>
             })
             .expect("No ApplicationEventPublisher found")
-    }
-
-    fn get_authorization_manager_factory(
-        ctx: &mut ApplicationContext,
-    ) -> Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>> {
-        get_authorization_manager_factory(ctx)
     }
 
     pub fn registry(&self) -> &AuthorizationManagerRequestMatcherRegistry {
@@ -482,8 +474,13 @@ impl AuthorizedUrl {
     }
 
     /// Specify that a path variable in URL to be compared.
-    pub fn has_variable<'a>(&mut self, variable: &'a str) -> AuthorizedUrlVariable<'a> {
-        AuthorizedUrlVariable::new(variable)
+    pub fn has_variable(&mut self, variable: &str) -> AuthorizedUrlVariable {
+        AuthorizedUrlVariable::new(
+            variable,
+            self.matchers.clone(),
+            self.registry.clone(),
+            self.not,
+        )
     }
 
     /// Allows specifying a custom [`AuthorizationManager`].
@@ -508,55 +505,103 @@ impl AuthorizedUrl {
 }
 
 /// An object that allows configuring RequestMatchers with URI path variables
-pub struct AuthorizedUrlVariable<'a> {
+pub struct AuthorizedUrlVariable {
     /// The name of the path variable to compare.
-    variable: &'a str,
+    variable: String,
+    matchers: Vec<Arc<dyn RequestMatcher>>,
+    registry: AuthorizationManagerRequestMatcherRegistry,
+    not: bool,
 }
 
-impl<'a> AuthorizedUrlVariable<'a> {
+impl AuthorizedUrlVariable {
     /// Creates a new `AuthorizedUrlVariable` instance.
     ///
     /// This is typically called by [`AuthorizedUrl::has_variable`].
-    pub fn new(variable: &'a str) -> Self {
-        Self { variable }
+    pub fn new(
+        variable: &str,
+        matchers: Vec<Arc<dyn RequestMatcher>>,
+        registry: AuthorizationManagerRequestMatcherRegistry,
+        not: bool,
+    ) -> Self {
+        Self {
+            variable: variable.to_string(),
+            matchers,
+            registry,
+            not,
+        }
     }
 
-    // /// Compares the value of a path variable in the URI with an `Authentication` attribute.
-    // ///
-    // /// This method takes a function that extracts a value from the `Authentication`
-    // /// object and compares it with the path variable value extracted from the
-    // /// request context.
-    // ///
-    // /// # Type Parameters
-    // /// * `F` - The function type that maps `Authentication` to `String`.
-    // ///
-    // /// # Arguments
-    // /// * `function` - A function that extracts a `String` value from `Authentication`.
-    // ///
-    // /// # Returns
-    // /// Returns a mutable reference to the parent [`AuthorizationManagerRequestMatcherRegistry`]
-    // /// for further customization.
-    // ///
-    // /// # Example
-    // /// ```rust
-    // /// # use authorize_http_requests_configurer::*;
-    // /// registry
-    // ///     .request_matchers(&["/user/{username}"])
-    // ///     .has_variable("username")
-    // ///     .equal_to(|auth| auth.name().to_string());
-    // /// ```
-    // pub fn equal_to<'b, F>(
-    //     &'a mut self,
-    //     function: F,
-    // ) -> &'a mut AuthorizationManagerRequestMatcherRegistry
-    // where
-    //     F: Fn(&'b dyn crate::core::Authentication) -> &'b str,
-    // {
-    //     // let value = function();
-    //     // let value1 = "";
-    //     // // AuthorizationDecision::new(value1 == value)
-    //     // self.registry
-    // }
+    /// Compares the value of a path variable in the URI with an `Authentication` attribute.
+    ///
+    /// This method takes a function that extracts a value from the `Authentication`
+    /// object and compares it with the path variable value extracted from the
+    /// request context.
+    ///
+    /// # Type Parameters
+    /// * `F` - The function type that maps `Authentication` to `String`.
+    ///
+    /// # Arguments
+    /// * `function` - A function that extracts a `String` value from `Authentication`.
+    ///
+    /// # Returns
+    /// Returns a mutable reference to the parent [`AuthorizationManagerRequestMatcherRegistry`]
+    /// for further customization.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use authorize_http_requests_configurer::*;
+    /// registry
+    ///     .request_matchers(&["/user/{username}"])
+    ///     .has_variable("username")
+    ///     .equal_to(|auth| auth.name().to_string());
+    /// ```
+    pub fn equal_to<F>(self, func: F) -> AuthorizationManagerRequestMatcherRegistry
+    where
+        F: Fn(&dyn crate::core::Authentication) -> String + Send + Sync + 'static,
+    {
+        let manager: Arc<dyn AuthorizationManager<RequestAuthorizationContext>> =
+            Arc::new(PathVariableAuthorizationManager {
+                variable: self.variable,
+                value: Arc::new(func),
+            });
+        let manager = if self.not {
+            Arc::new(AuthorizationManagers::not(manager))
+                as Arc<dyn AuthorizationManager<RequestAuthorizationContext>>
+        } else {
+            manager
+        };
+        for matcher in self.matchers {
+            add_mapping(matcher, manager.clone(), &self.registry.state);
+        }
+        self.registry
+    }
+}
+
+struct PathVariableAuthorizationManager<F> {
+    variable: String,
+    value: Arc<F>,
+}
+
+#[next_web_core::async_trait]
+impl<F> AuthorizationManager<RequestAuthorizationContext> for PathVariableAuthorizationManager<F>
+where
+    F: Fn(&dyn crate::core::Authentication) -> String + Send + Sync + 'static,
+{
+    async fn authorize(
+        &self,
+        authentication: &dyn crate::core::Authentication,
+        context: &RequestAuthorizationContext,
+    ) -> Result<
+        Option<Arc<dyn crate::authorization::AuthorizationResult>>,
+        next_web_core::error::BoxError,
+    > {
+        let expected = (self.value)(authentication);
+        let granted = context
+            .variables()
+            .and_then(|v| v.get(&self.variable).cloned())
+            .is_some_and(|actual| actual == expected);
+        Ok(Some(Arc::new(AuthorizationDecision::new(granted))))
+    }
 }
 
 fn add_mapping(

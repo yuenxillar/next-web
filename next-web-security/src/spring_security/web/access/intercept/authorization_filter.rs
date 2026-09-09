@@ -52,7 +52,7 @@ impl AuthorizationFilter {
         match self
             .security_context_holder_strategy
             .get_context()
-            .and_then(|ctx| ctx.get_authentication().cloned())
+            .get_authentication()
         {
             Some(authentication) => Ok(authentication),
             None => Err("An Authentication object was not found in the SecurityContext"),

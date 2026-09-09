@@ -44,10 +44,7 @@ impl AnonymousAuthenticationFilter {
     ) -> Self {
         let security_context_holder_strategy = SecurityContextHolder::get_context_holder_strategy();
         let key = key.into();
-        assert!(
-            StringUtils::has_text(key.as_str()),
-            "key cannot be null or empty"
-        );
+        assert!(StringUtils::has_text(key.as_str()), "key cannot be  empty");
 
         Self {
             key,
@@ -86,7 +83,7 @@ impl AnonymousAuthenticationFilter {
     fn default_with_anonymous(
         &self,
         req: &dyn HttpRequest,
-        current_context: Option<Arc<dyn SecurityContext>>,
+        current_context: Arc<dyn SecurityContext>,
     ) -> Arc<dyn SecurityContext> {
         let anonymous_context = || {
             let anonymous = self.create_authentication(req);
@@ -98,15 +95,12 @@ impl AnonymousAuthenticationFilter {
             anonymous_context
         };
 
-        match current_context
-            .as_ref()
-            .and_then(|ctx| ctx.get_authentication())
-        {
+        match current_context.get_authentication() {
             Some(_auth) => trace!("Did not set SecurityContextHolder since already authenticated."),
             None => return anonymous_context(),
         };
 
-        current_context.unwrap_or_else(anonymous_context)
+        current_context
     }
 
     pub fn create_authentication(&self, request: &dyn HttpRequest) -> Arc<dyn Authentication> {
@@ -157,13 +151,9 @@ impl HttpFilter for AnonymousAuthenticationFilter {
     ) -> Result<(), FilterError> {
         let current_context = self
             .default_with_anonymous(request, self.security_context_holder_strategy.get_context());
-
         self.security_context_holder_strategy
-            .scope_with_context(
-                current_context,
-                Box::pin(filter_chain.do_filter(request, response)),
-            )
-            .await
+            .set_context(current_context);
+        filter_chain.do_filter(request, response).await
     }
 }
 

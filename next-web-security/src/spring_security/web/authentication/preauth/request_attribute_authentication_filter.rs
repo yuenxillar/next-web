@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
-    error::BoxError,
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
@@ -13,30 +12,40 @@ use next_web_core::{
 
 use crate::{
     authorization::AuthenticationManager,
+    core::{AuthenticationError, AuthenticationErrorKind},
     web::authentication::preauth::{
-        base_pre_authenticated_processing_filter::{
-            BasePreAuthenticatedProcessingFilterSupport, NEXT_SECURITY_REQUEST_ATTRIBUTES,
-        },
+        base_pre_authenticated_processing_filter::BasePreAuthenticatedProcessingFilter,
         pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
-        pre_authenticated_credentials_not_found_exception::pre_authenticated_credentials_not_found,
     },
 };
 
+/// A simple pre-authenticated filter which obtains the username from request attributes, for use with
+///  SSO systems such as Stanford WebAuth   or Shibboleth  .
+///
+/// As with most pre-authenticated scenarios, it is essential that the external authentication system
+/// is set up correctly as this filter does no authentication whatsoever.
+///
+/// The property principalEnvironmentVariable is the name of the request attribute that contains the username.
+/// It defaults to "REMOTE_USER" for compatibility with WebAuth and Shibboleth.
+///
+/// If the environment variable is missing from the request, getPreAuthenticatedPrincipal will throw an exception.
+/// You can override this behaviour by setting the exceptionIfVariableMissing property
 #[derive(Clone)]
 pub struct RequestAttributeAuthenticationFilter {
-    support: BasePreAuthenticatedProcessingFilterSupport,
     principal_environment_variable: String,
     credentials_environment_variable: Option<String>,
     exception_if_variable_missing: bool,
+
+    base: BasePreAuthenticatedProcessingFilter,
 }
 
 impl RequestAttributeAuthenticationFilter {
     pub fn new(authentication_manager: Arc<dyn AuthenticationManager>) -> Self {
         Self {
-            support: BasePreAuthenticatedProcessingFilterSupport::new(authentication_manager),
             principal_environment_variable: String::from("REMOTE_USER"),
             credentials_environment_variable: None,
             exception_if_variable_missing: true,
+            base: BasePreAuthenticatedProcessingFilter::new(authentication_manager),
         }
     }
 
@@ -74,10 +83,13 @@ impl RequestAttributeAuthenticationFilter {
     ) -> Result<Option<String>, crate::core::AuthenticationError> {
         let principal = request_attribute(request, &self.principal_environment_variable);
         if principal.is_none() && self.exception_if_variable_missing {
-            return Err(pre_authenticated_credentials_not_found(format!(
-                "{} variable not found in request.",
-                self.principal_environment_variable
-            )));
+            return Err(AuthenticationError::with_kind(
+                format!(
+                    "{} variable not found in request.",
+                    self.principal_environment_variable
+                ),
+                AuthenticationErrorKind::BadCredentials,
+            ));
         }
         Ok(principal)
     }
@@ -96,11 +108,11 @@ impl HttpFilter for RequestAttributeAuthenticationFilter {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        filter_chain: &dyn HttpFilterChain,
+        _filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
         let principal = match self.pre_authenticated_principal(request) {
             Ok(principal) => principal,
-            Err(error) => return Err(FilterError::Chain(Box::new(error))),
+            Err(error) => return Err(FilterError::from(error)),
         };
         let Some(principal) = principal else {
             return Ok(());
@@ -110,7 +122,11 @@ impl HttpFilter for RequestAttributeAuthenticationFilter {
             Some(principal),
             self.pre_authenticated_credentials(request),
         );
-        let _ = self.support.authenticate(request, response, &token)?;
+        let _ = self
+            .base
+            .authenticate(request, response, &token)
+            .await
+            .map_err(FilterError::from)?;
         Ok(())
     }
 }

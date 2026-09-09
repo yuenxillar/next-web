@@ -1,27 +1,26 @@
 use std::{fmt, ops::Deref, ops::DerefMut, sync::Arc};
 
 use next_web_core::{
-    async_trait, http::StatusCode, filter::FilterError, traits::required::Required,
+    async_trait,
+    error::BoxError,
+    filter::FilterError,
+    http::StatusCode,
     traits::filter::{HttpFilter, HttpFilterChain},
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
-    traits::named::Named, error::BoxError,
+    traits::named::Named,
+    traits::required::Required,
 };
 
 use crate::{
     config::{
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
-        web::{
-            configurers::BaseHttpConfigurer,
-            HttpSecurityBuilder,
-        },
+        web::{configurers::BaseHttpConfigurer, HttpSecurityBuilder},
     },
     core::AuthenticationError,
     web::{
-        access::AccessDeniedHandler,
-        authentication::AuthenticationFailureHandler,
-        default_security_filter_chain::DefaultSecurityFilterChain,
-        AuthenticationEntryPoint,
+        access::AccessDeniedHandler, authentication::AuthenticationFailureHandler,
+        default_security_filter_chain::DefaultSecurityFilterChain, AuthenticationEntryPoint,
     },
 };
 
@@ -41,9 +40,8 @@ impl AuthenticationEntryPoint for BearerTokenAuthenticationEntryPoint {
     ) -> Result<(), BoxError> {
         response.set_status_code(StatusCode::UNAUTHORIZED);
         let error_description = auth_error.to_string();
-        let header_value = format!(
-            "Bearer error=\"invalid_token\", error_description=\"{error_description}\""
-        );
+        let header_value =
+            format!("Bearer error=\"invalid_token\", error_description=\"{error_description}\"");
         response.insert_header("WWW-Authenticate", header_value.as_str());
         response.set_body(Vec::new());
         Ok(())
@@ -145,10 +143,7 @@ impl HttpFilter for OAuth2ProtectedResourceMetadataFilter {
                 .unwrap_or_default();
             let body = format!(
                 "{{\n  \"resource_id\": \"{}\",\n  \"authorization_servers\": [{}]{}\n}}",
-                self.metadata
-                    .resource_id()
-                    .cloned()
-                    .unwrap_or_default(),
+                self.metadata.resource_id().cloned().unwrap_or_default(),
                 servers,
                 jwk
             );
@@ -242,15 +237,11 @@ where
     H: HttpSecurityBuilder<H>,
     H: crate::config::security_builder::SecurityBuilder<DefaultSecurityFilterChain>,
 {
-    fn get_object(
-        &self,
-    ) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base.get_mut_object()
     }
 }
@@ -351,21 +342,16 @@ where
     H: HttpSecurityBuilder<H>,
     H: crate::config::security_builder::SecurityBuilder<DefaultSecurityFilterChain>,
 {
-    fn get_object(
-        &self,
-    ) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_object(&self) -> &SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base.get_object()
     }
 
-    fn get_mut_object(
-        &mut self,
-    ) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
+    fn get_mut_object(&mut self) -> &mut SecurityConfigurerAdapter<DefaultSecurityFilterChain, H> {
         self.base.get_mut_object()
     }
 }
 
-impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H>
-    for ProtectedResourceMetadataConfigurer<H>
+impl<H> SecurityConfigurer<DefaultSecurityFilterChain, H> for ProtectedResourceMetadataConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
     H: crate::config::security_builder::SecurityBuilder<DefaultSecurityFilterChain>,
@@ -373,7 +359,9 @@ where
     fn init(&mut self, _http: &mut H) {}
 
     fn configure(&mut self, http: &mut H) {
-        http.add_filter(OAuth2ProtectedResourceMetadataFilter::new(self.metadata.clone()));
+        http.add_filter(OAuth2ProtectedResourceMetadataFilter::new(
+            self.metadata.clone(),
+        ));
     }
 }
 

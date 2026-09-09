@@ -56,22 +56,16 @@ impl HttpFilter for SecurityContextHolderFilter {
 
         request.set_attribute(Self::FILTER_APPLIED, AnyValue::Boolean(true));
 
-        let mut context = self
+        let context = self
             .security_context_repository
             .load_deferred_context(request);
-
         self.security_context_holder_strategy
-            .scope_with_context(
-                context.get().unwrap(),
-                Box::pin(async {
-                    filter_chain.do_filter(request, response).await?;
-                    self.security_context_holder_strategy.clear_context();
-                    request.remove_attribute(Self::FILTER_APPLIED);
+            .set_deferred_context(Arc::new(move || context.get()));
 
-                    Ok(())
-                }),
-            )
-            .await
+        let result = filter_chain.do_filter(request, response).await;
+        self.security_context_holder_strategy.clear_context();
+        request.remove_attribute(Self::FILTER_APPLIED);
+        result
     }
 }
 

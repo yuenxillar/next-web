@@ -43,6 +43,7 @@ next-web-ip             = { path = "../next-web-ip", version = "0.1.0" }
 next-web-document       = { path = "../next-web-document", version = "0.1.0", features = [] }
 next-web-retry          = { path = "../next-web-retry", version = "*"}
 next-web-pay-alipay     = { path = "../next-web-pay/next-web-pay-alipay", version = "*" }
+next-web-context        = { path = "../next-web-context", version = "*" }
 
 [features]
 enable-api-doc = ["next-web/enable-api-doc"]

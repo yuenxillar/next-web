@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use crate::oauth2::client::oidc_back_channel_logout::OidcLogoutToken;
 
@@ -45,7 +48,8 @@ pub trait OidcSessionRegistry: Send + Sync {
 
     /// Removes and returns the session information identified by the given
     /// client session id.
-    fn remove_session_information(&self, client_session_id: &str) -> Option<OidcSessionInformation>;
+    fn remove_session_information(&self, client_session_id: &str)
+        -> Option<OidcSessionInformation>;
 
     /// Removes and returns every session information whose `sid` or `sub` matches
     /// the supplied logout token.
@@ -75,7 +79,10 @@ impl OidcSessionRegistry for InMemoryOidcSessionRegistry {
         }
     }
 
-    fn remove_session_information(&self, client_session_id: &str) -> Option<OidcSessionInformation> {
+    fn remove_session_information(
+        &self,
+        client_session_id: &str,
+    ) -> Option<OidcSessionInformation> {
         match self.sessions.lock() {
             Ok(mut sessions) => sessions.remove(client_session_id),
             Err(_) => None,

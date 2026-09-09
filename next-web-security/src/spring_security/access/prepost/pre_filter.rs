@@ -16,4 +16,30 @@ impl PreFilter {
             filter_target: filter_target.into(),
         }
     }
+
+    pub fn expression(&self) -> &str {
+        &self.expression
+    }
+    pub fn value(&self) -> &str {
+        &self.expression
+    }
+    pub fn filter_target(&self) -> &str {
+        &self.filter_target
+    }
+    pub fn set_expression(&mut self, expression: impl Into<String>) {
+        self.expression = expression.into();
+    }
+    pub fn set_filter_target(&mut self, target: impl Into<String>) {
+        self.filter_target = target.into();
+    }
+
+    pub fn has_filter_target(&self) -> bool {
+        !self.filter_target.trim().is_empty()
+    }
+}
+
+impl super::PrePostExpressionAttribute for PreFilter {
+    fn expression(&self) -> &str {
+        &self.expression
+    }
 }

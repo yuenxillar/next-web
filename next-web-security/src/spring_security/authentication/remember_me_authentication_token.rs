@@ -28,10 +28,7 @@ impl RememberMeAuthenticationToken {
     ) -> Self {
         assert!(!key.as_ref().trim().is_empty(), "Key cannot be empty");
         assert!(
-            !principal
-                .as_ref()
-                .downcast_ref::<String>()
-                .map_or(false, |s| s.trim().is_empty()),
+            !principal.to_string().trim().is_empty(),
             "Principal cannot be empty"
         );
 
@@ -115,7 +112,7 @@ impl Principal for RememberMeAuthenticationToken {
     }
 }
 
-impl std::fmt::Display for RememberMeAuthenticationToken {
+impl std::fmt::Debug for RememberMeAuthenticationToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

@@ -11,7 +11,7 @@ mod media_type;
 
 pub use axum::http::{
     HeaderMap, HeaderName, HeaderValue, Method as HttpMethod, StatusCode, Uri,
-    Version as HttpVersion,
+    Version as HttpVersion, header,
 };
 pub use cookie::{Cookie, CookieBuilder, CookieError, CookieValidationError, SameSite};
 pub use http_filter_chain_share::HttpFilterChainShare;

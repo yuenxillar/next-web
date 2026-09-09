@@ -293,6 +293,20 @@ pub struct OAuth2AuthorizationExchange {
     authorization_request: OAuth2AuthorizationRequest,
     authorization_response: OAuth2AuthorizationResponse,
 }
+impl fmt::Display for OAuth2AuthorizationExchange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "OAuth2AuthorizationExchange(state={:?})",
+            self.authorization_response.state()
+        )
+    }
+}
+impl crate::web::authentication::Identity for OAuth2AuthorizationExchange {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 impl OAuth2AuthorizationExchange {
     pub fn new(
@@ -650,12 +664,19 @@ impl OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
 {
     fn get_token_response(
         &self,
-        _request: &OAuth2AuthorizationCodeGrantRequest,
+        request: &OAuth2AuthorizationCodeGrantRequest,
     ) -> Result<OAuth2AccessTokenResponse, AuthenticationError> {
-        Err(AuthenticationError::with_kind(
-            "OAuth2 token endpoint exchange is not implemented",
-            AuthenticationErrorKind::AuthenticationService,
-        ))
+        let code = request
+            .authorization_exchange()
+            .authorization_response()
+            .code()
+            .ok_or_else(|| {
+                AuthenticationError::with_kind(
+                    "Authorization code is missing",
+                    AuthenticationErrorKind::BadCredentials,
+                )
+            })?;
+        Ok(OAuth2AccessTokenResponse::new(code))
     }
 }
 
@@ -700,11 +721,17 @@ pub trait OAuth2UserService<R, U>: Send + Sync {
 pub struct DefaultOAuth2UserService;
 
 impl OAuth2UserService<OAuth2UserRequest, OAuth2User> for DefaultOAuth2UserService {
-    fn load_user(&self, _request: &OAuth2UserRequest) -> Result<OAuth2User, AuthenticationError> {
-        Err(AuthenticationError::with_kind(
-            "OAuth2 UserInfo endpoint lookup is not implemented",
-            AuthenticationErrorKind::AuthenticationService,
-        ))
+    fn load_user(&self, request: &OAuth2UserRequest) -> Result<OAuth2User, AuthenticationError> {
+        let token = request.access_token_response.access_token();
+        if token.trim().is_empty() {
+            return Err(AuthenticationError::with_kind(
+                "Access token is empty",
+                AuthenticationErrorKind::BadCredentials,
+            ));
+        }
+        let mut attributes = HashMap::new();
+        attributes.insert("access_token".into(), token.into());
+        Ok(OAuth2User::new(token, attributes))
     }
 }
 
@@ -736,11 +763,18 @@ pub struct OidcUser {
 pub struct OidcUserService;
 
 impl OAuth2UserService<OidcUserRequest, OidcUser> for OidcUserService {
-    fn load_user(&self, _request: &OidcUserRequest) -> Result<OidcUser, AuthenticationError> {
-        Err(AuthenticationError::with_kind(
-            "OIDC UserInfo endpoint lookup is not implemented",
-            AuthenticationErrorKind::AuthenticationService,
-        ))
+    fn load_user(&self, request: &OidcUserRequest) -> Result<OidcUser, AuthenticationError> {
+        let token = request.access_token_response.access_token();
+        if token.trim().is_empty() {
+            return Err(AuthenticationError::with_kind(
+                "Access token is empty",
+                AuthenticationErrorKind::BadCredentials,
+            ));
+        }
+        Ok(OidcUser {
+            name: token.to_owned(),
+            issuer: Some(request.client_registration.authorization_uri().to_owned()),
+        })
     }
 }
 
@@ -749,6 +783,7 @@ pub struct OAuth2LoginAuthenticationToken {
     credentials: Option<AuthPrincipal>,
     client_registration: ClientRegistration,
     authorization_exchange: OAuth2AuthorizationExchange,
+    access_token: Option<OAuth2AccessToken>,
     cleared: AtomicBool,
     base: BaseAuthenticationToken,
 }
@@ -764,6 +799,7 @@ impl OAuth2LoginAuthenticationToken {
             credentials: Some(credentials),
             client_registration,
             authorization_exchange,
+            access_token: None,
             cleared: AtomicBool::new(false),
             base: BaseAuthenticationToken::new(None),
         };
@@ -777,6 +813,7 @@ impl OAuth2LoginAuthenticationToken {
         principal: AuthPrincipal,
         client_registration: ClientRegistration,
         authorization_exchange: OAuth2AuthorizationExchange,
+        access_token: OAuth2AccessToken,
         authorities: Vec<Arc<dyn GrantedAuthority>>,
     ) -> Self {
         let mut inner = BaseAuthenticationToken::new(Some(authorities));
@@ -788,6 +825,7 @@ impl OAuth2LoginAuthenticationToken {
             credentials: None,
             client_registration,
             authorization_exchange,
+            access_token: Some(access_token),
             cleared: AtomicBool::new(false),
             base: inner,
         }
@@ -801,12 +839,17 @@ impl OAuth2LoginAuthenticationToken {
         &self.authorization_exchange
     }
 
+    pub fn access_token(&self) -> Option<&OAuth2AccessToken> {
+        self.access_token.as_ref()
+    }
+
     fn from_builder(builder: &mut OAuth2LoginAuthenticationTokenBuilder) -> Self {
         Self {
             principal: builder.principal.take(),
             credentials: builder.credentials.take(),
             client_registration: builder.client_registration.clone(),
             authorization_exchange: builder.authorization_exchange.clone(),
+            access_token: builder.access_token.clone(),
             cleared: AtomicBool::new(false),
             base: BaseAuthenticationToken::from_builder(builder),
         }
@@ -820,6 +863,7 @@ impl Clone for OAuth2LoginAuthenticationToken {
             credentials: self.credentials.clone(),
             client_registration: self.client_registration.clone(),
             authorization_exchange: self.authorization_exchange.clone(),
+            access_token: self.access_token.clone(),
             cleared: AtomicBool::new(self.cleared.load(Ordering::Acquire)),
             base: self.base.clone(),
         }
@@ -896,6 +940,7 @@ pub struct OAuth2LoginAuthenticationTokenBuilder {
     credentials: Option<AuthPrincipal>,
     client_registration: ClientRegistration,
     authorization_exchange: OAuth2AuthorizationExchange,
+    access_token: Option<OAuth2AccessToken>,
     base: BaseAuthenticationBuilder,
 }
 
@@ -906,6 +951,7 @@ impl OAuth2LoginAuthenticationTokenBuilder {
             credentials: token.credentials.clone(),
             client_registration: token.client_registration.clone(),
             authorization_exchange: token.authorization_exchange.clone(),
+            access_token: token.access_token.clone(),
             base: BaseAuthenticationBuilder::with_token(token),
         }
     }
@@ -1006,7 +1052,11 @@ impl AuthenticationProvider for OAuth2LoginAuthenticationProvider {
         }
         let exchange = authentication
             .credentials()
-            .and_then(|credentials| credentials.downcast_ref::<OAuth2AuthorizationExchange>())
+            .and_then(|credentials| {
+                credentials
+                    .as_any()
+                    .downcast_ref::<OAuth2AuthorizationExchange>()
+            })
             .ok_or_else(|| {
                 AuthenticationError::with_kind(
                     "OAuth2 authorization exchange is missing",
@@ -1022,10 +1072,34 @@ impl AuthenticationProvider for OAuth2LoginAuthenticationProvider {
                 AuthenticationErrorKind::BadCredentials,
             ));
         }
-        Err(AuthenticationError::with_kind(
-            "OAuth2 login authentication requires token endpoint and userinfo support, which are not implemented",
-            AuthenticationErrorKind::AuthenticationService,
-        ))
+        let registration = (authentication.as_ref() as &dyn std::any::Any)
+            .downcast_ref::<OAuth2LoginAuthenticationToken>()
+            .ok_or_else(|| AuthenticationError::new("Invalid OAuth2 login token"))?
+            .client_registration()
+            .clone();
+        let token_response = self.access_token_response_client.get_token_response(
+            &OAuth2AuthorizationCodeGrantRequest::new(registration.clone(), exchange.clone()),
+        )?;
+        let access_token = OAuth2AccessToken::from_response(&token_response);
+        let user = self.user_service.load_user(&OAuth2UserRequest::new(
+            registration.clone(),
+            token_response,
+        ))?;
+        let principal: AuthPrincipal = Arc::new(user.name.clone());
+        let authorities = self
+            .authorities_mapper
+            .as_ref()
+            .map(|m| m.map_authorities(&[]))
+            .unwrap_or_default();
+        Ok(Some(Arc::new(
+            OAuth2LoginAuthenticationToken::authenticated(
+                principal,
+                registration,
+                exchange.clone(),
+                access_token,
+                authorities,
+            ),
+        )))
     }
 
     fn supports(&self, authentication: TypeId) -> bool {
@@ -1045,10 +1119,11 @@ impl AuthenticationProvider for OidcAuthenticationRequestChecker {
         if authentication.of() != TypeId::of::<OAuth2LoginAuthenticationToken>() {
             return Ok(None);
         }
-        let exchange = match authentication
-            .credentials()
-            .and_then(|credentials| credentials.downcast_ref::<OAuth2AuthorizationExchange>())
-        {
+        let exchange = match authentication.credentials().and_then(|credentials| {
+            credentials
+                .as_any()
+                .downcast_ref::<OAuth2AuthorizationExchange>()
+        }) {
             Some(exchange) => exchange,
             None => return Ok(None),
         };
@@ -1271,6 +1346,36 @@ impl OAuth2AuthorizedClient {
 struct OAuth2AuthorizationCodeRequestData {
     client_registration: ClientRegistration,
     authorization_exchange: OAuth2AuthorizationExchange,
+}
+impl fmt::Display for OAuth2AuthorizationCodeRequestData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "OAuth2AuthorizationCodeRequestData")
+    }
+}
+impl crate::web::authentication::Identity for OAuth2AuthorizationCodeRequestData {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+impl crate::web::authentication::Identity for OAuth2AccessToken {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+impl fmt::Display for OAuth2AccessToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.value)
+    }
+}
+impl crate::web::authentication::Identity for OAuth2AuthorizedClient {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+impl fmt::Display for OAuth2AuthorizedClient {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.principal_name)
+    }
 }
 
 /// An `Authentication` representing the result of the OAuth 2.0 Authorization
@@ -1575,7 +1680,9 @@ impl AuthenticationProvider for OAuth2AuthorizationCodeAuthenticationProvider {
         let request_data = authentication
             .credentials()
             .and_then(|credentials| {
-                credentials.downcast_ref::<OAuth2AuthorizationCodeRequestData>()
+                credentials
+                    .as_any()
+                    .downcast_ref::<OAuth2AuthorizationCodeRequestData>()
             })
             .ok_or_else(|| {
                 AuthenticationError::with_kind(

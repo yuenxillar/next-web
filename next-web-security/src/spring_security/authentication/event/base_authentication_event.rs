@@ -1,6 +1,10 @@
-use std::{ops::Deref, sync::Arc};
+use std::{
+    any::{Any, TypeId},
+    ops::Deref,
+    sync::Arc,
+};
 
-use next_web_context::EventAttributes;
+use next_web_context::{ApplicationEvent, EventAttributes};
 
 use crate::core::Authentication;
 
@@ -17,10 +21,25 @@ impl BaseAuthenticationEvent {
     }
 
     pub fn authentication(&self) -> &Arc<dyn Authentication> {
-        self.base
-            .source()
-            .downcast_ref::<Arc<dyn Authentication>>()
-            .unwrap()
+        self.base.value()
+    }
+}
+
+impl ApplicationEvent for BaseAuthenticationEvent {
+    fn timestamp(&self) -> u64 {
+        self.base.timestamp()
+    }
+
+    fn source(&self) -> &dyn Any {
+        self.base.source()
+    }
+
+    fn event_type(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+
+    fn source_type(&self) -> TypeId {
+        self.base.source_type()
     }
 }
 

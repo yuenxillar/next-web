@@ -12,16 +12,16 @@ use next_web_core::{
 
 use crate::{
     authorization::AuthenticationManager,
+    core::{AuthenticationError, AuthenticationErrorKind},
     web::authentication::preauth::{
-        base_pre_authenticated_processing_filter::BasePreAuthenticatedProcessingFilterSupport,
+        base_pre_authenticated_processing_filter::BasePreAuthenticatedProcessingFilter,
         pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
-        pre_authenticated_credentials_not_found_exception::pre_authenticated_credentials_not_found,
     },
 };
 
 #[derive(Clone)]
 pub struct RequestHeaderAuthenticationFilter {
-    support: BasePreAuthenticatedProcessingFilterSupport,
+    support: BasePreAuthenticatedProcessingFilter,
     principal_request_header: String,
     credentials_request_header: Option<String>,
     exception_if_header_missing: bool,
@@ -30,7 +30,7 @@ pub struct RequestHeaderAuthenticationFilter {
 impl RequestHeaderAuthenticationFilter {
     pub fn new(authentication_manager: Arc<dyn AuthenticationManager>) -> Self {
         Self {
-            support: BasePreAuthenticatedProcessingFilterSupport::new(authentication_manager),
+            support: BasePreAuthenticatedProcessingFilter::new(authentication_manager),
             principal_request_header: String::from("SM_USER"),
             credentials_request_header: None,
             exception_if_header_missing: true,
@@ -70,10 +70,13 @@ impl RequestHeaderAuthenticationFilter {
             .header(&self.principal_request_header)
             .map(ToOwned::to_owned);
         if principal.is_none() && self.exception_if_header_missing {
-            return Err(pre_authenticated_credentials_not_found(format!(
-                "{} header not found in request.",
-                self.principal_request_header
-            )));
+            return Err(AuthenticationError::with_kind(
+                format!(
+                    "{} header not found in request.",
+                    self.principal_request_header
+                ),
+                AuthenticationErrorKind::BadCredentials,
+            ));
         }
         Ok(principal)
     }
@@ -93,11 +96,11 @@ impl HttpFilter for RequestHeaderAuthenticationFilter {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        filter_chain: &dyn HttpFilterChain,
+        _filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
         let principal = match self.pre_authenticated_principal(request) {
             Ok(principal) => principal,
-            Err(error) => return Err(FilterError::Chain(Box::new(error))),
+            Err(error) => return Err(FilterError::from(error)),
         };
         let Some(principal) = principal else {
             return Ok(());
@@ -107,7 +110,11 @@ impl HttpFilter for RequestHeaderAuthenticationFilter {
             Some(principal),
             self.pre_authenticated_credentials(request),
         );
-        let _ = self.support.authenticate(request, response, &token)?;
+        let _ = self
+            .support
+            .authenticate(request, response, &token)
+            .await
+            .map_err(FilterError::from)?;
         Ok(())
     }
 }

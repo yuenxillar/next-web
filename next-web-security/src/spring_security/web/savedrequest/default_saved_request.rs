@@ -49,10 +49,7 @@ impl DefaultSavedRequest {
     ) -> Self {
         let mut saved = Self {
             cookies: request.cookies().map(ToOwned::to_owned).unwrap_or_default(),
-            locales: request
-                .locales()
-                .map(|locales| locales.into_iter().copied().collect())
-                .unwrap_or_default(),
+            locales: request.locales().unwrap_or_default(),
             headers: HashMap::new(),
             parameters: HashMap::new(),
             context_path: request.context_path().map(ToOwned::to_owned),
@@ -196,27 +193,30 @@ impl SavedRequest for DefaultSavedRequest {
         self.cookies.clone()
     }
 
-    fn get_method(&self) -> String {
-        self.method.clone()
+    fn get_method(&self) -> &str {
+        self.method.as_str()
     }
 
-    fn get_header_values(&self, name: &str) -> Vec<String> {
+    fn get_header_values(&self, name: &str) -> Vec<&str> {
         self.headers
-            .get(&name.to_ascii_lowercase())
-            .cloned()
+            .get(&name.to_ascii_lowercase()) // Option<&Vec<String>>
+            .map(|v| v.iter().map(|s| s.as_str()).collect())
             .unwrap_or_default()
     }
 
-    fn get_header_names(&self) -> Vec<String> {
-        self.headers.keys().cloned().collect()
+    fn get_header_names(&self) -> Vec<&str> {
+        self.headers.keys().map(|s| s.as_str()).collect()
     }
 
     fn get_locales(&self) -> Vec<Locale> {
-        self.locales.clone()
+        self.locales.to_vec()
     }
 
-    fn get_parameter_values(&self, name: &str) -> Vec<String> {
-        self.parameters.get(name).cloned().unwrap_or_default()
+    fn get_parameter_values(&self, name: &str) -> Option<Vec<&str>> {
+        self.parameters
+            .get(name)
+            .map(|v| v.as_slice())
+            .map(|v| v.iter().map(|s| s.as_str()).collect())
     }
 
     fn get_parameter_map(&self) -> HashMap<String, Vec<String>> {
@@ -335,10 +335,8 @@ impl DefaultSavedRequestBuilder {
         self
     }
 
-    pub fn set_locales(&mut self, locales: Option<Vec<&Locale>>) -> &mut Self {
-        self.locales = locales
-            .map(|locales| locales.into_iter().copied().collect())
-            .unwrap_or_default();
+    pub fn set_locales(&mut self, locales: Option<Vec<Locale>>) -> &mut Self {
+        self.locales = locales.unwrap_or_default();
         self
     }
 
@@ -435,7 +433,10 @@ mod tests {
             .set_server_port(443)
             .set_method(next_web_core::http::HttpMethod::GET)
             .build();
-        assert_eq!(saved.get_redirect_url(), "https://example.com/app/page?a=1&b=2");
+        assert_eq!(
+            saved.get_redirect_url(),
+            "https://example.com/app/page?a=1&b=2"
+        );
     }
 
     #[test]
@@ -474,7 +475,7 @@ mod tests {
             .set_request_uri("/".to_string())
             .set_parameters(Some(vec![("name", "value")]))
             .build();
-        assert_eq!(saved.get_parameter_values("name"), vec!["value".to_string()]);
+        assert_eq!(saved.get_parameter_values("name"), Some(vec!["value"]));
         assert!(saved.get_parameter_map().contains_key("name"));
     }
 }

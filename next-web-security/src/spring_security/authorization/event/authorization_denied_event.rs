@@ -1,4 +1,8 @@
-use std::sync::Arc;
+use std::{
+    any::{Any, TypeId},
+    ops::Deref,
+    sync::Arc,
+};
 
 use next_web_context::ApplicationEvent;
 use next_web_core::BoxAny;
@@ -13,17 +17,17 @@ use crate::{
 /// Event published when authorization is denied.
 #[derive(Clone)]
 pub struct AuthorizationDeniedEvent {
-    inner: AuthorizationEvent,
+    base: AuthorizationEvent,
 }
 
 impl AuthorizationDeniedEvent {
     pub fn new(
         authentication: Arc<dyn Authentication>,
         object: BoxAny,
-        result: Box<dyn AuthorizationResult>,
+        result: Arc<dyn AuthorizationResult>,
     ) -> Self {
         Self {
-            inner: AuthorizationEvent::new(authentication, object, result),
+            base: AuthorizationEvent::new(authentication, object, result),
         }
     }
 
@@ -36,12 +40,25 @@ impl AuthorizationDeniedEvent {
     }
 }
 
+impl Deref for AuthorizationDeniedEvent {
+    type Target = AuthorizationEvent;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
 impl ApplicationEvent for AuthorizationDeniedEvent {
     fn timestamp(&self) -> u64 {
         self.base.timestamp()
     }
-
-    fn source(&self) -> &dyn std::any::Any {
+    fn source(&self) -> &dyn Any {
         self.base.source()
+    }
+    fn event_type(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+    fn source_type(&self) -> TypeId {
+        self.base.source_type()
     }
 }

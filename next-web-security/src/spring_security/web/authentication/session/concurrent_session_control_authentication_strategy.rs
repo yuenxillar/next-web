@@ -178,10 +178,7 @@ impl SessionAuthenticationStrategy for ConcurrentSessionControlAuthenticationStr
             }
         };
 
-        let sessions = self
-            .session_registry
-            .all_sessions(principal, false)
-            .await;
+        let sessions = self.session_registry.all_sessions(principal, false).await;
         let session_count = sessions.len() as i32;
 
         if session_count < allowed_sessions {

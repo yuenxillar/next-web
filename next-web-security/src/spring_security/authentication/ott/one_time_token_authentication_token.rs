@@ -1,7 +1,7 @@
 use std::{
     any::TypeId,
     borrow::Cow,
-    fmt::Display,
+    fmt::{Debug, Display},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -37,9 +37,7 @@ impl OneTimeTokenAuthenticationToken {
             credentials: Some(Arc::new(token_value.into())),
             base: BaseAuthenticationToken::new(None),
         };
-        token
-            .set_authenticated(false)
-            .expect("Cannot set this token to trusted - use the authenticated constructor instead");
+        token.base.set_authenticated(false);
         token
     }
 
@@ -60,7 +58,7 @@ impl OneTimeTokenAuthenticationToken {
     pub fn token_value(&self) -> &str {
         self.credentials
             .as_ref()
-            .and_then(|c| c.downcast_ref::<String>())
+            .and_then(|credentials| credentials.as_any().downcast_ref::<String>())
             .map(|s| s.as_str())
             .unwrap_or_default()
     }
@@ -121,7 +119,10 @@ impl Authentication for OneTimeTokenAuthenticationToken {
 
 impl Principal for OneTimeTokenAuthenticationToken {
     fn name(&self) -> Cow<'_, str> {
-        self.base.name()
+        self.principal
+            .as_ref()
+            .map(|principal| Cow::Owned(principal.to_string()))
+            .unwrap_or_default()
     }
 }
 
@@ -131,7 +132,7 @@ impl Display for OneTimeTokenAuthenticationToken {
             f,
             "{} [Principal={:?}, Credentials=[PROTECTED], Authenticated={}, Authorities={:?}]",
             std::any::type_name::<Self>(),
-            self.principal(),
+            self.principal().map(|principal| principal.to_string()),
             self.is_authenticated(),
             self.base
                 .authorities()
@@ -139,6 +140,12 @@ impl Display for OneTimeTokenAuthenticationToken {
                 .map(|a| a.authority())
                 .collect::<Vec<_>>()
         )
+    }
+}
+
+impl Debug for OneTimeTokenAuthenticationToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 

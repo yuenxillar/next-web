@@ -19,18 +19,13 @@ impl AuthenticationProvider for TestingAuthenticationProvider {
         &self,
         authentication: &Arc<dyn Authentication>,
     ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
-        // let Some(authentication) = authentication
-        //     .as_any()
-        //     .downcast_ref::<TestingAuthenticationToken>()
-        // else {
-        //     return Err(AuthenticationError::new(
-        //         "Only TestingAuthenticationToken is supported",
-        //     ));
-        // };
-
-        // Ok(Arc::new(authentication.clone()))
-        //
-        todo!()
+        if (authentication.as_ref() as &dyn std::any::Any)
+            .downcast_ref::<TestingAuthenticationToken>()
+            .is_none()
+        {
+            return Ok(None);
+        }
+        Ok(Some(authentication.clone()))
     }
 
     fn supports(&self, authentication: TypeId) -> bool {

@@ -21,12 +21,12 @@ pub const NEXT_SECURITY_AUTHENTICATION: &str = "NEXT_SECURITY_AUTHENTICATION";
 pub const NEXT_SECURITY_REQUEST_ATTRIBUTES: &str = "NEXT_SECURITY_REQUEST_ATTRIBUTES";
 
 #[derive(Clone)]
-pub struct BasePreAuthenticatedProcessingFilterSupport {
+pub struct BasePreAuthenticatedProcessingFilter {
     authentication_manager: Arc<dyn AuthenticationManager>,
     continue_filter_chain_on_unsuccessful_authentication: bool,
 }
 
-impl BasePreAuthenticatedProcessingFilterSupport {
+impl BasePreAuthenticatedProcessingFilter {
     pub fn new(authentication_manager: Arc<dyn AuthenticationManager>) -> Self {
         Self {
             authentication_manager,
@@ -38,13 +38,17 @@ impl BasePreAuthenticatedProcessingFilterSupport {
         self.continue_filter_chain_on_unsuccessful_authentication = value;
     }
 
-    pub fn authenticate(
+    pub async fn authenticate(
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         authentication: &dyn Authentication,
     ) -> Result<Option<Arc<dyn Authentication>>, BoxError> {
-        match self.authentication_manager.authenticate(authentication) {
+        match self
+            .authentication_manager
+            .authenticate(authentication)
+            .await
+        {
             Ok(authentication) => {
                 self.successful_authentication(request, response, authentication.clone())?;
                 Ok(Some(authentication))
@@ -66,17 +70,14 @@ impl BasePreAuthenticatedProcessingFilterSupport {
         _response: &mut dyn HttpResponse,
         authentication: Arc<dyn Authentication>,
     ) -> Result<(), FilterError> {
-        // let mut context = SecurityContext::new(None);
-        // context.set_authentication(Some(authentication.clone()));
-        // SecurityContextHolder::set_context(context);
-
-        // request.set_attribute(
-        //     NEXT_SECURITY_AUTHENTICATION,
-        //     AnyValue::Object(Box::new(authentication)),
-        // );
-
-        // Ok(())
-        todo!()
+        let context = SecurityContextHolder::create_empty_context();
+        context.set_authentication(Some(authentication.clone()));
+        SecurityContextHolder::set_context(context);
+        request.set_attribute(
+            NEXT_SECURITY_AUTHENTICATION,
+            AnyValue::Object(Box::new(authentication)),
+        );
+        Ok(())
     }
 
     fn unsuccessful_authentication(
@@ -94,19 +95,19 @@ impl BasePreAuthenticatedProcessingFilterSupport {
 }
 
 #[async_trait]
-impl HttpFilter for BasePreAuthenticatedProcessingFilterSupport {
+impl HttpFilter for BasePreAuthenticatedProcessingFilter {
     async fn do_filter(
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        todo!()
+        filter_chain.do_filter(request, response).await
     }
 }
 
-impl Named for BasePreAuthenticatedProcessingFilterSupport {
+impl Named for BasePreAuthenticatedProcessingFilter {
     fn name(&self) -> &str {
-        "BasePreAuthenticatedProcessingFilterSupport"
+        "BasePreAuthenticatedProcessingFilter"
     }
 }

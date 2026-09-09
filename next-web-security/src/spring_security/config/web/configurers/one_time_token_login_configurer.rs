@@ -5,9 +5,7 @@ use std::{
 };
 
 use next_web_core::{
-    http::HttpMethod,
-    traits::http::http_request::HttpRequest,
-    ApplicationContext,
+    http::HttpMethod, traits::http::http_request::HttpRequest, ApplicationContext,
 };
 
 use crate::{
@@ -44,7 +42,7 @@ use crate::{
             },
         },
         default_security_filter_chain::DefaultSecurityFilterChain,
-        util::matcher::{DEFAULT_BUILDER, RequestMatcher},
+        util::matcher::{RequestMatcher, DEFAULT_BUILDER},
     },
 };
 
@@ -79,7 +77,8 @@ where
 
     one_time_token_service: Option<Arc<dyn OneTimeTokenService>>,
     token_generating_url: String,
-    one_time_token_generation_success_handler: Option<Arc<dyn OneTimeTokenGenerationSuccessHandler>>,
+    one_time_token_generation_success_handler:
+        Option<Arc<dyn OneTimeTokenGenerationSuccessHandler>>,
     authentication_provider: Option<Arc<dyn AuthenticationProvider>>,
     request_resolver: Option<Arc<dyn GenerateOneTimeTokenRequestResolver>>,
 
@@ -128,7 +127,8 @@ where
         &mut self,
         one_time_token_generation_success_handler: Arc<dyn OneTimeTokenGenerationSuccessHandler>,
     ) -> &mut Self {
-        self.one_time_token_generation_success_handler = Some(one_time_token_generation_success_handler);
+        self.one_time_token_generation_success_handler =
+            Some(one_time_token_generation_success_handler);
         self
     }
 
@@ -149,7 +149,10 @@ where
     }
 
     /// Configures the `OneTimeTokenService` used to generate and consume tokens.
-    pub fn token_service(&mut self, one_time_token_service: Arc<dyn OneTimeTokenService>) -> &mut Self {
+    pub fn token_service(
+        &mut self,
+        one_time_token_service: Arc<dyn OneTimeTokenService>,
+    ) -> &mut Self {
         self.one_time_token_service = Some(one_time_token_service);
         self
     }
@@ -321,7 +324,9 @@ where
 {
     fn init(&mut self, http: &mut H) {
         if self.get_login_processing_url().is_none() {
-            self.login_processing_url(OneTimeTokenAuthenticationFilter::DEFAULT_LOGIN_PROCESSING_URL);
+            self.login_processing_url(
+                OneTimeTokenAuthenticationFilter::DEFAULT_LOGIN_PROCESSING_URL,
+            );
         }
         self.base.init(http);
 

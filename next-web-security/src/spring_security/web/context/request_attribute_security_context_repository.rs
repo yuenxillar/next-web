@@ -67,7 +67,7 @@ impl SecurityContextRepository for RequestAttributeSecurityContextRepository {
         request: &mut dyn HttpRequest,
     ) -> Box<dyn DeferredSecurityContext> {
         Box::new(SuppliedDeferredSecurityContext::new(
-            self.get_context(request).map(ToOwned::to_owned),
+            self.get_context(request).cloned(),
             self.security_context_holder_strategy.to_owned(),
         ))
     }

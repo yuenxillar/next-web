@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use crate::core::context::security_context::SecurityContext;
 
-type ContextSupplier = Arc<dyn Fn() -> Option<Arc<dyn SecurityContext>> + Send + Sync>;
+pub type ContextSupplier = Arc<dyn Fn() -> Option<Arc<dyn SecurityContext>> + Send + Sync>;
 
 /// Event that represents a change in SecurityContext.
 #[derive(Clone)]
 pub struct SecurityContextChangedEvent {
     old_context: ContextSupplier,
     new_context: ContextSupplier,
+    cleared: bool,
 }
 
 impl SecurityContextChangedEvent {
@@ -22,6 +23,7 @@ impl SecurityContextChangedEvent {
         old_context: Arc<dyn SecurityContext>,
         new_context: Option<Arc<dyn SecurityContext>>,
     ) -> Self {
+        let cleared = new_context.is_none();
         let old: ContextSupplier = Arc::new(move || Some(old_context.clone()));
         let new: ContextSupplier = match new_context {
             Some(ctx) => Arc::new(move || Some(ctx.clone())),
@@ -30,6 +32,7 @@ impl SecurityContextChangedEvent {
         Self {
             old_context: old,
             new_context: new,
+            cleared,
         }
     }
 
@@ -38,6 +41,15 @@ impl SecurityContextChangedEvent {
         Self {
             old_context,
             new_context,
+            cleared: false,
+        }
+    }
+
+    pub(crate) fn cleared(old_context: ContextSupplier) -> Self {
+        Self {
+            old_context,
+            new_context: Self::no_context(),
+            cleared: true,
         }
     }
 
@@ -53,6 +65,6 @@ impl SecurityContextChangedEvent {
 
     /// Whether this event represents clearing the context.
     pub fn is_cleared(&self) -> bool {
-        self.get_new_context().is_none()
+        self.cleared
     }
 }

@@ -46,7 +46,15 @@ impl AuthenticationSuccessHandler for SimpleUrlAuthenticationSuccessHandler {
         response: &mut dyn HttpResponse,
         authentication: &dyn Authentication,
     ) {
-        self.base.handle(request, response, Some(authentication));
+        self.base
+            .handle(request, response, Some(authentication))
+            .inspect_err(|err| {
+                tracing::error!(
+                    "BaseAuthenticationTargetUrlRequestHandler handle error: {}",
+                    err
+                )
+            })
+            .ok();
         self.clear_authentication_attributes(request);
     }
 }

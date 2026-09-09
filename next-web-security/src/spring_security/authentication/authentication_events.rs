@@ -1,38 +1,58 @@
-use std::sync::Arc;
+use std::{
+    any::{Any, TypeId},
+    sync::Arc,
+};
+
+use next_web_context::{ApplicationEvent, EventAttributes};
 
 use crate::core::{Authentication, AuthenticationError};
 
+/// Application event which indicates successful authentication.
 #[derive(Clone)]
 pub struct AuthenticationSuccessEvent {
-    authentication: Arc<dyn Authentication>,
+    base: EventAttributes<Arc<dyn Authentication>>,
 }
 
 impl AuthenticationSuccessEvent {
     pub fn new(authentication: Arc<dyn Authentication>) -> Self {
-        Self { authentication }
-    }
-
-    pub fn authentication(&self) -> Arc<dyn Authentication> {
-        self.authentication.clone()
-    }
-}
-
-#[derive(Clone)]
-pub struct AuthenticationFailureEvent {
-    authentication_type: String,
-    error: AuthenticationError,
-}
-
-impl AuthenticationFailureEvent {
-    pub fn new(authentication: &dyn Authentication, error: AuthenticationError) -> Self {
         Self {
-            authentication_type: authentication.authentication_type().to_string(),
-            error,
+            base: EventAttributes::new(authentication),
         }
     }
+}
 
-    pub fn authentication_type(&self) -> &str {
-        &self.authentication_type
+impl ApplicationEvent for AuthenticationSuccessEvent {
+    fn timestamp(&self) -> u64 {
+        self.base.timestamp()
+    }
+
+    fn source(&self) -> &dyn Any {
+        self.base.source()
+    }
+
+    fn event_type(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+
+    fn source_type(&self) -> TypeId {
+        self.base.source_type()
+    }
+}
+
+/// Base application event which indicates authentication failure for some reason.
+#[derive(Clone)]
+pub struct BaseAuthenticationFailureEvent {
+    error: AuthenticationError,
+
+    event_attributes: EventAttributes<Arc<dyn Authentication>>,
+}
+
+impl BaseAuthenticationFailureEvent {
+    pub fn new(authentication: &Arc<dyn Authentication>, error: AuthenticationError) -> Self {
+        Self {
+            error,
+            event_attributes: EventAttributes::new(Arc::clone(authentication)),
+        }
     }
 
     pub fn error(&self) -> &AuthenticationError {
@@ -40,18 +60,35 @@ impl AuthenticationFailureEvent {
     }
 }
 
+/// Application event which indicates successful logout
 #[derive(Clone)]
 pub struct LogoutSuccessEvent {
-    authentication: Arc<dyn Authentication>,
+    base: EventAttributes<Arc<dyn Authentication>>,
 }
 
 impl LogoutSuccessEvent {
     pub fn new(authentication: Arc<dyn Authentication>) -> Self {
-        Self { authentication }
+        Self {
+            base: EventAttributes::new(authentication),
+        }
+    }
+}
+
+impl ApplicationEvent for LogoutSuccessEvent {
+    fn timestamp(&self) -> u64 {
+        self.base.timestamp()
     }
 
-    pub fn authentication(&self) -> Arc<dyn Authentication> {
-        self.authentication.clone()
+    fn source(&self) -> &dyn Any {
+        self.base.source()
+    }
+
+    fn event_type(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+
+    fn source_type(&self) -> TypeId {
+        self.base.source_type()
     }
 }
 
@@ -59,18 +96,35 @@ macro_rules! failure_event_wrapper {
     ($name:ident) => {
         #[derive(Clone)]
         pub struct $name {
-            event: AuthenticationFailureEvent,
+            base_event: BaseAuthenticationFailureEvent,
         }
 
         impl $name {
-            pub fn new(authentication: &dyn Authentication, error: AuthenticationError) -> Self {
+            pub fn new(
+                authentication: &Arc<dyn Authentication>,
+                error: AuthenticationError,
+            ) -> Self {
                 Self {
-                    event: AuthenticationFailureEvent::new(authentication, error),
+                    base_event: BaseAuthenticationFailureEvent::new(authentication, error),
                 }
             }
+        }
 
-            pub fn event(&self) -> &AuthenticationFailureEvent {
-                &self.event
+        impl ApplicationEvent for $name {
+            fn timestamp(&self) -> u64 {
+                self.base_event.event_attributes.timestamp()
+            }
+
+            fn source(&self) -> &dyn Any {
+                self.base_event.event_attributes.source()
+            }
+
+            fn event_type(&self) -> TypeId {
+                TypeId::of::<$name>()
+            }
+
+            fn source_type(&self) -> TypeId {
+                self.base_event.event_attributes.source_type()
             }
         }
     };
@@ -82,4 +136,4 @@ failure_event_wrapper!(AuthenticationFailureDisabledEvent);
 failure_event_wrapper!(AuthenticationFailureExpiredEvent);
 failure_event_wrapper!(AuthenticationFailureLockedEvent);
 failure_event_wrapper!(AuthenticationFailureProviderNotFoundEvent);
-failure_event_wrapper!(AuthenticationFailureServiceExceptionEvent);
+failure_event_wrapper!(AuthenticationFailureServiceErrorEvent);

@@ -10,7 +10,7 @@ use crate::{
         DeferredSecurityContext, SecurityContext, SecurityContextHolder,
         SecurityContextHolderStrategy,
     },
-    web::context::SecurityContextRepository,
+    web::context::{SecurityContextRepository, SuppliedDeferredSecurityContext},
 };
 
 #[derive(Clone)]
@@ -48,10 +48,12 @@ impl SecurityContextRepository for NullSecurityContextRepository {
     // #[allow(unused_variables)]
     fn load_deferred_context(
         &self,
-        request: &mut dyn HttpRequest,
+        _request: &mut dyn HttpRequest,
     ) -> Box<dyn DeferredSecurityContext> {
-        // self.security_context_holder_strategy.create_empty_context()
-        todo!()
+        Box::new(SuppliedDeferredSecurityContext::new(
+            None,
+            self.security_context_holder_strategy.to_owned(),
+        ))
     }
 }
 

@@ -51,3 +51,9 @@ impl Into<MatcherInput> for next_web_core::http::HttpMethod {
         MatcherInput::Method(self)
     }
 }
+
+impl<const N: usize> Into<MatcherInput> for &[&'static str; N] {
+    fn into(self) -> MatcherInput {
+        MatcherInput::Paths(self.to_vec())
+    }
+}

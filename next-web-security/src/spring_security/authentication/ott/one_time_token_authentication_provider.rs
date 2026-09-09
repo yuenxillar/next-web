@@ -1,5 +1,5 @@
 use std::any::Any;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use next_web_core::async_trait;
 
@@ -8,16 +8,14 @@ use crate::{
         authentication_provider::AuthenticationProvider,
         ott::{
             invalid_one_time_token_exception::invalid_one_time_token,
-            one_time_token::OneTimeToken,
             one_time_token_authentication::OneTimeTokenAuthentication,
             one_time_token_authentication_token::OneTimeTokenAuthenticationToken,
             one_time_token_service::OneTimeTokenService,
         },
     },
     core::{
-        authority::FactorGrantedAuthority,
-        userdetails::UserDetailsService,
-        Authentication, AuthenticationError, AuthenticationErrorKind,
+        authority::FactorGrantedAuthority, userdetails::UserDetailsService, Authentication,
+        AuthenticationError, AuthenticationErrorKind,
     },
 };
 
@@ -44,8 +42,8 @@ impl AuthenticationProvider for OneTimeTokenAuthenticationProvider {
         &self,
         authentication: &Arc<dyn Authentication>,
     ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
-        let Some(token) = (authentication.as_ref() as &dyn Any)
-            .downcast_ref::<OneTimeTokenAuthenticationToken>()
+        let Some(token) =
+            (authentication.as_ref() as &dyn Any).downcast_ref::<OneTimeTokenAuthenticationToken>()
         else {
             return Ok(None);
         };
@@ -66,14 +64,18 @@ impl AuthenticationProvider for OneTimeTokenAuthenticationProvider {
                 )
             })?;
 
-        let mut authorities: Vec<Arc<dyn crate::core::GrantedAuthority>> = user
-            .authorities()
-            .iter()
-            .cloned()
-            .collect();
+        let mut authorities: Vec<Arc<dyn crate::core::GrantedAuthority>> =
+            user.authorities().iter().cloned().collect();
         authorities.push(Arc::new(FactorGrantedAuthority::from_authority(
             FactorGrantedAuthority::OTT_AUTHORITY,
         )));
+        let mut seen = HashSet::new();
+        authorities.retain(|authority| {
+            authority
+                .authority()
+                .map(|value| seen.insert(value.to_owned()))
+                .unwrap_or(false)
+        });
 
         let mut result = OneTimeTokenAuthentication::new(user.username().to_string(), authorities);
         result.set_details_value(authentication.details().cloned());

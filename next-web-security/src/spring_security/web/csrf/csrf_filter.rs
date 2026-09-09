@@ -138,7 +138,8 @@ impl HttpFilter for CsrfFilter {
             AnyValue::Object(Box::new(deferred_csrf_token.clone())),
         );
         self.request_handler
-            .handle(request, response, &mut deferred_csrf_token);
+            .handle(request, response, &mut deferred_csrf_token)
+            .await;
 
         if !self.require_csrf_protection_matcher.matches(request) {
             if enabled!(Level::TRACE) {

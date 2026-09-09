@@ -18,10 +18,11 @@ futures = { workspace = true }
 
 
 redis = { workspace = true }
-rslock = { workspace = true, optional = true }
 deadpool-redis = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
 
 [features]
 default = []
 deadpol = ["deadpool-redis"]
-lock = ["rslock"]
+distributed-lock = ["redis/cluster-async", "dep:uuid", "dep:thiserror"]

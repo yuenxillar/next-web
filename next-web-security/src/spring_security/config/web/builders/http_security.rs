@@ -23,7 +23,10 @@ use crate::{
     authentication::AuthenticationProvider,
     authorization::AuthenticationManager,
     config::{
-        authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
+        authentication::{
+            builders::authentication_manager_builder::AuthenticationManagerBuilder,
+            provider_manager_builder::ProviderManagerBuilder,
+        },
         base_configured_security_builder::{
             BaseConfiguredSecurityBuilder, BaseConfiguredSecurityBuilderExt, BuildState,
         },
@@ -527,7 +530,7 @@ impl HttpSecurityBuilder<Self> for HttpSecurity {
         authentication_provider: Arc<dyn AuthenticationProvider>,
     ) {
         self.get_authentication_registry()
-            .map(|r| r.authentication_provider(authentication_provider));
+            .map(|builder| builder.authentication_provider(authentication_provider));
     }
 
     fn user_details_service<T>(&mut self, user_details_service: T)

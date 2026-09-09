@@ -1,5 +1,6 @@
 use std::any::TypeId;
 use std::collections::HashSet;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use next_web_context::support::MessageSourceAccessor;
@@ -9,7 +10,7 @@ use next_web_core::{
     error::BoxError,
     filter::FilterError,
     traits::{
-        filter::{HttpFilter, HttpFilterChain},
+        filter::HttpFilterChain,
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
@@ -224,7 +225,7 @@ impl BaseAuthenticationProcessingFilter {
     ///    Before returning, the implementation should perform any additional work required
     ///    to complete the process.
     /// 3. Return an `Err(AuthenticationException)` if the authentication process fails
-    pub fn attempt_authentication(
+    pub(crate) async fn _attempt_authentication(
         &self,
         request: &mut dyn HttpRequest,
         _response: &mut dyn HttpResponse,
@@ -237,10 +238,13 @@ impl BaseAuthenticationProcessingFilter {
             None => return Ok(None),
         };
 
-        self.authentication_manager
-            .as_ref()
-            .map(|manager| manager.authenticate(authentication.as_ref()))
-            .transpose()
+        match self.authentication_manager.as_ref() {
+            Some(manager) => manager
+                .authenticate(authentication.as_ref())
+                .await
+                .map(Some),
+            None => Ok(None),
+        }
     }
 
     /// Default behaviour for successful authentication.
@@ -281,7 +285,9 @@ impl BaseAuthenticationProcessingFilter {
         }
 
         if let Some(remember_me_services) = self.remember_me_services.as_ref() {
-            remember_me_services.login_success(request, response, auth_result.as_ref());
+            remember_me_services
+                .login_success(request, response, auth_result.as_ref())
+                .await;
         }
 
         if let Some(publisher) = self.event_publisher.as_ref() {
@@ -496,30 +502,28 @@ impl BaseAuthenticationProcessingFilter {
     pub fn set_remember_me_services(&mut self, remember_me_services: Arc<dyn RememberMeServices>) {
         self.remember_me_services = Some(remember_me_services);
     }
-}
 
-#[async_trait]
-impl HttpFilter for BaseAuthenticationProcessingFilter {
-    async fn do_filter(
-        &self,
+    pub async fn do_filter(
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
+
+        this: &dyn BaseAuthenticationProcessingFilterExt,
     ) -> Result<(), FilterError> {
-        if !self.requires_authentication(request, response) {
+        if !this.requires_authentication(request, response) {
             filter_chain.do_filter(request, response).await?;
 
             return Ok(());
         }
 
-        match self.attempt_authentication(request, response) {
+        match this.attempt_authentication(request, response).await {
             Ok(Some(mut authentication_result)) => {
-                let current = self
+                let current = this
                     .security_context_holder_strategy
                     .get_context()
-                    .and_then(|ctx| ctx.get_authentication().map(Clone::clone));
+                    .get_authentication();
 
-                if self.should_perform_mfa(current.as_deref(), authentication_result.as_ref()) {
+                if this.should_perform_mfa(current.as_deref(), authentication_result.as_ref()) {
                     let mut builder = authentication_result.as_ref().to_builder();
                     builder.authorities(Box::new(move |authorities| {
                         let new_authorities: HashSet<&str> =
@@ -543,18 +547,18 @@ impl HttpFilter for BaseAuthenticationProcessingFilter {
                     authentication_result = builder.build();
                 }
 
-                if let Some(session_strategy) = self.session_strategy.as_ref() {
+                if let Some(session_strategy) = this.session_strategy.as_ref() {
                     session_strategy
                         .on_authentication(&authentication_result, request, response)
                         .await?;
                 }
 
                 // Authentication success
-                if self.continue_chain_before_successful_authentication {
+                if this.continue_chain_before_successful_authentication {
                     filter_chain.do_filter(request, response).await?;
                 }
 
-                self.successful_authentication(
+                this.successful_authentication(
                     request,
                     response,
                     filter_chain,
@@ -563,7 +567,7 @@ impl HttpFilter for BaseAuthenticationProcessingFilter {
                 .await?;
             }
             Ok(None) => {
-                if self.continue_chain_when_no_authentication_result {
+                if this.continue_chain_when_no_authentication_result {
                     filter_chain.do_filter(request, response).await?;
                 }
                 // return immediately as subclass has indicated that it hasn't completed
@@ -573,7 +577,7 @@ impl HttpFilter for BaseAuthenticationProcessingFilter {
                     "An internal error occurred while trying to authenticate the user."
                 );
                 // Authentication failed
-                self.unsuccessful_authentication(request, response, &err)?;
+                this.unsuccessful_authentication(request, response, &err)?;
             }
         }
 
@@ -584,5 +588,20 @@ impl HttpFilter for BaseAuthenticationProcessingFilter {
 impl Named for BaseAuthenticationProcessingFilter {
     fn name(&self) -> &str {
         "BaseAuthenticationProcessingFilter"
+    }
+}
+
+#[async_trait]
+pub trait BaseAuthenticationProcessingFilterExt
+where
+    Self: Deref<Target = BaseAuthenticationProcessingFilter>,
+    Self: Send + Sync,
+{
+    async fn attempt_authentication(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
+        self._attempt_authentication(request, response).await
     }
 }

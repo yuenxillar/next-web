@@ -1,4 +1,3 @@
-pub mod annotation;
 pub mod authorization_service_error;
 pub mod expression;
 pub mod hierarchicalroles;

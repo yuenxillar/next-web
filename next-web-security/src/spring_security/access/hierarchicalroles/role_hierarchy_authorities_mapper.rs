@@ -20,18 +20,7 @@ impl GrantedAuthoritiesMapper for RoleHierarchyAuthoritiesMapper {
         &self,
         authorities: &[Arc<dyn GrantedAuthority>],
     ) -> Vec<Arc<dyn GrantedAuthority>> {
-        // let names = authorities
-        //     .into_iter()
-        //     .filter_map(|authority| authority.authority().map(ToString::to_string))
-        //     .collect::<Vec<_>>();
-
-        // self.role_hierarchy
-        //     .reachable_granted_authorities(&names)
-        //     .into_iter()
-        //     .map(|authority| {
-        //         Arc::new(SimpleGrantedAuthority::new(authority)) as Arc<dyn GrantedAuthority>
-        //     })
-        //     .collect()
-        todo!()
+        self.role_hierarchy
+            .reachable_granted_authorities(authorities)
     }
 }

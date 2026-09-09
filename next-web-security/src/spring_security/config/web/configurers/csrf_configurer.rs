@@ -306,7 +306,7 @@ impl CsrfTokenRequestHandler for SpaCsrfTokenRequestHandler {
         response: &mut dyn HttpResponse,
         csrf_token: &mut dyn DeferredCsrfToken,
     ) {
-        self.xor.handle(request, response, csrf_token);
+        self.xor.handle(request, response, csrf_token).await;
     }
 }
 

@@ -20,10 +20,6 @@ pub struct BaseSessionFixationProtectionStrategy {
 }
 
 impl BaseSessionFixationProtectionStrategy {
-    fn get_application_event_publisher(&self) -> Option<&Arc<dyn ApplicationEventPublisher>> {
-        self.application_event_publisher.as_ref()
-    }
-
     /// Called when the session has been changed and the old attributes have been migrated
     /// to the new session. Only called if a session existed to start with. Allows
     /// subclasses to plug in additional behaviour.
@@ -50,7 +46,15 @@ impl BaseSessionFixationProtectionStrategy {
                 original_session_id,
                 new_session.map(|s| s.id()).unwrap_or_default(),
             );
-            application_event_publisher.publish_event(Box::new(event));
+            application_event_publisher
+                .publish_event(Box::new(event))
+                .inspect_err(|err| {
+                    tracing::error!(
+                        "Failed to publish session fixation protection event: {}",
+                        err
+                    )
+                })
+                .ok();
         }
     }
 

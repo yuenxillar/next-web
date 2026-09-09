@@ -1,4 +1,7 @@
-use std::{ops::{Deref, DerefMut}, sync::Arc};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::{traits::required::Required, ApplicationContext};
 
@@ -9,16 +12,16 @@ use crate::{
         security_configurer::SecurityConfigurer,
         security_configurer_adapter::SecurityConfigurerAdapter,
         web::{
-            configurers::{BaseHttpConfigurer, logout_configurer::LogoutConfigurer},
+            configurers::{logout_configurer::LogoutConfigurer, BaseHttpConfigurer},
             HttpSecurityBuilder,
         },
     },
     oauth2::{
         client::{
             oidc_back_channel_logout::{
-                EitherLogoutHandler, OidcBackChannelLogoutAuthenticationProvider,
-                OidcBackChannelLogoutFilter, OidcBackChannelLogoutHandler,
-                OidcLogoutAuthenticationConverter, OAuth2ClientConfigurerUtils,
+                EitherLogoutHandler, OAuth2ClientConfigurerUtils,
+                OidcBackChannelLogoutAuthenticationProvider, OidcBackChannelLogoutFilter,
+                OidcBackChannelLogoutHandler, OidcLogoutAuthenticationConverter,
             },
             OidcSessionRegistry,
         },
@@ -26,7 +29,10 @@ use crate::{
     },
     oauth2_resource_server::jwt::{JwtDecoder, NimbusJwtDecoder},
     web::{
-        authentication::{AuthenticationConverter, logout::{CompositeLogoutHandler, LogoutHandler, SecurityContextLogoutHandler}},
+        authentication::{
+            logout::{CompositeLogoutHandler, LogoutHandler, SecurityContextLogoutHandler},
+            AuthenticationConverter,
+        },
         csrf::CsrfFilter,
         default_security_filter_chain::DefaultSecurityFilterChain,
     },
@@ -100,7 +106,8 @@ where
     }
 }
 
-impl<B> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>> for OidcLogoutConfigurer<B>
+impl<B> Required<SecurityConfigurerAdapter<DefaultSecurityFilterChain, B>>
+    for OidcLogoutConfigurer<B>
 where
     B: HttpSecurityBuilder<B>,
     B: SecurityBuilder<DefaultSecurityFilterChain>,

@@ -80,9 +80,11 @@ where
 
     fn context_path(&self) -> Option<&str>;
 
-    fn locale(&self) -> Option<&Locale>;
+    fn locale(&self) -> Option<Locale>;
 
-    fn locales(&self) -> Option<Vec<&Locale>>;
+    fn locales(&self) -> Option<Vec<Locale>>;
+
+    fn content_type(&self) -> Option<&str>;
 
     fn get_attribute(&self, name: &str) -> Option<&AnyValue>;
 
@@ -191,6 +193,10 @@ impl HttpRequest for Request {
         self.headers()
     }
 
+    fn content_type(&self) -> Option<&str> {
+        todo!()
+    }
+
     fn header(&self, header_name: &str) -> Option<&str> {
         self.headers()
             .get(header_name)
@@ -282,11 +288,11 @@ impl HttpRequest for Request {
             .map(|var| var.context_path())?
     }
 
-    fn locale(&self) -> Option<&Locale> {
+    fn locale(&self) -> Option<Locale> {
         todo!()
     }
 
-    fn locales(&self) -> Option<Vec<&Locale>> {
+    fn locales(&self) -> Option<Vec<Locale>> {
         todo!()
     }
 

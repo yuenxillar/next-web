@@ -2,6 +2,8 @@ use std::fmt;
 
 use next_web_core::traits::http::http_request::HttpRequest;
 
+use crate::web::authentication::Identity;
+
 /// A holder of selected HTTP details related to a web authentication request.
 #[derive(Clone, Debug)]
 pub struct WebAuthenticationDetails {
@@ -57,5 +59,11 @@ impl fmt::Display for WebAuthenticationDetails {
             self.remote_address,
             self.session_id.as_deref().unwrap_or("null")
         )
+    }
+}
+
+impl Identity for WebAuthenticationDetails {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

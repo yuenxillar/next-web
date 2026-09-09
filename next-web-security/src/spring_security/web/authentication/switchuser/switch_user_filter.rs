@@ -13,13 +13,12 @@ use next_web_core::{
 use tracing::debug;
 
 use crate::{
-    authentication::AccountStatusUserDetailsChecker,
+    authentication::{AccountStatusUserDetailsChecker, UsernamePasswordAuthenticationToken},
     core::{
         authority::SimpleGrantedAuthority,
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
         userdetails::{UserDetails, UserDetailsChecker, UserDetailsService},
         Authentication, AuthenticationError, AuthenticationErrorKind, GrantedAuthority,
-        UsernamePasswordAuthenticationToken,
     },
     web::{
         authentication::{
@@ -286,8 +285,8 @@ impl SwitchUserFilter {
             {
                 original = Some(auth.source().clone());
                 debug!(
-                    "Found original switch user granted authority [{}]",
-                    original.as_ref().map_or("".into(), |a| a.to_string())
+                    "Found original switch user granted authority [{:?}]",
+                    original
                 );
             }
         }
@@ -304,21 +303,24 @@ impl SwitchUserFilter {
             Err(_) => self
                 .security_context_holder_strategy
                 .get_context()
-                .and_then(|ctx| ctx.get_authentication().cloned()),
+                .get_authentication(),
         }
     }
 
     /// Create a switch user token that contains an additional `GrantedAuthority`
     /// that contains the original `Authentication` object.
-    async fn create_switch_user_token(
+    fn create_switch_user_token(
         &self,
         target_user: &dyn UserDetails,
-    ) -> UsernamePasswordAuthenticationToken {
+    ) -> Result<UsernamePasswordAuthenticationToken, AuthenticationError> {
         // Grant an additional authority that contains the original Authentication
         // object which will be used to 'exit' from the current switched user.
-        let current_authentication = self
-            .get_current_authentication()
-            .expect("currentAuthentication cannot be null");
+        let current_authentication = self.get_current_authentication().ok_or_else(|| {
+            AuthenticationError::with_kind(
+                "No current user associated with this request",
+                AuthenticationErrorKind::CredentialsNotFound,
+            )
+        })?;
 
         // Clone the Arc before moving it into SwitchUserGrantedAuthority,
         // since we may need it again for the authority changer.
@@ -349,11 +351,13 @@ impl SwitchUserFilter {
         orig.push(switch_authority);
 
         // Create the new authentication token.
-        UsernamePasswordAuthenticationToken::authenticated(
-            target_user.username(),
-            target_user.password().map(ToString::to_string),
+        Ok(UsernamePasswordAuthenticationToken::authenticated(
+            Arc::new(target_user.username().to_owned()),
+            target_user
+                .password()
+                .map(|p| Arc::new(p.to_owned()) as crate::web::authentication::AuthPrincipal),
             orig,
-        )
+        ))
     }
 
     /// Attempt to switch to another user. If the user does not exist or is not
@@ -394,7 +398,7 @@ impl SwitchUserFilter {
         self.user_details_checker.check(target_user.as_ref())?;
 
         // Create the switch user token.
-        let token = self.create_switch_user_token(target_user.as_ref()).await;
+        let token = self.create_switch_user_token(target_user.as_ref())?;
 
         Ok(Arc::new(token))
     }
@@ -414,7 +418,7 @@ impl SwitchUserFilter {
         let current = self
             .security_context_holder_strategy
             .get_context()
-            .and_then(|ctx| ctx.get_authentication().cloned())
+            .get_authentication()
             .ok_or_else(|| {
                 AuthenticationError::with_kind(
                     "No current user associated with this request",

@@ -18,7 +18,9 @@ use crate::{
         entry::{AuthenticationEntryPointFailureHandler, BearerTokenAuthenticationEntryPoint},
     },
     web::{
-        authentication::BaseAuthenticationProcessingFilter,
+        authentication::{
+            BaseAuthenticationProcessingFilter, BaseAuthenticationProcessingFilterExt,
+        },
         context::SecurityContextRepository,
         util::matcher::RequestMatcher,
     },
@@ -55,19 +57,19 @@ impl BearerTokenAuthenticationFilter {
         authentication_manager: Arc<dyn AuthenticationManager>,
         bearer_token_resolver: Arc<dyn BearerTokenResolver>,
     ) -> Self {
-        let converter = Arc::new(BearerTokenAuthenticationConverter::new(bearer_token_resolver));
+        let converter = Arc::new(BearerTokenAuthenticationConverter::new(
+            bearer_token_resolver,
+        ));
         let entry_point: Arc<dyn crate::web::AuthenticationEntryPoint> =
             Arc::new(BearerTokenAuthenticationEntryPoint::default());
-        let mut inner = BaseAuthenticationProcessingFilter::with_request_matcher(Arc::new(
-            AllRequestMatcher,
-        ));
+        let mut inner =
+            BaseAuthenticationProcessingFilter::with_request_matcher(Arc::new(AllRequestMatcher));
         inner.set_authentication_manager(authentication_manager.clone());
         inner.set_authentication_converter(converter);
         inner.set_continue_chain_before_successful_authentication(true);
-        inner
-            .set_authentication_failure_handler(Arc::new(AuthenticationEntryPointFailureHandler::new(
-                entry_point.clone(),
-            )));
+        inner.set_authentication_failure_handler(Arc::new(
+            AuthenticationEntryPointFailureHandler::new(entry_point.clone()),
+        ));
         Self {
             authentication_manager: Some(authentication_manager),
             authentication_entry_point: entry_point,
@@ -75,7 +77,10 @@ impl BearerTokenAuthenticationFilter {
         }
     }
 
-    pub fn set_authentication_manager(&mut self, authentication_manager: Arc<dyn AuthenticationManager>) {
+    pub fn set_authentication_manager(
+        &mut self,
+        authentication_manager: Arc<dyn AuthenticationManager>,
+    ) {
         self.authentication_manager = Some(authentication_manager.clone());
         self.base.set_authentication_manager(authentication_manager);
     }
@@ -85,10 +90,9 @@ impl BearerTokenAuthenticationFilter {
         authentication_entry_point: Arc<dyn crate::web::AuthenticationEntryPoint>,
     ) {
         self.authentication_entry_point = authentication_entry_point.clone();
-        self.base
-            .set_authentication_failure_handler(Arc::new(
-                AuthenticationEntryPointFailureHandler::new(authentication_entry_point),
-            ));
+        self.base.set_authentication_failure_handler(Arc::new(
+            AuthenticationEntryPointFailureHandler::new(authentication_entry_point),
+        ));
     }
 
     pub fn set_security_context_holder_strategy(
@@ -122,6 +126,8 @@ impl DerefMut for BearerTokenAuthenticationFilter {
     }
 }
 
+impl BaseAuthenticationProcessingFilterExt for BearerTokenAuthenticationFilter {}
+
 #[async_trait]
 impl HttpFilter for BearerTokenAuthenticationFilter {
     async fn do_filter(
@@ -130,11 +136,7 @@ impl HttpFilter for BearerTokenAuthenticationFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        self.base.do_filter(request, response, filter_chain).await
-    }
-
-    fn supports(&self, name: &str) -> bool {
-        name == "BearerTokenAuthenticationFilter"
+        BaseAuthenticationProcessingFilter::do_filter(request, response, filter_chain, self).await
     }
 }
 
@@ -147,7 +149,10 @@ impl Named for BearerTokenAuthenticationFilter {
 impl fmt::Debug for BearerTokenAuthenticationFilter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BearerTokenAuthenticationFilter")
-            .field("authentication_manager", &self.authentication_manager.is_some())
+            .field(
+                "authentication_manager",
+                &self.authentication_manager.is_some(),
+            )
             .finish()
     }
 }

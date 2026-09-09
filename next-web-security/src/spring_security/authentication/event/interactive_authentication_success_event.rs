@@ -1,4 +1,4 @@
-use std::{any::TypeId, sync::Arc};
+use std::{any::TypeId, ops::Deref, sync::Arc};
 
 use next_web_context::ApplicationEvent;
 
@@ -25,6 +25,14 @@ impl InteractiveAuthenticationSuccessEvent {
     }
 }
 
+impl Deref for InteractiveAuthenticationSuccessEvent {
+    type Target = BaseAuthenticationEvent;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
 impl ApplicationEvent for InteractiveAuthenticationSuccessEvent {
     fn source(&self) -> &dyn std::any::Any {
         self.base.source()
@@ -32,5 +40,13 @@ impl ApplicationEvent for InteractiveAuthenticationSuccessEvent {
 
     fn timestamp(&self) -> u64 {
         self.base.timestamp()
+    }
+
+    fn event_type(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+
+    fn source_type(&self) -> TypeId {
+        self.base.source_type()
     }
 }

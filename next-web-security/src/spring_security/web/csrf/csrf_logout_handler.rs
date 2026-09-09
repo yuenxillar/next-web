@@ -37,6 +37,10 @@ impl LogoutHandler for CsrfLogoutHandler {
     ) {
         self.csrf_token_repository
             .save_token(None, request, response)
-            .await;
+            .await
+            .inspect_err(|err| {
+                tracing::error!("Failed to save CSRF token: {}", err);
+            })
+            .ok();
     }
 }

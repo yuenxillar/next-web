@@ -139,8 +139,8 @@ impl HttpFilter for RememberMeAuthenticationFilter {
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
         if SecurityContextHolder::get_context()
-            .map(|ctx| ctx.get_authentication().is_some())
-            .unwrap_or_default()
+            .get_authentication()
+            .is_some()
         {
             debug!("SecurityContextHolder not populated with remember-me token, as it already contained an authentication");
             return filter_chain.do_filter(request, response).await;
@@ -155,7 +155,8 @@ impl HttpFilter for RememberMeAuthenticationFilter {
                 // Authenticate the remember-me token via the AuthenticationManager
                 let remember_me_auth = self
                     .authentication_manager
-                    .authenticate(rememberme_token.as_ref())?;
+                    .authenticate(rememberme_token.as_ref())
+                    .await?;
                 if let Some(session_strategy) = self.session_strategy.as_ref() {
                     session_strategy
                         .on_authentication(&remember_me_auth, request, response)

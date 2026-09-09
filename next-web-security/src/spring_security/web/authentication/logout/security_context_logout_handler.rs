@@ -105,7 +105,7 @@ impl LogoutHandler for SecurityContextLogoutHandler {
         let context = self.security_context_holder_strategy.get_context();
         self.security_context_holder_strategy.clear_context();
         if self.clear_authentication {
-            context.map(|ctx| ctx.set_authentication(None));
+            context.set_authentication(None);
         }
 
         let empty_context = self.security_context_holder_strategy.create_empty_context();

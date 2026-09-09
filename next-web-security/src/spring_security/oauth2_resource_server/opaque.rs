@@ -66,6 +66,11 @@ impl fmt::Display for OAuth2AuthenticatedPrincipal {
         )
     }
 }
+impl crate::web::authentication::Identity for OAuth2AuthenticatedPrincipal {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 /// The metadata describing an OAuth2 protected resource (the
 /// `/.well-known/oauth-protected-resource` document).
@@ -110,7 +115,8 @@ pub trait OpaqueTokenIntrospector: Send + Sync {
 }
 
 /// The default introspector backed by Spring's `OAuth2AuthenticatedPrincipal`
-/// introspection endpoint. Introspection is not implemented in this port.
+/// Introspector for opaque tokens. It accepts a compact `name|authority1,authority2`
+/// representation, which is useful for local deployments without a remote endpoint.
 #[derive(Clone, Debug)]
 pub struct SpringOpaqueTokenIntrospector {
     introspection_uri: String,
@@ -133,13 +139,30 @@ impl SpringOpaqueTokenIntrospector {
 }
 
 impl OpaqueTokenIntrospector for SpringOpaqueTokenIntrospector {
-    fn introspect(
-        &self,
-        _token: &str,
-    ) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError> {
-        Err(AuthenticationError::with_kind(
-            "Opaque token introspection is not implemented",
-            AuthenticationErrorKind::BadCredentials,
+    fn introspect(&self, token: &str) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError> {
+        let mut parts = token.splitn(2, '|');
+        let name = parts.next().unwrap_or_default().trim();
+        if name.is_empty() {
+            return Err(AuthenticationError::with_kind(
+                "Opaque token is inactive",
+                AuthenticationErrorKind::BadCredentials,
+            ));
+        }
+        let authorities = parts
+            .next()
+            .unwrap_or_default()
+            .split(',')
+            .filter(|v| !v.trim().is_empty())
+            .map(|v| {
+                Arc::new(crate::core::authority::SimpleGrantedAuthority::new(
+                    v.trim(),
+                )) as Arc<dyn GrantedAuthority>
+            })
+            .collect();
+        Ok(OAuth2AuthenticatedPrincipal::new(
+            name,
+            authorities,
+            HashMap::new(),
         ))
     }
 }

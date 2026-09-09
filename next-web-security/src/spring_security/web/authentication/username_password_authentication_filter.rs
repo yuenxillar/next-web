@@ -1,28 +1,31 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-use next_web_core::error::BoxError;
-use next_web_core::AnyObject;
+use next_web_core::filter::FilterError;
+use next_web_core::traits::filter::{HttpFilter, HttpFilterChain};
 use next_web_core::{
     async_trait,
-    filter::FilterError,
     http::HttpMethod,
     traits::{
-        filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
 };
 
-use crate::authentication::EMPTY_STRING;
+use crate::authentication::{UsernamePasswordAuthenticationToken, EMPTY_STRING};
 use crate::authorization::AuthenticationManager;
-use crate::core::Authentication;
-use crate::web::util::matcher::{PathPatternRequestMatcher, RequestMatcher};
-use crate::{
-    core::UsernamePasswordAuthenticationToken,
-    web::authentication::BaseAuthenticationProcessingFilter,
+use crate::core::{Authentication, AuthenticationError, AuthenticationErrorKind};
+use crate::web::authentication::{
+    AuthPrincipal, BaseAuthenticationProcessingFilter, BaseAuthenticationProcessingFilterExt,
 };
+use crate::web::util::matcher::{PathPatternRequestMatcher, RequestMatcher};
 
+/// Processes an authentication form submission.
+/// Login forms must present two parameters to this filter: a username and password. The default parameter names to
+/// use are contained in the static fields NEXT_SECURITY_FORM_USERNAME_KEY and NEXT_SECURITY_FORM_PASSWORD_KEY.
+/// The parameter names can also be changed by setting the usernameParameter and passwordParameter properties.
+///
+/// This filter by default responds to the URL /login.
 #[derive(Clone)]
 pub struct UsernamePasswordAuthenticationFilter {
     username_parameter: Box<str>,
@@ -46,41 +49,6 @@ impl UsernamePasswordAuthenticationFilter {
                 authentication_manager,
             ),
         }
-    }
-
-    fn attempt_authentication(
-        &self,
-        request: &dyn HttpRequest,
-        _response: &mut dyn HttpResponse,
-    ) -> Result<Option<Arc<dyn Authentication>>, BoxError> {
-        if self.post_only && request.method() != HttpMethod::POST {
-            return Err(format!(
-                "Authentication method not supported: {:?}",
-                request.method()
-            )
-            .into());
-        }
-
-        let username = self
-            .obtain_username(request)
-            .map(str::trim)
-            .map(ToString::to_string)
-            .map(|s| Arc::new(s) as AnyObject)
-            .unwrap_or_else(|| EMPTY_STRING.to_owned());
-        let password = self
-            .obtain_password(request)
-            .map(ToString::to_string)
-            .map(|s| Arc::new(s) as AnyObject)
-            .unwrap_or_else(|| EMPTY_STRING.to_owned());
-
-        let mut auth_request =
-            UsernamePasswordAuthenticationToken::unauthenticated(Some(username), Some(password));
-
-        // Allow subclasses to set the "details" property
-        self.set_details(request, &mut auth_request);
-        self.get_authentication_manager()
-            .map(|manager| manager.authenticate(&auth_request).map_err(Into::into))
-            .transpose()
     }
 
     /// Enables subclasses to override the composition of the password, such as by including additional values and a separator.
@@ -165,6 +133,51 @@ impl DerefMut for UsernamePasswordAuthenticationFilter {
 }
 
 #[async_trait]
+impl BaseAuthenticationProcessingFilterExt for UsernamePasswordAuthenticationFilter {
+    async fn attempt_authentication(
+        &self,
+        request: &mut dyn HttpRequest,
+        _response: &mut dyn HttpResponse,
+    ) -> Result<Option<Arc<dyn Authentication>>, AuthenticationError> {
+        if self.post_only && request.method() != HttpMethod::POST {
+            return Err(AuthenticationError::with_kind(
+                format!(
+                    "Authentication method not supported: {:?}",
+                    request.method()
+                ),
+                AuthenticationErrorKind::AuthenticationService,
+            ));
+        }
+
+        let username = self
+            .obtain_username(request)
+            .map(str::trim)
+            .map(ToString::to_string)
+            .map(|s| Arc::new(s) as AuthPrincipal)
+            .unwrap_or_else(|| EMPTY_STRING.to_owned());
+        let password = self
+            .obtain_password(request)
+            .map(ToString::to_string)
+            .map(|s| Arc::new(s) as AuthPrincipal)
+            .unwrap_or_else(|| EMPTY_STRING.to_owned());
+
+        let mut auth_request =
+            UsernamePasswordAuthenticationToken::unauthenticated(Some(username), Some(password));
+
+        // Allow subclasses to set the "details" property
+        self.set_details(request, &mut auth_request);
+        match self.get_authentication_manager() {
+            Some(manager) => manager
+                .authenticate(&auth_request)
+                .await
+                .map(Some)
+                .map_err(Into::into),
+            None => Ok(None),
+        }
+    }
+}
+
+#[async_trait]
 impl HttpFilter for UsernamePasswordAuthenticationFilter {
     async fn do_filter(
         &self,
@@ -172,7 +185,7 @@ impl HttpFilter for UsernamePasswordAuthenticationFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        self.base.do_filter(request, response, filter_chain).await
+        BaseAuthenticationProcessingFilter::do_filter(request, response, filter_chain, self).await
     }
 }
 

@@ -15,7 +15,7 @@ use next_web_core::{
 
 use crate::web::authentication::{
     base_authentication_processing_filter::BaseAuthenticationProcessingFilter,
-    ott::OneTimeTokenAuthenticationConverter,
+    ott::OneTimeTokenAuthenticationConverter, BaseAuthenticationProcessingFilterExt,
 };
 
 #[derive(Clone)]
@@ -41,6 +41,8 @@ impl OneTimeTokenAuthenticationFilter {
     pub const DEFAULT_LOGIN_PROCESSING_URL: &'static str = "/login/ott";
 }
 
+impl BaseAuthenticationProcessingFilterExt for OneTimeTokenAuthenticationFilter {}
+
 #[async_trait]
 impl HttpFilter for OneTimeTokenAuthenticationFilter {
     async fn do_filter(
@@ -49,7 +51,7 @@ impl HttpFilter for OneTimeTokenAuthenticationFilter {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        self.base.do_filter(request, response, filter_chain).await
+        BaseAuthenticationProcessingFilter::do_filter(request, response, filter_chain, self).await
     }
 }
 

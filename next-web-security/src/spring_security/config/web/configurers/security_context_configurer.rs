@@ -18,6 +18,10 @@ use crate::{
     },
 };
 
+/// Allows persisting and restoring of the SecurityContext found on the SecurityContextHolder for
+/// each request by configuring the SecurityContextPersistenceFilter. All properties have reasonable defaults,
+/// so no additional configuration is required other than applying this
+/// SecurityConfigurer.
 #[derive(Clone)]
 pub struct SecurityContextConfigurer<H>
 where
@@ -94,35 +98,33 @@ where
         let security_context_repository = self.get_security_context_repository(http);
 
         if self.require_explicit_save {
-            let mut SecurityContextHolder_filter =
+            let mut security_context_holder_filter =
                 SecurityContextHolderFilter::new(security_context_repository);
-            SecurityContextHolder_filter.set_security_context_holder_strategy(
+            security_context_holder_filter.set_security_context_holder_strategy(
                 self.base.get_security_context_holder_strategy().to_owned(),
             );
 
-            // let filter = self.post_process(SecurityContextHolder_filter);
-            http.add_filter(SecurityContextHolder_filter);
-        } else {
-            // // Use SecurityContextPersistenceFilter for implicit save mode
-            // let mut security_context_filter =
-            //     SecurityContextPersistenceFilter::new(security_context_repository);
-            // security_context_filter.set_security_context_holder_strategy(
-            //     self.base.get_security_context_holder_strategy().to_owned(),
-            // );
-            // let session_creation_policy = http
-            //     .configurer::<SessionManagementConfigurer<H>>()
-            //     .map(|sm| sm.get_session_creation_policy());
-            // if session_creation_policy == Some(SessionCreationPolicy::Always) {
-            //     security_context_filter.set_force_eager_session_creation(true);
-
-            //     // let force_eager_filter = self.post_process(ForceEagerSessionCreationFilter::new());
-            //     http.add_filter(ForceEagerSessionCreationFilter::default());
-            // }
-
-            // // let filter = self.post_process(security_context_filter);
-            // http.add_filter(security_context_filter);
-            unreachable!()
+            // let filter = self.post_process(security_context_holder_filter);
+            http.add_filter(security_context_holder_filter);
         }
+        // else {
+        //     let mut security_context_filter =
+        //         SecurityContextPersistenceFilter::new(security_context_repository);
+        //     security_context_filter.set_security_context_holder_strategy(
+        //         self.base.get_security_context_holder_strategy().to_owned(),
+        //     );
+
+        //     if http
+        //         .configurer::<SessionManagementConfigurer<H>>()
+        //         .map(|ma| ma.get_session_creation_policy(http) == SessionCreationPolicy::Always)
+        //         .unwrap_or_default()
+        //     {
+        //         security_context_filter.set_force_eager_session_creation(true);
+        //         http.add_filter(ForceEagerSessionCreationFilter::default());
+        //     }
+
+        //     http.add_filter(security_context_filter);
+        // }
     }
 }
 

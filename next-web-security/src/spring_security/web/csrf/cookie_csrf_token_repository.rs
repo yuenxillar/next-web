@@ -232,7 +232,11 @@ mod tests {
 
         let token = repo.generate_token(&mut request).await;
         repo.save_token(Some(&token), &mut request, &mut response)
-            .await;
+            .await
+            .inspect_err(|err| {
+                eprintln!("Failed to save CSRF token: {}", err);
+            })
+            .ok();
 
         let set_cookie = response.header("set-cookie").unwrap_or_default();
         assert!(set_cookie.contains("XSRF-TOKEN="));
@@ -253,7 +257,12 @@ mod tests {
         let mut request = request_with_cookie("XSRF-TOKEN=abc");
         let mut response = AxumResponse::new(Body::empty());
 
-        repo.save_token(None, &mut request, &mut response).await;
+        repo.save_token(None, &mut request, &mut response)
+            .await
+            .inspect_err(|err| {
+                eprintln!("Failed to save CSRF token: {}", err);
+            })
+            .ok();
 
         let set_cookie = response.header("set-cookie").unwrap_or_default();
         assert!(set_cookie.contains("XSRF-TOKEN="));
@@ -277,7 +286,11 @@ mod tests {
 
         let token = repo.generate_token(&mut request).await;
         repo.save_token(Some(&token), &mut request, &mut response)
-            .await;
+            .await
+            .inspect_err(|err| {
+                eprintln!("Failed to save CSRF token: {}", err);
+            })
+            .ok();
 
         let set_cookie = response.header("set-cookie").unwrap_or_default();
         assert!(!set_cookie.contains("HttpOnly"));

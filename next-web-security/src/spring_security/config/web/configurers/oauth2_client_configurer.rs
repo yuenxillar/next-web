@@ -16,8 +16,8 @@ use crate::{
         AuthenticatedPrincipalOAuth2AuthorizedClientRepository, AuthorizationRequestRepository,
         ClientRegistrationRepository, DefaultOAuth2AuthorizationRequestResolver,
         NullOAuth2AuthorizedClientService, OAuth2AccessTokenResponseClient,
-        OAuth2AuthorizedClientRepository, OAuth2AuthorizationCodeAuthenticationProvider,
-        OAuth2AuthorizationCodeGrantRequest, OAuth2AuthorizationRequestResolver,
+        OAuth2AuthorizationCodeAuthenticationProvider, OAuth2AuthorizationCodeGrantRequest,
+        OAuth2AuthorizationRequestResolver, OAuth2AuthorizedClientRepository,
         RestClientAuthorizationCodeTokenResponseClient,
     },
     web::{
@@ -258,8 +258,8 @@ impl AuthorizationCodeGrantConfigurer {
     ) where
         H: HttpSecurityBuilder<H>,
     {
-        let authorization_request_redirect_filter =
-            self.create_authorization_request_redirect_filter(
+        let authorization_request_redirect_filter = self
+            .create_authorization_request_redirect_filter(
                 http,
                 &outer_client_registration_repository,
             );
@@ -282,10 +282,8 @@ impl AuthorizationCodeGrantConfigurer {
     where
         H: HttpSecurityBuilder<H>,
     {
-        let authorization_request_resolver = self.get_authorization_request_resolver(
-            http,
-            outer_client_registration_repository,
-        );
+        let authorization_request_resolver =
+            self.get_authorization_request_resolver(http, outer_client_registration_repository);
         let mut authorization_request_redirect_filter =
             OAuth2AuthorizationRequestRedirectFilter::new(authorization_request_resolver);
         if let Some(authorization_request_repository) = &self.authorization_request_repository {
@@ -318,10 +316,8 @@ impl AuthorizationCodeGrantConfigurer {
             .expect("AuthenticationManager is required for oauth2 client");
         let client_registration_repository =
             self.get_client_registration_repository(http, outer_client_registration_repository);
-        let authorized_client_repository = self.get_authorized_client_repository(
-            http,
-            outer_authorized_client_repository,
-        );
+        let authorized_client_repository =
+            self.get_authorized_client_repository(http, outer_authorized_client_repository);
         let mut authorization_code_grant_filter = OAuth2AuthorizationCodeGrantFilter::new(
             client_registration_repository,
             authorized_client_repository,
@@ -376,7 +372,10 @@ impl AuthorizationCodeGrantConfigurer {
     {
         outer_client_registration_repository
             .clone()
-            .or_else(|| http.shared_object::<Arc<dyn ClientRegistrationRepository>>().cloned())
+            .or_else(|| {
+                http.shared_object::<Arc<dyn ClientRegistrationRepository>>()
+                    .cloned()
+            })
             .expect("ClientRegistrationRepository is required for oauth2_client")
     }
 
@@ -390,11 +389,14 @@ impl AuthorizationCodeGrantConfigurer {
     {
         outer_authorized_client_repository
             .clone()
-            .or_else(|| http.shared_object::<Arc<dyn OAuth2AuthorizedClientRepository>>().cloned())
+            .or_else(|| {
+                http.shared_object::<Arc<dyn OAuth2AuthorizedClientRepository>>()
+                    .cloned()
+            })
             .unwrap_or_else(|| {
-                Arc::new(AuthenticatedPrincipalOAuth2AuthorizedClientRepository::new(Arc::new(
-                    NullOAuth2AuthorizedClientService::default(),
-                )))
+                Arc::new(AuthenticatedPrincipalOAuth2AuthorizedClientRepository::new(
+                    Arc::new(NullOAuth2AuthorizedClientService::default()),
+                ))
             })
     }
 }

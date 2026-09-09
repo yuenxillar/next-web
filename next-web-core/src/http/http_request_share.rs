@@ -138,11 +138,11 @@ impl HttpRequest for HttpRequestShare {
         todo!()
     }
 
-    fn locale(&self) -> Option<&Locale> {
+    fn locale(&self) -> Option<Locale> {
         todo!()
     }
 
-    fn locales(&self) -> Option<Vec<&Locale>> {
+    fn locales(&self) -> Option<Vec<Locale>> {
         todo!()
     }
 
@@ -175,6 +175,10 @@ impl HttpRequest for HttpRequestShare {
     }
 
     fn shared(&mut self) -> &HttpRequestShare {
+        todo!()
+    }
+
+    fn content_type(&self) -> Option<&str> {
         todo!()
     }
 }

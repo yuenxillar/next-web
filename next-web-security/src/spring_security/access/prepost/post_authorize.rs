@@ -13,4 +13,20 @@ impl PostAuthorize {
             expression: expression.into(),
         }
     }
+
+    pub fn expression(&self) -> &str {
+        &self.expression
+    }
+    pub fn value(&self) -> &str {
+        &self.expression
+    }
+    pub fn set_expression(&mut self, expression: impl Into<String>) {
+        self.expression = expression.into();
+    }
+}
+
+impl super::PrePostExpressionAttribute for PostAuthorize {
+    fn expression(&self) -> &str {
+        &self.expression
+    }
 }

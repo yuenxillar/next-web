@@ -27,7 +27,7 @@ where
 
     /// Called when interactive (e.g. form) login succeeds, so the
     /// implementation can create or refresh a remember-me token.
-    fn login_success(
+    async fn login_success(
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,

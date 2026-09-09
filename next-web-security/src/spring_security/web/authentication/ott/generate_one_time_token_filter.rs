@@ -157,7 +157,7 @@ impl HttpFilter for GenerateOneTimeTokenFilter {
 
         // Notify the success handler.
         self.token_generation_success_handler
-            .handle(request, response, &ott);
+            .handle(request, response, ott.as_ref());
 
         Ok(())
     }

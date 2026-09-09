@@ -1,12 +1,10 @@
 use std::fmt;
 use std::sync::Arc;
-use std::{collections::HashMap, sync::OnceLock};
-
-use next_web_core::{traits::http::http_request::HttpRequest, util::pattern::PathPatternParser};
-use regex::Regex;
+use std::{collections::BTreeMap, sync::OnceLock};
 
 use crate::web::util::matcher::{AnyRequestMatcher, MatchResult, RequestMatcher};
 use next_web_core::http::HttpMethod;
+use next_web_core::{traits::http::http_request::HttpRequest, util::pattern::PathPatternParser};
 
 /// A request matcher that uses path patterns to match against each request.
 ///
@@ -35,12 +33,21 @@ use next_web_core::http::HttpMethod;
 pub struct PathPatternRequestMatcher {
     pattern: Arc<PathPattern>,
     method: Arc<dyn RequestMatcher>,
+    method_key: Option<HttpMethod>,
 }
 
 impl PathPatternRequestMatcher {
     /// Creates a new `PathPatternRequestMatcher` with the given pattern and method matcher.
-    fn new(pattern: Arc<PathPattern>, method: Arc<dyn RequestMatcher>) -> Self {
-        Self { pattern, method }
+    fn new(
+        pattern: Arc<PathPattern>,
+        method: Arc<dyn RequestMatcher>,
+        method_key: Option<HttpMethod>,
+    ) -> Self {
+        Self {
+            pattern,
+            method,
+            method_key,
+        }
     }
 
     /// Constructs a `PathPatternRequestMatcher` using default settings.
@@ -85,9 +92,7 @@ impl PathPatternRequestMatcher {
 
 impl PartialEq for PathPatternRequestMatcher {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.pattern, &other.pattern) || self.pattern == other.pattern
-        // Note: method_matcher comparison is simplified here; in production,
-        // you'd implement PartialEq for HttpMethodMatcher as well
+        self.pattern == other.pattern && self.method_key == other.method_key
     }
 }
 
@@ -96,13 +101,16 @@ impl Eq for PathPatternRequestMatcher {}
 impl std::hash::Hash for PathPatternRequestMatcher {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.pattern.hash(state);
-        // Hash method_matcher appropriately in production
+        self.method_key.hash(state);
     }
 }
 
 impl fmt::Display for PathPatternRequestMatcher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "PathPattern [{:?}{}]", self.method, self.pattern)
+        match self.method_key.as_ref() {
+            Some(method) => write!(f, "PathPattern [{} {}]", method, self.pattern),
+            None => write!(f, "PathPattern [{}]", self.pattern),
+        }
     }
 }
 
@@ -116,16 +124,19 @@ impl RequestMatcher for PathPatternRequestMatcher {
             return MatchResult::not_match();
         }
 
-        MatchResult::not_match()
+        match self.pattern.match_and_extract(request.path()) {
+            Some(vars) => MatchResult::match_with_variables(vars),
+            None => MatchResult::not_match(),
+        }
     }
 }
 
 /// A compiled path pattern that can extract URI variables.
 #[derive(Debug, Clone)]
 struct PathPattern {
-    regex: Regex,
-    variable_names: Vec<String>,
+    segments: Vec<String>,
     pattern_string: String,
+    case_sensitive: bool,
 }
 
 impl PathPattern {
@@ -134,59 +145,64 @@ impl PathPattern {
     /// # Panics
     ///
     /// Panics if the pattern is malformed or contains invalid regex syntax.
-    fn parse(pattern: &str) -> Self {
-        let mut variable_names = Vec::new();
-        let regex_str = Self::pattern_to_regex(pattern, &mut variable_names);
-
-        let regex = Regex::new(&format!("^{}$", regex_str))
-            .unwrap_or_else(|e| panic!("Invalid path pattern '{}': {}", pattern, e));
-
+    fn parse(pattern: &str, case_sensitive: bool) -> Self {
+        assert!(pattern.starts_with('/'), "pattern must start with a /");
+        let segments = pattern.split('/').skip(1).map(str::to_string).collect();
         Self {
-            regex,
-            variable_names,
+            segments,
             pattern_string: pattern.to_string(),
+            case_sensitive,
         }
     }
 
     /// Converts a path pattern string to a regular expression.
     ///
     /// Handles `{variable}` placeholders and `**` wildcards.
-    fn pattern_to_regex(pattern: &str, variable_names: &mut Vec<String>) -> String {
-        // Remove leading slash for regex construction
-        let pattern = pattern.trim_start_matches('/');
-
-        let mut regex = String::from("");
-
-        for segment in pattern.split('/') {
-            if !regex.is_empty() {
-                regex.push('/');
+    fn match_and_extract(&self, path: &str) -> Option<BTreeMap<String, String>> {
+        let values: Vec<&str> = path.split('/').skip(1).collect();
+        let mut vars = BTreeMap::new();
+        let mut pi = 0;
+        for (i, segment) in self.segments.iter().enumerate() {
+            if segment == "**" && i + 1 == self.segments.len() {
+                return Some(vars);
             }
-
-            if segment == "**" {
-                regex.push_str(".*");
-            } else if segment.starts_with('{') && segment.ends_with('}') {
-                let var_name = &segment[1..segment.len() - 1];
-                variable_names.push(var_name.to_string());
-                regex.push_str("([^/]+)");
+            if segment.starts_with("{*") && segment.ends_with('}') && i + 1 == self.segments.len() {
+                vars.insert(
+                    segment[2..segment.len() - 1].to_string(),
+                    values[pi..].join("/"),
+                );
+                return Some(vars);
+            }
+            let raw_value = *values.get(pi)?;
+            let lowered;
+            let value = if self.case_sensitive {
+                raw_value
             } else {
-                regex.push_str(&regex::escape(segment));
-            }
-        }
-
-        format!("/{}", regex)
-    }
-
-    /// Attempts to match a path against this pattern and extract variables.
-    fn match_and_extract(&self, path: &str) -> Option<HashMap<String, String>> {
-        self.regex.captures(path).map(|captures| {
-            let mut variables = HashMap::new();
-            for (i, name) in self.variable_names.iter().enumerate() {
-                if let Some(value) = captures.get(i + 1) {
-                    variables.insert(name.clone(), value.as_str().to_string());
+                lowered = raw_value.to_ascii_lowercase();
+                &lowered
+            };
+            if segment.starts_with('{') && segment.ends_with('}') {
+                let body = &segment[1..segment.len() - 1];
+                let (name, expr) = body.split_once(':').unwrap_or((body, ""));
+                if !expr.is_empty() && !simple_regex_match(expr, value) {
+                    return None;
+                }
+                vars.insert(name.to_string(), value.to_string());
+            } else {
+                let lowered_segment;
+                let segment = if self.case_sensitive {
+                    segment.as_str()
+                } else {
+                    lowered_segment = segment.to_ascii_lowercase();
+                    &lowered_segment
+                };
+                if !segment_match(segment, value) {
+                    return None;
                 }
             }
-            variables
-        })
+            pi += 1;
+        }
+        (pi == values.len()).then_some(vars)
     }
 }
 
@@ -208,6 +224,54 @@ impl fmt::Display for PathPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.pattern_string)
     }
+}
+
+fn segment_match(pattern: &str, value: &str) -> bool {
+    let (p, v): (Vec<char>, Vec<char>) = (pattern.chars().collect(), value.chars().collect());
+    let (mut i, mut j, mut star, mut mark) = (0, 0, None, 0);
+    while j < v.len() {
+        if i < p.len() && (p[i] == '?' || p[i] == v[j]) {
+            i += 1;
+            j += 1;
+        } else if i < p.len() && p[i] == '*' {
+            star = Some(i);
+            i += 1;
+            mark = j;
+        } else if let Some(s) = star {
+            i = s + 1;
+            mark += 1;
+            j = mark;
+        } else {
+            return false;
+        }
+    }
+    while i < p.len() && p[i] == '*' {
+        i += 1;
+    }
+    i == p.len()
+}
+
+fn simple_regex_match(expr: &str, value: &str) -> bool {
+    // Covers the expressions commonly used by Spring path variables.
+    if expr == ".*" {
+        return true;
+    }
+    if expr == "\\w+" {
+        return value.chars().all(|c| c == '_' || c.is_ascii_alphanumeric()) && !value.is_empty();
+    }
+    if let Some(class) = expr
+        .strip_suffix('+')
+        .and_then(|s| s.strip_prefix('[').and_then(|s| s.strip_suffix(']')))
+    {
+        let valid = |c: char| match class {
+            "a-z" => c.is_ascii_lowercase(),
+            "A-Z" => c.is_ascii_uppercase(),
+            "0-9" => c.is_ascii_digit(),
+            _ => class.contains(c),
+        };
+        return !value.is_empty() && value.chars().all(valid);
+    }
+    segment_match(expr, value)
 }
 
 pub static DEFAULT_BUILDER: OnceLock<Builder> = OnceLock::new();
@@ -245,8 +309,12 @@ pub struct Builder {
 
 impl Builder {
     /// Creates a new `Builder` with an empty base path.
-    fn new(parser: Arc<PathPatternParser>, base_path: String) -> Self {
-        Self { parser, base_path }
+    #[allow(unused)]
+    fn new(parser: Arc<PathPatternParser>, base_path: impl Into<String>) -> Self {
+        Self {
+            parser,
+            base_path: base_path.into(),
+        }
     }
 
     fn with_parser(parser: Arc<PathPatternParser>) -> Self {
@@ -312,20 +380,23 @@ impl Builder {
         assert!(path.starts_with('/'), "pattern must start with a /");
 
         let prefix = if self.base_path == "/" {
-            String::new()
+            ""
         } else {
-            self.base_path.clone()
+            self.base_path.as_str()
         };
 
         let full_pattern = format!("{}{}", prefix, path);
-        let path_pattern = Arc::new(PathPattern::parse(&full_pattern));
+        let path_pattern = Arc::new(PathPattern::parse(
+            &full_pattern,
+            self.parser.is_case_sensitive(),
+        ));
 
-        let method_matcher = match method {
-            Some(method) => Arc::new(HttpMethodRequestMatcher::new(method)),
+        let method_matcher = match method.clone() {
+            Some(method) => Arc::new(HttpMethodRequestMatcher::new(method.clone())),
             None => AnyRequestMatcher::instance(),
         };
 
-        PathPatternRequestMatcher::new(path_pattern, method_matcher)
+        PathPatternRequestMatcher::new(path_pattern, method_matcher, method)
     }
 }
 
@@ -359,7 +430,7 @@ mod tests {
 
     #[test]
     fn test_path_with_variables() {
-        let pattern = PathPattern::parse("/users/{id}/posts/{post_id}");
+        let pattern = PathPattern::parse("/users/{id}/posts/{post_id}", true);
 
         let result = pattern.match_and_extract("/users/123/posts/456");
         assert!(result.is_some());
@@ -371,7 +442,7 @@ mod tests {
 
     #[test]
     fn test_wildcard_pattern() {
-        let pattern = PathPattern::parse("/api/**");
+        let pattern = PathPattern::parse("/api/**", true);
 
         assert!(pattern.match_and_extract("/api/users").is_some());
         assert!(pattern.match_and_extract("/api/users/123").is_some());

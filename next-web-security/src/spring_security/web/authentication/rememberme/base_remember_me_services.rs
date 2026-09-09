@@ -103,13 +103,13 @@ impl BaseRememberMeServices {
         request: &dyn HttpRequest,
         user: Arc<dyn UserDetails>,
     ) -> Arc<dyn Authentication> {
-        let authorities = user.authorities().to_vec();
+        let principal = Arc::clone(&user) as AuthPrincipal;
         let mut auth = RememberMeAuthenticationToken::new(
             &self.key,
-            user as AuthPrincipal,
+            principal,
             self.authorities_mapper
                 .as_ref()
-                .map(|gam| gam.map_authorities(&authorities).to_vec()),
+                .map(|gam| gam.map_authorities(user.authorities())),
         );
         auth.set_details(Some(
             self.authentication_details_source.build_details(request),
@@ -413,7 +413,7 @@ where
     /// Examines the incoming request and checks for the presence of the configured
     /// "remember me" parameter. If it's present, or if `always_remember` is set to
     /// true, calls `on_login_success`.
-    fn login_success(
+    async fn login_success(
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
@@ -423,7 +423,8 @@ where
             debug!("Remember-me login not requested.");
             return;
         }
-        self.on_login_success(request, response, successful_authentication);
+        self.on_login_success(request, response, successful_authentication)
+            .await;
     }
 }
 

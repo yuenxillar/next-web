@@ -8,7 +8,7 @@
 - 泛型类 → 泛型 Struct + Trait Bounds  使用 `where` 子句 
 
 ## 2. 代码规范
-- 注释为英文
+- 源代码中有注释则必须要添加注释，必须是英文注释，注释转化时需要转化为符合rust的doc格式
 - 无需添加java版本的 Copyright
 - 代码风格保持大概 无需基本一致
 - 将注释中的 关于java 或者 spring 相关的内容删除
@@ -19,6 +19,7 @@
 - 实现 From trait 简化错误转换
 - 多功能复用的函数需要写上测试用例
 - Java无参构造函数对应的是rust Default函数
+- 在函数运行时不能使用panic等中断程序的操作，在应用启动配置时允许可能需要中断程序的函数
 
 ## 3. 模块管理
 - 当定义多个模块时可使用 `mod access_denied_error;  pub use access_denied_error::AccessDeniedError;` 这种方式可以避免 用户导入时候冗余的导入

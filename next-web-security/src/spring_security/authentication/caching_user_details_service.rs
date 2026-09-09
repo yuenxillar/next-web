@@ -35,19 +35,15 @@ impl UserDetailsService for CachingUserDetailsService {
         &self,
         username: &str,
     ) -> Result<Arc<dyn UserDetails>, AuthenticationError> {
-        // match self.user_cache.as_ref() {
-        //     Some(user_cache) => user_cache,
-        //     None => return,
-        // }
-
-        // if let Some(user) = self.user_cache.get_user_from_cache(username).await {
-        //     return Ok(user);
-        // }
-
-        // let cache_key = self.delegate.user;
-        // self.user_cache
-        //     .put_user_in_cache(cache_key.to_string(), self.delegate.clone());
-        // Ok(user)
-        todo!()
+        if let Some(cache) = &self.user_cache {
+            if let Some(user) = cache.get_user_from_cache(username).await {
+                return Ok(user);
+            }
+        }
+        let user = self.delegate.load_user_by_username(username).await?;
+        if let Some(cache) = &self.user_cache {
+            cache.put_user_in_cache(user.clone()).await;
+        }
+        Ok(user)
     }
 }

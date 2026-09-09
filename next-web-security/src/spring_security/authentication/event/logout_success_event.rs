@@ -1,4 +1,8 @@
-use std::{any::Any, ops::Deref, sync::Arc};
+use std::{
+    any::{Any, TypeId},
+    ops::Deref,
+    sync::Arc,
+};
 
 use next_web_context::ApplicationEvent;
 
@@ -20,11 +24,19 @@ impl LogoutSuccessEvent {
 
 impl ApplicationEvent for LogoutSuccessEvent {
     fn timestamp(&self) -> u64 {
-        self.as_ref().timestamp()
+        self.base.timestamp()
     }
 
     fn source(&self) -> &dyn Any {
-        self.as_ref().source()
+        self.base.source()
+    }
+
+    fn event_type(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+
+    fn source_type(&self) -> TypeId {
+        self.base.source_type()
     }
 }
 

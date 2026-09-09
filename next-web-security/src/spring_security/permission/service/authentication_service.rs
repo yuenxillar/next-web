@@ -1,5 +1,4 @@
 // use crate::auth::models::login_type::LoginType;
-use next_web_core::async_trait;
 
 // #[async_trait]
 // pub trait AuthenticationService: Send + Sync {

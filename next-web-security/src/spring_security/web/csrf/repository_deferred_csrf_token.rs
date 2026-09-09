@@ -46,7 +46,11 @@ impl RepositoryDeferredCsrfToken {
                     );
                     self.csrf_token_repository
                         .save_token(self.csrf_token.as_ref(), &mut self.req, &mut self.resp)
-                        .await;
+                        .await
+                        .inspect_err(|err| {
+                            tracing::error!("Failed to save CSRF token: {}", err);
+                        })
+                        .ok();
                 }
             },
         }

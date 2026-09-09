@@ -112,7 +112,7 @@ mod tests {
             "noop",
             HashMap::from([(
                 String::from("noop"),
-                Arc::new(NoOpPasswordEncoder) as Arc<dyn PasswordEncoder>,
+                Arc::new(NoOpPasswordEncoder::default()) as Arc<dyn PasswordEncoder>,
             )]),
         );
 

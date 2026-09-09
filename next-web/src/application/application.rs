@@ -74,19 +74,22 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 type XResult = std::result::Result<(), Box<dyn std::error::Error>>;
 
-trait XApplication<Es = (), Ctx, Res>
+trait XApplication<Ctx, Es = ()>
 where
     Es: ErrorSolver,
     Ctx: next_web_context::ApplicationContext,
-    Res: App,
 {
-    fn ready(&mut self, ctx: &mut C) -> impl Future<Output = ()> {
+    fn ready(&mut self, ctx: &mut Ctx) -> impl Future<Output = ()> {
         async move {}
     }
 }
 
 #[async_trait]
-pub trait Application {
+pub trait Application
+where
+    Self: Send + Sync,
+    Self: 'static,
+{
     /// The error solver for the application.
     /// Apply it to the `catch_panic` function
     type ErrorSolve: ErrorSolver;
@@ -102,8 +105,8 @@ pub trait Application {
     fn banner_show(application_resources: &ApplicationResources) {
         application_resources
             .load(APPLICATION_BANNER)
-            .and_then(|content| std::str::from_utf8(&content).ok())
-            .map(|txt| TopBanner::show(txt))
+            .and_then(|content| std::str::from_utf8(&content).map(ToOwned::to_owned).ok())
+            .map(|txt| TopBanner::show(&txt))
             .unwrap_or_else(|| TopBanner::show(DEFAULT_TOP_BANNER));
     }
 
@@ -178,8 +181,8 @@ pub trait Application {
 
     /// Before starting the application
     #[allow(unused_variables)]
-    fn on_ready(&self, ctx: &mut ApplicationContext) -> impl Future<Output = Result<()>> {
-        std::future::ready(Ok(()))
+    async fn on_ready(&self, ctx: &mut ApplicationContext) -> Result<()> {
+        Ok(())
     }
 
     /// Suitable for capturing panic in application
@@ -187,7 +190,7 @@ pub trait Application {
         let error = err
             .downcast_ref::<String>()
             .map(|s| s.as_str())
-            .unwrap_or_else(|| err.downcast_ref::<&str>().unwrap_or_default());
+            .unwrap_or_else(|| err.downcast_ref::<&str>().map(|s| *s).unwrap_or_default());
 
         error!("Service panicked: {}", error);
         let mut resp = Self::ErrorSolve::solve_error(error).into_response();
@@ -196,10 +199,12 @@ pub trait Application {
     }
 
     /// No matching route handler
-    fn fallback() -> Response {
-        let mut resp = Self::ErrorSolve::solve_error("Not Found").into_response();
-        *resp.status_mut() = StatusCode::NOT_FOUND;
-        resp
+    fn fallback() -> impl Future<Output = Response> {
+        async move {
+            let mut resp = Self::ErrorSolve::solve_error("Not Found").into_response();
+            *resp.status_mut() = StatusCode::NOT_FOUND;
+            resp
+        }
     }
 
     /// Initialize the api doc.
@@ -488,7 +493,7 @@ pub trait Application {
             .application_router(&mut ctx)
             .await
             // Handle not found route
-            .fallback(Self::fallback)
+            .fallback(s_fallback)
             // Prevent program panic caused by users not setting routes
             .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
 
@@ -879,8 +884,9 @@ pub trait Application {
     }
 }
 
-type FilterResult = Result<Response, Response>;
-async fn http_filter_layer(
+type FilterResult = std::result::Result<Response, Response>;
+
+pub async fn http_filter_layer(
     State(filters): State<Arc<Vec<Arc<dyn HttpFilter>>>>,
     mut req: Request,
     next: Next,
@@ -903,4 +909,12 @@ use crate::extract::find_singleton::FindSingleton;
 #[cfg(feature = "enable-api-doc")]
 async fn openapi(FindSingleton(openapi): FindSingleton<OpenApi>) -> axum::Json<OpenApi> {
     axum::Json(openapi)
+}
+
+fn s_fallback() -> impl Future<Output = Response> {
+    async move {
+        let mut resp = "Not Found".into_response();
+        *resp.status_mut() = StatusCode::NOT_FOUND;
+        resp
+    }
 }

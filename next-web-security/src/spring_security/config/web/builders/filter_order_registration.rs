@@ -69,7 +69,7 @@ impl Default for FilterOrderRegistration {
         filter_order.put::<LogoutFilter>(order.next());
         filter_order.put::<GenerateOneTimeTokenFilter>(order.next());
         // filter_order.put::<X509AuthenticationFilter>(order.next());
-        filter_order.put::<BaseAuthenticationProcessingFilter>(order.next());
+        // filter_order.put::<BaseAuthenticationProcessingFilter>(order.next());
         filter_order.put::<UsernamePasswordAuthenticationFilter>(order.next());
         filter_order.put::<OneTimeTokenAuthenticationFilter>(order.next());
         filter_order.put::<OAuth2AuthorizationRequestRedirectFilter>(order.next());

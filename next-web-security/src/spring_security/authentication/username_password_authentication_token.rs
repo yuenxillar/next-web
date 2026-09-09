@@ -49,7 +49,7 @@ impl UsernamePasswordAuthenticationToken {
         authorities: Vec<Arc<dyn GrantedAuthority>>,
     ) -> Self {
         let mut base = BaseAuthenticationToken::new(Some(authorities));
-        base.set_authenticated(true); // must use super, as we override
+        base.set_authenticated(true).expect("nothing");
 
         Self {
             principal: Some(principal),
@@ -80,7 +80,7 @@ impl UsernamePasswordAuthenticationToken {
 
             base: BaseAuthenticationToken::new(None),
         };
-        token.set_authenticated(false).expect("Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead");
+        token.base.set_authenticated(false);
         token
     }
 
@@ -141,7 +141,17 @@ impl Authentication for UsernamePasswordAuthenticationToken {
 
 impl Principal for UsernamePasswordAuthenticationToken {
     fn name(&self) -> Cow<'_, str> {
-        self.base.name()
+        self.principal
+            .as_ref()
+            .map(|principal| {
+                principal
+                    .as_any()
+                    .downcast_ref::<String>()
+                    .cloned()
+                    .unwrap_or_else(|| principal.to_string())
+            })
+            .map(Cow::Owned)
+            .unwrap_or_default()
     }
 }
 
@@ -154,7 +164,29 @@ impl CredentialsContainer for UsernamePasswordAuthenticationToken {
 
 impl fmt::Debug for UsernamePasswordAuthenticationToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.debug_struct("UsernamePasswordAuthenticationToken")
+            .field(
+                "principal",
+                &self
+                    .principal
+                    .as_ref()
+                    .map(|principal| principal.to_string()),
+            )
+            .field("credentials", &"[PROTECTED]")
+            .field("authenticated", &self.is_authenticated())
+            .field(
+                "details",
+                &self.details().map(|details| details.to_string()),
+            )
+            .field(
+                "authorities",
+                &self
+                    .authorities()
+                    .iter()
+                    .filter_map(|authority| authority.authority())
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
     }
 }
 

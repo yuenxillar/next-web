@@ -85,10 +85,10 @@ impl UserDetailsService for MapUserDetailsService {
 impl UserDetailsPasswordService for MapUserDetailsService {
     async fn update_password(
         &self,
-        user: &dyn UserDetails,
+        user: Arc<dyn UserDetails>,
         new_password: Option<String>,
     ) -> Arc<dyn UserDetails> {
-        let user_details = Self::with_new_password(user, new_password);
+        let user_details = Self::with_new_password(user.as_ref(), new_password);
         let key = Self::key(user.username());
         self.users.write().await.insert(key, user_details.clone());
 

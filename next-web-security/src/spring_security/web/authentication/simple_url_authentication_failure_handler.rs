@@ -133,7 +133,7 @@ impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
                     request,
                     response,
                     self.default_failure_url.as_deref().unwrap_or_default(),
-                );
+                )?;
             }
         }
 

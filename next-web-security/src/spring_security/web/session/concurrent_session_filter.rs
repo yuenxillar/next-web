@@ -101,11 +101,10 @@ impl ConcurrentSessionFilter {
     /// Performs logout by invoking the configured logout handlers with the
     /// current authentication from the security context.
     async fn do_logout(&self, request: &mut dyn HttpRequest, response: &mut dyn HttpResponse) {
-        if let Some(ctx) = self.security_context_holder_strategy.get_context() {
-            self.logout_handlers
-                .logout(request, response, ctx.get_authentication())
-                .await;
-        }
+        let ctx = self.security_context_holder_strategy.get_context();
+        self.logout_handlers
+            .logout(request, response, ctx.get_authentication().as_ref())
+            .await;
     }
 }
 

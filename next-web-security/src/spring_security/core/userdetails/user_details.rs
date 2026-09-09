@@ -1,6 +1,6 @@
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
-use crate::core::GrantedAuthority;
+use crate::{core::GrantedAuthority, web::authentication::Identity};
 
 /// Provides core user information.
 /// Implementations are not used directly by Spring Security for security purposes. They simply store user
@@ -11,8 +11,7 @@ use crate::core::GrantedAuthority;
 /// See User for a reference implementation (which you might like to extend or use in your code).
 pub trait UserDetails
 where
-    Self: Send + Sync,
-    Self: Any,
+    Self: Identity,
 {
     /// Returns the authorities granted to the user.
     fn authorities(&self) -> &[Arc<dyn GrantedAuthority>];

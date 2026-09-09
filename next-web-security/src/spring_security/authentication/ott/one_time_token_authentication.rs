@@ -1,7 +1,7 @@
 use std::{
     any::TypeId,
     borrow::Cow,
-    fmt::Display,
+    fmt::{Debug, Display},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -40,7 +40,10 @@ impl OneTimeTokenAuthentication {
 
     pub fn from_builder(builder: &mut OneTimeTokenAuthenticationBuilder) -> Self {
         Self {
-            principal: builder.principal.take().expect("principal is required"),
+            principal: builder
+                .principal
+                .take()
+                .unwrap_or_else(|| Arc::new(String::new())),
             base: BaseAuthenticationToken::from_builder(builder),
         }
     }
@@ -98,7 +101,7 @@ impl Display for OneTimeTokenAuthentication {
             f,
             "{} [Principal={:?}, Authenticated={}, Authorities={:?}]",
             std::any::type_name::<Self>(),
-            self.principal(),
+            self.principal().map(|principal| principal.to_string()),
             self.is_authenticated(),
             self.base
                 .authorities()
@@ -106,6 +109,12 @@ impl Display for OneTimeTokenAuthentication {
                 .map(|a| a.authority())
                 .collect::<Vec<_>>()
         )
+    }
+}
+
+impl Debug for OneTimeTokenAuthentication {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 

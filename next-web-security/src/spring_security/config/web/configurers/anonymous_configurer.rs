@@ -1,5 +1,4 @@
 use std::{
-    any::Any,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -21,7 +20,7 @@ use crate::{
     },
     core::{authority::AuthorityUtils, GrantedAuthority},
     web::{
-        authentication::AnonymousAuthenticationFilter,
+        authentication::{AnonymousAuthenticationFilter, AuthPrincipal, Identity},
         default_security_filter_chain::DefaultSecurityFilterChain,
     },
 };
@@ -42,7 +41,7 @@ where
     key: Option<String>,
     authentication_provider: Option<Arc<dyn AuthenticationProvider>>,
     authentication_filter: Option<AnonymousAuthenticationFilter>,
-    principal: Arc<dyn Any + Send + Sync>,
+    principal: AuthPrincipal,
     authorities: Vec<Arc<dyn GrantedAuthority>>,
     computed_key: Option<String>,
 
@@ -80,7 +79,7 @@ where
     /// The `AnonymousConfigurer` for further customization of anonymous authentication
     pub fn principal<T>(&mut self, principal: T) -> &mut Self
     where
-        T: Any + Send + Sync,
+        T: Identity,
         T: 'static,
     {
         self.principal = Arc::new(principal);

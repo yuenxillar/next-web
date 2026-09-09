@@ -315,7 +315,7 @@ impl HttpFilter for OAuth2AuthorizationCodeGrantFilter {
             }
         };
 
-        match authentication_manager.authenticate(&authentication) {
+        match authentication_manager.authenticate(&authentication).await {
             Ok(authenticated) => self.successful(request, response, &authenticated).await,
             Err(error) => self.unsuccessful(request, response, error),
         }

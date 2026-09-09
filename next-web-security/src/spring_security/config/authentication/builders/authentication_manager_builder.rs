@@ -1,3 +1,4 @@
+use next_web_core::async_trait;
 use next_web_core::traits::required::Required;
 use std::any::Any;
 use std::sync::Arc;
@@ -10,7 +11,7 @@ use crate::config::base_configured_security_builder::{
 use crate::config::object_post_processor::ObjectPostProcessor;
 use crate::core::{
     userdetails::UserDetailsService,
-    Authentication, CredentialsContainer, {AuthenticationError, AuthenticationErrorKind},
+    Authentication, {AuthenticationError, AuthenticationErrorKind},
 };
 use crate::{
     authentication::{
@@ -18,7 +19,6 @@ use crate::{
         authentication_event_publisher::{
             AuthenticationEventPublisher, NullAuthenticationEventPublisher,
         },
-        authentication_events::{AuthenticationFailureEvent, AuthenticationSuccessEvent},
         AuthenticationProvider,
     },
     config::{security_configurer::SecurityConfigurer, web::builders::HttpSecurity},
@@ -131,19 +131,21 @@ impl BaseConfiguredSecurityBuilderExt<Arc<dyn AuthenticationManager>, Self>
     fn perform_build(&mut self) -> Arc<dyn AuthenticationManager> {
         if !self.is_configured() {
             debug!("No authenticationProviders and no parentAuthenticationManager defined.");
-            return;
+            return Arc::new(ProviderManager::new(Vec::new()));
         }
 
-        let mut provider_manager = ProviderManager::with_parent(
-            std::mem::take(&mut self.authentication_providers),
-            self.parent_authentication_manager.take(),
-        );
+        let providers = std::mem::take(&mut self.authentication_providers);
+        let mut provider_manager = if let Some(parent) = self.parent_authentication_manager.take() {
+            ProviderManager::with_parent(providers, parent)
+        } else {
+            ProviderManager::new(providers)
+        };
 
         if let Some(erase_credentials) = self.erase_credentials {
             provider_manager.set_erase_credentials_after_authentication(erase_credentials);
         }
 
-        provider_manager.set_authentication_event_publisher(self.event_publisher);
+        provider_manager.set_authentication_event_publisher(self.event_publisher.clone());
 
         // post_processing
 
@@ -214,8 +216,9 @@ struct ProviderAuthenticationManager {
     event_publisher: Arc<dyn AuthenticationEventPublisher>,
 }
 
+#[async_trait]
 impl AuthenticationManager for ProviderAuthenticationManager {
-    fn authenticate(
+    async fn authenticate(
         &self,
         authentication: &dyn Authentication,
     ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
@@ -225,8 +228,8 @@ impl AuthenticationManager for ProviderAuthenticationManager {
             ));
         }
 
-        let handle = tokio::runtime::Handle::try_current().ok();
-        let authentication_type = authentication.authentication_type();
+        let authentication_type = authentication.of();
+        let authentication_arc = authentication.to_builder().build();
         let mut last_error = None;
         let mut parent_attempted = false;
         let mut supported_provider_found = false;
@@ -235,30 +238,23 @@ impl AuthenticationManager for ProviderAuthenticationManager {
                 continue;
             }
             supported_provider_found = true;
-            let result = if let Some(handle) = &handle {
-                tokio::task::block_in_place(|| {
-                    handle.block_on(provider.authenticate(authentication))
-                })
-            } else {
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|err| AuthenticationError::new(err.to_string()))?
-                    .block_on(provider.authenticate(authentication))
-            };
+            let result = provider.authenticate(&authentication_arc).await;
 
             match result {
                 Ok(authentication) => {
-                    let authentication = self.erase_credentials(authentication);
-                    self.event_publisher.publish_authentication_success(
-                        AuthenticationSuccessEvent::new(authentication.clone()),
-                    );
+                    let authentication = match authentication {
+                        Some(value) => self.erase_credentials(value),
+                        None => continue,
+                    };
+                    self.event_publisher
+                        .publish_authentication_success(authentication.clone());
                     return Ok(authentication);
                 }
                 Err(error) => {
                     if error.is_account_status_error() || error.is_internal_service_error() {
                         self.event_publisher.publish_authentication_failure(
-                            AuthenticationFailureEvent::new(authentication, error.clone()),
+                            error.clone(),
+                            authentication_arc.clone(),
                         );
                         return Err(error);
                     }
@@ -269,7 +265,7 @@ impl AuthenticationManager for ProviderAuthenticationManager {
 
         if let Some(parent) = &self.parent {
             parent_attempted = true;
-            match parent.authenticate(authentication) {
+            match parent.authenticate(authentication).await {
                 Ok(authentication) => {
                     return Ok(self.erase_credentials(authentication));
                 }
@@ -281,20 +277,19 @@ impl AuthenticationManager for ProviderAuthenticationManager {
 
         if let Some(error) = last_error {
             if !parent_attempted {
-                self.event_publisher.publish_authentication_failure(
-                    AuthenticationFailureEvent::new(authentication, error.clone()),
-                );
+                self.event_publisher
+                    .publish_authentication_failure(error.clone(), authentication_arc.clone());
             }
             return Err(error);
         }
         if !supported_provider_found {
             let error = provider_not_found(format!(
-                "No AuthenticationProvider found for {authentication_type}"
+                "No AuthenticationProvider found for {:?}",
+                authentication_type
             ));
             if !parent_attempted {
-                self.event_publisher.publish_authentication_failure(
-                    AuthenticationFailureEvent::new(authentication, error.clone()),
-                );
+                self.event_publisher
+                    .publish_authentication_failure(error.clone(), authentication_arc.clone());
             }
             return Err(error);
         }
@@ -304,10 +299,7 @@ impl AuthenticationManager for ProviderAuthenticationManager {
         );
         if !parent_attempted {
             self.event_publisher
-                .publish_authentication_failure(AuthenticationFailureEvent::new(
-                    authentication,
-                    error.clone(),
-                ));
+                .publish_authentication_failure(error.clone(), authentication_arc);
         }
         Err(error)
     }
@@ -318,18 +310,12 @@ impl ProviderAuthenticationManager {
         &self,
         authentication: Arc<dyn Authentication>,
     ) -> Arc<dyn Authentication> {
-        // if !self.erase_credentials_after_authentication {
-        //     return authentication;
-        // }
-        // if let Some(token) = (authentication.as_ref() as &dyn Any)
-        //     .downcast_ref::<UsernamePasswordAuthenticationToken>()
-        // {
-        //     let mut token = token.clone();
-        //     CredentialsContainer::erase_credentials(&mut token);
-        //     return Arc::new(token);
-        // }
-        // authentication
-        todo!()
+        if !self.erase_credentials_after_authentication {
+            return authentication;
+        }
+        let mut builder = authentication.to_builder();
+        builder.credentials(None);
+        builder.build()
     }
 }
 

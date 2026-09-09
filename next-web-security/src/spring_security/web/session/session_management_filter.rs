@@ -157,15 +157,15 @@ impl HttpFilter for SessionManagementFilter {
 
         if !self.security_context_repository.contains_context(request) {
             let context = self.security_context_holder_strategy.get_context();
-            let authentication = context.as_ref().and_then(|s| s.get_authentication());
+            let authentication = context.get_authentication();
 
             if self
                 .trust_resolver
-                .is_authenticated(authentication.map(|auth| auth.as_ref()))
+                .is_authenticated(authentication.as_deref())
             {
                 // The user has been authenticated during the current request, so
                 // call the session strategy.
-                if let Some(authentication) = authentication {
+                if let Some(authentication) = authentication.as_ref() {
                     match self
                         .session_authentication_strategy
                         .on_authentication(authentication, request, response)
@@ -175,13 +175,10 @@ impl HttpFilter for SessionManagementFilter {
                             // Eagerly save the security context to make it available
                             // for any possible re-entrant requests which may occur
                             // before the current request completes. SEC-1396.
-                            if let Some(context) =
-                                self.security_context_holder_strategy.get_context()
-                            {
-                                self.security_context_repository
-                                    .save_context(&context, request, response)
-                                    .await;
-                            }
+                            let context = self.security_context_holder_strategy.get_context();
+                            self.security_context_repository
+                                .save_context(&context, request, response)
+                                .await;
                         }
                         Err(ex) => {
                             // The session strategy can reject the authentication.

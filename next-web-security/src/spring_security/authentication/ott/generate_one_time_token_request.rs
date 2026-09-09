@@ -13,7 +13,6 @@ impl GenerateOneTimeTokenRequest {
 
     pub fn with_expires_in(username: impl Into<String>, expires_in: Duration) -> Self {
         let username = username.into();
-        assert!(!username.trim().is_empty(), "username cannot be empty");
         Self {
             username,
             expires_in,

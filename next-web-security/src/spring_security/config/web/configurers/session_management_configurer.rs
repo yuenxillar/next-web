@@ -78,7 +78,6 @@ pub struct SessionManagementConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    default_session_fixation_strategy: Arc<dyn SessionAuthenticationStrategy>,
     pub(super) session_fixation_authentication_strategy:
         Option<Arc<dyn SessionAuthenticationStrategy>>,
     session_authentication_strategy: Option<Arc<dyn SessionAuthenticationStrategy>>,
@@ -313,7 +312,10 @@ where
     /// # Arguments
     ///
     /// * `maximum_sessions` - The maximum number of sessions for a user.
-    pub fn maximum_sessions(&mut self, maximum_sessions: i32) -> ConcurrencyControlConfigurer<H> {
+    pub fn maximum_sessions<'a>(
+        &'a mut self,
+        maximum_sessions: i32,
+    ) -> ConcurrencyControlConfigurer<'a, H> {
         self.session_limit = Some(session_limit_of(maximum_sessions));
         self.properties_that_require_implicit_authentication
             .insert(format!("maximum_sessions = {}", maximum_sessions));
@@ -488,7 +490,7 @@ where
     }
 
     /// Gets the `SessionCreationPolicy`. Can not be null.
-    fn get_session_creation_policy(&self, http: &H) -> SessionCreationPolicy {
+    pub(crate) fn get_session_creation_policy(&self, http: &H) -> SessionCreationPolicy {
         if let Some(policy) = self.session_policy {
             return policy;
         }
@@ -721,7 +723,6 @@ where
     fn default() -> Self {
         let default_strategy = Self::create_default_session_fixation_protection_strategy();
         Self {
-            default_session_fixation_strategy: default_strategy.clone(),
             session_fixation_authentication_strategy: Some(default_strategy),
             session_authentication_strategy: None,
             provided_session_authentication_strategy: None,

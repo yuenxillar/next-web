@@ -113,47 +113,46 @@ impl ErrorTranslationFilter {
         chain: &dyn HttpFilterChain,
         error: &AccessDeniedError,
     ) -> Result<(), BoxError> {
-        if let Some(ctx) = self.security_context_holder_strategy.get_context() {
-            let authentication = ctx.get_authentication();
-            let _auth = authentication.map(AsRef::as_ref);
+        let ctx = self.security_context_holder_strategy.get_context();
+        let authentication = ctx.get_authentication();
+        let auth = authentication.as_deref();
 
-            if self.authentication_trust_resolver.is_anonymous(_auth)
-                || self.authentication_trust_resolver.is_remember_me(_auth)
-            {
-                _auth.map(|authentication| {
+        if self.authentication_trust_resolver.is_anonymous(auth)
+            || self.authentication_trust_resolver.is_remember_me(auth)
+        {
+            auth.map(|authentication| {
                     if enabled!(Level::TRACE) {
                         trace!(
                             "Sending {} to authentication entry point since access is denied, error: {}",
-                            authentication,
+                            authentication.name(),
                             error
                         );
                     }
                 });
 
-                let mut ex = AuthenticationError::with_kind(
-                    self.messages.message_or_default(
-                        "ErrorTranslationFilter.insufficientAuthentication",
-                        None,
-                        "Full authentication is required to access this resource",
-                    ),
-                    AuthenticationErrorKind::InsufficientAuthentication,
-                );
+            let mut ex = AuthenticationError::with_kind(
+                self.messages.message_or_default(
+                    "ErrorTranslationFilter.insufficientAuthentication",
+                    None,
+                    "Full authentication is required to access this resource",
+                ),
+                AuthenticationErrorKind::InsufficientAuthentication,
+            );
 
-                authentication.map(|auth| ex.set_authentication_request(auth.clone()));
-                return self.send_start_authentication(request, response, chain, &ex);
-            } else {
-                _auth.map(|authentication| {
-                    if enabled!(Level::TRACE) {
-                        trace!(
-                            "Sending {} to access denied handler since access is denied, error: {}",
-                            authentication,
-                            error
-                        );
-                    }
-                });
+            authentication.map(|auth| ex.set_authentication_request(auth));
+            return self.send_start_authentication(request, response, chain, &ex);
+        } else {
+            auth.map(|authentication| {
+                if enabled!(Level::TRACE) {
+                    trace!(
+                        "Sending {} to access denied handler since access is denied, error: {}",
+                        authentication.name(),
+                        error
+                    );
+                }
+            });
 
-                return self.access_denied_handler.handle(request, response, error);
-            }
+            return self.access_denied_handler.handle(request, response, error);
         }
 
         Ok(())

@@ -216,30 +216,26 @@ impl BasicAuthenticationFilter {
     /// isn't authenticated (see SEC-53). Also handles the unusual condition where an
     /// `AnonymousAuthenticationToken` is already present (see SEC-610).
     pub fn authentication_is_required(&self, username: &str) -> bool {
-        match self.security_context_holder_strategy.as_ref().get_context() {
-            Some(ctx) => {
-                let existing_auth = match ctx.get_authentication() {
-                    Some(auth) => auth,
-                    None => return true,
-                };
-                if existing_auth.name() != username || !existing_auth.is_authenticated() {
-                    return true;
-                }
-
-                // Handle unusual condition where an AnonymousAuthenticationToken is already
-                // present. This shouldn't happen very often, as BasicAuthenticationFilter is
-                // meant to
-                // be earlier in the filter chain than AnonymousAuthenticationFilter.
-                // Nevertheless, presence of both an AnonymousAuthenticationToken together with a
-                // BASIC authentication request header should indicate reauthentication using the
-                // BASIC protocol is desirable. This behaviour is also consistent with that
-                // provided by form and digest, both of which force re-authentication if the
-                // respective header is detected (and in doing so replace/ any existing
-                // AnonymousAuthenticationToken). See SEC-610.
-                existing_auth.of() == TypeId::of::<AnonymousAuthenticationToken>()
-            }
+        let ctx = self.security_context_holder_strategy.as_ref().get_context();
+        let existing_auth = match ctx.get_authentication() {
+            Some(auth) => auth,
             None => return true,
+        };
+        if existing_auth.name() != username || !existing_auth.is_authenticated() {
+            return true;
         }
+
+        // Handle unusual condition where an AnonymousAuthenticationToken is already
+        // present. This shouldn't happen very often, as BasicAuthenticationFilter is
+        // meant to
+        // be earlier in the filter chain than AnonymousAuthenticationFilter.
+        // Nevertheless, presence of both an AnonymousAuthenticationToken together with a
+        // BASIC authentication request header should indicate reauthentication using the
+        // BASIC protocol is desirable. This behaviour is also consistent with that
+        // provided by form and digest, both of which force re-authentication if the
+        // respective header is detected (and in doing so replace/ any existing
+        // AnonymousAuthenticationToken). See SEC-610.
+        existing_auth.of() == TypeId::of::<AnonymousAuthenticationToken>()
     }
 
     /// Returns the authentication entry point, if set.
@@ -321,11 +317,10 @@ impl HttpFilter for BasicAuthenticationFilter {
             let mut func = async || -> Result<(), AuthenticationError> {
                 let mut auth_result = self
                     .authentication_manager
-                    .authenticate(auth_request.as_ref())?;
+                    .authenticate(auth_request.as_ref())
+                    .await?;
 
-                let current = SecurityContextHolder::get_context()
-                    .as_ref()
-                    .and_then(|c| c.get_authentication().map(Clone::clone));
+                let current = SecurityContextHolder::get_context().get_authentication();
 
                 if self.should_perform_mfa(current.as_deref(), auth_result.as_ref()) {
                     let mut builder = auth_result.as_ref().to_builder();
@@ -358,7 +353,9 @@ impl HttpFilter for BasicAuthenticationFilter {
                     tracing::debug!("Set SecurityContextHolder to {}", auth_result.name());
                 }
                 if let Some(remember_me_services) = &self.remember_me_services {
-                    remember_me_services.login_success(request, response, auth_result.as_ref());
+                    remember_me_services
+                        .login_success(request, response, auth_result.as_ref())
+                        .await;
                 }
                 self.security_context_repository
                     .save_context(&context, request, response)
