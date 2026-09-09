@@ -1,4 +1,4 @@
-use std::{any::TypeId, borrow::Cow, collections::HashMap, fs::File, io::Read, sync::Arc};
+use std::{any::TypeId, collections::HashMap, fs::File, io::Read, sync::Arc};
 
 use axum::{
     body::Body,
@@ -19,6 +19,7 @@ use next_web_core::{
     traits::{
         any_clone::AnyClone,
         filter::{HttpFilter, HttpFilterChain},
+        http::http_response::HttpResponse,
     },
 };
 use next_web_security::{
@@ -28,8 +29,7 @@ use next_web_security::{
         web::{WebSecurityConfigurer, builders::HttpSecurity},
     },
     web::{
-        filter_chain_proxy::{FilterChainProxy, VirtualFilterChain},
-        security_filter_chain::SecurityFilterChain,
+        filter_chain_proxy::FilterChainProxy, security_filter_chain::SecurityFilterChain,
         util::matcher::Builder,
     },
 };
@@ -61,12 +61,13 @@ impl Application for TestApplication {
         ));
         let mut shared_objects: HashMap<TypeId, Box<dyn AnyClone>> = HashMap::new();
         shared_objects.insert(TypeId::of::<ApplicationContext>(), Box::new(ctx));
+        shared_objects.insert(TypeId::of::<Builder>(), Box::new(Builder::default()));
 
         #[derive(Clone)]
         struct DefaultApplicationEventPublisher;
 
         impl ApplicationEventPublisher for DefaultApplicationEventPublisher {
-            fn publish_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
+            fn publish_event(&self, _event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
                 Ok(())
             }
         }
@@ -77,10 +78,20 @@ impl Application for TestApplication {
         }
         let chain = http.build();
 
-        let mut filter = CompositeFilter::default();
-        filter.set_filters(vec![Arc::new(FilterChainProxy::new(vec![Arc::new(chain)]))]);
-
-        let filter_chain = ApplicationFilterChain::new(vec![Arc::new(filter)]);
+        println!(
+            "{}",
+            chain
+                .get_filters()
+                .iter()
+                .map(|f| f.name())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        let filter: Arc<dyn HttpFilter> = {
+            let mut filter = CompositeFilter::default();
+            filter.set_filters(vec![Arc::new(FilterChainProxy::new(vec![Arc::new(chain)]))]);
+            Arc::new(filter)
+        };
 
         axum::Router::new()
             .route(
@@ -102,7 +113,7 @@ impl Application for TestApplication {
                     .route("/hello", get(async || "Hello!"))
                     .route("/get", post(async || "Authorized"))
                     .route_layer(axum::middleware::from_fn_with_state(
-                        Arc::new(filter_chain) as Arc<dyn HttpFilterChain>,
+                        filter,
                         http_filter_layer,
                     )),
             )
@@ -120,23 +131,37 @@ impl Application for TestApplication {
 type FilterResult = std::result::Result<Response, Response>;
 
 pub async fn http_filter_layer(
-    State(filter_chain): State<Arc<dyn HttpFilterChain>>,
+    State(filter): State<Arc<dyn HttpFilter>>,
     mut req: Request,
     next: Next,
 ) -> FilterResult {
+    let filter_chain = ApplicationFilterChain::new(vec![filter]);
     let mut resp = Response::new(Body::empty());
 
     if let Err(err) = filter_chain.do_filter(&mut req, &mut resp).await {
-        tracing::error!("The  filter_chain encountered an error: {}", err)
+        tracing::error!("{}", err);
+        return Err(Response::new(err.to_string().into()));
+    }
+
+    if resp.is_committed() {
+        return Ok(resp);
     }
 
     Ok(next.run(req).await)
 }
 
 mod t2 {
+
+    use axum::http::StatusCode;
     use next_web::macros::bind::singleton;
     use next_web_core::http::HttpMethod;
-    use next_web_security::config::web::{WebSecurityConfigurer, builders::HttpSecurity};
+    use next_web_security::{
+        config::{
+            http::SessionCreationPolicy,
+            web::{WebSecurityConfigurer, builders::HttpSecurity},
+        },
+        web::{access::access_denied_handler_fn_wrapper, authentication_entry_point_fn_wrapper},
+    };
 
     #[singleton(binds = [Self::into_web_security_configure])]
     #[derive(Clone)]
@@ -151,7 +176,7 @@ mod t2 {
     impl WebSecurityConfigurer for TestWebSecurityConfigure {
         fn configure(&mut self, http: &mut HttpSecurity) {
             http.csrf(|csrf| {
-                csrf.spa();
+                csrf.get_security_context_holder_strategy();
             })
             .authorize_http_requests(|auth| {
                 auth.request_matchers(&["/auth/**"])
@@ -162,12 +187,48 @@ mod t2 {
                     .authenticated();
             })
             .headers(|headers| {
-                headers.xss_protection(|xss| {
-                    xss.disable();
-                });
+                headers.get_security_context_holder_strategy();
             })
             .port_mapper(|pm| {
                 pm.http(30).maps_to(1000).http(40).maps_to(1010);
+            })
+            .error_handling(|eh| {
+                eh.authentication_entry_point(authentication_entry_point_fn_wrapper(
+                    |_req, resp, _err| {
+                        resp.insert_header("Content-Type", "application/json;charset=UTF-8");
+                        resp.set_status_code(StatusCode::UNAUTHORIZED);
+                        resp.set_body(
+                            r#"{"code": 401, "message": "未认证，请先登录"}"#.as_bytes().to_vec(),
+                        );
+
+                        Ok(())
+                    },
+                ))
+                .access_denied_handler(access_denied_handler_fn_wrapper(|_req, resp, _err| {
+                    resp.insert_header("Content-Type", "application/json;charset=UTF-8");
+                    resp.set_status_code(StatusCode::FORBIDDEN);
+                    resp.set_body(r#"{"code": 403, "message": "权限不足"}"#.as_bytes().to_vec());
+
+                    Ok(())
+                }));
+            })
+            .security_context(|sc| {
+                sc.is_require_explicit_save();
+            })
+            .anonymous(|a| {
+                a.get_security_context_holder_strategy();
+            })
+            .session_management(|session| {
+                session.session_creation_policy(SessionCreationPolicy::Stateless);
+            })
+            .request_cache(|r| {
+                r.get_security_context_holder_strategy();
+            })
+            .logout(|f| {
+                f.get_security_context_holder_strategy();
+            })
+            .form_login(|f| {
+                f.get_authentication_filter();
             });
         }
     }

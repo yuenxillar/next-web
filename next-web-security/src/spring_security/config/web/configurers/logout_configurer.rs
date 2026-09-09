@@ -258,13 +258,13 @@ where
                 let put = builder.matcher(Some(HttpMethod::PUT), &self.logout_url);
                 let delete = builder.matcher(Some(HttpMethod::DELETE), &self.logout_url);
 
-                let ele = [get, post, put, delete]
+                let matchers = [get, post, put, delete]
                     .into_iter()
                     .map(|a| Arc::new(a) as Arc<dyn RequestMatcher>)
                     .collect::<Vec<_>>();
-                Arc::new(OrRequestMatcher::new(ele))
+                Arc::new(OrRequestMatcher::new(matchers))
             })
-            .unwrap()
+            .expect("Builder not found in shared objects")
     }
 }
 

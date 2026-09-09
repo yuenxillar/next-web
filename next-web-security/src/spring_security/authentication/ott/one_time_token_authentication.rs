@@ -25,12 +25,16 @@ pub struct OneTimeTokenAuthentication {
 
 impl OneTimeTokenAuthentication {
     pub fn new(principal: impl Into<String>, authorities: Vec<Arc<dyn GrantedAuthority>>) -> Self {
-        let mut inner = BaseAuthenticationToken::new(Some(authorities));
-        inner.set_authenticated(true);
+        let mut base = BaseAuthenticationToken::new(Some(authorities));
+        base.set_authenticated(true)
+            .inspect_err(|err| {
+                tracing::error!("BaseAuthenticationToken set_authenticated failed: {}", err)
+            })
+            .ok();
 
         Self {
             principal: Arc::new(principal.into()),
-            base: inner,
+            base,
         }
     }
 
@@ -72,7 +76,7 @@ impl Authentication for OneTimeTokenAuthentication {
                 "Cannot set this token to trusted - use the new constructor instead".into(),
             );
         }
-        self.base.set_authenticated(false);
+        self.base.set_authenticated(false)?;
         Ok(())
     }
 

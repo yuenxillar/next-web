@@ -448,9 +448,6 @@ impl HttpSecurity {
     }
 }
 
-// =========================================================================
-// Trait implementations
-// =========================================================================
 impl SecurityBuilder<DefaultSecurityFilterChain> for HttpSecurity {
     fn build(&mut self) -> DefaultSecurityFilterChain {
         assert!(

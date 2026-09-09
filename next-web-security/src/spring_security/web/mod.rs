@@ -20,7 +20,9 @@ mod redirect_strategy;
 mod request_matcher_redirect_filter;
 mod web_attributes;
 
-pub use authentication_entry_point::AuthenticationEntryPoint;
+pub use authentication_entry_point::{
+    authentication_entry_point_fn_wrapper, AuthenticationEntryPoint,
+};
 pub use port_mapper::PortMapper;
 pub use port_mapper_impl::PortMapperImpl;
 pub use redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy};

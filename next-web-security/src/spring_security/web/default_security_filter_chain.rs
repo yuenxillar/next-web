@@ -9,6 +9,8 @@ use crate::{web::security_filter_chain::SecurityFilterChain, web::util::matcher:
 pub struct DefaultSecurityFilterChain {
     request_matcher: Arc<dyn RequestMatcher>,
     filters: Vec<Arc<dyn HttpFilter>>,
+
+    #[allow(dead_code)]
     name: Box<str>,
 }
 

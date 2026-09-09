@@ -3,7 +3,6 @@ use std::sync::LazyLock;
 
 use next_web_core::async_trait;
 use next_web_core::error::BoxError;
-use next_web_core::traits::http::http_request::HttpRequest;
 use tracing::enabled;
 use tracing::Level;
 

@@ -47,6 +47,6 @@ impl MessageSourceAccessor {
         args: Option<&[&dyn fmt::Display]>,
         default: &str,
     ) -> String {
-        todo!()
+        default.to_string()
     }
 }

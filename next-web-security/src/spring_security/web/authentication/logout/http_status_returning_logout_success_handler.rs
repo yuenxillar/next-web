@@ -34,7 +34,7 @@ impl LogoutSuccessHandler for HttpStatusReturningLogoutSuccessHandler {
         _authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError> {
         response.set_status_code(self.http_status_to_return);
-        response.finish();
+        response.commit();
 
         Ok(())
     }

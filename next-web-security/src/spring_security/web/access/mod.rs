@@ -7,7 +7,7 @@ mod delegating_missing_authority_access_denied_handler;
 mod error_translation_filter;
 mod request_matcher_delegating_access_denied_handler;
 
-pub use access_denied_handler::AccessDeniedHandler;
+pub use access_denied_handler::{access_denied_handler_fn_wrapper, AccessDeniedHandler};
 pub use access_denied_handler_impl::AccessDeniedHandlerImpl;
 pub use delegating_access_denied_handler::DelegatingAccessDeniedHandler;
 pub use delegating_missing_authority_access_denied_handler::{

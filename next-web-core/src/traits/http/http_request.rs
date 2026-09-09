@@ -1,15 +1,11 @@
 use crate::http::{HttpRequestShare, HttpVersion};
 use axum::{
     extract::Request,
-    http::{HeaderMap, HeaderValue, Uri, uri::Scheme},
+    http::{HeaderMap, HeaderValue, Uri, header::CONTENT_TYPE, uri::Scheme},
 };
 
 use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
-use std::{
-    collections::{HashMap, hash_map},
-    net::SocketAddr,
-    sync::OnceLock,
-};
+use std::{collections::HashMap, net::SocketAddr, sync::OnceLock};
 
 use crate::{
     anys::any_value::AnyValue,
@@ -110,30 +106,24 @@ impl HttpRequest for Request {
         AuthType::from_request(self)
     }
 
-    // fn session(&self, name: &str) -> Option<String> {
-    //     self.cookie()
-    //         .map(|cookie| cookie.get(name).map(ToString::to_string))
-    //         .unwrap_or_default()
-    // }
-
     fn session(&self) -> Option<&dyn HttpSession> {
         None
     }
 
-    fn session_mut(&mut self, create: bool) -> Option<&mut dyn HttpSession> {
-        todo!()
+    fn session_mut(&mut self, _create: bool) -> Option<&mut dyn HttpSession> {
+        None
     }
 
     fn change_session_id(&mut self) -> String {
-        todo!()
+        String::new()
     }
 
     fn is_requested_session_id_valid(&self) -> bool {
-        todo!()
+        false
     }
 
     fn requested_session_id(&self) -> Option<&str> {
-        todo!()
+        None
     }
 
     fn cookie(&self) -> Option<&Cookie> {
@@ -145,39 +135,7 @@ impl HttpRequest for Request {
         Some(lock.get_or_init(|| parse_cookies(self)).as_slice())
     }
 
-    fn request_dispatcher(&self, mut path: &str) -> Option<&dyn RequestDispatcher> {
-        if path.is_empty() {
-            return None;
-        }
-
-        let fragment_pos = path.find('#');
-        if fragment_pos.is_some() {
-            if let Some(var) = path.get(0..fragment_pos.unwrap()) {
-                path = var;
-            }
-        }
-
-        // If the path is already context-relative, just pass it through
-        if path.starts_with('/') {
-            // return Some(());
-        }
-
-        let request_path = self.path();
-        let pos = request_path.rfind('/');
-        let mut relative = None;
-        if pos.is_some() {
-            if let Some(data) = request_path.get(0..pos.unwrap() + 1) {
-                let str1 = urlencoding::encode(data);
-                let mut str2 = String::from(str1);
-                str2.push_str(path);
-                relative = Some(str2);
-            }
-        } else {
-            relative = Some(String::from(urlencoding::encode(request_path)) + path);
-        }
-
-        // Validate the path argument
-
+    fn request_dispatcher(&self, _default_failure_url: &str) -> Option<&dyn RequestDispatcher> {
         None
     }
 
@@ -194,7 +152,9 @@ impl HttpRequest for Request {
     }
 
     fn content_type(&self) -> Option<&str> {
-        todo!()
+        self.headers()
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
     }
 
     fn header(&self, header_name: &str) -> Option<&str> {
@@ -228,10 +188,10 @@ impl HttpRequest for Request {
     }
 
     fn parameter(&self, name: &str) -> Option<&str> {
-        self.query().and_then(|query| {
-            query
-                .split('&')
-                .find_map(|param| param.split('=').nth(1).filter(|value| *value == name))
+        let query = self.query()?;
+        query.split('&').find_map(|pair| {
+            let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+            (key == name).then_some(value)
         })
     }
 
@@ -289,11 +249,21 @@ impl HttpRequest for Request {
     }
 
     fn locale(&self) -> Option<Locale> {
-        todo!()
+        self.header("Accept-Language")
+            .and_then(Locale::from_accept_language)
     }
 
     fn locales(&self) -> Option<Vec<Locale>> {
-        todo!()
+        let accept_language = self.header("Accept-Language")?;
+        let locales: Vec<Locale> = accept_language
+            .split(',')
+            .filter_map(Locale::from_accept_language)
+            .collect();
+        if locales.is_empty() {
+            Some(vec![Locale::default()])
+        } else {
+            Some(locales)
+        }
     }
 
     fn remove_attribute(&mut self, name: &str) {

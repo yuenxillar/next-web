@@ -70,6 +70,10 @@ impl AuthenticationError {
     pub fn is_internal_service_error(&self) -> bool {
         self.kind == AuthenticationErrorKind::InternalService
     }
+
+    pub fn cause(&self) -> Option<&(dyn AnyError + 'static)> {
+        self.cause.as_ref().map(|e| e.as_ref())
+    }
 }
 impl Display for AuthenticationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -80,7 +80,13 @@ impl UsernamePasswordAuthenticationToken {
 
             base: BaseAuthenticationToken::new(None),
         };
-        token.base.set_authenticated(false);
+        token
+            .base
+            .set_authenticated(false)
+            .inspect_err(|err| {
+                tracing::error!("BaseAuthenticationToken set_authenticated failed: {}", err)
+            })
+            .ok();
         token
     }
 
@@ -121,7 +127,12 @@ impl Authentication for UsernamePasswordAuthenticationToken {
                 "Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead".into()
             );
         }
-        self.base.set_authenticated(false);
+        self.base
+            .set_authenticated(false)
+            .inspect_err(|err| {
+                tracing::error!("BaseAuthenticationToken set_authenticated failed: {}", err)
+            })
+            .ok();
 
         Ok(())
     }
@@ -211,7 +222,7 @@ pub struct UsernamePasswordAuthenticationTokenBuilder {
 }
 
 impl UsernamePasswordAuthenticationTokenBuilder {
-    fn new(token: &mut UsernamePasswordAuthenticationToken) -> Self {
+    pub fn new(token: &mut UsernamePasswordAuthenticationToken) -> Self {
         Self {
             principal: token.principal.take(),
             credentials: token.credentials.take(),

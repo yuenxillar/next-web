@@ -7,6 +7,9 @@ use axum::{
 
 use crate::http::{Cookie, HttpResponseShare};
 
+#[derive(Clone, Copy)]
+struct Committed;
+
 pub trait HttpResponse
 where
     Self: Send,
@@ -37,7 +40,7 @@ where
 
     fn is_committed(&self) -> bool;
 
-    fn finish(&mut self);
+    fn commit(&mut self);
 
     fn shared(&mut self) -> &HttpResponseShare;
 }
@@ -62,7 +65,17 @@ impl HttpResponse for Response {
     }
 
     fn headers(&self, name: &str) -> Option<Vec<&str>> {
-        todo!()
+        let values: Vec<&str> = self
+            .headers()
+            .get_all(name)
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .collect();
+        if values.is_empty() {
+            None
+        } else {
+            Some(values)
+        }
     }
 
     fn append_header(&mut self, name: &str, value: &str) -> bool {
@@ -104,11 +117,11 @@ impl HttpResponse for Response {
 
     fn set_body(&mut self, body: Vec<u8>) {
         *self.body_mut() = Body::from(body);
+        self.commit();
     }
 
     fn set_redirect(&mut self, url: &str) {
         if let Ok(url) = header::HeaderValue::from_str(url) {
-            println!("set redirect");
             *self.status_mut() = StatusCode::SEE_OTHER;
             self.headers_mut().insert(header::LOCATION, url);
         }
@@ -119,11 +132,11 @@ impl HttpResponse for Response {
     }
 
     fn is_committed(&self) -> bool {
-        todo!()
+        self.extensions().get::<Committed>().is_some()
     }
 
-    fn finish(&mut self) {
-        todo!()
+    fn commit(&mut self) {
+        self.extensions_mut().insert(Committed);
     }
 
     fn shared(&mut self) -> &HttpResponseShare {

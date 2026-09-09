@@ -188,7 +188,7 @@ impl OAuth2AuthorizationCodeGrantFilter {
     ) -> Result<(), FilterError> {
         self.security_context_holder_strategy.clear_context();
         response.set_status_code(StatusCode::UNAUTHORIZED);
-        response.finish();
+        response.commit();
         Ok(())
     }
 }

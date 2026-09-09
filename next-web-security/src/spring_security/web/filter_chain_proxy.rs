@@ -12,6 +12,7 @@ use next_web_core::{
         named::Named,
     },
 };
+use tracing::{enabled, Level};
 
 use super::{
     firewall::{
@@ -171,6 +172,14 @@ impl HttpFilterChain for VirtualFilterChain {
     ) -> Result<(), FilterError> {
         let index = self.position.fetch_add(1, Ordering::AcqRel);
         if let Some(filter) = self.filters.get(index) {
+            if enabled!(Level::TRACE) {
+                tracing::trace!(
+                    "Invoking {} ({}/{})",
+                    filter.name(),
+                    index + 1,
+                    self.filters.len()
+                );
+            }
             filter.do_filter(request, response, self).await
         } else {
             self.original.do_filter(request, response).await

@@ -311,6 +311,11 @@ impl MediaType {
     ///
     /// Panics if any of the parameters contain illegal characters
     pub fn with_quality(type_: &str, subtype: &str, quality_value: f64) -> Self {
+        assert!(
+            (0.0..=1.0).contains(&quality_value),
+            "Invalid quality value \"{}\": should be between 0.0 and 1.0",
+            quality_value
+        );
         let mut parameters = HashMap::new();
         parameters.insert(
             Self::PARAM_QUALITY_FACTOR.to_string(),
@@ -393,18 +398,8 @@ impl MediaType {
     /// Panics if any of the parameters contain illegal characters
     pub fn from_mime_type(mime_type: MimeType) -> Self {
         let media_type = MediaType { mime_type };
-        // Validate quality parameter if present
-        if let Some(quality) = media_type.get_parameters().get(Self::PARAM_QUALITY_FACTOR) {
-            let unquoted = Self::unquote(quality);
-            let d: f64 = unquoted.parse().expect(&format!(
-                "Invalid quality value \"{}\": should be a number",
-                unquoted
-            ));
-            assert!(
-                (0.0..=1.0).contains(&d),
-                "Invalid quality value \"{}\": should be between 0.0 and 1.0",
-                unquoted
-            );
+        for (parameter, value) in media_type.get_parameters() {
+            media_type.check_parameters(&parameter, &value);
         }
         media_type
     }
@@ -420,21 +415,22 @@ impl MediaType {
     ///
     /// Panics if the quality value is invalid
     fn check_parameters(&self, parameter: &str, value: &str) {
-        // self.mime_type.check_parameters(parameter, value);
-        todo!();
+        if !parameter.eq_ignore_ascii_case(Self::PARAM_QUALITY_FACTOR) {
+            return;
+        }
 
-        if Self::PARAM_QUALITY_FACTOR == parameter {
-            let unquoted_value = Self::unquote(value);
-            let d: f64 = unquoted_value.parse().expect(&format!(
+        let unquoted_value = Self::unquote(value);
+        let d: f64 = unquoted_value.parse().unwrap_or_else(|_| {
+            panic!(
                 "Invalid quality value \"{}\": should be a number",
                 unquoted_value
-            ));
-            assert!(
-                d >= 0.0 && d <= 1.0,
-                "Invalid quality value \"{}\": should be between 0.0 and 1.0",
-                unquoted_value
-            );
-        }
+            )
+        });
+        assert!(
+            d >= 0.0 && d <= 1.0,
+            "Invalid quality value \"{}\": should be between 0.0 and 1.0",
+            unquoted_value
+        );
     }
 
     /// Return the quality factor, as indicated by a `q` parameter, if any.
@@ -444,8 +440,7 @@ impl MediaType {
     ///
     /// The quality factor as double value
     pub fn get_quality_value(&self) -> f64 {
-        self.get_parameters()
-            .get(Self::PARAM_QUALITY_FACTOR)
+        self.get_parameter(Self::PARAM_QUALITY_FACTOR)
             .map(|q| Self::unquote(q).parse().unwrap_or(1.0))
             .unwrap_or(1.0)
     }
@@ -476,17 +471,7 @@ impl MediaType {
     ///
     /// * [HTTP 1.1: Semantics and Content, section 5.3.2](https://tools.ietf.org/html/rfc7231#section-5.3.2)
     pub fn is_more_specific(&self, other: &MimeType) -> bool {
-        // if let Some(other_media_type) = other.as_any().downcast_ref::<MediaType>() {
-        //     let quality1 = self.get_quality_value();
-        //     let quality2 = other_media_type.get_quality_value();
-        //     if quality1 > quality2 {
-        //         return true;
-        //     } else if quality1 < quality2 {
-        //         return false;
-        //     }
-        // }
-        // self.mime_type.is_more_specific(other)
-        todo!()
+        mime_is_more_specific(&self.mime_type, other)
     }
 
     /// Indicates whether this `MediaType` is less specific than the given type.
@@ -503,8 +488,7 @@ impl MediaType {
     ///
     /// * `is_more_specific`
     pub fn is_less_specific(&self, other: &MimeType) -> bool {
-        // other.is_more_specific(&self.mime_type)
-        todo!()
+        mime_is_more_specific(other, &self.mime_type)
     }
 
     /// Indicate whether this `MediaType` includes the given media type.
@@ -561,16 +545,15 @@ impl MediaType {
     /// The same instance if the given MediaType doesn't have a quality value,
     /// or a new one otherwise
     pub fn copy_quality_value(&self, media_type: &MediaType) -> MediaType {
-        if !media_type
-            .get_parameters()
-            .contains_key(Self::PARAM_QUALITY_FACTOR)
-        {
+        let Some(quality) = media_type
+            .mime_type
+            .get_parameter(Self::PARAM_QUALITY_FACTOR)
+            .cloned()
+        else {
             return self.clone();
-        }
-        let mut params = self.get_parameters().clone();
-        if let Some(q) = media_type.get_parameters().get(Self::PARAM_QUALITY_FACTOR) {
-            params.insert(Self::PARAM_QUALITY_FACTOR.to_string(), q.clone());
-        }
+        };
+        let mut params = self.get_parameters();
+        params.insert(Self::PARAM_QUALITY_FACTOR.to_string(), quality);
         MediaType::from_other_with_parameters(self, params)
     }
 
@@ -581,14 +564,15 @@ impl MediaType {
     /// The same instance if the media type doesn't contain a quality value,
     /// or a new one otherwise
     pub fn remove_quality_value(&self) -> MediaType {
-        if !self
-            .get_parameters()
-            .contains_key(Self::PARAM_QUALITY_FACTOR)
+        if self
+            .mime_type
+            .get_parameter(Self::PARAM_QUALITY_FACTOR)
+            .is_none()
         {
             return self.clone();
         }
-        let mut params = self.get_parameters().clone();
-        params.remove(Self::PARAM_QUALITY_FACTOR);
+        let mut params = self.get_parameters();
+        params.retain(|key, _| !key.eq_ignore_ascii_case(Self::PARAM_QUALITY_FACTOR));
         MediaType::from_other_with_parameters(self, params)
     }
 
@@ -603,10 +587,12 @@ impl MediaType {
     }
 
     /// Returns the parameters.
-    pub fn get_parameters(&self) -> &HashMap<String, String> {
-        // self.mime_type.get_parameters()
-
-        todo!()
+    pub fn get_parameters(&self) -> HashMap<String, String> {
+        self.mime_type
+            .get_parameters()
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect()
     }
 
     /// Returns a parameter value by name.
@@ -765,15 +751,7 @@ impl MediaType {
     ///
     /// The media type
     pub fn as_media_type(mime_type: &MimeType) -> MediaType {
-        // if let Some(media_type) = mime_type.as_any().downcast_ref::<MediaType>() {
-        //     return media_type.clone();
-        // }
-        // MediaType::with_parameters(
-        //     mime_type.get_type(),
-        //     mime_type.get_subtype(),
-        //     Some(mime_type.get_parameters().clone()),
-        // )
-        todo!()
+        MediaType::from_mime_type(mime_type.clone())
     }
 
     /// Return a string representation of the given list of `MediaType` objects.
@@ -790,6 +768,42 @@ impl MediaType {
     pub fn to_string(media_types: &[MediaType]) -> String {
         let mime_types: Vec<&MimeType> = media_types.iter().map(|m| &m.mime_type).collect();
         MimeTypeUtils::to_string(mime_types)
+    }
+}
+
+fn mime_quality_value(mime_type: &MimeType) -> f64 {
+    mime_type
+        .get_parameter(MediaType::PARAM_QUALITY_FACTOR)
+        .map(|q| MediaType::unquote(q).parse().unwrap_or(1.0))
+        .unwrap_or(1.0)
+}
+
+fn mime_is_more_specific(a: &MimeType, b: &MimeType) -> bool {
+    let quality1 = mime_quality_value(a);
+    let quality2 = mime_quality_value(b);
+    if quality1 > quality2 {
+        return true;
+    }
+    if quality1 < quality2 {
+        return false;
+    }
+
+    if a.is_wildcard_type() && !b.is_wildcard_type() {
+        return false;
+    }
+    if !a.is_wildcard_type() && b.is_wildcard_type() {
+        return true;
+    }
+    if a.is_wildcard_subtype() && !b.is_wildcard_subtype() {
+        return false;
+    }
+    if !a.is_wildcard_subtype() && b.is_wildcard_subtype() {
+        return true;
+    }
+    if a.equals_type_and_subtype(Some(b)) {
+        a.get_parameters().len() > b.get_parameters().len()
+    } else {
+        false
     }
 }
 

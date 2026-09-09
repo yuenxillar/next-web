@@ -33,7 +33,11 @@ impl RememberMeAuthenticationToken {
         );
 
         let mut base = BaseAuthenticationToken::new(authorities);
-        base.set_authenticated(true);
+        base.set_authenticated(true)
+            .inspect_err(|err| {
+                tracing::error!("BaseAuthenticationToken set_authenticated failed: {}", err)
+            })
+            .ok();
         Self {
             principal,
             key_hash: string_hash(key.as_ref()),
@@ -42,13 +46,18 @@ impl RememberMeAuthenticationToken {
     }
 
     /// Private constructor to help with deserialization.
+    #[allow(dead_code)]
     fn from_key_hash(
         key_hash: i32,
         principal: AuthPrincipal,
         authorities: Option<Vec<Arc<dyn GrantedAuthority>>>,
     ) -> Self {
         let mut base = BaseAuthenticationToken::new(authorities);
-        base.set_authenticated(true);
+        base.set_authenticated(true)
+            .inspect_err(|err| {
+                tracing::error!("BaseAuthenticationToken set_authenticated failed: {}", err)
+            })
+            .ok();
 
         Self {
             principal,

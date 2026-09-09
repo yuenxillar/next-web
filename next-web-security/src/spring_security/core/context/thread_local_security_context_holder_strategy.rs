@@ -20,14 +20,15 @@ impl ThreadLocalSecurityContextHolderStrategy {
     }
 
     fn current_supplier() -> SecurityContextSupplier {
-        CONTEXT_HOLDER.with(|cell| match cell.borrow().as_ref().cloned() {
-            Some(supplier) => supplier,
-            None => {
-                let context = Arc::new(SecurityContextImpl::default()) as Arc<dyn SecurityContext>;
-                let supplier: SecurityContextSupplier = Arc::new(move || context.clone());
-                *cell.borrow_mut() = Some(supplier.clone());
-                supplier
+        CONTEXT_HOLDER.with(|cell| {
+            if let Some(supplier) = cell.borrow().as_ref().cloned() {
+                return supplier;
             }
+
+            let context = Arc::new(SecurityContextImpl::default()) as Arc<dyn SecurityContext>;
+            let supplier: SecurityContextSupplier = Arc::new(move || context.clone());
+            *cell.borrow_mut() = Some(supplier.clone());
+            supplier
         })
     }
 }

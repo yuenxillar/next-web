@@ -191,7 +191,8 @@ impl AuthenticationFailureHandler for DefaultAuthorizationFailureHandler {
             error!("Authorization Request failed: {}", error.message());
         }
         response.set_status_code(StatusCode::INTERNAL_SERVER_ERROR);
-        response.finish();
+        response.commit();
+
         Ok(())
     }
 }

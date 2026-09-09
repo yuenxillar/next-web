@@ -40,7 +40,7 @@ impl ApplicationListener<Box<dyn ApplicationEvent>> for DelegatingApplicationLis
                     && !listener.supports_source_type(event.source_type())
                 {
                     // Notify the listener.
-                    listener.on_application_event(event.clone());
+                    listener.on_application_event(event.clone()).await;
                 }
             }
         })

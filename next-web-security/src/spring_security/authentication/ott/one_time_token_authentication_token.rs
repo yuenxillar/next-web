@@ -37,7 +37,13 @@ impl OneTimeTokenAuthenticationToken {
             credentials: Some(Arc::new(token_value.into())),
             base: BaseAuthenticationToken::new(None),
         };
-        token.base.set_authenticated(false);
+        token
+            .base
+            .set_authenticated(false)
+            .inspect_err(|err| {
+                tracing::error!("BaseAuthenticationToken set_authenticated failed: {}", err)
+            })
+            .ok();
         token
     }
 
@@ -46,7 +52,12 @@ impl OneTimeTokenAuthenticationToken {
         authorities: Vec<Arc<dyn GrantedAuthority>>,
     ) -> Self {
         let mut inner = BaseAuthenticationToken::new(Some(authorities));
-        inner.set_authenticated(true);
+        inner
+            .set_authenticated(true)
+            .inspect_err(|err| {
+                tracing::error!("BaseAuthenticationToken set_authenticated failed: {}", err)
+            })
+            .ok();
 
         Self {
             principal: Some(Arc::new(principal.into())),
@@ -100,7 +111,7 @@ impl Authentication for OneTimeTokenAuthenticationToken {
                     .into(),
             );
         }
-        self.base.set_authenticated(false);
+        self.base.set_authenticated(false)?;
         Ok(())
     }
 

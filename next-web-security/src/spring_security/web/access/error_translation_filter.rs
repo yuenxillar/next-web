@@ -138,8 +138,9 @@ impl ErrorTranslationFilter {
                 ),
                 AuthenticationErrorKind::InsufficientAuthentication,
             );
-
-            authentication.map(|auth| ex.set_authentication_request(auth));
+            if let Some(auth) = authentication {
+                ex.set_authentication_request(auth);
+            }
             return self.send_start_authentication(request, response, chain, &ex);
         } else {
             auth.map(|authentication| {
@@ -154,8 +155,6 @@ impl ErrorTranslationFilter {
 
             return self.access_denied_handler.handle(request, response, error);
         }
-
-        Ok(())
     }
 
     /// Clears the security context, saves the request, and commences authentication via
@@ -174,6 +173,7 @@ impl ErrorTranslationFilter {
         self.request_cache.save_request(request, response);
         self.authentication_entry_point
             .commence(request, response, reason)?;
+
         Ok(())
     }
 

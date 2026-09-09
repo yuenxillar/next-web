@@ -80,7 +80,7 @@ where
         self
     }
 
-    /// Add a custom `HeaderWriter`.
+    /// Adds a HeaderWriter instance
     pub fn add_header_writer(&mut self, writer: Arc<dyn HeaderWriter>) -> &mut Self {
         self.header_writers.push(writer);
 

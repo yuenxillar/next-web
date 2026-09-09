@@ -57,7 +57,7 @@ impl RedirectStrategy for DefaultRedirectStrategy {
         } else {
             response.insert_header("location", redirect_url.as_str());
             response.set_status_code(self.status_code);
-            response.finish();
+            response.commit();
         }
 
         Ok(())
