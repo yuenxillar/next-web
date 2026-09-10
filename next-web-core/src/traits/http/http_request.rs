@@ -5,7 +5,7 @@ use axum::{
 };
 
 use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
-use std::{collections::HashMap, net::SocketAddr, sync::OnceLock};
+use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::OnceLock};
 
 use crate::{
     anys::any_value::AnyValue,
@@ -60,9 +60,9 @@ where
 
     fn parameter(&self, name: &str) -> Option<&str>;
 
-    fn parameters(&self) -> Option<Vec<(&str, &str)>>;
+    fn parameters(&self) -> Option<Vec<(Cow<'_, str>, Cow<'_, str>)>>;
 
-    fn parameter_values(&self, name: &str) -> Option<Vec<&str>>;
+    fn parameter_values(&self, name: &str) -> Option<Vec<Cow<'_, str>>>;
 
     fn path(&self) -> &str;
 
@@ -195,22 +195,12 @@ impl HttpRequest for Request {
         })
     }
 
-    fn parameters(&self) -> Option<Vec<(&str, &str)>> {
-        self.query().map(|query| {
-            query
-                .split('&')
-                .filter(|s| !s.is_empty())
-                .map(|param| {
-                    let mut parts = param.splitn(2, '=');
-                    let key = parts.next().unwrap_or("");
-                    let value = parts.next().unwrap_or("");
-                    (key, value)
-                })
-                .collect()
-        })
+    fn parameters(&self) -> Option<Vec<(Cow<'_, str>, Cow<'_, str>)>> {
+        self.query()
+            .map(|query| form_urlencoded::parse(query.as_bytes()).collect())
     }
 
-    fn parameter_values(&self, name: &str) -> Option<Vec<&str>> {
+    fn parameter_values(&self, name: &str) -> Option<Vec<Cow<'_, str>>> {
         self.parameters().map(|params| {
             params
                 .into_iter()

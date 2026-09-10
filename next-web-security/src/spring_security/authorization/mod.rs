@@ -3,7 +3,7 @@ pub mod event;
 mod all_authorities_authorization_manager;
 mod all_required_factors_authorization_manager;
 mod authenticated_authorization_manager;
-mod authentication_details_source;
+// mod authentication_details_source;
 mod authentication_manager;
 mod authentication_trust_resolver;
 mod authorities_authorization_manager;
@@ -36,7 +36,7 @@ pub use all_required_factors_authorization_manager::{
 pub use authenticated_authorization_manager::{
     AuthenticatedAuthorizationManager, BaseAuthorizationStrategy, BaseAuthorizationStrategyExt,
 };
-pub use authentication_details_source::AuthenticationDetailsSource;
+// pub use authentication_details_source::AuthenticationDetailsSource;
 pub use authentication_manager::AuthenticationManager;
 pub use authentication_trust_resolver::{
     AuthenticationTrustResolver, DefaultAuthenticationTrustResolver,

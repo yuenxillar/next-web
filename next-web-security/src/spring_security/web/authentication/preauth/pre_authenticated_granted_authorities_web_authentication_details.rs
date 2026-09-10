@@ -1,40 +1,56 @@
-use std::{fmt, sync::Arc};
+use std::{
+    fmt,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use next_web_core::traits::http::http_request::HttpRequest;
 
-use crate::core::{authority::GrantedAuthoritiesContainer, GrantedAuthority};
+use crate::{
+    core::{authority::GrantedAuthoritiesContainer, GrantedAuthority},
+    web::authentication::{Identity, WebAuthenticationDetails},
+};
 
-#[derive(Clone, Default)]
+/// This WebAuthenticationDetails implementation allows for storing a list of pre-authenticated Granted Authorities.
+#[derive(Clone)]
 pub struct PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails {
-    remote_address: Option<String>,
-    session_id: Option<String>,
     authorities: Vec<Arc<dyn GrantedAuthority>>,
+
+    base: WebAuthenticationDetails,
 }
 
 impl PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails {
     pub fn new(request: &dyn HttpRequest, authorities: Vec<Arc<dyn GrantedAuthority>>) -> Self {
-        let remote_address = request.header("x-forwarded-for").map(ToOwned::to_owned);
-        let session_id = request.header("x-session-id").map(ToOwned::to_owned);
-
         Self {
-            remote_address,
-            session_id,
             authorities,
+            base: WebAuthenticationDetails::from(request),
         }
-    }
-
-    pub fn remote_address(&self) -> Option<&str> {
-        self.remote_address.as_deref()
-    }
-
-    pub fn session_id(&self) -> Option<&str> {
-        self.session_id.as_deref()
     }
 }
 
 impl GrantedAuthoritiesContainer for PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails {
     fn granted_authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
         &self.authorities
+    }
+}
+
+impl Identity for PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl Deref for PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails {
+    type Target = WebAuthenticationDetails;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl DerefMut for PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
     }
 }
 
@@ -48,8 +64,9 @@ impl fmt::Display for PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails
 
         write!(
             f,
-            "PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails(remote_address={:?}, session_id={:?}, authorities={:?})",
-            self.remote_address, self.session_id, authorities
+            "PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails({}; {:?})",
+            self.base.to_string(),
+            authorities
         )
     }
 }

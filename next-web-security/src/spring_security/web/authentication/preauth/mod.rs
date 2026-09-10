@@ -1,7 +1,20 @@
-pub mod base_pre_authenticated_processing_filter;
-pub mod pre_authenticated_authentication_provider;
-pub mod pre_authenticated_authentication_token;
 pub mod pre_authenticated_granted_authorities_user_details_service;
-pub mod pre_authenticated_granted_authorities_web_authentication_details;
 pub mod request_attribute_authentication_filter;
 pub mod request_header_authentication_filter;
+
+pub mod x509;
+
+mod base_pre_authenticated_processing_filter;
+mod pre_authenticated_authentication_provider;
+mod pre_authenticated_authentication_token;
+mod pre_authenticated_granted_authorities_web_authentication_details;
+
+pub use base_pre_authenticated_processing_filter::{
+    BasePreAuthenticatedProcessingFilter, BasePreAuthenticatedProcessingFilterExt,
+};
+pub use pre_authenticated_authentication_token::{
+    PreAuthenticatedAuthenticationToken, PreAuthenticatedAuthenticationTokenBuilder,
+};
+pub use pre_authenticated_granted_authorities_web_authentication_details::PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails;
+
+pub use pre_authenticated_authentication_provider::PreAuthenticatedAuthenticationProvider;

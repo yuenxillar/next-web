@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::http::{HeaderMap, HeaderValue, Uri, header::CONTENT_TYPE, uri::Scheme};
 use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
@@ -105,31 +105,19 @@ impl HttpRequest for HttpRequestShare {
         })
     }
 
-    fn parameters(&self) -> Option<Vec<(&str, &str)>> {
+    fn parameters(&self) -> Option<Vec<(Cow<'_, str>, Cow<'_, str>)>> {
         let query = self.query()?;
-        Some(
-            query
-                .split('&')
-                .filter(|part| !part.is_empty())
-                .map(|part| {
-                    let (key, value) = part.split_once('=').unwrap_or((part, ""));
-                    (key, value)
-                })
-                .collect(),
-        )
+        Some(form_urlencoded::parse(query.as_bytes()).collect())
     }
 
-    fn parameter_values(&self, name: &str) -> Option<Vec<&str>> {
-        let query = self.query()?;
-        Some(
-            query
-                .split('&')
-                .filter_map(|part| {
-                    let (key, value) = part.split_once('=').unwrap_or((part, ""));
-                    (key == name).then_some(value)
-                })
-                .collect(),
-        )
+    fn parameter_values(&self, name: &str) -> Option<Vec<Cow<'_, str>>> {
+        self.parameters().map(|params| {
+            params
+                .into_iter()
+                .filter(|(key, _)| *key == name)
+                .map(|(_, value)| value)
+                .collect()
+        })
     }
 
     fn path(&self) -> &str {

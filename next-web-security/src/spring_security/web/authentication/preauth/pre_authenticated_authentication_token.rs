@@ -13,45 +13,58 @@ use crate::{
 };
 use next_web_core::error::BoxError;
 
-#[derive(Clone, Default)]
+/// Authentication implementation for pre-authenticated authentication.
+#[derive(Clone)]
 pub struct PreAuthenticatedAuthenticationToken {
-    principal: Option<AuthPrincipal>,
+    principal: AuthPrincipal,
     credentials: Option<AuthPrincipal>,
     base: BaseAuthenticationToken,
 }
 
 impl PreAuthenticatedAuthenticationToken {
-    pub fn unauthenticated(principal: Option<String>, credentials: Option<String>) -> Self {
+    /// Constructor used for an authentication request.
+    ///
+    /// [`Authentication::is_authenticated`] will return `false`.
+    pub fn new(principal: AuthPrincipal, credentials: Option<AuthPrincipal>) -> Self {
         Self {
-            principal: principal.map(|v| Arc::new(v) as AuthPrincipal),
-            credentials: credentials.map(|v| Arc::new(v) as AuthPrincipal),
+            principal,
+            credentials,
             base: BaseAuthenticationToken::new(None),
         }
     }
 
-    pub fn authenticated(
-        principal: impl Into<String>,
-        credentials: Option<String>,
+    /// Constructor used for an authentication response.
+    ///
+    /// [`Authentication::is_authenticated`] will return `true`.
+    pub fn with_authorities(
+        principal: AuthPrincipal,
+        credentials: Option<AuthPrincipal>,
         authorities: Vec<Arc<dyn GrantedAuthority>>,
     ) -> Self {
         Self {
-            principal: Some(Arc::new(principal.into())),
-            credentials: credentials.map(|v| Arc::new(v) as AuthPrincipal),
+            principal,
+            credentials,
             base: {
-                let mut b = BaseAuthenticationToken::new(Some(authorities));
-                let _ = b.set_authenticated(true);
-                b
+                let mut base = BaseAuthenticationToken::new(Some(authorities));
+                base.set_authenticated(true).ok();
+                base
             },
         }
     }
 
-    pub fn set_details(&mut self, details: Option<String>) {
-        self.base
-            .set_details(details.map(|v| Arc::new(v) as AuthPrincipal));
+    pub fn set_details(&mut self, details: Option<AuthPrincipal>) {
+        self.base.set_details(details);
     }
 
-    pub fn set_details_value(&mut self, details: Option<AuthPrincipal>) {
-        self.base.set_details(details);
+    pub fn from_builder(builder: &mut PreAuthenticatedAuthenticationTokenBuilder) -> Self {
+        Self {
+            principal: builder
+                .principal
+                .take()
+                .expect("Builder take principal is None"),
+            credentials: builder.credentials.take(),
+            base: BaseAuthenticationToken::from_builder(builder),
+        }
     }
 }
 
@@ -69,7 +82,7 @@ impl Authentication for PreAuthenticatedAuthenticationToken {
     }
 
     fn principal(&self) -> Option<&AuthPrincipal> {
-        self.principal.as_ref()
+        Some(&self.principal)
     }
 
     fn is_authenticated(&self) -> bool {
@@ -91,12 +104,7 @@ impl Authentication for PreAuthenticatedAuthenticationToken {
 
 impl Principal for PreAuthenticatedAuthenticationToken {
     fn name(&self) -> Cow<'_, str> {
-        Cow::Owned(
-            self.principal
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default(),
-        )
+        Cow::Owned(self.principal.to_string())
     }
 }
 
@@ -120,6 +128,7 @@ impl Debug for PreAuthenticatedAuthenticationToken {
     }
 }
 
+/// A builder of PreAuthenticatedAuthenticationToken instances
 pub struct PreAuthenticatedAuthenticationTokenBuilder {
     principal: Option<AuthPrincipal>,
     credentials: Option<AuthPrincipal>,
@@ -139,30 +148,12 @@ impl DerefMut for PreAuthenticatedAuthenticationToken {
     }
 }
 
-impl PreAuthenticatedAuthenticationToken {
-    pub fn get_name(&self) -> String {
-        self.name().into_owned()
-    }
-
-    pub fn get_credentials(&self) -> Option<String> {
-        self.credentials.as_ref().map(ToString::to_string)
-    }
-
-    pub fn get_details_ref(&self) -> Option<&AuthPrincipal> {
-        self.details()
-    }
-
-    pub fn get_details_value(&self) -> Option<AuthPrincipal> {
-        self.details().cloned()
-    }
-}
-
 impl PreAuthenticatedAuthenticationTokenBuilder {
-    fn with_token(t: &PreAuthenticatedAuthenticationToken) -> Self {
+    fn with_token(token: &PreAuthenticatedAuthenticationToken) -> Self {
         Self {
-            principal: t.principal.clone(),
-            credentials: t.credentials.clone(),
-            base: BaseAuthenticationBuilder::with_token(t),
+            principal: Some(token.principal.clone()),
+            credentials: token.credentials.clone(),
+            base: BaseAuthenticationBuilder::with_token(token),
         }
     }
 }
@@ -203,29 +194,6 @@ impl AuthenticationBuilder for PreAuthenticatedAuthenticationTokenBuilder {
     }
 
     fn build(&mut self) -> Arc<dyn Authentication> {
-        Arc::new(PreAuthenticatedAuthenticationToken {
-            principal: self.principal.take(),
-            credentials: self.credentials.take(),
-            base: BaseAuthenticationToken::from_builder(self),
-        })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::core::{authority::AuthorityUtils, Authentication};
-
-    use super::PreAuthenticatedAuthenticationToken;
-
-    #[test]
-    fn pre_authenticated_authentication_token_supports_authenticated_constructor() {
-        let token = PreAuthenticatedAuthenticationToken::authenticated(
-            "alice",
-            Some(String::from("external-credential")),
-            AuthorityUtils::create_authority_list(["ROLE_USER"]),
-        );
-
-        assert!(token.is_authenticated());
-        assert_eq!(token.get_name(), "alice");
+        Arc::new(PreAuthenticatedAuthenticationToken::from_builder(self))
     }
 }

@@ -13,9 +13,11 @@ use next_web_core::{
 use crate::{
     authorization::AuthenticationManager,
     core::{AuthenticationError, AuthenticationErrorKind},
-    web::authentication::preauth::{
-        base_pre_authenticated_processing_filter::BasePreAuthenticatedProcessingFilter,
-        pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
+    web::authentication::{
+        preauth::base_pre_authenticated_processing_filter::{
+            BasePreAuthenticatedProcessingFilter, BasePreAuthenticatedProcessingFilterExt,
+        },
+        AuthPrincipal,
     },
 };
 
@@ -76,11 +78,15 @@ impl RequestAttributeAuthenticationFilter {
     pub fn set_exception_if_variable_missing(&mut self, exception_if_variable_missing: bool) {
         self.exception_if_variable_missing = exception_if_variable_missing;
     }
+}
 
-    pub fn pre_authenticated_principal(
+impl BasePreAuthenticatedProcessingFilterExt for RequestAttributeAuthenticationFilter {
+    /// Reads the request attribute named by `principal_environment_variable` as the
+    /// pre-authenticated principal.
+    fn get_pre_authenticated_principal(
         &self,
         request: &dyn HttpRequest,
-    ) -> Result<Option<String>, crate::core::AuthenticationError> {
+    ) -> Result<Option<AuthPrincipal>, AuthenticationError> {
         let principal = request_attribute(request, &self.principal_environment_variable);
         if principal.is_none() && self.exception_if_variable_missing {
             return Err(AuthenticationError::with_kind(
@@ -91,14 +97,22 @@ impl RequestAttributeAuthenticationFilter {
                 AuthenticationErrorKind::BadCredentials,
             ));
         }
-        Ok(principal)
+        Ok(principal.map(|principal| Arc::new(principal) as AuthPrincipal))
     }
 
-    pub fn pre_authenticated_credentials(&self, request: &dyn HttpRequest) -> Option<String> {
-        self.credentials_environment_variable
+    /// Credentials aren't usually applicable, but if a credentials environment variable
+    /// is set, this will be read and used as the credentials value. Otherwise a dummy
+    /// value will be used.
+    fn get_pre_authenticated_credentials(
+        &self,
+        request: &dyn HttpRequest,
+    ) -> Result<Option<AuthPrincipal>, AuthenticationError> {
+        let credentials = self
+            .credentials_environment_variable
             .as_ref()
             .and_then(|name| request_attribute(request, name))
-            .or_else(|| Some(String::from("N/A")))
+            .unwrap_or_else(|| String::from("N/A"));
+        Ok(Some(Arc::new(credentials) as AuthPrincipal))
     }
 }
 
@@ -108,26 +122,11 @@ impl HttpFilter for RequestAttributeAuthenticationFilter {
         &self,
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
-        _filter_chain: &dyn HttpFilterChain,
+        filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        let principal = match self.pre_authenticated_principal(request) {
-            Ok(principal) => principal,
-            Err(error) => return Err(FilterError::from(error)),
-        };
-        let Some(principal) = principal else {
-            return Ok(());
-        };
-
-        let token = PreAuthenticatedAuthenticationToken::unauthenticated(
-            Some(principal),
-            self.pre_authenticated_credentials(request),
-        );
-        let _ = self
-            .base
-            .authenticate(request, response, &token)
+        self.base
+            .do_filter(self, request, response, filter_chain)
             .await
-            .map_err(FilterError::from)?;
-        Ok(())
     }
 }
 

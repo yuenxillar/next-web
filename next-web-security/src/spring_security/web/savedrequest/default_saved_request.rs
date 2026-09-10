@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::{borrow::Cow, collections::HashMap, fmt};
 
 use next_web_core::{
     http::{Cookie, HttpMethod},
@@ -345,7 +345,10 @@ impl DefaultSavedRequestBuilder {
         self
     }
 
-    pub fn set_parameters(&mut self, parameters: Option<Vec<(&str, &str)>>) -> &mut Self {
+    pub fn set_parameters(
+        &mut self,
+        parameters: Option<Vec<(Cow<'_, str>, Cow<'_, str>)>>,
+    ) -> &mut Self {
         self.parameters.clear();
         if let Some(parameters) = parameters {
             for (name, value) in parameters {
@@ -419,6 +422,8 @@ impl DefaultSavedRequestBuilder {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use super::DefaultSavedRequest;
     use crate::web::savedrequest::SavedRequest;
 
@@ -473,7 +478,10 @@ mod tests {
             .set_scheme(Some("http".to_string()))
             .set_server_name(Some("localhost".to_string()))
             .set_request_uri("/".to_string())
-            .set_parameters(Some(vec![("name", "value")]))
+            .set_parameters(Some(vec![(
+                Cow::Owned("name".to_string()),
+                Cow::Owned("value".to_string()),
+            )]))
             .build();
         assert_eq!(saved.get_parameter_values("name"), Some(vec!["value"]));
         assert!(saved.get_parameter_map().contains_key("name"));

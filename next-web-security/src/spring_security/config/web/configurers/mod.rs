@@ -27,6 +27,7 @@ mod saml2_metadata_configurer;
 mod security_context_configurer;
 mod session_management_configurer;
 mod web_authn_configurer;
+mod x509_configurer;
 
 pub mod oauth2;
 
@@ -62,3 +63,4 @@ pub use saml2_metadata_configurer::Saml2MetadataConfigurer;
 pub use security_context_configurer::SecurityContextConfigurer;
 pub use session_management_configurer::SessionManagementConfigurer;
 pub use web_authn_configurer::WebAuthnConfigurer;
+pub use x509_configurer::X509Configurer;

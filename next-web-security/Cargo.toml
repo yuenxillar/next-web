@@ -31,6 +31,8 @@ T1 = ["web"]
 T2 = []
 
 web = []
+oauth2-resource-server = []
+oauth2-client = []
 
 [dev-dependencies]
 axum.workspace = true

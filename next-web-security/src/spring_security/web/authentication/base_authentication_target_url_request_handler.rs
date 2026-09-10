@@ -9,10 +9,7 @@ use tracing::trace;
 
 use crate::{
     core::Authentication,
-    web::{
-        redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},
-        util::UrlUtils,
-    },
+    web::{util::UrlUtils, DefaultRedirectStrategy, RedirectStrategy},
 };
 
 /// `AuthenticationSuccessHandler` and `LogoutSuccessHandler`, for example.

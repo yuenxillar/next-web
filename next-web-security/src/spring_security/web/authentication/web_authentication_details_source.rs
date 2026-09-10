@@ -3,7 +3,7 @@ use std::sync::Arc;
 use next_web_core::traits::http::http_request::HttpRequest;
 
 use crate::{
-    authorization::AuthenticationDetailsSource,
+    authentication::authentication_details_source::AuthenticationDetailsSource,
     web::authentication::{Identity, WebAuthenticationDetails},
 };
 

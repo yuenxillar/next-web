@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -123,15 +124,15 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
         })
     }
 
-    fn parameters(&self) -> Option<Vec<(&str, &str)>> {
+    fn parameters(&self) -> Option<Vec<(Cow<'_, str>, Cow<'_, str>)>> {
         self.request.parameters()
     }
 
-    fn parameter_values(&self, name: &str) -> Option<Vec<&str>> {
+    fn parameter_values(&self, name: &str) -> Option<Vec<Cow<'_, str>>> {
         let saved_request_params = self.saved_request.get_parameter_values(name);
         let wrapped_request_params = self.request.parameter_values(name);
         let saved_request_params = match saved_request_params {
-            Some(params) => params,
+            Some(params) => params.into_iter().map(|s| Cow::Borrowed(s)).collect(),
             None => return wrapped_request_params,
         };
 
@@ -144,9 +145,8 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
         // those already added
         Some(
             saved_request_params
-                .iter()
-                .filter(|s| !wrapped_request_params.contains(s))
-                .cloned()
+                .into_iter()
+                .filter(|s| !wrapped_request_params.contains(&s))
                 .collect(),
         )
     }

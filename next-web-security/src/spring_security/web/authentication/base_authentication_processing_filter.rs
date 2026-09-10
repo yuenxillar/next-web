@@ -17,8 +17,8 @@ use next_web_core::{
 };
 use tracing::{debug, enabled, trace, Level};
 
+use crate::authentication::authentication_details_source::AuthenticationDetailsSource;
 use crate::authentication::event::InteractiveAuthenticationSuccessEvent;
-use crate::authorization::AuthenticationDetailsSource;
 use crate::core::context::SecurityContextHolderStrategy;
 use crate::core::NextSecurityMessageSource;
 use crate::web::authentication::session::SessionAuthenticationStrategy;

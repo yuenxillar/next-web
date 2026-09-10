@@ -45,7 +45,7 @@ use crate::{
                 PasswordManagementConfigurer, PortMapperConfigurer, RememberMeConfigurer,
                 RequestCacheConfigurer, Saml2LoginConfigurer, Saml2LogoutConfigurer,
                 Saml2MetadataConfigurer, SecurityContextConfigurer, SessionManagementConfigurer,
-                WebAuthnConfigurer,
+                WebAuthnConfigurer, X509Configurer,
             },
             http_security_builder::HttpSecurityBuilder,
         },
@@ -385,6 +385,15 @@ impl HttpSecurity {
         F: FnMut(&mut PasswordManagementConfigurer<Self>),
     {
         self.get_or_apply(PasswordManagementConfigurer::default(), password_management);
+
+        self
+    }
+
+    pub fn x509<F>(&mut self, x509: F) -> &mut Self
+    where
+        F: FnMut(&mut X509Configurer<Self>),
+    {
+        self.get_or_apply(X509Configurer::default(), x509);
 
         self
     }

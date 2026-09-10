@@ -10,7 +10,8 @@ use next_web_core::{
 };
 
 use crate::{
-    authorization::{AuthenticationDetailsSource, AuthenticationManager},
+    authentication::authentication_details_source::AuthenticationDetailsSource,
+    authorization::AuthenticationManager,
     config::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,

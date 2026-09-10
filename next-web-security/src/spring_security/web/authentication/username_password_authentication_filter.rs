@@ -65,16 +65,16 @@ impl UsernamePasswordAuthenticationFilter {
     }
 
     /// Provided so that subclasses may configure what is put into the authentication request's details property.
-    pub fn set_details(
+    pub fn set_details<'a>(
         &self,
-        request: &dyn HttpRequest,
+        request: &'a dyn HttpRequest,
         auth_request: &mut UsernamePasswordAuthenticationToken,
     ) {
-        auth_request.set_details(Some(
-            self.base
-                .authentication_details_source
-                .build_details(request),
-        ));
+        let details = self
+            .base
+            .authentication_details_source
+            .build_details(request);
+        auth_request.set_details(Some(details));
     }
 
     /// Sets the parameter name which will be used to obtain the username from the login request.

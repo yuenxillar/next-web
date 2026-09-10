@@ -12,9 +12,8 @@ use crate::{
     core::AuthenticationError,
     web::{
         authentication_entry_point::AuthenticationEntryPoint,
-        redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},
         util::{RedirectUrlBuilder, UrlUtils},
-        PortMapper, PortMapperImpl, WebAttributes,
+        DefaultRedirectStrategy, PortMapper, PortMapperImpl, RedirectStrategy, WebAttributes,
     },
 };
 

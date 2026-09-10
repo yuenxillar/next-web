@@ -10,8 +10,10 @@ use next_web_core::{
 use tracing::debug;
 
 use crate::{
-    authentication::{AccountStatusUserDetailsChecker, RememberMeAuthenticationToken},
-    authorization::AuthenticationDetailsSource,
+    authentication::{
+        authentication_details_source::AuthenticationDetailsSource,
+        AccountStatusUserDetailsChecker, RememberMeAuthenticationToken,
+    },
     core::{
         authority::mapping::GrantedAuthoritiesMapper,
         userdetails::{UserDetails, UserDetailsChecker, UserDetailsService},

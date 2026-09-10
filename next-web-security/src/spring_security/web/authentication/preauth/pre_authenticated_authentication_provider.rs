@@ -1,22 +1,26 @@
-use std::{any::TypeId, sync::Arc};
+use std::{any::TypeId, collections::HashSet, sync::Arc};
 
 use next_web_core::async_trait;
+use tracing::debug;
 
 use crate::{
-    authentication::AuthenticationProvider,
+    authentication::{AccountStatusUserDetailsChecker, AuthenticationProvider},
     core::{
-        authority::AuthorityUtils,
         userdetails::{AuthenticationUserDetailsService, UserDetailsChecker},
-        Authentication, AuthenticationError, AuthenticationErrorKind,
+        Authentication, AuthenticationError, AuthenticationErrorKind, GrantedAuthority,
     },
-    web::authentication::preauth::pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken,
+    web::authentication::preauth::PreAuthenticatedAuthenticationToken,
 };
 
+/// Processes a pre-authenticated authentication request. The request will typically originate from a BasePreAuthenticatedProcessingFilter.
+///
+/// This authentication provider will not perform any checks on authentication requests, as they should already be pre-authenticated.
+///  However, the AuthenticationUserDetailsService implementation may still throw a UsernameNotFoundException, for example.
 pub struct PreAuthenticatedAuthenticationProvider {
     pre_authenticated_user_details_service:
-        Arc<dyn AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken>>,
+        Option<Arc<dyn AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken>>>,
     user_details_checker: Arc<dyn UserDetailsChecker>,
-    granted_authorities: Vec<String>,
+    granted_authorities: Vec<Arc<dyn GrantedAuthority>>,
     error_when_token_rejected: bool,
     order: i32,
 }
@@ -29,7 +33,7 @@ impl PreAuthenticatedAuthenticationProvider {
         user_details_checker: Arc<dyn UserDetailsChecker>,
     ) -> Self {
         Self {
-            pre_authenticated_user_details_service,
+            pre_authenticated_user_details_service: Some(pre_authenticated_user_details_service),
             user_details_checker,
             granted_authorities: Vec::new(),
             error_when_token_rejected: false,
@@ -37,18 +41,40 @@ impl PreAuthenticatedAuthenticationProvider {
         }
     }
 
+    /// Sets the `AuthenticationUserDetailsService` used to load the `UserDetails` for the
+    /// authenticated user.
+    pub fn set_pre_authenticated_user_details_service(
+        &mut self,
+        pre_authenticated_user_details_service: Arc<
+            dyn AuthenticationUserDetailsService<PreAuthenticatedAuthenticationToken>,
+        >,
+    ) {
+        self.pre_authenticated_user_details_service = Some(pre_authenticated_user_details_service);
+    }
+
+    /// Sets the strategy used to validate the loaded `UserDetails` object for the user.
+    /// Defaults to an `AccountStatusUserDetailsChecker`.
+    pub fn set_user_details_checker(&mut self, user_details_checker: Arc<dyn UserDetailsChecker>) {
+        self.user_details_checker = user_details_checker;
+    }
+
+    /// If `true`, the provider rejects an invalid authentication request (with a null
+    /// principal or credentials) with an error instead of returning `None`.
     pub fn set_error_when_token_rejected(&mut self, value: bool) {
         self.error_when_token_rejected = value;
     }
 
-    pub fn set_granted_authorities(&mut self, authorities: Vec<String>) {
+    /// Sets the authorities this provider should grant once authentication completes.
+    pub fn set_granted_authorities(&mut self, authorities: Vec<Arc<dyn GrantedAuthority>>) {
         self.granted_authorities = authorities;
     }
 
+    /// Returns the order of this provider.
     pub fn order(&self) -> i32 {
         self.order
     }
 
+    /// Sets the order of this provider.
     pub fn set_order(&mut self, order: i32) {
         self.order = order;
     }
@@ -63,59 +89,81 @@ impl AuthenticationProvider for PreAuthenticatedAuthenticationProvider {
         let Some(authentication) = (authentication.as_ref() as &dyn std::any::Any)
             .downcast_ref::<PreAuthenticatedAuthenticationToken>()
         else {
-            return Err(AuthenticationError::new(
-                "Only PreAuthenticatedAuthenticationToken is supported",
-            ));
+            return Ok(None);
         };
+        debug!(
+            "PreAuthenticated authentication request: {}",
+            authentication,
+        );
 
         if authentication.principal().is_none() {
+            debug!("No pre-authenticated principal found in request.");
             if self.error_when_token_rejected {
                 return Err(AuthenticationError::with_kind(
                     "No pre-authenticated principal found in request.",
                     AuthenticationErrorKind::BadCredentials,
                 ));
             }
-            return Err(AuthenticationError::new(
-                "No pre-authenticated principal found in request.",
-            ));
+            return Ok(None);
         }
-        if authentication.get_credentials().is_none() {
+
+        if authentication.credentials().is_none() {
+            debug!("No pre-authenticated credentials found in request.");
             if self.error_when_token_rejected {
                 return Err(AuthenticationError::with_kind(
                     "No pre-authenticated credentials found in request.",
                     AuthenticationErrorKind::BadCredentials,
                 ));
             }
-            return Err(AuthenticationError::new(
-                "No pre-authenticated credentials found in request.",
-            ));
+            return Ok(None);
         }
 
-        let user_details = self
-            .pre_authenticated_user_details_service
+        let user_details_service = match self.pre_authenticated_user_details_service.as_ref() {
+            Some(user_details_service) => user_details_service,
+            None => return Ok(None),
+        };
+
+        let user_details = user_details_service
             .load_user_details(authentication)
-            .await
-            .map_err(|error| AuthenticationError::new(error.to_string()))?;
+            .await?;
+
         self.user_details_checker.check(user_details.as_ref())?;
 
-        let mut authorities = Vec::new();
-        for authority in user_details.authorities() {
-            if let Some(name) = authority.authority() {
-                authorities.push(name.to_string());
+        let value = user_details.authorities();
+        let mut seen = HashSet::with_capacity(value.len());
+        let mut authorities: Vec<Arc<dyn GrantedAuthority>> = Vec::with_capacity(value.len());
+
+        for authority in value.iter() {
+            let key = authority.authority().unwrap_or("");
+            if seen.insert(key) {
+                authorities.push(Arc::clone(authority));
             }
         }
         authorities.extend(self.granted_authorities.iter().cloned());
 
-        let mut result = PreAuthenticatedAuthenticationToken::authenticated(
-            user_details.username(),
-            authentication.get_credentials(),
-            AuthorityUtils::create_authority_list(authorities),
+        let mut result = PreAuthenticatedAuthenticationToken::with_authorities(
+            user_details,
+            authentication.credentials().cloned(),
+            authorities,
         );
-        result.set_details_value(authentication.get_details_value());
-        Ok(Some(Arc::new(result)))
+        result.set_details(authentication.details().cloned());
+
+        return Ok(Some(Arc::new(result)));
     }
 
     fn supports(&self, authentication: TypeId) -> bool {
         authentication == TypeId::of::<PreAuthenticatedAuthenticationToken>()
+    }
+}
+
+impl Default for PreAuthenticatedAuthenticationProvider {
+    fn default() -> Self {
+        Self {
+            pre_authenticated_user_details_service: None,
+            user_details_checker: Arc::new(AccountStatusUserDetailsChecker::default()),
+            granted_authorities: Vec::new(),
+            error_when_token_rejected: false,
+            order: -1,
+        }
     }
 }

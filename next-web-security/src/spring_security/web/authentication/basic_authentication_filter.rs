@@ -13,8 +13,10 @@ use next_web_core::{
 use tracing::{debug, enabled, trace, Level};
 
 use crate::{
-    authentication::AnonymousAuthenticationToken,
-    authorization::{AuthenticationDetailsSource, AuthenticationManager},
+    authentication::{
+        authentication_details_source::AuthenticationDetailsSource, AnonymousAuthenticationToken,
+    },
+    authorization::AuthenticationManager,
     core::{
         context::{SecurityContextHolder, SecurityContextHolderStrategy},
         Authentication, AuthenticationError,

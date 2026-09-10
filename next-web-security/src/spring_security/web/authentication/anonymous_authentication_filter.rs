@@ -13,8 +13,9 @@ use next_web_core::{
 use tracing::{debug, trace};
 
 use crate::{
-    authentication::AnonymousAuthenticationToken,
-    authorization::AuthenticationDetailsSource,
+    authentication::{
+        authentication_details_source::AuthenticationDetailsSource, AnonymousAuthenticationToken,
+    },
     core::{
         authority::AuthorityUtils,
         context::{SecurityContext, SecurityContextHolder, SecurityContextHolderStrategy},
@@ -109,9 +110,8 @@ impl AnonymousAuthenticationFilter {
             self.principal.to_owned(),
             self.authorities.to_owned(),
         );
-        token.set_details(Some(
-            self.authentication_details_source.build_details(request),
-        ));
+        let details = self.authentication_details_source.build_details(request);
+        token.set_details(Some(details));
 
         Arc::new(token)
     }

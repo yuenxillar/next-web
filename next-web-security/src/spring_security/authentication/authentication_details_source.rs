@@ -1,14 +1,14 @@
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::traits::http::http_request::HttpRequest;
 
-pub trait AuthenticationDetailsSource<C>: Send + Sync {
-    fn build_details(&self, context: &C) -> AnyValue;
-}
+use crate::web::authentication::AuthPrincipal;
 
-#[derive(Clone, Debug, Default)]
-pub struct NullAuthenticationDetailsSource;
-
-impl<C> AuthenticationDetailsSource<C> for NullAuthenticationDetailsSource {
-    fn build_details(&self, _context: &C) -> AnyValue {
-        AnyValue::Null
-    }
+/// Provides an authentication `details` object for a given web request.
+pub trait AuthenticationDetailsSource<T = AuthPrincipal>
+where
+    Self: Send + Sync,
+{
+    /// Called by a class when it wishes a new authentication details instance to be created.
+    fn build_details(&self, context: &dyn HttpRequest) -> T
+    where
+        T: 'static;
 }

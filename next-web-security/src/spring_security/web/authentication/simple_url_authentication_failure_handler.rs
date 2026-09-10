@@ -14,7 +14,7 @@ use crate::{
     core::AuthenticationError,
     web::{
         authentication::authentication_failure_handler::AuthenticationFailureHandler,
-        redirect_strategy::{DefaultRedirectStrategy, RedirectStrategy},
+        DefaultRedirectStrategy, RedirectStrategy,
     },
 };
 

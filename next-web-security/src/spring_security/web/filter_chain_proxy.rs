@@ -193,8 +193,29 @@ impl Named for FilterChainProxy {
     }
 }
 
-pub trait FilterChainValidator: Send + Sync {
-    fn validate(&self, filter_chain_proxy: &FilterChainProxy);
+/// A strategy for decorating the provided filter chain with one that accounts for the SecurityFilterChain for a given request.
+pub trait FilterChainDecorator
+where
+    Self: Send + Sync,
+{
+    /// Provide a new FilterChain that accounts for needed security considerations when there are no security filters.
+    fn decorate(&self, original: Box<dyn HttpFilterChain>) -> Box<dyn HttpFilterChain> {
+        self.decorate_with_filters(original, Vec::new())
+    }
+
+    /// Provide a new FilterChain that accounts for the provided filters as well as the original filter chain.
+    fn decorate_with_filters(
+        &self,
+        original: Box<dyn HttpFilterChain>,
+        filters: Vec<Arc<dyn HttpFilter>>,
+    ) -> Box<dyn HttpFilterChain>;
+}
+
+pub trait FilterChainValidator
+where
+    Self: Send + Sync,
+{
+    fn validate(&self, _filter_chain_proxy: &FilterChainProxy);
 }
 
 #[derive(Clone, Default)]

@@ -4,14 +4,14 @@ use std::{
 };
 
 use next_web_core::{
-    http::HttpMethod,
-    http::MediaType,
+    http::{HttpMethod, MediaType},
     traits::filter::HttpFilter,
     web::accept::{ContentNegotiationStrategy, HeaderContentNegotiationStrategy},
 };
 
 use crate::{
-    authorization::{AuthenticationDetailsSource, AuthenticationManager},
+    authentication::authentication_details_source::AuthenticationDetailsSource,
+    authorization::AuthenticationManager,
     config::{
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
