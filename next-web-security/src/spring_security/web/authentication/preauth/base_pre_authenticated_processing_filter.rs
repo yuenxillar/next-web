@@ -117,7 +117,7 @@ pub struct BasePreAuthenticatedProcessingFilter {
     security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
     event_publisher: Option<Arc<dyn ApplicationEventPublisher>>,
     authentication_details_source: Arc<dyn AuthenticationDetailsSource>,
-    authentication_manager: Arc<dyn AuthenticationManager>,
+    authentication_manager: Option<Arc<dyn AuthenticationManager>>,
     continue_filter_chain_on_unsuccessful_authentication: bool,
     check_for_principal_changes: bool,
     invalidate_session_on_principal_change: bool,
@@ -132,24 +132,17 @@ impl BasePreAuthenticatedProcessingFilter {
     /// Creates a new instance using the supplied authentication manager.
     pub fn new(authentication_manager: Arc<dyn AuthenticationManager>) -> Self {
         Self {
-            security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
-            event_publisher: None,
-            authentication_details_source: Arc::new(WebAuthenticationDetailsSource::default()),
-            authentication_manager,
-            continue_filter_chain_on_unsuccessful_authentication: true,
-            check_for_principal_changes: false,
-            invalidate_session_on_principal_change: true,
-            authentication_success_handler: None,
-            authentication_failure_handler: None,
-            requires_authentication_request_matcher: None,
-            security_context_repository: Arc::new(HttpSessionSecurityContextRepository::default()),
-            mfa_enabled: false,
+            authentication_manager: Some(authentication_manager),
+            ..Default::default()
         }
     }
 
     /// Checks that all required properties have been set.
     pub fn after_properties_set(&self) {
-        // The authentication manager is required and always present.
+        debug_assert!(
+            self.authentication_manager.is_some(),
+            "An AuthenticationManager must be set"
+        );
     }
 
     /// Sets the `ApplicationEventPublisher` to use.
@@ -192,7 +185,12 @@ impl BasePreAuthenticatedProcessingFilter {
         &mut self,
         authentication_manager: Arc<dyn AuthenticationManager>,
     ) {
-        self.authentication_manager = authentication_manager;
+        self.authentication_manager = Some(authentication_manager);
+    }
+
+    /// Returns the `AuthenticationManager` in use, if any.
+    pub fn get_authentication_manager(&self) -> Option<&Arc<dyn AuthenticationManager>> {
+        self.authentication_manager.as_ref()
     }
 
     /// If set to `true` (the default), any authentication error raised by the
@@ -388,8 +386,11 @@ impl BasePreAuthenticatedProcessingFilter {
             self.authentication_details_source.build_details(request),
         ));
 
-        match self
-            .authentication_manager
+        let Some(authentication_manager) = self.authentication_manager.as_ref() else {
+            return Err(FilterError::custom("An AuthenticationManager must be set"));
+        };
+
+        match authentication_manager
             .authenticate(&authentication_request)
             .await
         {
@@ -520,5 +521,24 @@ impl BasePreAuthenticatedProcessingFilter {
         }
 
         Ok(())
+    }
+}
+
+impl Default for BasePreAuthenticatedProcessingFilter {
+    fn default() -> Self {
+        Self {
+            security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
+            event_publisher: None,
+            authentication_details_source: Arc::new(WebAuthenticationDetailsSource::default()),
+            authentication_manager: None,
+            continue_filter_chain_on_unsuccessful_authentication: true,
+            check_for_principal_changes: false,
+            invalidate_session_on_principal_change: true,
+            authentication_success_handler: None,
+            authentication_failure_handler: None,
+            requires_authentication_request_matcher: None,
+            security_context_repository: Arc::new(HttpSessionSecurityContextRepository::default()),
+            mfa_enabled: false,
+        }
     }
 }

@@ -5,6 +5,13 @@ use std::sync::Arc;
 use tracing::debug;
 
 use crate::authentication::provider_manager::ProviderManager;
+use crate::authentication::{
+    account_status_user_details_exceptions::provider_not_found,
+    authentication_event_publisher::{
+        AuthenticationEventPublisher, NullAuthenticationEventPublisher,
+    },
+    AuthenticationProvider,
+};
 use crate::config::base_configured_security_builder::{
     BaseConfiguredSecurityBuilder, BaseConfiguredSecurityBuilderExt,
 };
@@ -12,17 +19,6 @@ use crate::config::object_post_processor::ObjectPostProcessor;
 use crate::core::{
     userdetails::UserDetailsService,
     Authentication, {AuthenticationError, AuthenticationErrorKind},
-};
-use crate::{
-    authentication::{
-        account_status_user_details_exceptions::provider_not_found,
-        authentication_event_publisher::{
-            AuthenticationEventPublisher, NullAuthenticationEventPublisher,
-        },
-        AuthenticationProvider,
-    },
-    config::{security_configurer::SecurityConfigurer, web::builders::HttpSecurity},
-    web::default_security_filter_chain::DefaultSecurityFilterChain,
 };
 use crate::{
     authorization::AuthenticationManager,
@@ -316,15 +312,5 @@ impl ProviderAuthenticationManager {
         let mut builder = authentication.to_builder();
         builder.credentials(None);
         builder.build()
-    }
-}
-
-impl SecurityConfigurer<DefaultSecurityFilterChain, HttpSecurity> for AuthenticationManagerBuilder {
-    fn init(&mut self, http: &mut HttpSecurity) {
-        todo!()
-    }
-
-    fn configure(&mut self, http: &mut HttpSecurity) {
-        todo!()
     }
 }

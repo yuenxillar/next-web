@@ -16,7 +16,6 @@ use next_web_core::{
 };
 
 use crate::{
-    authorization::AuthenticationManager,
     core::AuthenticationError,
     web::authentication::{
         preauth::base_pre_authenticated_processing_filter::{
@@ -32,7 +31,7 @@ use super::{
 };
 
 /// Default request attribute holding the client certificate.
-pub const DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE: &str = "next.httprequest.X509Certificate";
+pub const DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE: &str = "next.http_request.X509_certificate";
 
 /// A pre-authentication filter that extracts the principal from an X.509 client
 /// certificate.
@@ -43,21 +42,11 @@ pub const DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE: &str = "next.httprequest.X509Cer
 #[derive(Clone)]
 pub struct X509AuthenticationFilter {
     principal_extractor: Arc<dyn X509PrincipalExtractor>,
-    client_certificate_attribute: String,
-
+    client_certificate_attribute: Box<str>,
     base: BasePreAuthenticatedProcessingFilter,
 }
 
 impl X509AuthenticationFilter {
-    /// Creates a new filter using the supplied authentication manager.
-    pub fn new(authentication_manager: Arc<dyn AuthenticationManager>) -> Self {
-        Self {
-            base: BasePreAuthenticatedProcessingFilter::new(authentication_manager),
-            principal_extractor: Arc::new(SubjectX500PrincipalExtractor::new()),
-            client_certificate_attribute: DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE.to_string(),
-        }
-    }
-
     /// Sets the extractor used to obtain the principal from the certificate.
     pub fn set_principal_extractor(
         &mut self,
@@ -69,7 +58,7 @@ impl X509AuthenticationFilter {
     /// Sets the request attribute that holds the client certificate.
     pub fn set_client_certificate_attribute(
         &mut self,
-        client_certificate_attribute: impl Into<String>,
+        client_certificate_attribute: impl Into<Box<str>>,
     ) {
         let client_certificate_attribute = client_certificate_attribute.into();
         assert!(
@@ -77,6 +66,31 @@ impl X509AuthenticationFilter {
             "clientCertificateAttribute must not be empty or null"
         );
         self.client_certificate_attribute = client_certificate_attribute;
+    }
+
+    fn extract_client_certificate(
+        request: &dyn HttpRequest,
+        attribute: &str,
+    ) -> Option<X509Certificate> {
+        let Some(value) = request.get_attribute(attribute) else {
+            debug!("No client certificate found in request.");
+            return None;
+        };
+
+        if let Some(subject_dn) = value.as_string() {
+            let certificate = X509Certificate::new(subject_dn);
+            debug!("X.509 client authentication certificate: {}", certificate);
+            return Some(certificate);
+        }
+
+        let certificate = value.as_object::<X509Certificate>();
+        match &certificate {
+            Some(certificate) => {
+                debug!("X.509 client authentication certificate: {}", certificate)
+            }
+            None => debug!("No client certificate found in request."),
+        }
+        certificate
     }
 }
 
@@ -87,7 +101,7 @@ impl BasePreAuthenticatedProcessingFilterExt for X509AuthenticationFilter {
         &self,
         request: &dyn HttpRequest,
     ) -> Result<Option<AuthPrincipal>, AuthenticationError> {
-        match extract_client_certificate(request, &self.client_certificate_attribute) {
+        match Self::extract_client_certificate(request, &self.client_certificate_attribute) {
             Some(certificate) => self
                 .principal_extractor
                 .extract_principal(&certificate)
@@ -103,7 +117,7 @@ impl BasePreAuthenticatedProcessingFilterExt for X509AuthenticationFilter {
         request: &dyn HttpRequest,
     ) -> Result<Option<AuthPrincipal>, AuthenticationError> {
         Ok(
-            extract_client_certificate(request, &self.client_certificate_attribute)
+            Self::extract_client_certificate(request, &self.client_certificate_attribute)
                 .map(|certificate| Arc::new(certificate.subject_dn().to_string()) as AuthPrincipal),
         )
     }
@@ -143,29 +157,14 @@ impl DerefMut for X509AuthenticationFilter {
     }
 }
 
-fn extract_client_certificate(
-    request: &dyn HttpRequest,
-    attribute: &str,
-) -> Option<X509Certificate> {
-    let Some(value) = request.get_attribute(attribute) else {
-        debug!("No client certificate found in request.");
-        return None;
-    };
-
-    if let Some(subject_dn) = value.as_string() {
-        let certificate = X509Certificate::new(subject_dn);
-        debug!("X.509 client authentication certificate: {}", certificate);
-        return Some(certificate);
-    }
-
-    let certificate = value.as_object::<X509Certificate>();
-    match &certificate {
-        Some(certificate) => {
-            debug!("X.509 client authentication certificate: {}", certificate)
+impl Default for X509AuthenticationFilter {
+    fn default() -> Self {
+        Self {
+            principal_extractor: Arc::new(SubjectX500PrincipalExtractor::default()),
+            client_certificate_attribute: DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE.into(),
+            base: Default::default(),
         }
-        None => debug!("No client certificate found in request."),
     }
-    certificate
 }
 
 #[cfg(test)]
@@ -179,13 +178,16 @@ mod tests {
     use next_web_core::{anys::any_value::AnyValue, async_trait};
     use tokio::sync::Mutex;
 
-    use crate::authentication::authentication_details_source::AuthenticationDetailsSource;
     use crate::core::{
         authority::AuthorityUtils, context::SecurityContextHolder, Authentication,
         AuthenticationError, AuthenticationErrorKind,
     };
     use crate::web::authentication::preauth::pre_authenticated_authentication_token::PreAuthenticatedAuthenticationToken;
     use crate::web::authentication::{AuthPrincipal, Identity};
+    use crate::{
+        authentication::authentication_details_source::AuthenticationDetailsSource,
+        authorization::AuthenticationManager,
+    };
 
     use super::*;
 
@@ -200,13 +202,11 @@ mod tests {
         ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
             let principal = authentication.name().to_string();
             let credentials = authentication.credentials().map(ToString::to_string);
-            Ok(Arc::new(
-                PreAuthenticatedAuthenticationToken::with_authorities(
-                    Arc::new(principal),
-                    credentials.map(|s| Arc::new(s) as AuthPrincipal),
-                    AuthorityUtils::create_authority_list(["FACTOR_X509"]),
-                ),
-            ))
+            Ok(Arc::new(PreAuthenticatedAuthenticationToken::with_authorities(
+                Arc::new(principal) as AuthPrincipal,
+                credentials.map(|credentials| Arc::new(credentials) as AuthPrincipal),
+                AuthorityUtils::create_authority_list(["FACTOR_X509"]),
+            )))
         }
     }
 
@@ -264,13 +264,11 @@ mod tests {
             *self.details.lock().await = authentication.details().map(ToString::to_string);
             let principal = authentication.name().to_string();
             let credentials = authentication.credentials().map(ToString::to_string);
-            Ok(Arc::new(
-                PreAuthenticatedAuthenticationToken::with_authorities(
-                    Arc::new(principal),
-                    credentials.map(|s| Arc::new(s) as AuthPrincipal),
-                    AuthorityUtils::create_authority_list(["FACTOR_X509"]),
-                ),
-            ))
+            Ok(Arc::new(PreAuthenticatedAuthenticationToken::with_authorities(
+                Arc::new(principal) as AuthPrincipal,
+                credentials.map(|credentials| Arc::new(credentials) as AuthPrincipal),
+                AuthorityUtils::create_authority_list(["FACTOR_X509"]),
+            )))
         }
     }
 
@@ -304,7 +302,8 @@ mod tests {
     #[tokio::test]
     async fn authenticates_when_certificate_is_present() {
         SecurityContextHolder::clear_context();
-        let filter = X509AuthenticationFilter::new(Arc::new(MockAuthenticationManager));
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(MockAuthenticationManager));
         let mut request = test_request();
         request.set_attribute(
             DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE,
@@ -328,7 +327,8 @@ mod tests {
     #[tokio::test]
     async fn continues_without_authenticating_when_certificate_is_missing() {
         SecurityContextHolder::clear_context();
-        let filter = X509AuthenticationFilter::new(Arc::new(MockAuthenticationManager));
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(MockAuthenticationManager));
         let mut request = test_request();
         let mut response = test_response();
         let chain = RecordingChain::default();
@@ -346,7 +346,8 @@ mod tests {
 
     #[test]
     fn extracts_credentials_from_subject_dn() {
-        let filter = X509AuthenticationFilter::new(Arc::new(MockAuthenticationManager));
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(MockAuthenticationManager));
         let mut request = test_request();
         request.set_attribute(
             DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE,
@@ -363,7 +364,8 @@ mod tests {
 
     #[test]
     fn fails_when_certificate_has_no_matching_attribute() {
-        let filter = X509AuthenticationFilter::new(Arc::new(MockAuthenticationManager));
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(MockAuthenticationManager));
         let mut request = test_request();
         request.set_attribute(
             DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE,
@@ -384,7 +386,8 @@ mod tests {
     #[tokio::test]
     async fn reads_certificate_from_object_attribute() {
         SecurityContextHolder::clear_context();
-        let filter = X509AuthenticationFilter::new(Arc::new(MockAuthenticationManager));
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(MockAuthenticationManager));
         let mut request = test_request();
         request.set_attribute(
             DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE,
@@ -407,7 +410,9 @@ mod tests {
     #[tokio::test]
     async fn reads_certificate_from_custom_attribute() {
         SecurityContextHolder::clear_context();
-        let mut filter = X509AuthenticationFilter::new(Arc::new(MockAuthenticationManager));
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(MockAuthenticationManager));
+
         filter.set_client_certificate_attribute("x-client-cert");
         let mut request = test_request();
         request.set_attribute("x-client-cert", AnyValue::from("CN=Bob,O=Example"));
@@ -428,7 +433,8 @@ mod tests {
     #[tokio::test]
     async fn supports_custom_principal_extractor() {
         SecurityContextHolder::clear_context();
-        let mut filter = X509AuthenticationFilter::new(Arc::new(MockAuthenticationManager));
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(MockAuthenticationManager));
         filter.set_principal_extractor(Arc::new(|certificate: &X509Certificate| {
             Ok(format!("custom:{}", certificate.subject_dn()))
         }));
@@ -464,7 +470,8 @@ mod tests {
         context.set_authentication(Some(Arc::new(current)));
         SecurityContextHolder::set_context(context);
 
-        let filter = X509AuthenticationFilter::new(Arc::new(FailingAuthenticationManager));
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(MockAuthenticationManager));
         let mut request = test_request();
         request.set_attribute(
             DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE,
@@ -500,7 +507,8 @@ mod tests {
         context.set_authentication(Some(Arc::new(current)));
         SecurityContextHolder::set_context(context);
 
-        let mut filter = X509AuthenticationFilter::new(Arc::new(MockAuthenticationManager));
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(MockAuthenticationManager));
         filter.set_check_for_principal_changes(true);
         let mut request = test_request();
         request.set_attribute(
@@ -528,7 +536,9 @@ mod tests {
     #[tokio::test]
     async fn propagates_failure_when_configured_to_stop() {
         SecurityContextHolder::clear_context();
-        let mut filter = X509AuthenticationFilter::new(Arc::new(FailingAuthenticationManager));
+
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(Arc::new(FailingAuthenticationManager));
         filter.set_continue_filter_chain_on_unsuccessful_authentication(false);
         let mut request = test_request();
         request.set_attribute(
@@ -551,7 +561,8 @@ mod tests {
         let manager = Arc::new(CapturingAuthenticationManager {
             details: captured.clone(),
         });
-        let mut filter = X509AuthenticationFilter::new(manager);
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(manager);
         filter.set_authentication_details_source(Arc::new(MarkerDetailsSource));
 
         let mut request = test_request();

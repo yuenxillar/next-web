@@ -31,7 +31,6 @@ use crate::{
 pub struct AnonymousAuthenticationFilter {
     security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
     authentication_details_source: Arc<dyn AuthenticationDetailsSource>,
-
     key: String,
     principal: AuthPrincipal,
     authorities: Vec<Arc<dyn GrantedAuthority>>,

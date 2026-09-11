@@ -38,7 +38,7 @@ impl DaoAuthenticationProvider {
     pub fn new(user_details_service: Arc<dyn UserDetailsService>) -> Self {
         Self {
             user_details_service,
-            password_encoder: Arc::new(BCryptPasswordEncoder),
+            password_encoder: Arc::new(BCryptPasswordEncoder::default()),
             user_not_found_encoded_password: ArcSwap::from_pointee(None),
             user_details_password_service: None,
             compromised_password_checker: None,
@@ -167,22 +167,29 @@ impl DaoAuthenticationProvider {
         }
 
         let existing_encoded_password = user.password();
-        let upgrade_encoding = self.user_details_password_service.is_some()
-            && existing_encoded_password
-                .map(|password| self.password_encoder.upgrade_encoding(password))
-                .unwrap_or(false);
+        let upgrade_encoding = if self.user_details_password_service.is_some() {
+            match existing_encoded_password {
+                Some(password) => self
+                    .password_encoder
+                    .upgrade_encoding(password)
+                    .map_err(|err| AuthenticationError::new(err.to_string()))?,
+                None => false,
+            }
+        } else {
+            false
+        };
 
         let mut _user = None;
         if upgrade_encoding {
             let new_password = self
                 .password_encoder
                 .as_ref()
-                .encode(&presented_password)
+                .encode(Some(&presented_password))
                 .map_err(|err| AuthenticationError::new(err.to_string()))?;
             if let Some(password_service) = &self.user_details_password_service {
                 _user = Some(
                     password_service
-                        .update_password(user.clone(), Some(new_password))
+                        .update_password(user.clone(), new_password)
                         .await,
                 );
             }
@@ -199,7 +206,7 @@ impl DaoAuthenticationProvider {
         if self.user_not_found_encoded_password.load().is_none() {
             let password = self
                 .password_encoder
-                .encode(Self::USER_NOT_FOUND_PASSWORD)
+                .encode(Some(Self::USER_NOT_FOUND_PASSWORD))
                 .map_err(|error| {
                     AuthenticationError::with_kind(
                         error.to_string(),
@@ -207,7 +214,7 @@ impl DaoAuthenticationProvider {
                     )
                 })?;
             self.user_not_found_encoded_password
-                .store(Arc::new(Some(password)));
+                .store(Arc::new(password));
         }
 
         Ok(())
@@ -298,8 +305,8 @@ mod tests {
     struct PlainTextPasswordEncoder;
 
     impl PasswordEncoder for PlainTextPasswordEncoder {
-        fn encode(&self, raw_password: &str) -> Result<String, BoxError> {
-            Ok(raw_password.to_owned())
+        fn encode(&self, raw_password: Option<&str>) -> Result<Option<String>, BoxError> {
+            Ok(raw_password.map(str::to_owned))
         }
 
         fn matches(&self, raw_password: &str, encoded_password: &str) -> bool {

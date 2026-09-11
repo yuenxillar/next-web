@@ -205,7 +205,8 @@ where
             .cloned()
             .expect("AuthenticationManager must be available");
 
-        let mut filter = X509AuthenticationFilter::new(authentication_manager);
+        let mut filter = X509AuthenticationFilter::default();
+        filter.set_authentication_manager(authentication_manager);
         if let Some(principal_extractor) = self.x509_principal_extractor.take() {
             filter.set_principal_extractor(principal_extractor);
         }

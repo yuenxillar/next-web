@@ -1,16 +1,20 @@
 use std::{fmt, sync::Arc};
 
 use next_web_context::{
-    support::MessageSourceAccessor, Locale, MessageSource, MessageSourceResolvable,
-    NoSuchMessageError,
+    support::{MessageSourceAccessor, ResourceBundleMessageSource},
+    Locale, MessageSource, MessageSourceResolvable, NoSuchMessageError,
 };
 
-#[derive(Clone)]
-pub struct NextSecurityMessageSource;
+/// The default MessageSource used by Next Security.
+/// All Next Security classes requiring message localization will by default use this class. However, all such
+/// classes will also implement MessageSourceAware so that the application context can inject an alternative
+/// message source. Therefore this class is only used when the deployment environment has not specified an alternative message source.
+#[derive(Clone, Default)]
+pub struct NextSecurityMessageSource(ResourceBundleMessageSource);
 
 impl NextSecurityMessageSource {
     pub fn get_accessor() -> MessageSourceAccessor {
-        MessageSourceAccessor::new(Arc::new(Self))
+        MessageSourceAccessor::new(Arc::new(Self::default()))
     }
 }
 

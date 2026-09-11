@@ -453,7 +453,7 @@ impl HttpSecurity {
     }
 
     pub fn get_authentication_registry(&mut self) -> Option<&mut AuthenticationManagerBuilder> {
-        self.base.configurer_mut::<AuthenticationManagerBuilder>()
+        self.shared_object_mut::<AuthenticationManagerBuilder>()
     }
 }
 
