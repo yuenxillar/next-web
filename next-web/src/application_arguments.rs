@@ -1,4 +1,4 @@
-//! Provides access to the arguments that were used to run a [`SpringApplication`].
+//! Provides access to the arguments that were used to run a [`NextWebApplication`].
 //!
 //! This trait mirrors the `ApplicationArguments` interface, offering a typed and
 //! idiomatic way to inspect both option and non-option arguments passed to an

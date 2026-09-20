@@ -68,18 +68,6 @@ use next_web_core::traits::schedule::scheduled_task::ScheduledTask;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-type XResult = std::result::Result<(), Box<dyn std::error::Error>>;
-
-trait XApplication<Ctx, Es = (), Res = ()>
-where
-    Es: ErrorSolver,
-    Ctx: next_web_context::ApplicationContext,
-{
-    fn ready(&mut self, ctx: &mut Ctx) -> impl Future<Output = ()> {
-        async move {}
-    }
-}
-
 #[async_trait]
 pub trait Application
 where

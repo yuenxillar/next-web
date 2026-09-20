@@ -14,13 +14,17 @@ pub mod macros;
 pub mod manager;
 pub mod signal;
 pub mod stream;
+pub mod support;
 pub mod util;
+pub mod web;
 
 mod ansi;
 mod application_arguments;
 mod application_banner_printer;
 mod application_context_factory;
 mod application_context_initializer;
+mod application_event_handler;
+mod application_info_property_source;
 mod application_properties;
 mod application_resources;
 mod application_runner;
@@ -29,6 +33,7 @@ mod banner;
 mod configurable_application_context;
 mod default_application_arguments;
 mod default_application_context_factory;
+mod error_handler;
 mod next_web_application;
 mod next_web_banner;
 mod next_web_error_reporter;
@@ -41,6 +46,8 @@ pub use application_arguments::ApplicationArguments;
 pub(crate) use application_banner_printer::ApplicationBannerPrinter;
 pub use application_context_factory::ApplicationContextFactory;
 pub use application_context_initializer::ApplicationContextInitializer;
+pub(crate) use application_event_handler::{ApplicationEventHandler, Event};
+pub use application_info_property_source::ApplicationInfoPropertySource;
 pub(crate) use application_properties::ApplicationProperties;
 pub use application_resources::ApplicationResources;
 pub use application_runner::ApplicationRunner;
@@ -49,7 +56,8 @@ pub use banner::Banner;
 pub use configurable_application_context::ConfigurableApplicationContext;
 pub use default_application_arguments::DefaultApplicationArguments;
 pub(crate) use default_application_context_factory::DefaultApplicationContextFactory;
-pub use next_web_application::NextWebApplication;
+pub use error_handler::ErrorHandler;
+pub use next_web_application::{Application, NextWebApplication};
 pub(crate) use next_web_banner::NextWebBanner;
 pub use next_web_error_reporter::NextWebErrorReporter;
 pub use next_web_version::NextWebVersion;
@@ -88,9 +96,6 @@ pub mod i18n;
 pub mod embed {
     pub use rust_embed::*;
 }
-
-#[cfg(feature = "common")]
-pub mod common;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]

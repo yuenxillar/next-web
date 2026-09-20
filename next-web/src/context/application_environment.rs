@@ -1,13 +1,20 @@
 use next_web_core::env::{
-    ConfigurableEnvironment, ConfigurablePropertyResolver, Environment, PropertyResolver,
+    ConfigurableEnvironment, ConfigurablePropertyResolver, Environment, MutablePropertySources,
+    PropertyResolver,
 };
 
 #[derive(Default)]
-pub struct ApplicationEnvironment {}
+pub struct ApplicationEnvironment {
+    property_sources: MutablePropertySources,
+}
 
 impl ConfigurableEnvironment for ApplicationEnvironment {
     fn add_active_profile(&mut self, profile: &str) {
         todo!()
+    }
+
+    fn property_sources(&mut self) -> &mut MutablePropertySources {
+        &mut self.property_sources
     }
 
     fn system_environment(&self) -> std::collections::HashMap<String, String> {
@@ -23,6 +30,10 @@ impl ConfigurableEnvironment for ApplicationEnvironment {
     }
 
     fn system_properties(&self) -> std::collections::HashMap<String, String> {
+        todo!()
+    }
+
+    fn merge(&mut self, parent: &dyn ConfigurableEnvironment) {
         todo!()
     }
 }

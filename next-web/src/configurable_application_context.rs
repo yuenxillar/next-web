@@ -49,7 +49,7 @@ pub const SYSTEM_ENVIRONMENT_BEAN_NAME: &str = "systemEnvironment";
 pub const APPLICATION_STARTUP_BEAN_NAME: &str = "applicationStartup";
 
 /// Name of the shutdown hook thread.
-pub const SHUTDOWN_HOOK_THREAD_NAME: &str = "SpringContextShutdownHook";
+pub const SHUTDOWN_HOOK_THREAD_NAME: &str = "NextContextShutdownHook";
 
 /// Errors returned by [`ConfigurableApplicationContext`] operations.
 #[derive(Debug)]
@@ -135,7 +135,7 @@ where
     /// # Arguments
     ///
     /// * `environment` - The new environment.
-    fn set_environment(&mut self, environment: Box<dyn ConfigurableEnvironment>);
+    fn set_environment(&mut self, environment: Arc<dyn ConfigurableEnvironment>);
 
     /// Returns the [`ConfigurableEnvironment`] for this application context in
     /// configurable form, allowing for further customization.

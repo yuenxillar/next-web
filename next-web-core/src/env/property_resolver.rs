@@ -1,4 +1,4 @@
-use crate::{convert::ConversionError, error::IllegalError};
+use crate::error::IllegalError;
 
 /// Trait for resolving properties against any underlying source.
 ///

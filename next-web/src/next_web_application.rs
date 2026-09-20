@@ -9,23 +9,37 @@ use std::{
 
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use next_web_context::{ApplicationEvent, ApplicationListener};
+use axum::{response::IntoResponse, Router};
 use next_web_core::{
     anys::any_value::AnyValue,
-    env::ConfigurableEnvironment,
+    constants::application_constants::APPLICATION_DEFAULT_PORT,
+    env::{
+        CompositePropertySource, ConfigurableEnvironment, MutablePropertySources, PropertySource,
+        SimpleCommandLinePropertySource, COMMAND_LINE_PROPERTY_SOURCE_NAME,
+        DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME,
+    },
     io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup},
+    util::indexmap::IndexMap,
 };
-use next_web_singletons::factory::ListableSingletonFactory;
+use next_web_singletons::factory::{
+    config::SingletonRegistry, ListableSingletonFactory, SingletonFactory,
+};
+use reqwest::StatusCode;
 use tracing::{enabled, Level};
 
 use crate::{
-    application::Application, application_banner_printer::PrintedBanner, banner::BannerMode,
-    context::ApplicationEnvironment, diagnostics::error_analyzers::ErrorAnalyzers,
+    application_banner_printer::PrintedBanner,
+    banner::BannerMode,
+    context::{properties::source::ConfigurationPropertySources, ApplicationEnvironment},
+    diagnostics::error_analyzers::ErrorAnalyzers,
+    env::{DefaultPropertiesPropertySource, MapPropertySource},
+    web::server::{Server, WebServer},
     ApplicationArguments, ApplicationBannerPrinter, ApplicationContextFactory,
-    ApplicationContextInitializer, ApplicationProperties, ApplicationRunner,
-    ApplicationShutdownHook, Banner, ConfigurableApplicationContext, DefaultApplicationArguments,
-    DefaultApplicationContextFactory, NextWebErrorReporter, StartupInfoLogger,
+    ApplicationContextInitializer, ApplicationEventHandler, ApplicationInfoPropertySource,
+    ApplicationProperties, ApplicationRunner, ApplicationShutdownHook, Banner,
+    ConfigurableApplicationContext, DefaultApplicationArguments, DefaultApplicationContextFactory,
+    ErrorHandler, NextWebErrorReporter, StartupInfoLogger,
 };
 
 /// Loader used when the application does not configure one of its own.
@@ -37,37 +51,47 @@ static DEFAULT_RESOURCE_LOADER: LazyLock<DefaultResourceLoader> =
 
 type ApplicationResult<T> = Result<T, Box<dyn Error>>;
 
-/// Error adapter that turns a caught panic payload into a standard error.
-///
-/// [`std::panic::catch_unwind`] yields `Box<dyn Any + Send>`, which cannot be
-/// handed to a [`NextWebErrorReporter`]. This wrapper extracts the usual panic
-/// message (`&str` or `String`) and exposes it as a referenceable
-/// [`std::error::Error`].
-#[derive(Debug)]
-struct PanicError {
-    message: String,
-}
+pub trait Application<E = ()>
+where
+    E: ErrorHandler,
+{
+    /// Before starting the application
+    #[allow(unused_variables)]
+    fn on_ready(
+        &self,
+        ctx: &mut dyn ConfigurableApplicationContext,
+    ) -> impl Future<Output = ApplicationResult<()>> {
+        std::future::ready(Ok(()))
+    }
 
-impl PanicError {
-    /// Builds a [`PanicError`] from a panic payload.
-    fn from_payload(payload: &(dyn Any + Send)) -> Self {
-        let message = payload
-            .downcast_ref::<&str>()
-            .map(|message| (*message).to_string())
-            .or_else(|| payload.downcast_ref::<String>().cloned())
-            .unwrap_or_else(|| "Unknown panic".to_string());
+    fn router(&self, ctx: &mut dyn ConfigurableApplicationContext) -> Router {
+        Router::new()
+    }
 
-        Self { message }
+    fn open_api(&self) {}
+
+    fn fallback() -> impl IntoResponse {
+        let mut resp = E::handle_error("Not Found").into_response();
+        *resp.status_mut() = StatusCode::NOT_FOUND;
+        resp
+    }
+
+    fn catch_panic(err: Box<dyn Any + Send + 'static>) -> impl IntoResponse {
+        let error = err
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .unwrap_or_else(|| {
+                err.downcast_ref::<&str>()
+                    .map(|s| *s)
+                    .unwrap_or("Unknown error")
+            });
+
+        tracing::error!("Service panicked: {}", error);
+        let mut resp = E::handle_error(error).into_response();
+        *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+        resp
     }
 }
-
-impl std::fmt::Display for PanicError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.message)
-    }
-}
-
-impl Error for PanicError {}
 
 pub struct NextWebApplication<T> {
     add_command_line_properties: bool,
@@ -75,7 +99,7 @@ pub struct NextWebApplication<T> {
     resource_loader: Option<Arc<dyn ResourceLoader>>,
     environment: Option<Box<dyn ConfigurableEnvironment>>,
     initializers: Vec<Box<dyn ApplicationContextInitializer>>,
-    listeners: Vec<Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>>,
+    event_handlers: Vec<Box<dyn ApplicationEventHandler>>,
     default_properties: Option<HashMap<String, AnyValue>>,
     additional_profiles: HashSet<String>,
     application_context_factory: Box<dyn ApplicationContextFactory>,
@@ -98,7 +122,7 @@ where
             banner: None,
             environment: None,
             initializers: Vec::new(),
-            listeners: Vec::new(),
+            event_handlers: Vec::new(),
             default_properties: None,
             additional_profiles: HashSet::new(),
             properties: Default::default(),
@@ -110,73 +134,131 @@ where
     }
 
     /// Run the application.
-    pub fn run(mut self) -> impl Future<Output = ()> {
-        async move {
-            use futures::FutureExt;
+    pub async fn run(mut self) {
+        use futures::FutureExt;
 
+        // The startup future borrows `self`; it is scoped inside this block
+        // so the borrow ends before the error handlers consume `self`.
+        let future = async {
+            let mut startup = StandardStartup::default();
             if self.properties.is_register_shutdown_hook() {
                 self.shutdown_hook = Some(ApplicationShutdownHook::default());
             }
-
             let application_arguments = DefaultApplicationArguments::new(std::env::args());
             let environment = self.prepare_environment(&application_arguments);
             let _ = self.print_banner(environment.as_ref());
-            let mut context = self.create_application_context();
+            let mut context = self.create_application_context()?;
             if let Some(application_startup) = self.application_startup.take() {
                 context.set_application_startup(application_startup);
             }
-
-            let result = AssertUnwindSafe(async {
-                let mut startup = StandardStartup::default();
-
-                self.prepare_context()?;
-                self.refresh_context(context.as_mut())?;
-                self.after_refresh(context.as_mut(), &application_arguments);
-                let _ = startup.started();
-                if self.properties.is_log_startup_info() {
-                    StartupInfoLogger::new(
-                        Some(type_name_of_val(&self.application)),
-                        environment.as_ref(),
-                    )
-                    .log_started(&startup);
-                }
-                self.call_runners(context.as_mut(), &application_arguments)
-                    .await?;
-
-                ApplicationResult::<()>::Ok(())
-            })
-            .catch_unwind()
-            .await;
-
-            match result {
-                Ok(Ok(())) => {}
-                Ok(Err(error)) => {
-                    self.handle_run_error(context.as_mut(), error.as_ref())
-                        .await
-                }
-                Err(payload) => {
-                    self.handle_run_panic(context.as_mut(), payload.as_ref())
-                        .await
-                }
+            self.prepare_context(
+                context.as_mut(),
+                environment.clone(),
+                &application_arguments,
+            )?;
+            self.refresh_context(context.as_mut())?;
+            self.after_refresh(context.as_mut(), &application_arguments);
+            let _ = startup.started();
+            if self.properties.is_log_startup_info() {
+                StartupInfoLogger::new(
+                    Some(type_name_of_val(&self.application)),
+                    environment.as_ref(),
+                )
+                .log_started(&startup);
             }
+            self.call_runners(context.as_mut(), &application_arguments)
+                .await?;
+
+            self.run_web_server(environment.as_ref(), context.as_mut())
+                .await?;
+            ApplicationResult::<()>::Ok(())
+        };
+
+        match AssertUnwindSafe(future).catch_unwind().await {
+            Ok(Err(error)) => self.handle_run_error(error.as_ref()).await,
+            Err(payload) => self.handle_run_panic(payload.as_ref()).await,
+            Ok(_) => return,
         }
+    }
+
+    /// Binds the web server to the specified environment and context.
+    async fn run_web_server(
+        &mut self,
+        environment: &dyn ConfigurableEnvironment,
+        ctx: &mut dyn ConfigurableApplicationContext,
+    ) -> ApplicationResult<()> {
+        let port = environment
+            .get_property_or_default("next.server.port", "8080")
+            .parse::<u16>()
+            .unwrap_or(APPLICATION_DEFAULT_PORT);
+        let address = environment.get_property_or_default("next.server.address", "0.0.0.0");
+        let socket_addr = format!("{}:{}", address, port).parse::<std::net::SocketAddr>()?;
+        let router = self
+            .application
+            .router(ctx)
+            .fallback(|| async { T::fallback() })
+            // Prevent program panic caused by users not setting routes
+            .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
+
+        let mut web_server = WebServer::new(socket_addr, router);
+        web_server.run().await?;
+
+        Ok(())
     }
 
     fn prepare_environment(
         &mut self,
         application_arguments: &dyn ApplicationArguments,
-    ) -> Box<dyn ConfigurableEnvironment> {
+    ) -> Arc<dyn ConfigurableEnvironment> {
         // Create and configure the environment
-        let environment = self.get_or_create_environment();
-        self.configure_environment(environment.as_ref(), application_arguments.source_args());
-
+        let mut environment = self.get_or_create_environment();
+        self.configure_environment(environment.as_mut(), application_arguments.source_args());
+        ConfigurationPropertySources::attach(environment.as_mut());
+        ApplicationInfoPropertySource::move_to_end(environment.as_mut());
+        DefaultPropertiesPropertySource::move_to_end(environment.as_mut());
         self.bind_to_application(environment.as_ref());
+        if self.environment.is_none() {
+            environment = Box::new(ApplicationEnvironment::default());
+        }
+        ConfigurationPropertySources::attach(environment.as_mut());
 
-        environment
+        Arc::from(environment)
     }
 
-    fn prepare_context(&mut self) -> ApplicationResult<()> {
+    fn prepare_context(
+        &mut self,
+        context: &mut dyn ConfigurableApplicationContext,
+        environment: Arc<dyn ConfigurableEnvironment>,
+        application_arguments: &DefaultApplicationArguments,
+    ) -> ApplicationResult<()> {
+        context.set_environment(environment);
+
+        context
+            .singleton_factory()?
+            .set_allow_override(self.properties.is_allow_override());
+        self.apply_initializers(context);
+        if self.properties.is_log_startup_info() {
+            self.log_startup_info(context);
+            self.log_startup_profile_info(context);
+        }
+
+        context
+            .singleton_factory()?
+            .registry_mut()
+            .register_singleton(
+                "nextWebApplicationArguments",
+                application_arguments.to_owned(),
+            );
+
         Ok(())
+    }
+
+    fn refresh_context(
+        &self,
+        application_context: &mut dyn ConfigurableApplicationContext,
+    ) -> ApplicationResult<()> {
+        // Refresh the underlying ApplicationContext.
+        application_context.refresh().map_err(Into::into)
     }
 
     fn get_or_create_environment(&mut self) -> Box<dyn ConfigurableEnvironment> {
@@ -194,21 +276,15 @@ where
         }
     }
 
-    fn refresh_context(
-        &self,
-        application_context: &mut dyn ConfigurableApplicationContext,
-    ) -> ApplicationResult<()> {
-        if self.properties.is_register_shutdown_hook() {}
-
-        // Refresh the underlying ApplicationContext.
-        application_context.refresh().map_err(Into::into)
-    }
-
     /// Template method delegating to configurePropertySources(ConfigurableEnvironment, String[])
     /// and configureProfiles(ConfigurableEnvironment, String[]) in that order. Override this method for complete
     /// control over Environment customization, or one of the above for fine-grained control
     /// over property sources or profiles, respectively.
-    fn configure_environment(&self, environment: &dyn ConfigurableEnvironment, args: &[String]) {
+    fn configure_environment(
+        &self,
+        environment: &mut dyn ConfigurableEnvironment,
+        args: &[String],
+    ) {
         self.configure_property_sources(environment, args);
         self.configure_profiles(environment, args);
     }
@@ -216,15 +292,40 @@ where
     /// Add, remove or re-order any PropertySources in this application's environment.
     fn configure_property_sources(
         &self,
-        environment: &dyn ConfigurableEnvironment,
+        environment: &mut dyn ConfigurableEnvironment,
         args: &[String],
     ) {
+        let sources = environment.property_sources();
+
+        if let Some(default_properties) = self.default_properties.as_ref() {
+            if !default_properties.is_empty() {
+                let default_properties = default_properties
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.to_string()))
+                    .collect();
+
+                DefaultPropertiesPropertySource::add_or_merge(default_properties, sources);
+            }
+        }
+
+        if self.add_command_line_properties && !args.is_empty() {
+            configure_command_line_property_source(sources, args);
+        }
+
+        environment
+            .property_sources()
+            .add_last(Box::new(ApplicationInfoPropertySource::default()));
     }
 
+    /// Configure which profiles are active (or active by default) for this application environment.
+    ///  Additional profiles may be activated during configuration file processing through the next.profiles.active property.
+    #[allow(unused_variables)]
     fn configure_profiles(&self, environment: &dyn ConfigurableEnvironment, args: &[String]) {}
 
     /// Bind the environment to the ApplicationProperties.
-    fn bind_to_application(&self, environment: &dyn ConfigurableEnvironment) {}
+    fn bind_to_application(&mut self, environment: &dyn ConfigurableEnvironment) {
+        self.properties.bind(environment);
+    }
 
     fn print_banner<'a>(
         &'a self,
@@ -329,34 +430,28 @@ where
     ) {
     }
 
-    fn call_runners<'a>(
+    async fn call_runners<'a>(
         &'a self,
         context: &'a mut dyn ConfigurableApplicationContext,
         args: &'a dyn ApplicationArguments,
-    ) -> impl Future<Output = ApplicationResult<()>> + 'a {
-        async {
-            let singleton_factory = context.singleton_factory()?;
-            let mut runners =
-                singleton_factory.get_singletons_mut_of_type::<Box<dyn ApplicationRunner>>();
-            runners.sort_by_key(|runner| runner.order());
+    ) -> ApplicationResult<()> {
+        let singleton_factory = context.singleton_factory()?;
+        let mut runners =
+            singleton_factory.get_singletons_mut_of_type::<Box<dyn ApplicationRunner>>();
+        runners.sort_by_key(|runner| runner.order());
 
-            for runner in runners {
-                runner.run(args).await?;
-            }
-
-            Ok(())
+        for runner in runners {
+            runner.run(args).await?;
         }
+
+        Ok(())
     }
 
     /// Converts a caught panic payload into a referenceable error and delegates
     /// to [`Self::handle_run_error`].
-    async fn handle_run_panic(
-        self,
-        context: &mut dyn ConfigurableApplicationContext,
-        payload: &(dyn Any + Send),
-    ) {
+    async fn handle_run_panic(self, payload: &(dyn Any + Send)) {
         let error = PanicError::from_payload(payload);
-        self.handle_run_error(context, &error).await;
+        self.handle_run_error(&error).await;
     }
 
     fn get_error_reporters(&self) -> Vec<Box<dyn NextWebErrorReporter>> {
@@ -368,11 +463,7 @@ where
     /// The error is passed by reference so it can be inspected by the
     /// registered [`NextWebErrorReporter`]s (for example to locate a cause in
     /// its `source` chain) before the process exits.
-    async fn handle_run_error(
-        self,
-        _context: &mut dyn ConfigurableApplicationContext,
-        error: &(dyn Error + 'static),
-    ) {
+    async fn handle_run_error(self, error: &(dyn Error + 'static)) {
         let mut reporters = self.get_error_reporters();
         self.report_error(&mut reporters, error);
 
@@ -520,25 +611,25 @@ where
         &mut self.initializers
     }
 
-    /// Sets the listeners that will be used to handle application events.
-    pub fn set_listeners<I>(&mut self, listeners: I)
+    /// Sets the event handlers that will be used to handle application events.
+    pub fn set_event_handlers<I>(&mut self, event_handlers: I)
     where
-        I: IntoIterator<Item = Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>>,
+        I: IntoIterator<Item = Box<dyn ApplicationEventHandler>>,
     {
-        self.listeners = listeners.into_iter().collect();
+        self.event_handlers = event_handlers.into_iter().collect();
     }
 
-    /// Adds a listener to the list of listeners that will be used to handle application events.
-    pub fn add_listeners<I>(&mut self, listeners: I)
+    /// Adds an event handler to the list of event handlers that will be used to handle application events.
+    pub fn add_event_handlers<I>(&mut self, event_handlers: I)
     where
-        I: IntoIterator<Item = Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>>,
+        I: IntoIterator<Item = Box<dyn ApplicationEventHandler>>,
     {
-        self.listeners.extend(listeners.into_iter());
+        self.event_handlers.extend(event_handlers.into_iter());
     }
 
-    /// Returns the listeners that will be used to handle application events.
-    pub fn listeners(&self) -> &[Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>] {
-        &self.listeners
+    /// Returns the event handlers that will be used to handle application events.
+    pub fn event_handlers(&mut self) -> &mut [Box<dyn ApplicationEventHandler>] {
+        &mut self.event_handlers
     }
 
     /// Sets the application startup implementation.
@@ -677,5 +768,103 @@ impl Default for StandardStartup {
             start_instant: Instant::now(),
             time_taken_to_started: None,
         }
+    }
+}
+
+/// Error adapter that turns a caught panic payload into a standard error.
+///
+/// [`std::panic::catch_unwind`] yields `Box<dyn Any + Send>`, which cannot be
+/// handed to a [`NextWebErrorReporter`]. This wrapper extracts the usual panic
+/// message (`&str` or `String`) and exposes it as a referenceable
+/// [`std::error::Error`].
+#[derive(Debug)]
+struct PanicError {
+    message: String,
+}
+
+impl PanicError {
+    /// Builds a [`PanicError`] from a panic payload.
+    fn from_payload(payload: &(dyn Any + Send)) -> Self {
+        let message = payload
+            .downcast_ref::<&str>()
+            .map(|message| (*message).to_string())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "Unknown panic".to_string());
+
+        Self { message }
+    }
+}
+
+impl std::fmt::Display for PanicError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl Error for PanicError {}
+
+/// Builds the map representation of the given command line arguments.
+///
+/// The resulting map can be stored in a [`MapPropertySource`] and combined with
+/// other map-backed sources, for example through a [`CompositePropertySource`].
+fn command_line_properties(args: &[String]) -> IndexMap<String, String> {
+    let source = SimpleCommandLinePropertySource::new(args);
+    let mut properties = IndexMap::new();
+
+    for name in source.property_names() {
+        if let Some(value) = source.property(name) {
+            properties.insert(name.to_string(), value);
+        }
+    }
+
+    if let Some(value) = source.property(DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME) {
+        properties.insert(DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME.to_string(), value);
+    }
+
+    properties
+}
+
+/// Adds the given command line arguments to the property sources, or merges
+/// them with an already registered command line property source.
+///
+/// When a source named [`COMMAND_LINE_PROPERTY_SOURCE_NAME`] already exists, a
+/// composite source holding the new arguments first and the existing source
+/// second takes its place. The new arguments therefore keep the highest
+/// precedence, and the composite keeps the position of the source it replaces.
+/// Otherwise, the new source is added with the highest precedence.
+///
+/// # Arguments
+///
+/// * `sources` - The property sources to update.
+/// * `args` - The raw command line arguments.
+fn configure_command_line_property_source(sources: &mut MutablePropertySources, args: &[String]) {
+    let name = COMMAND_LINE_PROPERTY_SOURCE_NAME;
+
+    // Remember the source preceding the command line source, so that the
+    // composite can be put back at the same position.
+    let previous = sources
+        .iter()
+        .take_while(|source| source.name() != name)
+        .last()
+        .map(|source| source.name().to_owned());
+
+    match sources.remove(name) {
+        Some(existing) => {
+            let mut composite = CompositePropertySource::new(name);
+            composite.add_property_source(Box::new(MapPropertySource::new(
+                "nextWebApplicationCommandLineArgs".to_owned(),
+                command_line_properties(args),
+            )));
+            composite.add_property_source(existing);
+
+            match previous {
+                Some(previous) => sources.add_after(&previous, Box::new(composite)),
+                None => sources.add_first(Box::new(composite)),
+            }
+        }
+        None => sources.add_first(Box::new(MapPropertySource::new(
+            name.to_owned(),
+            command_line_properties(args),
+        ))),
     }
 }

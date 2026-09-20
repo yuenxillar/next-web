@@ -65,12 +65,12 @@ impl<'a> ErrorAnalysis<'a> {
     /// ```
     pub fn new(
         description: impl Into<String>,
-        action: Option<impl Into<String>>,
+        action: Option<String>,
         cause: Option<&'a (dyn std::error::Error + 'static)>,
     ) -> Self {
         Self {
             description: description.into(),
-            action: action.map(Into::into),
+            action,
             cause,
         }
     }

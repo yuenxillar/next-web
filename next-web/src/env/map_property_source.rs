@@ -30,6 +30,10 @@ impl PropertySource<IndexMap<String, String>> for MapPropertySource {
         self.properties.contains_key(key)
     }
 
+    fn property_names(&self) -> Vec<String> {
+        self.properties.keys().cloned().collect()
+    }
+
     fn source(&self) -> &IndexMap<String, String> {
         &self.properties
     }

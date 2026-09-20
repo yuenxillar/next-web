@@ -11,8 +11,11 @@ impl ErrorAnalyzer for SingletonDefinitionOverrideErrorAnalyzer {
         let action = "Consider renaming one of the singleton or enabling \
         overriding by setting next.appliation.context.allow_override=true";
 
-        let error_analysis =
-            ErrorAnalysis::new("Singleton definition override error", Some(action), None);
+        let error_analysis = ErrorAnalysis::new(
+            "Singleton definition override error",
+            Some(action.to_owned()),
+            None,
+        );
 
         Some(error_analysis)
     }

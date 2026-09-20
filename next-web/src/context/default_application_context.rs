@@ -21,7 +21,7 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
         todo!()
     }
 
-    fn set_environment(&mut self, environment: Box<dyn ConfigurableEnvironment>) {
+    fn set_environment(&mut self, environment: Arc<dyn ConfigurableEnvironment>) {
         todo!()
     }
 

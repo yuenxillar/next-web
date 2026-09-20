@@ -96,8 +96,6 @@ full = [
     "enable-i18n",
     "enable-thread-pool",
 
-    "common",
-
     "decrypt-properties",
     # "enable-api-doc",
     "trace-log"
@@ -116,10 +114,10 @@ enable-prometheus       = ["axum-prometheus"]
 enable-i18n             = ["next-web-macros/translation"]
 enable-state-machine    = ["next-web-state-machine"]
 enable-thread-pool      = []
+enable-open-api         = ["next-web-api-doc", "utoipa-swagger-ui", "next-web-macros/api-doc"]
 
 embed-resources         = ["next-web-macros/embed-resources", "next-web-core/embed-resources", "dep:rust-embed"]
 
-common                  = []
 
 digester                = ["dep:md5", "dep:sha1", "dep:sha2"]
 decrypt-properties      = ["aes-gcm", "dep:base64", "scrypt", "rand"]

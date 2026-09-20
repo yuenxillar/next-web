@@ -53,6 +53,8 @@ impl ErrorAnalyzers {
         let mut error_analyzers = Self::new([]);
         error_analyzers.add_analyzer_of::<PortInUseErrorAnalyzer>();
 
+        // Last, so it is consulted after all other analyzers
+        error_analyzers.add_analyzer_of::<DefaultErrorAnalyzer>();
         error_analyzers
     }
 

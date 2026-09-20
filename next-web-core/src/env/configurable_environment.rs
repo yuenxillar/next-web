@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::env::{ConfigurablePropertyResolver, Environment};
+use crate::env::{ConfigurablePropertyResolver, Environment, MutablePropertySources};
 
 /// Configuration trait to be implemented by most if not all `Environment` types.
 /// Provides facilities for setting active and default profiles and manipulating underlying
@@ -95,20 +95,16 @@ where
     /// - [`AbstractEnvironment::DEFAULT_PROFILES_PROPERTY_NAME`]
     fn set_default_profiles(&mut self, profiles: &[&str]);
 
-    // /// Return the `PropertySources` for this `Environment` in mutable form,
-    // /// allowing for manipulation of the set of `PropertySource` objects that should
-    // /// be searched when resolving properties against this `Environment` object.
-    // /// The various `MutablePropertySources` methods such as
-    // /// `add_first`, `add_last`, `add_before` and `add_after` allow for fine-grained
-    // /// control over property source ordering. This is useful, for example, in ensuring
-    // /// that certain user-defined property sources have search precedence over default
-    // /// property sources such as the set of system properties or the set of system
-    // /// environment variables.
-    // ///
-    // /// # See also
-    // ///
-    // /// - [`AbstractEnvironment::customize_property_sources`]
-    // fn property_sources_mut(&mut self) -> &mut MutablePropertySources;
+    /// Return the `PropertySources` for this `Environment` in mutable form,
+    /// allowing for manipulation of the set of `PropertySource` objects that should
+    /// be searched when resolving properties against this `Environment` object.
+    /// The various `MutablePropertySources` methods such as
+    /// `add_first`, `add_last`, `add_before` and `add_after` allow for fine-grained
+    /// control over property source ordering. This is useful, for example, in ensuring
+    /// that certain user-defined property sources have search precedence over default
+    /// property sources such as the set of system properties or the set of system
+    /// environment variables.
+    fn property_sources(&mut self) -> &mut MutablePropertySources;
 
     /// Return the system properties as a map.
     ///
@@ -126,21 +122,21 @@ where
     /// property sources is expressly intended.
     fn system_environment(&self) -> HashMap<String, String>;
 
-    // /// Append the given parent environment's active profiles, default profiles, and
-    // /// property sources to this (child) environment's respective collections of each.
-    // ///
-    // /// For any identically-named `PropertySource` instance existing in both
-    // /// parent and child, the child instance is to be preserved and the parent instance
-    // /// discarded. This has the effect of allowing overriding of property sources by the
-    // /// child as well as avoiding redundant searches through common property source types
-    // /// — for example, system environment and system properties.
-    // ///
-    // /// Active and default profile names are also filtered for duplicates, to avoid
-    // /// confusion and redundant storage.
-    // ///
-    // /// The parent environment remains unmodified in any case. Note that any changes to
-    // /// the parent environment occurring after the call to `merge` will not be
-    // /// reflected in the child. Therefore, care should be taken to configure parent
-    // /// property sources and profile information prior to calling `merge`.
-    // fn merge(&mut self, parent: &dyn ConfigurableEnvironment);
+    /// Append the given parent environment's active profiles, default profiles, and
+    /// property sources to this (child) environment's respective collections of each.
+    ///
+    /// For any identically-named `PropertySource` instance existing in both
+    /// parent and child, the child instance is to be preserved and the parent instance
+    /// discarded. This has the effect of allowing overriding of property sources by the
+    /// child as well as avoiding redundant searches through common property source types
+    /// — for example, system environment and system properties.
+    ///
+    /// Active and default profile names are also filtered for duplicates, to avoid
+    /// confusion and redundant storage.
+    ///
+    /// The parent environment remains unmodified in any case. Note that any changes to
+    /// the parent environment occurring after the call to `merge` will not be
+    /// reflected in the child. Therefore, care should be taken to configure parent
+    /// property sources and profile information prior to calling `merge`.
+    fn merge(&mut self, parent: &dyn ConfigurableEnvironment);
 }

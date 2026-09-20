@@ -28,3 +28,24 @@ pub enum BannerMode {
     /// Print the banner to the log file.
     Log,
 }
+
+impl std::str::FromStr for BannerMode {
+    type Err = String;
+
+    /// Parses a banner mode from its textual representation.
+    ///
+    /// Matching is case-insensitive and ignores surrounding whitespace. The
+    /// accepted values are `off`, `console`, and `log`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the unrecognized value when it does not name a banner mode.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "off" => Ok(Self::Off),
+            "console" => Ok(Self::Console),
+            "log" => Ok(Self::Log),
+            other => Err(format!("Invalid banner mode '{other}'")),
+        }
+    }
+}

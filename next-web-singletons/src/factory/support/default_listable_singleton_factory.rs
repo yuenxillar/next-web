@@ -21,6 +21,10 @@ impl DefaultListableSingletonFactory {
             registry: DefaultSingletonRegistry::default(),
         }
     }
+
+    pub fn set_allow_override(&mut self, allow_overrides: bool) {
+        todo!()
+    }
 }
 
 impl Default for DefaultListableSingletonFactory {

@@ -45,6 +45,27 @@ where
         self.property(name).is_some()
     }
 
+    /// Return the names of all properties contained in this source.
+    ///
+    /// The default implementation returns an empty list, since the base
+    /// contract does not require a source to be enumerable. Implementations
+    /// backed by an enumerable store (such as a map) should override this
+    /// method. This mirrors Spring's
+    /// `EnumerablePropertySource#getPropertyNames`.
+    fn property_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Return whether this source is a placeholder for a source that cannot be
+    /// resolved yet.
+    ///
+    /// This mirrors Spring's `PropertySource.StubPropertySource` marker type:
+    /// Rust identifies stubs through a method rather than a type check. The
+    /// default implementation returns `false`.
+    fn is_stub(&self) -> bool {
+        false
+    }
+
     /// Return the underlying source object, if the implementation exposes one.
     ///
     /// This is an escape hatch for callers that need to reach into the original
@@ -99,6 +120,11 @@ impl PropertySource<()> for StubPropertySource {
     /// Always returns `None`.
     fn property(&self, _name: &str) -> Option<String> {
         None
+    }
+
+    /// Always returns `true`.
+    fn is_stub(&self) -> bool {
+        true
     }
 
     fn source(&self) -> &() {
