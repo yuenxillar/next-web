@@ -30,6 +30,7 @@ members = [
     "next-web-cloud/next-web-cloud-jingyue",
     "next-web-context",
     "next-web-singletons",
+    "next-web-util",
 ]
 exclude = ["next-web-code-generator"]
 resolver = "2"

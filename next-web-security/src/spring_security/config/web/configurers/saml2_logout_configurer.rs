@@ -28,7 +28,7 @@ where
 {
     logout_url: Option<String>,
 
-    base: BaseHttpConfigurer<Saml2LogoutConfigurer<H>, H>,
+    base: BaseHttpConfigurer<Self, H>,
 }
 
 impl<H> Saml2LogoutConfigurer<H>

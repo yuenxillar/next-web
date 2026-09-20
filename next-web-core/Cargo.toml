@@ -35,6 +35,8 @@ dashmap         = { workspace = true }
 uuid            = { workspace = true }
 regex           = { workspace = true }
 form_urlencoded = { workspace = true }
+indexmap        = { workspace = true }
+
 
 # tower-layer = "0.3.3"
 # tower-service = "0.3.3"

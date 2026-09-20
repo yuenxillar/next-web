@@ -1,8 +1,8 @@
 use std::{
-    any::{type_name, Any, TypeId},
+    any::{Any, TypeId, type_name},
     borrow::Cow,
     cmp::Ordering,
-    collections::{hash_map::Keys, HashMap},
+    collections::{HashMap, hash_map::Keys},
     hash::{Hash, Hasher},
 };
 
@@ -15,6 +15,10 @@ pub struct DefaultSingletonRegistry {
 impl DefaultSingletonRegistry {
     pub(crate) fn inner(&self) -> &HashMap<Key, DynSingle> {
         &self.registry
+    }
+
+    pub(crate) fn inner_mut(&mut self) -> &mut HashMap<Key, DynSingle> {
+        &mut self.registry
     }
 
     pub(crate) fn insert(&mut self, key: Key, single: DynSingle) {
@@ -43,6 +47,10 @@ impl DefaultSingletonRegistry {
 
     pub(crate) fn remove(&mut self, key: &Key) -> Option<DynSingle> {
         self.registry.remove(key)
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.registry.clear();
     }
 
     #[allow(unused)]
@@ -253,6 +261,11 @@ impl<T> Single<T> {
     pub fn get_mut(&mut self) -> &mut T {
         &mut self.instance
     }
+
+    /// Consumes this [`Single`] and returns the owned instance.
+    pub(crate) fn into_inner(self) -> T {
+        self.instance
+    }
 }
 
 /// Represents a [`Single`] that erased its type.
@@ -275,6 +288,18 @@ impl DynSingle {
         T: 'static,
     {
         self.origin.downcast_mut::<Single<T>>()
+    }
+
+    /// Consumes this [`DynSingle`] and returns the origin [`Single`] if it holds
+    /// a value of type `T`.
+    pub(crate) fn into_single<T>(self) -> Option<Single<T>>
+    where
+        T: 'static,
+    {
+        self.origin
+            .downcast::<Single<T>>()
+            .ok()
+            .map(|single| *single)
     }
 }
 

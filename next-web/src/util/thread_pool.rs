@@ -1,1317 +1,970 @@
-// https://crates.io/crates/threadpool
+//! Bounded, resizable executor for blocking work.
 
-//! A thread pool used to execute functions in parallel.
-//!
-//! Spawns a specified number of worker threads and replenishes the pool if any worker threads
-//! panic.
-//!
-//! # Examples
-//!
-//! ## Synchronized with a channel
-//!
-//! Every thread sends one message over the channel, which then is collected with the `take()`.
-//!
-//! ```
-//! use threadpool::ThreadPool;
-//! use std::sync::mpsc::channel;
-//!
-//! let n_workers = 4;
-//! let n_jobs = 8;
-//! let pool = ThreadPool::new(n_workers);
-//!
-//! let (tx, rx) = channel();
-//! for _ in 0..n_jobs {
-//!     let tx = tx.clone();
-//!     pool.execute(move|| {
-//!         tx.send(1).expect("channel will be there waiting for the pool");
-//!     });
-//! }
-//!
-//! assert_eq!(rx.iter().take(n_jobs).fold(0, |a, b| a + b), 8);
-//! ```
-//!
-//! ## Synchronized with a barrier
-//!
-//! Keep in mind, if a barrier synchronizes more jobs than you have workers in the pool,
-//! you will end up with a [deadlock](https://en.wikipedia.org/wiki/Deadlock)
-//! at the barrier which is [not considered unsafe](
-//! https://doc.rust-lang.org/reference/behavior-not-considered-unsafe.html).
-//!
-//! ```
-//! use threadpool::ThreadPool;
-//! use std::sync::{Arc, Barrier};
-//! use std::sync::atomic::{AtomicUsize, Ordering};
-//!
-//! // create at least as many workers as jobs or you will deadlock yourself
-//! let n_workers = 42;
-//! let n_jobs = 23;
-//! let pool = ThreadPool::new(n_workers);
-//! let an_atomic = Arc::new(AtomicUsize::new(0));
-//!
-//! assert!(n_jobs <= n_workers, "too many jobs, will deadlock");
-//!
-//! // create a barrier that waits for all jobs plus the starter thread
-//! let barrier = Arc::new(Barrier::new(n_jobs + 1));
-//! for _ in 0..n_jobs {
-//!     let barrier = barrier.clone();
-//!     let an_atomic = an_atomic.clone();
-//!
-//!     pool.execute(move|| {
-//!         // do the heavy work
-//!         an_atomic.fetch_add(1, Ordering::Relaxed);
-//!
-//!         // then wait for the other threads
-//!         barrier.wait();
-//!     });
-//! }
-//!
-//! // wait for the threads to finish the work
-//! barrier.wait();
-//! assert_eq!(an_atomic.load(Ordering::SeqCst), /* n_jobs = */ 23);
-//! ```
-
-extern crate num_cpus;
-
+use std::cell::Cell;
+use std::collections::VecDeque;
+use std::error::Error;
 use std::fmt;
+use std::future::Future;
+use std::io;
+use std::panic::{self, AssertUnwindSafe};
+use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Condvar, Mutex};
-use std::thread;
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::task::{Context, Poll};
+use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant};
+use tokio::sync::oneshot;
 
-trait FnBox {
-    fn call_box(self: Box<Self>);
+type Job = Box<dyn FnOnce() + Send + 'static>;
+static NEXT_POOL_ID: AtomicUsize = AtomicUsize::new(1);
+
+thread_local! {
+    static CURRENT_POOL_ID: Cell<Option<usize>> = const { Cell::new(None) };
 }
 
-impl<F: FnOnce()> FnBox for F {
-    fn call_box(self: Box<F>) {
-        (*self)()
-    }
+struct Task {
+    name: Option<String>,
+    job: Job,
 }
 
-type Thunk<'a> = Box<dyn FnBox + Send + 'a>;
-
-struct Sentinel<'a> {
-    shared_data: &'a Arc<ThreadPoolSharedData>,
-    active: bool,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Lifecycle {
+    Running,
+    ShuttingDown,
+    Stopping,
+    Terminated,
 }
 
-impl<'a> Sentinel<'a> {
-    fn new(shared_data: &'a Arc<ThreadPoolSharedData>) -> Sentinel<'a> {
-        Sentinel {
-            shared_data: shared_data,
-            active: true,
+/// The externally visible lifecycle of an executor.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExecutorState {
+    Running,
+    ShuttingDown,
+    Stopping,
+    Terminated,
+}
+
+impl From<Lifecycle> for ExecutorState {
+    fn from(value: Lifecycle) -> Self {
+        match value {
+            Lifecycle::Running => Self::Running,
+            Lifecycle::ShuttingDown => Self::ShuttingDown,
+            Lifecycle::Stopping => Self::Stopping,
+            Lifecycle::Terminated => Self::Terminated,
         }
     }
-
-    /// Cancel and destroy this sentinel.
-    fn cancel(mut self) {
-        self.active = false;
-    }
 }
 
-impl<'a> Drop for Sentinel<'a> {
-    fn drop(&mut self) {
-        if self.active {
-            self.shared_data.active_count.fetch_sub(1, Ordering::SeqCst);
-            if thread::panicking() {
-                self.shared_data.panic_count.fetch_add(1, Ordering::SeqCst);
-            }
-            self.shared_data.no_work_notify_all();
-            spawn_in_pool(self.shared_data.clone())
+struct State {
+    lifecycle: Lifecycle,
+    queue: VecDeque<Task>,
+    active: usize,
+    live_workers: usize,
+    desired_workers: usize,
+    completed: u64,
+    panicked: u64,
+    rejected: u64,
+    cancelled: u64,
+}
+
+struct Inner {
+    id: usize,
+    name: Option<String>,
+    name_is_prefix: bool,
+    stack_size: Option<usize>,
+    queue_capacity: usize,
+    state: Mutex<State>,
+    work_available: Condvar,
+    queue_space: Condvar,
+    idle: Condvar,
+    terminated: Condvar,
+    management: Mutex<()>,
+    workers: Mutex<Vec<JoinHandle<()>>>,
+    next_worker_id: AtomicUsize,
+    external_handles: AtomicUsize,
+}
+
+impl Inner {
+    fn state(&self) -> MutexGuard<'_, State> {
+        self.state.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn is_current_worker(&self) -> bool {
+        CURRENT_POOL_ID.with(|id| id.get() == Some(self.id))
+    }
+
+    fn notify_idle(&self, state: &State) {
+        if state.queue.is_empty() && state.active == 0 {
+            self.idle.notify_all();
         }
     }
 }
 
-/// [`ThreadPool`] factory, which can be used in order to configure the properties of the
-/// [`ThreadPool`].
-///
-/// The three configuration options available:
-///
-/// * `num_threads`: maximum number of threads that will be alive at any given moment by the built
-///   [`ThreadPool`]
-/// * `thread_name`: thread name for each of the threads spawned by the built [`ThreadPool`]
-/// * `thread_stack_size`: stack size (in bytes) for each of the threads spawned by the built
-///   [`ThreadPool`]
-///
-/// [`ThreadPool`]: struct.ThreadPool.html
-///
-/// # Examples
-///
-/// Build a [`ThreadPool`] that uses a maximum of eight threads simultaneously and each thread has
-/// a 8 MB stack size:
-///
-/// ```
-/// let pool = threadpool::Builder::new()
-///     .num_threads(8)
-///     .thread_stack_size(8_000_000)
-///     .build();
-/// ```
-#[derive(Clone, Default)]
+/// Why a task was not accepted.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExecuteError {
+    QueueFull,
+    TimedOut,
+    ShuttingDown,
+}
+
+impl fmt::Display for ExecuteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::QueueFull => "thread-pool task queue is full",
+            Self::TimedOut => "timed out waiting for thread-pool queue capacity",
+            Self::ShuttingDown => "thread-pool executor is shutting down",
+        })
+    }
+}
+impl Error for ExecuteError {}
+
+/// An operation would deadlock because it was called by this pool.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WaitError {
+    CalledFromWorker,
+}
+
+impl fmt::Display for WaitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("a worker cannot wait for its own thread-pool executor")
+    }
+}
+impl Error for WaitError {}
+
+/// Failure returned while awaiting a submitted task's value.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TaskError {
+    /// The task closure panicked. The worker remains healthy.
+    Panicked,
+    /// The task was discarded by immediate shutdown before it started.
+    Cancelled,
+}
+
+impl fmt::Display for TaskError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Panicked => "thread-pool task panicked",
+            Self::Cancelled => "thread-pool task was cancelled",
+        })
+    }
+}
+impl Error for TaskError {}
+
+/// An awaitable result from [`ThreadPoolTaskExecutor::submit`].
+#[must_use = "dropping the handle detaches the task; its work still runs"]
+pub struct TaskHandle<T> {
+    receiver: oneshot::Receiver<Result<T, TaskError>>,
+}
+
+impl<T> Future for TaskHandle<T> {
+    type Output = Result<T, TaskError>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match Pin::new(&mut self.receiver).poll(cx) {
+            Poll::Ready(Ok(result)) => Poll::Ready(result),
+            Poll::Ready(Err(_)) => Poll::Ready(Err(TaskError::Cancelled)),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+/// A consistent point-in-time executor snapshot.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ExecutorMetrics {
+    pub state: ExecutorState,
+    pub queued_tasks: usize,
+    pub active_tasks: usize,
+    pub live_workers: usize,
+    pub desired_workers: usize,
+    pub completed_tasks: u64,
+    pub panicked_tasks: u64,
+    pub rejected_tasks: u64,
+    pub cancelled_tasks: u64,
+}
+
+/// Configures a [`ThreadPoolTaskExecutor`].
+#[derive(Clone, Debug)]
 pub struct Builder {
     num_threads: Option<usize>,
     thread_name: Option<String>,
-    thread_stack_size: Option<usize>,
+    name_is_prefix: bool,
+    stack_size: Option<usize>,
+    queue_capacity: usize,
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self {
+            num_threads: None,
+            thread_name: None,
+            name_is_prefix: false,
+            stack_size: None,
+            queue_capacity: 1_024,
+        }
+    }
 }
 
 impl Builder {
-    /// Initiate a new [`Builder`].
-    ///
-    /// [`Builder`]: struct.Builder.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let builder = threadpool::Builder::new();
-    /// ```
-    pub fn new() -> Builder {
-        Builder {
-            num_threads: None,
-            thread_name: None,
-            thread_stack_size: None,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Set the maximum number of worker-threads that will be alive at any given moment by the built
-    /// [`ThreadPool`]. If not specified, defaults the number of threads to the number of CPUs.
-    ///
-    /// [`ThreadPool`]: struct.ThreadPool.html
-    ///
-    /// # Panics
-    ///
-    /// This method will panic if `num_threads` is 0.
-    ///
-    /// # Examples
-    ///
-    /// No more than eight threads will be alive simultaneously for this pool:
-    ///
-    /// ```
-    /// use std::thread;
-    ///
-    /// let pool = threadpool::Builder::new()
-    ///     .num_threads(8)
-    ///     .build();
-    ///
-    /// for _ in 0..100 {
-    ///     pool.execute(|| {
-    ///         println!("Hello from a worker thread!")
-    ///     })
-    /// }
-    /// ```
-    pub fn num_threads(mut self, num_threads: usize) -> Builder {
-        assert!(num_threads > 0);
-        self.num_threads = Some(num_threads);
+    pub fn num_threads(mut self, value: usize) -> Self {
+        assert!(value > 0, "num_threads must be greater than zero");
+        self.num_threads = Some(value);
         self
     }
 
-    /// Set the thread name for each of the threads spawned by the built [`ThreadPool`]. If not
-    /// specified, threads spawned by the thread pool will be unnamed.
-    ///
-    /// [`ThreadPool`]: struct.ThreadPool.html
-    ///
-    /// # Examples
-    ///
-    /// Each thread spawned by this pool will have the name "foo":
-    ///
-    /// ```
-    /// use std::thread;
-    ///
-    /// let pool = threadpool::Builder::new()
-    ///     .thread_name("foo".into())
-    ///     .build();
-    ///
-    /// for _ in 0..100 {
-    ///     pool.execute(|| {
-    ///         assert_eq!(thread::current().name(), Some("foo"));
-    ///     })
-    /// }
-    /// ```
-    pub fn thread_name(mut self, name: String) -> Builder {
-        self.thread_name = Some(name);
+    /// Gives every worker the same name (legacy behavior).
+    pub fn thread_name(mut self, value: String) -> Self {
+        self.thread_name = Some(value);
+        self.name_is_prefix = false;
         self
     }
 
-    /// Set the stack size (in bytes) for each of the threads spawned by the built [`ThreadPool`].
-    /// If not specified, threads spawned by the threadpool will have a stack size [as specified in
-    /// the `std::thread` documentation][thread].
-    ///
-    /// [thread]: https://doc.rust-lang.org/nightly/std/thread/index.html#stack-size
-    /// [`ThreadPool`]: struct.ThreadPool.html
-    ///
-    /// # Examples
-    ///
-    /// Each thread spawned by this pool will have a 4 MB stack:
-    ///
-    /// ```
-    /// let pool = threadpool::Builder::new()
-    ///     .thread_stack_size(4_000_000)
-    ///     .build();
-    ///
-    /// for _ in 0..100 {
-    ///     pool.execute(|| {
-    ///         println!("This thread has a 4 MB stack size!");
-    ///     })
-    /// }
-    /// ```
-    pub fn thread_stack_size(mut self, size: usize) -> Builder {
-        self.thread_stack_size = Some(size);
+    /// Names workers using the prefix followed by a numeric worker ID.
+    pub fn thread_name_prefix(mut self, value: impl Into<String>) -> Self {
+        self.thread_name = Some(value.into());
+        self.name_is_prefix = true;
         self
     }
 
-    /// Finalize the [`Builder`] and build the [`ThreadPool`].
-    ///
-    /// [`Builder`]: struct.Builder.html
-    /// [`ThreadPool`]: struct.ThreadPool.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let pool = threadpool::Builder::new()
-    ///     .num_threads(8)
-    ///     .thread_stack_size(4_000_000)
-    ///     .build();
-    /// ```
-    pub fn build(self) -> ThreadPool {
-        let (tx, rx) = channel::<Thunk<'static>>();
+    pub fn thread_stack_size(mut self, value: usize) -> Self {
+        self.stack_size = Some(value);
+        self
+    }
 
-        let num_threads = self.num_threads.unwrap_or_else(num_cpus::get);
+    /// Sets the bounded waiting queue capacity.
+    pub fn queue_capacity(mut self, value: usize) -> Self {
+        assert!(value > 0, "queue_capacity must be greater than zero");
+        self.queue_capacity = value;
+        self
+    }
 
-        let shared_data = Arc::new(ThreadPoolSharedData {
+    pub fn build(self) -> ThreadPoolTaskExecutor {
+        self.try_build()
+            .expect("unable to create thread-pool workers")
+    }
+
+    pub fn try_build(self) -> io::Result<ThreadPoolTaskExecutor> {
+        let n = self.num_threads.unwrap_or_else(default_parallelism);
+        let inner = Arc::new(Inner {
+            id: NEXT_POOL_ID.fetch_add(1, Ordering::Relaxed),
             name: self.thread_name,
-            job_receiver: Mutex::new(rx),
-            empty_condvar: Condvar::new(),
-            empty_trigger: Mutex::new(()),
-            join_generation: AtomicUsize::new(0),
-            queued_count: AtomicUsize::new(0),
-            active_count: AtomicUsize::new(0),
-            max_thread_count: AtomicUsize::new(num_threads),
-            panic_count: AtomicUsize::new(0),
-            stack_size: self.thread_stack_size,
+            name_is_prefix: self.name_is_prefix,
+            stack_size: self.stack_size,
+            queue_capacity: self.queue_capacity,
+            state: Mutex::new(State {
+                lifecycle: Lifecycle::Running,
+                queue: VecDeque::with_capacity(self.queue_capacity),
+                active: 0,
+                live_workers: 0,
+                desired_workers: n,
+                completed: 0,
+                panicked: 0,
+                rejected: 0,
+                cancelled: 0,
+            }),
+            work_available: Condvar::new(),
+            queue_space: Condvar::new(),
+            idle: Condvar::new(),
+            terminated: Condvar::new(),
+            management: Mutex::new(()),
+            workers: Mutex::new(Vec::with_capacity(n)),
+            next_worker_id: AtomicUsize::new(1),
+            external_handles: AtomicUsize::new(1),
         });
-
-        // Threadpool threads
-        for _ in 0..num_threads {
-            spawn_in_pool(shared_data.clone());
+        let executor = ThreadPoolTaskExecutor { inner };
+        if let Err(error) = executor.spawn_to_target() {
+            executor.shutdown_now();
+            let _ = executor.await_termination(Duration::from_secs(5));
+            return Err(error);
         }
-
-        ThreadPool {
-            jobs: tx,
-            shared_data: shared_data,
-        }
+        Ok(executor)
     }
 }
 
-struct ThreadPoolSharedData {
-    name: Option<String>,
-    job_receiver: Mutex<Receiver<Thunk<'static>>>,
-    empty_trigger: Mutex<()>,
-    empty_condvar: Condvar,
-    join_generation: AtomicUsize,
-    queued_count: AtomicUsize,
-    active_count: AtomicUsize,
-    max_thread_count: AtomicUsize,
-    panic_count: AtomicUsize,
-    stack_size: Option<usize>,
+fn default_parallelism() -> usize {
+    thread::available_parallelism()
+        .map(usize::from)
+        .unwrap_or(1)
 }
 
-impl ThreadPoolSharedData {
-    fn has_work(&self) -> bool {
-        self.queued_count.load(Ordering::SeqCst) > 0 || self.active_count.load(Ordering::SeqCst) > 0
-    }
-
-    /// Notify all observers joining this pool if there is no more work to do.
-    fn no_work_notify_all(&self) {
-        if !self.has_work() {
-            *self
-                .empty_trigger
-                .lock()
-                .expect("Unable to notify all joining threads");
-            self.empty_condvar.notify_all();
-        }
-    }
+/// A bounded, dynamically resizable executor intended for blocking web work.
+///
+/// Clones share one executor. Dropping the final handle starts graceful
+/// shutdown without blocking. For deterministic shutdown call [`Self::shutdown`]
+/// and then [`Self::await_termination`].
+pub struct ThreadPoolTaskExecutor {
+    inner: Arc<Inner>,
 }
 
-/// Abstraction of a thread pool for basic parallelism.
-pub struct ThreadPool {
-    // How the threadpool communicates with subthreads.
-    //
-    // This is the only such Sender, so when it is dropped all subthreads will
-    // quit.
-    jobs: Sender<Thunk<'static>>,
-    shared_data: Arc<ThreadPoolSharedData>,
-}
+/// Backward-compatible name.
+pub type ThreadPool = ThreadPoolTaskExecutor;
 
-impl ThreadPool {
-    /// Creates a new thread pool capable of executing `num_threads` number of jobs concurrently.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if `num_threads` is 0.
-    ///
-    /// # Examples
-    ///
-    /// Create a new thread pool capable of executing four jobs concurrently:
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    ///
-    /// let pool = ThreadPool::new(4);
-    /// ```
-    pub fn new(num_threads: usize) -> ThreadPool {
+impl ThreadPoolTaskExecutor {
+    pub fn new(num_threads: usize) -> Self {
         Builder::new().num_threads(num_threads).build()
     }
 
-    /// Creates a new thread pool capable of executing `num_threads` number of jobs concurrently.
-    /// Each thread will have the [name][thread name] `name`.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if `num_threads` is 0.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use std::thread;
-    /// use threadpool::ThreadPool;
-    ///
-    /// let pool = ThreadPool::with_name("worker".into(), 2);
-    /// for _ in 0..2 {
-    ///     pool.execute(|| {
-    ///         assert_eq!(
-    ///             thread::current().name(),
-    ///             Some("worker")
-    ///         );
-    ///     });
-    /// }
-    /// pool.join();
-    /// ```
-    ///
-    /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
-    pub fn with_name(name: String, num_threads: usize) -> ThreadPool {
+    pub fn with_name(name: String, num_threads: usize) -> Self {
         Builder::new()
             .num_threads(num_threads)
             .thread_name(name)
             .build()
     }
 
-    /// Executes the function `job` on a thread in the pool.
-    ///
-    /// # Examples
-    ///
-    /// Execute four jobs on a thread pool that can run two jobs concurrently:
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    ///
-    /// let pool = ThreadPool::new(2);
-    /// pool.execute(|| println!("hello"));
-    /// pool.execute(|| println!("world"));
-    /// pool.execute(|| println!("foo"));
-    /// pool.execute(|| println!("bar"));
-    /// pool.join();
-    /// ```
-    pub fn execute<F>(&self, job: F)
+    /// Non-blocking submission. A full queue is reported as backpressure.
+    pub fn execute<F>(&self, job: F) -> Result<(), ExecuteError>
     where
         F: FnOnce() + Send + 'static,
     {
-        self.shared_data.queued_count.fetch_add(1, Ordering::SeqCst);
-        self.jobs
-            .send(Box::new(job))
-            .expect("ThreadPool::execute unable to send job into queue.");
+        self.try_execute(job)
     }
 
-    /// Returns the number of jobs waiting to executed in the pool.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    /// use std::time::Duration;
-    /// use std::thread::sleep;
-    ///
-    /// let pool = ThreadPool::new(2);
-    /// for _ in 0..10 {
-    ///     pool.execute(|| {
-    ///         sleep(Duration::from_secs(100));
-    ///     });
-    /// }
-    ///
-    /// sleep(Duration::from_secs(1)); // wait for threads to start
-    /// assert_eq!(8, pool.queued_count());
-    /// ```
-    pub fn queued_count(&self) -> usize {
-        self.shared_data.queued_count.load(Ordering::Relaxed)
+    pub fn try_execute<F>(&self, job: F) -> Result<(), ExecuteError>
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.enqueue(Task {
+            name: None,
+            job: Box::new(job),
+        })
     }
 
-    /// Returns the number of currently active threads.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    /// use std::time::Duration;
-    /// use std::thread::sleep;
-    ///
-    /// let pool = ThreadPool::new(4);
-    /// for _ in 0..10 {
-    ///     pool.execute(move || {
-    ///         sleep(Duration::from_secs(100));
-    ///     });
-    /// }
-    ///
-    /// sleep(Duration::from_secs(1)); // wait for threads to start
-    /// assert_eq!(4, pool.active_count());
-    /// ```
-    pub fn active_count(&self) -> usize {
-        self.shared_data.active_count.load(Ordering::SeqCst)
+    pub fn try_execute_named<F>(&self, name: impl Into<String>, job: F) -> Result<(), ExecuteError>
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.enqueue(Task {
+            name: Some(name.into()),
+            job: Box::new(job),
+        })
     }
 
-    /// Returns the maximum number of threads the pool will execute concurrently.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    ///
-    /// let mut pool = ThreadPool::new(4);
-    /// assert_eq!(4, pool.max_count());
-    ///
-    /// pool.set_num_threads(8);
-    /// assert_eq!(8, pool.max_count());
-    /// ```
-    pub fn max_count(&self) -> usize {
-        self.shared_data.max_thread_count.load(Ordering::Relaxed)
+    /// Submits blocking work and returns a handle that can be awaited without
+    /// blocking an async runtime worker.
+    pub fn submit<F, T>(&self, job: F) -> Result<TaskHandle<T>, ExecuteError>
+    where
+        F: FnOnce() -> T + Send + 'static,
+        T: Send + 'static,
+    {
+        self.submit_task(None, job)
     }
 
-    /// Returns the number of panicked threads over the lifetime of the pool.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    ///
-    /// let pool = ThreadPool::new(4);
-    /// for n in 0..10 {
-    ///     pool.execute(move || {
-    ///         // simulate a panic
-    ///         if n % 2 == 0 {
-    ///             panic!()
-    ///         }
-    ///     });
-    /// }
-    /// pool.join();
-    ///
-    /// assert_eq!(5, pool.panic_count());
-    /// ```
-    pub fn panic_count(&self) -> usize {
-        self.shared_data.panic_count.load(Ordering::Relaxed)
+    /// Like [`Self::submit`], but includes a name in panic diagnostics.
+    pub fn submit_named<F, T>(
+        &self,
+        name: impl Into<String>,
+        job: F,
+    ) -> Result<TaskHandle<T>, ExecuteError>
+    where
+        F: FnOnce() -> T + Send + 'static,
+        T: Send + 'static,
+    {
+        self.submit_task(Some(name.into()), job)
     }
 
-    /// **Deprecated: Use [`ThreadPool::set_num_threads`](#method.set_num_threads)**
-    #[deprecated(since = "1.3.0", note = "use ThreadPool::set_num_threads")]
-    pub fn set_threads(&mut self, num_threads: usize) {
-        self.set_num_threads(num_threads)
+    fn submit_task<F, T>(&self, name: Option<String>, job: F) -> Result<TaskHandle<T>, ExecuteError>
+    where
+        F: FnOnce() -> T + Send + 'static,
+        T: Send + 'static,
+    {
+        let (sender, receiver) = oneshot::channel();
+        let task = move || match panic::catch_unwind(AssertUnwindSafe(job)) {
+            Ok(value) => {
+                let _ = sender.send(Ok(value));
+            }
+            Err(payload) => {
+                let _ = sender.send(Err(TaskError::Panicked));
+                panic::resume_unwind(payload);
+            }
+        };
+        self.enqueue(Task {
+            name,
+            job: Box::new(task),
+        })?;
+        Ok(TaskHandle { receiver })
     }
 
-    /// Sets the number of worker-threads to use as `num_threads`.
-    /// Can be used to change the threadpool size during runtime.
-    /// Will not abort already running or waiting threads.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if `num_threads` is 0.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    /// use std::time::Duration;
-    /// use std::thread::sleep;
-    ///
-    /// let mut pool = ThreadPool::new(4);
-    /// for _ in 0..10 {
-    ///     pool.execute(move || {
-    ///         sleep(Duration::from_secs(100));
-    ///     });
-    /// }
-    ///
-    /// sleep(Duration::from_secs(1)); // wait for threads to start
-    /// assert_eq!(4, pool.active_count());
-    /// assert_eq!(6, pool.queued_count());
-    ///
-    /// // Increase thread capacity of the pool
-    /// pool.set_num_threads(8);
-    ///
-    /// sleep(Duration::from_secs(1)); // wait for new threads to start
-    /// assert_eq!(8, pool.active_count());
-    /// assert_eq!(2, pool.queued_count());
-    ///
-    /// // Decrease thread capacity of the pool
-    /// // No active threads are killed
-    /// pool.set_num_threads(4);
-    ///
-    /// assert_eq!(8, pool.active_count());
-    /// assert_eq!(2, pool.queued_count());
-    /// ```
-    pub fn set_num_threads(&mut self, num_threads: usize) {
-        assert!(num_threads >= 1);
-        let prev_num_threads = self
-            .shared_data
-            .max_thread_count
-            .swap(num_threads, Ordering::Release);
-        if let Some(num_spawn) = num_threads.checked_sub(prev_num_threads) {
-            // Spawn new threads
-            for _ in 0..num_spawn {
-                spawn_in_pool(self.shared_data.clone());
+    fn enqueue(&self, task: Task) -> Result<(), ExecuteError> {
+        let mut state = self.inner.state();
+        if state.lifecycle != Lifecycle::Running {
+            state.rejected = state.rejected.saturating_add(1);
+            return Err(ExecuteError::ShuttingDown);
+        }
+        if state.queue.len() >= self.inner.queue_capacity {
+            state.rejected = state.rejected.saturating_add(1);
+            return Err(ExecuteError::QueueFull);
+        }
+        state.queue.push_back(task);
+        self.inner.work_available.notify_one();
+        Ok(())
+    }
+
+    /// Waits for queue capacity. Avoid this on async runtime workers.
+    pub fn execute_timeout<F>(&self, timeout: Duration, job: F) -> Result<(), ExecuteError>
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let deadline = Instant::now() + timeout;
+        let mut task = Some(Task {
+            name: None,
+            job: Box::new(job),
+        });
+        let mut state = self.inner.state();
+        loop {
+            if state.lifecycle != Lifecycle::Running {
+                state.rejected = state.rejected.saturating_add(1);
+                return Err(ExecuteError::ShuttingDown);
+            }
+            if state.queue.len() < self.inner.queue_capacity {
+                state
+                    .queue
+                    .push_back(task.take().expect("task enqueued once"));
+                self.inner.work_available.notify_one();
+                return Ok(());
+            }
+            let Some(left) = deadline.checked_duration_since(Instant::now()) else {
+                state.rejected = state.rejected.saturating_add(1);
+                return Err(ExecuteError::TimedOut);
+            };
+            let (next, result) = self
+                .inner
+                .queue_space
+                .wait_timeout(state, left)
+                .unwrap_or_else(|e| e.into_inner());
+            state = next;
+            if result.timed_out() && state.queue.len() >= self.inner.queue_capacity {
+                state.rejected = state.rejected.saturating_add(1);
+                return Err(ExecuteError::TimedOut);
             }
         }
     }
 
-    /// Block the current thread until all jobs in the pool have been executed.
-    ///
-    /// Calling `join` on an empty pool will cause an immediate return.
-    /// `join` may be called from multiple threads concurrently.
-    /// A `join` is an atomic point in time. All threads joining before the join
-    /// event will exit together even if the pool is processing new jobs by the
-    /// time they get scheduled.
-    ///
-    /// Calling `join` from a thread within the pool will cause a deadlock. This
-    /// behavior is considered safe.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    /// use std::sync::Arc;
-    /// use std::sync::atomic::{AtomicUsize, Ordering};
-    ///
-    /// let pool = ThreadPool::new(8);
-    /// let test_count = Arc::new(AtomicUsize::new(0));
-    ///
-    /// for _ in 0..42 {
-    ///     let test_count = test_count.clone();
-    ///     pool.execute(move || {
-    ///         test_count.fetch_add(1, Ordering::Relaxed);
-    ///     });
-    /// }
-    ///
-    /// pool.join();
-    /// assert_eq!(42, test_count.load(Ordering::Relaxed));
-    /// ```
-    pub fn join(&self) {
-        // fast path requires no mutex
-        if self.shared_data.has_work() == false {
-            return;
+    /// Changes worker count; shrinking never interrupts active tasks.
+    pub fn set_num_threads(&self, value: usize) -> io::Result<()> {
+        if value == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "num_threads must be greater than zero",
+            ));
         }
-
-        let generation = self.shared_data.join_generation.load(Ordering::SeqCst);
-        let mut lock = self.shared_data.empty_trigger.lock().unwrap();
-
-        while generation == self.shared_data.join_generation.load(Ordering::Relaxed)
-            && self.shared_data.has_work()
+        let _manager = self
+            .inner
+            .management
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         {
-            lock = self.shared_data.empty_condvar.wait(lock).unwrap();
+            let mut state = self.inner.state();
+            if state.lifecycle != Lifecycle::Running {
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "cannot resize a shutting-down executor",
+                ));
+            }
+            state.desired_workers = value;
+            self.inner.work_available.notify_all();
         }
+        if let Err(error) = self.spawn_to_target_locked() {
+            let mut state = self.inner.state();
+            state.desired_workers = state.live_workers.max(1);
+            return Err(error);
+        }
+        self.reap_finished();
+        Ok(())
+    }
 
-        // increase generation if we are the first thread to come out of the loop
-        let _ = self.shared_data.join_generation.compare_exchange(
-            generation,
-            generation.wrapping_add(1),
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        );
+    #[deprecated(since = "0.2.1", note = "use set_num_threads")]
+    pub fn set_threads(&self, value: usize) -> io::Result<()> {
+        self.set_num_threads(value)
+    }
+
+    fn spawn_to_target(&self) -> io::Result<()> {
+        let _manager = self
+            .inner
+            .management
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        self.spawn_to_target_locked()
+    }
+
+    fn spawn_to_target_locked(&self) -> io::Result<()> {
+        loop {
+            let worker_id = {
+                let mut state = self.inner.state();
+                if state.lifecycle != Lifecycle::Running
+                    || state.live_workers >= state.desired_workers
+                {
+                    return Ok(());
+                }
+                state.live_workers += 1;
+                self.inner.next_worker_id.fetch_add(1, Ordering::Relaxed)
+            };
+            let mut builder = thread::Builder::new();
+            if let Some(name) = &self.inner.name {
+                builder = builder.name(if self.inner.name_is_prefix {
+                    format!("{name}{worker_id}")
+                } else {
+                    name.clone()
+                });
+            }
+            if let Some(size) = self.inner.stack_size {
+                builder = builder.stack_size(size);
+            }
+            let inner = Arc::clone(&self.inner);
+            match builder.spawn(move || worker_loop(inner)) {
+                Ok(handle) => self
+                    .inner
+                    .workers
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .push(handle),
+                Err(error) => {
+                    let mut state = self.inner.state();
+                    state.live_workers = state.live_workers.saturating_sub(1);
+                    return Err(error);
+                }
+            }
+        }
+    }
+
+    /// Waits for a moment at which the queue and active set are empty.
+    pub fn join(&self) -> Result<(), WaitError> {
+        if self.inner.is_current_worker() {
+            return Err(WaitError::CalledFromWorker);
+        }
+        let mut state = self.inner.state();
+        while !state.queue.is_empty() || state.active != 0 {
+            state = self
+                .inner
+                .idle
+                .wait(state)
+                .unwrap_or_else(|e| e.into_inner());
+        }
+        Ok(())
+    }
+
+    pub fn wait_for_idle(&self, timeout: Duration) -> Result<bool, WaitError> {
+        if self.inner.is_current_worker() {
+            return Err(WaitError::CalledFromWorker);
+        }
+        let deadline = Instant::now() + timeout;
+        let mut state = self.inner.state();
+        while !state.queue.is_empty() || state.active != 0 {
+            let Some(left) = deadline.checked_duration_since(Instant::now()) else {
+                return Ok(false);
+            };
+            let (next, result) = self
+                .inner
+                .idle
+                .wait_timeout(state, left)
+                .unwrap_or_else(|e| e.into_inner());
+            state = next;
+            if result.timed_out() && (!state.queue.is_empty() || state.active != 0) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// Stops accepting work and completes queued tasks.
+    pub fn shutdown(&self) {
+        let _manager = self
+            .inner
+            .management
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let mut state = self.inner.state();
+        if state.lifecycle == Lifecycle::Running {
+            state.lifecycle = Lifecycle::ShuttingDown;
+            state.desired_workers = 0;
+            if state.live_workers == 0 {
+                state.lifecycle = Lifecycle::Terminated;
+                self.inner.terminated.notify_all();
+            }
+            self.inner.work_available.notify_all();
+            self.inner.queue_space.notify_all();
+        }
+    }
+
+    /// Discards queued work. Active Rust threads are never forcefully killed.
+    pub fn shutdown_now(&self) -> usize {
+        let cancelled = {
+            let _manager = self
+                .inner
+                .management
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            let mut state = self.inner.state();
+            if state.lifecycle == Lifecycle::Terminated {
+                return 0;
+            }
+            state.lifecycle = Lifecycle::Stopping;
+            state.desired_workers = 0;
+            let tasks: Vec<_> = state.queue.drain(..).collect();
+            state.cancelled = state.cancelled.saturating_add(tasks.len() as u64);
+            self.inner.notify_idle(&state);
+            if state.live_workers == 0 {
+                state.lifecycle = Lifecycle::Terminated;
+                self.inner.terminated.notify_all();
+            }
+            self.inner.work_available.notify_all();
+            self.inner.queue_space.notify_all();
+            tasks
+        };
+        let count = cancelled.len();
+        drop(cancelled);
+        count
+    }
+
+    /// Waits for shutdown and joins worker OS handles.
+    pub fn await_termination(&self, timeout: Duration) -> bool {
+        if self.inner.is_current_worker() {
+            return false;
+        }
+        let deadline = Instant::now() + timeout;
+        let mut state = self.inner.state();
+        while state.lifecycle != Lifecycle::Terminated {
+            let Some(left) = deadline.checked_duration_since(Instant::now()) else {
+                return false;
+            };
+            let (next, result) = self
+                .inner
+                .terminated
+                .wait_timeout(state, left)
+                .unwrap_or_else(|e| e.into_inner());
+            state = next;
+            if result.timed_out() && state.lifecycle != Lifecycle::Terminated {
+                return false;
+            }
+        }
+        drop(state);
+        self.join_all();
+        true
+    }
+
+    pub fn metrics(&self) -> ExecutorMetrics {
+        let s = self.inner.state();
+        ExecutorMetrics {
+            state: s.lifecycle.into(),
+            queued_tasks: s.queue.len(),
+            active_tasks: s.active,
+            live_workers: s.live_workers,
+            desired_workers: s.desired_workers,
+            completed_tasks: s.completed,
+            panicked_tasks: s.panicked,
+            rejected_tasks: s.rejected,
+            cancelled_tasks: s.cancelled,
+        }
+    }
+
+    pub fn queued_count(&self) -> usize {
+        self.metrics().queued_tasks
+    }
+    pub fn active_count(&self) -> usize {
+        self.metrics().active_tasks
+    }
+    pub fn max_count(&self) -> usize {
+        self.metrics().desired_workers
+    }
+    pub fn worker_count(&self) -> usize {
+        self.metrics().live_workers
+    }
+    pub fn panic_count(&self) -> usize {
+        self.metrics()
+            .panicked_tasks
+            .try_into()
+            .unwrap_or(usize::MAX)
+    }
+    pub fn queue_capacity(&self) -> usize {
+        self.inner.queue_capacity
+    }
+    pub fn state(&self) -> ExecutorState {
+        self.metrics().state
+    }
+
+    fn reap_finished(&self) {
+        let done = {
+            let mut handles = self.inner.workers.lock().unwrap_or_else(|e| e.into_inner());
+            let mut done = Vec::new();
+            let mut alive = Vec::new();
+            for h in handles.drain(..) {
+                if h.is_finished() {
+                    done.push(h)
+                } else {
+                    alive.push(h)
+                }
+            }
+            *handles = alive;
+            done
+        };
+        for h in done {
+            let _ = h.join();
+        }
+    }
+
+    fn join_all(&self) {
+        let handles =
+            std::mem::take(&mut *self.inner.workers.lock().unwrap_or_else(|e| e.into_inner()));
+        for h in handles {
+            let _ = h.join();
+        }
     }
 }
 
-impl Clone for ThreadPool {
-    /// Cloning a pool will create a new handle to the pool.
-    /// The behavior is similar to [Arc](https://doc.rust-lang.org/stable/std/sync/struct.Arc.html).
-    ///
-    /// We could for example submit jobs from multiple threads concurrently.
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    /// use std::thread;
-    /// use std::sync::mpsc::channel;
-    ///
-    /// let pool = ThreadPool::with_name("clone example".into(), 2);
-    ///
-    /// let results = (0..2)
-    ///     .map(|i| {
-    ///         let pool = pool.clone();
-    ///         thread::spawn(move || {
-    ///             let (tx, rx) = channel();
-    ///             for i in 1..12 {
-    ///                 let tx = tx.clone();
-    ///                 pool.execute(move || {
-    ///                     tx.send(i).expect("channel will be waiting");
-    ///                 });
-    ///             }
-    ///             drop(tx);
-    ///             if i == 0 {
-    ///                 rx.iter().fold(0, |accumulator, element| accumulator + element)
-    ///             } else {
-    ///                 rx.iter().fold(1, |accumulator, element| accumulator * element)
-    ///             }
-    ///         })
-    ///     })
-    ///     .map(|join_handle| join_handle.join().expect("collect results from threads"))
-    ///     .collect::<Vec<usize>>();
-    ///
-    /// assert_eq!(vec![66, 39916800], results);
-    /// ```
-    fn clone(&self) -> ThreadPool {
-        ThreadPool {
-            jobs: self.jobs.clone(),
-            shared_data: self.shared_data.clone(),
+impl Clone for ThreadPoolTaskExecutor {
+    fn clone(&self) -> Self {
+        self.inner.external_handles.fetch_add(1, Ordering::Relaxed);
+        Self {
+            inner: Arc::clone(&self.inner),
         }
     }
 }
 
-/// Create a thread pool with one thread per CPU.
-/// On machines with hyperthreading,
-/// this will create one thread per hyperthread.
-impl Default for ThreadPool {
+impl Drop for ThreadPoolTaskExecutor {
+    fn drop(&mut self) {
+        if self.inner.external_handles.fetch_sub(1, Ordering::AcqRel) == 1 {
+            self.shutdown();
+        }
+    }
+}
+
+impl Default for ThreadPoolTaskExecutor {
     fn default() -> Self {
-        ThreadPool::new(num_cpus::get())
+        Builder::new().build()
     }
 }
-
-impl fmt::Debug for ThreadPool {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("ThreadPool")
-            .field("name", &self.shared_data.name)
-            .field("queued_count", &self.queued_count())
-            .field("active_count", &self.active_count())
-            .field("max_count", &self.max_count())
+impl PartialEq for ThreadPoolTaskExecutor {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+impl Eq for ThreadPoolTaskExecutor {}
+impl fmt::Debug for ThreadPoolTaskExecutor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ThreadPoolTaskExecutor")
+            .field("name", &self.inner.name)
+            .field("queue_capacity", &self.inner.queue_capacity)
+            .field("metrics", &self.metrics())
             .finish()
     }
 }
 
-impl PartialEq for ThreadPool {
-    /// Check if you are working with the same pool
-    ///
-    /// ```
-    /// use threadpool::ThreadPool;
-    ///
-    /// let a = ThreadPool::new(2);
-    /// let b = ThreadPool::new(2);
-    ///
-    /// assert_eq!(a, a);
-    /// assert_eq!(b, b);
-    ///
-    /// assert!(a != b);
-    /// assert!(b != a);
-    /// ```
-    fn eq(&self, other: &ThreadPool) -> bool {
-        let a: &ThreadPoolSharedData = &*self.shared_data;
-        let b: &ThreadPoolSharedData = &*other.shared_data;
-        a as *const ThreadPoolSharedData == b as *const ThreadPoolSharedData
-        // with rust 1.17 and late:
-        // Arc::ptr_eq(&self.shared_data, &other.shared_data)
+fn worker_loop(inner: Arc<Inner>) {
+    CURRENT_POOL_ID.with(|id| id.set(Some(inner.id)));
+    loop {
+        let task = {
+            let mut state = inner.state();
+            loop {
+                let retire = match state.lifecycle {
+                    Lifecycle::Running => state.live_workers > state.desired_workers,
+                    Lifecycle::ShuttingDown => state.queue.is_empty(),
+                    Lifecycle::Stopping | Lifecycle::Terminated => true,
+                };
+                if retire {
+                    retire_worker(&inner, &mut state);
+                    CURRENT_POOL_ID.with(|id| id.set(None));
+                    return;
+                }
+                if let Some(task) = state.queue.pop_front() {
+                    state.active += 1;
+                    inner.queue_space.notify_one();
+                    break task;
+                }
+                state = inner
+                    .work_available
+                    .wait(state)
+                    .unwrap_or_else(|e| e.into_inner());
+            }
+        };
+        let name = task.name;
+        let result = panic::catch_unwind(AssertUnwindSafe(task.job));
+        let panic_message = result
+            .as_ref()
+            .err()
+            .map(|payload| panic_message(payload.as_ref()).to_owned());
+        let mut state = inner.state();
+        state.active = state.active.saturating_sub(1);
+        state.completed = state.completed.saturating_add(1);
+        if panic_message.is_some() {
+            state.panicked = state.panicked.saturating_add(1);
+        }
+        inner.notify_idle(&state);
+        drop(state);
+        if let Some(message) = panic_message {
+            tracing::error!(
+                task.name = name.as_deref().unwrap_or("<unnamed>"),
+                panic.message = %message,
+                "thread-pool task panicked"
+            );
+        }
     }
 }
-impl Eq for ThreadPool {}
 
-fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
-    let mut builder = thread::Builder::new();
-    if let Some(ref name) = shared_data.name {
-        builder = builder.name(name.clone());
+fn retire_worker(inner: &Inner, state: &mut State) {
+    state.live_workers = state.live_workers.saturating_sub(1);
+    if state.live_workers == 0 && state.lifecycle != Lifecycle::Running {
+        state.lifecycle = Lifecycle::Terminated;
+        inner.terminated.notify_all();
     }
-    if let Some(ref stack_size) = shared_data.stack_size {
-        builder = builder.stack_size(stack_size.to_owned());
-    }
-    builder
-        .spawn(move || {
-            // Will spawn a new thread on panic unless it is cancelled.
-            let sentinel = Sentinel::new(&shared_data);
+    inner.notify_idle(state);
+}
 
-            loop {
-                // Shutdown this thread if the pool has become smaller
-                let thread_counter_val = shared_data.active_count.load(Ordering::Acquire);
-                let max_thread_count_val = shared_data.max_thread_count.load(Ordering::Relaxed);
-                if thread_counter_val >= max_thread_count_val {
-                    break;
-                }
-                let message = {
-                    // Only lock jobs for the time it takes
-                    // to get a job, not run it.
-                    let lock = shared_data
-                        .job_receiver
-                        .lock()
-                        .expect("Worker thread unable to lock job_receiver");
-                    lock.recv()
-                };
-
-                let job = match message {
-                    Ok(job) => job,
-                    // The ThreadPool was dropped.
-                    Err(err) => {
-                        tracing::error!("Worker thread unable to receive job: {}", err);
-                        break;
-                    }
-                };
-                // Do not allow IR around the job execution
-                shared_data.active_count.fetch_add(1, Ordering::SeqCst);
-                shared_data.queued_count.fetch_sub(1, Ordering::SeqCst);
-
-                job.call_box();
-
-                shared_data.active_count.fetch_sub(1, Ordering::SeqCst);
-                shared_data.no_work_notify_all();
-            }
-
-            sentinel.cancel();
-        })
-        .unwrap();
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
+    payload
+        .downcast_ref::<&'static str>()
+        .copied()
+        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+        .unwrap_or("non-string panic payload")
 }
 
 #[cfg(test)]
-mod test {
-    use super::{Builder, ThreadPool};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::mpsc::{channel, sync_channel};
-    use std::sync::{Arc, Barrier};
-    use std::thread::{self, sleep};
-    use std::time::Duration;
+mod tests {
+    use super::*;
+    use std::sync::{mpsc, Barrier};
 
-    const TEST_TASKS: usize = 4;
+    const TIMEOUT: Duration = Duration::from_secs(2);
 
     #[test]
-    fn test_set_num_threads_increasing() {
-        let new_thread_amount = TEST_TASKS + 8;
-        let mut pool = ThreadPool::new(TEST_TASKS);
-        for _ in 0..TEST_TASKS {
-            pool.execute(move || sleep(Duration::from_secs(23)));
-        }
-        sleep(Duration::from_secs(1));
-        assert_eq!(pool.active_count(), TEST_TASKS);
-
-        pool.set_num_threads(new_thread_amount);
-
-        for _ in 0..(new_thread_amount - TEST_TASKS) {
-            pool.execute(move || sleep(Duration::from_secs(23)));
-        }
-        sleep(Duration::from_secs(1));
-        assert_eq!(pool.active_count(), new_thread_amount);
-
-        pool.join();
+    fn executes_and_isolates_panics() {
+        let pool = ThreadPoolTaskExecutor::new(2);
+        pool.try_execute_named("expected", || panic!("boom"))
+            .unwrap();
+        let (tx, rx) = mpsc::channel();
+        pool.execute(move || tx.send(42).unwrap()).unwrap();
+        assert_eq!(rx.recv_timeout(TIMEOUT).unwrap(), 42);
+        pool.join().unwrap();
+        assert_eq!(pool.panic_count(), 1);
+        assert_eq!(pool.worker_count(), 2);
     }
 
     #[test]
-    fn test_set_num_threads_decreasing() {
-        let new_thread_amount = 2;
-        let mut pool = ThreadPool::new(TEST_TASKS);
-        for _ in 0..TEST_TASKS {
-            pool.execute(move || {
-                assert_eq!(1, 1);
-            });
-        }
-        pool.set_num_threads(new_thread_amount);
-        for _ in 0..new_thread_amount {
-            pool.execute(move || sleep(Duration::from_secs(23)));
-        }
-        sleep(Duration::from_secs(1));
-        assert_eq!(pool.active_count(), new_thread_amount);
-
-        pool.join();
+    fn submitted_values_are_awaitable() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let pool = ThreadPoolTaskExecutor::new(1);
+        let value = runtime.block_on(pool.submit(|| 6 * 7).unwrap()).unwrap();
+        assert_eq!(value, 42);
+        let error = runtime
+            .block_on(
+                pool.submit_named("expected", || -> usize { panic!("boom") })
+                    .unwrap(),
+            )
+            .unwrap_err();
+        assert_eq!(error, TaskError::Panicked);
+        pool.join().unwrap();
+        assert_eq!(pool.panic_count(), 1);
     }
 
     #[test]
-    fn test_active_count() {
-        let pool = ThreadPool::new(TEST_TASKS);
-        for _ in 0..2 * TEST_TASKS {
-            pool.execute(move || loop {
-                sleep(Duration::from_secs(10))
-            });
-        }
-        sleep(Duration::from_secs(1));
-        let active_count = pool.active_count();
-        assert_eq!(active_count, TEST_TASKS);
-        let initialized_count = pool.max_count();
-        assert_eq!(initialized_count, TEST_TASKS);
-    }
-
-    #[test]
-    fn test_works() {
-        let pool = ThreadPool::new(TEST_TASKS);
-
-        let (tx, rx) = channel();
-        for _ in 0..TEST_TASKS {
-            let tx = tx.clone();
-            pool.execute(move || {
-                tx.send(1).unwrap();
-            });
-        }
-
-        assert_eq!(rx.iter().take(TEST_TASKS).fold(0, |a, b| a + b), TEST_TASKS);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_zero_tasks_panic() {
-        ThreadPool::new(0);
-    }
-
-    #[test]
-    fn test_recovery_from_subtask_panic() {
-        let pool = ThreadPool::new(TEST_TASKS);
-
-        // Panic all the existing threads.
-        for _ in 0..TEST_TASKS {
-            pool.execute(move || panic!("Ignore this panic, it must!"));
-        }
-        pool.join();
-
-        assert_eq!(pool.panic_count(), TEST_TASKS);
-
-        // Ensure new threads were spawned to compensate.
-        let (tx, rx) = channel();
-        for _ in 0..TEST_TASKS {
-            let tx = tx.clone();
-            pool.execute(move || {
-                tx.send(1).unwrap();
-            });
-        }
-
-        assert_eq!(rx.iter().take(TEST_TASKS).fold(0, |a, b| a + b), TEST_TASKS);
-    }
-
-    #[test]
-    fn test_should_not_panic_on_drop_if_subtasks_panic_after_drop() {
-        let pool = ThreadPool::new(TEST_TASKS);
-        let waiter = Arc::new(Barrier::new(TEST_TASKS + 1));
-
-        // Panic all the existing threads in a bit.
-        for _ in 0..TEST_TASKS {
-            let waiter = waiter.clone();
-            pool.execute(move || {
-                waiter.wait();
-                panic!("Ignore this panic, it should!");
-            });
-        }
-
-        drop(pool);
-
-        // Kick off the failure.
-        waiter.wait();
-    }
-
-    #[test]
-    fn test_massive_task_creation() {
-        let test_tasks = 4_200_000;
-
-        let pool = ThreadPool::new(TEST_TASKS);
-        let b0 = Arc::new(Barrier::new(TEST_TASKS + 1));
-        let b1 = Arc::new(Barrier::new(TEST_TASKS + 1));
-
-        let (tx, rx) = channel();
-
-        for i in 0..test_tasks {
-            let tx = tx.clone();
-            let (b0, b1) = (b0.clone(), b1.clone());
-
-            pool.execute(move || {
-                // Wait until the pool has been filled once.
-                if i < TEST_TASKS {
-                    b0.wait();
-                    // wait so the pool can be measured
-                    b1.wait();
-                }
-
-                let _ = tx.send(1).is_ok();
-            });
-        }
-
-        b0.wait();
-        assert_eq!(pool.active_count(), TEST_TASKS);
-        b1.wait();
-
-        assert_eq!(rx.iter().take(test_tasks).fold(0, |a, b| a + b), test_tasks);
-        pool.join();
-
-        let atomic_active_count = pool.active_count();
-        assert!(
-            atomic_active_count == 0,
-            "atomic_active_count: {}",
-            atomic_active_count
-        );
-    }
-
-    #[test]
-    fn test_shrink() {
-        let test_tasks_begin = TEST_TASKS + 2;
-
-        let mut pool = ThreadPool::new(test_tasks_begin);
-        let b0 = Arc::new(Barrier::new(test_tasks_begin + 1));
-        let b1 = Arc::new(Barrier::new(test_tasks_begin + 1));
-
-        for _ in 0..test_tasks_begin {
-            let (b0, b1) = (b0.clone(), b1.clone());
-            pool.execute(move || {
-                b0.wait();
-                b1.wait();
-            });
-        }
-
-        let b2 = Arc::new(Barrier::new(TEST_TASKS + 1));
-        let b3 = Arc::new(Barrier::new(TEST_TASKS + 1));
-
-        for _ in 0..TEST_TASKS {
-            let (b2, b3) = (b2.clone(), b3.clone());
-            pool.execute(move || {
-                b2.wait();
-                b3.wait();
-            });
-        }
-
-        b0.wait();
-        pool.set_num_threads(TEST_TASKS);
-
-        assert_eq!(pool.active_count(), test_tasks_begin);
-        b1.wait();
-
-        b2.wait();
-        assert_eq!(pool.active_count(), TEST_TASKS);
-        b3.wait();
-    }
-
-    #[test]
-    fn test_name() {
-        let name = "test";
-        let mut pool = ThreadPool::with_name(name.to_owned(), 2);
-        let (tx, rx) = sync_channel(0);
-
-        // initial thread should share the name "test"
-        for _ in 0..2 {
-            let tx = tx.clone();
-            pool.execute(move || {
-                let name = thread::current().name().unwrap().to_owned();
-                tx.send(name).unwrap();
-            });
-        }
-
-        // new spawn thread should share the name "test" too.
-        pool.set_num_threads(3);
-        let tx_clone = tx.clone();
+    fn bounded_queue_applies_backpressure() {
+        let pool = Builder::new().num_threads(1).queue_capacity(1).build();
+        let started = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+        let (s, r) = (started.clone(), release.clone());
         pool.execute(move || {
-            let name = thread::current().name().unwrap().to_owned();
-            tx_clone.send(name).unwrap();
-            panic!();
-        });
+            s.wait();
+            r.wait();
+        })
+        .unwrap();
+        started.wait();
+        pool.execute(|| {}).unwrap();
+        assert_eq!(pool.execute(|| {}), Err(ExecuteError::QueueFull));
+        release.wait();
+        pool.join().unwrap();
+    }
 
-        // recover thread should share the name "test" too.
+    #[test]
+    fn timed_submission_and_queued_handle_cancellation_are_reported() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let pool = Builder::new().num_threads(1).queue_capacity(1).build();
+        let started = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+        let (s, r) = (started.clone(), release.clone());
         pool.execute(move || {
-            let name = thread::current().name().unwrap().to_owned();
-            tx.send(name).unwrap();
-        });
-
-        for thread_name in rx.iter().take(4) {
-            assert_eq!(name, thread_name);
-        }
+            s.wait();
+            r.wait();
+        })
+        .unwrap();
+        started.wait();
+        let handle = pool.submit(|| 42).unwrap();
+        assert_eq!(
+            pool.execute_timeout(Duration::from_millis(10), || {}),
+            Err(ExecuteError::TimedOut)
+        );
+        assert_eq!(pool.shutdown_now(), 1);
+        assert_eq!(runtime.block_on(handle), Err(TaskError::Cancelled));
+        release.wait();
+        assert!(pool.await_termination(TIMEOUT));
     }
 
     #[test]
-    fn test_debug() {
-        let pool = ThreadPool::new(4);
-        let debug = format!("{:?}", pool);
-        assert_eq!(
-            debug,
-            "ThreadPool { name: None, queued_count: 0, active_count: 0, max_count: 4 }"
-        );
-
-        let pool = ThreadPool::with_name("hello".into(), 4);
-        let debug = format!("{:?}", pool);
-        assert_eq!(
-            debug,
-            "ThreadPool { name: Some(\"hello\"), queued_count: 0, active_count: 0, max_count: 4 }"
-        );
-
-        let pool = ThreadPool::new(4);
-        pool.execute(move || sleep(Duration::from_secs(5)));
-        sleep(Duration::from_secs(1));
-        let debug = format!("{:?}", pool);
-        assert_eq!(
-            debug,
-            "ThreadPool { name: None, queued_count: 0, active_count: 1, max_count: 4 }"
-        );
+    fn shrink_and_expand_tracks_real_workers() {
+        let pool = ThreadPoolTaskExecutor::new(4);
+        pool.set_num_threads(1).unwrap();
+        assert!(wait_until(|| pool.worker_count() == 1));
+        pool.set_num_threads(3).unwrap();
+        assert!(wait_until(|| pool.worker_count() == 3));
     }
 
     #[test]
-    fn test_repeate_join() {
-        let pool = ThreadPool::with_name("repeate join test".into(), 8);
-        let test_count = Arc::new(AtomicUsize::new(0));
-
-        for _ in 0..42 {
-            let test_count = test_count.clone();
-            pool.execute(move || {
-                sleep(Duration::from_secs(2));
-                test_count.fetch_add(1, Ordering::Release);
-            });
+    fn graceful_and_immediate_shutdown_are_distinct() {
+        let pool = Builder::new().num_threads(1).queue_capacity(8).build();
+        let started = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+        let (s, r) = (started.clone(), release.clone());
+        pool.execute(move || {
+            s.wait();
+            r.wait();
+        })
+        .unwrap();
+        started.wait();
+        for _ in 0..5 {
+            pool.execute(|| {}).unwrap();
         }
+        assert_eq!(pool.shutdown_now(), 5);
+        release.wait();
+        assert!(pool.await_termination(TIMEOUT));
+        assert_eq!(pool.state(), ExecutorState::Terminated);
 
-        println!("{:?}", pool);
-        pool.join();
-        assert_eq!(42, test_count.load(Ordering::Acquire));
-
-        for _ in 0..42 {
-            let test_count = test_count.clone();
-            pool.execute(move || {
-                sleep(Duration::from_secs(2));
-                test_count.fetch_add(1, Ordering::Relaxed);
-            });
-        }
-        pool.join();
-        assert_eq!(84, test_count.load(Ordering::Relaxed));
-    }
-
-    #[test]
-    fn test_multi_join() {
-        use std::sync::mpsc::TryRecvError::*;
-
-        // Toggle the following lines to debug the deadlock
-        fn error(_s: String) {
-            //use ::std::io::Write;
-            //let stderr = ::std::io::stderr();
-            //let mut stderr = stderr.lock();
-            //stderr.write(&_s.as_bytes()).is_ok();
-        }
-
-        let pool0 = ThreadPool::with_name("multi join pool0".into(), 4);
-        let pool1 = ThreadPool::with_name("multi join pool1".into(), 4);
-        let (tx, rx) = channel();
-
-        for i in 0..8 {
-            let pool1 = pool1.clone();
-            let pool0_ = pool0.clone();
+        let pool = ThreadPoolTaskExecutor::new(1);
+        let (tx, rx) = mpsc::channel();
+        for _ in 0..4 {
             let tx = tx.clone();
-            pool0.execute(move || {
-                pool1.execute(move || {
-                    error(format!("p1: {} -=- {:?}\n", i, pool0_));
-                    pool0_.join();
-                    error(format!("p1: send({})\n", i));
-                    tx.send(i).expect("send i from pool1 -> main");
-                });
-                error(format!("p0: {}\n", i));
-            });
+            pool.execute(move || tx.send(()).unwrap()).unwrap();
         }
         drop(tx);
+        pool.shutdown();
+        assert!(pool.await_termination(TIMEOUT));
+        assert_eq!(rx.iter().count(), 4);
+    }
 
-        assert_eq!(rx.try_recv(), Err(Empty));
-        error(format!("{:?}\n{:?}\n", pool0, pool1));
-        pool0.join();
-        error(format!("pool0.join() complete =-= {:?}", pool1));
-        pool1.join();
-        error("pool1.join() complete\n".into());
+    #[test]
+    fn self_join_is_rejected() {
+        let pool = ThreadPoolTaskExecutor::new(1);
+        let worker_pool = pool.clone();
+        let (tx, rx) = mpsc::channel();
+        pool.execute(move || tx.send(worker_pool.join()).unwrap())
+            .unwrap();
         assert_eq!(
-            rx.iter().fold(0, |acc, i| acc + i),
-            0 + 1 + 2 + 3 + 4 + 5 + 6 + 7
+            rx.recv_timeout(TIMEOUT).unwrap(),
+            Err(WaitError::CalledFromWorker)
         );
     }
 
-    #[test]
-    fn test_empty_pool() {
-        // Joining an empty pool must return imminently
-        let pool = ThreadPool::new(4);
-
-        pool.join();
-
-        assert!(true);
-    }
-
-    #[test]
-    fn test_no_fun_or_joy() {
-        // What happens when you keep adding jobs after a join
-
-        fn sleepy_function() {
-            sleep(Duration::from_secs(6));
-        }
-
-        let pool = ThreadPool::with_name("no fun or joy".into(), 8);
-
-        pool.execute(sleepy_function);
-
-        let p_t = pool.clone();
-        thread::spawn(move || {
-            (0..23).map(|_| p_t.execute(sleepy_function)).count();
-        });
-
-        pool.join();
-    }
-
-    #[test]
-    fn test_clone() {
-        let pool = ThreadPool::with_name("clone example".into(), 2);
-
-        // This batch of jobs will occupy the pool for some time
-        for _ in 0..6 {
-            pool.execute(move || {
-                sleep(Duration::from_secs(2));
-            });
-        }
-
-        // The following jobs will be inserted into the pool in a random fashion
-        let t0 = {
-            let pool = pool.clone();
-            thread::spawn(move || {
-                // wait for the first batch of tasks to finish
-                pool.join();
-
-                let (tx, rx) = channel();
-                for i in 0..42 {
-                    let tx = tx.clone();
-                    pool.execute(move || {
-                        tx.send(i).expect("channel will be waiting");
-                    });
-                }
-                drop(tx);
-                rx.iter()
-                    .fold(0, |accumulator, element| accumulator + element)
-            })
-        };
-        let t1 = {
-            let pool = pool.clone();
-            thread::spawn(move || {
-                // wait for the first batch of tasks to finish
-                pool.join();
-
-                let (tx, rx) = channel();
-                for i in 1..12 {
-                    let tx = tx.clone();
-                    pool.execute(move || {
-                        tx.send(i).expect("channel will be waiting");
-                    });
-                }
-                drop(tx);
-                rx.iter()
-                    .fold(1, |accumulator, element| accumulator * element)
-            })
-        };
-
-        assert_eq!(
-            861,
-            t0.join()
-                .expect("thread 0 will return after calculating additions",)
-        );
-        assert_eq!(
-            39916800,
-            t1.join()
-                .expect("thread 1 will return after calculating multiplications",)
-        );
-    }
-
-    #[test]
-    fn test_sync_shared_data() {
-        fn assert_sync<T: Sync>() {}
-        assert_sync::<super::ThreadPoolSharedData>();
-    }
-
-    #[test]
-    fn test_send_shared_data() {
-        fn assert_send<T: Send>() {}
-        assert_send::<super::ThreadPoolSharedData>();
-    }
-
-    #[test]
-    fn test_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<ThreadPool>();
-    }
-
-    #[test]
-    fn test_cloned_eq() {
-        let a = ThreadPool::new(2);
-
-        assert_eq!(a, a.clone());
-    }
-
-    #[test]
-    /// The scenario is joining threads should not be stuck once their wave
-    /// of joins has completed. So once one thread joining on a pool has
-    /// succeded other threads joining on the same pool must get out even if
-    /// the thread is used for other jobs while the first group is finishing
-    /// their join
-    ///
-    /// In this example this means the waiting threads will exit the join in
-    /// groups of four because the waiter pool has four workers.
-    fn test_join_wavesurfer() {
-        let n_cycles = 4;
-        let n_workers = 4;
-        let (tx, rx) = channel();
-        let builder = Builder::new()
-            .num_threads(n_workers)
-            .thread_name("join wavesurfer".into());
-        let p_waiter = builder.clone().build();
-        let p_clock = builder.build();
-
-        let barrier = Arc::new(Barrier::new(3));
-        let wave_clock = Arc::new(AtomicUsize::new(0));
-        let clock_thread = {
-            let barrier = barrier.clone();
-            let wave_clock = wave_clock.clone();
-            thread::spawn(move || {
-                barrier.wait();
-                for wave_num in 0..n_cycles {
-                    wave_clock.store(wave_num, Ordering::SeqCst);
-                    sleep(Duration::from_secs(1));
-                }
-            })
-        };
-
-        {
-            let barrier = barrier.clone();
-            p_clock.execute(move || {
-                barrier.wait();
-                // this sleep is for stabilisation on weaker platforms
-                sleep(Duration::from_millis(100));
-            });
-        }
-
-        // prepare three waves of jobs
-        for i in 0..3 * n_workers {
-            let p_clock = p_clock.clone();
-            let tx = tx.clone();
-            let wave_clock = wave_clock.clone();
-            p_waiter.execute(move || {
-                let now = wave_clock.load(Ordering::SeqCst);
-                p_clock.join();
-                // submit jobs for the second wave
-                p_clock.execute(|| sleep(Duration::from_secs(1)));
-                let clock = wave_clock.load(Ordering::SeqCst);
-                tx.send((now, clock, i)).unwrap();
-            });
-        }
-        println!("all scheduled at {}", wave_clock.load(Ordering::SeqCst));
-        barrier.wait();
-
-        p_clock.join();
-        //p_waiter.join();
-
-        drop(tx);
-        let mut hist = vec![0; n_cycles];
-        let mut data = vec![];
-        for (now, after, i) in rx.iter() {
-            let mut dur = after - now;
-            if dur >= n_cycles - 1 {
-                dur = n_cycles - 1;
+    fn wait_until(test: impl Fn() -> bool) -> bool {
+        let end = Instant::now() + TIMEOUT;
+        while Instant::now() < end {
+            if test() {
+                return true;
             }
-            hist[dur] += 1;
-
-            data.push((now, after, i));
+            thread::sleep(Duration::from_millis(2));
         }
-        for (i, n) in hist.iter().enumerate() {
-            println!(
-                "\t{}: {} {}",
-                i,
-                n,
-                &*(0..*n).fold("".to_owned(), |s, _| s + "*")
-            );
-        }
-        assert!(data.iter().all(|&(cycle, stop, i)| if i < n_workers {
-            cycle == stop
-        } else {
-            cycle < stop
-        }));
-
-        clock_thread.join().unwrap();
+        test()
     }
 }

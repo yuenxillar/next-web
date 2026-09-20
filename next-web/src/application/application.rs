@@ -43,18 +43,14 @@ use crate::application::permitted_groups::PERMITTED_GROUPS;
 use crate::autoregister::application_event_autoregister::ApplicationEventAutoRegister;
 use crate::autoregister::http_handler_autoregister::HttpHandlerAutoRegister;
 
-use crate::banner::top_banner::{TopBanner, DEFAULT_TOP_BANNER};
 use crate::configurer::http_method_handler_configurer::{RouteState, RouterContext};
-use crate::diagnostics::failure_analysis::FailureAnalysis;
-use crate::diagnostics::failure_analysis_reporter::FailureAnalysisReporter;
-use crate::diagnostics::failure_analyzers::FailureAnalyzers;
-use crate::diagnostics::logging_failure_analysis_reporter::LoggingFailureAnalysisReporter;
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::manager::background_service_manager::BackgroundServiceManager;
 use crate::signal::{APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL, APPLICATION_STARTED_SIGNAL};
 use crate::util::local_date_time::LocalDateTime;
 use crate::util::thread::ThreadUtil;
+use crate::{NextWebBanner, NextWebErrorReporter};
 
 #[cfg(feature = "enable-api-doc")]
 use next_web_api_doc::openapi::OpenApi;
@@ -74,7 +70,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 type XResult = std::result::Result<(), Box<dyn std::error::Error>>;
 
-trait XApplication<Ctx, Es = ()>
+trait XApplication<Ctx, Es = (), Res = ()>
 where
     Es: ErrorSolver,
     Ctx: next_web_context::ApplicationContext,
@@ -103,11 +99,12 @@ where
 
     /// Show the banner of the application.
     fn banner_show(application_resources: &ApplicationResources) {
-        application_resources
-            .load(APPLICATION_BANNER)
-            .and_then(|content| std::str::from_utf8(&content).map(ToOwned::to_owned).ok())
-            .map(|txt| TopBanner::show(&txt))
-            .unwrap_or_else(|| TopBanner::show(DEFAULT_TOP_BANNER));
+        // application_resources
+        //     .load(APPLICATION_BANNER)
+        //     .as_deref()
+        //     .and_then(|content| std::str::from_utf8(content).ok())
+        //     .map(NextWebBanner::print_banner)
+        //     .unwrap_or(NextWebBanner::default())
     }
 
     /// Initialize the logging.
@@ -210,7 +207,7 @@ where
     /// Initialize the api doc.
     #[cfg(feature = "enable-api-doc")]
     #[allow(unused_variables)]
-    async fn api_doc(&self, ctx: &mut ApplicationContext) -> OpenApi {
+    fn api_doc(&self, ctx: &mut ApplicationContext) -> OpenApi {
         use next_web_api_doc::OpenApi;
 
         struct OpenApiDoc;
@@ -424,7 +421,7 @@ where
     async fn application_router(&self, ctx: &mut ApplicationContext) -> Router {
         #[cfg(feature = "enable-api-doc")]
         let mut context = {
-            let openapi = self.api_doc(ctx).await;
+            let openapi = self.api_doc(ctx);
             RouterContext::with_openapi(openapi)
         };
 
@@ -810,13 +807,13 @@ where
 
         let application = next_application.application();
 
-        let mut application_error_reporter = None;
+        // let mut application_error_reporter = None;
         let run = async {
             application.init_logging(properties);
             info!("Logging initialized");
 
             // Get failure analyzers
-            application_error_reporter = ctx.resolve_with_default_name::<FailureAnalyzers>().into();
+            // application_error_reporter = todo!();
 
             // Autowire properties
             application
@@ -859,10 +856,10 @@ where
         use futures::FutureExt;
 
         // Set panic hook
-        std::panic::set_hook(Box::new(|hook_info| {
-            LoggingFailureAnalysisReporter::default()
-                .report(&FailureAnalysis::with_panic_hook(hook_info));
-        }));
+        // std::panic::set_hook(Box::new(|hook_info| {
+        //     LoggingFailureAnalysisReporter::default()
+        //         .report(&FailureAnalysis::with_panic_hook(hook_info));
+        // }));
 
         match AssertUnwindSafe(run)
             .catch_unwind()
@@ -875,9 +872,9 @@ where
                     .unwrap_or_else(|| "Unknown error".to_string())
             }) {
             Ok(Some(err)) => {
-                application_error_reporter
-                    .as_mut()
-                    .map(|reporter| reporter.report_error(err));
+                // application_error_reporter
+                //     .as_mut()
+                //     .map(|reporter| reporter.report_error(err.as_ref()));
             }
             _ => {}
         }

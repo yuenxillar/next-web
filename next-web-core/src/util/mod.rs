@@ -1,4 +1,5 @@
 pub mod locale;
+pub mod matcher;
 pub mod pattern;
 pub mod pattern_match;
 pub mod singleton;
@@ -13,7 +14,10 @@ mod web;
 pub use html_utils::HtmlUtils;
 pub use mime_type::MimeType;
 pub use mime_type_utils::MimeTypeUtils;
+
 pub use string::StringUtils;
 pub use web::WebUtils;
 
 pub use form_urlencoded;
+
+pub use indexmap;

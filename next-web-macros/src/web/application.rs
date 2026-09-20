@@ -47,27 +47,31 @@ pub fn impl_macro_application(
             #[include = "*.properties"]
             #[include = "*.toml"]
             #[include = "*.txt"]
-            pub(crate) struct _ApplicationResources;
+            pub(crate) struct EmbedResourceLoader;
 
-            impl ::next_web::context::application_resources::ResourceLoader for _ApplicationResources {
+            impl ::next_web::core::io::ResourceLoader for EmbedResourceLoader {
 
-                fn load(&self, path: &str) -> ::std::option::Option<::std::borrow::Cow<'static, [u8]>> {
-                    Self::get(path).map(|fs| fs.data)
+                fn load(&mut self) -> ::std::io::Result<()> {
+                    core::result::Result::Ok(())
                 }
 
-                fn load_dir(&self, dir: &str) -> ::std::vec::Vec<::std::borrow::Cow<'static, str>> {
+                fn get_resource(&self, location: &str) -> ::std::io::Result<&dyn ::next_web::core::io::Resource> {
+                    Self::get(location).map(|fs| ::next_web::core::io::BytesResource::new(location, fs.data))
+                }
+
+                fn get_directory(&self, dir: &str) -> ::std::vec::Vec<::std::borrow::Cow<'static, str>> {
                     let mut s = self.iter();
                     s.retain(|s| s.starts_with(dir));
 
                     s
                 }
 
-                fn iter(&self) -> ::std::vec::Vec<::std::borrow::Cow<'static, str>> {
+                fn paths(&self) -> ::std::vec::Vec<::std::borrow::Cow<'static, str>> {
                     Self::iter().collect()
                 }
 
-                fn exists(&self, path: &str) -> bool {
-                    Self::get(path).is_some()
+                fn exists(&self, location: &str) -> bool {
+                    Self::get(location).is_some()
                 }
             }
 

@@ -7,15 +7,17 @@
 ///
 /// # Example
 /// ```
-/// #[derive(Debug)]
-/// struct Order {}
+/// struct TestOrder;
 ///
-/// impl Ordered for Order {
+/// impl Ordered for TestOrder {
 ///     fn order(&self) -> i32 {
 ///         100
 ///     }
 /// }
 /// ```
 pub trait Ordered {
+    /// Returns the order of the value, as an `i32`.
+    ///
+    /// Lower integers represent earlier positions, while higher integers represent later positions.
     fn order(&self) -> i32;
 }

@@ -1,7 +1,7 @@
 pub mod analyzer;
-pub mod base_failure_analyzer;
-pub mod failure_analysis;
-pub mod failure_analysis_reporter;
-pub mod failure_analyzer;
-pub(crate) mod failure_analyzers;
-pub mod logging_failure_analysis_reporter;
+pub mod base_error_analyzer;
+pub mod error_analysis;
+pub mod error_analysis_reporter;
+pub mod error_analyzer;
+pub(crate) mod error_analyzers;
+pub mod logging_error_analysis_reporter;
