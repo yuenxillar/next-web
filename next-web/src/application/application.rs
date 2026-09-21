@@ -39,7 +39,6 @@ use tracing::{error, info, warn};
 
 use crate::application::next_application::NextApplication;
 
-use crate::application::permitted_groups::PERMITTED_GROUPS;
 use crate::autoregister::application_event_autoregister::ApplicationEventAutoRegister;
 use crate::autoregister::http_handler_autoregister::HttpHandlerAutoRegister;
 
@@ -453,11 +452,11 @@ where
         let config = application_properties.next().server();
         let context_path = config.context_path().unwrap_or("");
         let server_port = config.port();
-        let app_name = application_properties
+        let app_name: String = application_properties
             .next()
             .appliation()
-            .map(|config| config.name().into())
-            .unwrap_or("NextWebApplication".into());
+            .map(|config| config.name().to_owned())
+            .unwrap_or_else(|| "NextWebApplication".to_owned());
 
         let server_addr = if let Some(addr) = config.address() {
             addr
@@ -487,7 +486,6 @@ where
         app = use_routers
             .into_iter()
             // Only allowed groups can apply
-            .filter(|s| PERMITTED_GROUPS.contains(&s.group().name()))
             .fold(app, |app, item| item.use_router(app, &mut ctx));
 
         let mut apply_routers: Vec<_> = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
@@ -641,7 +639,7 @@ where
         // Monitor application shutdown signal
         let mut graceful_shutdown_rx = APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL.subscribe();
 
-        #[cfg(not(feature = "rustls"))]
+        #[cfg(not(feature = "tls-rustls"))]
         let shutdown_signal = async move {
             use next_web_core::traits::application::application_lifecycle::{
                 ShutdownContext, ShutdownReason,
@@ -708,7 +706,7 @@ where
         });
 
         // Configure certificate and private key used by https
-        #[cfg(feature = "rustls")]
+        #[cfg(feature = "tls-rustls")]
         {
             use axum_server::tls_rustls::RustlsConfig;
 
@@ -725,7 +723,7 @@ where
             server.serve(app.into_make_service()).await?;
         }
 
-        #[cfg(not(feature = "rustls"))]
+        #[cfg(not(feature = "tls-rustls"))]
         {
             let listener = tokio::net::TcpListener::bind(&socket_addr).await?;
 

@@ -13,8 +13,7 @@ pub trait EnvironmentPostProcessor {
 }
 
 /// Provides a blanket implementation of [`EnvironmentPostProcessor`] for
-/// closures, mirroring the `@FunctionalInterface` semantics of the original
-/// Java interface.
+/// closures.
 impl<F> EnvironmentPostProcessor for F
 where
     F: Fn(&mut dyn ConfigurableEnvironment),

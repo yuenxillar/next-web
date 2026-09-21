@@ -19,16 +19,6 @@ use next_web_singletons::factory::{
 /// context config paths in a single string value.
 pub const CONFIG_LOCATION_DELIMITERS: &str = ",; \t\n";
 
-/// The name of the bootstrap executor bean in the context.
-///
-/// If none is supplied, no background bootstrapping will be active.
-pub const BOOTSTRAP_EXECUTOR_BEAN_NAME: &str = "bootstrapExecutor";
-
-/// Name of the `ConversionService` bean in the factory.
-///
-/// If none is supplied, default conversion rules apply.
-pub const CONVERSION_SERVICE_BEAN_NAME: &str = "conversionService";
-
 /// Name of the `LoadTimeWeaver` bean in the factory.
 ///
 /// If such a bean is supplied, the context will use a temporary class loader
@@ -47,9 +37,6 @@ pub const SYSTEM_ENVIRONMENT_BEAN_NAME: &str = "systemEnvironment";
 
 /// Name of the application startup bean in the factory.
 pub const APPLICATION_STARTUP_BEAN_NAME: &str = "applicationStartup";
-
-/// Name of the shutdown hook thread.
-pub const SHUTDOWN_HOOK_THREAD_NAME: &str = "NextContextShutdownHook";
 
 /// Errors returned by [`ConfigurableApplicationContext`] operations.
 #[derive(Debug)]

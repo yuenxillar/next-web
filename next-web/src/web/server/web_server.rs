@@ -38,7 +38,12 @@ impl Server for WebServer {
     }
 }
 
-async fn graceful_shutdown() {
+/// Completes when the application receives a signal that asks it to shut down.
+///
+/// # Returns
+///
+/// The name of the signal that was received.
+pub(crate) async fn shutdown_signal() -> &'static str {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await
@@ -56,12 +61,14 @@ async fn graceful_shutdown() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        _ = ctrl_c => "Ctrl_C SIGINT",
+        _ = terminate => "Terminate SIGTERM",
     }
+}
 
-    tracing::info!(
-        "Graceful shutdown of application completed, reason: {}",
-        "todo"
-    )
+/// Waits for a shutdown signal and reports it.
+async fn graceful_shutdown() {
+    let reason = shutdown_signal().await;
+
+    tracing::info!("Graceful shutdown of application completed, reason: {reason}")
 }

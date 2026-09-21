@@ -28,7 +28,7 @@ next-web-state-machine  = { workspace = true, optional = true }
 tokio                   = { workspace = true, features = ["sync", "signal","net", "fs"] }
 axum                    = { workspace = true, features = ["http2"] }
 axum-core               = { workspace = true }
-axum-server             = { version = "0.8.0", features = ["tls-rustls"], optional = true }
+axum-server             = { version = "0.8.0",optional = true }
 axum-prometheus         = { workspace = true, optional = true }
 tower-http              = { workspace = true, features = [
     "trace",
@@ -100,7 +100,8 @@ full = [
     "trace-log"
 ]
 
-rustls = ["axum-server"]
+# tls-openssl = ["axum-server/tls-openssl"]
+tls-rustls  = ["axum-server/tls-rustls"]
 
 # web
 enable-web-security     = ["next-web-security"]

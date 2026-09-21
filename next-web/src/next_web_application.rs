@@ -43,6 +43,9 @@ use crate::{
     DefaultApplicationContextFactory, ErrorHandler, Event, NextWebErrorReporter, StartupInfoLogger,
 };
 
+#[cfg(feature = "tls-rustls")]
+use crate::web::server::TlsWebServer;
+
 /// Loader used when the application does not configure one of its own.
 ///
 /// It is created once, so that a banner resolved through it stays valid for as
@@ -210,6 +213,15 @@ where
             .fallback(|| async { T::fallback() })
             // Prevent program panic caused by users not setting routes
             .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
+
+        // TLS is used when it is enabled for the environment, which requires
+        // the crate to be built with its TLS support.
+        #[cfg(feature = "tls-rustls")]
+        if TlsWebServer::is_enabled(environment) {
+            let mut tls_web_server =
+                TlsWebServer::from_environment(environment, socket_addr, router).await?;
+            return tls_web_server.run().await;
+        }
 
         let mut web_server = WebServer::new(socket_addr, router);
         web_server.run().await?;

@@ -16,7 +16,6 @@ pub mod macros;
 pub mod messaging;
 pub mod metrics;
 pub mod mime_type;
-pub mod proxy;
 pub mod scheduler;
 pub mod server;
 pub mod state;
@@ -24,7 +23,6 @@ pub mod store;
 pub mod traits;
 pub mod util;
 pub mod web;
-pub mod wrapper;
 
 pub use self::autoregister::auto_register::*;
 pub use self::context::application_context::*;
