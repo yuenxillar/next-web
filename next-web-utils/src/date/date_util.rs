@@ -1,8 +1,9 @@
+use std::sync::LazyLock;
+
 use chrono::{
     DateTime, Datelike, Duration, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime,
     TimeZone, Timelike,
 };
-use once_cell::sync::Lazy;
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,7 +52,7 @@ pub const ZODIAC: [&str; 12] = [
 
 const ZODIAC_DATE: [u32; 12] = [20, 19, 21, 20, 21, 22, 23, 23, 23, 24, 23, 22];
 
-static DATE_TIME_FORMATS: Lazy<Vec<&'static str>> = Lazy::new(|| {
+static DATE_TIME_FORMATS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
     vec![
         "%Y-%m-%d %H:%M:%S%.f",
         "%Y-%m-%d %H:%M:%S",
@@ -64,11 +65,11 @@ static DATE_TIME_FORMATS: Lazy<Vec<&'static str>> = Lazy::new(|| {
     ]
 });
 
-static DATE_FORMATS: Lazy<Vec<&'static str>> =
-    Lazy::new(|| vec!["%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y%m%d"]);
+static DATE_FORMATS: LazyLock<Vec<&'static str>> =
+    LazyLock::new(|| vec!["%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y%m%d"]);
 
-static TIME_FORMATS: Lazy<Vec<&'static str>> =
-    Lazy::new(|| vec!["%H:%M:%S%.f", "%H:%M:%S", "%H:%M"]);
+static TIME_FORMATS: LazyLock<Vec<&'static str>> =
+    LazyLock::new(|| vec!["%H:%M:%S%.f", "%H:%M:%S", "%H:%M"]);
 
 pub struct DateUtil;
 

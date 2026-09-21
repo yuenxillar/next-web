@@ -26,9 +26,9 @@ const MAX_PLACEHOLDER_DEPTH: usize = 8;
 /// `ConfigurationPropertySourcesPropertyResolver`.
 ///
 /// Note: the resolution methods are exposed directly instead of implementing
-/// [`PropertyResolver`](next_web_core::env::PropertyResolver). That trait's
-/// `get_property_or_default` method returns a `&str` borrowed from `&self`,
-/// which cannot be implemented for a caller-provided default value.
+/// [`PropertyResolver`](next_web_core::env::PropertyResolver). A resolver of
+/// this kind holds a snapshot of the sources it resolves, while an environment
+/// resolves against the sources it owns at the time of the call.
 pub struct ConfigurationPropertySourcesPropertyResolver {
     sources: NextConfigurationPropertySources,
     placeholder_prefix: String,

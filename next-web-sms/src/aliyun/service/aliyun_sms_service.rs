@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::SystemTime};
+use std::{
+    collections::BTreeMap,
+    str::FromStr,
+    sync::{Arc, LazyLock},
+    time::SystemTime,
+};
 
 use chrono::DateTime;
 use next_web_core::{
@@ -6,7 +11,7 @@ use next_web_core::{
     error::BoxError,
     traits::{service::Service, singleton::Singleton},
 };
-use once_cell::sync::Lazy;
+
 use reqwest::{
     Method,
     header::{HeaderMap, HeaderName},
@@ -31,11 +36,11 @@ const ALGORITHM: &'static str = "ACS3-HMAC-SHA256";
 const EMPTY_BODY_HEX_HASH_256: &'static str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
-static ALIBABA_CLOUD_ACCESS_KEY_ID: Lazy<Arc<String>> =
-    Lazy::new(|| Arc::new(std::env::var("ALIBABA_CLOUD_ACCESS_KEY_ID").unwrap()));
+static ALIBABA_CLOUD_ACCESS_KEY_ID: LazyLock<Arc<String>> =
+    LazyLock::new(|| Arc::new(std::env::var("ALIBABA_CLOUD_ACCESS_KEY_ID").unwrap()));
 
-static ALIBABA_CLOUD_ACCESS_KEY_SECRET: Lazy<Arc<String>> =
-    Lazy::new(|| Arc::new(std::env::var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").unwrap()));
+static ALIBABA_CLOUD_ACCESS_KEY_SECRET: LazyLock<Arc<String>> =
+    LazyLock::new(|| Arc::new(std::env::var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").unwrap()));
 
 #[derive(Clone)]
 pub struct AliyunCloudSmsService {

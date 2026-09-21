@@ -1,11 +1,14 @@
-use std::{collections::BTreeMap, str::FromStr, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    str::FromStr,
+    sync::{Arc, LazyLock},
+};
 
 use next_web_core::{
     async_trait,
     error::BoxError,
     traits::{service::Service, singleton::Singleton},
 };
-use once_cell::sync::Lazy;
 use reqwest::{
     Method,
     header::{HeaderMap, HeaderName},
@@ -35,11 +38,11 @@ const JSON_CONTENT_TYPE: &'static str = "application/json; charset=utf-8";
 const QUERY_CONTENT_TYPE: &'static str = "application/x-www-form-urlencoded";
 const REGION: &'static str = "ap-guangzhou";
 
-static TENCENTCLOUD_SECRET_ID: Lazy<Arc<String>> =
-    Lazy::new(|| Arc::new(std::env::var("TENCENTCLOUD_SECRET_ID").unwrap()));
+static TENCENTCLOUD_SECRET_ID: LazyLock<Arc<String>> =
+    LazyLock::new(|| Arc::new(std::env::var("TENCENTCLOUD_SECRET_ID").unwrap()));
 
-static TENCENTCLOUD_SECRET_KEY: Lazy<Arc<String>> =
-    Lazy::new(|| Arc::new(std::env::var("TENCENTCLOUD_SECRET_KEY").unwrap()));
+static TENCENTCLOUD_SECRET_KEY: LazyLock<Arc<String>> =
+    LazyLock::new(|| Arc::new(std::env::var("TENCENTCLOUD_SECRET_KEY").unwrap()));
 
 #[derive(Clone)]
 pub struct TencentCloudSmsService {

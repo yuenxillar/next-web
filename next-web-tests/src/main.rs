@@ -91,30 +91,6 @@ pub async fn req_record_two(
     "Ok"
 }
 
-#[allow(unused)]
-struct TestUserRoutes;
-
-#[request_mapping(path = "/user")]
-impl TestUserRoutes {
-    // Request -> /user/login
-    #[get_mapping(path = "/login")]
-    async fn req_login() -> impl IntoResponse {
-        Html("<h1>Login Page</h1>")
-    }
-
-    // Request -> /user/logout
-    #[idempotency(
-        name = "memoryIdempotencyStore",
-        key = "Idempotency-Key",
-        cache_key_prefix = "test_key",
-        ttl = 10
-    )]
-    #[request_mapping(method = "POST", path = "/logout")]
-    async fn req_logout() -> impl IntoResponse {
-        Html("<h1>Logout Page</h1>")
-    }
-}
-
 #[singleton(name = "applicationStore")]
 #[derive(Clone)]
 pub struct ApplicationStore {

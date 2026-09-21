@@ -197,7 +197,7 @@ mod tests {
             self.properties.get(key).cloned()
         }
 
-        fn get_property_or_default(&self, _key: &str, _default_value: &str) -> &str {
+        fn get_property_or_default(&self, _key: &str, _default_value: &str) -> String {
             todo!()
         }
 
@@ -245,6 +245,10 @@ mod tests {
 
         fn property_sources(&mut self) -> &mut MutablePropertySources {
             &mut self.property_sources
+        }
+
+        fn property_sources_ref(&self) -> &MutablePropertySources {
+            &self.property_sources
         }
 
         fn system_properties(&self) -> HashMap<String, String> {

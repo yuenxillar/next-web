@@ -18,7 +18,6 @@ md2 = { workspace = true, optional = true }
 rand = { workspace = true }
 chrono = { workspace = true }
 regex = { workspace = true }
-once_cell = { workspace = true }
 dashmap = { workspace = true, optional = true}
 
 fastrand = "2.3.0"

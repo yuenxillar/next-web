@@ -7,7 +7,7 @@ use crate::error::IllegalError;
 /// placeholders embedded in text.
 ///
 /// See [`Environment`](crate::env::Environment) and
-/// [`PropertySourcesPropertyResolver`](crate::env::PropertySourcesPropertyResolver).
+/// [`PropertySourcesLookup`](crate::env::PropertySourcesLookup).
 pub trait PropertyResolver {
     /// Determine whether the given property key is available for resolution
     /// — for example, if the value for the given key is not `None`.
@@ -24,9 +24,13 @@ pub trait PropertyResolver {
     /// Resolve the property value associated with the given key, or
     /// `default_value` if the key cannot be resolved.
     ///
+    /// The result is owned: a property value is produced while it is resolved,
+    /// so it cannot be borrowed from the resolver for as long as the given
+    /// default value lives.
+    ///
     /// See [`get_property`](Self::get_property),
     /// [`get_required_property`](Self::get_required_property).
-    fn get_property_or_default(&self, key: &str, default_value: &str) -> &str;
+    fn get_property_or_default(&self, key: &str, default_value: &str) -> String;
 
     // /// Resolve the property value associated with the given key, converted
     // /// to the requested target type, or `None` if the key cannot be resolved.

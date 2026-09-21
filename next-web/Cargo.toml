@@ -28,7 +28,7 @@ next-web-state-machine  = { workspace = true, optional = true }
 tokio                   = { workspace = true, features = ["sync", "signal","net", "fs"] }
 axum                    = { workspace = true, features = ["http2"] }
 axum-core               = { workspace = true }
-axum-server             = { version = "0.7.1", features = ["tls-rustls"], optional = true }
+axum-server             = { version = "0.8.0", features = ["tls-rustls"], optional = true }
 axum-prometheus         = { workspace = true, optional = true }
 tower-http              = { workspace = true, features = [
     "trace",
@@ -49,7 +49,6 @@ tokio-util          = { workspace = true }
 futures             = { workspace = true }
 chrono              = { workspace = true }
 chrono-tz           = { workspace = true }
-once_cell           = { workspace = true }
 tracing             = { workspace = true }
 tracing-appender    = { workspace = true }
 regex               = { workspace = true }

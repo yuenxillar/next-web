@@ -8,7 +8,7 @@ use crate::env::{ParseError, ProfilesParser};
 /// keeps `Profiles` independent of any concrete [`Environment`] implementation
 /// and makes it trivial to test.
 ///
-/// Instances are usually created through the [`Profiles::of`] factory method
+/// Instances are usually created through the [`profiles_of`] factory function
 /// rather than implemented directly.
 ///
 /// # Examples
@@ -16,12 +16,14 @@ use crate::env::{ParseError, ProfilesParser};
 /// ```
 /// use std::collections::HashSet;
 ///
+/// use next_web_core::env::profiles_of;
+///
 /// let active: HashSet<&str> = ["dev", "cloud"].into_iter().collect();
 /// let is_active = |name: &str| active.contains(name);
 ///
-/// assert!(Profiles::of(&["dev"]).matches(&is_active));
-/// assert!(Profiles::of(&["production & cloud"]).matches(&is_active));
-/// assert!(!Profiles::of(&["production"]).matches(&is_active));
+/// assert!(profiles_of(&["dev"]).unwrap().matches(&is_active));
+/// assert!(profiles_of(&["production | cloud"]).unwrap().matches(&is_active));
+/// assert!(!profiles_of(&["production"]).unwrap().matches(&is_active));
 /// ```
 ///
 /// [`Environment`]: crate::env::Environment

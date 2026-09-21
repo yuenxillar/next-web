@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use axum::body::Bytes;
 use axum::http::{HeaderMap, HeaderName};
@@ -7,14 +8,13 @@ use axum::BoxError;
 use axum::{body::Body, response::Response};
 use futures::StreamExt;
 use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
-use once_cell::sync::Lazy;
 use reqwest::{header, Client};
 use reqwest::{Method, StatusCode};
 use tracing::error;
 
 use crate::util::{local_date_time::LocalDateTime, stream_throttle::throttle_byte_stream};
 
-pub static GLOBAL_CLIENT: Lazy<Client> = Lazy::new(Client::new);
+pub static GLOBAL_CLIENT: LazyLock<Client> = LazyLock::new(Client::new);
 
 pub struct NetworkFileStream {
     url: String,

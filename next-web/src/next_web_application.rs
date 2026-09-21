@@ -19,7 +19,7 @@ use next_web_core::{
         DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME,
     },
     io::{DefaultResourceLoader, ResourceLoader},
-    metrics::{ApplicationStartup, DefaultApplicationStartup},
+    metrics::{ApplicationStartup, DefaultApplicationStartup, StartupStep},
     util::indexmap::IndexMap,
 };
 use next_web_singletons::factory::{
@@ -31,15 +31,16 @@ use tracing::{enabled, Level};
 use crate::{
     application_banner_printer::PrintedBanner,
     banner::BannerMode,
-    context::{properties::source::ConfigurationPropertySources, ApplicationEnvironment},
+    context::{logging::LoggingEventHandler, properties::source::ConfigurationPropertySources},
     diagnostics::error_analyzers::ErrorAnalyzers,
     env::{DefaultPropertiesPropertySource, MapPropertySource},
+    support::EnvironmentPostProcessorEventHandler,
     web::server::{Server, WebServer},
     ApplicationArguments, ApplicationBannerPrinter, ApplicationContextFactory,
-    ApplicationContextInitializer, ApplicationEventHandler, ApplicationInfoPropertySource,
-    ApplicationProperties, ApplicationRunner, ApplicationShutdownHook, Banner,
-    ConfigurableApplicationContext, DefaultApplicationArguments, DefaultApplicationContextFactory,
-    ErrorHandler, NextWebErrorReporter, StartupInfoLogger,
+    ApplicationContextInitializer, ApplicationEnvironment, ApplicationEventHandler,
+    ApplicationInfoPropertySource, ApplicationProperties, ApplicationRunner,
+    ApplicationShutdownHook, Banner, ConfigurableApplicationContext, DefaultApplicationArguments,
+    DefaultApplicationContextFactory, ErrorHandler, Event, NextWebErrorReporter, StartupInfoLogger,
 };
 
 /// Loader used when the application does not configure one of its own.
@@ -68,7 +69,7 @@ where
         Router::new()
     }
 
-    fn open_api(&self) {}
+    fn open_api(&self, ctx: &mut dyn ConfigurableApplicationContext) {}
 
     fn fallback() -> impl IntoResponse {
         let mut resp = E::handle_error("Not Found").into_response();
@@ -103,7 +104,7 @@ pub struct NextWebApplication<T> {
     default_properties: Option<HashMap<String, AnyValue>>,
     additional_profiles: HashSet<String>,
     application_context_factory: Box<dyn ApplicationContextFactory>,
-    application_startup: Option<Box<dyn ApplicationStartup>>,
+    application_startup: Box<dyn ApplicationStartup>,
     properties: ApplicationProperties,
     shutdown_hook: Option<ApplicationShutdownHook>,
     application: T,
@@ -122,12 +123,15 @@ where
             banner: None,
             environment: None,
             initializers: Vec::new(),
-            event_handlers: Vec::new(),
+            event_handlers: vec![
+                Box::new(LoggingEventHandler::default()),
+                Box::new(EnvironmentPostProcessorEventHandler::default()),
+            ],
             default_properties: None,
             additional_profiles: HashSet::new(),
             properties: Default::default(),
             application_context_factory: Box::new(DefaultApplicationContextFactory::default()),
-            application_startup: Some(Box::new(DefaultApplicationStartup::default())),
+            application_startup: Box::new(DefaultApplicationStartup::default()),
             shutdown_hook: None,
             application: T::default(),
         }
@@ -144,13 +148,18 @@ where
             if self.properties.is_register_shutdown_hook() {
                 self.shutdown_hook = Some(ApplicationShutdownHook::default());
             }
+            self.send_event(|handlers| handlers.starting(std::any::type_name::<T>()));
+
+            // Start
             let application_arguments = DefaultApplicationArguments::new(std::env::args());
             let environment = self.prepare_environment(&application_arguments);
             let _ = self.print_banner(environment.as_ref());
             let mut context = self.create_application_context()?;
-            if let Some(application_startup) = self.application_startup.take() {
-                context.set_application_startup(application_startup);
-            }
+            let application_startup = std::mem::replace(
+                &mut self.application_startup,
+                Box::new(DefaultApplicationStartup::default()),
+            );
+            context.set_application_startup(application_startup);
             self.prepare_context(
                 context.as_mut(),
                 environment.clone(),
@@ -158,7 +167,7 @@ where
             )?;
             self.refresh_context(context.as_mut())?;
             self.after_refresh(context.as_mut(), &application_arguments);
-            let _ = startup.started();
+            let time_taken_to_started = startup.started();
             if self.properties.is_log_startup_info() {
                 StartupInfoLogger::new(
                     Some(type_name_of_val(&self.application)),
@@ -166,8 +175,10 @@ where
                 )
                 .log_started(&startup);
             }
+            self.send_event(|handlers| handlers.started(context.as_mut(), time_taken_to_started));
             self.call_runners(context.as_mut(), &application_arguments)
                 .await?;
+            self.send_event(|handlers| handlers.ready(context.as_mut(), startup.ready()));
 
             self.run_web_server(environment.as_ref(), context.as_mut())
                 .await?;
@@ -214,6 +225,21 @@ where
         let mut environment = self.get_or_create_environment();
         self.configure_environment(environment.as_mut(), application_arguments.source_args());
         ConfigurationPropertySources::attach(environment.as_mut());
+
+        let additional_profiles = self
+            .additional_profiles()
+            .into_iter()
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>();
+        let resource_loader = self.resource_loader.clone();
+        self.send_event(|handlers| {
+            handlers.environment_prepared(
+                environment.as_mut(),
+                resource_loader,
+                additional_profiles,
+            )
+        });
+
         ApplicationInfoPropertySource::move_to_end(environment.as_mut());
         DefaultPropertiesPropertySource::move_to_end(environment.as_mut());
         self.bind_to_application(environment.as_ref());
@@ -237,6 +263,7 @@ where
             .singleton_factory()?
             .set_allow_override(self.properties.is_allow_override());
         self.apply_initializers(context);
+        self.send_event(|handlers| handlers.context_prepared(context));
         if self.properties.is_log_startup_info() {
             self.log_startup_info(context);
             self.log_startup_profile_info(context);
@@ -250,6 +277,7 @@ where
                 application_arguments.to_owned(),
             );
 
+        self.send_event(|handlers| handlers.context_loaded(context));
         Ok(())
     }
 
@@ -259,6 +287,17 @@ where
     ) -> ApplicationResult<()> {
         // Refresh the underlying ApplicationContext.
         application_context.refresh().map_err(Into::into)
+    }
+
+    fn send_event<'a, F>(&'a mut self, handler_action: F)
+    where
+        F: FnOnce(&mut EventHandlers<'a>),
+    {
+        let mut event_handlers = EventHandlers {
+            handlers: &mut self.event_handlers,
+            application_startup: self.application_startup.as_mut(),
+        };
+        handler_action(&mut event_handlers);
     }
 
     fn get_or_create_environment(&mut self) -> Box<dyn ConfigurableEnvironment> {
@@ -463,7 +502,8 @@ where
     /// The error is passed by reference so it can be inspected by the
     /// registered [`NextWebErrorReporter`]s (for example to locate a cause in
     /// its `source` chain) before the process exits.
-    async fn handle_run_error(self, error: &(dyn Error + 'static)) {
+    async fn handle_run_error(mut self, error: &(dyn Error + 'static)) {
+        self.send_event(|handlers| handlers.error(error));
         let mut reporters = self.get_error_reporters();
         self.report_error(&mut reporters, error);
 
@@ -638,17 +678,27 @@ where
         S: ApplicationStartup,
         S: 'static,
     {
-        self.application_startup = Some(Box::new(startup));
+        self.application_startup = Box::new(startup);
     }
 
     /// Returns the application startup implementation, if one has been set.
-    pub fn application_startup(&self) -> Option<&dyn ApplicationStartup> {
-        self.application_startup.as_deref()
+    pub fn application_startup(&self) -> &dyn ApplicationStartup {
+        self.application_startup.as_ref()
     }
 
     /// Returns the application.
     pub fn application(&self) -> &T {
         &self.application
+    }
+}
+
+impl<T> Default for NextWebApplication<T>
+where
+    T: Default,
+    T: Application,
+{
+    fn default() -> Self {
+        Self::new(None)
     }
 }
 
@@ -802,6 +852,133 @@ impl std::fmt::Display for PanicError {
 }
 
 impl Error for PanicError {}
+
+struct EventHandlers<'a> {
+    handlers: &'a mut [Box<dyn ApplicationEventHandler>],
+    application_startup: &'a mut dyn ApplicationStartup,
+}
+
+impl<'a> EventHandlers<'a> {
+    pub fn starting(&mut self, main_application: &'static str) {
+        self.do_with_listeners(
+            "next.web.application.starting",
+            |handler| {
+                handler.handle_event(Event::Starting { args: &[] });
+            },
+            Some(&mut |step| {
+                step.tag("mainApplicationTypeName", main_application.to_owned());
+            }),
+        );
+    }
+
+    pub fn environment_prepared(
+        &mut self,
+        environment: &'a mut dyn ConfigurableEnvironment,
+        resource_loader: Option<Arc<dyn ResourceLoader>>,
+        additional_profiles: Vec<String>,
+    ) {
+        self.do_with_listeners(
+            "next.web.application.environment-prepared",
+            |handler| {
+                handler.handle_event(Event::EnvironmentPrepared(
+                    crate::EnvironmentPreparedPayload {
+                        args: &[],
+                        environment,
+                        resource_loader: resource_loader.to_owned(),
+                        additional_profiles: additional_profiles.to_owned(),
+                    },
+                ));
+            },
+            None,
+        );
+    }
+
+    pub fn context_prepared(&mut self, context: &'a mut dyn ConfigurableApplicationContext) {
+        self.do_with_listeners(
+            "next.web.application.context-prepared",
+            |handler| {
+                handler.handle_event(Event::ContextPrepared { args: &[], context });
+            },
+            None,
+        );
+    }
+
+    pub fn context_loaded(&mut self, context: &'a mut dyn ConfigurableApplicationContext) {
+        self.do_with_listeners(
+            "next.web.application.context-loaded",
+            |handler| {
+                handler.handle_event(Event::ContextLoaded { args: &[], context });
+            },
+            None,
+        );
+    }
+
+    pub fn started(
+        &mut self,
+        context: &'a mut dyn ConfigurableApplicationContext,
+        time_taken: Duration,
+    ) {
+        self.do_with_listeners(
+            "next.web.application.started",
+            |handler| {
+                handler.handle_event(Event::Started {
+                    args: &[],
+                    context,
+                    time_taken: Some(time_taken),
+                });
+            },
+            None,
+        );
+    }
+
+    pub fn ready(
+        &mut self,
+        context: &'a mut dyn ConfigurableApplicationContext,
+        time_taken: Duration,
+    ) {
+        self.do_with_listeners(
+            "next.web.application.ready",
+            |handler| {
+                handler.handle_event(Event::Ready {
+                    args: &[],
+                    context,
+                    time_taken: Some(time_taken),
+                });
+            },
+            None,
+        );
+    }
+
+    pub fn error(&mut self, err: &(dyn Error + 'static)) {
+        self.do_with_listeners(
+            "next.web.application.failed",
+            |handler| {
+                handler.handle_event(Event::Error { args: &[], err });
+            },
+            Some(&mut |step| {
+                step.tag("error", type_name_of_val(err).to_owned());
+                step.tag("message", err.to_string());
+            }),
+        );
+    }
+
+    fn do_with_listeners<F>(
+        &mut self,
+        step_name: &str,
+        handler_action: F,
+        step_action: Option<&mut dyn FnMut(&mut dyn StartupStep)>,
+    ) where
+        F: FnMut(&mut Box<dyn ApplicationEventHandler>),
+    {
+        let mut step = self.application_startup.start(step_name);
+        self.handlers.iter_mut().for_each(handler_action);
+
+        if let Some(action) = step_action {
+            action(step.as_mut());
+        }
+        step.end();
+    }
+}
 
 /// Builds the map representation of the given command line arguments.
 ///

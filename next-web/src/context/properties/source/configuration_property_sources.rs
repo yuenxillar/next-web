@@ -103,9 +103,7 @@ impl ConfigurationPropertySources {
     /// # Arguments
     ///
     /// * `environment` - The environment to read the property sources from.
-    pub fn get(
-        environment: &mut dyn ConfigurableEnvironment,
-    ) -> NextConfigurationPropertySources {
+    pub fn get(environment: &mut dyn ConfigurableEnvironment) -> NextConfigurationPropertySources {
         NextConfigurationPropertySources::new(environment.property_sources())
     }
 
@@ -183,7 +181,7 @@ fn is_included(source: &dyn PropertySource<PropertySourceValue>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{context::ApplicationEnvironment, env::MapPropertySource};
+    use crate::{env::MapPropertySource, ApplicationEnvironment};
     use next_web_core::util::indexmap::IndexMap;
 
     /// Creates an environment holding a single application property.
@@ -219,7 +217,7 @@ mod tests {
 
         assert_eq!(
             names(&mut environment),
-            vec!["configurationProperties", "test"]
+            vec!["configurationProperties", "systemEnvironment", "test"]
         );
 
         let attached = ConfigurationPropertySources::get_attached(environment.property_sources())
@@ -236,7 +234,7 @@ mod tests {
 
         assert_eq!(
             names(&mut environment),
-            vec!["configurationProperties", "test"]
+            vec!["configurationProperties", "systemEnvironment", "test"]
         );
     }
 
@@ -263,8 +261,9 @@ mod tests {
 
         let sources = ConfigurationPropertySources::get(&mut environment);
 
-        // Only the "test" source remains, the adapter itself is filtered out.
-        assert_eq!(sources.len(), 1);
+        // The sources of the environment remain, the adapter itself is
+        // filtered out.
+        assert_eq!(sources.len(), 2);
     }
 
     #[test]
@@ -287,7 +286,7 @@ mod tests {
 
         let adapted = ConfigurationPropertySources::from_sources(environment.property_sources());
 
-        assert_eq!(adapted.len(), 1);
+        assert_eq!(adapted.len(), 2);
         assert!(adapted.is_using_sources(environment.property_sources()));
     }
 

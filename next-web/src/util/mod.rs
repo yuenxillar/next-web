@@ -11,7 +11,7 @@ pub mod digester;
 pub mod aes;
 
 #[cfg(feature = "enable-thread-pool")]
-pub mod thread_pool;
+pub mod thread_pool_task_executor;
 
 mod amount;
 mod json_object;

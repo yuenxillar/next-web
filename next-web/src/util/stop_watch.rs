@@ -1,29 +1,21 @@
 use std::fmt;
 use std::time::{Duration, Instant};
 
-/// 高性能秒表实现，支持启动、停止、重置、分段计时等功能
-///
-/// High-performance StopWatch implementation with start, stop, reset, lap timing, and more.
+/// A high-performance stopwatch supporting start, stop, reset, and lap timing.
 #[derive(Debug, Clone)]
 pub struct StopWatch {
-    /// 开始时间
+    /// The instant when the stopwatch was last started, if running.
     start_time: Option<Instant>,
-    /// 累计运行时间
+    /// Accumulated elapsed time from previous runs.
     elapsed: Duration,
-    /// 分段计时记录
+    /// Recorded lap timestamps (cumulative elapsed at each lap).
     laps: Vec<Duration>,
-    /// 是否正在运行
+    /// Whether the stopwatch is currently running.
     is_running: bool,
 }
 
-impl Default for StopWatch {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl StopWatch {
-    /// 创建一个新的秒表
+    /// Creates a new, stopped stopwatch.
     pub fn new() -> Self {
         StopWatch {
             start_time: None,
@@ -33,13 +25,14 @@ impl StopWatch {
         }
     }
 
+    /// Creates a new stopwatch and starts it immediately.
     pub fn start_new() -> Self {
-        let mut StopWatch = StopWatch::new();
-        StopWatch.start();
-        StopWatch
+        let mut sw = StopWatch::new();
+        sw.start();
+        sw
     }
 
-    /// 启动或继续计时
+    /// Starts or resumes the stopwatch.
     pub fn start(&mut self) {
         if !self.is_running {
             self.start_time = Some(Instant::now());
@@ -47,7 +40,7 @@ impl StopWatch {
         }
     }
 
-    /// 停止计时
+    /// Stops the stopwatch, accumulating the elapsed time.
     pub fn stop(&mut self) {
         if let Some(start) = self.start_time.take() {
             self.elapsed += start.elapsed();
@@ -55,7 +48,7 @@ impl StopWatch {
         }
     }
 
-    /// 重置秒表（清除所有计时和分段记录）
+    /// Resets the stopwatch, clearing all elapsed time and lap records.
     pub fn reset(&mut self) {
         self.start_time = None;
         self.elapsed = Duration::default();
@@ -63,18 +56,22 @@ impl StopWatch {
         self.is_running = false;
     }
 
-    /// 记录一个分段时间（lap time）
+    /// Records a lap and returns the duration since the previous lap.
+    ///
+    /// The first lap returns the time since the stopwatch started.
+    /// Returns `Duration::ZERO` if the stopwatch is not running.
     pub fn lap(&mut self) -> Duration {
-        if self.is_running {
-            let lap_time = self.start_time.unwrap().elapsed();
-            self.laps.push(lap_time);
-            lap_time
-        } else {
-            Duration::default()
+        if !self.is_running {
+            return Duration::default();
         }
+        let now = self.start_time.unwrap().elapsed();
+        let last_total = self.laps.last().copied().unwrap_or(Duration::ZERO);
+        let lap_duration = now - last_total;
+        self.laps.push(now);
+        lap_duration
     }
 
-    /// 获取当前累计时间
+    /// Returns the current total elapsed time.
     pub fn elapsed(&self) -> Duration {
         let mut total = self.elapsed;
         if let Some(start) = self.start_time {
@@ -83,57 +80,49 @@ impl StopWatch {
         total
     }
 
-    /// 获取所有分段时间
+    /// Returns all recorded lap timestamps (cumulative elapsed at each lap).
     pub fn laps(&self) -> &[Duration] {
         &self.laps
     }
 
-    /// 清除所有分段记录（保留主计时）
+    /// Clears all lap records while keeping the main elapsed time.
     pub fn clear_laps(&mut self) {
         self.laps.clear();
     }
 
-    /// 检查秒表是否正在运行
+    /// Returns whether the stopwatch is currently running.
     pub fn is_running(&self) -> bool {
         self.is_running
     }
 
-    /// 获取当前累计时间（秒）
+    /// Returns the elapsed time in whole seconds.
     pub fn elapsed_secs(&self) -> u64 {
         self.elapsed().as_secs()
     }
 
-    /// 获取当前累计时间（毫秒）
+    /// Returns the elapsed time in whole milliseconds.
     pub fn elapsed_millis(&self) -> u128 {
         self.elapsed().as_millis()
     }
 
-    /// 获取当前累计时间（微秒）
+    /// Returns the elapsed time in whole microseconds.
     pub fn elapsed_micros(&self) -> u128 {
         self.elapsed().as_micros()
     }
 
-    /// 获取当前累计时间（纳秒）
+    /// Returns the elapsed time in whole nanoseconds.
     pub fn elapsed_nanos(&self) -> u128 {
         self.elapsed().as_nanos()
     }
 
-    /// 获取当前累计时间（秒，浮点数精度）
+    /// Returns the elapsed time as seconds in floating-point precision.
     pub fn elapsed_secs_f64(&self) -> f64 {
         self.elapsed().as_secs_f64()
     }
 
-    // /// 获取当前累计时间（毫秒，浮点数精度）
-    // pub fn elapsed_millis_f64(&self) -> f64 {
-    //     self.elapsed().as_millis_f64()
-    // }
-
-    // /// 获取当前累计时间（微秒，浮点数精度）
-    // pub fn elapsed_micros_f64(&self) -> f64 {
-    //     self.elapsed().as_micros_f64()
-    // }
-
-    /// 重启计时器（重置并立即开始）
+    /// Restarts the stopwatch (reset and start immediately).
+    ///
+    /// Returns the elapsed time before the restart.
     pub fn restart(&mut self) -> Duration {
         let elapsed = self.elapsed();
         self.reset();
@@ -141,12 +130,12 @@ impl StopWatch {
         elapsed
     }
 
-    /// 获取最后一段分段时间
+    /// Returns the most recent lap timestamp, if any.
     pub fn last_lap(&self) -> Option<Duration> {
         self.laps.last().copied()
     }
 
-    /// 获取分段时间的平均值
+    /// Returns the average lap duration, or `None` if no laps were recorded.
     pub fn average_lap(&self) -> Option<Duration> {
         if self.laps.is_empty() {
             None
@@ -156,26 +145,24 @@ impl StopWatch {
         }
     }
 
-    /// 获取最快分段时间
+    /// Returns the fastest lap timestamp, if any.
     pub fn fastest_lap(&self) -> Option<Duration> {
         self.laps.iter().min().copied()
     }
 
-    /// 获取最慢分段时间
+    /// Returns the slowest lap timestamp, if any.
     pub fn slowest_lap(&self) -> Option<Duration> {
         self.laps.iter().max().copied()
     }
 }
 
-// 为 StopWatch 实现 Display trait，方便格式化输出
+/// Formats the stopwatch as seconds with three decimal places.
 impl fmt::Display for StopWatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let elapsed = self.elapsed();
-        write!(f, "{:.3}s", elapsed.as_secs_f64())
+        write!(f, "{:.3}s", self.elapsed().as_secs_f64())
     }
 }
 
-// 为 StopWatch 实现一些有用的 trait
 impl PartialEq for StopWatch {
     fn eq(&self, other: &Self) -> bool {
         self.elapsed() == other.elapsed()
@@ -188,12 +175,18 @@ impl PartialOrd for StopWatch {
     }
 }
 
-/// 便捷函数：测量代码块的执行时间
+impl Default for StopWatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Measures the execution time of a code block.
 ///
-/// # 示例
-/// ```
-/// let result = time_it!(|| {
-///     // 需要计时的代码
+/// # Example
+///
+/// ```ignore
+/// let (result, elapsed) = time_it!(|| {
 ///     std::thread::sleep(std::time::Duration::from_millis(100));
 ///     42
 /// });
@@ -201,10 +194,10 @@ impl PartialOrd for StopWatch {
 #[macro_export]
 macro_rules! time_it {
     ($block:expr) => {{
-        let mut StopWatch = $crate::common::stop_watch::StopWatch::start_new();
+        let mut __sw = $crate::common::stop_watch::StopWatch::start_new();
         let result = $block();
-        StopWatch.stop();
-        (result, StopWatch.elapsed())
+        __sw.stop();
+        (result, __sw.elapsed())
     }};
 }
 
@@ -216,20 +209,16 @@ mod tests {
     #[test]
     fn test_basic_operations() {
         let mut sw = StopWatch::new();
-
-        // 测试开始
         sw.start();
         sleep(Duration::from_millis(50));
         assert!(sw.elapsed_millis() >= 50);
         assert!(sw.is_running());
 
-        // 测试停止
         sw.stop();
         let elapsed = sw.elapsed_millis();
         sleep(Duration::from_millis(50));
-        assert_eq!(sw.elapsed_millis(), elapsed); // 停止后时间不应增加
+        assert_eq!(sw.elapsed_millis(), elapsed);
 
-        // 测试重置
         sw.reset();
         assert_eq!(sw.elapsed_millis(), 0);
         assert!(!sw.is_running());
@@ -239,7 +228,6 @@ mod tests {
     fn test_lap_timing() {
         let mut sw = StopWatch::start_new();
         sleep(Duration::from_millis(10));
-
         let lap1 = sw.lap();
         assert!(lap1.as_millis() >= 10);
 
@@ -259,7 +247,7 @@ mod tests {
         let previous_elapsed = sw.restart();
         assert!(previous_elapsed.as_millis() >= 25);
         assert!(sw.is_running());
-        assert!(sw.elapsed_millis() < 10); // 重启后时间应该很短
+        assert!(sw.elapsed_millis() < 10);
     }
 
     #[test]
@@ -270,6 +258,6 @@ mod tests {
         sw.stop();
 
         let display_str = format!("{}", sw);
-        assert!(display_str.contains("0.1")); // 应该显示约0.1秒
+        assert!(display_str.contains("0.1"));
     }
 }

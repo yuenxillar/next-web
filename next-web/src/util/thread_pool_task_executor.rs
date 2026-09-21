@@ -300,9 +300,6 @@ pub struct ThreadPoolTaskExecutor {
     inner: Arc<Inner>,
 }
 
-/// Backward-compatible name.
-pub type ThreadPool = ThreadPoolTaskExecutor;
-
 impl ThreadPoolTaskExecutor {
     pub fn new(num_threads: usize) -> Self {
         Builder::new().num_threads(num_threads).build()

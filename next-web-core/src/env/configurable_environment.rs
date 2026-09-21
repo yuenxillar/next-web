@@ -19,29 +19,61 @@ use crate::env::{ConfigurablePropertyResolver, Environment, MutablePropertySourc
 /// ### Example: adding a new property source with highest search priority
 ///
 /// ```rust
+/// use next_web_core::env::{
+///     ConfigurableEnvironment, MapPropertySource, PropertyResolver, StandardEnvironment,
+///     SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+/// };
+/// use next_web_core::util::indexmap::IndexMap;
+///
 /// let mut environment = StandardEnvironment::new();
-/// let property_sources = environment.property_sources_mut();
-/// let mut my_map = HashMap::new();
-/// my_map.insert("xyz".to_string(), "myValue".to_string());
-/// property_sources.add_first(Box::new(MapPropertySource::new("MY_MAP", my_map)));
+/// let properties = IndexMap::from([("xyz".to_owned(), "myValue".to_owned())]);
+///
+/// environment
+///     .property_sources()
+///     .add_first(Box::new(MapPropertySource::new("MY_MAP".to_owned(), properties)));
+///
+/// assert_eq!(environment.get_property("xyz"), Some("myValue".to_owned()));
 /// ```
 ///
-/// ### Example: removing the default system properties property source
+/// ### Example: removing the property source of the process environment
 ///
 /// ```rust
-/// let property_sources = environment.property_sources_mut();
-/// property_sources.remove(StandardEnvironment::SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME);
+/// use next_web_core::env::{
+///     ConfigurableEnvironment, StandardEnvironment,
+///     SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+/// };
+///
+/// let mut environment = StandardEnvironment::new();
+/// environment
+///     .property_sources()
+///     .remove(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
+///
+/// assert!(!environment
+///     .property_sources_ref()
+///     .contains(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME));
 /// ```
 ///
-/// ### Example: mocking the system environment for testing purposes
+/// ### Example: replacing the property source of the process environment
 ///
 /// ```rust
-/// let property_sources = environment.property_sources_mut();
-/// let mock_env_vars = MockPropertySource::new().with_property("xyz", "myValue");
-/// property_sources.replace(
-///     StandardEnvironment::SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
-///     Box::new(mock_env_vars),
+/// use next_web_core::env::{
+///     ConfigurableEnvironment, MapPropertySource, PropertyResolver, StandardEnvironment,
+///     SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+/// };
+/// use next_web_core::util::indexmap::IndexMap;
+///
+/// let mut environment = StandardEnvironment::new();
+/// let mock_environment = IndexMap::from([("xyz".to_owned(), "myValue".to_owned())]);
+///
+/// environment.property_sources().replace(
+///     SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+///     Box::new(MapPropertySource::new(
+///         SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME.to_owned(),
+///         mock_environment,
+///     )),
 /// );
+///
+/// assert_eq!(environment.get_property("xyz"), Some("myValue".to_owned()));
 /// ```
 ///
 /// When an `Environment` is being used by an application context, it is
@@ -105,6 +137,15 @@ where
     /// property sources such as the set of system properties or the set of system
     /// environment variables.
     fn property_sources(&mut self) -> &mut MutablePropertySources;
+
+    /// Return the `PropertySources` for this `Environment` in immutable form.
+    ///
+    /// Use [`property_sources`](Self::property_sources) when the property
+    /// sources have to be manipulated, for example to remove, reorder or
+    /// replace them. This method is meant for the far more common case of
+    /// reading the property sources, which does not require mutable access to
+    /// the environment.
+    fn property_sources_ref(&self) -> &MutablePropertySources;
 
     /// Return the system properties as a map.
     ///

@@ -172,7 +172,7 @@ impl PropertySource<IndexMap<String, String>> for ApplicationInfoPropertySource 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::ApplicationEnvironment;
+    use crate::ApplicationEnvironment;
 
     fn pid() -> String {
         std::process::id().to_string()
@@ -277,8 +277,9 @@ mod tests {
                 IndexMap::new(),
             )));
 
+        let source_count = environment.property_sources().len();
         ApplicationInfoPropertySource::move_to_end(&mut environment);
 
-        assert_eq!(environment.property_sources().len(), 1);
+        assert_eq!(environment.property_sources().len(), source_count);
     }
 }
