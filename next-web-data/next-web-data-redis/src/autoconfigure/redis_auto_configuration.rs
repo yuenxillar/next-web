@@ -8,7 +8,7 @@ use next_web_core::{
 };
 use next_web_macros::auto_configuration;
 use redis::{Cmd, ConnectionLike, TypedCommands};
-use rudi_dev::singleton;
+use next_web_macros::singleton;
 
 use crate::{
     autoconfigure::redis_properties::RedisProperties,

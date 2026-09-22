@@ -4,7 +4,7 @@ use next_web_core::{
     async_trait, context::properties::ApplicationProperties, traits::singleton::Singleton,
     ApplicationContext, AutoRegister,
 };
-use rudi_dev::singleton;
+use next_web_macros::singleton;
 
 use crate::{
     properties::minio_properties::MinioClientProperties, service::minio_service::MinioService,

@@ -1,5 +1,4 @@
-use next_web_macros::Properties;
-use rudi_dev::singleton;
+use next_web_macros::{Properties, singleton};
 
 /// Properties for Mongod client.
 #[singleton(default, binds=[Self::into_properties])]

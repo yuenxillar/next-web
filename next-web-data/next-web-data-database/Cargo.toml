@@ -12,7 +12,6 @@ edition.workspace = true
 next-web-context.workspace = true
 next-web-core = { workspace = true, features = ["dev"] }
 next-web-macros = { workspace = true }
-rudi-dev = { workspace = true }
 
 serde = { workspace = true }
 tracing = { workspace = true}

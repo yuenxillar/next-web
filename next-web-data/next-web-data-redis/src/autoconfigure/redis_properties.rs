@@ -1,5 +1,4 @@
-use next_web_macros::properties;
-use rudi_dev::singleton;
+use next_web_macros::{properties, singleton};
 
 #[cfg(feature = "distributed-lock")]
 use crate::service::lock::{RedisLockConfig, RedisLockMode};

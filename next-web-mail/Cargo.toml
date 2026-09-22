@@ -10,7 +10,6 @@ edition.workspace = true
 next-web-context.workspace = true
 next-web-core   = { workspace = true }
 next-web-macros = { workspace = true }
-rudi-dev        = { workspace = true }
 
 lettre          = { workspace = true }
 serde           = { workspace = true }

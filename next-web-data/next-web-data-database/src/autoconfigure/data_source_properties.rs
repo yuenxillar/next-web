@@ -1,5 +1,4 @@
-use next_web_macros::properties;
-use rudi_dev::singleton;
+use next_web_macros::{properties, singleton};
 
 /// Base for configuration of a data source.
 #[singleton(default, binds=[Self::into_properties])]

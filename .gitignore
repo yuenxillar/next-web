@@ -2,6 +2,7 @@
 # will have compiled files and executables
 debug/
 target/
+.DS_Store
 
 # Remove Cargo.lock from gitignore if creating an executable, leave it for libraries
 # More information here https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
@@ -26,11 +27,6 @@ Cargo.lock
 *.log
 .log.*
 
-.DS_Store
-
-
 
 application-local.yaml
-
-
 settings.local.json

@@ -1,5 +1,4 @@
-use next_web_macros::properties;
-use rudi_dev::singleton;
+use next_web_macros::{properties, singleton};
 
 /// RabbitMQ client properties.
 #[singleton(default, binds=[Self::into_properties])]

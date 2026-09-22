@@ -1,10 +1,10 @@
 use from_attr::{AttrsValue, FromAttr, PathValue};
+use next_web_context::{Color, Scope};
 use proc_macro2::TokenStream;
 use quote::quote;
-use rudi_core::{Color, Scope};
 use syn::{GenericParam, ItemFn, ReturnType};
 
-use crate::{
+use crate::di::{
     commons::{self, ArgumentResolveStmts},
     resource_attr::ResourceAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
@@ -41,7 +41,7 @@ pub(crate) fn generate(
         async_: _,
         #[cfg(feature = "auto-register")]
         auto_register,
-        default,
+        default: _,
     } = attr;
 
     #[cfg(feature = "auto-register")]

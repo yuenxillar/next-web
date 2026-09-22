@@ -4,7 +4,7 @@ use next_web_context::ApplicationContextExt;
 use next_web_core::{
     ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
 };
-use rudi_dev::singleton;
+use next_web_macros::singleton;
 
 use crate::{
     autoconfigure::rabbitmq_properties::RabbitmqProperties,

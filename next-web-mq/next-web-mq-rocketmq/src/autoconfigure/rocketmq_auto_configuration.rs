@@ -5,7 +5,7 @@ use next_web_core::{
     ApplicationContext, async_trait, error::BoxError,
     traits::config::auto_configuration::AutoConfiguration,
 };
-use rudi_dev::singleton;
+use next_web_macros::singleton;
 use tracing::info;
 
 use crate::{

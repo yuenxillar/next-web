@@ -1,14 +1,14 @@
 use from_attr::{AttrsValue, FlagOrValue, FromAttr};
+use next_web_context::{Color, Scope};
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, format_ident, quote};
-use rudi_core::{Color, Scope};
+use quote::{format_ident, quote, ToTokens};
 use syn::{
-    AngleBracketedGenericArguments, Attribute, Expr, Field, Fields, FieldsNamed, FieldsUnnamed,
-    FnArg, GenericArgument, Ident, PatType, Path, PathArguments, PathSegment, Stmt, Token, Type,
-    TypePath, TypeReference, parse_quote, punctuated::Punctuated, spanned::Spanned,
+    parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
+    Attribute, Expr, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident,
+    PatType, Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath, TypeReference,
 };
 
-use crate::{field_or_argument_attr::FieldOrArgumentAttr, value_attr::ValueAttr};
+use crate::di::{field_or_argument_attr::FieldOrArgumentAttr, value_attr::ValueAttr};
 
 /// The import that the generated statements need in order to call the generic
 /// methods of the application context.
@@ -72,7 +72,7 @@ fn extract_ref_type(ty: &Type) -> syn::Result<&Type> {
                 ty.span(),
                 "not support non-reference type, \
         please change to a reference type, \
-        or if using a type alias, specify the original type using `#[di(ref = T)]`, \
+        or if using a type alias, specify the original type using `#[autowired(ref = T)]`, \
         where `T` is a non-reference type",
             ));
         }
@@ -311,7 +311,7 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                 match field_name {
                     Some(_name) => {
                         let singleton_name =
-                            super::util::field_name_to_singleton_name(&_name.to_string());
+                            crate::util::name::field_name_to_singleton_name(&_name.to_string());
 
                         Expr::Lit(syn::PatLit {
                             attrs: Default::default(),
@@ -332,7 +332,8 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                                     ));
                                 }
                             };
-                            let singleton_name = super::util::singleton_name(&ident.to_string());
+                            let singleton_name =
+                                crate::util::name::singleton_name(&ident.to_string());
 
                             Expr::Lit(syn::PatLit {
                                 attrs: Default::default(),

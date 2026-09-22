@@ -1,6 +1,6 @@
 use next_web_core::async_trait;
 
-use rudi_dev::singleton;
+use next_web_macros::singleton;
 
 use super::message_interceptor::MessageInterceptor;
 

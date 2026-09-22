@@ -1,0 +1,142 @@
+[package]
+name = "next-web-examples"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+[dependencies]
+
+
+
+# next-web-data-database = { path = "../next-web-data-database", version = "0.1.0" }
+# next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "0.1.0" }
+
+[dev-dependencies]
+next-web                = { path = "../next-web", version = "*", features = ["full"]}
+next-web-core           = { path = "../next-web-core", version = "*" }
+next-web-context        = { path = "../next-web-context", version = "*" }
+next-web-ai             = { path = "../next-web-ai", version = "*", features = ["deep-seek"]}
+next-web-mqtt           = { path = "../next-web-mqtt", version = "*" }
+next-web-websocket      = { path = "../next-web-websocket", version = "*" }
+next-web-security       = { path = "../next-web-security", version = "*" }
+next-web-data-redis     = { path = "../next-web-data/next-web-data-redis", version = "*", features = []}
+next-web-data-database  = { path = "../next-web-data/next-web-data-database", version = "*" }
+next-web-state-machine  = { path = "../next-web-state-machine", version = "*" }
+next-web-xxl-job        = { path = "../next-web-xxl-job", version = "*" }
+next-web-mail           = { path = "../next-web-mail", version = "*" }
+next-web-ip             = { path = "../next-web-ip", version = "0.1.0" }
+next-web-document       = { path = "../next-web-document", version = "0.1.0", features = [] }
+next-web-retry          = { path = "../next-web-retry", version = "*"}
+next-web-pay-alipay     = { path = "../next-web-pay/next-web-pay-alipay", version = "*" }
+
+tokio           = { workspace = true, features = ["sync"]}
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+
+rust_xlsxwriter = { workspace = true }
+axum            = { version = "0.8.4", features = ["default", "multipart", "query"] }
+tokio-util      = { workspace = true }
+futures         = { workspace = true }
+utoipa          = { workspace = true }
+
+tracing         = { workspace = true}
+
+[features]
+enable-api-doc = ["next-web/enable-api-doc"]
+
+[[bin]]
+name = "test_ai"
+path = "test_ai.rs"
+
+[[bin]]
+name = "test_api_doc"
+path = "test_api_doc.rs"
+
+[[bin]]
+name = "test_application"
+path = "test_application.rs"
+
+[[bin]]
+name = "test_application_event"
+path = "test_application_event.rs"
+
+[[bin]]
+name = "test_application_lifecycle"
+path = "test_application_lifecycle.rs"
+
+[[bin]]
+name = "test_auto_configuration"
+path = "test_auto_configuration.rs"
+
+[[bin]]
+name = "test_data"
+path = "test_data.rs"
+
+[[bin]]
+name = "test_database"
+path = "test_database.rs"
+
+[[bin]]
+name = "test_decoder_and_vaild"
+path = "test_decoder_and_vaild.rs"
+
+[[bin]]
+name = "test_desensitized"
+path = "test_desensitized.rs"
+
+[[bin]]
+name = "test_i18n"
+path = "test_i18n.rs"
+
+[[bin]]
+name = "test_mail"
+path = "test_mail.rs"
+
+[[bin]]
+name = "test_mqtt"
+path = "test_mqtt.rs"
+
+[[bin]]
+name = "test_pay"
+path = "test_pay.rs"
+
+[[bin]]
+name = "test_properties"
+path = "test_properties.rs"
+
+[[bin]]
+name = "test_redis"
+path = "test_redis.rs"
+
+[[bin]]
+name = "test_retry"
+path = "test_retry.rs"
+
+[[bin]]
+name = "test_scheduled"
+path = "test_scheduled.rs"
+
+[[bin]]
+name = "test_security"
+path = "test_security.rs"
+
+[[bin]]
+name = "test_singleton"
+path = "test_singleton.rs"
+
+[[bin]]
+name = "test_state_machine"
+path = "test_state_machine.rs"
+
+[[bin]]
+name = "test_stream"
+path = "test_stream.rs"
+
+[[bin]]
+name = "test_ws"
+path = "test_ws.rs"
+
+[[bin]]
+name = "test_xxl_job"
+path = "test_xxl_job.rs"

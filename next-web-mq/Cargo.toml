@@ -11,7 +11,6 @@ license.workspace = true
 [dependencies]
 next-web-core = { workspace = true }
 next-web-macros = { workspace = true }
-rudi-dev = { workspace = true }
 
 amqprs = { workspace = true, optional = true }
 rocketmq = { workspace = true, optional = true }

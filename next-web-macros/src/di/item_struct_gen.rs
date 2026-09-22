@@ -1,10 +1,10 @@
 use from_attr::{AttrsValue, FromAttr, PathValue};
+use next_web_context::{Color, Scope};
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
-use rudi_core::{Color, Scope};
+use quote::{quote, ToTokens};
 use syn::ItemStruct;
 
-use crate::{
+use crate::di::{
     commons::{self, FieldResolveStmts, ResolvedFields},
     resource_attr::ResourceAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
@@ -164,7 +164,7 @@ pub(crate) fn generate(
             .is_empty()
             .then(|| match is_properties {
                 true => format!("defaultProperties{}", struct_ident.to_string()),
-                false => super::util::singleton_name(&struct_ident.to_string()),
+                false => crate::util::name::singleton_name(&struct_ident.to_string()),
             })
             .unwrap_or(singleton_name)
     };

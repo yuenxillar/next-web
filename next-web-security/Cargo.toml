@@ -7,7 +7,6 @@ license.workspace = true
 
 [dependencies]
 next-web-core.workspace     = true
-rudi-dev.workspace          = true
 next-web-context.workspace  = true
 
 tokio.workspace         = true

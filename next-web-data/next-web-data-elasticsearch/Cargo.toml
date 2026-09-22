@@ -7,7 +7,6 @@ edition = "2024"
 next-web-context = { workspace = true }
 next-web-core = { workspace = true }
 next-web-macros = { workspace = true }
-rudi-dev = { workspace = true }
 
 tokio = { workspace = true }
 serde = { workspace = true }

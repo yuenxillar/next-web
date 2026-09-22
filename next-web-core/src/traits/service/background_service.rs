@@ -6,7 +6,7 @@ where
     Self: Send + Sync,
     Self: 'static,
 {
-    fn service_name(&self) -> &'static str;
+    fn name(&self) -> &'static str;
 
     async fn run(&self) -> Result<(), ServiceError>;
 

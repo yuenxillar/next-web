@@ -11,7 +11,6 @@ pub mod extract;
 pub mod macros;
 pub mod manager;
 pub mod signal;
-pub mod stream;
 pub mod support;
 pub mod util;
 pub mod web;

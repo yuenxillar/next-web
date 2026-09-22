@@ -6,7 +6,7 @@ use next_web_core::{
     ApplicationContext, async_trait,
     traits::{apply_router::ApplyRouter, config::auto_configuration::AutoConfiguration},
 };
-use rudi_dev::singleton;
+use next_web_macros::singleton;
 
 use crate::{
     autoconfigure::ws_properties::WebSocketProperties,

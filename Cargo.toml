@@ -11,7 +11,6 @@ members = [
     "next-web-retry",
     "next-web-security",
     "next-web-sms",
-    "next-web-tests",
     "next-web-utils",
     "next-web-websocket",
     "next-web-mq/next-web-mq-kafka",
@@ -31,12 +30,13 @@ members = [
     "next-web-context",
     "next-web-singletons",
     "next-web-util",
+    "examples",
 ]
 exclude = ["next-web-code-generator"]
 resolver = "2"
 
 [workspace.package]
-rust-version = "1.92.0"
+rust-version = "1.98.1"
 edition = "2024"
 version = "0.1.0"
 authors = ["Listening <yuenxillar@163.com>"]
@@ -89,7 +89,6 @@ next-web-open-api = { version = "0.1.0", path = "./next-web-open-api" }
 next-web-retry = { version = "0.1.0", path = "./next-web-retry" }
 next-web-security = { version = "0.1.0", path = "./next-web-security" }
 next-web-sms = { version = "0.1.0", path = "./next-web-sms" }
-next-web-tests = { version = "0.1.0", path = "./next-web-tests" }
 next-web-utils = { version = "0.1.0", path = "./next-web-utils" }
 next-web-websocket = { version = "0.1.2", path = "./next-web-websocket" }
 next-web-mq-kafka = { version = "0.1.0", path = "./next-web-mq/next-web-mq-kafka" }
@@ -101,8 +100,6 @@ next-web-state-machine = { version = "0.1.0", path = "./next-web-state-machine" 
 
 # next-web-common = { version = "0.1.0" }
 # next-web-mq = {  version = "0.1.0", path = "./next-web-mq"}
-
-rudi-dev = { version = "0.8.7", path = "./rudi-main/rudi-dev" }
 
 # main dependencies
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }

@@ -1,5 +1,5 @@
 use from_attr::{FlagOrValue, FromAttr};
-use syn::{Expr, Type, parse_quote};
+use syn::{parse_quote, Expr, Type};
 
 // #[autowired(
 //     name = "..",

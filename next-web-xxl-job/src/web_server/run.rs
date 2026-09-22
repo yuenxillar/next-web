@@ -4,7 +4,7 @@ use next_web_core::{
     async_trait,
     traits::service::background_service::{BackgroundService, HealthStatus, ServiceError},
 };
-use rudi_dev::singleton;
+use next_web_macros::singleton;
 
 use crate::web_server::{open_api::app, state::XxlJobAppState};
 
@@ -32,7 +32,7 @@ impl XxlWebServer {
 
 #[async_trait]
 impl BackgroundService for XxlWebServer {
-    fn service_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         "XxlJobWebServer"
     }
 

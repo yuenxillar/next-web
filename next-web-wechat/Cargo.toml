@@ -10,7 +10,6 @@ readme.workspace = true
 
 
 [dependencies]
-rudi-dev = { workspace = true }
 next-web-core = { workspace = true }
 
 aes = { workspace = true }

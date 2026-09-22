@@ -15,7 +15,7 @@ use tokio::sync::mpsc::{channel, Sender};
 #[cfg(feature = "trace-log")]
 use tracing::{debug, error, info, warn};
 
-use crate::util::thread::ThreadUtil;
+use crate::util::ThreadUtil;
 
 /// Event value types that can be sent through the channel
 ///

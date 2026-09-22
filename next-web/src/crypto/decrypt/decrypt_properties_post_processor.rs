@@ -3,7 +3,7 @@ use next_web_core::{
     context::application_args::ApplicationArgs,
     traits::{ordered::Ordered, properties_post_processor::PropertiesPostProcessor},
 };
-use rudi_dev::singleton;
+use next_web_macros::singleton;
 use serde_yaml::Value;
 
 #[singleton(binds = [Self::into_post_processor])]

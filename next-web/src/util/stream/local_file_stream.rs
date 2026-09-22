@@ -9,7 +9,7 @@ use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
 use std::path::Path;
 use tokio_util::io::ReaderStream;
 
-use crate::{stream::DEFAULT_CHUNK_SIZE, util::stream_throttle::throttle_byte_stream};
+use crate::util::{stream::DEFAULT_CHUNK_SIZE, stream_throttle::throttle_byte_stream};
 
 pub struct LocalFileStream<T: AsRef<Path>>(pub T);
 

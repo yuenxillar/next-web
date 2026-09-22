@@ -9,9 +9,8 @@ use next_web_context::{ApplicationContext, ApplicationContextExt};
 use next_web_core::async_trait;
 use next_web_core::autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES;
 use next_web_core::client::rest_client::RestClient;
-use next_web_core::constants::application_constants::APPLICATION_BANNER;
 use next_web_core::context::application_args::ApplicationArgs;
-use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
+use next_web_core::context::application_resources::ApplicationResources;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
 use next_web_core::state::application_state::ApplicationState;
@@ -47,9 +46,7 @@ use crate::event::default_application_event_multicaster::DefaultApplicationEvent
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::manager::background_service_manager::BackgroundServiceManager;
 use crate::signal::{APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL, APPLICATION_STARTED_SIGNAL};
-use crate::util::local_date_time::LocalDateTime;
-use crate::util::thread::ThreadUtil;
-use crate::{NextWebBanner, NextWebErrorReporter};
+use crate::util::{LocalDateTime, ThreadUtil};
 
 #[cfg(feature = "enable-api-doc")]
 use next_web_api_doc::openapi::OpenApi;

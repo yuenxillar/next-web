@@ -1,5 +1,5 @@
 use from_attr::{ConvertParsed, FromAttr, PathValue};
-use syn::{Expr, ExprPath, parse_quote, spanned::Spanned};
+use syn::{parse_quote, spanned::Spanned, Expr, ExprPath};
 
 #[derive(FromAttr)]
 #[attribute(idents = [resource])]

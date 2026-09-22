@@ -1,5 +1,5 @@
 use from_attr::FromAttr;
-use syn::{Expr, parse_quote};
+use syn::{parse_quote, Expr};
 
 #[derive(FromAttr)]
 #[attribute(idents = [value])]

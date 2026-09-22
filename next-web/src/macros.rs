@@ -8,7 +8,7 @@ pub mod bind {
         any_mapping, delete_mapping, get_mapping, patch_mapping, post_mapping, put_mapping,
         request_mapping,
     };
-    pub use rudi_dev::{singleowner, singleton, transient};
+    pub use next_web_macros::{singleowner, singleton, transient};
 }
 
 pub mod autoconfigure {

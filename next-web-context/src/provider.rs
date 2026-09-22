@@ -186,7 +186,7 @@ pub enum Color {
 /// # Example
 ///
 /// ```rust
-/// use rudi::{DefaultProvider, Provider, Singleton, Transient};
+/// use next-web-context::{DefaultProvider, Provider, Singleton, Transient};
 ///
 /// #[Transient]
 /// struct A;
@@ -463,9 +463,8 @@ impl DynProvider {
     /// [`Self::origin`]) and an instance created by it.
     pub fn clone_instance(
         &self,
-    ) -> Option<
-        fn(&(dyn Any + Send + Sync), &(dyn Any + Send + Sync)) -> Box<dyn Any + Send + Sync>,
-    > {
+    ) -> Option<fn(&(dyn Any + Send + Sync), &(dyn Any + Send + Sync)) -> Box<dyn Any + Send + Sync>>
+    {
         self.clone_instance
     }
 }
@@ -508,16 +507,13 @@ impl<T: 'static + Send + Sync> From<Provider<T>> for DynProvider {
             Box::new(clone(instance))
         }
 
-        let clone_instance = value
-            .clone_instance
-            .is_some()
-            .then_some(
-                clone_instance::<T>
-                    as fn(
-                        &(dyn Any + Send + Sync),
-                        &(dyn Any + Send + Sync),
-                    ) -> Box<dyn Any + Send + Sync>,
-            );
+        let clone_instance = value.clone_instance.is_some().then_some(
+            clone_instance::<T>
+                as fn(
+                    &(dyn Any + Send + Sync),
+                    &(dyn Any + Send + Sync),
+                ) -> Box<dyn Any + Send + Sync>,
+        );
 
         Self {
             definition: value.definition.clone(),
@@ -553,7 +549,8 @@ where
     Arc::new(constructor)
 }
 
-fn sync_eager_create_function<T: 'static + Send + Sync>() -> fn(&mut dyn ApplicationContext, Cow<'static, str>) {
+fn sync_eager_create_function<T: 'static + Send + Sync>()
+-> fn(&mut dyn ApplicationContext, Cow<'static, str>) {
     |cx, name| {
         // Resolving the instance is enough: a singleton is cached by the
         // context, so the instance that is resolved later is the one created
@@ -689,7 +686,7 @@ macro_rules! define_provider_sync {
         /// # Example
         ///
         /// ```rust
-        #[doc = concat!("use rudi::{", stringify!($function), ", ", stringify!($provider), "};")]
+        #[doc = concat!("use next-web-context::{", stringify!($function), ", ", stringify!($provider), "};")]
         ///
         /// #[derive(Clone)]
         /// struct A(i32);
@@ -727,7 +724,7 @@ macro_rules! define_provider_sync {
             /// ```rust
             /// use std::{fmt::Debug, rc::Arc, sync::Arc};
             ///
-            #[doc = concat!("use rudi::{", stringify!($function), ", Provider, ", stringify!($provider), "};")]
+            #[doc = concat!("use next-web-context::{", stringify!($function), ", Provider, ", stringify!($provider), "};")]
             ///
             /// #[derive(Clone, Debug)]
             /// struct A(i32);
@@ -833,7 +830,7 @@ macro_rules! define_provider_async {
         /// # Example
         ///
         /// ```rust
-        #[doc = concat!("use rudi::{", stringify!($function), ", FutureExt, ", stringify!($provider), "};")]
+        #[doc = concat!("use next-web-context::{", stringify!($function), ", FutureExt, ", stringify!($provider), "};")]
         ///
         /// #[derive(Clone)]
         /// struct A(i32);
@@ -875,7 +872,7 @@ macro_rules! define_provider_async {
             /// ```rust
             /// use std::{fmt::Debug, rc::Arc, sync::Arc};
             ///
-            #[doc = concat!("use rudi::{", stringify!($function), ", FutureExt, Provider, ", stringify!($provider), "};")]
+            #[doc = concat!("use next-web-context::{", stringify!($function), ", FutureExt, Provider, ", stringify!($provider), "};")]
             ///
             /// #[derive(Clone, Debug)]
             /// struct A(i32);
@@ -997,6 +994,3 @@ define_provider_async!(
     single_owner_async,
     None,
 );
-
-
-

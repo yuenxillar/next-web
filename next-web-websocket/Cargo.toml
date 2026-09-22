@@ -12,7 +12,6 @@ next-web-context.workspace = true
 axum            = { workspace = true, features = ["ws"] }
 
 serde           = { workspace = true }
-rudi-dev        = { workspace = true }
 tracing         = { workspace = true }
 futures         = { workspace = true }
 flume           = { workspace = true }

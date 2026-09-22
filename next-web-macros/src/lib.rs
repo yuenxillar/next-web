@@ -16,7 +16,10 @@ use syn::ItemFn;
 use syn::ItemImpl;
 use syn::ItemStruct;
 
+use next_web_context::Scope;
+
 mod data;
+mod di;
 mod util;
 mod web;
 
@@ -586,4 +589,97 @@ pub fn translation(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_translation(attr, item_fn)
+}
+
+// ========================= Dependency Injection =========================
+
+/// Declares the annotated item as a singleton provider.
+///
+/// The instance of a singleton provider is constructed only once and shared by
+/// every resolution, so it can be resolved by reference or, when the type
+/// implements `Clone`, by value. The annotated type also gets an implementation
+/// of `next_web_core::traits::singleton::Singleton` returning the name of the
+/// provider.
+///
+/// The macro can be applied to a `struct`, an `enum`, an `impl` block or a
+/// `fn`:
+///
+/// - on a `struct`, an `enum` or an `impl` block the annotated item is the
+///   provided type,
+/// - on a `fn` a `struct` named after the function is created and the provided
+///   type is the return type of the function.
+///
+/// # Arguments
+///
+/// - `name = "..."`: name of the provider. Defaults to the type name with its
+///   first character lower cased, e.g. `MyService` becomes `myService`.
+/// - `eager_create`: construct the instance while the provider is registered
+///   instead of while it is resolved for the first time.
+/// - `condition = path` or `condition = |cx| ...`: a function or a closure
+///   taking `&dyn ApplicationContext` that decides whether the provider is
+///   inserted into the context.
+/// - `binds = [path, ...]`: expressions converting the instance into the types
+///   it is bound to, e.g. `binds = [Self::into_service]`.
+/// - `async`: whether the constructor of a `struct` or an `enum` is async. Not
+///   supported on a `fn`, which is async when it is declared as `async fn`.
+/// - `auto_register`: whether the provider is submitted to the auto register
+///   registry, `true` by default. Generic items have to disable it with
+///   `auto_register = false`.
+/// - `default`: build the instance with `Default::default()` instead of
+///   resolving the fields of the annotated `struct`.
+///
+/// # Field and argument attributes
+///
+/// - `#[autowired(name = "...")]`: name of the provider to resolve. Defaults to
+///   the field name, so `my_service` resolves `myService`, or to the name of the
+///   type for an argument without a name.
+/// - `#[autowired(option)]`: the field is an `Option<T>` that is `None` when
+///   there is no provider with the given name.
+/// - `#[autowired(default)]`: the field uses `Default::default()` when there is
+///   no provider with the given name; `#[autowired(default = expr)]` uses the
+///   given expression instead.
+/// - `#[autowired(vec)]`: the field is a `Vec<T>` collecting every provider of
+///   `T`.
+/// - `#[autowired(map)]`: the field is a `HashMap<String, T>` naming every
+///   provider of `T`; `T` has to implement `Singleton`.
+/// - `#[autowired(ref)]`: the field takes a reference to the provider, which is
+///   required when a type alias hides the reference of the field type.
+/// - `#[value(key = "...")]`: the field takes the value of the given
+///   application property.
+/// - `#[resource(path = ...)]`: path of the crate used by the generated code,
+///   `::next_web_context` by default.
+///
+/// # Example
+///
+/// ```ignore
+/// #[singleton(binds = [Self::into_service])]
+/// #[derive(Clone)]
+/// struct MyService {
+///     #[autowired(name = "myRepository")]
+///     repository: Arc<dyn Repository>,
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn singleton(attr: TokenStream, item: TokenStream) -> TokenStream {
+    di::generate(attr, item, Scope::Singleton)
+}
+
+/// Declares the annotated item as a transient provider.
+///
+/// The instance of a transient provider is constructed on every resolution, so
+/// it is always resolved by value. The macro accepts the same arguments and
+/// field attributes as [`singleton`](macro@crate::singleton).
+#[proc_macro_attribute]
+pub fn transient(attr: TokenStream, item: TokenStream) -> TokenStream {
+    di::generate(attr, item, Scope::Transient)
+}
+
+/// Declares the annotated item as a single owner provider.
+///
+/// The instance of a single owner provider is constructed only once and is
+/// resolved by reference. The macro accepts the same arguments and field
+/// attributes as [`singleton`](macro@crate::singleton).
+#[proc_macro_attribute]
+pub fn singleowner(attr: TokenStream, item: TokenStream) -> TokenStream {
+    di::generate(attr, item, Scope::SingleOwner)
 }

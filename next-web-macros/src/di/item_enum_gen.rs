@@ -1,10 +1,10 @@
 use from_attr::{AttrsValue, FromAttr, PathValue};
+use next_web_context::{Color, Scope};
 use proc_macro2::TokenStream;
 use quote::quote;
-use rudi_core::{Color, Scope};
-use syn::{ItemEnum, spanned::Spanned};
+use syn::{spanned::Spanned, ItemEnum};
 
-use crate::{
+use crate::di::{
     commons::{self, FieldResolveStmts, ResolvedFields},
     impl_fn_or_enum_variant_attr::ImplFnOrEnumVariantAttr,
     resource_attr::ResourceAttr,
@@ -34,7 +34,7 @@ pub(crate) fn generate(
         async_,
         #[cfg(feature = "auto-register")]
         auto_register,
-        default,
+        default: _,
     } = attr;
 
     #[cfg(feature = "auto-register")]
@@ -77,7 +77,7 @@ pub(crate) fn generate(
         })
         .reduce(|first, (_, attrs)| {
             attrs.into_iter().for_each(|attr| {
-                let err = syn::Error::new(attr.span(), "duplicate `#[resource]` attribute");
+                let err = syn::Error::new(attr.span(), "duplicate `#[autowired]` attribute");
                 duplicate_errors.push(err);
             });
 
@@ -88,7 +88,7 @@ pub(crate) fn generate(
         variant_spans.iter().for_each(|span| {
             no_matched_variant_errors.push(syn::Error::new(
                 *span,
-                "there must be a variant annotated by `#[resource]`",
+                "there must be a variant annotated by `#[autowired]`",
             ));
         });
     }

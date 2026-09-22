@@ -2,14 +2,16 @@ use std::{
     any::{type_name_of_val, Any},
     collections::{HashMap, HashSet},
     error::Error,
-    future::Future,
     panic::AssertUnwindSafe,
     sync::{Arc, LazyLock},
 };
 
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use axum::{response::IntoResponse, Router};
+use axum::{
+    response::{IntoResponse, Response},
+    Router,
+};
 
 use next_web_core::{
     anys::any_value::AnyValue,
@@ -21,12 +23,14 @@ use next_web_core::{
     },
     io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup, StartupStep},
+    traits::service::background_service::BackgroundService,
     util::indexmap::IndexMap,
 };
 use next_web_singletons::factory::{
     config::SingletonRegistry, ListableSingletonFactory, SingletonFactory,
 };
 use reqwest::StatusCode;
+use tokio::sync::RwLock;
 use tracing::{enabled, Level};
 
 use crate::{
@@ -63,13 +67,11 @@ pub trait Application<E = ()>
 where
     E: ErrorHandler,
 {
-    /// Before starting the application
-    #[allow(unused_variables)]
-    fn on_ready(
+    fn background_services(
         &self,
-        ctx: &mut dyn ConfigurableApplicationContext,
-    ) -> impl Future<Output = ApplicationResult<()>> {
-        std::future::ready(Ok(()))
+        _ctx: &mut dyn ConfigurableApplicationContext,
+    ) -> Vec<Arc<dyn BackgroundService>> {
+        Vec::new()
     }
 
     #[allow(unused_variables)]
@@ -144,7 +146,7 @@ where
         resp
     }
 
-    fn catch_panic(err: Box<dyn Any + Send + 'static>) -> impl IntoResponse {
+    fn catch_panic(err: Box<dyn Any + Send + 'static>) -> Response {
         let error = err
             .downcast_ref::<String>()
             .map(String::as_str)
@@ -181,6 +183,7 @@ impl<T> NextWebApplication<T>
 where
     T: Application,
     T: Default,
+    T: 'static,
 {
     /// Creates a new `NextWebApplication` with the given resource loader.
     pub fn new(resource_loader: Option<Arc<dyn ResourceLoader>>) -> Self {
@@ -247,8 +250,7 @@ where
                 self.send_event(|handlers| handlers.ready(context.as_mut(), startup.ready()));
             }
 
-            self.run_web_server(environment.as_ref(), context.as_mut())
-                .await?;
+            self.run_web_server(environment.as_ref(), context).await?;
             ApplicationResult::<()>::Ok(())
         };
 
@@ -263,7 +265,7 @@ where
     async fn run_web_server(
         &mut self,
         environment: &dyn ConfigurableEnvironment,
-        ctx: &mut dyn ConfigurableApplicationContext,
+        mut ctx: Box<dyn ConfigurableApplicationContext>,
     ) -> ApplicationResult<()> {
         let port = environment
             .get_property_or_default("next.server.port", "11000")
@@ -271,12 +273,14 @@ where
             .unwrap_or(APPLICATION_DEFAULT_PORT);
         let address = environment.get_property_or_default("next.server.address", "0.0.0.0");
         let socket_addr = format!("{}:{}", address, port).parse::<std::net::SocketAddr>()?;
-        let router = self
+        let mut router = self
             .application
-            .router(ctx)
+            .router(ctx.as_mut())
             .fallback(|| async { T::fallback() })
             // Prevent program panic caused by users not setting routes
-            .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
+            .route("/_20250101", axum::routing::get(|| async { "a new year!" }))
+            .route_layer(axum::Extension(Arc::new(RwLock::new(ctx))));
+        router = self.add_layers(router);
 
         // TLS is used when it is enabled for the environment, which requires
         // the crate to be built with its TLS support.
@@ -291,6 +295,26 @@ where
         web_server.run().await?;
 
         Ok(())
+    }
+
+    /// Adds the necessary layers to the router.
+    fn add_layers(&self, router: Router) -> Router {
+        router
+            .route_layer(tower_http::catch_panic::CatchPanicLayer::custom(
+                T::catch_panic,
+            ))
+            .route_layer(tower_http::timeout::TimeoutLayer::with_status_code(
+                StatusCode::REQUEST_TIMEOUT,
+                std::time::Duration::from_secs(5),
+            ))
+            .layer(
+                tower_http::cors::CorsLayer::new()
+                    .allow_origin(tower_http::cors::Any)
+                    .allow_methods(tower_http::cors::Any)
+                    .allow_headers(tower_http::cors::Any)
+                    .max_age(std::time::Duration::from_secs(60) * 10),
+            )
+            .route_layer(tower_http::trace::TraceLayer::new_for_http())
     }
 
     fn prepare_environment(
@@ -770,8 +794,9 @@ where
 
 impl<T> Default for NextWebApplication<T>
 where
-    T: Default,
     T: Application,
+    T: Default,
+    T: 'static,
 {
     fn default() -> Self {
         Self::new(None)

@@ -131,7 +131,7 @@ impl BackgroundServiceManager {
     ///
     /// 返回 `ServiceError::AlreadyRunning` 如果服务名已存在
     pub async fn register(&self, service: Arc<dyn BackgroundService>) -> Result<(), ServiceError> {
-        let service_name = service.service_name();
+        let service_name = service.name();
         let mut services = self.services.lock().await;
 
         if services.contains_key(service_name) {

@@ -1,7 +1,7 @@
 use from_attr::FromAttr;
-use syn::{Path, parse_quote};
+use syn::{parse_quote, Path};
 
-// #[di(rudi_path = path::to::rudi)]
+// #[resource(path = path::to::next_web_context)]
 
 #[derive(FromAttr)]
 #[attribute(idents = [resource])]

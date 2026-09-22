@@ -9,6 +9,8 @@ license.workspace = true
 proc-macro = true
 
 [dependencies]
+next-web-context = { workspace = true }
+
 syn = { workspace = true, features = ["full"] }
 quote = { workspace = true }
 proc-macro2 = { workspace = true }
@@ -16,9 +18,10 @@ from-attr = { workspace = true }
 inventory = { workspace = true }
 
 [features]
-default = ["data", "translation"]
+default = ["data", "translation", "auto-register"]
 
 data = []
 api-doc = []
 translation = []
 embed-resources = []
+auto-register = []

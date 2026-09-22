@@ -59,8 +59,6 @@ inventory           = { workspace = true }
 
 utoipa-swagger-ui   = { workspace = true, optional = true }
 
-rudi-dev            = { workspace = true }
-
 tracing-subscriber  = { workspace = true }
 
 reqwest             = { workspace = true, features = ["stream"] }

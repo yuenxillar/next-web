@@ -14,7 +14,7 @@ use next_web_context::{ApplicationContext, ApplicationContextExt};
 
 #[cfg(feature = "embed-resources")]
 use next_web_core::context::application_resources::RESOURCE_LOADER;
-use rudi_dev::singleton;
+use next_web_macros::singleton;
 
 use crate::autoconfigure::context::message_source_properties::MessageSourceProperties;
 

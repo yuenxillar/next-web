@@ -3,7 +3,6 @@ use dyn_clone::DynClone;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Read;
-use std::path;
 
 use crate::constants::application_constants::APPLICATION_CONFIG;
 use crate::context::application_args::ApplicationArgs;
