@@ -10,6 +10,8 @@ license.workspace = true
 [dependencies]
 async-trait.workspace   = true
 dyn-clone.workspace     = true
+inventory.workspace     = true
+next-web-singletons     = { workspace = true }
 
 [lints]
 workspace = true

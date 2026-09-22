@@ -27,6 +27,7 @@ use crate::env::BasePropertySource;
 pub trait PropertySource<T>
 where
     Self: fmt::Debug,
+    Self: Send + Sync,
 {
     /// Return the name of this property source.
     ///

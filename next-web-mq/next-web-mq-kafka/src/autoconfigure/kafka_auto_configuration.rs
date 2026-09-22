@@ -1,4 +1,5 @@
 use std::error::Error;
+use next_web_context::ApplicationContextExt;
 
 use next_web_core::{
     ApplicationContext, async_trait, error::BoxError,
@@ -34,7 +35,7 @@ impl KafkaAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for KafkaAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mut registry = DefaultKafkaListenerRegistry::default();
         for configurer in self.configurers.iter_mut() {
             configurer.register_listeners(ctx, &mut registry);
@@ -55,3 +56,4 @@ impl AutoConfiguration for KafkaAutoConfiguration {
         Ok(())
     }
 }
+

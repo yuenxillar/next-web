@@ -1,6 +1,6 @@
 use chrono::Local;
 use next_web_core::env::Environment;
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::{next_web_application::StandardStartup, NextWebVersion};
 
@@ -23,7 +23,8 @@ impl<'a> StartupInfoLogger<'a> {
     /// at debug level.
     pub fn log_starting(&self) {
         info!("{}", self.get_starting_message());
-        debug!("{}", self.get_running_message());
+        info!("{}", self.get_running_message());
+        self.print_runtime_message()
     }
 
     /// Logs the "started" message.
@@ -35,7 +36,14 @@ impl<'a> StartupInfoLogger<'a> {
     fn get_starting_message(&self) -> String {
         let mut msg = String::new();
         msg.push_str("Starting");
-        self.append_application_name(&mut msg);
+        msg.push(' ');
+        msg.push_str(
+            self.source_name
+                .and_then(|s| s.rsplit("::").next())
+                .unwrap_or_else(|| "NextWebApplication")
+                .to_owned()
+                .as_mut_str(),
+        );
         self.append_context(&mut msg);
         msg
     }
@@ -45,45 +53,56 @@ impl<'a> StartupInfoLogger<'a> {
         let mut msg = String::new();
         msg.push_str("Running with Next Web ");
         self.append_application_version(&mut msg);
-        msg.push('\n');
-        msg.push_str("Rust version: ");
-        self.append_version(&mut msg, rust_version());
-        msg.push('\n');
-        msg.push_str("Starting Async Runtime: [Tokio/1.44.1]");
-        msg.push('\n');
-        msg.push_str("Starting HTTP  Server:  [Axum/0.8.4]");
         msg
+    }
+
+    /// Prints the runtime message to the log.
+    fn print_runtime_message(&self) {
+        info!("Starting Async Runtime: [Tokio/1.44.1]");
+        info!("Starting HTTP  Server:  [Axum/0.8.4]");
     }
 
     /// Builds the "Started ... in N seconds (process running for M)" line.
     fn get_started_message(&self, startup: &StandardStartup) -> String {
         let mut msg = String::new();
         self.append_application_name(&mut msg);
+        msg.push('\n');
         self.append_listening_on(&mut msg);
+        msg.push('\n');
         self.append_started_at(&mut msg);
+        msg.push('\n');
         self.append_startup_time(&mut msg, startup);
+        msg.push('\n');
         self.append_pid(&mut msg);
         msg
     }
 
     /// Appends the listening address and port of the application.
     fn append_listening_on(&self, msg: &mut String) {
-        self.append(msg, "Application Listening on:  {}", || {
-            format!(
-                "{}:{}",
-                self.environment
-                    .get_property_or_default("next.server.address", "localhost"),
-                self.environment
-                    .get_property_or_default("next.server.port", "11000")
-            )
-        });
+        self.append(
+            msg,
+            "Application Listening on:  ",
+            || {
+                format!(
+                    "{}:{}",
+                    self.environment
+                        .get_property_or_default("next.server.address", "127.0.0.1"),
+                    self.environment
+                        .get_property_or_default("next.server.port", "11000")
+                )
+            },
+            false,
+        );
     }
 
     /// Appends the started at timestamp of the application.
     fn append_started_at(&self, msg: &mut String) {
-        self.append(msg, "Application Started   at:  {}", || {
-            Local::now().to_string()
-        });
+        self.append(
+            msg,
+            "Application Started   at:  ",
+            || Local::now().to_string(),
+            false,
+        );
     }
 
     /// Appends the startup time of the application.
@@ -106,46 +125,71 @@ impl<'a> StartupInfoLogger<'a> {
         //     ));
         // }
 
-        self.append(msg, "Application Startup time:  {:?}", || {
-            startup
-                .time_taken_to_started()
-                .ok()
-                .map(|dur| format!("{dur:?}"))
-                .unwrap_or("0.01s".to_owned())
-        });
+        self.append(
+            msg,
+            "Application Startup time:  ",
+            || {
+                startup
+                    .time_taken_to_started()
+                    .ok()
+                    .map(|dur| format!("{dur:?}"))
+                    .unwrap_or("0.01s".to_owned())
+            },
+            false,
+        );
     }
 
     /// Appends the application name, falling back to `"application"`.
     fn append_application_name(&self, msg: &mut String) {
-        self.append(msg, "Application Name      is:  {}", || {
-            self.source_name
-                .and_then(|s| s.rsplit("::").next())
-                .unwrap_or_else(|| "NextWebApplication")
-                .to_owned()
-        });
+        self.append(
+            msg,
+            "Application Name      is:  ",
+            || {
+                self.source_name
+                    .and_then(|s| s.rsplit("::").next())
+                    .unwrap_or_else(|| "NextWebApplication")
+                    .to_owned()
+            },
+            false,
+        );
     }
 
     /// Appends a version with a `v` prefix.
+    #[allow(dead_code)]
     fn append_version(&self, msg: &mut String, version: Option<&str>) {
-        self.append(msg, "v", || {
-            version.map(String::from).unwrap_or("Unknown".to_owned())
-        });
+        self.append(
+            msg,
+            "v",
+            || version.map(String::from).unwrap_or("latest".to_owned()),
+            true,
+        );
     }
 
     /// Appends the application version.
     fn append_application_version(&self, msg: &mut String) {
-        self.append(msg, "v", || {
-            self.environment
-                .get_property_or_default("next.application.version", NextWebVersion::get_version())
-                .to_owned()
-        });
+        self.append(
+            msg,
+            "v",
+            || {
+                self.environment
+                    .get_property_or_default(
+                        "next.application.version",
+                        NextWebVersion::get_version(),
+                    )
+                    .to_owned()
+            },
+            true,
+        );
     }
 
     /// Appends the process ID.
     fn append_pid(&self, msg: &mut String) {
-        self.append(msg, "Application Process   ID:  {:?}\n", || {
-            std::process::id().to_string()
-        });
+        self.append(
+            msg,
+            "Application Process   ID:  ",
+            || std::process::id().to_string(),
+            false,
+        );
     }
 
     /// Appends the startup context: executable path, user, and working directory.
@@ -176,11 +220,11 @@ impl<'a> StartupInfoLogger<'a> {
     }
 
     /// Appends `prefix + value` to `message`, skipping empty values.
-    fn append<F>(&self, message: &mut String, prefix: &str, call: F)
+    fn append<F>(&self, message: &mut String, prefix: &str, call: F, whitespace: bool)
     where
         F: FnOnce() -> String,
     {
-        self.append_with_default(message, prefix, call, "")
+        self.append_with_default(message, prefix, call, "unknown", whitespace)
     }
 
     /// Appends `prefix + value` with a fallback default when the value is
@@ -191,6 +235,7 @@ impl<'a> StartupInfoLogger<'a> {
         prefix: &str,
         call: F,
         default_value: &str,
+        whitespace: bool,
     ) where
         F: FnOnce() -> String,
     {
@@ -201,7 +246,7 @@ impl<'a> StartupInfoLogger<'a> {
             &owned
         };
         if !value.is_empty() {
-            if !message.is_empty() {
+            if !message.is_empty() && whitespace {
                 message.push(' ');
             }
             message.push_str(prefix);
@@ -214,13 +259,8 @@ impl<'a> StartupInfoLogger<'a> {
     where
         F: FnOnce() -> String,
     {
-        self.append_with_default(message, prefix, call, "");
+        self.append_with_default(message, prefix, call, "", true);
     }
-}
-
-/// Returns the current Rust version
-fn rust_version() -> Option<&'static str> {
-    option_env!("RUSTC_VERSION")
 }
 
 /// Returns the current user name, mirroring `user.name`.

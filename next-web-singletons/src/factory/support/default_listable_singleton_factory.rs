@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::factory::config::SingletonRegistry;
 use crate::factory::support::DefaultSingletonRegistry;
-use crate::factory::support::default_singleton_registry::{DynSingle, Key, Single};
+use crate::factory::support::default_singleton_registry::{DynSingle, Key};
 use crate::factory::{ListableSingletonFactory, SingletonFactory};
 
 /// Default [`ListableSingletonFactory`] implementation backed by a
@@ -22,9 +22,7 @@ impl DefaultListableSingletonFactory {
         }
     }
 
-    pub fn set_allow_override(&mut self, allow_overrides: bool) {
-        todo!()
-    }
+    pub fn set_allow_override(&mut self, allow_overrides: bool) {}
 }
 
 impl Default for DefaultListableSingletonFactory {
@@ -51,8 +49,7 @@ impl ListableSingletonFactory for DefaultListableSingletonFactory {
         self.registry
             .inner()
             .values()
-            .filter_map(DynSingle::as_single::<T>)
-            .map(Single::get_ref)
+            .filter_map(DynSingle::as_ref::<T>)
             .collect()
     }
 
@@ -63,8 +60,7 @@ impl ListableSingletonFactory for DefaultListableSingletonFactory {
         self.registry
             .inner_mut()
             .values_mut()
-            .filter_map(DynSingle::as_single_mut::<T>)
-            .map(Single::get_mut)
+            .filter_map(DynSingle::as_mut::<T>)
             .collect()
     }
 }
@@ -82,14 +78,13 @@ impl SingletonFactory for DefaultListableSingletonFactory {
 
     fn remove_singleton<T, N>(&mut self, name: N) -> Option<T>
     where
-        T: 'static,
+        T: Send + Sync + 'static,
         N: Into<Cow<'static, str>>,
     {
         let key = Key::new::<T>(name.into());
         self.registry
             .remove(&key)
-            .and_then(DynSingle::into_single::<T>)
-            .map(Single::into_inner)
+            .and_then(DynSingle::into_inner::<T>)
     }
 
     fn clear_all_singletons(&mut self) {

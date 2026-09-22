@@ -4,9 +4,18 @@ use std::{
     cmp::Ordering,
     collections::{HashMap, hash_map::Keys},
     hash::{Hash, Hasher},
+    sync::Arc,
 };
 
 use crate::factory::config::SingletonRegistry;
+
+/// Function that produces an owned copy of a type erased instance.
+///
+/// The function is shared (instead of being a bare `fn` pointer) because a
+/// context may need to capture state in it, for example the provider that
+/// recorded the clone function of the instance.
+pub type InstanceClone =
+    Arc<dyn Fn(&(dyn Any + Send + Sync)) -> Box<dyn Any + Send + Sync> + Send + Sync>;
 
 pub struct DefaultSingletonRegistry {
     registry: HashMap<Key, DynSingle>,
@@ -30,15 +39,15 @@ impl DefaultSingletonRegistry {
     }
 
     pub(crate) fn get_owned<T: 'static>(&self, key: &Key) -> Option<T> {
-        self.registry.get(key)?.as_single::<T>()?.get_owned()
+        self.registry.get(key)?.get_owned::<T>()
     }
 
     pub(crate) fn get_ref<T: 'static>(&self, key: &Key) -> Option<&T> {
-        Some(self.registry.get(key)?.as_single::<T>()?.get_ref())
+        self.registry.get(key)?.as_ref::<T>()
     }
 
     pub(crate) fn get_mut<T: 'static>(&mut self, key: &Key) -> Option<&mut T> {
-        Some(self.registry.get_mut(key)?.as_single_mut::<T>()?.get_mut())
+        self.registry.get_mut(key)?.as_mut::<T>()
     }
 
     pub(crate) fn contains(&self, key: &Key) -> bool {
@@ -61,17 +70,118 @@ impl DefaultSingletonRegistry {
     pub fn is_empty(&self) -> bool {
         self.registry.is_empty()
     }
+
+    /// Inserts an already type erased instance under the given key.
+    ///
+    /// This is the entry point for a context that stores its instances behind
+    /// a [`Key`] and therefore cannot name their concrete type.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key identifying the instance.
+    /// * `single` - The type erased instance.
+    pub fn insert_dyn(&mut self, key: Key, single: DynSingle) {
+        self.insert(key, single);
+    }
+
+    /// Returns whether an instance is registered under the given key.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key identifying the instance.
+    pub fn contains_key(&self, key: &Key) -> bool {
+        self.contains(key)
+    }
+
+    /// Returns the type erased entry registered under the given key.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key identifying the instance.
+    pub fn get_dyn(&self, key: &Key) -> Option<&DynSingle> {
+        self.registry.get(key)
+    }
+
+    /// Returns the type erased entry registered under the given key, mutably.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key identifying the instance.
+    pub fn get_dyn_mut(&mut self, key: &Key) -> Option<&mut DynSingle> {
+        self.registry.get_mut(key)
+    }
+
+    /// Removes and returns the type erased entry registered under the given key.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key identifying the instance.
+    pub fn remove_dyn(&mut self, key: &Key) -> Option<DynSingle> {
+        self.remove(key)
+    }
+
+    /// Returns every type erased entry whose instance has the given type.
+    ///
+    /// # Arguments
+    ///
+    /// * `ty` - The [`TypeId`] of the instances to return.
+    pub fn dyn_of_type(&self, ty: TypeId) -> Vec<&DynSingle> {
+        self.registry
+            .iter()
+            .filter(|(key, _)| key.ty.id == ty)
+            .map(|(_, single)| single)
+            .collect()
+    }
+
+    /// Returns every type erased entry whose instance has the given type, mutably.
+    ///
+    /// # Arguments
+    ///
+    /// * `ty` - The [`TypeId`] of the instances to return.
+    pub fn dyn_of_type_mut(&mut self, ty: TypeId) -> Vec<&mut DynSingle> {
+        self.registry
+            .iter_mut()
+            .filter(|(key, _)| key.ty.id == ty)
+            .map(|(_, single)| single)
+            .collect()
+    }
+
+    /// Returns owned copies of every instance of the given type that recorded a
+    /// clone function.
+    ///
+    /// # Arguments
+    ///
+    /// * `ty` - The [`TypeId`] of the instances to copy.
+    pub fn owned_of_type(&self, ty: TypeId) -> Vec<Box<dyn Any + Send + Sync>> {
+        self.dyn_of_type(ty)
+            .into_iter()
+            .filter_map(DynSingle::get_owned_boxed)
+            .collect()
+    }
+
+    /// Returns the keys of every instance whose type is the given type.
+    ///
+    /// # Arguments
+    ///
+    /// * `ty` - The [`TypeId`] of the instances.
+    pub fn keys_of_type(&self, ty: TypeId) -> Vec<Key> {
+        self.registry
+            .keys()
+            .filter(|key| key.ty.id == ty)
+            .cloned()
+            .collect()
+    }
 }
 
 impl SingletonRegistry for DefaultSingletonRegistry {
     fn register_singleton<T, N>(&mut self, name: N, singleton: T)
     where
-        T: 'static,
+        T: Send + Sync + 'static,
         N: Into<Cow<'static, str>>,
     {
         self.insert(
             Key::new::<T>(name.into()),
-            DynSingle::from(Single::new(singleton, None)),
+            DynSingle::from_uncloneable(singleton),
         );
     }
 
@@ -104,16 +214,35 @@ impl SingletonRegistry for DefaultSingletonRegistry {
 
     fn get_singleton_or_insert<T, N>(&mut self, name: N, default: T) -> &mut T
     where
-        T: 'static,
+        T: Send + Sync + 'static,
         N: Into<Cow<'static, str>>,
     {
         let key = Key::new::<T>(name.into());
         self.registry
             .entry(key)
-            .or_insert_with(|| DynSingle::from(Single::new(default, None)))
-            .as_single_mut()
-            .map(Single::get_mut)
+            .or_insert_with(|| DynSingle::from_uncloneable(default))
+            .as_mut::<T>()
             .expect("Value was just inserted as type T")
+    }
+
+    fn register_cloneable_singleton<T, N>(&mut self, name: N, singleton: T)
+    where
+        T: Clone + Send + Sync + 'static,
+        N: Into<Cow<'static, str>>,
+    {
+        self.insert(
+            Key::new::<T>(name.into()),
+            DynSingle::from_cloneable(singleton),
+        );
+    }
+
+    fn get_singleton_owned<T, N>(&self, name: N) -> Option<T>
+    where
+        T: 'static,
+        N: Into<Cow<'static, str>>,
+    {
+        let key = Key::new::<T>(name.into());
+        self.get_owned(&key)
     }
 
     fn get_singleton_names<T>(&self) -> impl Iterator<Item = &Cow<'static, str>>
@@ -153,7 +282,15 @@ pub struct Key {
 }
 
 impl Key {
-    pub(crate) fn new<T: 'static>(name: Cow<'static, str>) -> Self {
+    /// Creates the key of a singleton of type `T` with the given name.
+    ///
+    /// A key identifies a stored instance by its type and its name, which is
+    /// the pair a [`SingletonRegistry`] looks an instance up with.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the singleton.
+    pub fn new<T: 'static>(name: Cow<'static, str>) -> Self {
         Self {
             name,
             ty: Type::new::<T>(),
@@ -236,82 +373,165 @@ impl Hash for Type {
     }
 }
 
-/// Represents a [`Singleton`](crate::Scope::Singleton) or [`SingleOwner`](crate::Scope::SingleOwner) instance.
-pub struct Single<T> {
-    instance: T,
-    clone: Option<fn(&T) -> T>,
+/// Represents a [`Singleton`](crate::Scope::Singleton) or
+/// [`SingleOwner`](crate::Scope::SingleOwner) instance whose type was erased.
+///
+/// The instance is stored as a trait object so that a registry can hold values
+/// of any type, and can be inserted either from a concrete value (which records
+/// whether the value can be cloned) or from an already boxed instance. The
+/// latter is what lets an application context insert the instances it receives
+/// from its own, type erased API.
+pub struct DynSingle {
+    /// The erased singleton.
+    ///
+    /// The `Send + Sync` bounds are part of the type so that a
+    /// [`DefaultSingletonRegistry`] can be stored inside a shareable
+    /// application context. Registration therefore requires `T: Send + Sync`.
+    instance: Box<dyn Any + Send + Sync>,
+    /// Produces an owned copy of the stored instance when one was recorded.
+    clone: Option<InstanceClone>,
 }
 
-impl<T> Single<T> {
-    pub(crate) fn new(instance: T, clone: Option<fn(&T) -> T>) -> Self {
+impl DynSingle {
+    /// Wraps an already boxed instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `instance` - The boxed instance.
+    /// * `clone` - The function producing owned copies of the instance, when the
+    ///   instance may be handed out as an owned value.
+    pub fn new(
+        instance: Box<dyn Any + Send + Sync>,
+        clone: Option<InstanceClone>,
+    ) -> Self {
         Self { instance, clone }
     }
 
-    /// Returns the owned instance.
-    pub fn get_owned(&self) -> Option<T> {
-        self.clone.map(|clone| clone(&self.instance))
+    /// Wraps a value that can be cloned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `instance` - The instance to wrap.
+    pub fn from_cloneable<T>(instance: T) -> Self
+    where
+        T: Clone + Send + Sync + 'static,
+    {
+        Self::new(Box::new(instance), Some(Arc::new(clone_boxed::<T>)))
     }
 
-    /// Returns a reference to the instance.
-    pub fn get_ref(&self) -> &T {
-        &self.instance
+    /// Wraps a value that only supports being borrowed.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `instance` - The instance to wrap.
+    pub fn from_uncloneable<T>(instance: T) -> Self
+    where
+        T: Send + Sync + 'static,
+    {
+        Self::new(Box::new(instance), None)
     }
 
-    /// Returns a mutable reference to the instance.
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.instance
+    /// Returns the stored instance as a type erased reference.
+    pub fn as_any(&self) -> &(dyn Any + Send + Sync) {
+        &*self.instance
     }
 
-    /// Consumes this [`Single`] and returns the owned instance.
-    pub(crate) fn into_inner(self) -> T {
+    /// Returns the stored instance as a type erased mutable reference.
+    pub fn as_any_mut(&mut self) -> &mut (dyn Any + Send + Sync) {
+        &mut *self.instance
+    }
+
+    /// Returns an owned copy of the stored instance.
+    ///
+    /// Returns `None` when the instance was registered without a clone
+    /// function, in which case only borrows of it can be handed out.
+    pub fn get_owned_boxed(&self) -> Option<Box<dyn Any + Send + Sync>> {
+        Some((self.clone.as_ref())?(self.as_any()))
+    }
+
+    /// Returns a reference to the instance when it has the given type.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The expected type of the instance.
+    pub fn as_ref<T>(&self) -> Option<&T>
+    where
+        T: 'static,
+    {
+        self.instance.downcast_ref::<T>()
+    }
+
+    /// Returns a mutable reference to the instance when it has the given type.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The expected type of the instance.
+    pub fn as_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: 'static,
+    {
+        self.instance.downcast_mut::<T>()
+    }
+
+    /// Returns an owned copy of the instance when it has the given type.
+    ///
+    /// Returns `None` when the instance cannot be cloned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The expected type of the instance.
+    pub fn get_owned<T>(&self) -> Option<T>
+    where
+        T: 'static,
+    {
+        self.get_owned_boxed()?.downcast::<T>().ok().map(|value| *value)
+    }
+
+    /// Consumes this [`DynSingle`] and returns the instance when it has the
+    /// given type.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The expected type of the instance.
+    pub fn into_inner<T>(self) -> Option<T>
+    where
+        T: 'static,
+    {
+        self.instance.downcast::<T>().ok().map(|value| *value)
+    }
+
+    /// Consumes this [`DynSingle`] and returns the type erased instance.
+    pub fn into_inner_boxed(self) -> Box<dyn Any + Send + Sync> {
         self.instance
     }
 }
 
-/// Represents a [`Single`] that erased its type.
-pub struct DynSingle {
-    origin: Box<dyn Any>,
-}
-
-impl DynSingle {
-    /// Returns a reference of the origin [`Single`].
-    pub fn as_single<T>(&self) -> Option<&Single<T>>
-    where
-        T: 'static,
-    {
-        self.origin.downcast_ref::<Single<T>>()
-    }
-
-    /// Returns a mutable reference of the origin [`Single`].
-    pub fn as_single_mut<T>(&mut self) -> Option<&mut Single<T>>
-    where
-        T: 'static,
-    {
-        self.origin.downcast_mut::<Single<T>>()
-    }
-
-    /// Consumes this [`DynSingle`] and returns the origin [`Single`] if it holds
-    /// a value of type `T`.
-    pub(crate) fn into_single<T>(self) -> Option<Single<T>>
-    where
-        T: 'static,
-    {
-        self.origin
-            .downcast::<Single<T>>()
-            .ok()
-            .map(|single| *single)
-    }
-}
-
-impl<T> From<Single<T>> for DynSingle
+/// Clones the instance held by a type erased reference.
+///
+/// # Type Parameters
+///
+/// * `T` - The concrete type of the instance.
+///
+/// # Arguments
+///
+/// * `instance` - The type erased instance to copy.
+fn clone_boxed<T>(instance: &(dyn Any + Send + Sync)) -> Box<dyn Any + Send + Sync>
 where
-    T: 'static,
+    T: Clone + Send + Sync + 'static,
 {
-    fn from(value: Single<T>) -> Self {
-        Self {
-            origin: Box::new(value),
-        }
-    }
+    let instance = instance
+        .downcast_ref::<T>()
+        .expect("the erased instance holds its own type");
+
+    Box::new(instance.clone())
 }
 
 #[cfg(test)]
@@ -449,68 +669,47 @@ mod tests {
         assert_eq!(h1.finish(), h2.finish());
     }
 
-    // ========== Single Tests ==========
-
-    #[test]
-    fn test_single_new_without_clone() {
-        let config = DatabaseConfig::new("localhost:5432", 10);
-        let single = Single::new(config, None);
-        assert_eq!(single.get_ref().url, "localhost:5432");
-        assert_eq!(single.get_ref().pool_size, 10);
-        assert!(single.get_owned().is_none());
-    }
-
-    #[test]
-    fn test_single_new_with_clone() {
-        let config = DatabaseConfig::new("localhost:5432", 10);
-        let clone_fn: fn(&DatabaseConfig) -> DatabaseConfig = |c| c.clone();
-        let single = Single::new(config, Some(clone_fn));
-        let owned = single.get_owned();
-        assert!(owned.is_some());
-        assert_eq!(owned.unwrap().url, "localhost:5432");
-    }
-
-    #[test]
-    fn test_single_get_mut() {
-        let config = DatabaseConfig::new("localhost:5432", 10);
-        let mut single = Single::new(config, None);
-        single.get_mut().pool_size = 20;
-        assert_eq!(single.get_ref().pool_size, 20);
-    }
-
     // ========== DynSingle Tests ==========
 
     #[test]
-    fn test_dyn_single_new_and_downcast() {
-        let config = DatabaseConfig::new("localhost:5432", 10);
-        let clone_fn: fn(&DatabaseConfig) -> DatabaseConfig = |c| c.clone();
-        let single = Single::new(config, Some(clone_fn));
-        let dyn_single = DynSingle::from(single);
+    fn test_dyn_single_from_cloneable_is_cloneable() {
+        let dyn_single = DynSingle::from_cloneable(DatabaseConfig::new("localhost:5432", 10));
 
-        let downcasted = dyn_single.as_single::<DatabaseConfig>();
+        let downcasted = dyn_single.as_ref::<DatabaseConfig>();
         assert!(downcasted.is_some());
-        assert_eq!(downcasted.unwrap().get_ref().url, "localhost:5432");
+        assert_eq!(downcasted.unwrap().url, "localhost:5432");
+
+        assert_eq!(
+            dyn_single.get_owned::<DatabaseConfig>(),
+            Some(DatabaseConfig::new("localhost:5432", 10))
+        );
+    }
+
+    #[test]
+    fn test_dyn_single_from_uncloneable_is_not_cloneable() {
+        let dyn_single = DynSingle::from_uncloneable(DatabaseConfig::new("localhost:5432", 10));
+
+        assert!(dyn_single.as_ref::<DatabaseConfig>().is_some());
+        assert!(dyn_single.get_owned::<DatabaseConfig>().is_none());
     }
 
     #[test]
     fn test_dyn_single_downcast_wrong_type() {
-        let config = DatabaseConfig::new("localhost:5432", 10);
-        let single = Single::new(config, None);
-        let dyn_single = DynSingle::from(single);
+        let dyn_single = DynSingle::from_uncloneable(DatabaseConfig::new("localhost:5432", 10));
         // 尝试用错误的类型 downcast
-        let result = dyn_single.as_single::<CacheConfig>();
+        let result = dyn_single.as_ref::<CacheConfig>();
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_dyn_single_as_single_mut() {
-        let config = DatabaseConfig::new("localhost:5432", 10);
-        let single = Single::new(config, None);
-        let mut dyn_single = DynSingle::from(single);
+    fn test_dyn_single_as_mut() {
+        let mut dyn_single = DynSingle::from_uncloneable(DatabaseConfig::new("localhost:5432", 10));
 
-        let downcasted = dyn_single.as_single_mut::<DatabaseConfig>();
+        let downcasted = dyn_single.as_mut::<DatabaseConfig>();
         assert!(downcasted.is_some());
-        downcasted.unwrap().get_mut().pool_size = 50;
+        downcasted.unwrap().pool_size = 50;
+
+        assert_eq!(dyn_single.as_ref::<DatabaseConfig>().unwrap().pool_size, 50);
     }
 
     // ========== DefaultSingletonRegistry Tests ==========
@@ -604,6 +803,42 @@ mod tests {
             .get_singleton::<DatabaseConfig, _>("main-db")
             .unwrap();
         assert_eq!(updated.pool_size, 50);
+    }
+
+    #[test]
+    fn test_register_cloneable_singleton_hands_out_owned_copies() {
+        let mut registry = DefaultSingletonRegistry::default();
+        registry.register_cloneable_singleton("db", DatabaseConfig::new("localhost", 3));
+
+        let owned = registry.get_singleton_owned::<DatabaseConfig, _>("db");
+        assert_eq!(owned, Some(DatabaseConfig::new("localhost", 3)));
+
+        // Producing a copy must not remove the stored instance.
+        assert!(registry.contains_singleton::<DatabaseConfig, _>("db"));
+        assert_eq!(
+            registry
+                .get_singleton::<DatabaseConfig, _>("db")
+                .unwrap()
+                .pool_size,
+            3
+        );
+    }
+
+    #[test]
+    fn test_get_singleton_owned_requires_a_recorded_clone() {
+        let mut registry = DefaultSingletonRegistry::default();
+        registry.register_singleton("db", DatabaseConfig::new("localhost", 3));
+
+        // `register_singleton` stores no clone function, so no owned copy exists.
+        assert_eq!(registry.get_singleton_owned::<DatabaseConfig, _>("db"), None);
+        assert!(registry.contains_singleton::<DatabaseConfig, _>("db"));
+    }
+
+    #[test]
+    fn test_get_singleton_owned_of_a_missing_singleton() {
+        let registry = DefaultSingletonRegistry::default();
+
+        assert_eq!(registry.get_singleton_owned::<DatabaseConfig, _>("db"), None);
     }
 
     #[test]
@@ -726,7 +961,7 @@ mod tests {
     fn test_insert_and_remove() {
         let mut registry = DefaultSingletonRegistry::default();
         let key = Key::new::<DatabaseConfig>(Cow::Borrowed("test"));
-        let single = DynSingle::from(Single::new(DatabaseConfig::default(), None));
+        let single = DynSingle::from_uncloneable(DatabaseConfig::default());
 
         registry.insert(key.clone(), single);
         assert!(registry.contains(&key));

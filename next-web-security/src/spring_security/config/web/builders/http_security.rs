@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     fmt::Display,
     ops::{Deref, DerefMut},
-    sync::{atomic::Ordering, Arc},
+    sync::{atomic::Ordering, Arc, RwLock},
 };
 
 use next_web_core::{
@@ -95,10 +95,16 @@ impl HttpSecurity {
         http
     }
 
-    fn get_context(&mut self) -> &mut ApplicationContext {
+    /// Returns the shared application context of the security builder.
+    ///
+    /// The context is shared as `Arc<RwLock<Box<dyn ApplicationContext>>>`, so
+    /// that a configurer can keep a handle on it while the application keeps
+    /// owning the context itself.
+    fn get_context(&mut self) -> Arc<RwLock<Box<dyn ApplicationContext>>> {
         self.base
-            .get_mut_shared_object::<ApplicationContext>()
+            .get_shared_object::<Arc<RwLock<Box<dyn ApplicationContext>>>>()
             .expect("ApplicationContext must be registered as a HttpSecurity shared object")
+            .clone()
     }
 
     /// If a configurer of type `C` is already registered, clone and return it.
@@ -701,3 +707,4 @@ impl Display for OrderedFilter {
         )
     }
 }
+

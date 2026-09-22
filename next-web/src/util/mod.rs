@@ -14,9 +14,11 @@ pub mod aes;
 pub mod thread_pool_task_executor;
 
 mod amount;
+mod inventory_helper;
 mod json_object;
 mod stop_watch;
 
 pub use amount::Amount;
+pub use inventory_helper::InventoryHelper;
 pub use json_object::JsonObject;
 pub use stop_watch::StopWatch;

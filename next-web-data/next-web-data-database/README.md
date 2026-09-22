@@ -53,7 +53,7 @@ impl Application for TestApplication {
     /// initialize the middleware.
     async fn init_middleware(&mut self, _properties: &ApplicationProperties) {}
 
-    async fn application_router(&mut self, _ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&mut self, _ctx: &mut dyn ApplicationContext) -> axum::Router {
         axum::Router::new().route("/version", get(req_version))
     }
 }

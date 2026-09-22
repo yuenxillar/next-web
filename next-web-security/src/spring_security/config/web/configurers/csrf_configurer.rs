@@ -1,7 +1,7 @@
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 use next_web_core::{
@@ -61,7 +61,7 @@ impl<H> CsrfConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    pub fn new(_ctx: &ApplicationContext) -> Self {
+    pub fn new(_context: Arc<RwLock<Box<dyn ApplicationContext>>>) -> Self {
         Self {
             csrf_token_repository: Arc::new(HttpSessionCsrfTokenRepository::default()),
             require_csrf_protection_matcher: CsrfFilter::default_csrf_matcher(),
@@ -337,3 +337,6 @@ impl Default for SpaCsrfTokenRequestHandler {
         }
     }
 }
+
+
+

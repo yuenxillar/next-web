@@ -9,8 +9,8 @@ use next_web_core::{
         MessageSource,
     },
     traits::config::auto_configuration::AutoConfiguration,
-    ApplicationContext,
 };
+use next_web_context::{ApplicationContext, ApplicationContextExt};
 
 #[cfg(feature = "embed-resources")]
 use next_web_core::context::application_resources::RESOURCE_LOADER;
@@ -36,7 +36,10 @@ impl AutoConfiguration for MessageSourceAutoConfiguration {
         i32::MIN
     }
 
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configuration(
+        &mut self,
+        ctx: &mut dyn ApplicationContext,
+    ) -> Result<(), Box<dyn Error>> {
         let message_source_single_name: &'static str = "messageSource";
 
         if ctx.contains_single_with_name::<Arc<dyn MessageSource>>(message_source_single_name) {
@@ -85,3 +88,4 @@ impl AutoConfiguration for MessageSourceAutoConfiguration {
         Ok(())
     }
 }
+

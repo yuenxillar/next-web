@@ -11,9 +11,10 @@ where
     /// Register WebSocketHandler including SockJS fallback options if desired.
     fn register_websocket_handlers(
         &mut self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         registry: &mut dyn WebSocketHandlerRegistry,
     );
 }
 
 clone_trait_object!(WebSocketConfigurer where Self: Send + Sync);
+

@@ -20,7 +20,7 @@ pub trait SingletonRegistry {
     /// ```
     fn register_singleton<T, N>(&mut self, name: N, singleton: T)
     where
-        T: 'static,
+        T: Send + Sync + 'static,
         N: Into<Cow<'static, str>>;
 
     /// Returns a shared reference to the singleton identified by the given name and type.
@@ -68,7 +68,8 @@ pub trait SingletonRegistry {
     /// reference to the newly inserted singleton is returned.
     ///
     /// # Type Parameters
-    /// - `T`: The type of the singleton. Must be `'static`.
+    /// - `T`: The type of the singleton. Must be `Send + Sync + 'static`, because the
+    ///   registry is handed out as part of a shareable application context.
     /// - `N`: The name type, which can be converted into a `Cow<'static, str>`.
     ///
     /// # Arguments
@@ -79,6 +80,42 @@ pub trait SingletonRegistry {
     /// A mutable reference (`&mut T`) to the singleton, whether newly inserted or
     /// previously registered.
     fn get_singleton_or_insert<T, N>(&mut self, name: N, default: T) -> &mut T
+    where
+        T: Send + Sync + 'static,
+        N: Into<Cow<'static, str>>;
+
+    /// Registers a singleton while remembering how to clone it.
+    ///
+    /// [`Self::register_singleton`] stores the instance as it is, so only
+    /// borrows of it can be handed out later. This method additionally records
+    /// `T::clone`, which allows an owned copy to be produced by
+    /// [`Self::get_singleton_owned`]. A dependency injection context that
+    /// resolves dependencies as owned values (rather than as references) needs
+    /// this behaviour for its singletons.
+    ///
+    /// # Type Parameters
+    /// - `T`: The type of the singleton. Must be `Clone + Send + Sync + 'static`.
+    /// - `N`: The name type, which can be converted into a `Cow<'static, str>`.
+    ///
+    /// # Arguments
+    /// - `name`: The name to identify the singleton.
+    /// - `singleton`: The instance to store.
+    fn register_cloneable_singleton<T, N>(&mut self, name: N, singleton: T)
+    where
+        T: Clone + Send + Sync + 'static,
+        N: Into<Cow<'static, str>>;
+
+    /// Returns an owned copy of the singleton identified by the given name and type.
+    ///
+    /// Returns `None` when no singleton of type `T` is registered with the given
+    /// name, or when the instance was registered through
+    /// [`Self::register_singleton`] or [`Self::get_singleton_or_insert`], neither
+    /// of which records a clone function.
+    ///
+    /// # Type Parameters
+    /// - `T`: The type of the singleton to produce.
+    /// - `N`: The name type, which can be converted into a `Cow<'static, str>`.
+    fn get_singleton_owned<T, N>(&self, name: N) -> Option<T>
     where
         T: 'static,
         N: Into<Cow<'static, str>>;

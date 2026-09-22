@@ -1,4 +1,5 @@
 use std::{error::Error, sync::Arc};
+use next_web_context::ApplicationContextExt;
 
 use next_web_core::{
     ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
@@ -24,7 +25,7 @@ impl XxlJobAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for XxlJobAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let xxl_client = XxlClientBuilder::from(self.0.clone()).build()?;
 
         for (name, handler) in ctx
@@ -40,7 +41,7 @@ impl AutoConfiguration for XxlJobAutoConfiguration {
             xxl_client.register(name, handler).await?;
         }
 
-        ctx.insert_singleton_with_name::<Arc<XxlJobAppState>, &'static str>(
+        ctx.insert_singleton_with_name::<Arc<XxlJobAppState>>(
             xxl_client.app_state.clone(),
             "xxlJobAppState",
         );
@@ -49,3 +50,5 @@ impl AutoConfiguration for XxlJobAutoConfiguration {
         Ok(())
     }
 }
+
+

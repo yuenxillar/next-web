@@ -15,13 +15,13 @@ impl Application for TestApplication {
 
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 
-    async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&self, _ctx: &mut dyn ApplicationContext) -> axum::Router {
         axum::Router::new()
             .route("/properties", axum::routing::get(req_properties))
             .route("/serverPort", axum::routing::get(req_server_port))

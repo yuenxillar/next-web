@@ -14,13 +14,13 @@ impl Application for TestApplication {
 
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 
-    async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&self, _ctx: &mut dyn ApplicationContext) -> axum::Router {
         axum::Router::new()
             .route("/mail/html", axum::routing::post(send_html_mail))
             .route("/mail/upload", axum::routing::post(send_mail_with_upload))

@@ -265,9 +265,11 @@ pub fn impl_macro_properties(attr: TokenStream, mut item_struct: ItemStruct) -> 
             impl ::next_web_core::AutoRegister for #struct_ident {
                 async fn register(
                     &self,
-                    ctx: &mut ::next_web_core::context::application_context::ApplicationContext,
+                    ctx: &mut dyn ::next_web_context::ApplicationContext,
                     properties: & ::next_web_core::context::properties::ApplicationProperties,
                 ) -> ::std::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error + Send + Sync>> {
+                    use ::next_web_context::ApplicationContextExt as _;
+
                     let mut noting = false;
 
                     let instance = Self {

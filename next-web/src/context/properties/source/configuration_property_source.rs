@@ -11,7 +11,10 @@ use crate::context::properties::source::{ConfigurationProperty, ConfigurationPro
 /// factory methods that return a specific implementation.
 ///
 /// [`NextConfigurationPropertySource::from`]: crate::context::properties::source::NextConfigurationPropertySource::from
-pub trait ConfigurationPropertySource {
+pub trait ConfigurationPropertySource
+where
+    Self: Send + Sync,
+{
     /// Returns the configuration property with the given name, or `None` when
     /// this source does not contain such a property.
     ///

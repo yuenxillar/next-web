@@ -22,7 +22,7 @@ impl Application for TestApplication {
     /// initialize the middleware.
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
@@ -44,7 +44,7 @@ impl TestApplicationLifecycle {
 impl ApplicationLifecycle for TestApplicationLifecycle {
     async fn on_start(
         &mut self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
         info!("Application Started...");
 

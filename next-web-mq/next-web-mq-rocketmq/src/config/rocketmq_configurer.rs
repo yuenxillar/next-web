@@ -15,9 +15,10 @@ where
     /// Registers the listeners owned by the current module.
     fn register_listeners(
         &mut self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         registry: &mut dyn RocketmqListenerRegistry,
     );
 }
 
 clone_trait_object!(RocketmqConfigurer where Self: Send + Sync);
+

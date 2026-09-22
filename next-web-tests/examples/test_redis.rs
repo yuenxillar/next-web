@@ -56,14 +56,14 @@ impl Application for TestApplication {
     type ErrorSolve = ();
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 
     // get the application router. (open api  and private api)
-    async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&self, _ctx: &mut dyn ApplicationContext) -> axum::Router {
         axum::Router::new()
             .route("/get/{key}", axum::routing::post(get_cache))
             .route("/set", axum::routing::post(set_cache))

@@ -11,7 +11,7 @@ pub(crate) struct ResourceAttr {
 }
 
 fn default_path() -> Path {
-    parse_quote!(::next_web_core)
+    parse_quote!(::next_web_context)
 }
 
 impl Default for ResourceAttr {

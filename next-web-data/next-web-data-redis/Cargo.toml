@@ -7,6 +7,7 @@ readme = "README.md"
 license.workspace = true
 
 [dependencies]
+next-web-context.workspace = true
 next-web-core = { workspace = true }
 next-web-macros = { workspace = true }
 rudi-dev = { workspace = true }
@@ -26,3 +27,4 @@ thiserror = { workspace = true, optional = true }
 default = []
 deadpol = ["deadpool-redis"]
 distributed-lock = ["redis/cluster-async", "dep:uuid", "dep:thiserror"]
+

@@ -23,7 +23,7 @@ pub trait SingletonFactory {
     /// called when a singleton with the given name and type does not already exist.
     ///
     /// # Type Parameters
-    /// - `T`: The type of singleton to retrieve or create. Must be `'static`.
+    /// - `T`: The type of singleton to retrieve or create. Must be `Send + Sync + 'static`.
     /// - `N`: The name type, which can be converted into a `Cow<'static, str>`.
     /// - `F`: The factory function type that produces `T`.
     ///
@@ -34,7 +34,7 @@ pub trait SingletonFactory {
     /// ```
     fn get_or_create<T, N, F>(&mut self, name: N, factory: F) -> &T
     where
-        T: 'static,
+        T: Send + Sync + 'static,
         N: Into<Cow<'static, str>>,
         F: FnOnce() -> T,
     {
@@ -59,7 +59,7 @@ pub trait SingletonFactory {
     /// - `N`: The name type.
     fn get_or_default<T, N>(&mut self, name: N) -> &T
     where
-        T: Default + 'static,
+        T: Default + Send + Sync + 'static,
         N: Into<Cow<'static, str>>,
     {
         self.get_or_create(name, T::default)
@@ -74,7 +74,7 @@ pub trait SingletonFactory {
     /// - `F`: The factory function type.
     fn get_or_create_mut<T, N, F>(&mut self, name: N, factory: F) -> &mut T
     where
-        T: 'static,
+        T: Send + Sync + 'static,
         N: Into<Cow<'static, str>>,
         F: FnOnce() -> T,
     {
@@ -93,7 +93,7 @@ pub trait SingletonFactory {
     /// `T::default()` if it doesn't exist.
     fn get_or_default_mut<T, N>(&mut self, name: N) -> &mut T
     where
-        T: Default + 'static,
+        T: Default + Send + Sync + 'static,
         N: Into<Cow<'static, str>>,
     {
         self.get_or_create_mut(name, T::default)
@@ -121,11 +121,11 @@ pub trait SingletonFactory {
     /// Removes a singleton of type `T` with the given name, returning it if it existed.
     ///
     /// # Type Parameters
-    /// - `T`: The type of singleton to remove.
+    /// - `T`: The type of singleton to remove. Must be `Send + Sync + 'static`.
     /// - `N`: The name type.
     fn remove_singleton<T, N>(&mut self, name: N) -> Option<T>
     where
-        T: 'static,
+        T: Send + Sync + 'static,
         N: Into<Cow<'static, str>>;
 
     /// Clears all singletons from the registry, effectively resetting the factory.

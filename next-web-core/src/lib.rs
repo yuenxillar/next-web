@@ -25,7 +25,16 @@ pub mod util;
 pub mod web;
 
 pub use self::autoregister::auto_register::*;
-pub use self::context::application_context::*;
+
+// The dependency injection service provider interface lives in its own, light
+// crate, so that a library that only contributes singletons does not have to
+// depend on the runtime. It is re-exported here for convenience.
+pub use next_web_context::{
+    ApplicationContext, AutoRegisterModule, BoxValue, Color, Constructor, DefaultProvider,
+    Definition, DynProvider, EagerCreateFunction, FutureExt, Module, Provider, ProviderRegister,
+    ResolveModule, Scope, auto_registered_providers, register_provider,
+};
+
 pub use arc_swap::*;
 pub use async_trait::async_trait;
 pub use dyn_clone::{DynClone, clone_box, clone_trait_object};

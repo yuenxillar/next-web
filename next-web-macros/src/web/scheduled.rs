@@ -162,7 +162,8 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
         #vis struct #name;
 
         impl ::next_web::autoregister::scheduler_autoregister::SchedulerAutoRegister for #name {
-            fn register(& self, __ctx: &mut ::next_web::core::ApplicationContext) -> ::next_web::manager::job_scheduler_manager::BoxedJob {
+            fn register(& self, __ctx: &mut dyn ::next_web::core::ApplicationContext) -> ::next_web::manager::job_scheduler_manager::BoxedJob {
+                use ::next_web_context::ApplicationContextExt as _;
 
                 #item_fn
 
@@ -179,3 +180,4 @@ pub(crate) fn impl_macro_scheduled(attr: TokenStream, item: TokenStream) -> Toke
 
     expanded.into()
 }
+

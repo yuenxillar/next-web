@@ -12,6 +12,7 @@ use next_web::{
     macros::bind::{get_mapping, post_mapping},
     rand::{self, Rng},
 };
+use next_web_context::ApplicationContextExt;
 use next_web_core::{
     ApplicationContext, async_trait, context::properties::ApplicationProperties, headers::Host,
 };
@@ -42,14 +43,14 @@ impl Application for TestApplication {
     #[allow(unused_variables)]
     async fn init_middleware(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 
     #[allow(unused_variables)]
-    async fn on_ready(&self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn on_ready(&self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mut config = AlipayConfig::default()
             .with_gateway_url("https://openapi-sandbox.dl.alipaydev.com/gateway.do")
             .with_notify_url(format!("{MY_GATEWAY_URL}/pay/notify/alipay"));

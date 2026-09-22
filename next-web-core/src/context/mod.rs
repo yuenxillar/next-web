@@ -1,7 +1,6 @@
 use crate::util::locale::Locale;
 
 pub mod application_args;
-pub mod application_context;
 
 pub mod application_resources;
 pub mod next_properties;

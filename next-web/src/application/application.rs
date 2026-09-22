@@ -5,12 +5,12 @@ use axum::middleware::{from_fn_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use axum::Router;
 
+use next_web_context::{ApplicationContext, ApplicationContextExt};
 use next_web_core::async_trait;
 use next_web_core::autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES;
 use next_web_core::client::rest_client::RestClient;
 use next_web_core::constants::application_constants::APPLICATION_BANNER;
 use next_web_core::context::application_args::ApplicationArgs;
-use next_web_core::context::application_context::ApplicationContext;
 use next_web_core::context::application_resources::{ApplicationResources, ResourceLoader};
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
@@ -80,7 +80,7 @@ where
     /// Initialize the middleware.
     async fn init_middleware(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         properties: &ApplicationProperties,
     ) -> Result<()>;
 
@@ -165,7 +165,7 @@ where
 
     /// Before starting the application
     #[allow(unused_variables)]
-    async fn on_ready(&self, ctx: &mut ApplicationContext) -> Result<()> {
+    async fn on_ready(&self, ctx: &mut dyn ApplicationContext) -> Result<()> {
         Ok(())
     }
 
@@ -194,7 +194,7 @@ where
     /// Initialize the api doc.
     #[cfg(feature = "enable-api-doc")]
     #[allow(unused_variables)]
-    fn api_doc(&self, ctx: &mut ApplicationContext) -> OpenApi {
+    fn api_doc(&self, ctx: &mut dyn ApplicationContext) -> OpenApi {
         use next_web_api_doc::OpenApi;
 
         struct OpenApiDoc;
@@ -236,7 +236,7 @@ where
     /// Autowire properties
     async fn autowire_properties(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         application_properties: &ApplicationProperties,
     ) -> Result<()> {
         for properties in ctx.resolve_by_type::<Box<dyn Properties>>() {
@@ -250,7 +250,7 @@ where
     }
 
     /// Auto configuration
-    async fn auto_configuration(&self, ctx: &mut ApplicationContext) -> Result<()> {
+    async fn auto_configuration(&self, ctx: &mut dyn ApplicationContext) -> Result<()> {
         use next_web_core::autoregister::auto_configuration_autoregister::DefaultAutoConfigurationAutoregister;
 
         let mut auto_configurations = ctx.resolve_by_type::<Box<dyn AutoConfiguration>>();
@@ -272,7 +272,7 @@ where
     /// Register application singleton
     async fn register_singleton(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         application_properties: &ApplicationProperties,
         application_args: &ApplicationArgs,
         application_resources: &ApplicationResources,
@@ -301,7 +301,7 @@ where
     /// Initialize the context
     async fn init_context(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         _application_properties: &ApplicationProperties,
     ) -> Result<()> {
         // Register application event
@@ -375,7 +375,7 @@ where
     }
 
     /// Start all background services and register the service manager
-    async fn run_services(&self, ctx: &mut ApplicationContext) -> Result<()> {
+    async fn run_services(&self, ctx: &mut dyn ApplicationContext) -> Result<()> {
         let manager = BackgroundServiceManager::default();
         for service in ctx
             .resolve_by_type::<Arc<dyn BackgroundService>>()
@@ -405,7 +405,7 @@ where
 
     /// Get the application router.
     #[allow(unused_variables)]
-    async fn application_router(&self, ctx: &mut ApplicationContext) -> Router {
+    async fn application_router(&self, ctx: &mut dyn ApplicationContext) -> Router {
         #[cfg(feature = "enable-api-doc")]
         let mut context = {
             let openapi = self.api_doc(ctx);
@@ -444,7 +444,7 @@ where
     /// Bind tcp server.
     async fn bind_tcp_server(
         &self,
-        mut ctx: ApplicationContext,
+        mut ctx: Box<dyn ApplicationContext>,
         application_properties: &ApplicationProperties,
         startup_time: std::time::Instant,
     ) -> Result<()> {
@@ -474,7 +474,7 @@ where
 
         // 2. Build basic routing
         let mut app = self
-            .application_router(&mut ctx)
+            .application_router(&mut *ctx)
             .await
             // Handle not found route
             .fallback(s_fallback)
@@ -486,7 +486,7 @@ where
         app = use_routers
             .into_iter()
             // Only allowed groups can apply
-            .fold(app, |app, item| item.use_router(app, &mut ctx));
+            .fold(app, |app, item| item.use_router(app, &mut *ctx));
 
         let mut apply_routers: Vec<_> = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
 
@@ -496,7 +496,7 @@ where
         app = app.merge(
             apply_routers
                 .into_iter()
-                .map(|mut val| val.apply(&mut ctx))
+                .map(|mut val| val.apply(&mut *ctx))
                 .filter(|val| val.has_routes())
                 .fold(axum::Router::new(), |acc, r| acc.merge(r)),
         );
@@ -559,7 +559,7 @@ where
         }
 
         // 5. On Ready
-        self.on_ready(&mut ctx).await?;
+        self.on_ready(&mut *ctx).await?;
 
         // 6. Configure API documentation if feature is enabled
         //
@@ -615,7 +615,7 @@ where
         app_lifecycle.sort_by(|a, b| a.order().cmp(&b.order()));
 
         for lifecycle in app_lifecycle.iter_mut() {
-            lifecycle.on_start(&mut ctx).await?;
+            lifecycle.on_start(&mut *ctx).await?;
         }
 
         let background_service_manager = ctx
@@ -763,10 +763,12 @@ where
             .appliation()
             .map(|s| s.context().allow_override())
             .unwrap_or(false);
-        let mut ctx = ApplicationContext::options()
-            .allow_override(allow_override)
-            .auto_register_async()
-            .await;
+        // The context collects the providers that were submitted by the
+        // attribute macros, and the properties decide whether a provider may
+        // replace another one with the same key.
+        let mut ctx = crate::context::DefaultApplicationContext::default();
+        ctx.set_allow_override(allow_override);
+        ctx.register_auto_providers();
 
         info!("Init Application context success");
 
@@ -833,7 +835,7 @@ where
             info!("Starting HTTP  Server:  [Axum/0.8.4]");
 
             application
-                .bind_tcp_server(ctx, properties, startup_time)
+                .bind_tcp_server(Box::new(ctx), properties, startup_time)
                 .await?;
 
             Ok::<(), Box<dyn Error>>(())

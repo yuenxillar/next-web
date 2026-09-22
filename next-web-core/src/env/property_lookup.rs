@@ -12,7 +12,10 @@ use crate::env::MutablePropertySources;
 /// Values are looked up as they are stored: resolving the placeholders of a
 /// value, and reporting a property that is missing as an error, is the
 /// responsibility of the environment that uses the strategy.
-pub trait PropertyLookup {
+pub trait PropertyLookup
+where
+    Self: Send + Sync,
+{
     /// Returns the value of the given key, or `None` when none of the property
     /// sources has it.
     ///

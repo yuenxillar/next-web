@@ -1,10 +1,11 @@
 use std::{
     ops::{Deref, DerefMut},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use next_web_context::ApplicationEventPublisher;
 use next_web_core::ApplicationContext;
+use next_web_context::ApplicationContextExt;
 
 use crate::{
     access::hierarchicalroles::NullRoleHierarchy, authorization::AuthorizationDecision,
@@ -52,7 +53,12 @@ where
     H: HttpSecurityBuilder<H>,
 {
     /// Creates an instance.
-    pub fn new(ctx: &mut ApplicationContext) -> Self {
+    pub fn new(context: Arc<RwLock<Box<dyn ApplicationContext>>>) -> Self {
+        let mut context = context
+            .write()
+            .expect("the application context lock is poisoned");
+        let ctx: &mut dyn ApplicationContext = &mut **context;
+
         let authorization_manager_factory = get_authorization_manager_factory(ctx);
         let mut registry =
             AuthorizationManagerRequestMatcherRegistry::with_authorization_manager_factory(
@@ -74,7 +80,7 @@ where
     }
 
     fn get_authorization_event_publisher(
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
     ) -> Arc<dyn AuthorizationEventPublisher> {
         if let Some(publisher) = ctx
             .resolve_by_type::<Arc<dyn AuthorizationEventPublisher>>()
@@ -173,7 +179,7 @@ pub struct AuthorizationManagerRequestMatcherRegistry<C = AuthorizedUrl> {
 }
 
 impl AuthorizationManagerRequestMatcherRegistry<AuthorizedUrl> {
-    pub fn new(ctx: &mut ApplicationContext) -> Self {
+    pub fn new(ctx: &mut dyn ApplicationContext) -> Self {
         Self::with_authorization_manager_factory(get_authorization_manager_factory(ctx))
     }
 
@@ -616,7 +622,7 @@ fn add_mapping(
 }
 
 fn get_authorization_manager_factory(
-    ctx: &mut ApplicationContext,
+    ctx: &mut dyn ApplicationContext,
 ) -> Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>> {
     let factories =
         ctx.resolve_by_type::<Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>>>();
@@ -660,3 +666,7 @@ where
         &mut self.base
     }
 }
+
+
+
+

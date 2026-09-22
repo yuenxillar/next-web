@@ -34,11 +34,11 @@ impl Application for TestApplication {
 
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
 
-    async fn on_ready(&self, ctx: &mut ApplicationContext) {
+    async fn on_ready(&self, ctx: &mut dyn ApplicationContext) {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
 
         #[rustfmt::skip]

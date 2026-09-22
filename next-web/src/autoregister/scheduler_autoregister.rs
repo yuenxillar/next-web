@@ -6,7 +6,7 @@ pub trait SchedulerAutoRegister
 where
     Self: Send + Sync + 'static,
 {
-    fn register(&self, __ctx: &mut ApplicationContext) -> BoxedJob;
+    fn register(&self, __ctx: &mut dyn ApplicationContext) -> BoxedJob;
 }
 
 inventory::collect!(&'static dyn SchedulerAutoRegister);

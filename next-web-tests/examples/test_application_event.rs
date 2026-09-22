@@ -7,6 +7,7 @@ use next_web::{
     event::default_application_event_publisher::DefaultApplicationEventPublisher,
     macros::event::event_listener,
 };
+use next_web_context::ApplicationContextExt;
 use next_web_core::traits::event::application_event::ApplicationEvent;
 use next_web_core::traits::event::application_event_publisher::ApplicationEventPublisher;
 
@@ -21,7 +22,7 @@ impl Application for TestApplication {
     /// initialize the middleware.
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
@@ -29,7 +30,7 @@ impl Application for TestApplication {
 
     async fn on_ready(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let event_publisher = ctx
             .get_single_with_default_name::<DefaultApplicationEventPublisher>()

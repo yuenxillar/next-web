@@ -8,6 +8,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+next-web-context.workspace = true
 next-web-core = { workspace = true }
 next-web-macros = { workspace = true }
 rudi-dev = { workspace = true }
@@ -19,3 +20,4 @@ amqprs = { workspace = true }
 
 [lints]
 workspace = true
+

@@ -97,7 +97,10 @@ impl<T> CompositePropertySource<T> {
     }
 }
 
-impl<T> PropertySource<T> for CompositePropertySource<T> {
+impl<T> PropertySource<T> for CompositePropertySource<T>
+where
+    T: Send + Sync,
+{
     fn name(&self) -> &str {
         &self.name
     }

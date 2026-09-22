@@ -2,6 +2,8 @@ use axum::{
     extract::ConnectInfo,
     response::{Html, IntoResponse},
 };
+use next_web_context::ApplicationContextExt;
+
 use next_web::{
     application::Application,
     core::{
@@ -35,7 +37,7 @@ impl Application for TestApplication {
 
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
@@ -43,7 +45,7 @@ impl Application for TestApplication {
 
     async fn on_ready(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
         ctx.insert_singleton_with_name(Arc::new(AtomicU32::new(0)), "requestCount");
 
@@ -142,3 +144,4 @@ mod tests {
         };
     }
 }
+

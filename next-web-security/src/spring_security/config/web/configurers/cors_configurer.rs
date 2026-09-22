@@ -1,6 +1,6 @@
 use std::{
     ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 use next_web_core::{
@@ -9,6 +9,7 @@ use next_web_core::{
     traits::required::Required,
     ApplicationContext,
 };
+use next_web_context::ApplicationContextExt;
 
 use crate::{
     config::{
@@ -75,23 +76,30 @@ where
         if let Some(handler) = &self.pre_flight_request_handler {
             return Some(handler.clone());
         }
-        http.shared_object::<ApplicationContext>()?
+        let context = http
+            .shared_object::<Arc<RwLock<Box<dyn ApplicationContext>>>>()?
+            .clone();
+        let context = context
+            .read()
+            .expect("the application context lock is poisoned");
+
+        context
             .get_single_option::<Arc<dyn PreFlightRequestHandler>>()
             .map(Clone::clone)
     }
 
     fn get_cors_configuration_source(
         &self,
-        context: Option<&ApplicationContext>,
+        context: Option<&Arc<RwLock<Box<dyn ApplicationContext>>>>,
     ) -> Option<Arc<dyn CorsConfigurationSource>> {
         context
-            .as_ref()
+            .map(|context| context.read().expect("the application context lock is poisoned"))
             .and_then(|ctx| {
                 ctx.get_single_option_with_name::<Arc<dyn CorsConfigurationSource>>(
                     CORS_CONFIGURATION_SOURCE_BEAN_NAME,
                 )
+                .map(Clone::clone)
             })
-            .map(Clone::clone)
     }
 
     fn get_cors_filter(&mut self, http: &H) -> Option<CorsFilter> {
@@ -102,13 +110,23 @@ where
         if let Some(source) = self.configuration_source.take() {
             return Some(CorsFilter::new(source));
         }
-        let context = http.shared_object::<ApplicationContext>();
-        if let Some(filter) = context
-            .and_then(|ctx| ctx.get_single_option_with_name::<CorsFilter>(CORS_FILTER_BEAN_NAME))
-        {
-            return Some(filter.clone());
+        let context = http
+            .shared_object::<Arc<RwLock<Box<dyn ApplicationContext>>>>()
+            .cloned();
+
+        if let Some(context) = context.as_ref() {
+            let guard = context
+                .read()
+                .expect("the application context lock is poisoned");
+
+            if let Some(filter) =
+                guard.get_single_option_with_name::<CorsFilter>(CORS_FILTER_BEAN_NAME)
+            {
+                return Some(filter.clone());
+            }
         }
-        self.get_cors_configuration_source(context)
+
+        self.get_cors_configuration_source(context.as_ref())
             .map(CorsFilter::new)
     }
 }
@@ -189,3 +207,10 @@ where
         }
     }
 }
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-use crate::{ApplicationContext, traits::group::Group};
+use crate::{traits::group::Group, ApplicationContext};
 use axum::Router;
 use dyn_clone::DynClone;
 
@@ -7,7 +7,8 @@ where
     Self: Send + Sync,
     Self: Group + DynClone,
 {
-    fn use_router(&self, router: axum::Router, ctx: &mut ApplicationContext) -> Router;
+    fn use_router(&self, router: axum::Router, ctx: &mut dyn ApplicationContext) -> Router;
 }
 
 dyn_clone::clone_trait_object!(UseRouter);
+

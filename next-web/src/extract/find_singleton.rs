@@ -40,38 +40,13 @@ where
     async fn from_request_parts(req: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let state = req.extensions.get_mut::<ApplicationState>();
 
-        let instance = if let Some(state) = state {
-            let singleton_name = SingletonUtil::name::<T>();
+        let state = state.ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
+        let singleton_name = SingletonUtil::name::<T>();
 
-            let reader = state.context().read().await;
-
-            match reader.get_single_option_with_name::<T>(singleton_name.clone()) {
-                Some(instance_with_name) => instance_with_name.clone(),
-                None => match reader.get_single_option_with_name::<T>("") {
-                    Some(instance) => instance.clone(),
-                    None => {
-                        drop(reader);
-                        match state
-                            .mut_context()
-                            .write()
-                            .await
-                            .resolve_option_with_name_async::<T>(singleton_name)
-                            .await
-                        {
-                            Some(instance) => instance,
-                            None => {
-                                return Err((
-                                    StatusCode::INTERNAL_SERVER_ERROR,
-                                    "Internal Server Error",
-                                ))
-                            }
-                        }
-                    }
-                },
-            }
-        } else {
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"));
-        };
+        let instance = state
+            .find_single_with_name::<T>(singleton_name)
+            .await
+            .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
 
         Ok(Self(instance))
     }

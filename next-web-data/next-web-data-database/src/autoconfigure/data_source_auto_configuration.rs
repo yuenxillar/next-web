@@ -1,7 +1,8 @@
+use next_web_context::ApplicationContextExt;
 use std::{error::Error, sync::Arc};
 
 use next_web_core::{
-    context::application_context::ApplicationContext,
+    ApplicationContext,
     traits::{config::auto_configuration::AutoConfiguration, singleton::Singleton},
 };
 use rbatis::{Intercept, async_trait};
@@ -34,7 +35,10 @@ impl DataSourceAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for DataSourceAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configuration(
+        &mut self,
+        ctx: &mut dyn ApplicationContext,
+    ) -> Result<(), Box<dyn Error>> {
         // Clone theconfiguration properties
         let data_source_properties = self.data_source_properties.clone();
 

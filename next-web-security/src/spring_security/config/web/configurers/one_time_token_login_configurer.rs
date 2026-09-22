@@ -7,6 +7,7 @@ use std::{
 use next_web_core::{
     http::HttpMethod, traits::http::http_request::HttpRequest, ApplicationContext,
 };
+use next_web_context::ApplicationContextExt;
 
 use crate::{
     authentication::{
@@ -73,13 +74,12 @@ pub struct OneTimeTokenLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    context: ApplicationContext,
-
     one_time_token_service: Option<Arc<dyn OneTimeTokenService>>,
     token_generating_url: String,
     one_time_token_generation_success_handler:
         Option<Arc<dyn OneTimeTokenGenerationSuccessHandler>>,
     authentication_provider: Option<Arc<dyn AuthenticationProvider>>,
+    user_details_service: Option<Arc<dyn crate::core::userdetails::UserDetailsService>>,
     request_resolver: Option<Arc<dyn GenerateOneTimeTokenRequestResolver>>,
 
     default_submit_page_url: String,
@@ -97,12 +97,44 @@ where
     ///
     /// # Arguments
     ///
-    /// * `context` - the `ApplicationContext` used to resolve beans such as the
-    ///   `OneTimeTokenService`, `UserDetailsService` and
+    /// * `context` - the context used to resolve beans such as the
+    ///   `OneTimeTokenService` and the
     ///   `OneTimeTokenGenerationSuccessHandler`.
-    pub fn new(context: &ApplicationContext) -> Self {
+    ///
+    /// The beans are resolved right away: the configurer does not keep the
+    /// context itself, and a value set through the DSL still takes precedence.
+    pub fn new(context: Arc<std::sync::RwLock<Box<dyn ApplicationContext>>>) -> Self {
+        let mut context = context
+            .write()
+            .expect("the application context lock is poisoned");
+        let context: &mut dyn ApplicationContext = &mut **context;
+
         let mut configurer = Self::default();
-        configurer.context = context.clone();
+
+        if configurer.one_time_token_service.is_none() {
+            configurer.one_time_token_service = context
+                .get_single_option::<Arc<dyn OneTimeTokenService>>()
+                .cloned();
+        }
+
+        if configurer.one_time_token_generation_success_handler.is_none() {
+            configurer.one_time_token_generation_success_handler = context
+                .get_single_option::<Arc<dyn OneTimeTokenGenerationSuccessHandler>>()
+                .cloned();
+        }
+
+        if configurer.request_resolver.is_none() {
+            configurer.request_resolver = context
+                .get_single_option::<Arc<dyn GenerateOneTimeTokenRequestResolver>>()
+                .cloned();
+        }
+
+        if configurer.user_details_service.is_none() {
+            configurer.user_details_service = context
+                .get_single_option::<Arc<dyn crate::core::userdetails::UserDetailsService>>()
+                .cloned();
+        }
+
         configurer
     }
 
@@ -183,12 +215,8 @@ where
     /// Resolves the `OneTimeTokenService` to use. Falls back to a bean from the
     /// `ApplicationContext`, and finally to an `InMemoryOneTimeTokenService`.
     fn get_one_time_token_service(&self) -> Arc<dyn OneTimeTokenService> {
-        if let Some(service) = &self.one_time_token_service {
-            return service.clone();
-        }
-        self.context
-            .get_single_option::<Arc<dyn OneTimeTokenService>>()
-            .map(Clone::clone)
+        self.one_time_token_service
+            .clone()
             .unwrap_or_else(|| Arc::new(InMemoryOneTimeTokenService::new()))
     }
 
@@ -198,12 +226,8 @@ where
     fn get_one_time_token_generation_success_handler(
         &self,
     ) -> Arc<dyn OneTimeTokenGenerationSuccessHandler> {
-        if let Some(handler) = &self.one_time_token_generation_success_handler {
-            return handler.clone();
-        }
-        self.context
-            .get_single_option::<Arc<dyn OneTimeTokenGenerationSuccessHandler>>()
-            .map(Clone::clone)
+        self.one_time_token_generation_success_handler
+            .clone()
             .expect(
                 "A OneTimeTokenGenerationSuccessHandler is required to enable oneTimeTokenLogin(). \
                  Please provide it as a bean or pass it to the oneTimeTokenLogin() DSL.",
@@ -214,12 +238,8 @@ where
     /// bean from the `ApplicationContext`, and finally to a
     /// `DefaultGenerateOneTimeTokenRequestResolver`.
     fn get_generate_request_resolver(&self) -> Arc<dyn GenerateOneTimeTokenRequestResolver> {
-        if let Some(resolver) = &self.request_resolver {
-            return resolver.clone();
-        }
-        self.context
-            .get_single_option::<Arc<dyn GenerateOneTimeTokenRequestResolver>>()
-            .map(Clone::clone)
+        self.request_resolver
+            .clone()
             .unwrap_or_else(|| Arc::new(DefaultGenerateOneTimeTokenRequestResolver::default()))
     }
 
@@ -229,9 +249,8 @@ where
             return provider.clone();
         }
         let user_details_service = self
-            .context
-            .get_single_option::<Arc<dyn crate::core::userdetails::UserDetailsService>>()
-            .map(Clone::clone)
+            .user_details_service
+            .clone()
             .expect(
                 "A UserDetailsService is required to enable oneTimeTokenLogin(). \
                  Please provide it as a bean.",
@@ -388,11 +407,11 @@ where
 {
     fn default() -> Self {
         Self {
-            context: ApplicationContext::default(),
             one_time_token_service: None,
             token_generating_url: DEFAULT_GENERATE_URL.to_string(),
             one_time_token_generation_success_handler: None,
             authentication_provider: None,
+            user_details_service: None,
             request_resolver: None,
             default_submit_page_url: DEFAULT_SUBMIT_PAGE_URL.to_string(),
             submit_page_enabled: true,

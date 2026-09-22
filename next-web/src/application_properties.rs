@@ -259,7 +259,7 @@ mod tests {
             HashMap::new()
         }
 
-        fn merge(&mut self, parent: &dyn ConfigurableEnvironment) {}
+        fn merge(&mut self, _parent: &dyn ConfigurableEnvironment) {}
     }
 
     #[test]

@@ -16,7 +16,8 @@ where
         100
     }
 
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>>;
+    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>>;
 }
 
 clone_trait_object!(AutoConfiguration where Self: Send + Sync);
+

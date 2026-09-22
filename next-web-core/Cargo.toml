@@ -9,6 +9,8 @@ license.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
+next-web-context = { workspace = true }
+
 axum            = { workspace = true }
 tokio           = { workspace = true, features = ["sync"]}
 

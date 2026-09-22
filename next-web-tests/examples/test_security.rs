@@ -9,9 +9,10 @@ use axum::{
 };
 use next_web::{
     application::Application,
+    context::DefaultApplicationContext,
     core::{ApplicationContext, context::properties::ApplicationProperties},
 };
-use next_web_context::{ApplicationEvent, ApplicationEventPublisher};
+use next_web_context::{ApplicationContextExt, ApplicationEvent, ApplicationEventPublisher};
 use next_web_core::{
     async_trait,
     error::BoxError,
@@ -42,22 +43,22 @@ impl Application for TestApplication {
     /// initialize the middleware.
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 
     // get the application router. (open api  and private api)
-    async fn application_router(&self, ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&self, ctx: &mut dyn ApplicationContext) -> axum::Router {
         let web_security_configurers = ctx.resolve_by_type::<Box<dyn WebSecurityConfigurer>>();
-        let mut ctx = ApplicationContext::default();
+        let mut ctx = DefaultApplicationContext::default();
         ctx.insert_singleton(Builder::default());
         ctx.insert_singleton::<Arc<dyn ApplicationEventPublisher>>(Arc::new(
             DefaultApplicationEventPublisher,
         ));
         let mut shared_objects: HashMap<TypeId, Box<dyn AnyClone>> = HashMap::new();
-        shared_objects.insert(TypeId::of::<ApplicationContext>(), Box::new(ctx));
+        // shared_objects.insert(TypeId::of::<Box<dyn ApplicationContext>>(), Box::new(ctx));
         shared_objects.insert(TypeId::of::<Builder>(), Box::new(Builder::default()));
 
         #[derive(Clone)]
@@ -118,7 +119,7 @@ impl Application for TestApplication {
 
     async fn on_ready(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
         ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
         Ok(())

@@ -8,6 +8,7 @@ use next_web::{
     },
     macros::{autoconfigure::auto_configuration, bind::singleton},
 };
+use next_web_context::ApplicationContextExt;
 
 #[derive(Clone, Default)]
 pub struct TestApplication;
@@ -19,7 +20,7 @@ impl Application for TestApplication {
     /// initialize the middleware.
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
@@ -34,7 +35,7 @@ pub struct TestAutoRegister;
 impl AutoConfiguration for TestAutoRegister {
     async fn configuration(
         &mut self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
         ctx.insert_singleton_with_name(String::from("value1"), "msg2");
         ctx.insert_singleton_with_name(String::from("value0"), "s3");
@@ -79,7 +80,7 @@ impl TestAutoConfiguation {
         vec![msg1, msg2]
     }
 
-    fn test1(ctx: &ApplicationContext) -> bool {
+    fn test1(ctx: &dyn ApplicationContext) -> bool {
         ctx.contains_single_with_name::<String>("s2")
     }
 }

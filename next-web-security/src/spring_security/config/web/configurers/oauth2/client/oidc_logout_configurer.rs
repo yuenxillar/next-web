@@ -1,6 +1,6 @@
 use std::{
     ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 use next_web_core::{traits::required::Required, ApplicationContext};
@@ -55,7 +55,7 @@ impl<B> OidcLogoutConfigurer<B>
 where
     B: HttpSecurityBuilder<B>,
 {
-    pub fn new(_ctx: &ApplicationContext) -> Self {
+    pub fn new(_context: Arc<RwLock<Box<dyn ApplicationContext>>>) -> Self {
         Self::default()
     }
 
@@ -244,3 +244,6 @@ impl BackChannelLogoutConfigurer {
         http.add_filter_before::<OidcBackChannelLogoutFilter, CsrfFilter>(filter);
     }
 }
+
+
+

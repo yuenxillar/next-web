@@ -1,3 +1,4 @@
+use std::sync::{Arc, RwLock};
 use std::ops::{Deref, DerefMut};
 
 use next_web_core::{traits::required::Required, ApplicationContext};
@@ -35,7 +36,7 @@ impl<H> Saml2LogoutConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    pub fn new(ctx: &ApplicationContext) -> Self {
+    pub fn new(_context: Arc<RwLock<Box<dyn ApplicationContext>>>) -> Self {
         Self::default()
     }
 
@@ -107,3 +108,6 @@ where
         &mut self.base
     }
 }
+
+
+

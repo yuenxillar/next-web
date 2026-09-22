@@ -106,7 +106,7 @@ pub fn impl_macro_auto_configuration(_attrs: TokenStream, mut item_impl: ItemImp
              struct #name;
 
              impl ::next_web_core::autoregister::auto_configuration_autoregister::DefaultAutoConfigurationAutoregister for #name {
-                fn configuration<'life0, 'life1, 'async_trait>(&'life0 self, ctx: &'life1 mut ApplicationContext)
+                fn configuration<'life0, 'life1, 'async_trait>(&'life0 self, ctx: &'life1 mut dyn ::next_web_core::ApplicationContext)
                 -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ::std::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error>>>
                     + ::core::marker::Send + 'async_trait>>
 
@@ -116,6 +116,7 @@ pub fn impl_macro_auto_configuration(_attrs: TokenStream, mut item_impl: ItemImp
                     Self: 'async_trait,
                  {
                       ::std::boxed::Box::pin(async {
+                          use ::next_web_context::ApplicationContextExt as _;
 
                           #(#conditional_function)*
 

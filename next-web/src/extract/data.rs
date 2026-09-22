@@ -8,6 +8,7 @@ use axum::{
 use next_web_core::{
     state::application_state::ApplicationState, traits::data_decoder::DataDecoder,
 };
+use next_web_context::ApplicationContextExt;
 use serde::de::DeserializeOwned;
 
 pub struct Data<T>(pub T);
@@ -118,3 +119,4 @@ where
         Ok(Data(value))
     }
 }
+

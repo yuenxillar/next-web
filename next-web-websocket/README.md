@@ -32,7 +32,7 @@ pub struct TestWebSocketConfigurer;
 impl WebSocketConfigurer for TestWebSocketConfigurer {
     fn register_websocket_handlers(
         &mut self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         registry: &mut dyn WebSocketHandlerRegistry,
     ) {
         registry
@@ -140,7 +140,7 @@ impl Application for TestWSApplication {
     /// initialize the middleware.
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
 }

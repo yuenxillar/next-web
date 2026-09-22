@@ -1,4 +1,4 @@
-use std::{fmt, ops::Deref, ops::DerefMut, sync::Arc};
+use std::{fmt, ops::Deref, ops::DerefMut, sync::{Arc, RwLock}};
 
 use next_web_core::{traits::required::Required, ApplicationContext};
 
@@ -151,7 +151,7 @@ where
 
     /// Creates a new `OAuth2ResourceServerConfigurer` with the given application
     /// context (mirrors the Java constructor).
-    pub fn new(_ctx: &ApplicationContext) -> Self {
+    pub fn new(_context: Arc<RwLock<Box<dyn ApplicationContext>>>) -> Self {
         Self::default()
     }
 }
@@ -306,3 +306,6 @@ where
             .finish()
     }
 }
+
+
+

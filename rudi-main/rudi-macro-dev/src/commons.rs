@@ -10,6 +10,15 @@ use syn::{
 
 use crate::{field_or_argument_attr::FieldOrArgumentAttr, value_attr::ValueAttr};
 
+/// The import that the generated statements need in order to call the generic
+/// methods of the application context.
+///
+/// The context interface is object safe, so its generic client methods live in
+/// an extension trait that has to be imported by the code that calls them.
+fn context_ext_import() -> Stmt {
+    parse_quote! { use ::next_web_context::ApplicationContextExt as _; }
+}
+
 pub(crate) fn generate_create_provider(scope: Scope, color: Color) -> TokenStream {
     match (scope, color) {
         (Scope::Singleton, Color::Async) => quote! {
@@ -696,6 +705,10 @@ pub(crate) fn generate_argument_resolve_methods(
         }
     }
 
+    if !ref_mut_cx_stmts.is_empty() {
+        ref_mut_cx_stmts.insert(0, context_ext_import());
+    }
+
     Ok(ArgumentResolveStmts {
         ref_mut_cx_stmts,
         ref_cx_stmts,
@@ -817,6 +830,10 @@ pub(crate) fn generate_field_resolve_stmts(
                 field_names.push(field_name.clone().unwrap());
             }
 
+            if !ref_mut_cx_stmts.is_empty() {
+                ref_mut_cx_stmts.insert(0, context_ext_import());
+            }
+
             Ok(FieldResolveStmts {
                 ref_mut_cx_stmts,
                 ref_cx_stmts,
@@ -853,6 +870,10 @@ pub(crate) fn generate_field_resolve_stmts(
                 }
 
                 field_values.push(field_value);
+            }
+
+            if !ref_mut_cx_stmts.is_empty() {
+                ref_mut_cx_stmts.insert(0, context_ext_import());
             }
 
             Ok(FieldResolveStmts {

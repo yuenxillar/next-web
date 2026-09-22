@@ -1,4 +1,5 @@
 use std::{error::Error, sync::Arc};
+use next_web_context::ApplicationContextExt;
 
 use next_web_core::{
     ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
@@ -25,14 +26,14 @@ impl MailAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for MailAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mail_properties = self.mail_properties.clone();
 
         let default_mail_service = DefaultMailService::new(mail_properties)?;
 
         default_mail_service.test_connection().await?;
 
-        ctx.insert_singleton_with_name::<Arc<dyn MailService>, &'static str>(
+        ctx.insert_singleton_with_name::<Arc<dyn MailService>>(
             Arc::new(default_mail_service),
             "mailService",
         );
@@ -40,3 +41,5 @@ impl AutoConfiguration for MailAutoConfiguration {
         Ok(())
     }
 }
+
+

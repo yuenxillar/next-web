@@ -71,14 +71,14 @@ impl Application for TestApplication {
     #[allow(unused_variables)]
     async fn init_middleware(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 
     #[allow(unused_variables)]
-    async fn on_ready(&self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn on_ready(&self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
 
         // 这里是使用的沙箱环境
         let mut config = AlipayConfig::default()

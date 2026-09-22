@@ -34,7 +34,7 @@ impl AutoRegister for MinioServiceAutoRegister {
     /// Asynchronous registration method
     async fn register(
         &self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Clone theconfiguration properties
@@ -54,3 +54,4 @@ impl AutoRegister for MinioServiceAutoRegister {
         Ok(())
     }
 }
+

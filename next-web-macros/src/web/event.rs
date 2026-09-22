@@ -78,11 +78,12 @@ pub fn impl_macro_event_listener(args: TokenStream, input: ItemImpl) -> TokenStr
 
         impl ::next_web::autoregister::application_event_autoregister::ApplicationEventAutoRegister  for  #name {
             fn register<'life_a>(&'life_a self,
-                ctx: &'life_a mut ::next_web::core::ApplicationContext,
+                ctx: &'life_a mut dyn ::next_web::core::ApplicationContext,
                 multicaster: &'life_a mut ::next_web::event::default_application_event_multicaster::DefaultApplicationEventMulticaster
             ) -> ::core::pin::Pin<::std::boxed::Box<dyn ::core::future::Future<Output = ()> + Send + 'life_a>>
             {
                 ::std::boxed::Box::pin(async move {
+                    use ::next_web_context::ApplicationContextExt as _;
                     use ::next_web::core::traits::event::application_event_multicaster::ApplicationEventMulticaster;
 
                     let listener = ctx.resolve_with_default_name::<#listener_type>();
@@ -143,3 +144,4 @@ fn extract_event_type_from_impl(input: &ItemImpl) -> Option<&Type> {
         _ => None,
     }
 }
+

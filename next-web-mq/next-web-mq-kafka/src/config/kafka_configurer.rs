@@ -10,9 +10,10 @@ where
 {
     fn register_listeners(
         &mut self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         registry: &mut dyn KafkaListenerRegistry,
     );
 }
 
 clone_trait_object!(KafkaConfigurer where Self: Send + Sync);
+

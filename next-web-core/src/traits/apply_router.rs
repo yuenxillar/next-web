@@ -11,7 +11,8 @@ where
         i32::MAX
     }
 
-    fn apply(&mut self, ctx: &mut ApplicationContext) -> axum::Router;
+    fn apply(&mut self, ctx: &mut dyn ApplicationContext) -> axum::Router;
 }
 
 dyn_clone::clone_trait_object!(ApplyRouter);
+

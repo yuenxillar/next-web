@@ -118,7 +118,7 @@ where
     /// - `Err(Box<dyn std::error::Error>)` 表示初始化失败
     async fn on_start(
         &mut self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Called when the application is preparing to shut down.

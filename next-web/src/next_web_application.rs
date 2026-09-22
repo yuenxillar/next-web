@@ -10,6 +10,7 @@ use std::{
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::{response::IntoResponse, Router};
+
 use next_web_core::{
     anys::any_value::AnyValue,
     constants::application_constants::APPLICATION_DEFAULT_PORT,
@@ -30,11 +31,14 @@ use tracing::{enabled, Level};
 
 use crate::{
     application_banner_printer::PrintedBanner,
+    autoregister::http_handler_autoregister::HttpHandlerAutoRegister,
     banner::BannerMode,
+    configurer::http_method_handler_configurer::RouterContext,
     context::{logging::LoggingEventHandler, properties::source::ConfigurationPropertySources},
     diagnostics::error_analyzers::ErrorAnalyzers,
     env::{DefaultPropertiesPropertySource, MapPropertySource},
     support::EnvironmentPostProcessorEventHandler,
+    util::InventoryHelper,
     web::server::{Server, WebServer},
     ApplicationArguments, ApplicationBannerPrinter, ApplicationContextFactory,
     ApplicationContextInitializer, ApplicationEnvironment, ApplicationEventHandler,
@@ -68,11 +72,71 @@ where
         std::future::ready(Ok(()))
     }
 
+    #[allow(unused_variables)]
     fn router(&self, ctx: &mut dyn ConfigurableApplicationContext) -> Router {
-        Router::new()
+        #[cfg(feature = "enable-open-api")]
+        use next_web_context::ApplicationContextExt;
+
+        #[cfg(feature = "enable-open-api")]
+        let mut context = RouterContext::with_openapi(self.open_api(ctx));
+
+        #[cfg(not(feature = "enable-open-api"))]
+        let mut context = RouterContext::default();
+
+        let router = InventoryHelper::iter::<&dyn HttpHandlerAutoRegister>()
+            .into_iter()
+            .fold(Router::new(), |router, item| {
+                item.register(router, &mut context)
+            });
+
+        #[cfg(feature = "enable-open-api")]
+        ctx.insert_singleton_with_default_name(
+            context.open_api.take().expect("open_api is not available"),
+        );
+
+        router
     }
 
-    fn open_api(&self, ctx: &mut dyn ConfigurableApplicationContext) {}
+    #[cfg(feature = "enable-open-api")]
+    #[allow(unused_variables)]
+    fn open_api(&self, ctx: &mut dyn ConfigurableApplicationContext) {
+        use next_web_api_doc::OpenApi;
+
+        struct OpenApiDoc;
+
+        impl next_web_api_doc::OpenApi for OpenApiDoc {
+            fn openapi() -> next_web_api_doc::openapi::OpenApi {
+                next_web_api_doc::openapi::OpenApiBuilder::new()
+                    .info(
+                        next_web_api_doc::openapi::InfoBuilder::new()
+                            .title("API Documentation")
+                            .version("0.1.0")
+                            .description(Some(
+                                std::env::var("CARGO_PKG_DESCRIPTION")
+                                    .unwrap_or(String::from("Empty")),
+                            ))
+                            .license(Some(next_web_api_doc::openapi::License::new(
+                                "MIT or Apache-2.0",
+                            )))
+                            .contact(Some(
+                                next_web_api_doc::openapi::ContactBuilder::new()
+                                    .name(Some(
+                                        std::env::var("CARGO_PKG_AUTHORS")
+                                            .unwrap_or(String::from("Listeing")),
+                                    ))
+                                    .email(None::<String>)
+                                    .build(),
+                            ))
+                            .build(),
+                    )
+                    .paths(next_web_api_doc::openapi::path::Paths::new())
+                    .components(Some(next_web_api_doc::openapi::Components::new()))
+                    .build()
+            }
+        }
+
+        OpenApiDoc::openapi()
+    }
 
     fn fallback() -> impl IntoResponse {
         let mut resp = E::handle_error("Not Found").into_response();
@@ -144,8 +208,6 @@ where
     pub async fn run(mut self) {
         use futures::FutureExt;
 
-        // The startup future borrows `self`; it is scoped inside this block
-        // so the borrow ends before the error handlers consume `self`.
         let future = async {
             let mut startup = StandardStartup::default();
             if self.properties.is_register_shutdown_hook() {
@@ -181,7 +243,9 @@ where
             self.send_event(|handlers| handlers.started(context.as_mut(), time_taken_to_started));
             self.call_runners(context.as_mut(), &application_arguments)
                 .await?;
-            self.send_event(|handlers| handlers.ready(context.as_mut(), startup.ready()));
+            if !context.is_closed() {
+                self.send_event(|handlers| handlers.ready(context.as_mut(), startup.ready()));
+            }
 
             self.run_web_server(environment.as_ref(), context.as_mut())
                 .await?;
@@ -202,7 +266,7 @@ where
         ctx: &mut dyn ConfigurableApplicationContext,
     ) -> ApplicationResult<()> {
         let port = environment
-            .get_property_or_default("next.server.port", "8080")
+            .get_property_or_default("next.server.port", "11000")
             .parse::<u16>()
             .unwrap_or(APPLICATION_DEFAULT_PORT);
         let address = environment.get_property_or_default("next.server.address", "0.0.0.0");

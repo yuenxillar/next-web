@@ -84,6 +84,7 @@ use crate::env::{ConfigurablePropertyResolver, Environment, MutablePropertySourc
 pub trait ConfigurableEnvironment
 where
     Self: Environment + ConfigurablePropertyResolver,
+    Self: Send + Sync,
 {
     /// Specify the set of profiles active for this `Environment`. Profiles are
     /// evaluated during container bootstrap to determine whether bean definitions

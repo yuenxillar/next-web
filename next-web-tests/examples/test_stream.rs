@@ -21,14 +21,14 @@ impl Application for TestApplication {
     /// initialize the middleware.
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 
     // get the application router. (open api  and private api)
-    async fn application_router(&self, _ctx: &mut ApplicationContext) -> axum::Router {
+    async fn application_router(&self, _ctx: &mut dyn ApplicationContext) -> axum::Router {
         axum::Router::new()
             .route("/localFile", axum::routing::get(download_file))
             .route("/bytes", axum::routing::get(download_bytes))

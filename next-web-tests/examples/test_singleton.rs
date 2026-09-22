@@ -19,14 +19,14 @@ impl Application for TestApplication {
     /// initialize the middleware.
     async fn init_middleware(
         &self,
-        _ctx: &mut ApplicationContext,
+        _ctx: &mut dyn ApplicationContext,
         _properties: &ApplicationProperties,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 
     // get the application router. (open api  and private api)
-    async fn application_router(&self, _ctx: &mut ApplicationContext) -> Router {
+    async fn application_router(&self, _ctx: &mut dyn ApplicationContext) -> Router {
         Router::new().route("/getSingleton", axum::routing::get(req_get_singleton))
     }
 }

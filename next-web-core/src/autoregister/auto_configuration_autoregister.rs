@@ -10,7 +10,7 @@ where
     Self: Send + Sync,
     Self: 'static,
 {
-    async fn configuration(&self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>>;
+    async fn configuration(&self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>>;
 }
 
 inventory::collect!(&'static dyn DefaultAutoConfigurationAutoregister);
@@ -23,3 +23,4 @@ macro_rules! submit_default_auto_configure {
         }
     };
 }
+

@@ -12,6 +12,7 @@ readme.workspace = true
 [dependencies]
 next-web        = { path = "../next-web", version = "*", features = ["full"]}
 next-web-core   = { path = "../next-web-core", version = "*" }
+next-web-context = { path = "../next-web-context", version = "*" }
 
 tokio           = { workspace = true, features = ["sync"]}
 serde           = { workspace = true }

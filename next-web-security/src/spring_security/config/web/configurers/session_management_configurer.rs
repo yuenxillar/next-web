@@ -1,13 +1,14 @@
 use std::{
     collections::HashSet,
     ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 use next_web_context::{
     event::GenericApplicationListenerAdapter, ApplicationEvent, ApplicationListener,
 };
 use next_web_core::{traits::required::Required, ApplicationContext};
+use next_web_context::ApplicationContextExt;
 
 use crate::{
     authorization::AuthenticationTrustResolver,
@@ -568,10 +569,17 @@ where
             return registry.clone();
         }
 
-        let registry = http.shared_object::<ApplicationContext>().and_then(|ctx| {
-            ctx.get_single_option::<Arc<dyn SessionRegistry>>()
-                .map(Clone::clone)
-        });
+        let registry = http
+            .shared_object::<Arc<RwLock<Box<dyn ApplicationContext>>>>()
+            .and_then(|context| {
+                let context = context
+                    .read()
+                    .expect("the application context lock is poisoned");
+
+                context
+                    .get_single_option::<Arc<dyn SessionRegistry>>()
+                    .map(Clone::clone)
+            });
         if let Some(registry) = registry {
             self.session_registry = Some(registry.clone());
             return registry;
@@ -590,12 +598,16 @@ where
         http: &mut H,
         delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
     ) {
-        let delegating = http
-            .shared_object_mut::<ApplicationContext>()
-            .and_then(|ctx| ctx.get_single_option_mut::<DelegatingApplicationListener>());
-        if let Some(delegating) = delegating {
-            let smart_listener = GenericApplicationListenerAdapter::new(delegate);
-            delegating.add_listener(Arc::new(smart_listener));
+        let context = http.shared_object_mut::<Arc<RwLock<Box<dyn ApplicationContext>>>>();
+        if let Some(context) = context {
+            let mut context = context
+                .write()
+                .expect("the application context lock is poisoned");
+
+            if let Some(delegating) = context.get_single_option_mut::<DelegatingApplicationListener>() {
+                let smart_listener = GenericApplicationListenerAdapter::new(delegate);
+                delegating.add_listener(Arc::new(smart_listener));
+            }
         }
     }
 
@@ -905,3 +917,6 @@ where
         self.parent
     }
 }
+
+
+

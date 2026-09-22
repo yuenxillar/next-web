@@ -10,9 +10,10 @@ where
 {
     fn register_listeners(
         &mut self,
-        ctx: &mut ApplicationContext,
+        ctx: &mut dyn ApplicationContext,
         registry: &mut dyn RabbitmqListenerRegistry,
     );
 }
 
 clone_trait_object!(RabbitmqConfigurer where Self: Send + Sync);
+

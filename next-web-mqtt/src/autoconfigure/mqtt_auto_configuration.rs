@@ -1,4 +1,5 @@
 use std::{error::Error, sync::Arc};
+use next_web_context::ApplicationContextExt;
 
 use next_web_core::{
     async_trait, error::BoxError, traits::config::auto_configuration::AutoConfiguration,
@@ -33,7 +34,7 @@ impl MQTTAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for MQTTAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mqtt_properties = self.mqtt_client_properties.clone();
 
         let listeners = ctx.resolve_by_type::<Arc<dyn TopicListener>>();
@@ -82,3 +83,4 @@ impl AutoConfiguration for MQTTAutoConfiguration {
         Ok(())
     }
 }
+

@@ -1,4 +1,5 @@
 use std::{error::Error, sync::Arc};
+use next_web_context::ApplicationContextExt;
 
 #[cfg(feature = "distributed-lock")]
 use next_web_core::traits::singleton::Singleton;
@@ -29,7 +30,7 @@ pub struct RedisAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for RedisAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let redis_template = RedisTemplate::with_properties(&self.redis_properties)?;
 
         // Validate the Redis connection.
@@ -92,7 +93,7 @@ impl RedisAutoConfiguration {
         )
     }
 
-    fn redis_template_missing(ctx: &ApplicationContext) -> bool {
+    fn redis_template_missing(ctx: &dyn ApplicationContext) -> bool {
         !ctx.contains_single::<RedisTemplate>()
     }
 }
@@ -102,3 +103,4 @@ impl RedisAutoConfiguration {
         Box::new(self)
     }
 }
+

@@ -8,6 +8,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+next-web-context.workspace = true
 axum            = { workspace = true, features = ["ws"] }
 
 serde           = { workspace = true }
@@ -24,3 +25,4 @@ next-web-macros = { workspace = true }
 
 [lints]
 workspace = true
+
