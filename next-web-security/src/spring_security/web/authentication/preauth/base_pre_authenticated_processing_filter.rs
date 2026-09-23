@@ -513,7 +513,7 @@ impl BasePreAuthenticatedProcessingFilter {
 
         request.set_attribute(
             WebAttributes::AUTHENTICATION_ERROR,
-            AnyValue::Object(Box::new(failed.clone())),
+            AnyValue::BoxedValue(Box::new(failed.clone())),
         );
 
         if let Some(authentication_failure_handler) = self.authentication_failure_handler.as_ref() {

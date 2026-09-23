@@ -63,7 +63,7 @@ impl ConstantValueParser {
                 // next 6 bytes are unused
                 in_.read_u_short();
                 in_.read_int();
-                AnyValue::Object(Box::new(ErrorConstant::new(err_code as i32)))
+                AnyValue::BoxedValue(Box::new(ErrorConstant::new(err_code as i32)))
             }
             _ => panic!("Unknown grbit value ({})", grbit),
         }
@@ -134,7 +134,7 @@ impl ConstantValueParser {
                 out.write_byte(Self::TYPE_STRING);
                 StringUtil::write_unicode_string(out, val);
             }
-            AnyValue::Object(obj) => {
+            AnyValue::BoxedValue(obj) => {
                 out.write_byte(Self::TYPE_ERROR_CODE);
                 if let Some(error_val) = (obj as &dyn std::any::Any).downcast_ref::<ErrorConstant>()
                 {

@@ -137,7 +137,7 @@ impl AccessDeniedHandler for DelegatingMissingAuthorityAccessDeniedHandler {
                     if !errors.is_empty() {
                         request.set_attribute(
                             WebAttributes::REQUIRED_FACTOR_ERRORS,
-                            AnyValue::Object(Box::new(errors)),
+                            AnyValue::BoxedValue(Box::new(errors)),
                         );
                     }
 

@@ -49,7 +49,7 @@ impl<T> AccessControlFilter<T> {
     ) {
         if let Some(subject) = request.get_attribute("NextSubject") {
             match subject {
-                AnyValue::Object(obj) => {
+                AnyValue::BoxedValue(obj) => {
                     if let Some(_subject) = (obj as &dyn Any).downcast_ref::<WebDelegatingSubject>()
                     {
                         debug!("Subject found in request attribute");

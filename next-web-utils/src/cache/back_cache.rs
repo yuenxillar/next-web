@@ -440,7 +440,7 @@ mod tests {
         );
         let value = cache.get("key1");
         assert_eq!(
-            value.map(|f| f.as_object::<String>()).unwrap().unwrap(),
+            value.map(|f| f.to_value::<String>()).unwrap().unwrap(),
             "Hello, world!".to_string()
         );
 
@@ -450,7 +450,7 @@ mod tests {
         let gogo = TestA("I am Gogo!!".to_string());
         cache.set("test_gogo", CacheObject(gogo), None);
         if let Some(value) = cache.get("test_gogo") {
-            if let Some(var) = value.as_object::<TestA>() {
+            if let Some(var) = value.to_value::<TestA>() {
                 assert_eq!(var.0, "I am Gogo!!".to_string());
             }
         }

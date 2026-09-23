@@ -184,7 +184,7 @@ impl ArrayPtg {
                     "FALSE".to_string()
                 }
             }
-            AnyValue::Object(e) => {
+            AnyValue::BoxedValue(e) => {
                 if let Some(e) = (e as &dyn std::any::Any).downcast_ref::<ErrorConstant>() {
                     return Ok(e.get_text());
                 }

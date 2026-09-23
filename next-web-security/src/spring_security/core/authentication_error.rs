@@ -92,7 +92,7 @@ impl Debug for AuthenticationError {
 
 impl Into<AnyValue> for AuthenticationError {
     fn into(self) -> AnyValue {
-        AnyValue::Object(Box::new(self))
+        AnyValue::BoxedValue(Box::new(self))
     }
 }
 

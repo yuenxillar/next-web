@@ -31,7 +31,6 @@ where
     fn get_last_error(&self) -> Option<RetryError>;
 }
 
-
 pub trait SyncAttributeAccessor
 where
     Self: Send + Sync,
@@ -76,19 +75,19 @@ mod tests {
     fn attribute_accessor_stores_reads_and_removes_values() {
         let attributes = AttributeAccessorSupport::default();
 
-        attributes.set_attribute("answer", AnyValue::Number(42));
+        attributes.set_attribute("answer", 42u64.into());
 
         assert!(attributes.has_attribute("answer"));
         assert_eq!(
             attributes
                 .get_attribute("answer")
-                .and_then(|value| value.as_number()),
+                .and_then(|value| value.as_u64()),
             Some(42)
         );
         assert_eq!(
             attributes
                 .remove_attribute("answer")
-                .and_then(|value| value.as_number()),
+                .and_then(|value| value.as_u64()),
             Some(42)
         );
         assert!(!attributes.has_attribute("answer"));

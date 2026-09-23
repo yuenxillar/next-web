@@ -162,7 +162,7 @@ impl CacheValue {
         }
     }
 
-    pub fn as_object<T: Any>(&self) -> Option<T> {
+    pub fn to_value<T: Any>(&self) -> Option<T> {
         if let CacheValue::Object(obj) = self {
             let any_obj = obj.clone();
             any_obj.into_any().downcast().map(|obj| *obj).ok()

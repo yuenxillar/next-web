@@ -34,7 +34,7 @@ impl HttpSessionDestroyedEvent {
             .filter_map(|name| {
                 session
                     .attribute(name)
-                    .and_then(|value| value.as_object::<Arc<dyn SecurityContext>>())
+                    .and_then(|value| value.to_value::<Arc<dyn SecurityContext>>())
             })
             .collect()
     }

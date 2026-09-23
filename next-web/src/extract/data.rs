@@ -5,11 +5,11 @@ use axum::{
     extract::{FromRequest, Request},
     http::{header, HeaderMap, StatusCode},
 };
-use next_web_core::{
-    state::application_state::ApplicationState, traits::data_decoder::DataDecoder,
-};
 use next_web_context::ApplicationContextExt;
+use next_web_core::traits::data_decoder::DataDecoder;
 use serde::de::DeserializeOwned;
+
+use crate::ApplicationState;
 
 pub struct Data<T>(pub T);
 
@@ -24,7 +24,6 @@ where
         if is_json(req.headers()) {
             let decoder = match req.extensions().get::<ApplicationState>() {
                 Some(state) => state
-                    .context()
                     .read()
                     .await
                     .get_single_option_with_name::<Arc<dyn DataDecoder>>("defaultDataDecoder")
@@ -119,4 +118,3 @@ where
         Ok(Data(value))
     }
 }
-

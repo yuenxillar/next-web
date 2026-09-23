@@ -607,12 +607,15 @@ pub fn translation(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// - on a `struct`, an `enum` or an `impl` block the annotated item is the
 ///   provided type,
 /// - on a `fn` a `struct` named after the function is created and the provided
-///   type is the return type of the function.
+///   type is the return type of the function. The struct carries no value, it
+///   only gives the provider a type of its own.
 ///
 /// # Arguments
 ///
-/// - `name = "..."`: name of the provider. Defaults to the type name with its
-///   first character lower cased, e.g. `MyService` becomes `myService`.
+/// - `name = "..."`: name of the provider. On a `fn` it defaults to the name of
+///   the function in camel case, so `fn test_name` provides `testName`; on a
+///   `struct` it defaults to the type name with its first character lower
+///   cased, e.g. `MyService` becomes `myService`.
 /// - `eager_create`: construct the instance while the provider is registered
 ///   instead of while it is resolved for the first time.
 /// - `condition = path` or `condition = |cx| ...`: a function or a closure
@@ -630,9 +633,11 @@ pub fn translation(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Field and argument attributes
 ///
-/// - `#[autowired(name = "...")]`: name of the provider to resolve. Defaults to
-///   the field name, so `my_service` resolves `myService`, or to the name of the
-///   type for an argument without a name.
+/// - `#[autowired(name = "...")]`: name of the provider to resolve, which wins
+///   over the defaults below. Without it the name of the field or of the
+///   argument is used, so `my_service` resolves `myService`; a field or an
+///   argument without a name of its own uses the name of its type with its
+///   first character lower cased, so `&MyService` resolves `myService`.
 /// - `#[autowired(option)]`: the field is an `Option<T>` that is `None` when
 ///   there is no provider with the given name.
 /// - `#[autowired(default)]`: the field uses `Default::default()` when there is
@@ -644,6 +649,12 @@ pub fn translation(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///   provider of `T`; `T` has to implement `Singleton`.
 /// - `#[autowired(ref)]`: the field takes a reference to the provider, which is
 ///   required when a type alias hides the reference of the field type.
+/// - A field or an argument declared as a reference, e.g. `&MyService` or
+///   `&mut MyService`, is taken from the context as a reference to the instance
+///   and does not need `#[autowired(ref)]`; the instance is created in the
+///   context first when it does not exist yet. The context lends any number of
+///   immutable references, or a single mutable one, so a `&mut` field or
+///   argument cannot be combined with another reference.
 /// - `#[value(key = "...")]`: the field takes the value of the given
 ///   application property.
 /// - `#[resource(path = ...)]`: path of the crate used by the generated code,

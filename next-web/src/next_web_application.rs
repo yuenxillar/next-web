@@ -61,7 +61,8 @@ use crate::web::server::TlsWebServer;
 static DEFAULT_RESOURCE_LOADER: LazyLock<DefaultResourceLoader> =
     LazyLock::new(DefaultResourceLoader::default);
 
-type ApplicationResult<T> = Result<T, Box<dyn Error>>;
+pub type ApplicationResult<T> = Result<T, Box<dyn Error>>;
+pub type ApplicationState = Arc<RwLock<Box<dyn ConfigurableApplicationContext>>>;
 
 pub trait Application<E = ()>
 where
@@ -279,7 +280,9 @@ where
             .fallback(|| async { T::fallback() })
             // Prevent program panic caused by users not setting routes
             .route("/_20250101", axum::routing::get(|| async { "a new year!" }))
-            .route_layer(axum::Extension(Arc::new(RwLock::new(ctx))));
+            .route_layer(axum::Extension::<ApplicationState>(Arc::new(RwLock::new(
+                ctx,
+            ))));
         router = self.add_layers(router);
 
         // TLS is used when it is enabled for the environment, which requires

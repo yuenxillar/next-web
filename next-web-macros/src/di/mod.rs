@@ -25,6 +25,8 @@ mod item_impl_gen;
 mod item_struct_gen;
 mod resource_attr;
 mod struct_or_function_attr;
+#[cfg(test)]
+mod tests;
 mod value_attr;
 
 use from_attr::FromAttr;

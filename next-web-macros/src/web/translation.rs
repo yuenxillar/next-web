@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Block, ItemFn, Stmt};
+use syn::{Block, ItemFn};
 
 use crate::util::logic::Logic;
 

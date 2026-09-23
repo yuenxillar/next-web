@@ -40,7 +40,10 @@ impl CsrfTokenRequestHandler for CsrfTokenRequestAttributeHandler {
         let csrf_token = deferred_csrf_token.token().await;
 
         let type_name = std::any::type_name::<&dyn CsrfToken>();
-        request.set_attribute(type_name, AnyValue::Object(Box::new(csrf_token.clone())));
+        request.set_attribute(
+            type_name,
+            AnyValue::BoxedValue(Box::new(csrf_token.clone())),
+        );
 
         let csrf_attr_name = &self
             .csrf_request_attribute_name
@@ -49,7 +52,7 @@ impl CsrfTokenRequestHandler for CsrfTokenRequestAttributeHandler {
             .unwrap_or(csrf_token.parameter_name())
             .to_string();
 
-        request.set_attribute(csrf_attr_name, AnyValue::Object(Box::new(csrf_token)));
+        request.set_attribute(csrf_attr_name, AnyValue::BoxedValue(Box::new(csrf_token)));
 
         trace!(
             "Wrote a CSRF token to the following request attributes: [{}, {}]",

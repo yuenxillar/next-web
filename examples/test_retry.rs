@@ -5,7 +5,7 @@ use next_web::retry::error::retry_error::RetryError;
 use next_web::retry::retry_callback::with_fn;
 use next_web::retry::retry_operations::RetryOperations;
 use next_web::retry::support::retry_template::RetryTemplate;
-use next_web::util::local_date_time::LocalDateTime;
+use next_web::util::LocalDateTime;
 use next_web_core::anys::any_value::AnyValue;
 
 #[allow(unused)]
@@ -55,7 +55,7 @@ async fn main() {
             Box::pin(async move {
                 let retry_count = ctx.get_attribute("retryCount");
                 let value = retry_count
-                    .map(|s| s.as_number().unwrap_or_default())
+                    .map(|s| s.as_u64().unwrap_or_default())
                     .unwrap_or_default();
 
                 if value < 4 {
@@ -66,7 +66,7 @@ async fn main() {
                             LocalDateTime::timestamp()
                         );
                     }
-                    ctx.set_attribute("retryCount", AnyValue::Number(value + 1));
+                    ctx.set_attribute("retryCount", (value + 1).into());
                     return Err(RetryError::Any(Box::new(TestRetryError::Default(
                         "test retry error".to_string(),
                     ))));

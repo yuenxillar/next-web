@@ -38,7 +38,7 @@ impl RequestAttributeSecurityContextRepository {
     ) -> Option<&'a Arc<dyn SecurityContext>> {
         request
             .get_attribute(&self.request_attribute_name)
-            .and_then(|obj| obj.as_ref_object())
+            .and_then(|obj| obj.as_ref_value())
     }
 
     /// Sets the SecurityContextHolderStrategy to use.
@@ -80,7 +80,7 @@ impl SecurityContextRepository for RequestAttributeSecurityContextRepository {
     ) {
         request.set_attribute(
             &self.request_attribute_name,
-            AnyValue::Object(Box::new(context.to_owned())),
+            AnyValue::BoxedValue(Box::new(context.to_owned())),
         );
     }
 

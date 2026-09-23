@@ -13,7 +13,6 @@ use next_web_core::context::application_args::ApplicationArgs;
 use next_web_core::context::application_resources::ApplicationResources;
 use next_web_core::context::properties::{ApplicationProperties, Properties};
 use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
-use next_web_core::state::application_state::ApplicationState;
 use next_web_core::traits::application::application_lifecycle::ApplicationLifecycle;
 use next_web_core::traits::apply_router::ApplyRouter;
 use next_web_core::traits::config::auto_configuration::AutoConfiguration;
@@ -621,7 +620,7 @@ where
             .unwrap_or_default();
 
         // 9. Add State to [Context]
-        app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
+        // app = app.route_layer(axum::Extension(ApplicationState::from_context(ctx)));
 
         println!("\nApplication Name      is:  {}", app_name);
         #[rustfmt::skip]

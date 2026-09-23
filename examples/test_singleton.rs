@@ -119,6 +119,11 @@ pub struct TestSingletonConsumer {
     pub single_option: Option<Arc<dyn TestSingleton>>,
 }
 
+#[singleton]
+fn test_name(a: &String, b: &String, c: &String) -> String {
+    format!("{}{}{}", a, b, c)
+}
+
 #[tokio::main]
 async fn main() {
     TestApplication::run().await;

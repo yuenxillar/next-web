@@ -9,7 +9,7 @@ use next_web::{
         traits::schedule::scheduled_task::ScheduledTask,
     },
     macros::{bind::singleton, scheduled},
-    util::local_date_time::LocalDateTime,
+    util::LocalDateTime,
 };
 use next_web_core::{async_trait, context::properties::ApplicationProperties};
 

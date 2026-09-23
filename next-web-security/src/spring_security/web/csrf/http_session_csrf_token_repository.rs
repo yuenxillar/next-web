@@ -100,7 +100,7 @@ impl CsrfTokenRepository for HttpSessionCsrfTokenRepository {
                 };
                 session.set_attribute(
                     &self.session_attribute_name,
-                    AnyValue::Object(Box::new(Arc::clone(token))),
+                    AnyValue::BoxedValue(Box::new(Arc::clone(token))),
                 );
             }
         }
@@ -112,6 +112,6 @@ impl CsrfTokenRepository for HttpSessionCsrfTokenRepository {
         let session = request.session()?;
         session
             .attribute(&self.session_attribute_name)
-            .and_then(|value| value.as_object::<Arc<dyn CsrfToken>>())
+            .and_then(|value| value.to_value::<Arc<dyn CsrfToken>>())
     }
 }

@@ -299,9 +299,9 @@ async fn retry_context_attributes_survive_across_attempts() {
             Box::pin(async move {
                 let count = context
                     .get_attribute("attempts")
-                    .and_then(|value| value.as_number())
+                    .and_then(|value| value.as_u64())
                     .unwrap_or_default();
-                context.set_attribute("attempts", AnyValue::Number(count + 1));
+                context.set_attribute("attempts", (count + 1).into());
 
                 if count < 2 {
                     return Err(retry_error("needs more attempts"));

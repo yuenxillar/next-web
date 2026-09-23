@@ -6,13 +6,6 @@ publish = false
 license = "MIT"
 
 [dependencies]
-
-
-
-# next-web-data-database = { path = "../next-web-data-database", version = "0.1.0" }
-# next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "0.1.0" }
-
-[dev-dependencies]
 next-web                = { path = "../next-web", version = "*", features = ["full"]}
 next-web-core           = { path = "../next-web-core", version = "*" }
 next-web-context        = { path = "../next-web-context", version = "*" }
@@ -25,10 +18,13 @@ next-web-data-database  = { path = "../next-web-data/next-web-data-database", ve
 next-web-state-machine  = { path = "../next-web-state-machine", version = "*" }
 next-web-xxl-job        = { path = "../next-web-xxl-job", version = "*" }
 next-web-mail           = { path = "../next-web-mail", version = "*" }
-next-web-ip             = { path = "../next-web-ip", version = "0.1.0" }
-next-web-document       = { path = "../next-web-document", version = "0.1.0", features = [] }
-next-web-retry          = { path = "../next-web-retry", version = "*"}
+next-web-ip             = { path = "../next-web-ip", version = "*" }
+next-web-document       = { path = "../next-web-document", version = "*", features = [] }
+next-web-retry          = { path = "../next-web-retry", version = "*" }
 next-web-pay-alipay     = { path = "../next-web-pay/next-web-pay-alipay", version = "*" }
+
+# next-web-data-database = { path = "../next-web-data-database", version = "*" }
+# next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "*" }
 
 tokio           = { workspace = true, features = ["sync"]}
 serde           = { workspace = true }

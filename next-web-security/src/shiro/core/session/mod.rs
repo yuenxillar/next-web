@@ -40,7 +40,7 @@ pub enum SessionValue {
 }
 
 impl SessionValue {
-    pub fn as_object<T: AnyClone>(&self) -> Option<&T> {
+    pub fn to_value<T: AnyClone>(&self) -> Option<&T> {
         if let SessionValue::Object(ref obj) = self {
             (obj as &dyn Any).downcast_ref::<T>()
         } else {

@@ -96,7 +96,9 @@ impl RequestCache for HttpSessionRequestCache {
             if let Some(session) = request.session_mut(true) {
                 session.set_attribute(
                     &self.session_attr_name,
-                    AnyValue::Object(Box::new(Arc::new(saved_request) as Arc<dyn SavedRequest>)),
+                    AnyValue::BoxedValue(
+                        Box::new(Arc::new(saved_request) as Arc<dyn SavedRequest>),
+                    ),
                 );
             }
             if tracing::enabled!(Level::DEBUG) {
@@ -120,7 +122,7 @@ impl RequestCache for HttpSessionRequestCache {
         };
         session
             .attribute(&self.session_attr_name)
-            .and_then(|req| req.as_object::<Arc<dyn SavedRequest>>())
+            .and_then(|req| req.to_value::<Arc<dyn SavedRequest>>())
     }
 
     fn get_matching_request<'a>(

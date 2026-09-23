@@ -63,7 +63,7 @@ impl AccessDeniedHandler for AccessDeniedHandlerImpl {
         // Put exception into request scope (perhaps of use to a view)
         request.set_attribute(
             WebAttributes::ACCESS_DENIED_403,
-            AnyValue::Object(Box::new(access_denied_error.clone())),
+            AnyValue::BoxedValue(Box::new(access_denied_error.clone())),
         );
         // Set the 403 status code.
         response.set_status_code(StatusCode::FORBIDDEN);

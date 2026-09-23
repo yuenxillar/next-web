@@ -93,7 +93,7 @@ impl HttpSessionSecurityContextRepository {
         if let Some(session) = session {
             session.set_attribute(
                 &self.next_security_context_key,
-                AnyValue::Object(Box::new(context.to_owned())),
+                AnyValue::BoxedValue(Box::new(context.to_owned())),
             );
             debug!(
                 "Stored SecurityContext to HttpSession [{}]",
@@ -148,7 +148,7 @@ impl HttpSessionSecurityContextRepository {
         // Check if it's actually a SecurityContext (would need Any downcast in Rust)
         // For now, assume it's properly typed
         let context_from_session = match context_from_session
-            .as_ref_object::<Arc<dyn SecurityContext>>()
+            .as_ref_value::<Arc<dyn SecurityContext>>()
         {
             Some(s) => s,
             None => {

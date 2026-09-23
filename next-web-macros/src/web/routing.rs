@@ -357,7 +357,13 @@ fn generate_block(
                                                 );
                                                 let single_name = Ident::new(&crate::util::name::field_name_to_singleton_name(&original_variable.to_string()), Span::call_site());
                                                 let stream = quote! {
-                                                    let #original_variable = #variable.get_single_with_name::<#arg>(stringify!(#single_name)).await;
+                                                    pub use ::next_web::context::ApplicationContextExt;
+
+                                                    let #original_variable =
+                                                        match ::next_web::extract::find_singleton::find::<#arg>( #variable, stringify!(#single_name).to_owned()).await {
+                                                            Some(value) => value,
+                                                            None => return (::next_web::http::StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response(),
+                                                        };
                                                 };
 
                                                 variables.push(stream);
@@ -369,19 +375,33 @@ fn generate_block(
                                         if flag {
                                             angle_bracketed.args.clear();
                                             angle_bracketed.args.push(syn::GenericArgument::Type(
-                                                    parse_quote!(::next_web::core::state::application_state::ApplicationState)
+                                                parse_quote!(::next_web::ApplicationState),
                                             ));
 
-                                            let pat = syn::Pat::Ident(syn::PatIdent {
+                                            let inner_ident = Ident::new(
+                                                format!("__my_service{}", index).as_str(),
+                                                Span::call_site(),
+                                            );
+
+                                            let pat = syn::Pat::TupleStruct(syn::PatTupleStruct {
                                                 attrs: vec![],
-                                                by_ref: None,
-                                                mutability: None,
-                                                ident: Ident::new(
-                                                    format!("__my_service{}", index).as_str(),
-                                                    Span::call_site(),
-                                                ),
-                                                subpat: None,
+                                                qself: None,
+                                                path: parse_quote!(::next_web::extract::Extension),
+                                                paren_token: Default::default(),
+                                                elems: {
+                                                    let mut elems =
+                                                        syn::punctuated::Punctuated::new();
+                                                    elems.push(syn::Pat::Ident(syn::PatIdent {
+                                                        attrs: vec![],
+                                                        by_ref: None,
+                                                        mutability: None,
+                                                        ident: inner_ident,
+                                                        subpat: None,
+                                                    }));
+                                                    elems
+                                                },
                                             });
+
                                             pat_type.pat = Box::new(pat);
                                         }
                                     }
@@ -394,11 +414,9 @@ fn generate_block(
                         }
 
                         if is_single {
-                            let arg: syn::Type = parse_quote!(
-                                ::next_web::core::state::application_state::ApplicationState
-                            );
+                            let arg: syn::Type = parse_quote!(::next_web::ApplicationState);
                             let path: syn::Path =
-                                parse_quote!(::next_web::extract::Extension<#arg>);
+                                parse_quote!(::next_web::extract::Extension<& #arg>);
                             type_path.path = path;
                         }
                     }
@@ -513,7 +531,7 @@ fn generate_block(
         }
     };
 
-    // println!("token_stream: \n{}", token_stream.to_string());
+    println!("token_stream: \n{}", token_stream.to_string());
 
     Ok(token_stream.into())
 }

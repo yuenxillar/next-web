@@ -1,17 +1,15 @@
 use std::sync::Arc;
 
+use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use next_web::core::ApplicationContext;
-use next_web::core::context::MessageSource;
-use next_web::extract::Path;
-use next_web::i18n::RequestLocaleHolder;
-use next_web::macros::i18n::translation;
 use next_web::{
     application::Application,
     core::{async_trait, context::properties::ApplicationProperties},
     macros::bind::get_mapping,
 };
+use next_web_context::MessageSource;
 
 #[derive(Clone, Default)]
 pub struct TestApplication;
@@ -42,18 +40,13 @@ impl IntoResponse for ApiResponse {
     }
 }
 
-#[translation]
 #[get_mapping(path = "/message/{msg}")]
 async fn req_message(
     Path(code): Path<String>,
     #[find] FindSingleton(message_source): FindSingleton<Arc<dyn MessageSource>>,
 ) -> impl IntoResponse {
     message_source
-        .message_with_args(
-            code.as_str(),
-            &["Ben", "Jack", "John"],
-            RequestLocaleHolder::locale_or_default(),
-        )
+        .message(code.as_str(), None, None)
         .unwrap_or("Sorry!!".into())
 }
 

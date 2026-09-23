@@ -164,7 +164,7 @@ where
 
 impl<T: 'static + Any + Clone + Send + Sync> From<CacheObject<T>> for AnyValue {
     fn from(value: CacheObject<T>) -> Self {
-        AnyValue::Object(Box::new(value.0))
+        AnyValue::BoxedValue(Box::new(value.0))
     }
 }
 

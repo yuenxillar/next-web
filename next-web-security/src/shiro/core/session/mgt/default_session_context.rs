@@ -69,7 +69,7 @@ impl SessionContext for DefaultSessionContext {
     fn get_session_id(&self) -> Option<&SessionId> {
         self.map_context
             .get(Self::SESSION_ID)
-            .map(Object::as_object)
+            .map(Object::to_value)
             .unwrap_or_default()
     }
 

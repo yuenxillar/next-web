@@ -141,7 +141,7 @@ impl LoginUrlAuthenticationEntryPoint {
     {
         request
             .get_attribute(name)
-            .and_then(|val| val.as_ref_object::<T>())
+            .and_then(|val| val.as_ref_value::<T>())
     }
 
     /// Builds the redirect URL to the login page, considering force HTTPS and

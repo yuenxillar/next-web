@@ -157,9 +157,16 @@ mod tests {
         let filter = RemoveJsonAttributesResponseBodyFilter::from(config);
         let mut ctx = test_ctx();
         let mut response_body = Some(Bytes::from(body.to_string()));
-        let mut exchange = crate::server::DefaultServerWebExchange::new(&mut ctx, crate::context::HeaderAndBody::with_resp_body(&mut response_body));
+        let mut exchange = crate::server::DefaultServerWebExchange::new(
+            &mut ctx,
+            crate::context::HeaderAndBody::with_resp_body(&mut response_body),
+        );
 
-        futures::executor::block_on(filter.filter(&mut exchange, &crate::handler::DefaultGatewayFilterChain::default())).unwrap();
+        futures::executor::block_on(filter.filter(
+            &mut exchange,
+            &crate::handler::DefaultGatewayFilterChain::default(),
+        ))
+        .unwrap();
         drop(exchange);
 
         String::from_utf8(response_body.unwrap().to_vec()).unwrap()

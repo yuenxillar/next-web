@@ -1,4 +1,4 @@
-use crate::{traits::group::Group, util::singleton::SingletonUtil};
+use crate::{traits::group::Group, util::SingletonUtil};
 
 /// 单例
 ///

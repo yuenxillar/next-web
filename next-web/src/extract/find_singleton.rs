@@ -1,10 +1,12 @@
 use std::ops::{Deref, DerefMut};
 
+use crate::ApplicationState;
 use axum::{
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
 };
-use next_web_core::{state::application_state::ApplicationState, util::singleton::SingletonUtil};
+use next_web_context::ApplicationContextExt;
+use next_web_core::util::SingletonUtil;
 
 #[derive(Clone)]
 pub struct FindSingleton<T>(pub T);
@@ -38,16 +40,45 @@ where
     type Rejection = (StatusCode, &'static str);
 
     async fn from_request_parts(req: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let state = req.extensions.get_mut::<ApplicationState>();
+        let state = req
+            .extensions
+            .get::<ApplicationState>()
+            .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
 
-        let state = state.ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
-        let singleton_name = SingletonUtil::name::<T>();
+        let name = SingletonUtil::name::<T>();
 
-        let instance = state
-            .find_single_with_name::<T>(singleton_name)
+        let instance = find(state, name)
             .await
             .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
 
         Ok(Self(instance))
     }
+}
+
+pub async fn find<T>(state: &ApplicationState, name: String) -> Option<T>
+where
+    T: Send + Sync,
+    T: Clone + 'static,
+{
+    let reader = state.read().await;
+
+    if let Some(instance) = reader
+        .get_single_option_with_name::<T>(name.to_owned())
+        .map(Clone::clone)
+    {
+        return Some(instance);
+    }
+
+    if let Some(instance) = reader
+        .get_single_option_with_name::<T>("")
+        .map(Clone::clone)
+    {
+        return Some(instance);
+    }
+
+    drop(reader);
+
+    let mut writer = state.write().await;
+
+    writer.resolve_option_with_name::<T>(name)
 }

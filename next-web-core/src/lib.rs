@@ -18,7 +18,6 @@ pub mod metrics;
 pub mod mime_type;
 pub mod scheduler;
 pub mod server;
-pub mod state;
 pub mod store;
 pub mod traits;
 pub mod util;

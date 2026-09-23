@@ -68,7 +68,7 @@ impl DefaultSubjectDAO {
                     .get_attribute(DefaultSubjectContext::PRINCIPALS_SESSION_KEY)
                     .await;
                 if let Some(value) = value {
-                    if let Some(pc) = value.as_object::<Arc<dyn PrincipalCollection>>() {
+                    if let Some(pc) = value.to_value::<Arc<dyn PrincipalCollection>>() {
                         if current_principals.map(|a| a.is_empty()).unwrap_or(true) {
                             if !pc.is_empty() {
                                 session
@@ -177,7 +177,7 @@ impl SubjectDAO for DefaultSubjectDAO {
             self.save_to_session(subject).await;
         } else {
             tracing::trace!(
-                "Session storage of subject state for Subject [{}] has been disabled: identity and 
+                "Session storage of subject state for Subject [{}] has been disabled: identity and
                 authentication state are expected to be initialized on every request or invocation.",
                 "todo!()"
             )

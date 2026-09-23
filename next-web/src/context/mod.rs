@@ -11,3 +11,5 @@ pub use application_pid_file_writer::{
     PIDFILE_ENVIRONMENT_VARIABLE, PIDFILE_PROPERTY, PID_FILE_PROPERTY,
 };
 pub use default_application_context::DefaultApplicationContext;
+
+pub use next_web_context::*;

@@ -83,7 +83,7 @@ impl X509AuthenticationFilter {
             return Some(certificate);
         }
 
-        let certificate = value.as_object::<X509Certificate>();
+        let certificate = value.to_value::<X509Certificate>();
         match &certificate {
             Some(certificate) => {
                 debug!("X.509 client authentication certificate: {}", certificate)
@@ -202,11 +202,13 @@ mod tests {
         ) -> Result<Arc<dyn Authentication>, AuthenticationError> {
             let principal = authentication.name().to_string();
             let credentials = authentication.credentials().map(ToString::to_string);
-            Ok(Arc::new(PreAuthenticatedAuthenticationToken::with_authorities(
-                Arc::new(principal) as AuthPrincipal,
-                credentials.map(|credentials| Arc::new(credentials) as AuthPrincipal),
-                AuthorityUtils::create_authority_list(["FACTOR_X509"]),
-            )))
+            Ok(Arc::new(
+                PreAuthenticatedAuthenticationToken::with_authorities(
+                    Arc::new(principal) as AuthPrincipal,
+                    credentials.map(|credentials| Arc::new(credentials) as AuthPrincipal),
+                    AuthorityUtils::create_authority_list(["FACTOR_X509"]),
+                ),
+            ))
         }
     }
 
@@ -264,11 +266,13 @@ mod tests {
             *self.details.lock().await = authentication.details().map(ToString::to_string);
             let principal = authentication.name().to_string();
             let credentials = authentication.credentials().map(ToString::to_string);
-            Ok(Arc::new(PreAuthenticatedAuthenticationToken::with_authorities(
-                Arc::new(principal) as AuthPrincipal,
-                credentials.map(|credentials| Arc::new(credentials) as AuthPrincipal),
-                AuthorityUtils::create_authority_list(["FACTOR_X509"]),
-            )))
+            Ok(Arc::new(
+                PreAuthenticatedAuthenticationToken::with_authorities(
+                    Arc::new(principal) as AuthPrincipal,
+                    credentials.map(|credentials| Arc::new(credentials) as AuthPrincipal),
+                    AuthorityUtils::create_authority_list(["FACTOR_X509"]),
+                ),
+            ))
         }
     }
 
@@ -391,7 +395,7 @@ mod tests {
         let mut request = test_request();
         request.set_attribute(
             DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE,
-            AnyValue::Object(Box::new(X509Certificate::new("CN=Alice,O=Example"))),
+            AnyValue::BoxedValue(Box::new(X509Certificate::new("CN=Alice,O=Example"))),
         );
         let mut response = test_response();
         let chain = RecordingChain::default();

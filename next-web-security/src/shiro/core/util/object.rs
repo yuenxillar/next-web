@@ -109,7 +109,7 @@ impl Object {
         }
     }
 
-    pub fn as_object<T: AnyObject>(&self) -> Option<&T> {
+    pub fn to_value<T: AnyObject>(&self) -> Option<&T> {
         match self {
             Object::Obj(obj) => (obj as &dyn Any).downcast_ref::<T>(),
             _ => None,

@@ -135,7 +135,7 @@ impl HttpFilter for CsrfFilter {
             load_deferred_token(self.token_repository.clone(), request, response);
         request.set_attribute(
             type_name::<&dyn DeferredCsrfToken>(),
-            AnyValue::Object(Box::new(deferred_csrf_token.clone())),
+            AnyValue::BoxedValue(Box::new(deferred_csrf_token.clone())),
         );
         self.request_handler
             .handle(request, response, &mut deferred_csrf_token)

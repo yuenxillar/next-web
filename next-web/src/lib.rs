@@ -53,7 +53,9 @@ pub use configurable_application_context::ConfigurableApplicationContext;
 pub use default_application_arguments::DefaultApplicationArguments;
 pub use environment_post_processor::EnvironmentPostProcessor;
 pub use error_handler::ErrorHandler;
-pub use next_web_application::{Application, NextWebApplication};
+pub use next_web_application::{
+    Application, ApplicationResult, ApplicationState, NextWebApplication,
+};
 pub use next_web_error_reporter::NextWebErrorReporter;
 pub use next_web_version::NextWebVersion;
 pub use resource_banner::ResourceBanner;

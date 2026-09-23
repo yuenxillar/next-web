@@ -15,13 +15,13 @@
 //! ```
 
 use std::any::{Any, TypeId};
-use std::sync::Arc;
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use next_web_singletons::factory::support::Key;
 
-use crate::application_context::{InstanceClone, default_singleton_name};
 use crate::ApplicationContext;
+use crate::application_context::{InstanceClone, default_singleton_name};
 
 /// Type safe access to the singletons of an [`ApplicationContext`].
 ///
@@ -235,13 +235,78 @@ pub trait ApplicationContextExt: ApplicationContext {
     ///
     /// * `T` - The type of the instance.
     /// * `N` - The name type.
-    fn get_single_option_mut_with_name<T>(&mut self, name: impl Into<Cow<'static, str>>) -> Option<&mut T>
+    fn get_single_option_mut_with_name<T>(
+        &mut self,
+        name: impl Into<Cow<'static, str>>,
+    ) -> Option<&mut T>
     where
         T: 'static,
     {
         let key = Key::new::<T>(name.into());
         self.get_singleton_boxed_mut(&key)
             .and_then(|instance| instance.downcast_mut::<T>())
+    }
+
+    /// Returns a mutable reference to the instance registered under the given
+    /// name.
+    ///
+    /// The mutable reference is what lets an item that is built by the context
+    /// modify a singleton: the instance is borrowed from the context, so the
+    /// changes are the ones the context keeps.
+    ///
+    /// # Panics
+    ///
+    /// Panics when no instance is registered for the type and name.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instance.
+    /// * `N` - The name type.
+    #[track_caller]
+    fn get_single_mut_with_name<T>(&mut self, name: impl Into<Cow<'static, str>>) -> &mut T
+    where
+        T: 'static,
+    {
+        let key = Key::new::<T>(name.into());
+        self.get_singleton_boxed_mut(&key)
+            .and_then(|instance| instance.downcast_mut::<T>())
+            .unwrap_or_else(|| panic!("no instance is registered for: {key:?}"))
+    }
+
+    /// Creates the instance registered under the given name, when it does not
+    /// exist yet.
+    ///
+    /// The instance is built through its provider and stored in the context, so
+    /// that a reference to it can be taken afterwards. This is what lets an item
+    /// borrow an instance that was not inserted or resolved before.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the context has no provider for the type and name.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instance.
+    /// * `N` - The name type.
+    #[track_caller]
+    fn just_create_single_with_name<T>(&mut self, name: impl Into<Cow<'static, str>>)
+    where
+        T: Send + Sync + 'static,
+    {
+        let key = Key::new::<T>(name.into());
+
+        if self.contains_singleton(&key) {
+            return;
+        }
+
+        // Resolving a singleton stores it in the context. The owned copy the
+        // resolution returns as well is dropped again, because the callers of
+        // this method only want the instance to exist.
+        let _ = self.resolve_option_boxed::<T>(&key);
+
+        if !self.contains_singleton(&key) {
+            panic!("no instance could be created for: {key:?}");
+        }
     }
 
     /// Resolves the instance registered under the empty name `""`.
@@ -364,10 +429,11 @@ pub trait ApplicationContextExt: ApplicationContext {
     where
         T: Send + Sync + 'static,
     {
-        self.resolve_boxed(key)
-            .map(|instance| *instance.downcast::<T>().expect(
-                "the context resolved an instance whose type does not match its key",
-            ))
+        self.resolve_boxed(key).map(|instance| {
+            *instance
+                .downcast::<T>()
+                .expect("the context resolved an instance whose type does not match its key")
+        })
     }
 }
 
@@ -451,7 +517,9 @@ mod tests {
                 .cloned()
                 .collect();
 
-            keys.iter().filter_map(|key| self.resolve_boxed(key)).collect()
+            keys.iter()
+                .filter_map(|key| self.resolve_boxed(key))
+                .collect()
         }
     }
 
@@ -519,10 +587,7 @@ mod tests {
         context.insert_singleton("value".to_owned());
 
         assert_eq!(context.resolve::<String>(), "value");
-        assert_eq!(
-            context.resolve_option::<String>(),
-            Some("value".to_owned())
-        );
+        assert_eq!(context.resolve_option::<String>(), Some("value".to_owned()));
     }
 
     #[test]
@@ -531,6 +596,35 @@ mod tests {
 
         assert!(context.resolve_option::<u32>().is_none());
         assert!(context.get_single_option::<u32>().is_none());
+    }
+
+    #[test]
+    fn changes_the_instance_a_mutable_reference_points_to() {
+        let mut context = FakeContext::default();
+        context.insert_singleton_with_name(String::from("value"), "name");
+
+        context.get_single_mut_with_name::<String>("name").push('!');
+
+        // The instance the context keeps is the one that was changed.
+        assert_eq!(context.get_single_with_name::<String>("name"), "value!");
+    }
+
+    #[test]
+    fn keeps_the_instance_that_exists_already() {
+        let mut context = FakeContext::default();
+        context.insert_singleton_with_name(7_u32, "answer");
+
+        context.just_create_single_with_name::<u32>("answer");
+
+        assert_eq!(context.get_single_with_name::<u32>("answer"), &7);
+    }
+
+    #[test]
+    #[should_panic(expected = "no instance could be created")]
+    fn creating_an_instance_without_a_provider_panics() {
+        let mut context = FakeContext::default();
+
+        context.just_create_single_with_name::<u32>("answer");
     }
 
     #[test]
@@ -566,10 +660,12 @@ mod tests {
         let key = Key::new::<u8>("one".into());
         let removed = context.remove_singleton_boxed(&key);
 
-        assert_eq!(removed.and_then(|instance| instance.downcast::<u8>().ok()).map(|instance| *instance), Some(1));
+        assert_eq!(
+            removed
+                .and_then(|instance| instance.downcast::<u8>().ok())
+                .map(|instance| *instance),
+            Some(1)
+        );
         assert!(!context.contains_single_with_name::<u8>("one"));
     }
 }
-
-
-

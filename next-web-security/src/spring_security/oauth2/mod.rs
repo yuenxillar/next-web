@@ -507,7 +507,7 @@ impl AuthorizationRequestRepository for HttpSessionOAuth2AuthorizationRequestRep
         request.session().and_then(|session| {
             session
                 .attribute(&self.session_attribute_name)
-                .and_then(|value| value.as_ref_object::<OAuth2AuthorizationRequest>())
+                .and_then(|value| value.as_ref_value::<OAuth2AuthorizationRequest>())
                 .cloned()
         })
     }
@@ -523,7 +523,7 @@ impl AuthorizationRequestRepository for HttpSessionOAuth2AuthorizationRequestRep
                 if let Some(session) = request.session_mut(true) {
                     session.set_attribute(
                         &self.session_attribute_name,
-                        AnyValue::Object(Box::new(authorization_request)),
+                        AnyValue::BoxedValue(Box::new(authorization_request)),
                     );
                 }
             }
@@ -542,7 +542,7 @@ impl AuthorizationRequestRepository for HttpSessionOAuth2AuthorizationRequestRep
         let session = request.session()?;
         let authorization_request = session
             .attribute(&self.session_attribute_name)
-            .and_then(|value| value.as_ref_object::<OAuth2AuthorizationRequest>())
+            .and_then(|value| value.as_ref_value::<OAuth2AuthorizationRequest>())
             .cloned();
         if authorization_request.is_some() {
             session.remove_attribute(&self.session_attribute_name);

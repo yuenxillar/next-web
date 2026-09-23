@@ -206,6 +206,7 @@ impl Default for Builder {
 }
 
 impl Builder {
+    /// Creates a new [`Builder`] with default settings.
     pub fn new() -> Self {
         Self::default()
     }
@@ -224,18 +225,22 @@ impl Builder {
     }
 
     /// Names workers using the prefix followed by a numeric worker ID.
+    #[allow(unused)]
     pub fn thread_name_prefix(mut self, value: impl Into<String>) -> Self {
         self.thread_name = Some(value.into());
         self.name_is_prefix = true;
         self
     }
 
+    /// Sets the stack size for worker threads.
+    #[allow(unused)]
     pub fn thread_stack_size(mut self, value: usize) -> Self {
         self.stack_size = Some(value);
         self
     }
 
     /// Sets the bounded waiting queue capacity.
+    #[allow(unused)]
     pub fn queue_capacity(mut self, value: usize) -> Self {
         assert!(value > 0, "queue_capacity must be greater than zero");
         self.queue_capacity = value;

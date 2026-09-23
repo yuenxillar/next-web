@@ -228,8 +228,8 @@ impl MessageHeaderAccessor {
         self.get_header("timestamp").and_then(|value| {
             if let Some(ts) = value.as_string() {
                 ts.parse().ok()
-            } else if let Some(ts) = value.as_number() {
-                ts.try_into().ok()
+            } else if let Some(ts) = value.as_u64() {
+                Some(ts)
             } else {
                 None
             }
@@ -247,7 +247,7 @@ impl MessageHeaderAccessor {
     /// Get content type.
     pub fn get_content_type(&self) -> Option<&MimeType> {
         self.get_header("contentType")
-            .and_then(|v| v.as_ref_object::<MimeType>())
+            .and_then(|v| v.as_ref_value::<MimeType>())
     }
 
     /// Set reply channel name.
@@ -266,7 +266,7 @@ impl MessageHeaderAccessor {
     {
         self.set_header(
             "replyChannel".to_string(),
-            AnyValue::Object(Box::new(reply_channel)),
+            AnyValue::BoxedValue(Box::new(reply_channel)),
         );
     }
 
@@ -291,7 +291,7 @@ impl MessageHeaderAccessor {
     {
         self.set_header(
             "errorChannel".to_string(),
-            AnyValue::Object(Box::new(error_channel)),
+            AnyValue::BoxedValue(Box::new(error_channel)),
         );
     }
 

@@ -208,7 +208,7 @@ impl AroundFilterObservation {
 pub fn observation(request: &dyn HttpRequest) -> AroundFilterObservation {
     request
         .get_attribute(ATTRIBUTE)
-        .and_then(|value| value.as_object::<AroundFilterObservation>())
+        .and_then(|value| value.to_value::<AroundFilterObservation>())
         .unwrap_or_else(AroundFilterObservation::noop)
 }
 
@@ -317,7 +317,7 @@ impl ObservationFilter {
     fn parent(request: &mut dyn HttpRequest) -> AroundFilterObservation {
         let parent =
             AroundFilterObservation::create(new_chain_span("before"), new_chain_span("after"));
-        request.set_attribute(ATTRIBUTE, AnyValue::Object(Box::new(parent.clone())));
+        request.set_attribute(ATTRIBUTE, AnyValue::BoxedValue(Box::new(parent.clone())));
         parent
     }
 

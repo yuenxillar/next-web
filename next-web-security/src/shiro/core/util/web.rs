@@ -121,7 +121,7 @@ impl WebUtils {
     ) -> Box<dyn Subject> {
         if let Some(subject) = req.get_attribute("NextSubject") {
             match subject {
-                AnyValue::Object(obj) => {
+                AnyValue::BoxedValue(obj) => {
                     if let Some(subject) = (obj as &dyn Any).downcast_ref::<WebDelegatingSubject>()
                     {
                         return Box::new(subject.clone());
@@ -133,7 +133,7 @@ impl WebUtils {
 
         req.get_attribute(DEFAULT_WEB_DELEGATING_SUBJECT_KEY)
             .unwrap()
-            .as_object::<Arc<dyn SecurityManager>>()
+            .to_value::<Arc<dyn SecurityManager>>()
             .unwrap()
             .create_subject(Arc::new(DefaultWebSubjectContext::default()), req, resp)
             .await

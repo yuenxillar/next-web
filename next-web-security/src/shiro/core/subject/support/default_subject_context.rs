@@ -103,7 +103,7 @@ impl DefaultSubjectContext {
     fn get_type_value<T: AnyObject>(&self, key: &str) -> Option<&T> {
         self.map_context
             .get(key)
-            .map(|value| value.as_object::<T>())?
+            .map(|value| value.to_value::<T>())?
     }
 
     fn set_value(&mut self, key: impl ToString, value: Object) {
@@ -180,7 +180,7 @@ impl SubjectContext for DefaultSubjectContext {
                 // principals = session
                 //     .get_attribute(Self::PRINCIPALS_SESSION_KEY)
                 //     .await
-                //     .map(|value| value.as_object::<Arc<dyn PrincipalCollection>>())
+                //     .map(|value| value.to_value::<Arc<dyn PrincipalCollection>>())
                 //     .unwrap_or_default();
                 todo!()
             }

@@ -150,7 +150,7 @@ impl StateMachineUtils {
         context.message_headers().map(|headers| {
             headers
                 .get(HEADER_DO_ACTION_TIMEOUT)
-                .map(|val| val.as_number())
+                .map(|val| val.as_i64())
                 .unwrap_or_default()
         })?
     }

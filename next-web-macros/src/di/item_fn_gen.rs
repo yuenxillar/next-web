@@ -2,18 +2,13 @@ use from_attr::{AttrsValue, FromAttr, PathValue};
 use next_web_context::{Color, Scope};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{GenericParam, ItemFn, ReturnType};
+use syn::{Expr, ExprLit, GenericParam, Ident, ItemFn, Lit, LitStr, ReturnType};
 
 use crate::di::{
     commons::{self, ArgumentResolveStmts},
     resource_attr::ResourceAttr,
     struct_or_function_attr::{ClosureOrPath, StructOrFunctionAttr},
 };
-
-// #[Singleton]
-// fn One(#[resource(name = "hello")] i: i32) -> String {
-//     i.to_string()
-// }
 
 pub(crate) fn generate(
     attr: StructOrFunctionAttr,
@@ -80,6 +75,11 @@ pub(crate) fn generate(
 
     let ident = &item_fn.sig.ident;
 
+    // The name of the singleton a function provides defaults to the name of
+    // the function in camel case, so that `fn test_name(...)` provides
+    // `testName`.
+    let name = provider_name(&name, ident);
+
     let return_type_ident = match &item_fn.sig.output {
         ReturnType::Default => quote! {
             ()
@@ -89,9 +89,19 @@ pub(crate) fn generate(
         },
     };
 
+    // The type the provider of the function is implemented for carries no
+    // value: it only gives the provider a name of its own, and the provided
+    // type is the return type of the function.
+    //
+    // The type has a field, even when the function is not generic, so that it
+    // is not a unit struct: a field or an argument that is named like the
+    // function would otherwise be read as a pattern of this type instead of as
+    // a binding.
     let struct_definition = if item_fn.sig.generics.params.is_empty() {
         quote! {
-            #vis struct #ident;
+            #vis struct #ident {
+                _mark: (),
+            }
         }
     } else {
         let members = item_fn
@@ -180,4 +190,30 @@ pub(crate) fn generate(
     };
 
     Ok(expand)
+}
+
+/// Returns the name the provider of a function is registered with.
+///
+/// The name given with `name = "..."` wins. Without it the provider is named
+/// after the function, in camel case: `fn test_name(...)` provides the instance
+/// named `testName`.
+///
+/// # Arguments
+///
+/// * `name` - The `name` argument of the attribute.
+/// * `function` - The name of the function the provider is generated for.
+fn provider_name(name: &Expr, function: &Ident) -> Expr {
+    match name {
+        Expr::Lit(ExprLit {
+            lit: Lit::Str(lit), ..
+        }) if lit.value().is_empty() => {
+            let name = crate::util::name::field_name_to_singleton_name(&function.to_string());
+
+            Expr::Lit(ExprLit {
+                attrs: Vec::new(),
+                lit: Lit::Str(LitStr::new(&name, lit.span())),
+            })
+        }
+        name => name.clone(),
+    }
 }

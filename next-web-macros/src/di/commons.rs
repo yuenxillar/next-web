@@ -4,8 +4,8 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
-    Attribute, Expr, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident,
-    PatType, Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath, TypeReference,
+    Attribute, Expr, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident, Pat,
+    PatIdent, PatType, Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath, TypeReference,
 };
 
 use crate::di::{field_or_argument_attr::FieldOrArgumentAttr, value_attr::ValueAttr};
@@ -86,6 +86,24 @@ fn extract_ref_type(ty: &Type) -> syn::Result<&Type> {
     }
 
     Ok(ty)
+}
+
+/// Returns the type below every reference of `ty`.
+///
+/// The type of the instance a reference stands for is the one below its
+/// references, so `&T`, `&mut T` and `&&T` all yield `T`.
+///
+/// # Arguments
+///
+/// * `ty` - The type the references are removed from.
+fn strip_references(ty: &Type) -> &Type {
+    let mut ty = ty;
+
+    while let Type::Reference(TypeReference { elem, .. }) = ty {
+        ty = elem;
+    }
+
+    ty
 }
 
 fn extract_path_type<'a>(ty: &'a Type, ty_name: &str) -> syn::Result<&'a Type> {
@@ -303,6 +321,19 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         Err(AttrsValue { value, .. }) => return Err(value),
     };
 
+    // A field or an argument that is declared as a reference does not have to
+    // spell out `ref`: whether the instance is taken from the context mutably
+    // or immutably is already written in the type. The value is `Some(true)`
+    // for a `&mut T`, `Some(false)` for a `&T` and `None` when the type is not
+    // a reference, or when `ref` was given explicitly.
+    let inferred_ref = match ref_ {
+        FlagOrValue::None => match field_or_argument_ty {
+            Type::Reference(TypeReference { mutability, .. }) => Some(mutability.is_some()),
+            _ => None,
+        },
+        FlagOrValue::Flag { .. } | FlagOrValue::Value { .. } => None,
+    };
+
     // If name is empty, It is to generate singleton names using field names
     let name: Expr = match name {
         Expr::Lit(expr_lit) => {
@@ -310,8 +341,12 @@ fn generate_only_one_field_or_argument_resolve_stmt(
             if signleton_name.is_empty() {
                 match field_name {
                     Some(_name) => {
+                        // A leading underscore only marks a name that is not
+                        // used, so it is not part of the name of the instance.
+                        let field_name = _name.to_string();
+                        let field_name = field_name.trim_start_matches('_');
                         let singleton_name =
-                            crate::util::name::field_name_to_singleton_name(&_name.to_string());
+                            crate::util::name::field_name_to_singleton_name(field_name);
 
                         Expr::Lit(syn::PatLit {
                             attrs: Default::default(),
@@ -322,28 +357,32 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                         })
                     }
                     None => {
-                        if let syn::Type::Path(path) = field_or_argument_ty {
-                            let ident = match path.path.get_ident() {
-                                Some(ident) => ident.clone(),
-                                None => {
-                                    return Err(syn::Error::new(
-                                        field_or_argument_ty.span(),
-                                        "not support non-ident type",
-                                    ));
-                                }
-                            };
-                            let singleton_name =
-                                crate::util::name::singleton_name(&ident.to_string());
+                        // A reference stands for the type it refers to, so a
+                        // field or an argument is named after the type below
+                        // its references, with the first character lower cased:
+                        // `&MyService` is named `myService`. A type with
+                        // generic arguments is named after its own name, e.g.
+                        // `Vec<MyService>` after `Vec`.
+                        match strip_references(field_or_argument_ty) {
+                            syn::Type::Path(TypePath { qself: None, path }) => {
+                                match path.segments.last() {
+                                    Some(segment) => {
+                                        let name = segment.ident.to_string();
+                                        let singleton_name =
+                                            crate::util::name::singleton_name(&name);
 
-                            Expr::Lit(syn::PatLit {
-                                attrs: Default::default(),
-                                lit: syn::Lit::Str(syn::LitStr::new(
-                                    &singleton_name,
-                                    Span::call_site(),
-                                )),
-                            })
-                        } else {
-                            Expr::Lit(expr_lit)
+                                        Expr::Lit(syn::PatLit {
+                                            attrs: Default::default(),
+                                            lit: syn::Lit::Str(syn::LitStr::new(
+                                                &singleton_name,
+                                                Span::call_site(),
+                                            )),
+                                        })
+                                    }
+                                    None => Expr::Lit(expr_lit),
+                                }
+                            }
+                            _ => Expr::Lit(expr_lit),
                         }
                     }
                 }
@@ -368,9 +407,12 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         false
     };
 
-    let ident = match ref_ {
-        FlagOrValue::None => format_ident!("owned_{}", index),
-        FlagOrValue::Flag { .. } | FlagOrValue::Value { .. } => format_ident!("ref_{}", index),
+    // A reference is bound to a name of its own, whether it was spelled out
+    // with `ref` or inferred from the type of the field or argument.
+    let is_reference = inferred_ref.is_some() || !matches!(ref_, FlagOrValue::None);
+    let ident = match is_reference {
+        false => format_ident!("owned_{}", index),
+        true => format_ident!("ref_{}", index),
     };
 
     if option {
@@ -596,6 +638,39 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         };
     }
 
+    if let Some(is_mut_ref) = inferred_ref {
+        let instance_ty = strip_references(field_or_argument_ty);
+
+        // The instance is created in the context first, so that the item can
+        // borrow it: a `&T` borrows it immutably and a `&mut T` mutably, which
+        // is what makes an item able to modify a singleton.
+        let create_single = match color {
+            Color::Async => parse_quote! {
+                cx.just_create_single_with_name_async::<#instance_ty>(#name).await;
+            },
+            Color::Sync => parse_quote! {
+                cx.just_create_single_with_name::<#instance_ty>(#name);
+            },
+        };
+
+        let get_single = match is_mut_ref {
+            false => parse_quote! {
+                let #ident = cx.get_single_with_name(#name);
+            },
+            true => parse_quote! {
+                let #ident = cx.get_single_mut_with_name(#name);
+            },
+        };
+
+        return Ok(ResolveOne {
+            stmt: ResolveOneValue::Ref {
+                create_single,
+                get_single,
+            },
+            variable: ident,
+        });
+    }
+
     let ty = match ref_ {
         FlagOrValue::None => None,
         FlagOrValue::Flag { .. } => {
@@ -669,6 +744,78 @@ pub(crate) struct ArgumentResolveStmts {
     pub(crate) args: Vec<Ident>,
 }
 
+/// Adds the statements a resolved field or argument needs to the two sets of
+/// statements a constructor runs before it builds its instance.
+///
+/// # Arguments
+///
+/// * `stmt` - The statements produced for one field or argument.
+/// * `ref_mut_cx_stmts` - The statements that need the context mutably.
+/// * `ref_cx_stmts` - The statements that borrow the instances the first set
+///   stored in the context.
+fn push_resolve_stmts(
+    stmt: ResolveOneValue,
+    ref_mut_cx_stmts: &mut Vec<Stmt>,
+    ref_cx_stmts: &mut Vec<Stmt>,
+) {
+    match stmt {
+        ResolveOneValue::Owned { resolve } => ref_mut_cx_stmts.push(resolve),
+        ResolveOneValue::Ref {
+            create_single,
+            get_single,
+        } => {
+            ref_mut_cx_stmts.push(create_single);
+            ref_cx_stmts.push(get_single);
+        }
+    }
+}
+
+/// The mutability of a reference the context hands out, and where it was
+/// written down.
+type BorrowedReference = (Span, bool);
+
+/// Checks that the references the context hands out to an item can exist at the
+/// same time.
+///
+/// The context is borrowed while the item runs, so it can lend any number of
+/// immutable references, or a single mutable reference, but not a mutable
+/// reference together with another one: taking `&mut T` from the context and
+/// then borrowing the context again does not compile.
+///
+/// # Arguments
+///
+/// * `references` - The references of the fields or arguments of the item,
+///   paired with their mutability.
+fn check_reference_borrows(references: &[BorrowedReference]) -> syn::Result<()> {
+    let mut mutables = references
+        .iter()
+        .filter(|(_, is_mut)| *is_mut)
+        .map(|(span, _)| *span);
+
+    if mutables.next().is_none() {
+        return Ok(());
+    }
+
+    if let Some(span) = mutables.next() {
+        return Err(syn::Error::new(
+            span,
+            "a mutable reference is borrowed from the context while the item runs, \
+            so only one `&mut` field or argument is supported",
+        ));
+    }
+
+    if let Some((span, _)) = references.iter().find(|(_, is_mut)| !is_mut) {
+        return Err(syn::Error::new(
+            *span,
+            "a mutable reference is borrowed from the context while the item runs, \
+            so a `&mut` field or argument cannot be combined with another reference, \
+            please make one of them an owned field or argument",
+        ));
+    }
+
+    Ok(())
+}
+
 pub(crate) fn generate_argument_resolve_methods(
     inputs: &mut Punctuated<FnArg, Token![,]>,
     color: Color,
@@ -678,33 +825,41 @@ pub(crate) fn generate_argument_resolve_methods(
     let mut ref_mut_cx_stmts = Vec::with_capacity(capacity);
     let mut ref_cx_stmts = Vec::with_capacity(capacity);
     let mut args = Vec::with_capacity(capacity);
+    let mut references = Vec::new();
 
     for (index, input) in inputs.iter_mut().enumerate() {
         match input {
             FnArg::Receiver(r) => {
                 return Err(syn::Error::new(r.span(), "not support `self` receiver"));
             }
-            FnArg::Typed(PatType { attrs, ty, .. }) => {
+            FnArg::Typed(PatType {
+                attrs, pat, ty, ..
+            }) => {
+                if let Type::Reference(TypeReference { mutability, .. }) = &**ty {
+                    references.push((ty.span(), mutability.is_some()));
+                }
+
+                // The name of the instance an argument takes is the name of the
+                // argument, so that a provider function of the same name needs
+                // no `name` argument.
+                let argument_name = match &**pat {
+                    Pat::Ident(PatIdent { ident, .. }) => Some(ident.clone()),
+                    _ => None,
+                };
+
                 let ResolveOne { stmt, variable } =
                     generate_only_one_field_or_argument_resolve_stmt(
-                        None, attrs, color, index, ty,
+                        argument_name, attrs, color, index, ty,
                     )?;
 
-                match stmt {
-                    ResolveOneValue::Owned { resolve } => ref_mut_cx_stmts.push(resolve),
-                    ResolveOneValue::Ref {
-                        create_single,
-                        get_single,
-                    } => {
-                        ref_mut_cx_stmts.push(create_single);
-                        ref_cx_stmts.push(get_single);
-                    }
-                }
+                push_resolve_stmts(stmt, &mut ref_mut_cx_stmts, &mut ref_cx_stmts);
 
                 args.push(variable);
             }
         }
     }
+
+    check_reference_borrows(&references)?;
 
     if !ref_mut_cx_stmts.is_empty() {
         ref_mut_cx_stmts.insert(0, context_ext_import());
@@ -794,6 +949,7 @@ pub(crate) fn generate_field_resolve_stmts(
             let mut field_values = Vec::with_capacity(capacity);
 
             let mut field_names = Vec::with_capacity(capacity);
+            let mut references = Vec::new();
 
             for (
                 index,
@@ -805,6 +961,11 @@ pub(crate) fn generate_field_resolve_stmts(
                 },
             ) in named.into_iter().enumerate()
             {
+                if let Type::Reference(TypeReference { mutability, .. }) = &*ty {
+                    let is_mut_ref = mutability.is_some();
+                    references.push((ty.span(), is_mut_ref));
+                }
+
                 let ResolveOne {
                     stmt,
                     variable: field_value,
@@ -816,20 +977,13 @@ pub(crate) fn generate_field_resolve_stmts(
                     ty,
                 )?;
 
-                match stmt {
-                    ResolveOneValue::Owned { resolve } => ref_mut_cx_stmts.push(resolve),
-                    ResolveOneValue::Ref {
-                        create_single,
-                        get_single,
-                    } => {
-                        ref_mut_cx_stmts.push(create_single);
-                        ref_cx_stmts.push(get_single);
-                    }
-                }
+                push_resolve_stmts(stmt, &mut ref_mut_cx_stmts, &mut ref_cx_stmts);
 
                 field_values.push(field_value);
                 field_names.push(field_name.clone().unwrap());
             }
+
+            check_reference_borrows(&references)?;
 
             if !ref_mut_cx_stmts.is_empty() {
                 ref_mut_cx_stmts.insert(0, context_ext_import());
@@ -850,8 +1004,14 @@ pub(crate) fn generate_field_resolve_stmts(
             let mut ref_mut_cx_stmts = Vec::with_capacity(capacity);
             let mut ref_cx_stmts = Vec::with_capacity(capacity);
             let mut field_values = Vec::with_capacity(capacity);
+            let mut references = Vec::new();
 
             for (index, Field { attrs, ty, .. }) in unnamed.into_iter().enumerate() {
+                if let Type::Reference(TypeReference { mutability, .. }) = &*ty {
+                    let is_mut_ref = mutability.is_some();
+                    references.push((ty.span(), is_mut_ref));
+                }
+
                 let ResolveOne {
                     stmt,
                     variable: field_value,
@@ -859,19 +1019,12 @@ pub(crate) fn generate_field_resolve_stmts(
                     None, attrs, color, index, ty,
                 )?;
 
-                match stmt {
-                    ResolveOneValue::Owned { resolve } => ref_mut_cx_stmts.push(resolve),
-                    ResolveOneValue::Ref {
-                        create_single,
-                        get_single,
-                    } => {
-                        ref_mut_cx_stmts.push(create_single);
-                        ref_cx_stmts.push(get_single);
-                    }
-                }
+                push_resolve_stmts(stmt, &mut ref_mut_cx_stmts, &mut ref_cx_stmts);
 
                 field_values.push(field_value);
             }
+
+            check_reference_borrows(&references)?;
 
             if !ref_mut_cx_stmts.is_empty() {
                 ref_mut_cx_stmts.insert(0, context_ext_import());
