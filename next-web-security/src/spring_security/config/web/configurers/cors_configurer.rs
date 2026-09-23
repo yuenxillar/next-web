@@ -84,7 +84,7 @@ where
             .expect("the application context lock is poisoned");
 
         context
-            .get_single_option::<Arc<dyn PreFlightRequestHandler>>()
+            .get_singleton_option::<Arc<dyn PreFlightRequestHandler>>()
             .map(Clone::clone)
     }
 
@@ -95,7 +95,7 @@ where
         context
             .map(|context| context.read().expect("the application context lock is poisoned"))
             .and_then(|ctx| {
-                ctx.get_single_option_with_name::<Arc<dyn CorsConfigurationSource>>(
+                ctx.get_singleton_option_with_name::<Arc<dyn CorsConfigurationSource>>(
                     CORS_CONFIGURATION_SOURCE_BEAN_NAME,
                 )
                 .map(Clone::clone)
@@ -120,7 +120,7 @@ where
                 .expect("the application context lock is poisoned");
 
             if let Some(filter) =
-                guard.get_single_option_with_name::<CorsFilter>(CORS_FILTER_BEAN_NAME)
+                guard.get_singleton_option_with_name::<CorsFilter>(CORS_FILTER_BEAN_NAME)
             {
                 return Some(filter.clone());
             }

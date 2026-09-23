@@ -10,7 +10,7 @@
 //!
 //! fn configure(context: &mut dyn ApplicationContext) {
 //!     // `ApplicationContextExt` has to be in scope for this call.
-//!     let _ = context.get_single_option::<u32>();
+//!     let _ = context.get_singleton_option::<u32>();
 //! }
 //! ```
 
@@ -32,7 +32,7 @@ use crate::application_context::{InstanceClone, default_singleton_name};
 /// use next_web_context::{ApplicationContext, ApplicationContextExt};
 ///
 /// fn configure(context: &mut dyn ApplicationContext) {
-///     let _ = context.get_single_option::<u32>();
+///     let _ = context.get_singleton_option::<u32>();
 /// }
 /// ```
 ///
@@ -45,6 +45,9 @@ use crate::application_context::{InstanceClone, default_singleton_name};
 /// - `with_name`: the instance is registered under the given name,
 /// - `with_default_name`: the instance is registered under the name derived
 ///   from its type by [`default_singleton_name`].
+///
+/// The type erased counterpart of a method is the `_boxed` method of
+/// [`ApplicationContext`], which takes a [`Key`] instead of a type parameter.
 pub trait ApplicationContextExt: ApplicationContext {
     /// Inserts `instance` under the empty name `""`.
     ///
@@ -102,11 +105,11 @@ pub trait ApplicationContextExt: ApplicationContext {
     /// # Type Parameters
     ///
     /// * `T` - The type of the instance.
-    fn contains_single<T>(&self) -> bool
+    fn contains_singleton<T>(&self) -> bool
     where
         T: 'static,
     {
-        self.contains_single_with_name::<T>("")
+        self.contains_singleton_with_name::<T>("")
     }
 
     /// Returns whether an instance is registered under the given name.
@@ -115,11 +118,11 @@ pub trait ApplicationContextExt: ApplicationContext {
     ///
     /// * `T` - The type of the instance.
     /// * `N` - The name type.
-    fn contains_single_with_name<T>(&self, name: impl Into<Cow<'static, str>>) -> bool
+    fn contains_singleton_with_name<T>(&self, name: impl Into<Cow<'static, str>>) -> bool
     where
         T: 'static,
     {
-        self.contains_singleton(&Key::new::<T>(name.into()))
+        self.contains_singleton_boxed(&Key::new::<T>(name.into()))
     }
 
     /// Returns whether an instance is registered under the name derived from its
@@ -128,11 +131,11 @@ pub trait ApplicationContextExt: ApplicationContext {
     /// # Type Parameters
     ///
     /// * `T` - The type of the instance.
-    fn contains_single_with_default_name<T>(&self) -> bool
+    fn contains_singleton_with_default_name<T>(&self) -> bool
     where
         T: 'static,
     {
-        self.contains_single_with_name::<T>(default_singleton_name::<T>())
+        self.contains_singleton_with_name::<T>(default_singleton_name::<T>())
     }
 
     /// Returns a reference to the instance registered under the empty name `""`.
@@ -145,11 +148,11 @@ pub trait ApplicationContextExt: ApplicationContext {
     ///
     /// * `T` - The type of the instance.
     #[track_caller]
-    fn get_single<T>(&self) -> &T
+    fn get_singleton<T>(&self) -> &T
     where
         T: 'static,
     {
-        self.get_single_with_name::<T>("")
+        self.get_singleton_with_name::<T>("")
     }
 
     /// Returns a reference to the instance registered under the given name.
@@ -163,7 +166,7 @@ pub trait ApplicationContextExt: ApplicationContext {
     /// * `T` - The type of the instance.
     /// * `N` - The name type.
     #[track_caller]
-    fn get_single_with_name<T>(&self, name: impl Into<Cow<'static, str>>) -> &T
+    fn get_singleton_with_name<T>(&self, name: impl Into<Cow<'static, str>>) -> &T
     where
         T: 'static,
     {
@@ -179,11 +182,11 @@ pub trait ApplicationContextExt: ApplicationContext {
     /// # Type Parameters
     ///
     /// * `T` - The type of the instance.
-    fn get_single_with_default_name<T>(&self) -> Option<&T>
+    fn get_singleton_option_with_default_name<T>(&self) -> Option<&T>
     where
         T: 'static,
     {
-        self.get_single_option_with_name::<T>(default_singleton_name::<T>())
+        self.get_singleton_option_with_name::<T>(default_singleton_name::<T>())
     }
 
     /// Returns a reference to the instance registered under the empty name `""`,
@@ -192,11 +195,11 @@ pub trait ApplicationContextExt: ApplicationContext {
     /// # Type Parameters
     ///
     /// * `T` - The type of the instance.
-    fn get_single_option<T>(&self) -> Option<&T>
+    fn get_singleton_option<T>(&self) -> Option<&T>
     where
         T: 'static,
     {
-        self.get_single_option_with_name::<T>("")
+        self.get_singleton_option_with_name::<T>("")
     }
 
     /// Returns a reference to the instance registered under the given name, when
@@ -206,7 +209,7 @@ pub trait ApplicationContextExt: ApplicationContext {
     ///
     /// * `T` - The type of the instance.
     /// * `N` - The name type.
-    fn get_single_option_with_name<T>(&self, name: impl Into<Cow<'static, str>>) -> Option<&T>
+    fn get_singleton_option_with_name<T>(&self, name: impl Into<Cow<'static, str>>) -> Option<&T>
     where
         T: 'static,
     {
@@ -221,11 +224,11 @@ pub trait ApplicationContextExt: ApplicationContext {
     /// # Type Parameters
     ///
     /// * `T` - The type of the instance.
-    fn get_single_option_mut<T>(&mut self) -> Option<&mut T>
+    fn get_singleton_option_mut<T>(&mut self) -> Option<&mut T>
     where
         T: 'static,
     {
-        self.get_single_option_mut_with_name::<T>("")
+        self.get_singleton_option_mut_with_name::<T>("")
     }
 
     /// Returns a mutable reference to the instance registered under the given
@@ -235,7 +238,7 @@ pub trait ApplicationContextExt: ApplicationContext {
     ///
     /// * `T` - The type of the instance.
     /// * `N` - The name type.
-    fn get_single_option_mut_with_name<T>(
+    fn get_singleton_option_mut_with_name<T>(
         &mut self,
         name: impl Into<Cow<'static, str>>,
     ) -> Option<&mut T>
@@ -263,7 +266,7 @@ pub trait ApplicationContextExt: ApplicationContext {
     /// * `T` - The type of the instance.
     /// * `N` - The name type.
     #[track_caller]
-    fn get_single_mut_with_name<T>(&mut self, name: impl Into<Cow<'static, str>>) -> &mut T
+    fn get_singleton_mut_with_name<T>(&mut self, name: impl Into<Cow<'static, str>>) -> &mut T
     where
         T: 'static,
     {
@@ -271,6 +274,63 @@ pub trait ApplicationContextExt: ApplicationContext {
         self.get_singleton_boxed_mut(&key)
             .and_then(|instance| instance.downcast_mut::<T>())
             .unwrap_or_else(|| panic!("no instance is registered for: {key:?}"))
+    }
+
+    /// Removes the instance registered under the empty name `""`, when the
+    /// context holds it, and returns it.
+    ///
+    /// Only the instance is removed; the provider that created it is kept, so
+    /// resolving the instance again builds a new one.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instance.
+    fn remove_singleton<T>(&mut self) -> Option<T>
+    where
+        T: Send + Sync + 'static,
+    {
+        self.remove_singleton_with_name::<T>("")
+    }
+
+    /// Removes the instance registered under the given name, when the context
+    /// holds it, and returns it.
+    ///
+    /// Only the instance is removed; the provider that created it is kept, so
+    /// resolving the instance again builds a new one.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instance.
+    /// * `N` - The name type.
+    fn remove_singleton_with_name<T>(&mut self, name: impl Into<Cow<'static, str>>) -> Option<T>
+    where
+        T: Send + Sync + 'static,
+    {
+        let key = Key::new::<T>(name.into());
+
+        self.remove_singleton_boxed(&key).map(|instance| {
+            *instance
+                .downcast::<T>()
+                .expect("the context holds an instance of the type of its key")
+        })
+    }
+
+    /// Removes the instance registered under the name derived from its type,
+    /// when the context holds it, and returns it.
+    ///
+    /// Only the instance is removed; the provider that created it is kept, so
+    /// resolving the instance again builds a new one. The name is the one
+    /// [`default_singleton_name`] derives from the type, which is the name the
+    /// attribute macros register an instance under.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instance.
+    fn remove_singleton_with_default_name<T>(&mut self) -> Option<T>
+    where
+        T: Send + Sync + 'static,
+    {
+        self.remove_singleton_with_name::<T>(default_singleton_name::<T>())
     }
 
     /// Creates the instance registered under the given name, when it does not
@@ -289,24 +349,96 @@ pub trait ApplicationContextExt: ApplicationContext {
     /// * `T` - The type of the instance.
     /// * `N` - The name type.
     #[track_caller]
-    fn just_create_single_with_name<T>(&mut self, name: impl Into<Cow<'static, str>>)
+    fn just_create_singleton_with_name<T>(&mut self, name: impl Into<Cow<'static, str>>)
     where
         T: Send + Sync + 'static,
     {
         let key = Key::new::<T>(name.into());
 
-        if self.contains_singleton(&key) {
-            return;
+        if !self.try_just_create_singleton_with_name::<T>(key.name.clone()) {
+            panic!("no instance could be created for: {key:?}");
+        }
+    }
+
+    /// Creates the instance registered under the given name, when the context
+    /// does not hold it yet, and reports whether it holds it afterwards.
+    ///
+    /// This is the variant of [`Self::just_create_singleton_with_name`] that
+    /// does not panic: it lets an item that only optionally depends on another
+    /// one create it first and decide afterwards.
+    ///
+    /// The result is `false` when the context has no provider for the type and
+    /// name, and when the provider creates a new instance for every resolution
+    /// (the [transient](crate::Scope::Transient) scope), because such an
+    /// instance is not held by the context.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instance.
+    /// * `N` - The name type.
+    fn try_just_create_singleton_with_name<T>(&mut self, name: impl Into<Cow<'static, str>>) -> bool
+    where
+        T: Send + Sync + 'static,
+    {
+        let key = Key::new::<T>(name.into());
+
+        if self.contains_singleton_boxed(&key) {
+            return true;
         }
 
         // Resolving a singleton stores it in the context. The owned copy the
         // resolution returns as well is dropped again, because the callers of
         // this method only want the instance to exist.
-        let _ = self.resolve_option_boxed::<T>(&key);
+        let _ = self.resolve_boxed(&key);
 
-        if !self.contains_singleton(&key) {
-            panic!("no instance could be created for: {key:?}");
-        }
+        self.contains_singleton_boxed(&key)
+    }
+
+    /// Creates every instance of the given type the context does not hold yet,
+    /// and reports for each of them whether it is held afterwards.
+    ///
+    /// The flag of an instance is `false` when its provider creates a new
+    /// instance for every resolution, see
+    /// [`Self::try_just_create_singleton_with_name`].
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instances.
+    fn try_just_create_singletons_by_type<T>(&mut self) -> Vec<bool>
+    where
+        T: Send + Sync + 'static,
+    {
+        self.keys_of_type(TypeId::of::<T>())
+            .into_iter()
+            .map(|key| {
+                if self.contains_singleton_boxed(&key) {
+                    return true;
+                }
+
+                let _ = self.resolve_boxed(&key);
+                self.contains_singleton_boxed(&key)
+            })
+            .collect()
+    }
+
+    /// Returns every instance of the given type the context holds.
+    ///
+    /// This is the borrowing counterpart of [`Self::resolve_by_type`], which
+    /// creates the instances that are missing and hands them out as owned
+    /// values. The instances are returned in the order of their keys.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instances.
+    fn get_singletons_by_type<T>(&self) -> Vec<&T>
+    where
+        T: 'static,
+    {
+        self.keys_of_type(TypeId::of::<T>())
+            .into_iter()
+            .filter_map(|key| self.get_singleton_boxed(&key))
+            .filter_map(|instance| instance.downcast_ref::<T>())
+            .collect()
     }
 
     /// Resolves the instance registered under the empty name `""`.
@@ -359,7 +491,7 @@ pub trait ApplicationContextExt: ApplicationContext {
     {
         let key = Key::new::<T>(name.into());
 
-        self.resolve_option_boxed(&key)
+        self.resolve_singleton_option::<T>(&key)
             .unwrap_or_else(|| panic!("no instance could be resolved for: {key:?}"))
     }
 
@@ -374,7 +506,7 @@ pub trait ApplicationContextExt: ApplicationContext {
         T: Send + Sync + 'static,
     {
         let key = Key::new::<T>(name.into());
-        self.resolve_option_boxed(&key)
+        self.resolve_singleton_option::<T>(&key)
     }
 
     /// Resolves the instance registered under the name derived from its type.
@@ -422,10 +554,16 @@ pub trait ApplicationContextExt: ApplicationContext {
             .collect()
     }
 
-    /// Resolves the instance registered under the given key and downcasts it.
+    /// Resolves the instance registered under the given key, when there is one.
     ///
-    /// This is the shared implementation of the `resolve*` methods.
-    fn resolve_option_boxed<T>(&mut self, key: &Key) -> Option<T>
+    /// The instance is downcast to the type of the key. This is the shared,
+    /// typed implementation of the `resolve*` methods; use
+    /// [`Self::resolve_boxed`] to resolve an instance whose type is erased.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instance.
+    fn resolve_singleton_option<T>(&mut self, key: &Key) -> Option<T>
     where
         T: Send + Sync + 'static,
     {
@@ -441,9 +579,9 @@ impl<C> ApplicationContextExt for C where C: ApplicationContext + ?Sized {}
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
     use std::collections::HashMap;
     use std::fmt;
+    use std::{any::Any, fmt::Debug};
 
     use crate::{
         ApplicationEvent, ApplicationEventPublisher, Locale, MessageSource,
@@ -486,7 +624,7 @@ mod tests {
             self.instances.insert(key, (instance, clone));
         }
 
-        fn contains_singleton(&self, key: &Key) -> bool {
+        fn contains_singleton_boxed(&self, key: &Key) -> bool {
             self.instances.contains_key(key)
         }
 
@@ -510,16 +648,22 @@ mod tests {
         }
 
         fn resolve_all_of_type(&mut self, ty: TypeId) -> Vec<Box<dyn Any + Send + Sync>> {
-            let keys: Vec<Key> = self
+            let keys = self.keys_of_type(ty);
+
+            keys.iter()
+                .filter_map(|key| self.resolve_boxed(key))
+                .collect()
+        }
+
+        fn keys_of_type(&self, ty: TypeId) -> Vec<Key> {
+            let mut keys: Vec<Key> = self
                 .instances
                 .keys()
                 .filter(|key| key.ty.id == ty)
                 .cloned()
                 .collect();
-
-            keys.iter()
-                .filter_map(|key| self.resolve_boxed(key))
-                .collect()
+            keys.sort();
+            keys
         }
     }
 
@@ -567,6 +711,14 @@ mod tests {
         }
     }
 
+    impl Debug for FakeContext {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("FakeContext")
+                .field("instances", &"none")
+                .finish()
+        }
+    }
+
     /// Type used to check the default name convention.
     #[derive(Clone)]
     struct MyService;
@@ -576,9 +728,9 @@ mod tests {
         let mut context = FakeContext::default();
         context.insert_singleton_with_name(7_u32, "answer");
 
-        assert!(context.contains_single_with_name::<u32>("answer"));
-        assert!(!context.contains_single_with_name::<u32>("missing"));
-        assert_eq!(context.get_single_with_name::<u32>("answer"), &7);
+        assert!(context.contains_singleton_with_name::<u32>("answer"));
+        assert!(!context.contains_singleton_with_name::<u32>("missing"));
+        assert_eq!(context.get_singleton_with_name::<u32>("answer"), &7);
     }
 
     #[test]
@@ -595,7 +747,7 @@ mod tests {
         let mut context = FakeContext::default();
 
         assert!(context.resolve_option::<u32>().is_none());
-        assert!(context.get_single_option::<u32>().is_none());
+        assert!(context.get_singleton_option::<u32>().is_none());
     }
 
     #[test]
@@ -603,10 +755,12 @@ mod tests {
         let mut context = FakeContext::default();
         context.insert_singleton_with_name(String::from("value"), "name");
 
-        context.get_single_mut_with_name::<String>("name").push('!');
+        context
+            .get_singleton_mut_with_name::<String>("name")
+            .push('!');
 
         // The instance the context keeps is the one that was changed.
-        assert_eq!(context.get_single_with_name::<String>("name"), "value!");
+        assert_eq!(context.get_singleton_with_name::<String>("name"), "value!");
     }
 
     #[test]
@@ -614,9 +768,9 @@ mod tests {
         let mut context = FakeContext::default();
         context.insert_singleton_with_name(7_u32, "answer");
 
-        context.just_create_single_with_name::<u32>("answer");
+        context.just_create_singleton_with_name::<u32>("answer");
 
-        assert_eq!(context.get_single_with_name::<u32>("answer"), &7);
+        assert_eq!(context.get_singleton_with_name::<u32>("answer"), &7);
     }
 
     #[test]
@@ -624,7 +778,7 @@ mod tests {
     fn creating_an_instance_without_a_provider_panics() {
         let mut context = FakeContext::default();
 
-        context.just_create_single_with_name::<u32>("answer");
+        context.just_create_singleton_with_name::<u32>("answer");
     }
 
     #[test]
@@ -633,9 +787,12 @@ mod tests {
         context.insert_singleton_with_default_name(1_u64);
         context.insert_singleton_with_default_name(MyService);
 
-        assert_eq!(context.get_single_with_default_name::<u64>(), Some(&1));
+        assert_eq!(
+            context.get_singleton_option_with_default_name::<u64>(),
+            Some(&1)
+        );
         assert_eq!(context.resolve_with_default_name::<u64>(), 1);
-        assert!(context.contains_single_with_default_name::<MyService>());
+        assert!(context.contains_singleton_with_default_name::<MyService>());
         assert_eq!(default_singleton_name::<MyService>(), "myService");
     }
 
@@ -666,6 +823,94 @@ mod tests {
                 .map(|instance| *instance),
             Some(1)
         );
-        assert!(!context.contains_single_with_name::<u8>("one"));
+        assert!(!context.contains_singleton_with_name::<u8>("one"));
+    }
+
+    #[test]
+    fn removes_the_instance_registered_under_a_name() {
+        let mut context = FakeContext::default();
+        context.insert_singleton_with_name(7_u32, "answer");
+
+        assert_eq!(context.remove_singleton_with_name::<u32>("answer"), Some(7));
+        assert!(!context.contains_singleton_with_name::<u32>("answer"));
+
+        // An instance the context does not hold is not returned.
+        assert_eq!(context.remove_singleton_with_name::<u32>("answer"), None);
+    }
+
+    #[test]
+    fn removes_the_instance_registered_under_the_empty_name() {
+        let mut context = FakeContext::default();
+        context.insert_singleton(7_u32);
+
+        assert_eq!(context.remove_singleton::<u32>(), Some(7));
+        assert!(!context.contains_singleton::<u32>());
+    }
+
+    #[test]
+    fn removes_the_instance_registered_under_its_default_name() {
+        let mut context = FakeContext::default();
+        context.insert_singleton_with_default_name(MyService);
+
+        assert!(
+            context
+                .remove_singleton_with_default_name::<MyService>()
+                .is_some()
+        );
+        assert!(!context.contains_singleton_with_default_name::<MyService>());
+        assert!(
+            context
+                .remove_singleton_with_default_name::<MyService>()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn reports_whether_an_instance_could_be_created() {
+        let mut context = FakeContext::default();
+        context.insert_singleton_with_name(7_u32, "answer");
+
+        // An instance the context holds is reported as created.
+        assert!(context.try_just_create_singleton_with_name::<u32>("answer"));
+        // An instance without a provider is not.
+        assert!(!context.try_just_create_singleton_with_name::<u32>("missing"));
+    }
+
+    #[test]
+    fn borrows_every_instance_of_a_type() {
+        let mut context = FakeContext::default();
+        context.insert_singleton_with_name(1_i32, "one");
+        context.insert_singleton_with_name(2_i32, "two");
+        context.insert_singleton_with_name("other".to_owned(), "one");
+
+        let mut values: Vec<i32> = context
+            .get_singletons_by_type::<i32>()
+            .into_iter()
+            .copied()
+            .collect();
+        values.sort();
+
+        assert_eq!(values, vec![1, 2]);
+        // The instances of the other type are not returned.
+        assert_eq!(context.get_singletons_by_type::<String>().len(), 1);
+    }
+
+    #[test]
+    fn reports_every_instance_of_a_type() {
+        let mut context = FakeContext::default();
+        context.insert_singleton_with_name(1_i32, "one");
+        context.insert_singleton_with_name(2_i32, "two");
+
+        // Both instances are held by the context, so both are reported.
+        assert_eq!(
+            context.try_just_create_singletons_by_type::<i32>(),
+            vec![true, true]
+        );
+        // A type the context does not know at all has no instance to report.
+        assert!(
+            context
+                .try_just_create_singletons_by_type::<u32>()
+                .is_empty()
+        );
     }
 }

@@ -81,7 +81,7 @@ impl TestAutoConfiguation {
     }
 
     fn test1(ctx: &dyn ApplicationContext) -> bool {
-        ctx.contains_single_with_name::<String>("s2")
+        ctx.contains_singleton_with_name::<String>("s2")
     }
 }
 

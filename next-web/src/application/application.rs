@@ -44,8 +44,7 @@ use crate::configurer::http_method_handler_configurer::{RouteState, RouterContex
 use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
 use crate::event::default_application_event_publisher::DefaultApplicationEventPublisher;
 use crate::manager::background_service_manager::BackgroundServiceManager;
-use crate::signal::{APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL, APPLICATION_STARTED_SIGNAL};
-use crate::util::{LocalDateTime, ThreadUtil};
+use crate::util::LocalDateTime;
 
 #[cfg(feature = "enable-api-doc")]
 use next_web_api_doc::openapi::OpenApi;
@@ -564,7 +563,7 @@ where
         // specification and the Swagger UI interface for API exploration.
         #[cfg(feature = "enable-api-doc")]
         let mut openapi_router = ctx
-            .get_single::<next_web_api_doc::OpenApiRouter>()
+            .get_singleton::<next_web_api_doc::OpenApiRouter>()
             .to_owned();
 
         #[cfg(feature = "enable-api-doc")]
@@ -615,7 +614,7 @@ where
         }
 
         let background_service_manager = ctx
-            .get_single_with_default_name::<BackgroundServiceManager>()
+            .get_singleton_option_with_default_name::<BackgroundServiceManager>()
             .map(Clone::clone)
             .unwrap_or_default();
 
@@ -631,9 +630,6 @@ where
 
         //  Build socket addr
         let socket_addr: SocketAddr = format!("{}:{}", server_addr, server_port).parse()?;
-
-        // Monitor application shutdown signal
-        let mut graceful_shutdown_rx = APPLICATION_GRACEFUL_SHUTDOWN_SIGNAL.subscribe();
 
         #[cfg(not(feature = "tls-rustls"))]
         let shutdown_signal = async move {
@@ -672,9 +668,9 @@ where
                     shutdown_ctx.reason = ShutdownReason::Signal("Terminate SIGTERM".into());
                 },
 
-                _ = graceful_shutdown_rx.recv() => {
-                    shutdown_ctx.reason = ShutdownReason::Signal("Application SIGTERM".into());
-                },
+                // _ = graceful_shutdown_rx.recv() => {
+                //     shutdown_ctx.reason = ShutdownReason::Signal("Application SIGTERM".into());
+                // },
             }
 
             // Trigger application 'on_shutdown' event
@@ -693,13 +689,6 @@ where
 
         //  Take Panic hook
         let _ = std::panic::take_hook();
-
-        // Delay trigger
-        ThreadUtil::spawn(async move {
-            ThreadUtil::sleep(std::time::Duration::from_millis(1500)).await;
-
-            let _ = APPLICATION_STARTED_SIGNAL.send(());
-        });
 
         // Configure certificate and private key used by https
         #[cfg(feature = "tls-rustls")]

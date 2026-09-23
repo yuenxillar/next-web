@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     error::Error,
     panic::AssertUnwindSafe,
-    sync::{Arc, LazyLock},
+    sync::{Arc, OnceLock},
 };
 
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -38,7 +38,10 @@ use crate::{
     autoregister::http_handler_autoregister::HttpHandlerAutoRegister,
     banner::BannerMode,
     configurer::http_method_handler_configurer::RouterContext,
-    context::{logging::LoggingEventHandler, properties::source::ConfigurationPropertySources},
+    context::{
+        logging::LoggingEventHandler, properties::source::ConfigurationPropertySources,
+        ContextIdApplicationContextInitializer,
+    },
     diagnostics::error_analyzers::ErrorAnalyzers,
     env::{DefaultPropertiesPropertySource, MapPropertySource},
     support::EnvironmentPostProcessorEventHandler,
@@ -54,12 +57,8 @@ use crate::{
 #[cfg(feature = "tls-rustls")]
 use crate::web::server::TlsWebServer;
 
-/// Loader used when the application does not configure one of its own.
-///
-/// It is created once, so that a banner resolved through it stays valid for as
-/// long as it is borrowed.
-static DEFAULT_RESOURCE_LOADER: LazyLock<DefaultResourceLoader> =
-    LazyLock::new(DefaultResourceLoader::default);
+/// The application shutdown hook, used to clean up resources on shutdown.
+pub static APPLICATION_SHUTDOWN_HOOK: OnceLock<ApplicationShutdownHook> = OnceLock::new();
 
 pub type ApplicationResult<T> = Result<T, Box<dyn Error>>;
 pub type ApplicationState = Arc<RwLock<Box<dyn ConfigurableApplicationContext>>>;
@@ -176,7 +175,6 @@ pub struct NextWebApplication<T> {
     application_context_factory: Box<dyn ApplicationContextFactory>,
     application_startup: Box<dyn ApplicationStartup>,
     properties: ApplicationProperties,
-    shutdown_hook: Option<ApplicationShutdownHook>,
     application: T,
 }
 
@@ -193,7 +191,7 @@ where
             add_command_line_properties: true,
             banner: None,
             environment: None,
-            initializers: Vec::new(),
+            initializers: vec![Box::new(ContextIdApplicationContextInitializer::default())],
             event_handlers: vec![
                 Box::new(LoggingEventHandler::default()),
                 Box::new(EnvironmentPostProcessorEventHandler::default()),
@@ -203,7 +201,6 @@ where
             properties: Default::default(),
             application_context_factory: Box::new(DefaultApplicationContextFactory::default()),
             application_startup: Box::new(DefaultApplicationStartup::default()),
-            shutdown_hook: None,
             application: T::default(),
         }
     }
@@ -215,7 +212,9 @@ where
         let future = async {
             let mut startup = StandardStartup::default();
             if self.properties.is_register_shutdown_hook() {
-                self.shutdown_hook = Some(ApplicationShutdownHook::default());
+                APPLICATION_SHUTDOWN_HOOK
+                    .set(ApplicationShutdownHook::default())
+                    .ok();
             }
             self.send_event(|handlers| handlers.starting(std::any::type_name::<T>()));
 
@@ -346,9 +345,13 @@ where
         ApplicationInfoPropertySource::move_to_end(environment.as_mut());
         DefaultPropertiesPropertySource::move_to_end(environment.as_mut());
         self.bind_to_application(environment.as_ref());
-        if self.environment.is_none() {
-            environment = Box::new(ApplicationEnvironment::default());
-        }
+        // The environment is kept as it is. The original converts it when it
+        // was not supplied by the caller, but such a conversion has to preserve
+        // the property sources and the profiles that have been configured by
+        // now. Recreating the environment here would drop the property sources
+        // that were contributed by the config data, by the command line and by
+        // the application information, so the properties of the configuration
+        // files would never be seen by the application.
         ConfigurationPropertySources::attach(environment.as_mut());
 
         Arc::from(environment)
@@ -477,11 +480,13 @@ where
             return None;
         }
 
-        // The banner borrows the loader it was resolved from, so the default
-        // loader is a static rather than a local of this call.
+        // The banner borrows the loader it was resolved from, so the loader the
+        // framework falls back to is the shared one rather than a local of this
+        // call. It is also the loader the config data reads its locations from,
+        // so the resources directory is read once for both.
         let resource_loader: &'a dyn ResourceLoader = match self.resource_loader.as_deref() {
             Some(loader) => loader,
-            None => &*DEFAULT_RESOURCE_LOADER,
+            None => DefaultResourceLoader::shared(),
         };
 
         let banner_printer = ApplicationBannerPrinter::new(resource_loader, self.banner.as_deref());
@@ -610,7 +615,7 @@ where
         let mut reporters = self.get_error_reporters();
         self.report_error(&mut reporters, error);
 
-        if let Some(shutdown_hook) = self.shutdown_hook {
+        if let Some(shutdown_hook) = APPLICATION_SHUTDOWN_HOOK.get() {
             shutdown_hook.shutdown().await;
         }
 
@@ -707,7 +712,7 @@ where
     /// running the application and trigger them with
     /// [`ApplicationShutdownHook::shutdown`] when it is time to stop.
     pub fn shutdown_hook(&self) -> Option<&ApplicationShutdownHook> {
-        self.shutdown_hook.as_ref()
+        APPLICATION_SHUTDOWN_HOOK.get()
     }
 
     /// The ResourceLoader that will be used in the ApplicationContext.
@@ -1147,5 +1152,114 @@ fn configure_command_line_property_source(sources: &mut MutablePropertySources, 
             name.to_owned(),
             command_line_properties(args),
         ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+
+    /// An application that keeps the default behavior of the trait.
+    #[derive(Default)]
+    struct TestApplication;
+
+    impl Application for TestApplication {}
+
+    /// The environment that is prepared is the one that is used: the property
+    /// sources that the config data and the command line contributed must still
+    /// be there when the preparation is done.
+    #[test]
+    fn keeps_the_property_sources_of_the_prepared_environment() {
+        let root = std::env::temp_dir().join(format!(
+            "next-web-prepared-environment-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("application.yaml"),
+            "next:\n  test:\n    name: config-data\n",
+        )
+        .unwrap();
+
+        let mut resource_loader = DefaultResourceLoader::new(&root, None);
+        resource_loader.load().unwrap();
+
+        let mut application = NextWebApplication::<TestApplication>::default();
+        application.set_resource_loader(resource_loader);
+
+        let arguments = DefaultApplicationArguments::new([
+            "test_application".to_owned(),
+            "--next.test.name=command-line".to_owned(),
+        ]);
+
+        let environment = application.prepare_environment(&arguments);
+
+        let names: Vec<&str> = environment
+            .property_sources_ref()
+            .iter()
+            .map(|source| source.name())
+            .collect();
+        assert!(
+            names.contains(&"application.yaml"),
+            "the config data is missing from {names:?}"
+        );
+        assert!(
+            names.contains(&COMMAND_LINE_PROPERTY_SOURCE_NAME),
+            "the command line is missing from {names:?}"
+        );
+        assert_eq!(
+            environment.get_property("next.test.name"),
+            Some("command-line".to_owned())
+        );
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The values of the configuration files that are marked as encrypted are
+    /// decrypted while the environment is prepared, so the application reads
+    /// the plaintext through the properties it uses.
+    #[cfg(feature = "decrypt-properties")]
+    #[test]
+    fn decrypts_the_encrypted_values_of_the_configuration_files() {
+        let root = std::env::temp_dir().join(format!(
+            "next-web-decrypted-configuration-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+
+        let ciphertext = crate::util::aes::encrypt("s3cr3t", "password").unwrap();
+        fs::write(
+            root.join("application.yaml"),
+            format!(
+                "next:\n  test:\n    password: \"{}{}\"\n",
+                crate::env::property_decryptor::SECURE_PROPERTY_PREFIX,
+                ciphertext
+            ),
+        )
+        .unwrap();
+
+        let mut resource_loader = DefaultResourceLoader::new(&root, None);
+        resource_loader.load().unwrap();
+
+        let mut application = NextWebApplication::<TestApplication>::default();
+        application.set_resource_loader(resource_loader);
+
+        let arguments = DefaultApplicationArguments::new([
+            "test_application".to_owned(),
+            "--next.decrypt.password=password".to_owned(),
+        ]);
+
+        let environment = application.prepare_environment(&arguments);
+
+        assert_eq!(
+            environment.get_property("next.test.password"),
+            Some("s3cr3t".to_owned())
+        );
+
+        let _ = fs::remove_dir_all(&root);
     }
 }

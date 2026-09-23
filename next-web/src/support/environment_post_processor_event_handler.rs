@@ -1,10 +1,17 @@
 use crate::{
-    context::config::ConfigDataEnvironmentPostProcessor, ApplicationEventHandler,
+    context::config::ConfigDataEnvironmentPostProcessor,
+    env::DecryptPropertiesEnvironmentPostProcessor, ApplicationEventHandler,
     EnvironmentPostProcessor, EnvironmentPreparedPayload, Event,
 };
 
+/// The decryption must run after the config data has been loaded, so that the
+/// values of the configuration files are decrypted.
+const _: () = assert!(
+    ConfigDataEnvironmentPostProcessor::ORDER < DecryptPropertiesEnvironmentPostProcessor::ORDER
+);
+
 #[derive(Default)]
-pub struct EnvironmentPostProcessorEventHandler {}
+pub struct EnvironmentPostProcessorEventHandler;
 
 impl EnvironmentPostProcessorEventHandler {
     fn on_environment_prepared_event(&mut self, payload: EnvironmentPreparedPayload<'_>) {
@@ -24,7 +31,15 @@ impl EnvironmentPostProcessorEventHandler {
         }
         post_processor.set_additional_profiles(payload.additional_profiles.clone());
 
-        vec![Box::new(post_processor)]
+        // The post processors run in the order they are registered, which
+        // mirrors the order of the post processors of an application: the config
+        // data is loaded first, and the encrypted values it holds are decrypted
+        // right after it. The orders are stated by the `Ordered` implementation
+        // of each processor.
+        vec![
+            Box::new(post_processor),
+            Box::new(DecryptPropertiesEnvironmentPostProcessor::default()),
+        ]
     }
 }
 

@@ -7,9 +7,7 @@ use next_web_core::env::{
 };
 use next_web_core::impl_environment_delegate;
 
-use crate::context::properties::source::{
-    ConfigurationPropertyName, NextConfigurationPropertySources,
-};
+use crate::context::properties::source::{ConfigurationPropertyName, ConfigurationPropertySources};
 
 /// The [`Environment`](next_web_core::env::Environment) that is used by a
 /// [`NextWebApplication`](crate::NextWebApplication).
@@ -60,10 +58,15 @@ impl_environment_delegate!(ApplicationEnvironment, base);
 
 /// The [`PropertyLookup`] that is used by an application environment.
 ///
-/// The property sources of the environment are adapted to configuration
-/// property sources, which are searched in order. Sources that hold no
-/// properties, and the adapter of the configuration properties itself, are
-/// skipped by the adaptation.
+/// The property sources of the environment are searched in order with
+/// configuration property names, which is how an adapted configuration property
+/// source resolves a name as well. Sources that hold no properties, and the
+/// adapter of the configuration properties itself, are skipped.
+///
+/// The sources are searched as they are, instead of adapting them all first:
+/// an adaptation copies every property of every source, so building one for a
+/// single lookup would make the cost of a lookup depend on the size of the
+/// whole configuration.
 ///
 /// A key that is not a configuration property name, such as the name of an
 /// environment variable, is looked up as it is.
@@ -76,10 +79,13 @@ impl PropertyLookup for ConfigurationPropertyLookup {
             return PropertySourcesLookup.lookup(property_sources, key);
         };
 
-        NextConfigurationPropertySources::new(property_sources)
+        property_sources
             .iter()
-            .find_map(|source| source.get_configuration_property(&name))
-            .map(|property| property.get_value().to_string())
+            .filter(|source| {
+                !source.is_stub()
+                    && !ConfigurationPropertySources::is_attached_configuration_property_source(*source)
+            })
+            .find_map(|source| source.property(name.as_str()))
     }
 }
 

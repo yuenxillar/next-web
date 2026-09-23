@@ -113,25 +113,25 @@ where
 
         if configurer.one_time_token_service.is_none() {
             configurer.one_time_token_service = context
-                .get_single_option::<Arc<dyn OneTimeTokenService>>()
+                .get_singleton_option::<Arc<dyn OneTimeTokenService>>()
                 .cloned();
         }
 
         if configurer.one_time_token_generation_success_handler.is_none() {
             configurer.one_time_token_generation_success_handler = context
-                .get_single_option::<Arc<dyn OneTimeTokenGenerationSuccessHandler>>()
+                .get_singleton_option::<Arc<dyn OneTimeTokenGenerationSuccessHandler>>()
                 .cloned();
         }
 
         if configurer.request_resolver.is_none() {
             configurer.request_resolver = context
-                .get_single_option::<Arc<dyn GenerateOneTimeTokenRequestResolver>>()
+                .get_singleton_option::<Arc<dyn GenerateOneTimeTokenRequestResolver>>()
                 .cloned();
         }
 
         if configurer.user_details_service.is_none() {
             configurer.user_details_service = context
-                .get_single_option::<Arc<dyn crate::core::userdetails::UserDetailsService>>()
+                .get_singleton_option::<Arc<dyn crate::core::userdetails::UserDetailsService>>()
                 .cloned();
         }
 

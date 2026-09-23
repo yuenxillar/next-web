@@ -23,37 +23,43 @@ impl NextWebBanner {
         _environment: &dyn Environment,
         out: &mut dyn std::io::prelude::Write,
     ) -> io::Result<()> {
+        // The banner is rendered into a buffer and written once: every write to
+        // a console, a pipe or a file costs a system call, so writing the
+        // banner line by line is needlessly expensive during the startup.
+        let mut banner = String::with_capacity(BANNER.len() + 256);
+
         // Leading blank line.
-        writeln!(out)?;
+        banner.push('\n');
 
         // Banner text (no trailing newline added by the caller).
-        write!(out, "{}", BANNER)?;
+        banner.push_str(BANNER);
 
         // Green title and version.
-        writeln!(
-            out,
+        banner.push_str(&format!(
             "\n{} \t\t\t\t (v{}.Develop)",
             Self::green(":: Next Web ::"),
             NextWebVersion::get_version()
-        )?;
+        ));
+        banner.push('\n');
 
         // Bold home page with underlined URL.
-        writeln!(
-            out,
+        banner.push_str(&format!(
             "\n{}",
             Self::bold(&format!(
                 "Home Page: \x1b[4m{}\x1b[24m",
                 env!("CARGO_PKG_HOMEPAGE")
             ))
-        )?;
+        ));
+        banner.push('\n');
 
         // Bold thank-you message.
-        writeln!(out, "{}", Self::bold("Thank you for using it."))?;
+        banner.push_str(&Self::bold("Thank you for using it."));
+        banner.push('\n');
 
         // Trailing blank line.
-        writeln!(out)?;
+        banner.push('\n');
 
-        Ok(())
+        out.write_all(banner.as_bytes())
     }
 }
 

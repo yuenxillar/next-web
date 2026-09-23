@@ -147,7 +147,7 @@ fn a_mutable_reference_argument_is_taken_from_the_context() {
     // The instance is created in the context, and the owned argument is
     // resolved with it, before the context is borrowed.
     assert!(
-        context.contains(r#"just_create_single_with_name :: < String > ("testName")"#),
+        context.contains(r#"just_create_singleton_with_name :: < String > ("testName")"#),
         "{context}"
     );
     assert!(
@@ -158,7 +158,7 @@ fn a_mutable_reference_argument_is_taken_from_the_context() {
     // The mutable reference is borrowed from the context, so the item modifies
     // the instance the context keeps.
     assert!(
-        instances.contains(r#"let ref_0 = cx . get_single_mut_with_name ("testName") ;"#),
+        instances.contains(r#"let ref_0 = cx . get_singleton_mut_with_name ("testName") ;"#),
         "{instances}"
     );
 
@@ -177,11 +177,11 @@ fn immutable_reference_arguments_are_taken_from_the_context() {
     );
 
     assert!(
-        context.contains(r#"just_create_single_with_name :: < String > ("testName")"#),
+        context.contains(r#"just_create_singleton_with_name :: < String > ("testName")"#),
         "{context}"
     );
     assert!(
-        context.contains(r#"just_create_single_with_name :: < Vec < String > > ("array")"#),
+        context.contains(r#"just_create_singleton_with_name :: < Vec < String > > ("array")"#),
         "{context}"
     );
     assert!(
@@ -191,11 +191,11 @@ fn immutable_reference_arguments_are_taken_from_the_context() {
 
     // Any number of immutable references can be borrowed at the same time.
     assert!(
-        instances.contains(r#"let ref_0 = cx . get_single_with_name ("testName") ;"#),
+        instances.contains(r#"let ref_0 = cx . get_singleton_with_name ("testName") ;"#),
         "{instances}"
     );
     assert!(
-        instances.contains(r#"let ref_1 = cx . get_single_with_name ("array") ;"#),
+        instances.contains(r#"let ref_1 = cx . get_singleton_with_name ("array") ;"#),
         "{instances}"
     );
 
@@ -231,11 +231,11 @@ fn an_argument_without_a_name_is_taken_from_the_name_of_the_argument() {
         "{context}"
     );
     assert!(
-        context.contains(r#"just_create_single_with_name :: < Vec < String > > ("myArray")"#),
+        context.contains(r#"just_create_singleton_with_name :: < Vec < String > > ("myArray")"#),
         "{context}"
     );
     assert!(
-        instances.contains(r#"let ref_1 = cx . get_single_with_name ("myArray") ;"#),
+        instances.contains(r#"let ref_1 = cx . get_singleton_with_name ("myArray") ;"#),
         "{instances}"
     );
 
@@ -274,11 +274,11 @@ fn a_field_without_a_name_is_taken_from_the_lower_cased_name_of_its_type() {
     let (context, instances) = resolve_fields_of("pub struct Fields<'a>(&'a MyService);");
 
     assert!(
-        context.contains(r#"just_create_single_with_name :: < MyService > ("myService")"#),
+        context.contains(r#"just_create_singleton_with_name :: < MyService > ("myService")"#),
         "{context}"
     );
     assert!(
-        instances.contains(r#"let ref_0 = cx . get_single_with_name ("myService") ;"#),
+        instances.contains(r#"let ref_0 = cx . get_singleton_with_name ("myService") ;"#),
         "{instances}"
     );
 }
@@ -292,11 +292,11 @@ fn a_reference_argument_of_an_async_function_is_created_async() {
 
     assert!(
         context
-            .contains(r#"just_create_single_with_name_async :: < String > ("testName") . await"#),
+            .contains(r#"just_create_singleton_with_name_async :: < String > ("testName") . await"#),
         "{context}"
     );
     assert!(
-        instances.contains(r#"let ref_0 = cx . get_single_mut_with_name ("testName") ;"#),
+        instances.contains(r#"let ref_0 = cx . get_singleton_mut_with_name ("testName") ;"#),
         "{instances}"
     );
 }
@@ -309,11 +309,11 @@ fn an_explicit_ref_argument_is_taken_from_the_context() {
     );
 
     assert!(
-        context.contains(r#"just_create_single_with_name :: < String > ("testName")"#),
+        context.contains(r#"just_create_singleton_with_name :: < String > ("testName")"#),
         "{context}"
     );
     assert!(
-        instances.contains(r#"let ref_0 = cx . get_single_with_name ("testName")"#),
+        instances.contains(r#"let ref_0 = cx . get_singleton_with_name ("testName")"#),
         "{instances}"
     );
     assert_eq!(args, "ref_0");
@@ -347,4 +347,68 @@ fn only_one_mutable_reference_is_supported() {
         rejection.contains("only one `&mut` field or argument is supported"),
         "{rejection}"
     );
+}
+
+#[test]
+fn a_missing_instance_of_an_optional_reference_is_created_without_failing() {
+    let (context, instances, args) = resolve_of(
+        r#"fn test_name(
+            #[autowired(option, ref = String, name = "testName")] name: Option<&String>,
+        ) -> String"#,
+        Color::Sync,
+    );
+
+    // The instance is created when it is missing, and the item still resolves
+    // when the context has no provider for it.
+    assert!(
+        context.contains(
+            r#"cx . try_just_create_singleton_with_name :: < String > ("testName") ;"#
+        ),
+        "{context}"
+    );
+    assert!(
+        instances.contains(r#"let ref_0 = cx . get_singleton_option_with_name ("testName") ;"#),
+        "{instances}"
+    );
+    assert_eq!(args, "ref_0");
+}
+
+#[test]
+fn every_instance_of_a_type_is_created_before_they_are_borrowed() {
+    let (context, instances, args) = resolve_of(
+        r#"fn test_name(#[autowired(vec, ref = String)] names: Vec<&String>) -> String"#,
+        Color::Sync,
+    );
+
+    assert!(
+        context.contains(r#"cx . try_just_create_singletons_by_type :: < String > () ;"#),
+        "{context}"
+    );
+    assert!(
+        instances.contains(r#"let ref_0 = cx . get_singletons_by_type () ;"#),
+        "{instances}"
+    );
+    assert_eq!(args, "ref_0");
+}
+
+#[test]
+fn every_instance_of_a_type_is_keyed_by_its_singleton_name() {
+    let (context, instances, args) = resolve_of(
+        r#"fn test_name(
+            #[autowired(map, ref = String)] names: HashMap<String, &String>,
+        ) -> String"#,
+        Color::Sync,
+    );
+
+    assert!(
+        context.contains(r#"cx . try_just_create_singletons_by_type :: < String > () ;"#),
+        "{context}"
+    );
+    // The instances are keyed by their singleton name, like the owned variant
+    // of the attribute.
+    assert!(
+        instances.contains(r#"instance . singleton_name ()"#),
+        "{instances}"
+    );
+    assert_eq!(args, "ref_0");
 }

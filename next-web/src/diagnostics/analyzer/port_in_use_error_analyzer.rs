@@ -1,3 +1,5 @@
+use std::io;
+
 use crate::diagnostics::{
     base_error_analyzer::BaseErrorAnalyzerExt, error_analysis::ErrorAnalysis,
 };
@@ -13,7 +15,8 @@ impl BaseErrorAnalyzerExt for PortInUseErrorAnalyzer {
         cause: Option<&'a Self::Cause>,
     ) -> Option<ErrorAnalysis<'a>> {
         let cause = cause?;
-        if cause.kind() == std::io::ErrorKind::AddrInUse {
+
+        if cause.kind() == io::ErrorKind::PermissionDenied {
             let description = format!(
                 "Web server failed to start. Port {} was already in use.",
                 cause

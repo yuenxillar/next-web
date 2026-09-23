@@ -26,7 +26,7 @@ where
                 Some(state) => state
                     .read()
                     .await
-                    .get_single_option_with_name::<Arc<dyn DataDecoder>>("defaultDataDecoder")
+                    .get_singleton_option_with_name::<Arc<dyn DataDecoder>>("defaultDataDecoder")
                     .cloned(),
                 _ => None,
             };

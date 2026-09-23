@@ -308,7 +308,7 @@ fn gen_code(
                 let match_value = analyze_litstr(having_value);
 
                 quote! {
-                    match ctx.get_single_with_default_name::<ApplicationProperties>()
+                    match ctx.get_singleton_option_with_default_name::<ApplicationProperties>()
                         .unwrap()
                         .get_value::<#generic>(#name)
                     {

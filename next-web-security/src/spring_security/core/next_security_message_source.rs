@@ -1,4 +1,7 @@
-use std::{fmt, sync::Arc};
+use std::{
+    fmt::{self, Debug},
+    sync::Arc,
+};
 
 use next_web_context::{
     support::{MessageSourceAccessor, ResourceBundleMessageSource},
@@ -44,5 +47,11 @@ impl MessageSource for NextSecurityMessageSource {
         locale: Option<&Locale>,
     ) -> Result<String, NoSuchMessageError> {
         todo!()
+    }
+}
+
+impl Debug for NextSecurityMessageSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "NextSecurityMessageSource")
     }
 }

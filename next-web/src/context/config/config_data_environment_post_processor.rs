@@ -1,7 +1,7 @@
 //! An [`EnvironmentPostProcessor`] that loads and applies config data to the
 //! environment.
 
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use next_web_core::{
     env::ConfigurableEnvironment,
@@ -19,13 +19,6 @@ use crate::EnvironmentPostProcessor;
 /// Property used to determine what action to take when a config data location
 /// that must exist cannot be found.
 pub const ON_LOCATION_NOT_FOUND_PROPERTY: &str = ON_NOT_FOUND_PROPERTY;
-
-/// The resource loader that is used when the post processor has not been given
-/// one.
-///
-/// It is created once, because the locations of the resources are resolved
-/// against the cache of a resource loader.
-static DEFAULT_RESOURCE_LOADER: OnceLock<DefaultResourceLoader> = OnceLock::new();
 
 /// An [`EnvironmentPostProcessor`] that loads and applies config data to the
 /// environment before the application context is refreshed.
@@ -207,13 +200,10 @@ impl ConfigDataEnvironmentPostProcessor {
     fn resource_loader(&self) -> &dyn ResourceLoader {
         match &self.resource_loader {
             Some(resource_loader) => resource_loader.as_ref(),
-            None => DEFAULT_RESOURCE_LOADER.get_or_init(|| {
-                let mut resource_loader = DefaultResourceLoader::default();
-                // An application without a resources directory is not an
-                // error: the locations of its resources are simply empty.
-                let _ = resource_loader.load();
-                resource_loader
-            }),
+            // The shared loader is created and loaded once per process, so the
+            // resources directory is read once even when the banner is resolved
+            // through the same loader.
+            None => DefaultResourceLoader::shared(),
         }
     }
 }

@@ -94,7 +94,7 @@ impl RedisAutoConfiguration {
     }
 
     fn redis_template_missing(ctx: &dyn ApplicationContext) -> bool {
-        !ctx.contains_single::<RedisTemplate>()
+        !ctx.contains_singleton::<RedisTemplate>()
     }
 }
 

@@ -6,7 +6,7 @@
 //! starts up:
 //!
 //! - a [`ConfigurableEnvironment`] holding the properties and the profiles,
-//! - a [`DefaultListableSingletonFactory`] acting as the bean container,
+//! - a singleton container ([`Context`]) holding the providers and the singletons,
 //! - an [`ApplicationStartup`] used to record startup steps,
 //! - the registered [`ApplicationListener`]s,
 //! - an optional [`MessageSource`] used to resolve localized messages.
@@ -17,6 +17,16 @@
 //! activates it and [`ConfigurableApplicationContext::close`] shuts it down for
 //! good. Both flags live in a small shared state (`LifecycleState`), which the
 //! shutdown hook can update without borrowing the context mutably.
+//!
+//! Refreshing the context is also what populates it:
+//!
+//! 1. the providers an attribute macro submitted, such as the ones of
+//!    `#[singleton]`, are loaded into the container,
+//! 2. the providers that declare a condition are registered when their
+//!    condition holds,
+//! 3. the singletons whose provider asks for it are created eagerly, so that
+//!    they exist before the application starts to serve. Every other singleton
+//!    is created when it is first resolved.
 //!
 //! # Listeners
 //!
@@ -30,19 +40,21 @@
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
-    fmt,
+    fmt::{self, Debug},
     future::Future,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use next_web_context::{
-    ApplicationContext, ApplicationEvent, ApplicationEventPublisher, ApplicationListener,
-    DynProvider, InstanceClone, Locale, MessageSource, MessageSourceResolvable,
-    NoSuchMessageError, Scope,
+    event::{ApplicationEventMulticaster, DefaultApplicationEventMulticaster},
+    support::DelegatingMessageSource,
+    ApplicationContext, ApplicationContextExt, ApplicationEvent, ApplicationEventPublisher,
+    ApplicationListener, Definition, DynProvider, EagerCreateFunction, InstanceClone, Locale,
+    MessageSource, MessageSourceResolvable, NoSuchMessageError, Scope,
+    APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME, MESSAGE_SOURCE_SINGLETON_NAME,
 };
 use next_web_core::{
     env::ConfigurableEnvironment,
@@ -50,20 +62,17 @@ use next_web_core::{
     metrics::{ApplicationStartup, DefaultApplicationStartup},
 };
 use next_web_singletons::factory::{
+    config::SingletonRegistry,
     support::{DefaultListableSingletonFactory, DynSingle, Key},
     SingletonFactory,
 };
+use tracing::{enabled, Level};
 
 use crate::{
-    configurable_application_context::ContextError, ApplicationEnvironment,
-    ApplicationShutdownHook, ConfigurableApplicationContext,
+    configurable_application_context::ContextError,
+    next_web_application::APPLICATION_SHUTDOWN_HOOK, ApplicationEnvironment,
+    ConfigurableApplicationContext,
 };
-
-/// Prefix used for the identifiers handed out by [`DefaultApplicationContext::default`].
-const APPLICATION_ID_PREFIX: &str = "application";
-
-/// Source of the sequence numbers used for the default context identifiers.
-static APPLICATION_ID_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 /// Lifecycle flags shared between the context and its shutdown hook.
 ///
@@ -95,42 +104,33 @@ pub struct DefaultApplicationContext {
     environment: Arc<dyn ConfigurableEnvironment>,
     /// Collector recording the steps of the startup phase.
     application_startup: Box<dyn ApplicationStartup>,
-    /// The bean container held by this context.
-    singleton_factory: DefaultListableSingletonFactory,
+    /// The singleton container holding the providers and the singletons.
+    context: Context,
     /// Registered listeners, in registration order, paired with their identifier.
     listeners: Vec<(
         String,
-        Box<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
     )>,
     /// Message source used to resolve localized messages, when one is installed.
     message_source: Option<Arc<dyn MessageSource>>,
+    /// Application event multicaster used to dispatch events to listeners.
+    application_event_multicaster: Option<Arc<dyn ApplicationEventMulticaster>>,
     /// Lifecycle flags shared with the shutdown hook.
     lifecycle: Arc<LifecycleState>,
-    /// Shutdown hook registered for this context, created on demand.
-    shutdown_hook: Option<ApplicationShutdownHook>,
-    /// Providers registered with this context, keyed by the instance they create.
-    providers: HashMap<Key, DynProvider>,
-    /// Keys of the providers that are being created, used to detect cycles.
-    resolving: Vec<Key>,
-    /// Whether a provider may replace another provider with the same key.
-    allow_override: bool,
+    /// Flag indicating whether the shutdown hook is registered.
+    is_registered_shutdown_hook: AtomicBool,
 }
 
 impl DefaultApplicationContext {
-    /// Creates an empty application context.
+    ///  Creates an empty application context with the given identifier.
     ///
     /// The environment and the startup collector are set to their defaults, and
     /// a unique identifier is generated.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Creates an empty application context with the given identifier.
     ///
     /// # Arguments
     ///
     /// * `id` - The identifier to install on the context.
-    pub fn with_id(id: impl Into<String>) -> Self {
+    pub fn new(id: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             ..Self::default()
@@ -170,26 +170,13 @@ impl DefaultApplicationContext {
         self.message_source.as_deref()
     }
 
-    /// Returns the shutdown hook registered for this context, if any.
-    ///
-    /// The returned handle shares its callback registry and cancellation token
-    /// with the context, so triggering the shutdown through it marks the context
-    /// as closed.
-    ///
-    /// # Returns
-    ///
-    /// A clone of the registered hook, or `None` while no hook is registered.
-    pub fn shutdown_hook(&self) -> Option<ApplicationShutdownHook> {
-        self.shutdown_hook.clone()
-    }
-
     /// Sets whether a provider may replace another provider with the same key.
     ///
     /// # Arguments
     ///
     /// * `allow_override` - Whether replacing a provider is allowed.
     pub fn set_allow_override(&mut self, allow_override: bool) {
-        self.allow_override = allow_override;
+        self.context.allow_override = allow_override;
     }
 
     /// Registers a provider, together with the providers it is bound to.
@@ -202,32 +189,19 @@ impl DefaultApplicationContext {
     /// # Arguments
     ///
     /// * `provider` - The provider to register.
-    pub fn register_provider(&mut self, mut provider: DynProvider) {
-        // A provider that binds a type registers one provider per bound type.
-        if let Some(bindings) = provider.binding_providers() {
-            for binding in bindings {
-                self.register_provider(binding);
-            }
-        }
-
-        let key = provider.key().clone();
-        let definition = provider.definition().clone();
-
-        if self.providers.contains_key(&key) && !self.allow_override {
-            panic!("a provider with the same key is already registered: {definition:?}");
-        }
-
-        self.providers.insert(key, provider);
+    pub fn register_provider(&mut self, provider: DynProvider) {
+        self.context.load_provider(false, provider);
     }
 
-    /// Registers every provider that was submitted with `register_provider!`.
+    /// Registers every provider that was submitted by an attribute macro, such
+    /// as `#[singleton]`.
     ///
     /// This is what makes the providers of the attribute macros available to the
-    /// context without the application having to list them.
+    /// context without the application having to list them. The providers are
+    /// loaded once, and [`ConfigurableApplicationContext::refresh`] does the
+    /// same, so calling this method before refreshing the context is allowed.
     pub fn register_auto_providers(&mut self) {
-        for provider in next_web_context::auto_registered_providers() {
-            self.register_provider(provider);
-        }
+        self.context.register_auto_providers();
     }
 
     /// Returns the identifier that
@@ -300,25 +274,163 @@ impl DefaultApplicationContext {
 
         Err(NoSuchMessageError::new(code, locale))
     }
+
+    /// Registers the providers whose condition holds.
+    ///
+    /// A provider that declares a condition is held back while the context is
+    /// populated, and is only registered when its condition holds once the
+    /// context is refreshed. The condition receives the context itself, so it
+    /// can depend on the providers that are already registered.
+    fn evaluate_conditional_providers(&mut self) {
+        let mut pending = self.context.take_conditional_providers();
+        // The providers are held back in registration order and popped from the
+        // end, so they are reversed to evaluate them in that order.
+        pending.reverse();
+
+        while let Some((eager_create, provider)) = pending.pop() {
+            let evaluate = provider
+                .condition()
+                .expect("a provider in the conditional providers has a condition");
+
+            if evaluate(self) {
+                self.context.load_provider(eager_create, provider);
+            } else {
+                tracing::warn!(
+                    "the condition of a provider does not hold: {:?}",
+                    provider.definition()
+                );
+            }
+        }
+    }
+
+    /// Creates the instances of the providers that are eager.
+    ///
+    /// The functions are taken out of the container before they run, because
+    /// they create their instance through the context, which owns the
+    /// container.
+    ///
+    /// # Panics
+    ///
+    /// Panics when a provider asks for an asynchronous instance to be created
+    /// eagerly, because a context resolves its providers synchronously.
+    fn create_eager_instances(&mut self) {
+        for (definition, create) in self.context.take_eager_create_functions() {
+            match create {
+                EagerCreateFunction::Sync(create) => create(self, definition.key.name),
+                EagerCreateFunction::Async(_) => panic!(
+                    "an asynchronous provider cannot be created eagerly by a synchronous context: {definition:?}"
+                ),
+                EagerCreateFunction::None => {
+                    unreachable!("the container only records providers it has to create eagerly")
+                }
+            }
+        }
+    }
+
+    /// Prepare this context for refreshing,
+    /// setting its startup date and active flag as well as performing any initialization of property sources.
+    fn prepare_refresh(&mut self) {
+        // Switch to active.
+        self.startup_date = current_time_millis();
+        self.lifecycle.closed.store(false, Ordering::SeqCst);
+        self.lifecycle.active.store(true, Ordering::SeqCst);
+
+        if enabled!(Level::DEBUG) {
+            tracing::debug!("Refreshing {}", self.id);
+        }
+    }
+
+    /// Initialize the message source for this context.
+    fn init_message_source(&mut self) -> Result<(), ContextError> {
+        if let Some(message_source) = self
+            .singleton_factory()?
+            .registry_mut()
+            .get_singleton::<Arc<dyn MessageSource>, &'static str>(MESSAGE_SOURCE_SINGLETON_NAME)
+            .map(Clone::clone)
+        {
+            tracing::trace!("Using MessageSource [{:?}]", message_source);
+            self.message_source = Some(message_source);
+        } else {
+            let parent_message_source = self
+                .parent
+                .as_ref()
+                .map(Clone::clone)
+                .map(|ctx| ctx as Arc<dyn MessageSource>);
+            let dms = Arc::new(DelegatingMessageSource::new(parent_message_source))
+                as Arc<dyn MessageSource>;
+            self.singleton_factory()?
+                .registry_mut()
+                .register_singleton(MESSAGE_SOURCE_SINGLETON_NAME, Arc::clone(&dms));
+
+            tracing::trace!(
+                "No '{MESSAGE_SOURCE_SINGLETON_NAME}' singleton, using [{:?}]",
+                dms
+            );
+            self.message_source = Some(dms);
+        }
+
+        Ok(())
+    }
+
+    /// Initialize the ApplicationEventMulticaster.
+    /// Uses SimpleApplicationEventMulticaster if none defined in the context.
+    fn init_application_event_multicaster(&mut self) -> Result<(), ContextError> {
+        if let Some(event_multicaster) = self
+            .singleton_factory()?
+            .registry_mut()
+            .get_singleton::<Arc<dyn ApplicationEventMulticaster>, &'static str>(
+                APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
+            )
+            .map(Clone::clone)
+        {
+            tracing::trace!(
+                "Using ApplicationEventMulticaster [{:?}]",
+                event_multicaster
+            );
+            self.application_event_multicaster = Some(event_multicaster);
+        } else {
+            let listeners =
+                self.resolve_by_type::<Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>>();
+
+            let mut event_multicaster = DefaultApplicationEventMulticaster::new(listeners);
+            // Register statically specified listeners first.
+            for (id, listener) in self.listeners.iter() {
+                event_multicaster.add_application_listener(id.to_owned(), Arc::clone(&listener));
+            }
+
+            let event_multicaster =
+                Arc::new(event_multicaster) as Arc<dyn ApplicationEventMulticaster>;
+            self.singleton_factory()?.registry_mut().register_singleton(
+                APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
+                Arc::clone(&event_multicaster),
+            );
+
+            tracing::trace!(
+                "No '{APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME}' singleton, using [{:?}]",
+                event_multicaster
+            );
+            self.application_event_multicaster = Some(event_multicaster);
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for DefaultApplicationContext {
     fn default() -> Self {
         Self {
-            id: next_application_id(),
+            id: String::from("application"),
             application_name: String::new(),
             startup_date: current_time_millis(),
             parent: None,
             environment: Arc::new(ApplicationEnvironment::default()),
             application_startup: Box::new(DefaultApplicationStartup::default()),
-            singleton_factory: DefaultListableSingletonFactory::default(),
+            context: Context::default(),
             listeners: Vec::new(),
             message_source: None,
+            application_event_multicaster: None,
             lifecycle: Arc::new(LifecycleState::default()),
-            shutdown_hook: None,
-            providers: HashMap::new(),
-            resolving: Vec::new(),
-            allow_override: true,
+            is_registered_shutdown_hook: AtomicBool::new(false),
         }
     }
 }
@@ -350,7 +462,7 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
 
     fn add_application_listener(
         &mut self,
-        listener: Box<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
     ) {
         let id = Self::listener_id(listener.as_ref().type_id());
 
@@ -380,11 +492,40 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
             ));
         }
 
-        // Singletons that have to exist eagerly are created while refreshing,
-        // mirroring the "finishRefresh" phase of the original Spring context.
-        self.singleton_factory.initialize_defaults();
+        let started = std::time::Instant::now();
+        let mut context_refresh = self.application_startup.start("next.context.refresh");
+
+        // Prepare this context for refreshing.
+        self.prepare_refresh();
+
+        // Initialize message source for this context.
+        self.init_message_source()?;
+
+        // Initialize event multicaster for this context.
+        self.init_application_event_multicaster()?;
+
+        // The providers the attribute macros submitted, such as the singleton
+        // providers of `#[singleton]`, are loaded first, so that the singletons
+        // of the application are known to the context.
+        self.context.register_auto_providers();
+        // A provider that declares a condition is only registered when its
+        // condition holds.
+        self.evaluate_conditional_providers();
+        // The singletons that have to exist eagerly are created while
+        // refreshing, mirroring the "finishRefresh" phase of the original
+        // context. Every other singleton is created when it is resolved.
+        self.create_eager_instances();
+        // Last chance for the container to install the singletons it considers
+        // essential.
+        self.context.singleton_factory_mut().initialize_defaults();
         self.startup_date = current_time_millis();
         self.lifecycle.active.store(true, Ordering::SeqCst);
+        context_refresh.end();
+
+        tracing::info!(
+            elapsed_ms = started.elapsed().as_secs_f64() * 1000.0,
+            "Application context refreshed"
+        );
 
         Ok(())
     }
@@ -401,13 +542,12 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
     }
 
     fn register_shutdown_hook(&mut self) {
-        if self.shutdown_hook.is_some() {
-            // A context registers at most one shutdown hook.
+        if self.is_registered_shutdown_hook.load(Ordering::SeqCst) {
             return;
         }
 
         let lifecycle = Arc::clone(&self.lifecycle);
-        let shutdown_hook = ApplicationShutdownHook::new();
+        let shutdown_hook = APPLICATION_SHUTDOWN_HOOK.get_or_init(|| Default::default());
         shutdown_hook.add_hook(move || async move {
             // The hook cannot borrow the context, so it only marks it as closed;
             // `close` remains responsible for releasing the singletons.
@@ -415,7 +555,8 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
             lifecycle.closed.store(true, Ordering::SeqCst);
         });
 
-        self.shutdown_hook = Some(shutdown_hook);
+        self.is_registered_shutdown_hook
+            .store(true, Ordering::SeqCst);
     }
 
     fn close(&mut self) -> Result<(), ContextError> {
@@ -426,7 +567,7 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
 
         // Release the singletons held by this context. The parent context is
         // deliberately left untouched, because it has its own lifecycle.
-        self.singleton_factory.clear_all_singletons();
+        self.context.clear_all_singletons();
         self.listeners.clear();
         self.lifecycle.active.store(false, Ordering::SeqCst);
         self.lifecycle.closed.store(true, Ordering::SeqCst);
@@ -455,7 +596,7 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
 
         // The factory is available from construction until the context is
         // closed: the application has to populate it before refreshing.
-        Ok(&mut self.singleton_factory)
+        Ok(self.context.singleton_factory_mut())
     }
 }
 
@@ -480,31 +621,38 @@ impl ApplicationContext for DefaultApplicationContext {
     ) {
         // The context delegates the storage of its singletons to the singleton
         // factory, which keeps the registry in a single place.
-        self.singleton_factory
+        self.context
+            .singleton_factory_mut()
             .registry_mut()
             .insert_dyn(key, DynSingle::new(instance, clone));
     }
 
-    fn contains_singleton(&self, key: &Key) -> bool {
-        self.singleton_factory.registry().contains_key(key)
+    fn contains_singleton_boxed(&self, key: &Key) -> bool {
+        self.context
+            .singleton_factory()
+            .registry()
+            .contains_key(key)
     }
 
     fn get_singleton_boxed(&self, key: &Key) -> Option<&(dyn Any + Send + Sync)> {
-        self.singleton_factory
+        self.context
+            .singleton_factory()
             .registry()
             .get_dyn(key)
             .map(DynSingle::as_any)
     }
 
     fn get_singleton_boxed_mut(&mut self, key: &Key) -> Option<&mut (dyn Any + Send + Sync)> {
-        self.singleton_factory
+        self.context
+            .singleton_factory_mut()
             .registry_mut()
             .get_dyn_mut(key)
             .map(DynSingle::as_any_mut)
     }
 
     fn remove_singleton_boxed(&mut self, key: &Key) -> Option<Box<dyn Any + Send + Sync>> {
-        self.singleton_factory
+        self.context
+            .singleton_factory_mut()
             .registry_mut()
             .remove_dyn(key)
             .map(DynSingle::into_inner_boxed)
@@ -512,11 +660,11 @@ impl ApplicationContext for DefaultApplicationContext {
 
     fn resolve_boxed(&mut self, key: &Key) -> Option<Box<dyn Any + Send + Sync>> {
         // An instance that was created before is handed out as it is.
-        if let Some(instance) = self.singleton_factory.registry().get_dyn(key) {
+        if let Some(instance) = self.context.singleton_factory().registry().get_dyn(key) {
             return instance.get_owned_boxed();
         }
 
-        let provider = self.providers.get(key)?.clone();
+        let provider = self.context.provider(key)?.clone();
         let definition = provider.definition().clone();
         let scope = definition.scope;
 
@@ -526,13 +674,13 @@ impl ApplicationContext for DefaultApplicationContext {
             panic!("a single owner instance cannot be resolved as an owned value: {definition:?}");
         }
 
-        if self.resolving.contains(key) {
+        if self.context.is_resolving(key) {
             panic!("a circular dependency was detected while resolving: {definition:?}");
         }
 
-        self.resolving.push(key.clone());
+        self.context.push_dependency_chain(key.clone());
         let instance = provider.build_boxed(self);
-        self.resolving.pop();
+        self.context.pop_dependency_chain();
 
         if scope != Scope::Singleton {
             // A transient instance is created for every resolution and is not
@@ -543,10 +691,9 @@ impl ApplicationContext for DefaultApplicationContext {
         let erased_clone: Option<InstanceClone> = provider.clone_instance().map(|clone| {
             let origin = provider.origin();
 
-            let erased: InstanceClone =
-                Arc::new(move |instance: &(dyn Any + Send + Sync)| {
-                    clone(origin.as_ref(), instance)
-                });
+            let erased: InstanceClone = Arc::new(move |instance: &(dyn Any + Send + Sync)| {
+                clone(origin.as_ref(), instance)
+            });
 
             erased
         });
@@ -555,16 +702,21 @@ impl ApplicationContext for DefaultApplicationContext {
             Some(clone) => {
                 // Keep one copy in the context and return the other one.
                 let stored = clone(instance.as_ref());
-                self.singleton_factory
+                self.context
+                    .singleton_factory_mut()
                     .registry_mut()
-                    .insert_dyn(key.clone(), DynSingle::new(stored, Some(Arc::clone(&clone))));
+                    .insert_dyn(
+                        key.clone(),
+                        DynSingle::new(stored, Some(Arc::clone(&clone))),
+                    );
 
                 Some(instance)
             }
             None => {
                 // The instance cannot be copied, so it can only be borrowed from
                 // the context afterwards.
-                self.singleton_factory
+                self.context
+                    .singleton_factory_mut()
                     .registry_mut()
                     .insert_dyn(key.clone(), DynSingle::new(instance, None));
 
@@ -574,21 +726,21 @@ impl ApplicationContext for DefaultApplicationContext {
     }
 
     fn resolve_all_of_type(&mut self, ty: TypeId) -> Vec<Box<dyn Any + Send + Sync>> {
-        // An instance either comes from a provider, or was inserted into the
-        // context directly.
-        let mut keys: Vec<Key> = self
-            .providers
-            .keys()
-            .filter(|key| key.ty.id == ty)
-            .cloned()
-            .collect();
-        keys.extend(self.singleton_factory.registry().keys_of_type(ty));
-        keys.sort();
-        keys.dedup();
+        let keys = self.keys_of_type(ty);
 
         keys.iter()
             .filter_map(|key| self.resolve_boxed(key))
             .collect()
+    }
+
+    fn keys_of_type(&self, ty: TypeId) -> Vec<Key> {
+        // An instance either comes from a provider, or was inserted into the
+        // context directly.
+        let mut keys: Vec<Key> = self.context.keys_of_type(ty);
+        keys.extend(self.context.singleton_factory().registry().keys_of_type(ty));
+        keys.sort();
+        keys.dedup();
+        keys
     }
 }
 
@@ -665,18 +817,29 @@ impl MessageSource for DefaultApplicationContext {
     }
 }
 
-/// Returns the next unique identifier for an application context.
-fn next_application_id() -> String {
-    let sequence = APPLICATION_ID_SEQUENCE.fetch_add(1, Ordering::SeqCst);
-    format!("{APPLICATION_ID_PREFIX}-{sequence}")
+impl Debug for DefaultApplicationContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DefaultApplicationContext")
+            .field("id", &self.id)
+            .field("application_name", &self.application_name)
+            .field("startup_date", &self.startup_date)
+            .field("parent", &self.parent)
+            .field("environment", &"")
+            .field("application_startup", &"")
+            .field("context", &"")
+            .field("listeners", &"")
+            .field("message_source", &self.message_source)
+            .field("lifecycle", &self.lifecycle)
+            .field(
+                "is_registered_shutdown_hook",
+                &self.is_registered_shutdown_hook,
+            )
+            .finish()
+    }
 }
-
 /// Returns the current wall clock time in milliseconds since the Unix epoch.
 fn current_time_millis() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_millis() as i64)
-        .unwrap_or_default()
+    chrono::Utc::now().timestamp_millis()
 }
 
 /// Drives a listener future to completion for the synchronous
@@ -697,16 +860,236 @@ where
     }
 }
 
+/// The singleton container of an application context.
+///
+/// The container is the `Context` of the original dependency injection
+/// implementation, ported so that a [`DefaultApplicationContext`] owns its
+/// providers and its singletons in one place:
+///
+/// - the providers are the instances of `#[singleton]`, `#[transient]` and
+///   `#[singleowner]`, plus everything an application registers by hand,
+/// - the singletons are the instances the providers created, held by a
+///   [`DefaultListableSingletonFactory`],
+/// - the dependency chain is what detects a cycle while an instance is built,
+/// - the eager create functions are the ones a refresh has to run, and the
+///   conditional providers are the ones whose condition has to be evaluated
+///   first.
+struct Context {
+    /// The providers of the application, keyed by the instance they create.
+    providers: HashMap<Key, DynProvider>,
+    /// The factory holding the singletons the providers created.
+    singleton_factory: DefaultListableSingletonFactory,
+    /// The keys of the providers that are being created, innermost last.
+    ///
+    /// A key that appears twice in the chain is a dependency cycle, which is
+    /// what stops a provider from resolving itself forever.
+    dependency_chain: Vec<Key>,
+    /// The providers whose condition has not been evaluated yet, together with
+    /// whether their instances have to be created eagerly.
+    conditional_providers: Vec<(bool, DynProvider)>,
+    /// The functions creating the instances of the eager providers.
+    eager_create_functions: Vec<(Definition, EagerCreateFunction)>,
+    /// Whether a provider may replace another provider with the same key.
+    allow_override: bool,
+    /// Whether every provider is created eagerly, unless a provider says
+    /// otherwise.
+    eager_create: bool,
+    /// Whether only a single instance may be created eagerly.
+    ///
+    /// A transient instance is created for every resolution, so creating one
+    /// eagerly would have no effect. The flag therefore only allows the
+    /// [`Scope::Singleton`] and [`Scope::SingleOwner`] scopes until it is
+    /// cleared.
+    allow_only_single_eager_create: bool,
+    /// Whether the providers the attribute macros submitted have been loaded.
+    auto_providers_loaded: bool,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self {
+            providers: HashMap::new(),
+            singleton_factory: DefaultListableSingletonFactory::default(),
+            dependency_chain: Vec::new(),
+            conditional_providers: Vec::new(),
+            eager_create_functions: Vec::new(),
+            allow_override: true,
+            eager_create: false,
+            allow_only_single_eager_create: true,
+            auto_providers_loaded: false,
+        }
+    }
+}
+
+impl Context {
+    /// Registers a provider, together with the providers it is bound to.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the key of the provider is already registered and the
+    /// container does not allow a provider to be overridden.
+    ///
+    /// # Arguments
+    ///
+    /// * `eager_create` - Whether the instance of the provider has to be
+    ///   created while the context is refreshed, in addition to the providers
+    ///   that ask for it themselves.
+    /// * `provider` - The provider to register.
+    #[track_caller]
+    fn load_provider(&mut self, eager_create: bool, mut provider: DynProvider) {
+        // A provider that binds a type registers one provider per bound type.
+        if let Some(bindings) = provider.binding_providers() {
+            for binding in bindings {
+                self.load_provider(eager_create, binding);
+            }
+        }
+
+        let definition = provider.definition().clone();
+        let need_eager_create = self.eager_create || eager_create || provider.eager_create();
+        let allow_eager_create = !self.allow_only_single_eager_create
+            || matches!(definition.scope, Scope::Singleton | Scope::SingleOwner);
+
+        if need_eager_create && allow_eager_create {
+            self.eager_create_functions
+                .push((definition.clone(), provider.eager_create_function()));
+        }
+
+        let key = definition.key.clone();
+        if self.providers.contains_key(&key) && !self.allow_override {
+            panic!("a provider with the same key is already registered: {definition:?}");
+        }
+
+        self.providers.insert(key, provider);
+    }
+
+    /// Registers the given providers, together with the providers they are
+    /// bound to.
+    ///
+    /// A provider that declares a condition is not registered until the
+    /// condition is evaluated, which happens while the context is refreshed.
+    ///
+    /// # Arguments
+    ///
+    /// * `eager_create` - Whether the instances of the providers have to be
+    ///   created while the context is refreshed.
+    /// * `providers` - The providers to register.
+    fn load_providers(&mut self, eager_create: bool, providers: Vec<DynProvider>) {
+        for provider in providers {
+            if provider.condition().is_some() {
+                self.conditional_providers.push((eager_create, provider));
+                continue;
+            }
+
+            self.load_provider(eager_create, provider);
+        }
+    }
+
+    /// Registers every provider that an attribute macro submitted.
+    ///
+    /// This is what makes the singletons an application declares with
+    /// `#[singleton]` available, without the application having to list them.
+    /// The providers are loaded once: a second call is a no-op, so refreshing
+    /// the context does not register them twice.
+    fn register_auto_providers(&mut self) {
+        if self.auto_providers_loaded {
+            return;
+        }
+        self.auto_providers_loaded = true;
+
+        let providers: Vec<DynProvider> = next_web_context::auto_registered_providers().collect();
+        self.load_providers(false, providers);
+    }
+
+    /// Returns the provider registered under the given key, if any.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key identifying the provider.
+    fn provider(&self, key: &Key) -> Option<&DynProvider> {
+        self.providers.get(key)
+    }
+
+    /// Returns the keys of the providers whose instance has the given type.
+    ///
+    /// # Arguments
+    ///
+    /// * `ty` - The [`TypeId`] of the instances to look for.
+    fn keys_of_type(&self, ty: TypeId) -> Vec<Key> {
+        self.providers
+            .keys()
+            .filter(|key| key.ty.id == ty)
+            .cloned()
+            .collect()
+    }
+
+    /// Returns the singletons the providers created.
+    fn singleton_factory(&self) -> &DefaultListableSingletonFactory {
+        &self.singleton_factory
+    }
+
+    /// Returns the singletons the providers created.
+    fn singleton_factory_mut(&mut self) -> &mut DefaultListableSingletonFactory {
+        &mut self.singleton_factory
+    }
+
+    /// Returns whether the given key is being resolved.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key to look for in the dependency chain.
+    fn is_resolving(&self, key: &Key) -> bool {
+        self.dependency_chain.contains(key)
+    }
+
+    /// Pushes the key of a provider that is about to be created.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key of the provider.
+    fn push_dependency_chain(&mut self, key: Key) {
+        self.dependency_chain.push(key);
+    }
+
+    /// Pops the key of the provider that was created last.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the chain is empty, which cannot happen because a key is
+    /// pushed before a provider is created.
+    fn pop_dependency_chain(&mut self) {
+        self.dependency_chain
+            .pop()
+            .expect("a key is pushed before a provider is created");
+    }
+
+    /// Returns the providers whose condition has not been evaluated yet.
+    fn take_conditional_providers(&mut self) -> Vec<(bool, DynProvider)> {
+        std::mem::take(&mut self.conditional_providers)
+    }
+
+    /// Returns the functions creating the instances of the eager providers.
+    ///
+    /// The functions are returned in the order the providers were registered,
+    /// and are removed from the container, so that refreshing the context runs
+    /// each of them once.
+    fn take_eager_create_functions(&mut self) -> Vec<(Definition, EagerCreateFunction)> {
+        std::mem::take(&mut self.eager_create_functions)
+    }
+
+    /// Releases the singletons the providers created.
+    fn clear_all_singletons(&mut self) {
+        self.singleton_factory.clear_all_singletons();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::any::Any;
     use std::pin::Pin;
     use std::sync::atomic::AtomicUsize;
 
+    use next_web_context::{singleton, transient, ApplicationContextExt, Provider};
     use next_web_singletons::factory::config::SingletonRegistry;
-    use next_web_context::{
-        ApplicationContextExt, Provider, singleton, transient,
-    };
 
     use super::*;
 
@@ -756,17 +1139,6 @@ mod tests {
     }
 
     #[test]
-    fn distinct_contexts_get_distinct_identifiers() {
-        let first = DefaultApplicationContext::default();
-        let second = DefaultApplicationContext::default();
-
-        assert_ne!(first.id(), second.id());
-
-        let renamed = DefaultApplicationContext::with_id("custom");
-        assert_eq!(renamed.id(), "custom");
-    }
-
-    #[test]
     fn refresh_activates_the_context_only_once() {
         let mut context = DefaultApplicationContext::default();
 
@@ -804,11 +1176,11 @@ mod tests {
         let received = Arc::new(AtomicUsize::new(0));
         let mut context = DefaultApplicationContext::default();
 
-        context.add_application_listener(Box::new(CountingListener {
+        context.add_application_listener(Arc::new(CountingListener {
             received: Arc::clone(&received),
         }));
         // Registering another instance of the same type replaces the first one.
-        context.add_application_listener(Box::new(CountingListener {
+        context.add_application_listener(Arc::new(CountingListener {
             received: Arc::clone(&received),
         }));
 
@@ -846,7 +1218,7 @@ mod tests {
         assert_eq!(context.resolve::<u32>(), 42);
 
         // The instance is created once and kept by the context.
-        assert!(context.contains_single::<u32>());
+        assert!(context.contains_singleton::<u32>());
         assert_eq!(context.resolve::<u32>(), 42);
     }
 
@@ -864,7 +1236,7 @@ mod tests {
         assert_eq!(context.resolve::<u32>(), 1);
 
         // A transient instance is not kept by the context.
-        assert!(!context.contains_single::<u32>());
+        assert!(!context.contains_singleton::<u32>());
     }
 
     #[test]
@@ -898,15 +1270,122 @@ mod tests {
     #[should_panic(expected = "circular dependency")]
     fn detects_a_circular_dependency() {
         let mut context = DefaultApplicationContext::default();
-        let provider: Provider<u32> = singleton(|cx| {
-            ApplicationContextExt::resolve_with_name::<u32>(cx, "loop")
-        })
-        .name("loop")
-        .into();
+        let provider: Provider<u32> =
+            singleton(|cx| ApplicationContextExt::resolve_with_name::<u32>(cx, "loop"))
+                .name("loop")
+                .into();
         context.register_provider(provider.into());
 
         let _ = context.resolve_with_name::<u32>("loop");
     }
+
+    /// A singleton that the attribute macro registers automatically.
+    #[crate::macros::bind::singleton]
+    #[derive(Clone)]
+    struct AutoRegisteredService;
+
+    /// A singleton that the attribute macro marks as eager.
+    #[crate::macros::bind::singleton(eager_create = true)]
+    #[derive(Clone)]
+    struct AutoRegisteredEagerService;
+
+    #[test]
+    fn creates_the_singleton_that_the_attribute_macro_registered() {
+        let mut context = DefaultApplicationContext::default();
+        context.refresh().expect("refreshing succeeds");
+
+        // The provider the macro registered has to be known to the context, so
+        // that the instance can be created and is then held by the context.
+        context.just_create_singleton_with_name::<AutoRegisteredService>(
+            next_web_context::default_singleton_name::<AutoRegisteredService>(),
+        );
+
+        assert!(context.contains_singleton_with_default_name::<AutoRegisteredService>());
+    }
+
+    #[test]
+    fn creates_the_eager_singleton_while_refreshing() {
+        let mut context = DefaultApplicationContext::default();
+        context.refresh().expect("refreshing succeeds");
+
+        assert!(context.contains_singleton_with_default_name::<AutoRegisteredEagerService>());
+    }
+
+    /// A trait whose implementations are bound to it, the way the framework
+    /// binds an application runner or a filter to a trait object.
+    trait Greeter: Send + Sync {
+        fn greet(&self) -> String;
+    }
+
+    #[crate::macros::bind::singleton(binds = [Self::into_greeter])]
+    #[derive(Clone)]
+    struct EnglishGreeter;
+
+    impl Greeter for EnglishGreeter {
+        fn greet(&self) -> String {
+            "hello".to_owned()
+        }
+    }
+
+    impl EnglishGreeter {
+        fn into_greeter(self) -> Arc<dyn Greeter> {
+            Arc::new(self)
+        }
+    }
+
+    #[test]
+    fn resolves_the_bindings_of_an_auto_registered_singleton() {
+        let mut context = DefaultApplicationContext::default();
+        context.refresh().expect("refreshing succeeds");
+
+        // The binding provider is registered together with the provider of the
+        // type it is bound to, so the bound instances can be resolved by type.
+        let greeters = context.resolve_by_type::<Arc<dyn Greeter>>();
+
+        assert_eq!(greeters.len(), 1);
+        assert_eq!(greeters[0].greet(), "hello");
+    }
+
+    #[test]
+    fn creates_and_borrows_every_instance_of_a_type() {
+        let mut context = DefaultApplicationContext::default();
+        context.refresh().expect("refreshing succeeds");
+
+        let name = next_web_context::default_singleton_name::<AutoRegisteredService>();
+
+        // The provider of the macro is known, so the instance is created on
+        // demand and the context holds it afterwards.
+        assert!(context.try_just_create_singleton_with_name::<AutoRegisteredService>(name.clone()));
+        assert!(!context.try_just_create_singleton_with_name::<u32>("missing"));
+
+        // Every instance of the type is reported once it was created.
+        assert_eq!(
+            context
+                .get_singletons_by_type::<AutoRegisteredService>()
+                .len(),
+            1
+        );
+        assert_eq!(
+            context.try_just_create_singletons_by_type::<AutoRegisteredService>(),
+            vec![true]
+        );
+    }
+
+    #[test]
+    fn removing_a_singleton_keeps_the_provider_that_created_it() {
+        let mut context = DefaultApplicationContext::default();
+        context.refresh().expect("refreshing succeeds");
+
+        let name = next_web_context::default_singleton_name::<AutoRegisteredService>();
+        context.just_create_singleton_with_name::<AutoRegisteredService>(name.clone());
+
+        assert!(context
+            .remove_singleton_with_name::<AutoRegisteredService>(name.clone())
+            .is_some());
+        assert!(!context.contains_singleton_with_name::<AutoRegisteredService>(name.clone()));
+
+        // Only the instance was removed, so the context creates it again.
+        context.just_create_singleton_with_name::<AutoRegisteredService>(name.clone());
+        assert!(context.contains_singleton_with_name::<AutoRegisteredService>(name));
+    }
 }
-
-

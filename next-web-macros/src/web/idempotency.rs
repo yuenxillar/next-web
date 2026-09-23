@@ -93,7 +93,7 @@ pub(crate) fn impl_macro_idempotency(attr: TokenStream, mut item_fn: ItemFn) -> 
             let __idempotency_store = #extension.context()
                 .read()
                 .await
-                .get_single_with_name::<::std::sync::Arc<dyn ::next_web::core::traits::store::idempotency_store::IdempotencyStore<Value = ()>> >( #name )
+                .get_singleton_with_name::<::std::sync::Arc<dyn ::next_web::core::traits::store::idempotency_store::IdempotencyStore<Value = ()>> >( #name )
                 .clone();
 
             match __idempotency_store.check_and_store(#cache_key, Some(()), #ttl).await {

@@ -19,6 +19,26 @@ impl FileResource {
         Self::try_from(path.as_ref())
     }
 
+    /// Creates a resource for the given path, reusing the metadata that was
+    /// already read for it.
+    ///
+    /// Reading the metadata of a file costs a system call, so a caller that
+    /// already has it, such as the scan of the resources directory, passes it
+    /// in instead of letting the resource read it a second time.
+    pub(crate) fn from_metadata(path: &Path, metadata: &fs::Metadata) -> io::Result<Self> {
+        let data = Cow::from(fs::read(path)?);
+
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&data);
+        let hash: [u8; 32] = hasher.finalize().into();
+
+        Ok(FileResource {
+            data,
+            path: path.into(),
+            metadata: Metadata::of(metadata, hash),
+        })
+    }
+
     pub fn data(&self) -> &Cow<'static, [u8]> {
         &self.data
     }
@@ -32,39 +52,7 @@ impl TryFrom<&Path> for FileResource {
     type Error = io::Error;
 
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        let data = Cow::from(fs::read(path)?);
-
-        let mut hasher = sha2::Sha256::new();
-        hasher.update(&data);
-        let hash: [u8; 32] = hasher.finalize().into();
-
-        let source_date_epoch = match std::env::var("SOURCE_DATE_EPOCH") {
-            Ok(value) => value.parse::<u64>().ok(),
-            Err(_) => None,
-        };
-        let metadata = path.symlink_metadata()?;
-
-        let last_modified = metadata
-            .modified()
-            .ok()
-            .and_then(|modified| modified.duration_since(SystemTime::UNIX_EPOCH).ok())
-            .map(|secs| secs.as_secs());
-
-        let created = metadata
-            .created()
-            .ok()
-            .and_then(|created| created.duration_since(SystemTime::UNIX_EPOCH).ok())
-            .map(|secs| secs.as_secs());
-
-        Ok(FileResource {
-            data,
-            path: path.into(),
-            metadata: Metadata::new(
-                hash,
-                source_date_epoch.or(last_modified),
-                source_date_epoch.or(created),
-            ),
-        })
+        Self::from_metadata(path, &path.symlink_metadata()?)
     }
 }
 
@@ -82,6 +70,42 @@ impl Metadata {
             last_modified,
             created,
         }
+    }
+
+    /// Creates the metadata of a file from the metadata of the file system and
+    /// the hash of its content.
+    ///
+    /// The last modification and creation times are taken from the file system
+    /// metadata, or from the `SOURCE_DATE_EPOCH` environment variable when it
+    /// is set, so that a build is reproducible.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - The metadata of the file, as read from the file system.
+    /// * `hash` - The hash of the content of the file.
+    fn of(metadata: &fs::Metadata, hash: [u8; 32]) -> Self {
+        let source_date_epoch = match std::env::var("SOURCE_DATE_EPOCH") {
+            Ok(value) => value.parse::<u64>().ok(),
+            Err(_) => None,
+        };
+
+        let last_modified = metadata
+            .modified()
+            .ok()
+            .and_then(|modified| modified.duration_since(SystemTime::UNIX_EPOCH).ok())
+            .map(|secs| secs.as_secs());
+
+        let created = metadata
+            .created()
+            .ok()
+            .and_then(|created| created.duration_since(SystemTime::UNIX_EPOCH).ok())
+            .map(|secs| secs.as_secs());
+
+        Self::new(
+            hash,
+            source_date_epoch.or(last_modified),
+            source_date_epoch.or(created),
+        )
     }
 
     pub fn hash(&self) -> &[u8; 32] {

@@ -74,6 +74,8 @@ impl<'a> StartupInfoLogger<'a> {
         self.append_startup_time(&mut msg, startup);
         msg.push('\n');
         self.append_pid(&mut msg);
+        msg.push('\n');
+
         msg
     }
 
@@ -86,7 +88,7 @@ impl<'a> StartupInfoLogger<'a> {
                 format!(
                     "{}:{}",
                     self.environment
-                        .get_property_or_default("next.server.address", "127.0.0.1"),
+                        .get_property_or_default("next.server.address", "0.0.0.0"),
                     self.environment
                         .get_property_or_default("next.server.port", "11000")
                 )

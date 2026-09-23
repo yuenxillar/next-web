@@ -40,9 +40,9 @@ impl AutoConfiguration for MessageSourceAutoConfiguration {
         &mut self,
         ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn Error>> {
-        let message_source_single_name: &'static str = "messageSource";
+        let message_source_singleton_name: &'static str = "messageSource";
 
-        if ctx.contains_single_with_name::<Arc<dyn MessageSource>>(message_source_single_name) {
+        if ctx.contains_singleton_with_name::<Arc<dyn MessageSource>>(message_source_singleton_name) {
             return Ok(());
         }
 
@@ -56,7 +56,7 @@ impl AutoConfiguration for MessageSourceAutoConfiguration {
 
         #[cfg(not(feature = "embed-resources"))]
         let resource_loader: Arc<dyn ResourceLoader> = ctx
-            .get_single_with_default_name::<ApplicationResources>()
+            .get_singleton_option_with_default_name::<ApplicationResources>()
             .map(Clone::clone)
             .map(Arc::new)
             .ok_or("No `ApplicationResources` found")?;
@@ -84,7 +84,7 @@ impl AutoConfiguration for MessageSourceAutoConfiguration {
         //     .set(message_source.clone())
         //     .map_err(|_e| Into::<Box<dyn Error>>::into("MessageSource already exists"))?;
 
-        ctx.insert_singleton_with_name(message_source, message_source_single_name);
+        ctx.insert_singleton_with_name(message_source, message_source_singleton_name);
         Ok(())
     }
 }

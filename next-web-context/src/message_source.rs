@@ -1,6 +1,10 @@
-use std::fmt;
+use std::fmt::{self, Debug};
 
 use crate::{Locale, MessageSourceResolvable, NoSuchMessageError};
+
+/// The name of the  singleton in the context.
+/// If none is supplied, message resolution is delegated to the parent.
+pub const MESSAGE_SOURCE_SINGLETON_NAME: &str = "messageSource";
 
 /// Strategy trait for resolving messages, with support for the parameterization
 /// and internationalization of such messages.
@@ -11,6 +15,7 @@ use crate::{Locale, MessageSourceResolvable, NoSuchMessageError};
 pub trait MessageSource
 where
     Self: Send + Sync,
+    Self: Debug,
 {
     /// Try to resolve the message. Return default message if no message was found.
     ///

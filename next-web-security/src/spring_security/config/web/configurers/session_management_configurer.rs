@@ -577,7 +577,7 @@ where
                     .expect("the application context lock is poisoned");
 
                 context
-                    .get_single_option::<Arc<dyn SessionRegistry>>()
+                    .get_singleton_option::<Arc<dyn SessionRegistry>>()
                     .map(Clone::clone)
             });
         if let Some(registry) = registry {
@@ -604,7 +604,7 @@ where
                 .write()
                 .expect("the application context lock is poisoned");
 
-            if let Some(delegating) = context.get_single_option_mut::<DelegatingApplicationListener>() {
+            if let Some(delegating) = context.get_singleton_option_mut::<DelegatingApplicationListener>() {
                 let smart_listener = GenericApplicationListenerAdapter::new(delegate);
                 delegating.add_listener(Arc::new(smart_listener));
             }

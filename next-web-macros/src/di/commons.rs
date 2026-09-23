@@ -292,7 +292,7 @@ enum ResolveOneValue {
     },
     Ref {
         create_single: Stmt,
-        get_single: Stmt,
+        get_singleton: Stmt,
     },
 }
 
@@ -429,21 +429,21 @@ fn generate_only_one_field_or_argument_resolve_stmt(
             Some(ty) => {
                 let create_single = match color {
                     Color::Async => parse_quote! {
-                        cx.try_just_create_single_with_name_async::<#ty>(#name).await;
+                        cx.try_just_create_singleton_with_name_async::<#ty>(#name).await;
                     },
                     Color::Sync => parse_quote! {
-                        cx.try_just_create_single_with_name::<#ty>(#name);
+                        cx.try_just_create_singleton_with_name::<#ty>(#name);
                     },
                 };
 
-                let get_single = parse_quote! {
-                    let #ident = cx.get_single_option_with_name(#name);
+                let get_singleton = parse_quote! {
+                    let #ident = cx.get_singleton_option_with_name(#name);
                 };
 
                 Ok(ResolveOne {
                     stmt: ResolveOneValue::Ref {
                         create_single,
-                        get_single,
+                        get_singleton,
                     },
                     variable: ident,
                 })
@@ -486,15 +486,15 @@ fn generate_only_one_field_or_argument_resolve_stmt(
             Some(ty) => {
                 let create_single = match color {
                     Color::Async => parse_quote! {
-                        cx.try_just_create_single_with_name_async::<#ty>(#name).await;
+                        cx.try_just_create_singleton_with_name_async::<#ty>(#name).await;
                     },
                     Color::Sync => parse_quote! {
-                        cx.try_just_create_single_with_name::<#ty>(#name);
+                        cx.try_just_create_singleton_with_name::<#ty>(#name);
                     },
                 };
 
-                let get_single = parse_quote! {
-                    let #ident = match cx.get_single_option_with_name(#name) {
+                let get_singleton = parse_quote! {
+                    let #ident = match cx.get_singleton_option_with_name(#name) {
                         Some(value) => value,
                         None => #default,
                     };
@@ -503,7 +503,7 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                 Ok(ResolveOne {
                     stmt: ResolveOneValue::Ref {
                         create_single,
-                        get_single,
+                        get_singleton,
                     },
                     variable: ident,
                 })
@@ -546,21 +546,21 @@ fn generate_only_one_field_or_argument_resolve_stmt(
             Some(ty) => {
                 let create_single = match color {
                     Color::Async => parse_quote! {
-                        cx.try_just_create_singles_by_type_async::<#ty>().await;
+                        cx.try_just_create_singletons_by_type_async::<#ty>().await;
                     },
                     Color::Sync => parse_quote! {
-                        cx.try_just_create_singles_by_type::<#ty>();
+                        cx.try_just_create_singletons_by_type::<#ty>();
                     },
                 };
 
-                let get_single = parse_quote! {
-                    let #ident = cx.get_singles_by_type();
+                let get_singleton = parse_quote! {
+                    let #ident = cx.get_singletons_by_type();
                 };
 
                 Ok(ResolveOne {
                     stmt: ResolveOneValue::Ref {
                         create_single,
-                        get_single,
+                        get_singleton,
                     },
                     variable: ident,
                 })
@@ -598,21 +598,26 @@ fn generate_only_one_field_or_argument_resolve_stmt(
             Some(ty) => {
                 let create_single = match color {
                     Color::Async => parse_quote! {
-                        cx.try_just_create_singles_by_type_async::<#ty>().await;
+                        cx.try_just_create_singletons_by_type_async::<#ty>().await;
                     },
                     Color::Sync => parse_quote! {
-                        cx.try_just_create_singles_by_type::<#ty>();
+                        cx.try_just_create_singletons_by_type::<#ty>();
                     },
                 };
 
-                let get_single = parse_quote! {
-                    let #ident = cx.get_singles_by_type();
+                let get_singleton = parse_quote! {
+                    let #ident: ::std::collections::HashMap<String, _> =
+                        ::std::collections::HashMap::from_iter(
+                            cx.get_singletons_by_type()
+                                .into_iter()
+                                .map(|instance| (instance.singleton_name(), instance)),
+                        );
                 };
 
                 Ok(ResolveOne {
                     stmt: ResolveOneValue::Ref {
                         create_single,
-                        get_single,
+                        get_singleton,
                     },
                     variable: ident,
                 })
@@ -646,26 +651,26 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         // is what makes an item able to modify a singleton.
         let create_single = match color {
             Color::Async => parse_quote! {
-                cx.just_create_single_with_name_async::<#instance_ty>(#name).await;
+                cx.just_create_singleton_with_name_async::<#instance_ty>(#name).await;
             },
             Color::Sync => parse_quote! {
-                cx.just_create_single_with_name::<#instance_ty>(#name);
+                cx.just_create_singleton_with_name::<#instance_ty>(#name);
             },
         };
 
-        let get_single = match is_mut_ref {
+        let get_singleton = match is_mut_ref {
             false => parse_quote! {
-                let #ident = cx.get_single_with_name(#name);
+                let #ident = cx.get_singleton_with_name(#name);
             },
             true => parse_quote! {
-                let #ident = cx.get_single_mut_with_name(#name);
+                let #ident = cx.get_singleton_mut_with_name(#name);
             },
         };
 
         return Ok(ResolveOne {
             stmt: ResolveOneValue::Ref {
                 create_single,
-                get_single,
+                get_singleton,
             },
             variable: ident,
         });
@@ -684,21 +689,21 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         Some(ty) => {
             let create_single = match color {
                 Color::Async => parse_quote! {
-                    cx.just_create_single_with_name_async::<#ty>(#name).await;
+                    cx.just_create_singleton_with_name_async::<#ty>(#name).await;
                 },
                 Color::Sync => parse_quote! {
-                    cx.just_create_single_with_name::<#ty>(#name);
+                    cx.just_create_singleton_with_name::<#ty>(#name);
                 },
             };
 
-            let get_single = parse_quote! {
-                let #ident = cx.get_single_with_name(#name);
+            let get_singleton = parse_quote! {
+                let #ident = cx.get_singleton_with_name(#name);
             };
 
             Ok(ResolveOne {
                 stmt: ResolveOneValue::Ref {
                     create_single,
-                    get_single,
+                    get_singleton,
                 },
                 variable: ident,
             })
@@ -720,7 +725,7 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                         }
 
                         parse_quote! {
-                            let #ident = cx.get_single::<::next_web_core::context::properties::ApplicationProperties>().one_value::<#value_type>(#key);
+                            let #ident = cx.get_singleton::<::next_web_core::context::properties::ApplicationProperties>().one_value::<#value_type>(#key);
                         }
                     } else {
                         parse_quote! {
@@ -762,10 +767,10 @@ fn push_resolve_stmts(
         ResolveOneValue::Owned { resolve } => ref_mut_cx_stmts.push(resolve),
         ResolveOneValue::Ref {
             create_single,
-            get_single,
+            get_singleton,
         } => {
             ref_mut_cx_stmts.push(create_single);
-            ref_cx_stmts.push(get_single);
+            ref_cx_stmts.push(get_singleton);
         }
     }
 }

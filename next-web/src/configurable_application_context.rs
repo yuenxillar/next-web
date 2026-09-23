@@ -19,13 +19,6 @@ use next_web_singletons::factory::{
 /// context config paths in a single string value.
 pub const CONFIG_LOCATION_DELIMITERS: &str = ",; \t\n";
 
-/// Name of the `LoadTimeWeaver` bean in the factory.
-///
-/// If such a bean is supplied, the context will use a temporary class loader
-/// for type matching, in order to allow the `LoadTimeWeaver` to process all
-/// actual bean classes.
-pub const LOAD_TIME_WEAVER_BEAN_NAME: &str = "loadTimeWeaver";
-
 /// Name of the environment bean in the factory.
 pub const ENVIRONMENT_BEAN_NAME: &str = "environment";
 
@@ -160,7 +153,7 @@ where
     /// * `listener` - The listener to register.
     fn add_application_listener(
         &mut self,
-        listener: Box<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
     );
 
     /// Removes the given [`ApplicationListener`] from this context's set of

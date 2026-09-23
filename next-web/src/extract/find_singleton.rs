@@ -63,14 +63,14 @@ where
     let reader = state.read().await;
 
     if let Some(instance) = reader
-        .get_single_option_with_name::<T>(name.to_owned())
+        .get_singleton_option_with_name::<T>(name.to_owned())
         .map(Clone::clone)
     {
         return Some(instance);
     }
 
     if let Some(instance) = reader
-        .get_single_option_with_name::<T>("")
+        .get_singleton_option_with_name::<T>("")
         .map(Clone::clone)
     {
         return Some(instance);

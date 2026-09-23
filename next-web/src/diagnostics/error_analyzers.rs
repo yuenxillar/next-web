@@ -125,6 +125,11 @@ impl ErrorAnalyzers {
         analyzers: &[Box<dyn ErrorAnalyzer>],
     ) -> Option<ErrorAnalysis<'a>> {
         for analyzer in analyzers {
+            tracing::info!(
+                "ErrorAnalyzers analyze error={:?}",
+                error.downcast_ref::<std::io::Error>()
+            );
+
             if let Some(analysis) = analyzer.analyze(error) {
                 return Some(analysis);
             }

@@ -1,8 +1,9 @@
-server_addr: 192.168.18.168
+server_addr: "192.168.1.18"
 
 next:
   server:
-    port: 11000
+    port: 8080
+    address: 127.0.0.1
   application:
     name: "NextWebApplication"
 
@@ -14,7 +15,7 @@ next:
       host: "192.168.1.19"
       port: 6379
       password: "123"
-      
+
   xxl_job:
     server_address: "127.0.0.1:11300"
     access_token: "null"

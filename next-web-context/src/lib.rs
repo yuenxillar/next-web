@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
-pub mod event;
 pub mod autoregister;
+pub mod event;
 pub mod provider;
 pub mod support;
 
@@ -14,12 +14,17 @@ mod message_source_resolvable;
 mod no_such_message_error;
 
 pub use application_context::{
-    ApplicationContext, InstanceClone, default_singleton_name,
+    APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME, ApplicationContext, InstanceClone,
+    default_singleton_name,
 };
 pub use application_context_ext::ApplicationContextExt;
-pub use autoregister::{
-    AutoRegisterModule, ProviderRegister, auto_registered_providers, submit,
-};
+pub use application_event::{ApplicationEvent, EventAttributes};
+pub use application_event_publisher::ApplicationEventPublisher;
+pub use application_listener::ApplicationListener;
+pub use autoregister::{AutoRegisterModule, ProviderRegister, auto_registered_providers, submit};
+pub use message_source::{MESSAGE_SOURCE_SINGLETON_NAME, MessageSource};
+pub use message_source_resolvable::MessageSourceResolvable;
+pub use no_such_message_error::NoSuchMessageError;
 pub use provider::{
     BoxValue, Color, Constructor, DefaultProvider, Definition, DynProvider, EagerCreateFunction,
     FutureExt, Module, Provider, ResolveModule, Scope, SingleOwnerAsyncProvider,
@@ -27,12 +32,6 @@ pub use provider::{
     TransientProvider, single_owner, single_owner_async, singleton, singleton_async, transient,
     transient_async,
 };
-pub use application_event::{ApplicationEvent, EventAttributes};
-pub use application_event_publisher::ApplicationEventPublisher;
-pub use application_listener::ApplicationListener;
-pub use message_source::MessageSource;
-pub use message_source_resolvable::MessageSourceResolvable;
-pub use no_such_message_error::NoSuchMessageError;
 
 #[derive(Debug, Clone)]
 pub struct Locale;

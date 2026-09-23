@@ -65,7 +65,7 @@ where
                 authorization_manager_factory.clone(),
             );
         registry.base.set_request_matcher_builder(
-            ctx.get_single_option::<Builder>()
+            ctx.get_singleton_option::<Builder>()
                 .map(Clone::clone)
                 .unwrap_or_default(),
         );

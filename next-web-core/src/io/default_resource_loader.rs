@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     io,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
     time::SystemTime,
 };
 
@@ -30,7 +30,32 @@ pub struct DefaultResourceLoader {
     current_cache_size: u64,
 }
 
+/// The resource loader that is shared by the framework when an application does
+/// not configure one of its own.
+static SHARED: OnceLock<DefaultResourceLoader> = OnceLock::new();
+
 impl DefaultResourceLoader {
+    /// Returns the resource loader that is shared by the framework.
+    ///
+    /// The loader reads the [`resources`](Self::resources_dir) directory of the
+    /// application once, the first time it is used, so the directory is scanned
+    /// and its files are read a single time no matter how many components look
+    /// a resource up. It is the loader used by the banner and by the config
+    /// data when the application does not configure a resource loader of its
+    /// own.
+    ///
+    /// A missing resources directory is not an error: the loader then simply
+    /// holds no resource. Use [`new`](Self::new) to load another directory.
+    pub fn shared() -> &'static DefaultResourceLoader {
+        SHARED.get_or_init(|| {
+            let mut resource_loader = DefaultResourceLoader::default();
+            // An application without a resources directory is not an error: the
+            // locations of its resources are simply empty.
+            let _ = resource_loader.load();
+            resource_loader
+        })
+    }
+
     /// Creates a new default resource loader with the specified root directory and cache configuration.
     pub fn new<P>(root: P, cache_config: Option<ResourceCacheConfig>) -> Self
     where
@@ -196,7 +221,9 @@ impl DefaultResourceLoader {
         }
 
         // Read the file contents only after the size check passes.
-        let source = match FileResource::try_from(path) {
+        // The metadata was read above, so the resource reuses it instead of
+        // reading it a second time.
+        let source = match FileResource::from_metadata(path, &metadata) {
             Ok(source) => source,
             Err(e) => {
                 warn!("Skipping unreadable resource {}: {}", path.display(), e);
@@ -582,5 +609,19 @@ mod tests {
         assert!(loader.get_resources("   ").is_err());
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn shares_a_single_loader() {
+        let first = DefaultResourceLoader::shared();
+        let second = DefaultResourceLoader::shared();
+
+        // The same instance is handed out to every caller, so the resources of
+        // the application are read and held once.
+        assert!(std::ptr::eq(first, second));
+        assert_eq!(
+            first.root(),
+            DefaultResourceLoader::resources_dir().as_path()
+        );
     }
 }

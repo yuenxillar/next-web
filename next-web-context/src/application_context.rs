@@ -27,6 +27,10 @@ use next_web_singletons::factory::support::Key;
 
 use crate::{ApplicationEventPublisher, MessageSource};
 
+/// The name of the ApplicationEventMulticaster singleton in the context.
+/// If none is supplied, a SimpleApplicationEventMulticaster is used.
+pub const APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME: &str = "applicationEventMulticaster";
+
 /// Signature of the function a context stores next to an instance so that owned
 /// copies of it can be produced later.
 ///
@@ -70,6 +74,12 @@ pub fn default_singleton_name<T: ?Sized>() -> String {
 /// provide. Those operations are expressed in terms of [`Key`], which pairs the
 /// type of an instance with the name it is registered under.
 ///
+/// The accessors that work on type erased instances end with `_boxed`, which
+/// keeps them apart from the type safe methods of
+/// [`ApplicationContextExt`](crate::ApplicationContextExt): the context has a
+/// single concept of a singleton, reachable either through a [`Key`] here or
+/// through a type parameter there.
+///
 /// Implementations are expected to be usable as `&mut dyn ApplicationContext`,
 /// which is why every method of this trait is object safe.
 pub trait ApplicationContext
@@ -110,7 +120,7 @@ where
     /// # Arguments
     ///
     /// * `key` - The key identifying the instance.
-    fn contains_singleton(&self, key: &Key) -> bool;
+    fn contains_singleton_boxed(&self, key: &Key) -> bool;
 
     /// Returns a shared, type erased reference to the instance registered under
     /// the given key, or `None` when there is none.
@@ -156,4 +166,16 @@ where
     ///
     /// * `ty` - The [`TypeId`] of the instances to produce.
     fn resolve_all_of_type(&mut self, ty: TypeId) -> Vec<Box<dyn Any + Send + Sync>>;
+
+    /// Returns the keys of the instances whose type has the given [`TypeId`].
+    ///
+    /// The keys cover both the instances the context holds and the instances
+    /// its providers can still create, so a key that is returned does not have
+    /// to be resolvable yet. This is the operation behind the type wide
+    /// operations of [`ApplicationContextExt`](crate::ApplicationContextExt).
+    ///
+    /// # Arguments
+    ///
+    /// * `ty` - The [`TypeId`] of the instances to look for.
+    fn keys_of_type(&self, ty: TypeId) -> Vec<Key>;
 }

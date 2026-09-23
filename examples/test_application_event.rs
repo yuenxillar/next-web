@@ -33,7 +33,7 @@ impl Application for TestApplication {
         ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let event_publisher = ctx
-            .get_single_with_default_name::<DefaultApplicationEventPublisher>()
+            .get_singleton_option_with_default_name::<DefaultApplicationEventPublisher>()
             .unwrap()
             .to_owned();
 

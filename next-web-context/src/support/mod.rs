@@ -1,7 +1,9 @@
 mod base_resource_based_message_source;
+mod delegating_message_source;
 mod message_source_accessor;
 mod resource_bundle_message_source;
 
 pub use base_resource_based_message_source::BaseResourceBasedMessageSource;
+pub use delegating_message_source::DelegatingMessageSource;
 pub use message_source_accessor::MessageSourceAccessor;
 pub use resource_bundle_message_source::ResourceBundleMessageSource;
