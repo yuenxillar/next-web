@@ -27,9 +27,21 @@ use next_web_singletons::factory::support::Key;
 
 use crate::{ApplicationEventPublisher, MessageSource};
 
+/// The name of the  singleton in the context.
+/// If none is supplied, message resolution is delegated to the parent.
+pub const MESSAGE_SOURCE_SINGLETON_NAME: &str = "messageSource";
+
 /// The name of the ApplicationEventMulticaster singleton in the context.
 /// If none is supplied, a SimpleApplicationEventMulticaster is used.
 pub const APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME: &str = "applicationEventMulticaster";
+
+/// The name of the ResourceLoader singleton in the context.
+/// If none is supplied, a SimpleResourceLoader is used.
+pub const RESOURCE_LOADER_SINGLETON_NAME: &str = "resourceLoader";
+
+/// The name of the ApplicationEnvironment singleton in the context.
+/// If none is supplied, a SimpleApplicationEnvironment is used.
+pub const APPLICATION_ENVIRONMENT_SINGLETON_NAME: &str = "applicationEnvironment";
 
 /// Signature of the function a context stores next to an instance so that owned
 /// copies of it can be produced later.

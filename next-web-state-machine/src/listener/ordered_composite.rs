@@ -1,4 +1,4 @@
-use next_web_core::traits::ordered::Ordered;
+use next_web_core::Ordered;
 
 /// Composite item which can be used in other components which
 /// may want to allow automatic and annotation based ordering.

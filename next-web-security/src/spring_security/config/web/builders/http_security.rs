@@ -14,9 +14,8 @@ use next_web_core::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
-        ordered::Ordered,
     },
-    ApplicationContext,
+    ApplicationContext, Ordered,
 };
 
 use crate::{
@@ -707,4 +706,3 @@ impl Display for OrderedFilter {
         )
     }
 }
-

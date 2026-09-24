@@ -6,6 +6,7 @@
 //! starts up:
 //!
 //! - a [`ConfigurableEnvironment`] holding the properties and the profiles,
+//! - a [`ResourceLoader`] reading the resources of the application,
 //! - a singleton container ([`Context`]) holding the providers and the singletons,
 //! - an [`ApplicationStartup`] used to record startup steps,
 //! - the registered [`ApplicationListener`]s,
@@ -41,7 +42,6 @@ use std::{
     any::{Any, TypeId},
     collections::HashMap,
     fmt::{self, Debug},
-    future::Future,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -54,11 +54,13 @@ use next_web_context::{
     ApplicationContext, ApplicationContextExt, ApplicationEvent, ApplicationEventPublisher,
     ApplicationListener, Definition, DynProvider, EagerCreateFunction, InstanceClone, Locale,
     MessageSource, MessageSourceResolvable, NoSuchMessageError, Scope,
-    APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME, MESSAGE_SOURCE_SINGLETON_NAME,
+    APPLICATION_ENVIRONMENT_SINGLETON_NAME, APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
+    MESSAGE_SOURCE_SINGLETON_NAME, RESOURCE_LOADER_SINGLETON_NAME,
 };
 use next_web_core::{
     env::ConfigurableEnvironment,
     error::BoxError,
+    io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup},
 };
 use next_web_singletons::factory::{
@@ -102,6 +104,8 @@ pub struct DefaultApplicationContext {
     parent: Option<Arc<dyn ApplicationContext>>,
     /// The environment holding the properties and the profiles.
     environment: Arc<dyn ConfigurableEnvironment>,
+    /// Resource loader reading the resources of the application.
+    resource_loader: Option<Arc<dyn ResourceLoader>>,
     /// Collector recording the steps of the startup phase.
     application_startup: Box<dyn ApplicationStartup>,
     /// The singleton container holding the providers and the singletons.
@@ -168,6 +172,30 @@ impl DefaultApplicationContext {
     /// The installed message source, or `None`.
     pub fn message_source(&self) -> Option<&dyn MessageSource> {
         self.message_source.as_deref()
+    }
+
+    /// Sets the loader used to read the resources of the application.
+    ///
+    /// The loader is registered as the `resourceLoader` singleton when the
+    /// context is refreshed, so that the components of the framework that read
+    /// resources (the message source, the banner, ...) resolve them the same
+    /// way.
+    ///
+    /// # Arguments
+    ///
+    /// * `resource_loader` - The loader of the resources.
+    pub fn set_resource_loader(&mut self, resource_loader: Arc<dyn ResourceLoader>) {
+        self.resource_loader = Some(resource_loader);
+    }
+
+    /// Returns the loader used to read the resources of the application.
+    ///
+    /// # Returns
+    ///
+    /// The loader of the resources, which reads the resources directory of the
+    /// application unless another one has been set.
+    pub fn resource_loader(&self) -> Option<&Arc<dyn ResourceLoader>> {
+        self.resource_loader.as_ref()
     }
 
     /// Sets whether a provider may replace another provider with the same key.
@@ -257,7 +285,7 @@ impl DefaultApplicationContext {
     fn resolve_message(
         &self,
         code: &str,
-        args: Option<&[&dyn fmt::Display]>,
+        args: &[&dyn fmt::Display],
         locale: Option<&Locale>,
     ) -> Result<String, NoSuchMessageError> {
         if let Some(message_source) = self.message_source.as_deref() {
@@ -414,6 +442,28 @@ impl DefaultApplicationContext {
 
         Ok(())
     }
+
+    /// Called when the application context is refreshed.
+    fn on_refresh(&mut self) {
+        self.insert_singleton_with_name::<Arc<dyn ConfigurableEnvironment>>(
+            Arc::clone(&self.environment),
+            APPLICATION_ENVIRONMENT_SINGLETON_NAME,
+        );
+
+        // A loader the application configured wins over the shared one, which is
+        // loaded once per process: the context and the components that read the
+        // resources directly, such as the banner, therefore share the resources
+        // they hold.
+        let resource_loader: Arc<dyn ResourceLoader> = match self.resource_loader.as_ref() {
+            Some(resource_loader) => Arc::clone(resource_loader),
+            None => DefaultResourceLoader::shared_arc(),
+        };
+
+        self.insert_singleton_with_name::<Arc<dyn ResourceLoader>>(
+            resource_loader,
+            RESOURCE_LOADER_SINGLETON_NAME,
+        );
+    }
 }
 
 impl Default for DefaultApplicationContext {
@@ -424,6 +474,7 @@ impl Default for DefaultApplicationContext {
             startup_date: current_time_millis(),
             parent: None,
             environment: Arc::new(ApplicationEnvironment::default()),
+            resource_loader: None,
             application_startup: Box::new(DefaultApplicationStartup::default()),
             context: Context::default(),
             listeners: Vec::new(),
@@ -504,6 +555,9 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
         // Initialize event multicaster for this context.
         self.init_application_event_multicaster()?;
 
+        // Initialize other special instances
+        self.on_refresh();
+
         // The providers the attribute macros submitted, such as the singleton
         // providers of `#[singleton]`, are loaded first, so that the singletons
         // of the application are known to the context.
@@ -518,13 +572,11 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
         // Last chance for the container to install the singletons it considers
         // essential.
         self.context.singleton_factory_mut().initialize_defaults();
-        self.startup_date = current_time_millis();
-        self.lifecycle.active.store(true, Ordering::SeqCst);
         context_refresh.end();
 
         tracing::info!(
-            elapsed_ms = started.elapsed().as_secs_f64() * 1000.0,
-            "Application context refreshed"
+            "Application context refreshed elapsed: {:?}",
+            started.elapsed()
         );
 
         Ok(())
@@ -746,11 +798,9 @@ impl ApplicationContext for DefaultApplicationContext {
 
 impl ApplicationEventPublisher for DefaultApplicationContext {
     fn publish_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
-        // Listeners are notified in registration order. Each of them receives
-        // its own clone of the event, so a listener cannot consume the event for
-        // the listeners that follow.
-        for (_, listener) in &self.listeners {
-            block_on(listener.on_application_event(event.clone()));
+        // Multicast the event to the application event multicaster, if one is configured.
+        if let Some(multicaster) = self.application_event_multicaster.as_ref() {
+            multicaster.multicast_event(event.clone())?;
         }
 
         // The event is also handed to the parent context, which notifies its own
@@ -767,7 +817,7 @@ impl MessageSource for DefaultApplicationContext {
     fn message(
         &self,
         code: &str,
-        args: Option<&[&dyn fmt::Display]>,
+        args: &[&dyn fmt::Display],
         locale: Option<&Locale>,
     ) -> Result<String, NoSuchMessageError> {
         self.resolve_message(code, args, locale)
@@ -787,7 +837,9 @@ impl MessageSource for DefaultApplicationContext {
         });
 
         for code in codes {
-            if let Ok(message) = self.resolve_message(code, arguments.as_deref(), locale) {
+            if let Ok(message) =
+                self.resolve_message(code, arguments.as_deref().unwrap_or_default(), locale)
+            {
                 return Ok(message);
             }
         }
@@ -807,7 +859,7 @@ impl MessageSource for DefaultApplicationContext {
     fn message_or_default(
         &self,
         code: &str,
-        args: Option<&[&dyn fmt::Display]>,
+        args: &[&dyn fmt::Display],
         default_message: Option<&str>,
         locale: Option<&Locale>,
     ) -> Option<String> {
@@ -837,27 +889,10 @@ impl Debug for DefaultApplicationContext {
             .finish()
     }
 }
+
 /// Returns the current wall clock time in milliseconds since the Unix epoch.
 fn current_time_millis() -> i64 {
     chrono::Utc::now().timestamp_millis()
-}
-
-/// Drives a listener future to completion for the synchronous
-/// [`ApplicationEventPublisher`] contract.
-///
-/// Inside a multi threaded Tokio runtime the current worker is kept available
-/// with [`tokio::task::block_in_place`], so listeners that need the runtime keep
-/// working. Everywhere else the future is driven by the `futures` executor.
-fn block_on<F>(future: F) -> F::Output
-where
-    F: Future,
-{
-    match tokio::runtime::Handle::try_current() {
-        Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
-            tokio::task::block_in_place(|| handle.block_on(future))
-        }
-        _ => futures::executor::block_on(future),
-    }
 }
 
 /// The singleton container of an application context.
@@ -1085,6 +1120,7 @@ impl Context {
 #[cfg(test)]
 mod tests {
     use std::any::Any;
+    use std::future::Future;
     use std::pin::Pin;
     use std::sync::atomic::AtomicUsize;
 
@@ -1202,9 +1238,9 @@ mod tests {
     fn falls_back_to_the_default_message() {
         let context = DefaultApplicationContext::default();
 
-        assert!(context.message("missing", None, None).is_err());
+        assert!(context.message("missing", &[], None).is_err());
         assert_eq!(
-            context.message_or_default("missing", None, Some("fallback"), None),
+            context.message_or_default("missing", &[], Some("fallback"), None),
             Some("fallback".to_owned())
         );
     }

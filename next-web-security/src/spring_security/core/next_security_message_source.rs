@@ -25,7 +25,7 @@ impl MessageSource for NextSecurityMessageSource {
     fn message_or_default(
         &self,
         code: &str,
-        args: Option<&[&dyn fmt::Display]>,
+        args: &[&dyn fmt::Display],
         default_message: Option<&str>,
         locale: Option<&Locale>,
     ) -> Option<String> {
@@ -35,7 +35,7 @@ impl MessageSource for NextSecurityMessageSource {
     fn message(
         &self,
         code: &str,
-        args: Option<&[&dyn fmt::Display]>,
+        args: &[&dyn fmt::Display],
         locale: Option<&Locale>,
     ) -> Result<String, NoSuchMessageError> {
         todo!()

@@ -1,8 +1,8 @@
-use std::error::Error;
 use next_web_context::ApplicationContextExt;
+use std::error::Error;
 
 use next_web_core::{
-    ApplicationContext, async_trait, error::BoxError,
+    ApplicationContext, Ordered, async_trait, error::BoxError,
     traits::config::auto_configuration::AutoConfiguration,
 };
 use next_web_macros::singleton;
@@ -35,7 +35,7 @@ impl KafkaAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for KafkaAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mut registry = DefaultKafkaListenerRegistry::default();
         for configurer in self.configurers.iter_mut() {
             configurer.register_listeners(ctx, &mut registry);
@@ -57,3 +57,8 @@ impl AutoConfiguration for KafkaAutoConfiguration {
     }
 }
 
+impl Ordered for KafkaAutoConfiguration {
+    fn order(&self) -> i32 {
+        100
+    }
+}

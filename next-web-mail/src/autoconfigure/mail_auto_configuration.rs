@@ -1,8 +1,8 @@
-use std::{error::Error, sync::Arc};
 use next_web_context::ApplicationContextExt;
+use std::{error::Error, sync::Arc};
 
 use next_web_core::{
-    ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
+    ApplicationContext, Ordered, async_trait, traits::config::auto_configuration::AutoConfiguration,
 };
 use next_web_macros::singleton;
 
@@ -26,7 +26,7 @@ impl MailAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for MailAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mail_properties = self.mail_properties.clone();
 
         let default_mail_service = DefaultMailService::new(mail_properties)?;
@@ -42,4 +42,8 @@ impl AutoConfiguration for MailAutoConfiguration {
     }
 }
 
-
+impl Ordered for MailAutoConfiguration {
+    fn order(&self) -> i32 {
+        100
+    }
+}

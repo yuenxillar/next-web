@@ -1,6 +1,6 @@
 use std::{ops::Deref, sync::Arc};
 
-use next_web_core::traits::ordered::Ordered;
+use next_web_core::Ordered;
 
 use crate::{
     listener::default_composite_listener::DefaultCompositeListener,

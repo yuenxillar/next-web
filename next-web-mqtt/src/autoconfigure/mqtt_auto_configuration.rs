@@ -1,9 +1,9 @@
-use std::{error::Error, sync::Arc};
 use next_web_context::ApplicationContextExt;
+use std::{error::Error, sync::Arc};
 
 use next_web_core::{
     async_trait, error::BoxError, traits::config::auto_configuration::AutoConfiguration,
-    ApplicationContext,
+    ApplicationContext, Ordered,
 };
 use next_web_macros::singleton;
 use tracing::warn;
@@ -34,7 +34,7 @@ impl MQTTAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for MQTTAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mqtt_properties = self.mqtt_client_properties.clone();
 
         let listeners = ctx.resolve_by_type::<Arc<dyn TopicListener>>();
@@ -84,3 +84,8 @@ impl AutoConfiguration for MQTTAutoConfiguration {
     }
 }
 
+impl Ordered for MQTTAutoConfiguration {
+    fn order(&self) -> i32 {
+        100
+    }
+}

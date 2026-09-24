@@ -3,10 +3,10 @@ use std::{borrow::Cow, collections::HashMap, fmt};
 use next_web_core::{
     http::{Cookie, HttpMethod},
     traits::http::http_request::HttpRequest,
-    util::locale::Locale,
 };
 
 use crate::web::{savedrequest::SavedRequest, util::UrlUtils};
+use next_web_context::Locale;
 
 const HEADER_IF_NONE_MATCH: &str = "If-None-Match";
 const HEADER_IF_MODIFIED_SINCE: &str = "If-Modified-Since";
@@ -306,7 +306,7 @@ impl DefaultSavedRequestBuilder {
         for cookie in &self.cookies {
             saved.cookies.push(cookie.clone());
         }
-        saved.locales.extend(self.locales.iter().copied());
+        saved.locales.extend(self.locales.iter().cloned());
         for (name, values) in &self.parameters {
             for value in values {
                 saved

@@ -18,7 +18,6 @@ use next_web_core::traits::apply_router::ApplyRouter;
 use next_web_core::traits::config::auto_configuration::AutoConfiguration;
 use next_web_core::traits::error_solver::ErrorSolver;
 use next_web_core::traits::filter::HttpFilter;
-use next_web_core::traits::properties_post_processor::PropertiesPostProcessor;
 use next_web_core::traits::service::background_service::BackgroundService;
 use next_web_core::traits::use_router::UseRouter;
 use next_web_core::AutoRegister;
@@ -252,7 +251,7 @@ where
         auto_configurations.sort_by_key(|v| v.order());
 
         for auto_configuration in auto_configurations.iter_mut().map(|s| s.as_mut()) {
-            auto_configuration.configuration(ctx).await?;
+            auto_configuration.configure(ctx).await?;
         }
 
         for auto_configuration in
@@ -756,14 +755,6 @@ where
         ctx.register_auto_providers();
 
         info!("Init Application context success");
-
-        let mut post_processors = ctx.resolve_by_type::<Box<dyn PropertiesPostProcessor>>();
-        post_processors.sort_by_key(|item| item.order());
-
-        #[rustfmt::skip]
-        post_processors
-            .into_iter()
-            .for_each(|mut item| item.post_process_properties(next_application.application_properties.mapping_mut()));
 
         // Set global server properties
         GLOBAL_SERVER_PROPERTIES.get_or_init(|| {

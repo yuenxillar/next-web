@@ -30,7 +30,7 @@ where
 
     fn get_header_names(&self) -> Vec<&str>;
 
-    fn get_locales(&self) -> Vec<next_web_core::util::locale::Locale>;
+    fn get_locales(&self) -> Vec<next_web_context::Locale>;
 
     fn get_parameter_values(&self, name: &str) -> Option<Vec<&str>>;
 

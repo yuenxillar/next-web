@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use next_web_core::util::locale::Locale;
+use next_web_context::Locale;
 
 tokio::task_local! {
     static LOCALE: Locale;

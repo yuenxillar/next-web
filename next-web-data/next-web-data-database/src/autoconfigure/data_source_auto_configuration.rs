@@ -2,11 +2,11 @@ use next_web_context::ApplicationContextExt;
 use std::{error::Error, sync::Arc};
 
 use next_web_core::{
-    ApplicationContext,
+    ApplicationContext, Ordered,
     traits::{config::auto_configuration::AutoConfiguration, singleton::Singleton},
 };
-use rbatis::{Intercept, async_trait};
 use next_web_macros::singleton;
+use rbatis::{Intercept, async_trait};
 
 use crate::{
     autoconfigure::{
@@ -35,10 +35,7 @@ impl DataSourceAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for DataSourceAutoConfiguration {
-    async fn configuration(
-        &mut self,
-        ctx: &mut dyn ApplicationContext,
-    ) -> Result<(), Box<dyn Error>> {
+    async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         // Clone theconfiguration properties
         let data_source_properties = self.data_source_properties.clone();
 
@@ -63,6 +60,12 @@ impl AutoConfiguration for DataSourceAutoConfiguration {
         ctx.insert_singleton_with_name(database_service, name);
 
         Ok(())
+    }
+}
+
+impl Ordered for DataSourceAutoConfiguration {
+    fn order(&self) -> i32 {
+        100
     }
 }
 

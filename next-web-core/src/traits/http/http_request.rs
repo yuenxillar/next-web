@@ -1,7 +1,9 @@
 use crate::http::{HttpRequestShare, HttpVersion};
 use axum::{
     extract::Request,
-    http::{HeaderMap, HeaderValue, Uri, header::CONTENT_TYPE, uri::Scheme},
+    http::{
+        HeaderMap, HeaderValue, Uri, header::ACCEPT_LANGUAGE, header::CONTENT_TYPE, uri::Scheme,
+    },
 };
 
 use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
@@ -12,8 +14,8 @@ use crate::{
     autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES,
     http::{Cookie, HttpMethod, auth_type::AuthType},
     traits::http::{HttpSession, request_dispatcher::RequestDispatcher},
-    util::locale::Locale,
 };
+use next_web_context::Locale;
 
 pub const IDENTITY_REMOVED_KEY: &str = stringify!(format!(
     "{}_IDENTITY_REMOVED_KEY",
@@ -239,18 +241,29 @@ impl HttpRequest for Request {
     }
 
     fn locale(&self) -> Option<Locale> {
-        self.header("Accept-Language")
-            .and_then(Locale::from_accept_language)
+        // The preferred locale is the first language of the header; the
+        // optional parameters of a language, such as its quality, are not part
+        // of the tag.
+        self.header(ACCEPT_LANGUAGE.as_str())
+            .and_then(|accept_language| accept_language.split(',').next())
+            .and_then(|language| language.split(';').next())
+            .map(str::trim)
+            .filter(|language| !language.is_empty())
+            .and_then(|language| Locale::for_language_tag(language).ok())
     }
 
     fn locales(&self) -> Option<Vec<Locale>> {
-        let accept_language = self.header("Accept-Language")?;
-        let locales: Vec<Locale> = accept_language
+        let accept_language = self.header(ACCEPT_LANGUAGE.as_str())?;
+        let locales = accept_language
             .split(',')
-            .filter_map(Locale::from_accept_language)
-            .collect();
+            .filter_map(|language| language.split(';').next())
+            .map(str::trim)
+            .filter(|language| !language.is_empty())
+            .filter_map(|language| Locale::for_language_tag(language).ok())
+            .collect::<Vec<Locale>>();
+
         if locales.is_empty() {
-            Some(vec![Locale::default()])
+            Some(vec![Locale::system_locale()])
         } else {
             Some(locales)
         }

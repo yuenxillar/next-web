@@ -9,8 +9,9 @@ use next_web_core::traits::http::HttpSession;
 use next_web_core::{
     http::{header::CONTENT_TYPE, Cookie, HttpMethod},
     traits::http::http_request::HttpRequest,
-    util::locale::Locale,
 };
+
+use next_web_context::Locale;
 
 use crate::web::savedrequest::SavedRequest;
 

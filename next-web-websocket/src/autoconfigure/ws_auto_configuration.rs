@@ -1,9 +1,9 @@
-use std::{error::Error, sync::Arc};
 use next_web_context::ApplicationContextExt;
+use std::{error::Error, sync::Arc};
 
 use axum::{Router, routing::any};
 use next_web_core::{
-    ApplicationContext, async_trait,
+    ApplicationContext, Ordered, async_trait,
     traits::{apply_router::ApplyRouter, config::auto_configuration::AutoConfiguration},
 };
 use next_web_macros::singleton;
@@ -42,7 +42,7 @@ impl WebsocketAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for WebsocketAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let mut registry = DefaultWebSocketHandlerRegistry::default();
         for configurer in self.configurers.iter_mut() {
             configurer.register_websocket_handlers(ctx, &mut registry);
@@ -67,11 +67,14 @@ impl AutoConfiguration for WebsocketAutoConfiguration {
         );
 
         let instance = Box::new(WebsocketApplyRouter { ws_context });
-        ctx.insert_singleton_with_name::<Box<dyn ApplyRouter>>(
-            instance,
-            "websocketApplyRouter",
-        );
+        ctx.insert_singleton_with_name::<Box<dyn ApplyRouter>>(instance, "websocketApplyRouter");
         Ok(())
+    }
+}
+
+impl Ordered for WebsocketAutoConfiguration {
+    fn order(&self) -> i32 {
+        100
     }
 }
 
@@ -92,5 +95,3 @@ impl ApplyRouter for WebsocketApplyRouter {
             .with_state(Arc::new(std::mem::take(&mut self.ws_context)))
     }
 }
-
-

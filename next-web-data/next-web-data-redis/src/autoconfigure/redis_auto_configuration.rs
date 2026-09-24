@@ -1,5 +1,6 @@
-use std::{error::Error, sync::Arc};
 use next_web_context::ApplicationContextExt;
+use next_web_core::Ordered;
+use std::{error::Error, sync::Arc};
 
 #[cfg(feature = "distributed-lock")]
 use next_web_core::traits::singleton::Singleton;
@@ -7,8 +8,8 @@ use next_web_core::{
     ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
 };
 use next_web_macros::auto_configuration;
-use redis::{Cmd, ConnectionLike, TypedCommands};
 use next_web_macros::singleton;
+use redis::{Cmd, ConnectionLike, TypedCommands};
 
 use crate::{
     autoconfigure::redis_properties::RedisProperties,
@@ -30,7 +31,7 @@ pub struct RedisAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for RedisAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let redis_template = RedisTemplate::with_properties(&self.redis_properties)?;
 
         // Validate the Redis connection.
@@ -83,6 +84,12 @@ impl AutoConfiguration for RedisAutoConfiguration {
     }
 }
 
+impl Ordered for RedisAutoConfiguration {
+    fn order(&self) -> i32 {
+        100
+    }
+}
+
 #[auto_configuration]
 impl RedisAutoConfiguration {
     #[provider(conditional = [Self::redis_template_missing])]
@@ -103,4 +110,3 @@ impl RedisAutoConfiguration {
         Box::new(self)
     }
 }
-

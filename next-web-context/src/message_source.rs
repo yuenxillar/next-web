@@ -2,10 +2,6 @@ use std::fmt::{self, Debug};
 
 use crate::{Locale, MessageSourceResolvable, NoSuchMessageError};
 
-/// The name of the  singleton in the context.
-/// If none is supplied, message resolution is delegated to the parent.
-pub const MESSAGE_SOURCE_SINGLETON_NAME: &str = "messageSource";
-
 /// Strategy trait for resolving messages, with support for the parameterization
 /// and internationalization of such messages.
 ///
@@ -25,7 +21,6 @@ where
     ///   or package names, avoiding potential conflicts and ensuring maximum clarity.
     /// * `args` - An array of arguments that will be filled in for params within
     ///   the message (params look like "{0}", "{1,date}", "{2,time}" within a message),
-    ///   or `None` if none.
     /// * `default_message` - A default message to return if the lookup fails.
     /// * `locale` - The locale in which to do the lookup.
     ///
@@ -35,7 +30,7 @@ where
     fn message_or_default(
         &self,
         code: &str,
-        args: Option<&[&dyn fmt::Display]>,
+        args: &[&dyn fmt::Display],
         default_message: Option<&str>,
         locale: Option<&Locale>,
     ) -> Option<String>;
@@ -45,7 +40,7 @@ where
     /// # Arguments
     /// * `code` - The message code to look up, e.g. 'calculator.noRateSet'.
     /// * `args` - An array of arguments that will be filled in for params within
-    ///   the message, or `None` if none.
+    ///   the message.
     /// * `locale` - The locale in which to do the lookup.
     ///
     /// # Returns
@@ -56,7 +51,7 @@ where
     fn message(
         &self,
         code: &str,
-        args: Option<&[&dyn fmt::Display]>,
+        args: &[&dyn fmt::Display],
         locale: Option<&Locale>,
     ) -> Result<String, NoSuchMessageError>;
 

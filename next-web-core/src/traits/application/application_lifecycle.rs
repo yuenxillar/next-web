@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use dyn_clone::{DynClone, clone_trait_object};
 
-use crate::{ApplicationContext, traits::ordered::Ordered};
+use crate::{ApplicationContext, Ordered};
 
 /// Trait for monitoring application lifecycle events.
 ///

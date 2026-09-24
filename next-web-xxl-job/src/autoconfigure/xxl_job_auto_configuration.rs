@@ -1,8 +1,8 @@
-use std::{error::Error, sync::Arc};
 use next_web_context::ApplicationContextExt;
+use std::{error::Error, sync::Arc};
 
 use next_web_core::{
-    ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
+    ApplicationContext, Ordered, async_trait, traits::config::auto_configuration::AutoConfiguration,
 };
 use next_web_macros::singleton;
 
@@ -25,7 +25,7 @@ impl XxlJobAutoConfiguration {
 
 #[async_trait]
 impl AutoConfiguration for XxlJobAutoConfiguration {
-    async fn configuration(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
+    async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         let xxl_client = XxlClientBuilder::from(self.0.clone()).build()?;
 
         for (name, handler) in ctx
@@ -51,4 +51,8 @@ impl AutoConfiguration for XxlJobAutoConfiguration {
     }
 }
 
-
+impl Ordered for XxlJobAutoConfiguration {
+    fn order(&self) -> i32 {
+        100
+    }
+}

@@ -46,7 +46,7 @@ async fn req_message(
     #[find] FindSingleton(message_source): FindSingleton<Arc<dyn MessageSource>>,
 ) -> impl IntoResponse {
     message_source
-        .message(code.as_str(), None, None)
+        .message(code.as_str(), &[], None)
         .unwrap_or("Sorry!!".into())
 }
 

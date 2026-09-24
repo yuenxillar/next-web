@@ -680,7 +680,7 @@ mod tests {
         fn message_or_default(
             &self,
             _code: &str,
-            _args: Option<&[&dyn fmt::Display]>,
+            _args: &[&dyn fmt::Display],
             default_message: Option<&str>,
             _locale: Option<&Locale>,
         ) -> Option<String> {
@@ -690,7 +690,7 @@ mod tests {
         fn message(
             &self,
             code: &str,
-            _args: Option<&[&dyn fmt::Display]>,
+            _args: &[&dyn fmt::Display],
             locale: Option<&Locale>,
         ) -> Result<String, NoSuchMessageError> {
             Err(NoSuchMessageError::new(code, locale))

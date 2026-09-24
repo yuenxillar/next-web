@@ -32,7 +32,22 @@ pub struct DefaultResourceLoader {
 
 /// The resource loader that is shared by the framework when an application does
 /// not configure one of its own.
-static SHARED: OnceLock<DefaultResourceLoader> = OnceLock::new();
+///
+/// The loader is held behind an [`Arc`] so that the components that have to own
+/// it, such as the singleton of an application context, share the same instance
+/// instead of loading the resources directory again.
+static SHARED: OnceLock<Arc<DefaultResourceLoader>> = OnceLock::new();
+
+/// Creates the resource loader that is shared by the framework.
+///
+/// An application without a resources directory is not an error: the locations
+/// of its resources are simply empty.
+fn create_shared() -> Arc<DefaultResourceLoader> {
+    let mut resource_loader = DefaultResourceLoader::default();
+    let _ = resource_loader.load();
+
+    Arc::new(resource_loader)
+}
 
 impl DefaultResourceLoader {
     /// Returns the resource loader that is shared by the framework.
@@ -46,14 +61,21 @@ impl DefaultResourceLoader {
     ///
     /// A missing resources directory is not an error: the loader then simply
     /// holds no resource. Use [`new`](Self::new) to load another directory.
+    ///
+    /// Use [`shared_arc`](Self::shared_arc) to obtain the same loader as an
+    /// owned [`Arc`], for example to register it as a singleton.
     pub fn shared() -> &'static DefaultResourceLoader {
-        SHARED.get_or_init(|| {
-            let mut resource_loader = DefaultResourceLoader::default();
-            // An application without a resources directory is not an error: the
-            // locations of its resources are simply empty.
-            let _ = resource_loader.load();
-            resource_loader
-        })
+        SHARED.get_or_init(create_shared).as_ref()
+    }
+
+    /// Returns an owned handle of the resource loader that is shared by the
+    /// framework.
+    ///
+    /// The handle refers to the same loader [`shared`](Self::shared) returns, so
+    /// the resources directory of the application is still read a single time,
+    /// no matter which of the two accessors is used.
+    pub fn shared_arc() -> Arc<DefaultResourceLoader> {
+        SHARED.get_or_init(create_shared).clone()
     }
 
     /// Creates a new default resource loader with the specified root directory and cache configuration.
@@ -619,6 +641,12 @@ mod tests {
         // The same instance is handed out to every caller, so the resources of
         // the application are read and held once.
         assert!(std::ptr::eq(first, second));
+
+        // The owned handle refers to that same instance as well.
+        let owned = DefaultResourceLoader::shared_arc();
+        assert!(std::ptr::eq(first, Arc::as_ref(&owned)));
+        assert!(Arc::ptr_eq(&owned, &DefaultResourceLoader::shared_arc()));
+
         assert_eq!(
             first.root(),
             DefaultResourceLoader::resources_dir().as_path()

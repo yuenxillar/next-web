@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::sync::{Arc, RwLock as StdRwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use arc_swap::ArcSwap;
 use encoding::label::encoding_from_whatwg_label;
@@ -9,7 +9,8 @@ use tracing::warn;
 
 use crate::constants::application_constants::MESSAGES;
 use crate::context::MessageSource;
-use crate::context::application_resources::ResourceLoader;
+use crate::context::properties::Properties;
+use crate::io::ResourceLoader;
 use crate::util::locale::Locale;
 
 const PROPERTIES_EXTENSION: &str = "properties";
@@ -95,32 +96,18 @@ impl ResourceBundle {
 #[derive(Debug, Clone)]
 struct CachedBundle {
     bundle: Arc<ResourceBundle>,
-    loaded_at_millis: i64,
+    loaded_at_millis: u64,
 }
 
 pub struct ResourceBundleMessageSource {
     basenames: Vec<String>,
-    default_encoding: Option<String>,
-    cache_millis: i64,
+    cache_duration: u64,
     fallback_to_system_locale: bool,
     default_locale: Option<Locale>,
-    resource_loader: Arc<dyn ResourceLoader>,
     cached_resource_bundles: ArcSwap<HashMap<String, HashMap<Locale, CachedBundle>>>,
 }
 
 impl ResourceBundleMessageSource {
-    pub fn new(resource_loader: Arc<dyn ResourceLoader>) -> Self {
-        Self {
-            basenames: Vec::new(),
-            default_encoding: Some("UTF-8".to_string()),
-            cache_millis: -1,
-            fallback_to_system_locale: true,
-            default_locale: None,
-            resource_loader,
-            cached_resource_bundles: ArcSwap::new(Arc::new(HashMap::default())),
-        }
-    }
-
     pub fn basenames(&self) -> &[String] {
         &self.basenames
     }
@@ -152,31 +139,17 @@ impl ResourceBundleMessageSource {
         }
     }
 
-    pub fn default_encoding(&self) -> Option<&str> {
-        self.default_encoding.as_deref()
-    }
-
-    pub fn set_default_encoding(&mut self, encoding: impl Into<String>) {
-        self.default_encoding = Some(encoding.into());
-        self.clear_cache();
-    }
-
     pub fn clear_default_encoding(&mut self) {
-        self.default_encoding = None;
         self.clear_cache();
     }
 
-    pub fn cache_millis(&self) -> i64 {
-        self.cache_millis
+    pub fn cache_duration(&self) -> Duration {
+        Duration::from_secs(self.cache_duration)
     }
 
-    pub fn set_cache_millis(&mut self, millis: i64) {
-        self.cache_millis = millis;
+    pub fn set_cache_duration(&mut self, duration: Duration) {
+        self.cache_duration = duration.as_secs();
         self.clear_cache();
-    }
-
-    pub fn set_cache_seconds(&mut self, seconds: i64) {
-        self.set_cache_millis(seconds.saturating_mul(1000));
     }
 
     pub fn default_locale(&self) -> Option<Locale> {
@@ -197,8 +170,19 @@ impl ResourceBundleMessageSource {
         self.clear_cache();
     }
 
-    pub fn resource_loader(&self) -> &Arc<dyn ResourceLoader> {
-        &self.resource_loader
+    pub fn is_use_code_as_default_message(&self) -> bool {
+        // self.use_code_as_default_message
+        todo!()
+    }
+
+    pub fn set_use_code_as_default_message(&mut self, use_code_as_default_message: bool) {
+        // self.use_code_as_default_message = use_code_as_default_message;
+        self.clear_cache();
+    }
+
+    pub fn set_common_messages(&mut self, common_messages: Arc<dyn Properties>) {
+        // self.common_messages = Some(common_messages);
+        let _ = common_messages;
     }
 
     pub fn resolve_code_without_arguments(&self, code: &str, locale: &Locale) -> Option<String> {
@@ -235,38 +219,6 @@ impl ResourceBundleMessageSource {
             .store(Arc::new(Default::default()));
     }
 
-    pub fn preload_all(&self) -> io::Result<()> {
-        let system_locale = self.fallback_to_system_locale.then(Locale::locale);
-
-        for basename in self.basenames.iter() {
-            let discovered = self.discover_bundle_locales(basename);
-            if discovered.is_empty() {
-                continue;
-            }
-
-            let has_default_bundle = discovered.contains(&None);
-            let mut target_locales: HashSet<Locale> = discovered.into_iter().flatten().collect();
-
-            if has_default_bundle {
-                target_locales.extend(Locale::all_locales());
-            }
-
-            if let Some(default_locale) = self.default_locale {
-                target_locales.insert(default_locale);
-            }
-
-            if let Some(system_locale) = system_locale {
-                target_locales.insert(system_locale);
-            }
-
-            for locale in target_locales {
-                let _ = self.try_get_resource_bundle(basename, &locale, false);
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn get_basename_set(&self) -> &[String] {
         &self.basenames
     }
@@ -281,46 +233,47 @@ impl ResourceBundleMessageSource {
         locale: &Locale,
         log_missing: bool,
     ) -> Option<Arc<ResourceBundle>> {
-        if let Some(bundle) = self.get_cached_bundle(basename, locale) {
-            return Some(bundle);
-        }
+        // if let Some(bundle) = self.get_cached_bundle(basename, locale) {
+        //     return Some(bundle);
+        // }
 
-        let resolved = self
-            .load_bundle_hierarchy(basename, locale)
-            .inspect_err(|error| {
-                if log_missing {
-                    warn!(
-                        "ResourceBundle [{}] not found for locale [{}]: {}",
-                        basename,
-                        locale.as_str(),
-                        error
-                    );
-                }
-            })
-            .ok()?;
+        // let resolved = self
+        //     .load_bundle_hierarchy(basename, locale)
+        //     .inspect_err(|error| {
+        //         if log_missing {
+        //             warn!(
+        //                 "ResourceBundle [{}] not found for locale [{}]: {}",
+        //                 basename,
+        //                 locale.as_str(),
+        //                 error
+        //             );
+        //         }
+        //     })
+        //     .ok()?;
 
-        let loaded_at = current_time_millis();
-        let bundle = Arc::new(ResourceBundle::new(basename.to_string(), *locale, resolved));
-        let cache = self.cached_resource_bundles.load();
+        // let loaded_at = current_time_millis();
+        // let bundle = Arc::new(ResourceBundle::new(basename.to_string(), *locale, resolved));
+        // let cache = self.cached_resource_bundles.load();
 
-        if let Some(bundle) = self.cached_bundle_from_map(&cache, basename, locale) {
-            return Some(bundle);
-        }
+        // if let Some(bundle) = self.cached_bundle_from_map(&cache, basename, locale) {
+        //     return Some(bundle);
+        // }
 
-        self.cached_resource_bundles.rcu(|cache| {
-            let mut map = HashMap::clone(&cache);
-            map.entry(basename.to_string()).or_default().insert(
-                *locale,
-                CachedBundle {
-                    bundle: Arc::clone(&bundle),
-                    loaded_at_millis: loaded_at,
-                },
-            );
+        // self.cached_resource_bundles.rcu(|cache| {
+        //     let mut map = HashMap::clone(&cache);
+        //     map.entry(basename.to_string()).or_default().insert(
+        //         *locale,
+        //         CachedBundle {
+        //             bundle: Arc::clone(&bundle),
+        //             loaded_at_millis: loaded_at,
+        //         },
+        //     );
 
-            Arc::new(map)
-        });
+        //     Arc::new(map)
+        // });
 
-        Some(bundle)
+        // Some(bundle)
+        todo!()
     }
 
     fn get_cached_bundle(&self, basename: &str, locale: &Locale) -> Option<Arc<ResourceBundle>> {
@@ -336,8 +289,8 @@ impl ResourceBundleMessageSource {
     ) -> Option<Arc<ResourceBundle>> {
         let cached = cache.get(basename)?.get(locale)?;
 
-        if self.cache_millis >= 0
-            && cached.loaded_at_millis <= current_time_millis().saturating_sub(self.cache_millis)
+        if self.cache_duration >= 0
+            && cached.loaded_at_millis <= current_time_millis().saturating_sub(self.cache_duration)
         {
             return None;
         }
@@ -345,37 +298,37 @@ impl ResourceBundleMessageSource {
         Some(Arc::clone(&cached.bundle))
     }
 
-    fn load_bundle_hierarchy(
-        &self,
-        basename: &str,
-        locale: &Locale,
-    ) -> io::Result<HashMap<String, String>> {
-        let mut merged = HashMap::new();
+    // fn load_bundle_hierarchy(
+    //     &self,
+    //     basename: &str,
+    //     locale: &Locale,
+    // ) -> io::Result<HashMap<String, String>> {
+    //     let mut merged = HashMap::new();
 
-        for filename in self
-            .calculate_bundle_filenames(basename, locale)
-            .into_iter()
-            .rev()
-        {
-            // Load from least specific to most specific so locale-specific entries can
-            // override the generic defaults inside the same merged map.
-            if let Some(properties) = self.load_bundle_properties(&filename)? {
-                merged.extend(properties);
-            }
-        }
+    //     for filename in self
+    //         .calculate_bundle_filenames(basename, locale)
+    //         .into_iter()
+    //         .rev()
+    //     {
+    //         // Load from least specific to most specific so locale-specific entries can
+    //         // override the generic defaults inside the same merged map.
+    //         if let Some(properties) = self.load_bundle_properties(&filename)? {
+    //             merged.extend(properties);
+    //         }
+    //     }
 
-        if merged.is_empty() {
-            Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!(
-                    "No bundle found for basename {basename} and locale {}",
-                    locale.as_str()
-                ),
-            ))
-        } else {
-            Ok(merged)
-        }
-    }
+    //     if merged.is_empty() {
+    //         Err(io::Error::new(
+    //             io::ErrorKind::NotFound,
+    //             format!(
+    //                 "No bundle found for basename {basename} and locale {}",
+    //                 locale.as_str()
+    //             ),
+    //         ))
+    //     } else {
+    //         Ok(merged)
+    //     }
+    // }
 
     fn calculate_bundle_filenames(&self, basename: &str, locale: &Locale) -> Vec<String> {
         // Preserve lookup precedence while avoiding duplicated filenames when the
@@ -425,58 +378,45 @@ impl ResourceBundleMessageSource {
         result
     }
 
-    fn load_bundle_properties(
-        &self,
-        filename: &str,
-    ) -> io::Result<Option<HashMap<String, String>>> {
-        let resource_name = self.to_resource_name(filename, PROPERTIES_EXTENSION);
-        let Some(data) = self.resource_loader.load(&resource_name) else {
-            return Ok(None);
-        };
-
-        let source = decode_with_encoding(data.as_ref(), self.default_encoding.as_deref())?;
-        Ok(Some(load_properties(&source)))
-    }
-
     fn to_resource_name(&self, bundle_name: &str, extension: &str) -> String {
         let normalized_extension = extension.trim_start_matches('.');
         let path = bundle_name.replace('.', "/");
         format!("{MESSAGES}{path}.{normalized_extension}")
     }
 
-    fn discover_bundle_locales(&self, basename: &str) -> HashSet<Option<Locale>> {
-        let basename = format!("{}{}", MESSAGES, basename);
-        let extension = format!(".{PROPERTIES_EXTENSION}");
-        let mut locales = HashSet::new();
+    // fn discover_bundle_locales(&self, basename: &str) -> HashSet<Option<Locale>> {
+    //     let basename = format!("{}{}", MESSAGES, basename);
+    //     let extension = format!(".{PROPERTIES_EXTENSION}");
+    //     let mut locales = HashSet::new();
 
-        for path in self.resource_loader.iter() {
-            if !path.ends_with(&extension) || !path.starts_with(&basename) {
-                continue;
-            }
+    //     for path in self.resource_loader.paths() {
+    //         if !path.ends_with(&extension) || !path.starts_with(&basename) {
+    //             continue;
+    //         }
 
-            let suffix = &path[basename.len()..path.len() - extension.len()];
-            if suffix.is_empty() {
-                locales.insert(None);
-                continue;
-            }
+    //         let suffix = &path[basename.len()..path.len() - extension.len()];
+    //         if suffix.is_empty() {
+    //             locales.insert(None);
+    //             continue;
+    //         }
 
-            let suffix = suffix
-                .trim_start_matches('_')
-                .trim_start_matches('.')
-                .trim_start_matches('-');
+    //         let suffix = suffix
+    //             .trim_start_matches('_')
+    //             .trim_start_matches('.')
+    //             .trim_start_matches('-');
 
-            if suffix.is_empty() {
-                locales.insert(None);
-                continue;
-            }
+    //         if suffix.is_empty() {
+    //             locales.insert(None);
+    //             continue;
+    //         }
 
-            if let Ok(locale) = suffix.replace('_', "-").parse::<Locale>() {
-                locales.insert(Some(locale));
-            }
-        }
+    //         if let Ok(locale) = suffix.replace('_', "-").parse::<Locale>() {
+    //             locales.insert(Some(locale));
+    //         }
+    //     }
 
-        locales
-    }
+    //     locales
+    // }
 }
 
 impl std::fmt::Display for ResourceBundleMessageSource {
@@ -538,10 +478,20 @@ impl Clone for ResourceBundleMessageSource {
             basenames: self.basenames.clone(),
             default_locale: self.default_locale.clone(),
             fallback_to_system_locale: self.fallback_to_system_locale,
-            default_encoding: self.default_encoding.clone(),
-            resource_loader: self.resource_loader.clone(),
-            cache_millis: self.cache_millis,
+            cache_duration: self.cache_duration,
             cached_resource_bundles: ArcSwap::new(self.cached_resource_bundles.load_full()),
+        }
+    }
+}
+
+impl Default for ResourceBundleMessageSource {
+    fn default() -> Self {
+        Self {
+            basenames: Vec::new(),
+            cache_duration: 0,
+            fallback_to_system_locale: true,
+            default_locale: None,
+            cached_resource_bundles: ArcSwap::new(Arc::new(HashMap::default())),
         }
     }
 }
@@ -802,11 +752,11 @@ fn render_message_template(template: &MessageTemplate, args: &[impl AsRef<str>])
     rendered
 }
 
-fn current_time_millis() -> i64 {
+fn current_time_millis() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
-        .map(|duration| duration.as_millis() as i64)
+        .map(|duration| duration.as_millis() as u64)
         .unwrap_or_default()
 }
 

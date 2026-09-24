@@ -112,8 +112,10 @@ impl ResourceLoader for ApplicationResources {
 
         #[cfg(feature = "embed-resources")]
         {
-            let resource_loader = RESOURCE_LOADER.get()?;
-            return resource_loader.exists(&path);
+            return RESOURCE_LOADER
+                .get()
+                .map(|resource_loader| resource_loader.exists(&path))
+                .unwrap_or_default();
         }
 
         #[cfg(not(feature = "embed-resources"))]

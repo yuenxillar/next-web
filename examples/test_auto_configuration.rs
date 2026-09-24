@@ -9,6 +9,7 @@ use next_web::{
     macros::{autoconfigure::auto_configuration, bind::singleton},
 };
 use next_web_context::ApplicationContextExt;
+use next_web_core::Ordered;
 
 #[derive(Clone, Default)]
 pub struct TestApplication;
@@ -33,7 +34,7 @@ pub struct TestAutoRegister;
 
 #[async_trait]
 impl AutoConfiguration for TestAutoRegister {
-    async fn configuration(
+    async fn configure(
         &mut self,
         ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -43,6 +44,12 @@ impl AutoConfiguration for TestAutoRegister {
         ctx.insert_singleton_with_name(Arc::new(String::from("value0")), "value");
 
         Ok(())
+    }
+}
+
+impl Ordered for TestAutoRegister {
+    fn order(&self) -> i32 {
+        100
     }
 }
 

@@ -19,5 +19,7 @@ pub trait Ordered {
     /// Returns the order of the value, as an `i32`.
     ///
     /// Lower integers represent earlier positions, while higher integers represent later positions.
-    fn order(&self) -> i32;
+    fn order(&self) -> i32 {
+        100
+    }
 }

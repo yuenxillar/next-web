@@ -1,3 +1,5 @@
+pub mod support;
+
 mod bytes_resource;
 mod config_only_policy;
 mod default_resource_loader;

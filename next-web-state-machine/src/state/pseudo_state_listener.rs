@@ -1,4 +1,4 @@
-use next_web_core::traits::ordered::Ordered;
+use next_web_core::Ordered;
 
 use crate::state::pseudo_state_context::PseudoStateContext;
 

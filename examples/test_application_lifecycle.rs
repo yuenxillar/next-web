@@ -1,12 +1,9 @@
 use next_web::{
     application::Application,
     core::{
-        ApplicationContext, async_trait,
+        ApplicationContext, Ordered, async_trait,
         context::properties::ApplicationProperties,
-        traits::{
-            application::application_lifecycle::{ApplicationLifecycle, ShutdownContext},
-            ordered::Ordered,
-        },
+        traits::application::application_lifecycle::{ApplicationLifecycle, ShutdownContext},
     },
     macros::bind::singleton,
 };

@@ -19,9 +19,6 @@ use next_web_singletons::factory::{
 /// context config paths in a single string value.
 pub const CONFIG_LOCATION_DELIMITERS: &str = ",; \t\n";
 
-/// Name of the environment bean in the factory.
-pub const ENVIRONMENT_BEAN_NAME: &str = "environment";
-
 /// Name of the system properties bean in the factory.
 pub const SYSTEM_PROPERTIES_BEAN_NAME: &str = "systemProperties";
 

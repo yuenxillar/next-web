@@ -1,4 +1,4 @@
-use next_web_core::traits::ordered::Ordered;
+use next_web_core::Ordered;
 
 #[derive(Clone)]
 pub struct OrderedCompositeItem<S> {

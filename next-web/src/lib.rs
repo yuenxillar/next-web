@@ -76,6 +76,11 @@ pub use validator as validate;
 
 pub use next_web_core as core;
 
+// The internationalization support is reachable at the root of the crate, which
+// is where the bindings of `#[translation]` look it up.
+#[cfg(feature = "enable-i18n")]
+pub use web::i18n;
+
 #[cfg(feature = "enable-state-machine")]
 pub use next_web_state_machine as state_machine;
 
@@ -90,9 +95,6 @@ pub use next_web_retry as retry;
 
 #[cfg(feature = "enable-api-doc")]
 pub use next_web_api_doc as api_doc;
-
-#[cfg(feature = "enable-i18n")]
-pub mod i18n;
 
 #[cfg(feature = "embed-resources")]
 pub mod embed {
