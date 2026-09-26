@@ -5,7 +5,7 @@ use std::{error::Error, sync::Arc};
 #[cfg(feature = "distributed-lock")]
 use next_web_core::traits::singleton::Singleton;
 use next_web_core::{
-    ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
+    async_trait, traits::config::auto_configuration::AutoConfiguration, ApplicationContext,
 };
 use next_web_macros::auto_configuration;
 use next_web_macros::singleton;
@@ -16,7 +16,7 @@ use crate::{
     core::redis_template::RedisTemplate,
     listener::{
         key_expiration_event_message_listener::{
-            KEYEVENT_EXPIRED_TOPIC, KeyExpirationEventMessageListener,
+            KeyExpirationEventMessageListener, KEYEVENT_EXPIRED_TOPIC,
         },
         redis_message_listener_container::RedisMessageListenerContainer,
     },
@@ -90,7 +90,9 @@ impl Ordered for RedisAutoConfiguration {
     }
 }
 
-#[auto_configuration]
+// The configuration class runs after the auto-configuration above, so its
+// provider only creates the fallback `RedisTemplate` when nothing else did.
+#[auto_configuration(order = 101)]
 impl RedisAutoConfiguration {
     #[provider(conditional = [Self::redis_template_missing])]
     pub fn redis_template(redis_properties: &RedisProperties) -> RedisTemplate {

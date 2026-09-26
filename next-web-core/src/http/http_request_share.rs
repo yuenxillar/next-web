@@ -7,7 +7,6 @@ use reqwest::header::ACCEPT_LANGUAGE;
 
 use crate::{
     anys::any_value::AnyValue,
-    autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES,
     http::{Cookie, HttpMethod, HttpVersion, auth_type::AuthType},
     traits::http::{HttpSession, http_request::HttpRequest, request_dispatcher::RequestDispatcher},
 };
@@ -144,9 +143,10 @@ impl HttpRequest for HttpRequestShare {
     }
 
     fn context_path(&self) -> Option<&str> {
-        GLOBAL_SERVER_PROPERTIES
-            .get()
-            .and_then(|var| var.context_path())
+        // GLOBAL_SERVER_PROPERTIES
+        //     .get()
+        //     .and_then(|var| var.context_path())
+        None
     }
 
     fn locale(&self) -> Option<Locale> {

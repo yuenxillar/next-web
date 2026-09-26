@@ -11,7 +11,6 @@ use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::OnceLock};
 
 use crate::{
     anys::any_value::AnyValue,
-    autoconfigure::context::server_properties::GLOBAL_SERVER_PROPERTIES,
     http::{Cookie, HttpMethod, auth_type::AuthType},
     traits::http::{HttpSession, request_dispatcher::RequestDispatcher},
 };
@@ -235,9 +234,10 @@ impl HttpRequest for Request {
     }
 
     fn context_path(&self) -> Option<&str> {
-        GLOBAL_SERVER_PROPERTIES
-            .get()
-            .map(|var| var.context_path())?
+        // GLOBAL_SERVER_PROPERTIES
+        //     .get()
+        //     .map(|var| var.context_path())?
+        None
     }
 
     fn locale(&self) -> Option<Locale> {

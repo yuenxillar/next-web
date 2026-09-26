@@ -1,5 +1,4 @@
 pub mod anys;
-pub mod autoconfigure;
 pub mod autoregister;
 pub mod client;
 pub mod common;

@@ -1,33 +1,72 @@
+//! The auto-configuration example.
+//!
+//! The example declares the auto-configuration of an application in both of the
+//! ways the framework supports:
+//!
+//! - a type implements `AutoConfiguration` and is provided as a singleton, which
+//!   is how a starter contributes its configuration,
+//! - an `impl` block is annotated with `#[auto_configuration]`, which turns the
+//!   methods that declare a provider into the singletons of the application.
+//!
+//! Both are applied in the order of `Ordered`, and a configuration is skipped
+//! when its condition does not hold. The example serves the singletons it
+//! created at `http://127.0.0.1:11000/autoConfiguration`.
+
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use next_web::{
-    Application, NextWebApplication,
     core::{
-        ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
+        async_trait, traits::config::auto_configuration::AutoConfiguration, ApplicationContext,
     },
+    extract::find_singleton::FindSingleton,
     macros::{
         autoconfigure::{auto_configuration, configuration_properties},
-        bind::singleton,
+        bind::{get_mapping, singleton},
     },
+    Application, NextWebApplication,
 };
 use next_web_context::ApplicationContextExt;
-use next_web_core::Ordered;
+use next_web_core::{anys::any_value::AnyValue, Ordered};
 
 #[derive(Default)]
 pub struct TestApplication;
 
 impl Application for TestApplication {}
 
-/// The properties of the feature the condition of the auto-configuration reads.
+/// The properties the condition of the configuration class reads.
+///
+/// The example enables the feature while it starts, so the conditional provider
+/// of the configuration class is created.
 #[configuration_properties(prefix = "next.feature")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct TestFeatureProperties {
     pub enabled: Option<bool>,
 }
 
-#[derive(Clone)]
+/// The instance the configuration class of the example creates.
+#[derive(Debug, Clone)]
+pub struct Greeting {
+    /// The message the greeting was built with.
+    pub message: String,
+
+    /// The names of the feature, which the conditional provider contributed.
+    pub names: Vec<String>,
+}
+
+/// An auto-configuration the application provides itself.
+///
+/// A starter contributes its auto-configurations the same way: with a singleton
+/// that is bound to `Box<dyn AutoConfiguration>`.
 #[singleton(binds = [Self::into_auto_configuration])]
+#[derive(Clone)]
 pub struct TestAutoRegister;
+
+impl TestAutoRegister {
+    pub fn into_auto_configuration(self) -> Box<dyn AutoConfiguration> {
+        Box::new(self)
+    }
+}
 
 #[async_trait]
 impl AutoConfiguration for TestAutoRegister {
@@ -35,9 +74,8 @@ impl AutoConfiguration for TestAutoRegister {
         &mut self,
         ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        ctx.insert_singleton_with_name(String::from("value1"), "msg2");
-        ctx.insert_singleton_with_name(String::from("value0"), "s3");
-
+        // What the configuration class below depends on.
+        ctx.insert_singleton_with_name(String::from("value1"), "applicationName");
         ctx.insert_singleton_with_name(Arc::new(String::from("value0")), "value");
 
         Ok(())
@@ -50,44 +88,51 @@ impl Ordered for TestAutoRegister {
     }
 }
 
-impl TestAutoRegister {
-    pub fn into_auto_configuration(self) -> Box<dyn AutoConfiguration> {
-        Box::new(self)
-    }
-}
-
+/// The type the configuration class below belongs to.
+///
+/// The type only gives the configuration a name of its own; the methods that
+/// declare a provider are called by the framework while the application starts.
 #[derive(Clone)]
-pub struct TestAutoConfiguation;
+pub struct TestAutoConfiguration;
 
-#[auto_configuration]
-impl TestAutoConfiguation {
-    #[provider(name = "msg666", conditional = [Self::test1], order = 12)]
-    fn msg1(
-        #[autowired(name = "msg2")] s1: String,
-        #[autowired(default)] s2: String,
-        s3: String,
-    ) -> String {
-        format!("{}:{}:{}", s1, s2, s3)
+/// The configuration class of the application.
+///
+/// The class is applied after the auto-configuration above, which is what lets
+/// its providers depend on the singletons that auto-configuration created.
+#[auto_configuration(order = 200)]
+impl TestAutoConfiguration {
+    /// A conditional provider, which runs before the other providers of the
+    /// class so that they can depend on the names it contributes.
+    #[provider(name = "featureNames", conditional = [Self::feature_enabled], order = 10)]
+    fn feature_names() -> Vec<String> {
+        println!("the feature of the example is enabled");
+
+        vec![String::from("first"), String::from("second")]
     }
 
-    #[provider(conditional = [Self::feature_enabled])]
-    fn msg2() -> Vec<String> {
-        println!("is me!");
-        vec![]
-    }
-
+    /// A provider that names its instance and resolves its parameters by name.
+    ///
+    /// The names of the feature are optional, so the instance is created whether
+    /// the feature of the example is enabled or not.
     #[provider]
-    async fn msg3(value: Arc<String>, #[autowired(name = "msg2")] msg2: String) -> Vec<String> {
-        let msg1 = value.as_ref().clone();
-
-        vec![msg1, msg2]
+    fn greeting(
+        #[autowired(name = "applicationName")] application_name: String,
+        #[autowired(name = "featureNames", default)] names: Vec<String>,
+        value: Arc<String>,
+    ) -> Greeting {
+        Greeting {
+            message: format!("{application_name}: {value}"),
+            names,
+        }
     }
 
-    fn test1(ctx: &dyn ApplicationContext) -> bool {
-        ctx.contains_singleton_with_name::<String>("s2")
+    /// An asynchronous provider.
+    #[provider]
+    async fn repeated(value: Arc<String>) -> Vec<String> {
+        vec![value.as_ref().clone(), value.as_ref().clone()]
     }
 
-    /// Returns whether the feature of the application is enabled.
+    /// Returns whether the feature of the example is enabled.
     ///
     /// # Arguments
     ///
@@ -99,7 +144,22 @@ impl TestAutoConfiguation {
     }
 }
 
+/// Serves the instance the configuration class created.
+#[get_mapping(path = "/autoConfiguration")]
+async fn auto_configuration(FindSingleton(greeting): FindSingleton<Greeting>) -> impl IntoResponse {
+    format!("{greeting:?}")
+}
+
 #[tokio::main]
 async fn main() {
-    NextWebApplication::<TestApplication>::default().run().await
+    let mut application = NextWebApplication::<TestApplication>::default();
+
+    // The condition of the configuration class reads this property, and a
+    // default property makes the example behave the same way wherever it runs.
+    application.set_default_properties(HashMap::from([(
+        String::from("next.feature.enabled"),
+        AnyValue::from(true),
+    )]));
+
+    application.run().await
 }

@@ -7,6 +7,8 @@ use next_web_core::{
 };
 use std::{error::Error, sync::Arc};
 
+use crate::web::server::autoconfigure::ServerProperties;
+
 #[derive(Debug, Clone)]
 pub struct WebAutoConfiguration;
 
@@ -54,7 +56,48 @@ impl WebAutoConfiguration {
         }
     }
 
+    /// Publishes the properties of the web server to the process.
+    ///
+    /// The properties of the server are registered as a singleton while the
+    /// configuration properties are bound, and this hands them to
+    /// [`ServerProperties::install_global`], so that the parts of the framework
+    /// that are reached without an application context read the configuration
+    /// of the application. Installing them twice is not an error: the first
+    /// installation wins, which is the configuration of the first context of the
+    /// process.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context the properties were registered in.
+    fn publish_server_properties(&self, ctx: &mut dyn ApplicationContext) {
+        let Some(properties) = ctx
+            .get_singleton_option_with_default_name::<ServerProperties>()
+            .cloned()
+        else {
+            return;
+        };
+
+        if let Err(error) = properties.install_global() {
+            tracing::debug!(
+                error = %error,
+                "the properties of the web server are installed already"
+            );
+        }
+    }
+
     /// Auto-configures the application context by resolving and configuring all auto-configurations.
+    ///
+    /// The auto-configurations of an application are the types that implement
+    /// [`AutoConfiguration`], which are contributed by the providers of the
+    /// application:
+    ///
+    /// - the auto-configurations of a starter declare a `#[singleton(binds =
+    ///   [Self::into_auto_configuration])]`,
+    /// - the configuration classes of an application are declared with
+    ///   `#[auto_configuration]`, which registers them the same way.
+    ///
+    /// They are applied in the order of [`Ordered`](next_web_core::Ordered), and
+    /// a configuration whose condition does not hold is skipped.
     async fn run_auto_configurations(
         &mut self,
         ctx: &mut dyn ApplicationContext,
@@ -66,14 +109,7 @@ impl WebAutoConfiguration {
             auto_configuration.configure(ctx).await?;
         }
 
-        // use next_web_core::autoregister::auto_configuration_autoregister::DefaultAutoConfigurationAutoregister;
-        // for auto_configuration in
-        //     inventory::iter::<&dyn DefaultAutoConfigurationAutoregister>.into_iter()
-        // {
-        //     auto_configuration.configuration(ctx).await?;
-        // }
-
-        // Resove autoRegister
+        // Resolve autoRegister
         // for auto_register in ctx
         //     .resolve_by_type::<Arc<dyn AutoRegister>>()
         //     .iter()
@@ -93,6 +129,7 @@ impl WebAutoConfiguration {
 impl AutoConfiguration for WebAutoConfiguration {
     async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         self.bind_configuration_properties(ctx)?;
+        self.publish_server_properties(ctx);
         self.run_auto_configurations(ctx).await?;
 
         // The tasks an application declared with `#[scheduled]` are resolved

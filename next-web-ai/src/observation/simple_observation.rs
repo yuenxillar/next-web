@@ -1,11 +1,6 @@
 use std::collections::VecDeque;
 
-use next_web_core::autoconfigure::context;
-
-use crate::{
-    chat::observation::observation_convention::ObservationConvention,
-    observation::observation_documentation::BoxObservationConvention,
-};
+use crate::observation::observation_documentation::BoxObservationConvention;
 
 use super::{
     observation::{Context, Observation},

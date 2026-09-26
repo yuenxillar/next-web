@@ -1,4 +1,4 @@
-use next_web_core::{autoconfigure::context, DynClone};
+use next_web_core::DynClone;
 
 use crate::observation::observation::{Context, Event};
 

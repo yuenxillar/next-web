@@ -59,6 +59,7 @@ use crate::{
 
 #[cfg(feature = "tls-rustls")]
 use crate::web::server::TlsWebServer;
+use crate::web::server::autoconfigure::ServerProperties;
 
 /// The application shutdown hook, used to clean up resources on shutdown.
 pub static APPLICATION_SHUTDOWN_HOOK: OnceLock<ApplicationShutdownHook> = OnceLock::new();
@@ -298,7 +299,7 @@ where
         if let Some(context_path) = environment
             .get_property("next.server.context_path")
             .as_ref()
-            .and_then(|s| normalize_context_path(s))
+            .and_then(|s| ServerProperties::normalize_context_path(s))
         {
             let new_router = Router::new();
             router = new_router.nest(&context_path, router);
@@ -1201,31 +1202,6 @@ fn configure_command_line_property_source(sources: &mut MutablePropertySources, 
             command_line_properties(args),
         ))),
     }
-}
-
-/// Standardize the context path, remove all ASCII whitespace, fill in the opening slash, and remove the ending slash
-fn normalize_context_path(raw: &str) -> Option<String> {
-    let cleaned: String = raw.chars().filter(|c| !c.is_ascii_whitespace()).collect();
-
-    if cleaned.is_empty() {
-        return None;
-    }
-
-    let mut path = if cleaned.starts_with('/') {
-        cleaned
-    } else {
-        format!("/{cleaned}")
-    };
-
-    while path.len() > 1 && path.ends_with('/') {
-        path.pop();
-    }
-
-    if path == "/" {
-        return None;
-    }
-
-    Some(path)
 }
 
 #[cfg(test)]

@@ -19,20 +19,20 @@ use next_web_singletons::factory::{
 /// context config paths in a single string value.
 pub const CONFIG_LOCATION_DELIMITERS: &str = ",; \t\n";
 
-/// Name of the system properties bean in the factory.
-pub const SYSTEM_PROPERTIES_BEAN_NAME: &str = "systemProperties";
+/// Name of the system properties singleton in the factory.
+pub const SYSTEM_PROPERTIES_SINGLETON_NAME: &str = "systemProperties";
 
-/// Name of the operating system environment bean in the factory.
-pub const SYSTEM_ENVIRONMENT_BEAN_NAME: &str = "systemEnvironment";
+/// Name of the operating system environment singleton in the factory.
+pub const SYSTEM_ENVIRONMENT_SINGLETON_NAME: &str = "systemEnvironment";
 
-/// Name of the application startup bean in the factory.
-pub const APPLICATION_STARTUP_BEAN_NAME: &str = "applicationStartup";
+/// Name of the application startup singleton in the factory.
+pub const APPLICATION_STARTUP_SINGLETON_NAME: &str = "applicationStartup";
 
 /// Errors returned by [`ConfigurableApplicationContext`] operations.
 #[derive(Debug)]
 pub enum ContextError {
-    /// Returned when the bean factory could not be initialized.
-    Beans(Box<dyn std::error::Error + Send + Sync>),
+    /// Returned when the singleton factory could not be initialized.
+    Singletons(Box<dyn std::error::Error + Send + Sync>),
     /// Returned when an operation is attempted in an invalid state.
     IllegalState(String),
     /// Returned for I/O failures while closing the context.
@@ -42,7 +42,7 @@ pub enum ContextError {
 impl std::fmt::Display for ContextError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ContextError::Beans(error) => write!(f, "bean error: {}", error),
+            ContextError::Singletons(error) => write!(f, "singleton error: {}", error),
             ContextError::IllegalState(message) => write!(f, "illegal state: {}", message),
             ContextError::Io(error) => write!(f, "I/O error: {}", error),
         }
@@ -52,7 +52,7 @@ impl std::fmt::Display for ContextError {
 impl std::error::Error for ContextError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            ContextError::Beans(error) => Some(error.as_ref()),
+            ContextError::Singletons(error) => Some(error.as_ref()),
             ContextError::IllegalState(_) => None,
             ContextError::Io(error) => Some(error),
         }
@@ -177,13 +177,13 @@ where
     ///
     /// # Errors
     ///
-    /// Returns [`ContextError::Beans`] if the bean factory could not be
+    /// Returns [`ContextError::Singletons`] if the singleton factory could not be
     /// initialized, or [`ContextError::IllegalState`] if the context is already
     /// initialized and multiple refresh attempts are not supported.
     fn refresh(&mut self) -> Result<(), ContextError>;
 
-    /// Pauses all beans in this application context if necessary, and
-    /// subsequently restarts all auto-startup beans, effectively restoring the
+    /// Pauses all singletons in this application context if necessary, and
+    /// subsequently restarts all auto-startup singletons, effectively restoring the
     /// lifecycle state after [`Self::refresh`].
     ///
     /// # Returns
@@ -191,7 +191,7 @@ where
     /// `Ok(())` on success.
     fn restart(&mut self) -> Result<(), ContextError>;
 
-    /// Stops all beans in this application context unless they explicitly opt
+    /// Stops all singletons in this application context unless they explicitly opt
     /// out of pausing.
     ///
     /// # Returns
@@ -208,7 +208,7 @@ where
 
     /// Closes this application context, releasing all resources and locks that
     /// the implementation might hold, including destroying all cached singleton
-    /// beans.
+    /// singletons.
     ///
     /// Note: does *not* invoke `close` on a parent context; parent contexts
     /// have their own, independent lifecycle.
@@ -243,7 +243,7 @@ where
     /// Return the parent context, or none if there is no parent and this is the root of the context hierarchy.
     fn parent(&self) -> Option<&dyn ApplicationContext>;
 
-    /// Returns the internal bean factory of this application context.
+    /// Returns the internal singleton factory of this application context.
     ///
     /// The internal factory is generally only accessible while the context is
     /// active, that is, in-between [`Self::refresh`] and [`Self::close`]. The
@@ -252,12 +252,12 @@ where
     ///
     /// # Returns
     ///
-    /// The underlying bean factory.
+    /// The underlying singleton factory.
     ///
     /// # Errors
     ///
     /// Returns [`ContextError::IllegalState`] if the context does not hold an
-    /// internal bean factory (usually if [`Self::refresh`] has not been called
+    /// internal singleton factory (usually if [`Self::refresh`] has not been called
     /// yet or if [`Self::close`] has already been called).
     fn singleton_factory(&mut self) -> Result<&mut F, ContextError>;
 }

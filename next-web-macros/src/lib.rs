@@ -333,6 +333,60 @@ pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
     impl_macro_application(attr, item_fn)
 }
 
+/// Declares an `impl` block as a configuration class of the application.
+///
+/// A method of the block that declares a provider is called while the
+/// application starts: it resolves the parameters of the method from the
+/// application context, and registers the value it returns as a singleton. The
+/// configuration class itself is an
+/// [`AutoConfiguration`](next_web_core::traits::config::auto_configuration::AutoConfiguration),
+/// so the framework applies it together with the auto-configurations of the
+/// starters, in the order of [`Ordered`](next_web_core::Ordered).
+///
+/// # Arguments
+///
+/// - `order` - The order the configuration is applied in. It defaults to `100`,
+///   the default of `Ordered`.
+/// - `conditional = [path, ...]` - The conditions the configuration is applied
+///   under. Each names a function that takes `&dyn ApplicationContext` and
+///   returns a `bool`, and the configuration is skipped when one of them
+///   returns `false`.
+/// - `name = "..."` - The name the configuration is registered under. It
+///   defaults to the name of the type the macro generates.
+///
+/// # Method attributes
+///
+/// - `#[provider]`, which is required for a method to be called, takes
+///   `name = "..."`, `conditional = [path, ...]` and `order = <integer>`. A
+///   provider runs in the order of its `order`, which defaults to `100`, and
+///   the providers of the same order run in the order they are declared in.
+/// - `#[autowired(name = "...", default)]` of a parameter resolves the
+///   parameter from the context by name, and falls back to `Default::default()`
+///   when the name is not registered.
+/// - `#[conditional_on_property(name = "...", having_value = "...")]` creates
+///   the instance only when the property holds the given value.
+///
+/// The methods of the block take their dependencies as parameters and do not
+/// take `self`, and a method that returns a `Result` reports its failure to the
+/// application, which stops the startup.
+///
+/// # Example
+///
+/// ```ignore
+/// use next_web::macros::autoconfigure::auto_configuration;
+///
+/// #[auto_configuration(order = 200, conditional = [Self::feature_enabled])]
+/// impl MyConfiguration {
+///     #[provider(name = "myClient", order = 10)]
+///     fn my_client(#[autowired(name = "myProperties")] properties: MyProperties) -> Client {
+///         Client::with_properties(&properties)
+///     }
+///
+///     fn feature_enabled(ctx: &dyn ApplicationContext) -> bool {
+///         ctx.contains_singleton::<Client>()
+///     }
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn auto_configuration(attr: TokenStream, item: TokenStream) -> TokenStream {
     use crate::web::auto_configuration::impl_macro_auto_configuration;
