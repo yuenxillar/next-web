@@ -1,10 +1,10 @@
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
 /// MQTT Client Configuration Properties
 ///
 /// MQTT客户端配置属性
-#[singleton(default, binds=[Self::into_properties])]
-#[properties(prefix = "next.mqtt", dynamic)]
+
+#[configuration_properties(prefix = "next.mqtt", dynamic)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct MQTTClientProperties {
     /// Client identifier (optional)

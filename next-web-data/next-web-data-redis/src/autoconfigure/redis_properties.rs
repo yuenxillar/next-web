@@ -1,4 +1,4 @@
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
 #[cfg(feature = "distributed-lock")]
 use crate::service::lock::{RedisLockConfig, RedisLockMode};
@@ -6,8 +6,8 @@ use crate::service::lock::{RedisLockConfig, RedisLockMode};
 /// Configuration properties for the Redis starter.
 ///
 /// These values are typically bound from the `next.data.redis` prefix in `application.yaml`.
-#[singleton(default, binds=[Self::into_properties])]
-#[properties(prefix = "next.data.redis", dynamic)]
+
+#[configuration_properties(prefix = "next.data.redis", dynamic)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct RedisProperties {
     /// Full Redis connection URL (e.g., `redis://[:password@]host:port[/database]`).

@@ -1,5 +1,6 @@
 mod base_environment;
 mod base_property_source;
+pub mod bind;
 mod command_line_args;
 mod command_line_property_source;
 mod composite_property_source;
@@ -25,6 +26,7 @@ pub use base_environment::{
     IGNORE_GETENV_PROPERTY_NAME, RESERVED_DEFAULT_PROFILE_NAME,
 };
 pub use base_property_source::BasePropertySource;
+pub use bind::{BindError, Binder, ConfigurableEnvironmentBindExt};
 pub(crate) use command_line_args::CommandLineArgs;
 pub use command_line_property_source::{
     CommandLinePropertySource, CommandLinePropertySourceExt, COMMAND_LINE_PROPERTY_SOURCE_NAME,

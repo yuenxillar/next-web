@@ -13,7 +13,7 @@ pub mod bind {
 
 pub mod autoconfigure {
     pub use next_web_macros::auto_configuration;
-    pub use next_web_macros::properties;
+    pub use next_web_macros::configuration_properties;
 }
 
 pub mod data {

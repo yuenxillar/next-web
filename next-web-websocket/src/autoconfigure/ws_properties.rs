@@ -1,10 +1,10 @@
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
 /// WebSocket configuration properties, used to configure parameters related to WebSocket connections
 ///
 /// WebSocket配置属性，用于配置WebSocket连接的相关参数
-#[singleton(default, binds=[Self::into_properties])]
-#[properties(prefix = "next.ws")]
+
+#[configuration_properties(prefix = "next.ws")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct WebSocketProperties {
     /// Maximum message size

@@ -1,8 +1,8 @@
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
 /// RabbitMQ client properties.
-#[singleton(default, binds=[Self::into_properties])]
-#[properties(prefix = "next.mq.rabbitmq")]
+
+#[configuration_properties(prefix = "next.mq.rabbitmq")]
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct RabbitmqProperties {
     host: Option<String>,

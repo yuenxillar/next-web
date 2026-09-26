@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 
-use crate::{ApplicationContext, context::properties::ApplicationProperties, error::BoxError};
+use crate::{ApplicationContext, error::BoxError};
 
-///
 /// AutoRegister trait
 ///
 /// This trait is used to register the singletons of a module in the application
@@ -20,7 +19,7 @@ use crate::{ApplicationContext, context::properties::ApplicationProperties, erro
 /// `Box<dyn std::error::Error + Send + Sync>`.
 ///
 #[async_trait]
-pub trait AutoRegister: Sync + Send {
+pub trait AutoRegister: Send + Sync {
     /// Get the name of the registration instance.
     ///
     /// This method is used to obtain the name of the registration instance.
@@ -35,7 +34,7 @@ pub trait AutoRegister: Sync + Send {
     async fn register(
         &self,
         ctx: &mut dyn ApplicationContext,
-        properties: &ApplicationProperties,
+        properties: (),
     ) -> Result<(), BoxError>;
 }
 

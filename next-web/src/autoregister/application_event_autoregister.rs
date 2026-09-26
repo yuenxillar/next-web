@@ -1,8 +1,6 @@
 use futures::future::BoxFuture;
 use next_web_context::ApplicationContext;
 
-use crate::event::default_application_event_multicaster::DefaultApplicationEventMulticaster;
-
 pub trait ApplicationEventAutoRegister
 where
     Self: Send + Sync,
@@ -11,7 +9,6 @@ where
     fn register<'life_a>(
         &'life_a self,
         ctx: &'life_a mut dyn ApplicationContext,
-        multicaster: &'life_a mut DefaultApplicationEventMulticaster,
     ) -> BoxFuture<'life_a, ()>;
 }
 

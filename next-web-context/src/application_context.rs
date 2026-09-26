@@ -43,6 +43,10 @@ pub const RESOURCE_LOADER_SINGLETON_NAME: &str = "resourceLoader";
 /// If none is supplied, a SimpleApplicationEnvironment is used.
 pub const APPLICATION_ENVIRONMENT_SINGLETON_NAME: &str = "applicationEnvironment";
 
+/// The name of the ApplicationArguments singleton in the context.
+/// If none is supplied, the default arguments are used.
+pub const APPLICATION_ARGUMENTS_SINGLETON_NAME: &str = "applicationArguments";
+
 /// Signature of the function a context stores next to an instance so that owned
 /// copies of it can be produced later.
 ///

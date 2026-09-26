@@ -2,6 +2,7 @@ server_addr: "192.168.1.18"
 
 next:
   server:
+    context_path: "/app"
     port: 8080
     address: 127.0.0.1
   application:
@@ -31,6 +32,8 @@ next:
   logging:
     format: "%Y-%m-%d %H:%M:%S%.3f"
     level: info
+    file:
+      name: next.log
 
   feature:
     enabled: true

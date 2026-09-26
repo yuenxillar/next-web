@@ -1,11 +1,11 @@
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
 /// RocketMQ starter properties.
 ///
 /// These values are bound from the `next.mq.rocketmq` prefix and describe the
 /// common defaults shared by producer and consumer flows.
-#[singleton(default, binds=[Self::into_properties])]
-#[properties(prefix = "next.mq.rocketmq")]
+
+#[configuration_properties(prefix = "next.mq.rocketmq")]
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct RocketmqProperties {
     name_servers: Option<Vec<String>>,

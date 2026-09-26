@@ -95,3 +95,9 @@ impl ApplyRouter for WebsocketApplyRouter {
             .with_state(Arc::new(std::mem::take(&mut self.ws_context)))
     }
 }
+
+impl Ordered for WebsocketApplyRouter {
+    fn order(&self) -> i32 {
+        100
+    }
+}

@@ -1,14 +1,13 @@
-pub mod application;
 pub mod autoconfigure;
 pub mod autoregister;
 pub mod configurer;
 pub mod context;
 pub mod diagnostics;
 pub mod env;
-pub mod event;
 pub mod extract;
 pub mod macros;
 pub mod manager;
+pub mod scheduling;
 pub mod support;
 pub mod util;
 pub mod web;

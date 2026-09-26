@@ -16,6 +16,7 @@ tokio           = { workspace = true, features = ["sync"]}
 
 serde           = { workspace = true }
 serde_yaml      = { workspace = true }
+serde_path_to_error = { workspace = true }
 
 thiserror       = { workspace = true }
 dyn-clone       = { workspace = true }

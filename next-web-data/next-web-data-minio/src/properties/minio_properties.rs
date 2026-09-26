@@ -1,8 +1,8 @@
-use next_web_macros::{Properties, singleton};
+use next_web_macros::{singleton, Properties};
 
 /// Properties for Minio client.
-#[singleton(default, binds=[Self::into_properties])]
-#[Properties(prefix = "next.data.minio")]
+
+#[configuration_properties(prefix = "next.data.minio")]
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct MinioClientProperties {
     /// Minio endpoint.

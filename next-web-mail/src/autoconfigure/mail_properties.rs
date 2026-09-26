@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
 use next_web_core::server::ssl::Ssl;
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
-#[singleton(default, binds=[Self::into_properties])]
-#[properties(prefix = "next.mail")]
+#[configuration_properties(prefix = "next.mail")]
 #[derive(Debug, Default, Clone, serde::Deserialize)]
 pub struct MailProperties {
     /// SMTP server host. For instance, 'smtp.example.com'.

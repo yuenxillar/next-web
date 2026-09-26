@@ -14,7 +14,7 @@ dyn-clone.workspace     = true
 indexmap.workspace      = true
 inventory.workspace     = true
 next-web-singletons     = { workspace = true }
-tokio.workspace         = true
+tokio                   = { workspace = true, features = ["time"] }
 tracing.workspace       = true
 
 [lints]

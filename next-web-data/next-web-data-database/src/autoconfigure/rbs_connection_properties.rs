@@ -1,7 +1,6 @@
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
-#[singleton(default, binds=[Self::into_properties])]
-#[properties(prefix = "next.datasource.rbs")]
+#[configuration_properties(prefix = "next.datasource.rbs")]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct RbsConnectionProperties {
     /// Maximum pool size. (default: 32)

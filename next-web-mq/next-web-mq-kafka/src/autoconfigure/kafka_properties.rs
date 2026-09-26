@@ -1,8 +1,8 @@
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
 /// Kafka starter properties.
-#[singleton(default, binds=[Self::into_properties])]
-#[properties(prefix = "next.mq.kafka")]
+
+#[configuration_properties(prefix = "next.mq.kafka")]
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct KafkaProperties {
     bootstrap_servers: Option<Vec<String>>,

@@ -401,46 +401,95 @@ impl DefaultApplicationContext {
     }
 
     /// Initialize the ApplicationEventMulticaster.
-    /// Uses SimpleApplicationEventMulticaster if none defined in the context.
+    ///
+    /// A multicaster the application installed under
+    /// [`APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME`] wins; otherwise the
+    /// default one of the framework is used and registered under that name, so
+    /// that components can publish events through it. Either way the listeners
+    /// of the context are added to it:
+    ///
+    /// 1. the listeners the providers of the application contribute, which are
+    ///    resolved by their type,
+    /// 2. the listeners that were registered through
+    ///    [`ConfigurableApplicationContext::add_application_listener`], which
+    ///    win over the listeners of a provider of the same concrete type.
     fn init_application_event_multicaster(&mut self) -> Result<(), ContextError> {
-        if let Some(event_multicaster) = self
+        let installed = self
             .singleton_factory()?
             .registry_mut()
             .get_singleton::<Arc<dyn ApplicationEventMulticaster>, &'static str>(
                 APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
             )
-            .map(Clone::clone)
-        {
-            tracing::trace!(
-                "Using ApplicationEventMulticaster [{:?}]",
-                event_multicaster
-            );
-            self.application_event_multicaster = Some(event_multicaster);
-        } else {
-            let listeners =
-                self.resolve_by_type::<Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>>();
+            .map(Clone::clone);
 
-            let mut event_multicaster = DefaultApplicationEventMulticaster::new(listeners);
-            // Register statically specified listeners first.
-            for (id, listener) in self.listeners.iter() {
-                event_multicaster.add_application_listener(id.to_owned(), Arc::clone(&listener));
+        let event_multicaster = match installed {
+            Some(event_multicaster) => {
+                tracing::trace!(
+                    "Using ApplicationEventMulticaster [{:?}]",
+                    event_multicaster
+                );
+                event_multicaster
             }
+            None => {
+                // A multicaster that was created before the context was
+                // refreshed is reused, so the listeners that were registered on
+                // it and the events it already received stay with the same
+                // multicaster.
+                let event_multicaster = match self.application_event_multicaster.as_ref() {
+                    Some(event_multicaster) => Arc::clone(event_multicaster),
+                    None => {
+                        let event_multicaster = self.create_application_event_multicaster();
+                        self.application_event_multicaster = Some(Arc::clone(&event_multicaster));
+                        event_multicaster
+                    }
+                };
 
-            let event_multicaster =
-                Arc::new(event_multicaster) as Arc<dyn ApplicationEventMulticaster>;
-            self.singleton_factory()?.registry_mut().register_singleton(
-                APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
-                Arc::clone(&event_multicaster),
-            );
+                self.singleton_factory()?.registry_mut().register_singleton(
+                    APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
+                    Arc::clone(&event_multicaster),
+                );
 
-            tracing::trace!(
-                "No '{APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME}' singleton, using [{:?}]",
+                tracing::trace!(
+                    "No '{APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME}' singleton, using [{:?}]",
+                    event_multicaster
+                );
+
                 event_multicaster
-            );
-            self.application_event_multicaster = Some(event_multicaster);
+            }
+        };
+
+        self.application_event_multicaster = Some(Arc::clone(&event_multicaster));
+
+        // Listeners contributed by the providers of the application.
+        let listeners =
+            self.resolve_by_type::<Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>>();
+        for listener in listeners {
+            let id = Self::listener_id(listener.as_ref().type_id());
+            event_multicaster.add_application_listener(id, listener);
+        }
+
+        // Statically specified listeners.
+        for (id, listener) in self.listeners.iter() {
+            event_multicaster.add_application_listener(id.to_owned(), Arc::clone(listener));
         }
 
         Ok(())
+    }
+
+    /// Creates the multicaster of the context and adds the listeners that are
+    /// registered in it.
+    ///
+    /// The multicaster is the default one of the framework, which dispatches
+    /// the events inline and logs the failures of its listeners.
+    fn create_application_event_multicaster(&self) -> Arc<dyn ApplicationEventMulticaster> {
+        let event_multicaster = Arc::new(DefaultApplicationEventMulticaster::default())
+            as Arc<dyn ApplicationEventMulticaster>;
+
+        for (id, listener) in self.listeners.iter() {
+            event_multicaster.add_application_listener(id.to_owned(), Arc::clone(listener));
+        }
+
+        event_multicaster
     }
 
     /// Called when the application context is refreshed.
@@ -521,13 +570,31 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
         // instance of the same type replaces the previous one, which mirrors the
         // set semantics of the original Spring implementation.
         match self.listeners.iter_mut().find(|(key, _)| *key == id) {
-            Some((_, registered)) => *registered = listener,
-            None => self.listeners.push((id, listener)),
+            Some((_, registered)) => *registered = Arc::clone(&listener),
+            None => self.listeners.push((id.clone(), Arc::clone(&listener))),
+        }
+
+        // A listener that is registered while the context is active is added to
+        // the multicaster right away, so that it receives the events a
+        // component publishes from now on. Before the context is refreshed the
+        // multicaster is created on demand, which is what lets an application
+        // publish an event without refreshing its context first.
+        match self.application_event_multicaster.as_ref() {
+            Some(multicaster) => multicaster.add_application_listener(id, listener),
+            None => {
+                let multicaster = self.create_application_event_multicaster();
+                multicaster.add_application_listener(id, listener);
+                self.application_event_multicaster = Some(multicaster);
+            }
         }
     }
 
     fn remove_application_listener(&mut self, id: &str) {
         self.listeners.retain(|(listener_id, _)| listener_id != id);
+
+        if let Some(multicaster) = self.application_event_multicaster.as_ref() {
+            multicaster.remove_application_listener(id.to_owned());
+        }
     }
 
     fn refresh(&mut self) -> Result<(), ContextError> {

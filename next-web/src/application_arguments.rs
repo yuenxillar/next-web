@@ -10,7 +10,10 @@ use std::collections::HashSet;
 ///
 /// Implementors of this trait expose the raw arguments as well as helpers for
 /// inspecting option arguments (e.g. `--foo=bar`) and non-option arguments.
-pub trait ApplicationArguments {
+pub trait ApplicationArguments
+where
+    Self: Send + Sync,
+{
     /// Returns the raw unprocessed arguments that were passed to the application.
     ///
     /// # Returns

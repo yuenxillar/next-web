@@ -1,8 +1,8 @@
-use next_web_macros::{Properties, singleton};
+use next_web_macros::{singleton, Properties};
 
 /// Properties for Mongod client.
-#[singleton(default, binds=[Self::into_properties])]
-#[Properties(prefix = "next.data.mongodb")]
+
+#[configuration_properties(prefix = "next.data.mongodb")]
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct MongodbClientProperties {
     username: Option<String>,

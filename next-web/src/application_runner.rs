@@ -38,6 +38,7 @@ use crate::ApplicationArguments;
 /// ```
 pub trait ApplicationRunner
 where
+    Self: Send + Sync,
     Self: Ordered,
 {
     /// Executes the application runner's logic.

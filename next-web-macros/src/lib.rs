@@ -4,9 +4,9 @@ use crate::data::builder::impl_macro_builder;
 use crate::data::constructor::impl_macro_required_args_constructor;
 use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
+use crate::web::configuration_properties::impl_macro_configuration_properties;
 use crate::web::idempotency::impl_macro_idempotency;
 use crate::web::pre_authorize::impl_macro_pre_authorize;
-use crate::web::properties::impl_macro_properties;
 
 use data::desensitized::impl_macro_desensitized;
 use proc_macro::TokenStream;
@@ -341,11 +341,39 @@ pub fn auto_configuration(attr: TokenStream, item: TokenStream) -> TokenStream {
     impl_macro_auto_configuration(attr, item_impl)
 }
 
-#[doc = ""]
+/// Declares the configuration properties of a struct.
+///
+/// The properties below the prefix are bound from the environment of the
+/// application, and the bound instance is registered as a singleton under the
+/// name of the struct. The properties are registered before the
+/// auto-configurations of the application run, so an auto-configuration that
+/// depends on them can resolve them.
+///
+/// The name of a field is the name of the property it is bound from, which the
+/// `#[key = "..."]` attribute of the field overrides. A field is bound from an
+/// environment variable as well, which is named after the property.
+///
+/// The struct has to derive `Clone`, `Default` and `Deserialize`. It is
+/// normally declared as a `#[singleton]` as well, which registers the type
+/// itself; the properties are registered whether or not it is. With `dynamic`,
+/// the properties that a key below the prefix groups are bound as well, and can
+/// be read with the generated `dynamic_properties` method.
+///
+/// # Example
+///
+/// ```ignore
+/// #[singleton(default, binds = [Self::into_properties])]
+/// #[configuration_properties(prefix = "next.data.redis", dynamic)]
+/// #[derive(Debug, Clone, Default, serde::Deserialize)]
+/// pub struct RedisProperties {
+///     host: Option<String>,
+///     port: Option<u16>,
+/// }
+/// ```
 #[proc_macro_attribute]
-pub fn properties(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn configuration_properties(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as ItemStruct);
-    impl_macro_properties(attr, item)
+    impl_macro_configuration_properties(attr, item)
 }
 
 #[doc = ""]
@@ -381,14 +409,23 @@ pub fn api_doc(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::api_doc::impl_macro_api_doc(args, input)
 }
 
-/// A procedural macro attribute for defining scheduled tasks.
+/// Declares a function as a task of the scheduler of the application.
 ///
-/// This attribute can be applied to a function to register it as a scheduled job
-/// with configurable timing behavior. It supports three scheduling modes:
+/// The function is registered while the application starts, without the
+/// application listing it, and it is persisted with its schedule, so that the
+/// state of the task (whether it is enabled, when it last ran) is kept by the
+/// repository of the application. See the `scheduling` module of `next-web` for
+/// the pieces the macro generates and for what the state is worth.
+///
+/// A task takes its dependencies as its parameters, which are resolved from the
+/// application context, so `fn cleanup(service: MyService)` is given the
+/// instance registered under the default name of `MyService`.
+///
+/// It supports three scheduling modes:
 ///
 /// - **Cron-based scheduling**: via the `cron` parameter (e.g., `"0 0 2 * * *"`).
 /// - **Fixed-rate execution**: via the `fixed_rate` parameter (executes repeatedly at fixed intervals).
-/// - **One-shot execution**: when `one_shot = true`, the task runs once after an optional `initial_delay`.
+/// - **One-shot execution**: when `one_shot` is set, the task runs once, after `initial_delay`.
 ///
 /// # Parameters
 ///
@@ -397,23 +434,32 @@ pub fn api_doc(args: TokenStream, input: TokenStream) -> TokenStream {
 /// - `fixed_rate`: Interval between executions (as a positive integer literal).
 ///   Mutually exclusive with `cron`.
 /// - `initial_delay`: Delay before the first execution (in units specified by `time_unit`).
+///   Only a `one_shot` task supports it.
 /// - `timezone`: IANA time zone ID (e.g., `"Asia/Shanghai"`, `"UTC"`).
 ///   If empty or omitted, the scheduler's default time zone is used.
 /// - `time_unit`: Time unit for `fixed_rate` and `initial_delay` (e.g., `"ms"`, `"s"`, `"m"`).
-///   Interpretation depends on the underlying scheduler.
-/// - `one_shot`: If `true`, the task runs exactly once (typically after `initial_delay`).
-///   In this mode, `cron` and `fixed_rate` are ignored.
+///   Milliseconds are the default, and the scheduler evaluates a schedule once
+///   per second at the most, so a shorter duration is raised to one second.
+/// - `one_shot`: If set, the task runs exactly once, after `initial_delay`.
+/// - `name`: The key the task is registered and persisted under. It defaults to
+///   the path of the function, and it is what keeps a persisted schedule of a
+///   task from being declared again when the function moves.
+///
+/// The function may return nothing, or a `Result` whose failure the scheduler
+/// logs while the task keeps its schedule.
 ///
 /// # Examples
 ///
-/// ```rust
-/// #[Scheduled(cron = "0 0 3 * * *", timezone = "UTC")]
+/// ```ignore
+/// use next_web::macros::scheduled;
+///
+/// #[scheduled(cron = "0 0 3 * * *", timezone = "UTC")]
 /// fn daily_cleanup() { /* ... */ }
 ///
-/// #[scheduled(fixed_rate = 30, time_unit = "s", initial_delay = 5)]
-/// fn heartbeat() { /* ... */ }
+/// #[scheduled(fixed_rate = 30, time_unit = "s", name = "heartbeat")]
+/// async fn heartbeat(cluster: Cluster) { /* ... */ }
 ///
-/// #[Scheduled(one_shot = true, initial_delay = 10, time_unit = "s")]
+/// #[scheduled(one_shot, initial_delay = 10, time_unit = "s")]
 /// fn delayed_init() { /* ... */ }
 /// ```
 #[proc_macro_attribute]

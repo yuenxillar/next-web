@@ -16,7 +16,6 @@ pub mod macros;
 pub mod messaging;
 pub mod metrics;
 pub mod mime_type;
-pub mod scheduler;
 pub mod server;
 pub mod store;
 pub mod traits;

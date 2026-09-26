@@ -42,97 +42,97 @@ tracing         = { workspace = true}
 enable-api-doc = ["next-web/enable-api-doc"]
 
 [[bin]]
-name = "test_ai"
-path = "test_ai.rs"
+name = "ai"
+path = "ai.rs"
 
 [[bin]]
-name = "test_api_doc"
-path = "test_api_doc.rs"
+name = "api_doc"
+path = "api_doc.rs"
 
 [[bin]]
-name = "test_application"
-path = "test_application.rs"
+name = "application"
+path = "application.rs"
 
 [[bin]]
-name = "test_application_event"
-path = "test_application_event.rs"
+name = "application_event"
+path = "application_event.rs"
 
 [[bin]]
-name = "test_application_lifecycle"
-path = "test_application_lifecycle.rs"
+name = "application_lifecycle"
+path = "application_lifecycle.rs"
 
 [[bin]]
-name = "test_auto_configuration"
-path = "test_auto_configuration.rs"
+name = "auto_configuration"
+path = "auto_configuration.rs"
 
 [[bin]]
-name = "test_data"
-path = "test_data.rs"
+name = "data"
+path = "data.rs"
 
 [[bin]]
-name = "test_database"
-path = "test_database.rs"
+name = "database"
+path = "database.rs"
 
 [[bin]]
-name = "test_decoder_and_vaild"
-path = "test_decoder_and_vaild.rs"
+name = "decoder_and_vaild"
+path = "decoder_and_vaild.rs"
 
 [[bin]]
-name = "test_desensitized"
-path = "test_desensitized.rs"
+name = "desensitized"
+path = "desensitized.rs"
 
 [[bin]]
-name = "test_i18n"
-path = "test_i18n.rs"
+name = "i18n"
+path = "i18n.rs"
 
 [[bin]]
-name = "test_mail"
-path = "test_mail.rs"
+name = "mail"
+path = "mail.rs"
 
 [[bin]]
-name = "test_mqtt"
-path = "test_mqtt.rs"
+name = "mqtt"
+path = "mqtt.rs"
 
 [[bin]]
-name = "test_pay"
-path = "test_pay.rs"
+name = "pay"
+path = "pay.rs"
 
 [[bin]]
-name = "test_properties"
-path = "test_properties.rs"
+name = "properties"
+path = "properties.rs"
 
 [[bin]]
-name = "test_redis"
-path = "test_redis.rs"
+name = "redis"
+path = "redis.rs"
 
 [[bin]]
-name = "test_retry"
-path = "test_retry.rs"
+name = "retry"
+path = "retry.rs"
 
 [[bin]]
-name = "test_scheduled"
-path = "test_scheduled.rs"
+name = "scheduled"
+path = "scheduled.rs"
 
 [[bin]]
-name = "test_security"
-path = "test_security.rs"
+name = "security"
+path = "security.rs"
 
 [[bin]]
-name = "test_singleton"
-path = "test_singleton.rs"
+name = "singleton"
+path = "singleton.rs"
 
 [[bin]]
-name = "test_state_machine"
-path = "test_state_machine.rs"
+name = "state_machine"
+path = "state_machine.rs"
 
 [[bin]]
-name = "test_stream"
-path = "test_stream.rs"
+name = "stream"
+path = "stream.rs"
 
 [[bin]]
-name = "test_ws"
-path = "test_ws.rs"
+name = "ws"
+path = "ws.rs"
 
 [[bin]]
-name = "test_xxl_job"
-path = "test_xxl_job.rs"
+name = "xxl_job"
+path = "xxl_job.rs"

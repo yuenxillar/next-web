@@ -7,15 +7,17 @@ use std::{error::Error, time::Duration};
 use next_web_context::support::{BundleLoader, ResourceBundleMessageSource};
 use next_web_context::util::Properties;
 use next_web_context::{
-    APPLICATION_ENVIRONMENT_SINGLETON_NAME, ApplicationContext, ApplicationContextExt, Locale,
-    MESSAGE_SOURCE_SINGLETON_NAME, MessageSource, RESOURCE_LOADER_SINGLETON_NAME,
+    ApplicationContext, ApplicationContextExt, MessageSource,
+    APPLICATION_ENVIRONMENT_SINGLETON_NAME, MESSAGE_SOURCE_SINGLETON_NAME,
+    RESOURCE_LOADER_SINGLETON_NAME,
 };
 use next_web_core::env::ConfigurableEnvironment;
 use next_web_core::{
-    Ordered, async_trait,
+    async_trait,
     io::support::PropertiesLoaderUtils,
     io::{BytesResource, Resource, ResourceLoader},
     traits::config::auto_configuration::AutoConfiguration,
+    Ordered,
 };
 
 #[cfg(feature = "embed-resources")]
@@ -68,14 +70,6 @@ impl AutoConfiguration for MessageSourceAutoConfiguration {
         let base_name = self.message_source_properties.base_name();
         if base_name.iter().any(|s| !s.is_empty()) {
             message_source.set_basenames(base_name);
-        }
-        if let Some(locale) = self.message_source_properties.default_local() {
-            let locale = Locale::for_language_tag(locale).map_err(|error| {
-                format!(
-                    "Invalid default locale [{locale}] configured for the message source: {error}"
-                )
-            })?;
-            message_source.set_default_locale(Some(locale));
         }
         message_source.set_fallback_to_system_locale(
             self.message_source_properties.fallback_to_system_locale(),

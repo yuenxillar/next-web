@@ -13,6 +13,7 @@ use axum::{
     Router,
 };
 
+use next_web_context::{ApplicationContextExt, APPLICATION_ARGUMENTS_SINGLETON_NAME};
 use next_web_core::{
     anys::any_value::AnyValue,
     constants::application_constants::APPLICATION_DEFAULT_PORT,
@@ -23,18 +24,20 @@ use next_web_core::{
     },
     io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup, StartupStep},
-    traits::service::background_service::BackgroundService,
+    traits::{
+        apply_router::ApplyRouter, config::auto_configuration::AutoConfiguration,
+        service::background_service::BackgroundService,
+    },
     util::indexmap::IndexMap,
 };
-use next_web_singletons::factory::{
-    config::SingletonRegistry, ListableSingletonFactory, SingletonFactory,
-};
+use next_web_singletons::factory::{config::SingletonRegistry, SingletonFactory};
 use reqwest::StatusCode;
 use tokio::sync::RwLock;
 use tracing::{enabled, Level};
 
 use crate::{
     application_banner_printer::PrintedBanner,
+    autoconfigure::web_auto_configuration::WebAutoConfiguration,
     autoregister::http_handler_autoregister::HttpHandlerAutoRegister,
     banner::BannerMode,
     configurer::http_method_handler_configurer::RouterContext,
@@ -60,7 +63,10 @@ use crate::web::server::TlsWebServer;
 /// The application shutdown hook, used to clean up resources on shutdown.
 pub static APPLICATION_SHUTDOWN_HOOK: OnceLock<ApplicationShutdownHook> = OnceLock::new();
 
+/// The result type for application operations.
 pub type ApplicationResult<T> = Result<T, Box<dyn Error>>;
+
+/// The application state, wrapped in an [`Arc`] and [`RwLock`] to allow shared access.
 pub type ApplicationState = Arc<RwLock<Box<dyn ConfigurableApplicationContext>>>;
 
 pub trait Application<E = ()>
@@ -193,8 +199,10 @@ where
             environment: None,
             initializers: vec![Box::new(ContextIdApplicationContextInitializer::default())],
             event_handlers: vec![
-                Box::new(LoggingEventHandler::default()),
+                // The logging properties are bound from the environment, so
+                // the config data is loaded before the logging is initialized.
                 Box::new(EnvironmentPostProcessorEventHandler::default()),
+                Box::new(LoggingEventHandler::default()),
             ],
             default_properties: None,
             additional_profiles: HashSet::new(),
@@ -234,7 +242,8 @@ where
                 &application_arguments,
             )?;
             self.refresh_context(context.as_mut())?;
-            self.after_refresh(context.as_mut(), &application_arguments);
+            self.after_refresh(context.as_mut(), &application_arguments)
+                .await?;
             let time_taken_to_started = startup.started();
             if self.properties.is_log_startup_info() {
                 StartupInfoLogger::new(
@@ -278,11 +287,23 @@ where
             .router(ctx.as_mut())
             .fallback(|| async { T::fallback() })
             // Prevent program panic caused by users not setting routes
-            .route("/_20250101", axum::routing::get(|| async { "a new year!" }))
+            .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
+        router = self.apply_routers(ctx.as_mut(), router)?;
+        router = self
+            .add_layers(router)
             .route_layer(axum::Extension::<ApplicationState>(Arc::new(RwLock::new(
                 ctx,
             ))));
-        router = self.add_layers(router);
+
+        if let Some(context_path) = environment
+            .get_property("next.server.context_path")
+            .as_ref()
+            .and_then(|s| normalize_context_path(s))
+        {
+            let new_router = Router::new();
+            router = new_router.nest(&context_path, router);
+            // info!("Nest context path: {}", context_path);
+        }
 
         // TLS is used when it is enabled for the environment, which requires
         // the crate to be built with its TLS support.
@@ -317,6 +338,26 @@ where
                     .max_age(std::time::Duration::from_secs(60) * 10),
             )
             .route_layer(tower_http::trace::TraceLayer::new_for_http())
+    }
+
+    /// Applies all routers registered in the application context to the router.
+    fn apply_routers(
+        &mut self,
+        ctx: &mut dyn ConfigurableApplicationContext,
+        mut router: Router,
+    ) -> Result<Router, Box<dyn Error>> {
+        let mut apply_routers = ctx.resolve_by_type::<Box<dyn ApplyRouter>>();
+        apply_routers.sort_by_key(|ar| ar.order());
+
+        router = router.merge(
+            apply_routers
+                .into_iter()
+                .map(|mut val| val.apply(&mut *ctx))
+                .filter(|val| val.has_routes())
+                .fold(axum::Router::new(), |acc, r| acc.merge(r)),
+        );
+
+        Ok(router)
     }
 
     fn prepare_environment(
@@ -378,9 +419,9 @@ where
         context
             .singleton_factory()?
             .registry_mut()
-            .register_singleton(
-                "nextWebApplicationArguments",
-                application_arguments.to_owned(),
+            .register_singleton::<Arc<dyn ApplicationArguments>, _>(
+                APPLICATION_ARGUMENTS_SINGLETON_NAME,
+                Arc::new(application_arguments.to_owned()),
             );
 
         self.send_event(|handlers| handlers.context_loaded(context));
@@ -570,11 +611,20 @@ where
     }
 
     /// Called after the context has been refreshed.
-    fn after_refresh(
-        &self,
-        _context: &mut dyn ConfigurableApplicationContext,
+    async fn after_refresh(
+        &mut self,
+        context: &mut dyn ConfigurableApplicationContext,
         _application_arguments: &dyn ApplicationArguments,
-    ) {
+    ) -> ApplicationResult<()> {
+        self.autoconfigure(context).await
+    }
+
+    /// Automatically configures the application context.
+    async fn autoconfigure(
+        &mut self,
+        context: &mut dyn ConfigurableApplicationContext,
+    ) -> ApplicationResult<()> {
+        WebAutoConfiguration.configure(context).await
     }
 
     async fn call_runners<'a>(
@@ -582,12 +632,10 @@ where
         context: &'a mut dyn ConfigurableApplicationContext,
         args: &'a dyn ApplicationArguments,
     ) -> ApplicationResult<()> {
-        let singleton_factory = context.singleton_factory()?;
-        let mut runners =
-            singleton_factory.get_singletons_mut_of_type::<Box<dyn ApplicationRunner>>();
+        let mut runners = context.resolve_by_type::<Box<dyn ApplicationRunner>>();
         runners.sort_by_key(|runner| runner.order());
 
-        for runner in runners {
+        for mut runner in runners.into_iter() {
             runner.run(args).await?;
         }
 
@@ -1153,6 +1201,31 @@ fn configure_command_line_property_source(sources: &mut MutablePropertySources, 
             command_line_properties(args),
         ))),
     }
+}
+
+/// Standardize the context path, remove all ASCII whitespace, fill in the opening slash, and remove the ending slash
+fn normalize_context_path(raw: &str) -> Option<String> {
+    let cleaned: String = raw.chars().filter(|c| !c.is_ascii_whitespace()).collect();
+
+    if cleaned.is_empty() {
+        return None;
+    }
+
+    let mut path = if cleaned.starts_with('/') {
+        cleaned
+    } else {
+        format!("/{cleaned}")
+    };
+
+    while path.len() > 1 && path.ends_with('/') {
+        path.pop();
+    }
+
+    if path == "/" {
+        return None;
+    }
+
+    Some(path)
 }
 
 #[cfg(test)]

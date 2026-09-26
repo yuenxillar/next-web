@@ -1,4 +1,4 @@
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
 /// Configuration properties for the message source.
 ///
@@ -8,13 +8,9 @@ use next_web_macros::{properties, singleton};
 ///
 /// The `#[singleton]` attribute registers this type as a singleton and
 /// converts it into properties via [`Self::into_properties`].
-#[singleton(default, binds = [Self::into_properties])]
-#[properties(prefix = "next.messages")]
+#[configuration_properties(prefix = "next.messages")]
 #[derive(Debug, Default, Clone, serde::Deserialize)]
 pub struct MessageSourceProperties {
-    /// The default locale used when no locale-specific bundle is available.
-    default_local: Option<String>,
-
     /// Resource bundle basenames, comma-separated.
     ///
     /// For example `"messages, errors, validation"`. When unset, the accessor
@@ -48,15 +44,10 @@ pub struct MessageSourceProperties {
     /// without arguments.
     ///
     /// Defaults to `false` when unset.
-    is_always_use_message_format: Option<bool>,
+    always_use_message_format: Option<bool>,
 }
 
 impl MessageSourceProperties {
-    /// Returns the configured default locale, if any.
-    pub fn default_local(&self) -> Option<&str> {
-        self.default_local.as_deref()
-    }
-
     /// Returns the resource bundle basenames as a list.
     ///
     /// The stored value is comma-separated; surrounding whitespace on the whole
@@ -66,7 +57,7 @@ impl MessageSourceProperties {
             .as_ref()
             .map(|s| s.trim_end())
             .map(|s| s.split(",").map(str::to_string).collect::<Vec<_>>())
-            .unwrap_or(vec!["messages".to_string()])
+            .unwrap_or(vec!["messages".to_owned()])
     }
 
     /// Returns whether to fall back to the system locale.
@@ -82,12 +73,24 @@ impl MessageSourceProperties {
         self.cache_duration
     }
 
-    /// Sets the default locale.
-    pub fn set_default_local<T>(&mut self, local: T)
-    where
-        T: Into<String>,
-    {
-        self.default_local = Some(local.into());
+    /// Returns the locale-independent resources containing common messages,
+    /// if any.
+    pub fn common_messages(&self) -> Option<&[String]> {
+        self.common_messages.as_deref()
+    }
+
+    /// Returns whether to use the message code as the default message.
+    ///
+    /// Defaults to `false` when unset.
+    pub fn is_use_code_as_default_message(&self) -> bool {
+        self.use_code_as_default_message.unwrap_or(false)
+    }
+
+    /// Returns whether to always apply the `MessageFormat` rules.
+    ///
+    /// Defaults to `false` when unset.
+    pub fn is_always_use_message_format(&self) -> bool {
+        self.always_use_message_format.unwrap_or(false)
     }
 
     /// Sets the resource bundle basenames.
@@ -117,13 +120,6 @@ impl MessageSourceProperties {
         self.use_code_as_default_message = Some(use_code_as_default_message);
     }
 
-    /// Returns whether to use the message code as the default message.
-    ///
-    /// Defaults to `false` when unset.
-    pub fn is_use_code_as_default_message(&self) -> bool {
-        self.use_code_as_default_message.unwrap_or(false)
-    }
-
     /// Sets the locale-independent resources containing common messages.
     pub fn set_common_messages<I>(&mut self, common_messages: I)
     where
@@ -133,21 +129,8 @@ impl MessageSourceProperties {
         self.common_messages = Some(common_messages.into_iter().map(Into::into).collect());
     }
 
-    /// Returns the locale-independent resources containing common messages,
-    /// if any.
-    pub fn common_messages(&self) -> Option<&[String]> {
-        self.common_messages.as_deref()
-    }
-
     /// Sets whether to always apply the `MessageFormat` rules.
     pub fn set_always_use_message_format(&mut self, always_use_message_format: bool) {
-        self.is_always_use_message_format = Some(always_use_message_format);
-    }
-
-    /// Returns whether to always apply the `MessageFormat` rules.
-    ///
-    /// Defaults to `false` when unset.
-    pub fn is_always_use_message_format(&self) -> bool {
-        self.is_always_use_message_format.unwrap_or(false)
+        self.always_use_message_format = Some(always_use_message_format);
     }
 }

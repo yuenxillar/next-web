@@ -24,7 +24,7 @@ impl<'a> StartupInfoLogger<'a> {
     pub fn log_starting(&self) {
         info!("{}", self.get_starting_message());
         info!("{}", self.get_running_message());
-        self.print_runtime_message()
+        self.print_runtime_message();
     }
 
     /// Logs the "started" message.

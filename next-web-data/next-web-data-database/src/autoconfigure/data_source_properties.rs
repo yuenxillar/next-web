@@ -1,8 +1,7 @@
-use next_web_macros::{properties, singleton};
+use next_web_macros::configuration_properties;
 
 /// Base for configuration of a data source.
-#[singleton(default, binds=[Self::into_properties])]
-#[properties(prefix = "next.datasource", dynamic)]
+#[configuration_properties(prefix = "next.datasource", dynamic)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct DataSourceProperties {
     /// Datasource name
