@@ -1,7 +1,11 @@
 use bytes::Bytes;
 use futures_core::stream::BoxStream;
 use futures_util::StreamExt;
-use next_web_core::{client::rest_client::RestClient, error::BoxError};
+use next_web_core::error::BoxError;
+use reqwest::{
+    header::{HeaderMap, HeaderValue, CONTENT_TYPE},
+    Client,
+};
 use serde::{Deserialize, Deserializer};
 use std::time::Duration;
 use tracing::debug;
@@ -15,20 +19,24 @@ const DONE: [u8; 12] = [100, 97, 116, 97, 58, 32, 91, 68, 79, 78, 69, 93];
 #[derive(Clone)]
 pub struct DeepSeekApi {
     pub(crate) api_key: Option<Box<str>>,
-
     pub(crate) chat_model: ChatModel,
-
-    pub(crate) client: RestClient,
+    pub(crate) client: Client,
 }
 
 impl DeepSeekApi {
+    const BASE_URL: &'static str = "https://api.deepseek.com";
+
     pub fn new(api_key: impl Into<Box<str>>, chat_model: ChatModel) -> Self {
-        let client = RestClient::builder()
-            .base_url("https://api.deepseek.com")
-            .default_headers([("Content-Type", "application/json")])
+        let headers = HeaderMap::from_iter([(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/json; charset=utf-8"),
+        )]);
+        let client = Client::builder()
+            .default_headers(headers)
             .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(60))
-            .build();
+            .build()
+            .expect("Failed to create DeepSeek API client with API key");
         let api_key = api_key.into();
         Self {
             api_key: Some(api_key),
@@ -38,12 +46,16 @@ impl DeepSeekApi {
     }
 
     pub fn without_api_key(chat_model: ChatModel) -> Self {
-        let client = RestClient::builder()
-            .base_url("https://api.deepseek.com")
-            .default_headers([("Content-Type", "application/json")])
+        let headers = HeaderMap::from_iter([(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/json; charset=utf-8"),
+        )]);
+        let client = Client::builder()
+            .default_headers(headers)
             .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(60))
-            .build();
+            .build()
+            .expect("Failed to create DeepSeek API client without API key");
         Self {
             api_key: None,
             chat_model,
@@ -62,8 +74,7 @@ impl DeepSeekApi {
         let body = serde_json::to_string(req)?;
         let resp = self
             .client
-            .post("")
-            .await
+            .post(Self::BASE_URL)
             .bearer_auth(api_key)
             .body(body)
             .send()

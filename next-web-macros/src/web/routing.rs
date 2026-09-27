@@ -360,7 +360,7 @@ fn generate_block(
                                                     pub use ::next_web::context::ApplicationContextExt;
 
                                                     let #original_variable =
-                                                        match ::next_web::extract::find_singleton::find::<#arg>( #variable, stringify!(#single_name).to_owned()).await {
+                                                        match ::next_web::extract::find_singleton::find::<#arg>(& #variable, stringify!(#single_name).to_owned()).await {
                                                             Some(value) => value,
                                                             None => return (::next_web::http::StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response(),
                                                         };
@@ -416,7 +416,7 @@ fn generate_block(
                         if is_single {
                             let arg: syn::Type = parse_quote!(::next_web::ApplicationState);
                             let path: syn::Path =
-                                parse_quote!(::next_web::extract::Extension<& #arg>);
+                                parse_quote!(::next_web::extract::Extension< #arg>);
                             type_path.path = path;
                         }
                     }

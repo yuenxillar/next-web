@@ -24,7 +24,7 @@ pub const ON_LOCATION_NOT_FOUND_PROPERTY: &str = ON_NOT_FOUND_PROPERTY;
 /// environment before the application context is refreshed.
 ///
 /// The locations that are imported are taken from the `next.config.import`,
-/// `next.config.additional-location` and `next.config.location` properties of
+/// `next.config.additional_location` and `next.config.location` properties of
 /// the environment. When `next.config.location` is not set, the default search
 /// locations are used.
 #[derive(Default)]

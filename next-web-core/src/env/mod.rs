@@ -8,6 +8,7 @@ mod configurable_environment;
 mod configurable_property_resolver;
 mod env_error;
 mod environment;
+mod environment_variable_resolver;
 mod map_property_source;
 mod mutable_property_sources;
 mod parse_error;
@@ -37,6 +38,7 @@ pub use configurable_environment::ConfigurableEnvironment;
 pub use configurable_property_resolver::ConfigurablePropertyResolver;
 pub use env_error::EnvError;
 pub use environment::Environment;
+pub(crate) use environment_variable_resolver::EnvironmentVariableResolver;
 pub use map_property_source::MapPropertySource;
 pub use mutable_property_sources::{
     BoxedPropertySource, MutablePropertySources, PropertySourceValue,

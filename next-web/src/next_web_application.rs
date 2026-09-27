@@ -57,9 +57,9 @@ use crate::{
     DefaultApplicationContextFactory, ErrorHandler, Event, NextWebErrorReporter, StartupInfoLogger,
 };
 
+use crate::web::server::autoconfigure::ServerProperties;
 #[cfg(feature = "tls-rustls")]
 use crate::web::server::TlsWebServer;
-use crate::web::server::autoconfigure::ServerProperties;
 
 /// The application shutdown hook, used to clean up resources on shutdown.
 pub static APPLICATION_SHUTDOWN_HOOK: OnceLock<ApplicationShutdownHook> = OnceLock::new();

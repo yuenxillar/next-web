@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use axum::{body::Bytes, BoxError};
-use futures::{Stream, StreamExt};
+use futures::{stream, Stream, StreamExt};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
@@ -14,16 +14,17 @@ const CHANNEL_SIZE: usize = 16;
 /// The limiter keeps the average throughput near `target_rate`, while a small
 /// deterministic jitter avoids a perfectly uniform pattern.
 pub fn throttle_byte_stream<S>(
-    source: S,
+    mut source: S,
     target_rate: usize,
 ) -> impl Stream<Item = Result<Bytes, BoxError>>
 where
-    S: Stream<Item = Result<Bytes, BoxError>> + Send + 'static,
+    S: Stream<Item = Result<Bytes, BoxError>>,
+    S: Unpin,
+    S: Send + 'static,
 {
-    let (tx, mut rx) = mpsc::channel(CHANNEL_SIZE);
+    let (tx, rx) = mpsc::channel(CHANNEL_SIZE);
 
     tokio::spawn(async move {
-        let mut source = Box::pin(source);
         let mut limiter = StreamRateLimiter::new(target_rate);
 
         while let Some(item) = source.next().await {
@@ -53,11 +54,9 @@ where
         }
     });
 
-    async_stream::stream! {
-        while let Some(item) = rx.recv().await {
-            yield item;
-        }
-    }
+    stream::unfold(rx, |mut rx| async move {
+        rx.recv().await.map(|item| (item, rx))
+    })
 }
 
 struct StreamRateLimiter {

@@ -110,8 +110,8 @@ impl<'a> HashSlot<'a> {
                 let donor_node = {
                     let donor = node_slot_count
                         .iter()
-                        .filter(|(_, &count)| count > target_slots)
-                        .max_by_key(|(_, &count)| count)
+                        .filter(|(_, count)| **count > target_slots)
+                        .max_by_key(|(_, count)| **count)
                         .map(|(node, _)| node.clone());
                     donor
                 };

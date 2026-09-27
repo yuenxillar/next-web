@@ -8,6 +8,7 @@ use next_web::{
     extract::find_singleton::FindSingleton,
     macros::bind::{get_mapping, singleton},
 };
+use next_web_core::env::ConfigurableEnvironment;
 
 #[derive(Default)]
 struct TestApplication;
@@ -16,7 +17,14 @@ impl Application for TestApplication {}
 
 #[get_mapping(path = "/hello")]
 async fn hello() -> &'static str {
-    "Hello, World!"
+    "Hello World!"
+}
+
+#[get_mapping(path = "/env")]
+async fn env(
+    #[find] application_environment: FindSingleton<Arc<dyn ConfigurableEnvironment>>,
+) -> String {
+    application_environment.get_property_or_default("key", "unknown")
 }
 
 #[get_mapping(path = "/change")]

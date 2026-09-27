@@ -31,7 +31,7 @@ use crate::env::DefaultPropertiesPropertySource;
 pub(crate) const LOCATION_PROPERTY: &str = "next.config.location";
 
 /// Property used to provide additional locations to import.
-pub(crate) const ADDITIONAL_LOCATION_PROPERTY: &str = "next.config.additional-location";
+pub(crate) const ADDITIONAL_LOCATION_PROPERTY: &str = "next.config.additional_location";
 
 /// Property used to determine what action to take when a location that must
 /// exist cannot be found.
@@ -95,7 +95,7 @@ impl From<InvalidConfigDataPropertyError> for ConfigDataEnvironmentError {
 /// config data.
 ///
 /// The initial locations are taken from the `next.config.import`,
-/// `next.config.additional-location` and `next.config.location` properties of
+/// `next.config.additional_location` and `next.config.location` properties of
 /// the environment, and default to the default search locations when
 /// `next.config.location` is not set.
 ///
@@ -792,7 +792,7 @@ mod tests {
         );
         let resource_loader = resource_loader(&root);
         let mut environment = MockEnvironment::default()
-            .with_property_source("test", &[("next.config.additional-location", "/extra/")]);
+            .with_property_source("test", &[("next.config.additional_location", "/extra/")]);
 
         process(&mut environment, &resource_loader).unwrap();
 
@@ -898,7 +898,7 @@ mod tests {
         let mut environment = MockEnvironment::default().with_property_source(
             "test",
             &[
-                ("next.config.additional-location", "/missing/"),
+                ("next.config.additional_location", "/missing/"),
                 ("next.config.on-not-found", "ignore"),
             ],
         );

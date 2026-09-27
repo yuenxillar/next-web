@@ -20,6 +20,6 @@ pub use http_properties::{
 };
 pub use server_properties::{
     ServerProperties, ServerPropertiesError, ServerPropertiesErrorKind, DEFAULT_ADDRESS,
-    DEFAULT_PORT, GLOBAL_SERVER_PROPERTIES, SERVER_PROPERTIES_PREFIX,
+    GLOBAL_SERVER_PROPERTIES, SERVER_PROPERTIES_PREFIX,
 };
 pub use ssl_properties::SslProperties;

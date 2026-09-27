@@ -2,7 +2,7 @@
 
 use serde::de::{self, DeserializeSeed, MapAccess, Visitor};
 
-use crate::env::ConfigurableEnvironment;
+use crate::env::{ConfigurableEnvironment, EnvironmentVariableResolver};
 
 use super::property_index::{candidate_names, PropertyIndex};
 use super::property_tree::{PropertyNode, PropertyTreeDeserializer};
@@ -21,7 +21,7 @@ macro_rules! deserialize_value_or_tree {
             where
                 V: Visitor<'de>,
             {
-                match self.value() {
+                match self.value()? {
                     Some(value) => de::Deserializer::$method(
                         PropertyValueDeserializer::new(value),
                         $($argument,)*
@@ -73,9 +73,32 @@ impl<'a> PropertyDeserializer<'a> {
 
     /// Returns the value of this key, when the environment resolves one.
     ///
-    /// The placeholders of the value are resolved by the environment.
-    fn value(&self) -> Option<String> {
-        self.environment.get_property(&self.key)
+    /// The placeholders of the value are resolved by the environment. An
+    /// environment variable placeholder that declares no default value and
+    /// whose variable is not set is reported as an error, so that a required
+    /// environment variable is never silently bound as the text of its
+    /// placeholder.
+    fn value(&self) -> Result<Option<String>, BindError> {
+        let Some(value) = self.environment.get_property(&self.key) else {
+            return Ok(None);
+        };
+
+        if let Some(unresolved) = EnvironmentVariableResolver::unresolved_in(&value)
+            .into_iter()
+            .next()
+        {
+            return Err(BindError::new(format!(
+                "could not resolve environment variable '{}' for property '{}': {} \
+                 (placeholder: {}). Declare a default value as {}",
+                unresolved.name(),
+                self.key,
+                unresolved.reason(),
+                unresolved.placeholder(),
+                unresolved.default_example()
+            )));
+        }
+
+        Ok(Some(value))
     }
 
     /// Returns the tree of the properties below this key.
@@ -142,7 +165,7 @@ impl<'de, 'a> de::Deserializer<'de> for PropertyDeserializer<'a> {
     {
         // A key that holds neither a value nor properties below it does not
         // describe a value of the target, so the target is not set.
-        if self.value().is_some() || self.index.has_descendants(&self.key) {
+        if self.value()?.is_some() || self.index.has_descendants(&self.key) {
             visitor.visit_some(self)
         } else {
             visitor.visit_none()
@@ -185,7 +208,7 @@ impl<'de, 'a> de::Deserializer<'de> for PropertyDeserializer<'a> {
         // field for holds nothing, in which case the fields that are required
         // are reported as missing by the target itself.
         if bound.is_empty() {
-            return match self.value() {
+            return match self.value()? {
                 Some(value) => de::Deserializer::deserialize_struct(
                     PropertyValueDeserializer::new(value),
                     name,
@@ -448,6 +471,36 @@ mod tests {
         .unwrap();
 
         assert_eq!(messages.base_name.as_deref(), Some("demo"));
+    }
+
+    #[test]
+    fn resolves_the_default_value_of_an_environment_variable_placeholder() {
+        let messages = bind::<Messages>(
+            &[&[(
+                "next.messages.base_name",
+                "#{NEXT_WEB_TEST_MISSING_BASE_NAME:messages}",
+            )]],
+            "next.messages",
+        )
+        .unwrap();
+
+        assert_eq!(messages.base_name.as_deref(), Some("messages"));
+    }
+
+    #[test]
+    fn reports_an_environment_variable_placeholder_without_a_default_value() {
+        let error = bind::<Messages>(
+            &[&[(
+                "next.messages.base_name",
+                "#{NEXT_WEB_TEST_MISSING_BASE_NAME}",
+            )]],
+            "next.messages",
+        )
+        .unwrap_err();
+
+        assert!(error.message().contains("NEXT_WEB_TEST_MISSING_BASE_NAME"));
+        assert!(error.message().contains("next.messages.base_name"));
+        assert!(error.to_string().contains("failed to bind `base_name`"));
     }
 
     #[test]

@@ -1,6 +1,5 @@
 pub mod anys;
 pub mod autoregister;
-pub mod client;
 pub mod common;
 pub mod constants;
 pub mod context;
@@ -16,7 +15,6 @@ pub mod messaging;
 pub mod metrics;
 pub mod mime_type;
 pub mod server;
-pub mod store;
 pub mod traits;
 pub mod util;
 pub mod web;

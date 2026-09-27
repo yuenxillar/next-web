@@ -19,6 +19,7 @@ mod hash_slot;
 mod inventory_helper;
 mod json_object;
 mod local_date_time;
+mod rest_client;
 mod stop_watch;
 mod thread;
 
@@ -27,5 +28,6 @@ pub use hash_slot::HashSlot;
 pub use inventory_helper::InventoryHelper;
 pub use json_object::JsonObject;
 pub use local_date_time::LocalDateTime;
+pub use rest_client::RestClient;
 pub use stop_watch::StopWatch;
 pub use thread::ThreadUtil;

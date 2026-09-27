@@ -2,7 +2,7 @@
 
 use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 
-use crate::env::ConfigurableEnvironment;
+use crate::env::{ConfigurableEnvironment, EnvironmentVariableResolver};
 use crate::util::indexmap::IndexMap;
 
 use super::property_index::PropertyIndex;
@@ -23,7 +23,7 @@ macro_rules! deserialize_tree {
             {
                 match self.node {
                     PropertyNode::Value(value) => de::Deserializer::$method(
-                        PropertyValueDeserializer::new(value),
+                        strict_value(value)?,
                         $($argument,)*
                         visitor,
                     ),
@@ -35,6 +35,26 @@ macro_rules! deserialize_tree {
             }
         )*
     };
+}
+
+/// Returns the deserializer of a property value, or an error when the value
+/// holds an environment variable placeholder that declares no default value.
+fn strict_value(value: String) -> Result<PropertyValueDeserializer, BindError> {
+    if let Some(unresolved) = EnvironmentVariableResolver::unresolved_in(&value)
+        .into_iter()
+        .next()
+    {
+        return Err(BindError::new(format!(
+            "could not resolve environment variable '{}': {} (placeholder: {}). \
+             Declare a default value as {}",
+            unresolved.name(),
+            unresolved.reason(),
+            unresolved.placeholder(),
+            unresolved.default_example()
+        )));
+    }
+
+    Ok(PropertyValueDeserializer::new(value))
 }
 
 /// A property of an environment, and the properties below it.
@@ -445,6 +465,28 @@ mod tests {
                 base_name: "messages".to_owned(),
                 common: vec!["first".to_owned(), "second".to_owned()],
             }
+        );
+    }
+
+    #[test]
+    fn reports_an_environment_variable_placeholder_of_a_map_value() {
+        let node = tree(
+            &[(
+                "next.messages.base_name",
+                "#{NEXT_WEB_TEST_MISSING_MAP_BASE_NAME}",
+            )],
+            "next.messages",
+        );
+
+        let error = std::collections::HashMap::<String, String>::deserialize(
+            PropertyTreeDeserializer::new(node),
+        )
+        .unwrap_err();
+
+        assert!(
+            error
+                .message()
+                .contains("NEXT_WEB_TEST_MISSING_MAP_BASE_NAME")
         );
     }
 

@@ -4,6 +4,7 @@ use crate::error::IllegalError;
 ///
 /// A property resolver maps string keys to string values, optionally
 /// converting values to a requested target type and resolving `${...}`
+/// configuration property placeholders and `#{...}` environment variable
 /// placeholders embedded in text.
 ///
 /// See [`Environment`](crate::env::Environment) and
@@ -71,12 +72,13 @@ pub trait PropertyResolver {
     // /// [`ConversionError`] if the value cannot be converted to `T`.
     // fn get_required_property_as<T>(&self, key: &str) -> Result<T, IllegalError>;
 
-    /// Resolve `${...}` placeholders in the given text, replacing them with
-    /// corresponding property values as resolved by
-    /// [`get_property`](Self::get_property).
+    /// Resolve `${...}` configuration property placeholders and `#{...}`
+    /// environment variable placeholders in the given text.
     ///
-    /// Unresolvable placeholders with no default value are ignored and passed
-    /// through unchanged.
+    /// A property placeholder is resolved by [`get_property`](Self::get_property).
+    /// An environment variable placeholder is resolved against the environment
+    /// variables of the process. Unresolvable placeholders with no default
+    /// value are ignored and passed through unchanged.
     ///
     /// # Panics
     ///
@@ -84,12 +86,11 @@ pub trait PropertyResolver {
     /// represent. Callers should not pass `none`.
     fn resolve_placeholders(&self, text: &str) -> String;
 
-    /// Resolve `${...}` placeholders in the given text, replacing them with
-    /// corresponding property values as resolved by
-    /// [`get_property`](Self::get_property).
+    /// Resolve `${...}` configuration property placeholders and `#{...}`
+    /// environment variable placeholders in the given text.
     ///
     /// # Errors
     ///
-    /// Returns [`PlaceholderError`] if any placeholder cannot be resolved.
+    /// Returns a placeholder error if any placeholder cannot be resolved.
     fn resolve_required_placeholders(&self, text: &str) -> Result<String, IllegalError>;
 }

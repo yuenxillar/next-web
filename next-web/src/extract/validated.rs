@@ -7,7 +7,6 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::de::DeserializeOwned;
-use thiserror::Error;
 use validator::Validate;
 
 use super::data::is_json;
@@ -37,16 +36,49 @@ where
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum ValidationError {
-    #[error(transparent)]
-    ValidationError(#[from] validator::ValidationErrors),
+    ValidationError(validator::ValidationErrors),
+    FormRejection(FormRejection),
+    JsonRejection(JsonRejection),
+}
 
-    #[error(transparent)]
-    FormRejection(#[from] FormRejection),
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValidationError::ValidationError(e) => write!(f, "{e}"),
+            ValidationError::FormRejection(e) => write!(f, "{e}"),
+            ValidationError::JsonRejection(e) => write!(f, "{e}"),
+        }
+    }
+}
 
-    #[error(transparent)]
-    JsonRejection(#[from] JsonRejection),
+impl std::error::Error for ValidationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ValidationError::ValidationError(e) => Some(e),
+            ValidationError::FormRejection(e) => Some(e),
+            ValidationError::JsonRejection(e) => Some(e),
+        }
+    }
+}
+
+impl From<validator::ValidationErrors> for ValidationError {
+    fn from(err: validator::ValidationErrors) -> Self {
+        ValidationError::ValidationError(err)
+    }
+}
+
+impl From<FormRejection> for ValidationError {
+    fn from(err: FormRejection) -> Self {
+        ValidationError::FormRejection(err)
+    }
+}
+
+impl From<JsonRejection> for ValidationError {
+    fn from(err: JsonRejection) -> Self {
+        ValidationError::JsonRejection(err)
+    }
 }
 
 impl IntoResponse for ValidationError {

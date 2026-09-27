@@ -25,6 +25,13 @@ impl<'a> StartupInfoLogger<'a> {
         info!("{}", self.get_starting_message());
         info!("{}", self.get_running_message());
         self.print_runtime_message();
+        info!(
+            "Axum started on port {} (http) with context path '{}'",
+            self.environment
+                .get_property_or_default("next.server.port", "11000"),
+            self.environment
+                .get_property_or_default("next.server.context_path", "/")
+        );
     }
 
     /// Logs the "started" message.

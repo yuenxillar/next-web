@@ -6,9 +6,9 @@ use std::sync::OnceLock;
 use tracing::debug;
 
 use crate::env::{
-    ConfigurableEnvironment, ConfigurablePropertyResolver, Environment, MapPropertySource,
-    MutablePropertySources, PlaceholdersResolver, Profiles, PropertyLookup, PropertyResolver,
-    PropertySourceValue, PropertySourcesLookup,
+    ConfigurableEnvironment, ConfigurablePropertyResolver, Environment,
+    EnvironmentVariableResolver, MapPropertySource, MutablePropertySources, PlaceholdersResolver,
+    Profiles, PropertyLookup, PropertyResolver, PropertySourceValue, PropertySourcesLookup,
 };
 use crate::error::IllegalError;
 use crate::util::indexmap::IndexMap;
@@ -204,6 +204,20 @@ impl BaseEnvironment {
     fn value_lookup(&self) -> impl Fn(&str) -> Option<String> + '_ {
         move |key| self.lookup.lookup(&self.property_sources, key)
     }
+
+    /// Resolves the configuration property placeholders and the environment
+    /// variable placeholders of the given value.
+    ///
+    /// An environment variable placeholder that cannot be resolved is kept as
+    /// it is written. The methods that require a value to be resolved report
+    /// such a placeholder as an error.
+    fn resolve_value(&self, value: &str) -> String {
+        let (value, _) = self
+            .placeholders_resolver
+            .resolve(value, &self.value_lookup());
+
+        EnvironmentVariableResolver::resolve(&value).0
+    }
 }
 
 impl Default for BaseEnvironment {
@@ -225,10 +239,7 @@ impl PropertyResolver for BaseEnvironment {
     /// to report such a placeholder as an error.
     fn get_property(&self, key: &str) -> Option<String> {
         let value = self.lookup.lookup(&self.property_sources, key)?;
-        let (value, _) = self
-            .placeholders_resolver
-            .resolve(&value, &self.value_lookup());
-        Some(value)
+        Some(self.resolve_value(&value))
     }
 
     fn get_property_or_default(&self, key: &str, default_value: &str) -> String {
@@ -240,27 +251,53 @@ impl PropertyResolver for BaseEnvironment {
     ///
     /// Returns [`IllegalError`] when the key cannot be resolved.
     fn get_required_property(&self, key: &str) -> Result<String, IllegalError> {
-        self.get_property(key)
-            .ok_or_else(|| IllegalError::IllegalStateError(format!("Property '{key}' is required")))
+        let value = self.get_property(key).ok_or_else(|| {
+            IllegalError::IllegalStateError(format!("Property '{key}' is required"))
+        })?;
+
+        if let Some(unresolved) = EnvironmentVariableResolver::unresolved_in(&value)
+            .into_iter()
+            .next()
+        {
+            return Err(IllegalError::InvalidParameterError(format!(
+                "Could not resolve environment variable '{}' of property '{key}': {} \
+                 (placeholder: {})",
+                unresolved.name(),
+                unresolved.reason(),
+                unresolved.placeholder()
+            )));
+        }
+
+        Ok(value)
     }
 
     fn resolve_placeholders(&self, text: &str) -> String {
-        self.placeholders_resolver
-            .resolve(text, &self.value_lookup())
-            .0
+        self.resolve_value(text)
     }
 
     /// # Errors
     ///
     /// Returns [`IllegalError`] when a placeholder cannot be resolved.
     fn resolve_required_placeholders(&self, text: &str) -> Result<String, IllegalError> {
-        let (value, resolved) = self
+        let (value, placeholders_resolved) = self
             .placeholders_resolver
             .resolve(text, &self.value_lookup());
+        let (value, unresolved) = EnvironmentVariableResolver::resolve(&value);
 
-        if resolved {
+        if let Some(unresolved) = unresolved.first() {
+            return Err(IllegalError::InvalidParameterError(format!(
+                "Could not resolve environment variable '{}' in \"{text}\": {} \
+                 (placeholder: {})",
+                unresolved.name(),
+                unresolved.reason(),
+                unresolved.placeholder()
+            )));
+        }
+
+        if placeholders_resolved {
             return Ok(value);
         }
+
         Err(IllegalError::InvalidParameterError(format!(
             "Could not resolve placeholder in \"{text}\""
         )))
@@ -747,6 +784,57 @@ mod tests {
         assert!(environment
             .resolve_required_placeholders("${next.application.missing}")
             .is_err());
+    }
+
+    #[test]
+    fn resolves_the_environment_variable_placeholders_of_its_properties_and_of_text() {
+        let environment = environment(&[
+            (
+                "next.application.name",
+                "#{NEXT_WEB_TEST_MISSING_APPLICATION_NAME:demo}",
+            ),
+            (
+                "next.application.version",
+                "#{NEXT_WEB_TEST_MISSING_APPLICATION_VERSION}",
+            ),
+        ]);
+
+        assert_eq!(
+            environment.get_property("next.application.name"),
+            Some("demo".to_owned())
+        );
+        assert_eq!(
+            environment.resolve_placeholders("#{NEXT_WEB_TEST_MISSING_APPLICATION_NAME:demo}"),
+            "demo"
+        );
+        assert_eq!(
+            environment.get_property("next.application.version"),
+            Some("#{NEXT_WEB_TEST_MISSING_APPLICATION_VERSION}".to_owned())
+        );
+        assert!(
+            environment
+                .resolve_required_placeholders("#{NEXT_WEB_TEST_MISSING_APPLICATION_VERSION}")
+                .is_err()
+        );
+        assert!(
+            environment
+                .get_required_property("next.application.version")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn resolves_an_environment_variable_of_the_process() {
+        let Ok(path) = std::env::var("PATH") else {
+            return;
+        };
+        let value = "#{PATH:fallback}".to_owned();
+        let environment = environment(&[("next.application.path", value.as_str())]);
+
+        assert_eq!(
+            environment.get_property("next.application.path"),
+            Some(path)
+        );
     }
 
     #[test]

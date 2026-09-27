@@ -6,18 +6,20 @@
 //! auto-configuration of a starter, in the order of `Ordered`, and only when its
 //! conditions hold.
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use next_web::{
+    ConfigurableApplicationContext,
     autoconfigure::web_auto_configuration::WebAutoConfiguration,
     context::{ApplicationContextExt, DefaultApplicationContext},
     core::{
-        async_trait, traits::config::auto_configuration::AutoConfiguration, ApplicationContext,
+        ApplicationContext, async_trait,
+        env::{ConfigurableEnvironment, MapPropertySource, StandardEnvironment},
+        traits::config::auto_configuration::AutoConfiguration,
     },
     macros::{autoconfigure::auto_configuration, bind::singleton},
-    ConfigurableApplicationContext,
 };
-use next_web_core::Ordered;
+use next_web_core::{Ordered, util::indexmap::IndexMap};
 
 /// The configurations of the test that were applied, in the order they were.
 static APPLIED: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
@@ -145,7 +147,20 @@ impl DisabledConfiguration {
 
 /// Starts a context and applies the auto-configurations of the application.
 async fn start_application() -> DefaultApplicationContext {
+    // The condition of the configuration class reads
+    // `AUTO_CONFIGURATION_PROPERTY` from the environment. The property is
+    // installed directly, so the test does not have to change the environment
+    // of the process.
+    let mut environment = StandardEnvironment::new();
+    environment
+        .property_sources()
+        .add_first(Box::new(MapPropertySource::new(
+            "test".to_owned(),
+            IndexMap::from([("AUTO_CONFIGURATION_PROPERTY".to_owned(), "true".to_owned())]),
+        )));
+
     let mut context = DefaultApplicationContext::default();
+    context.set_environment(Arc::new(environment));
     context.refresh().expect("the context refreshes");
 
     // The condition of the configuration class of the test reads this
@@ -167,7 +182,6 @@ async fn the_configurations_of_the_application_are_applied_in_their_order() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-    std::env::set_var("AUTO_CONFIGURATION_PROPERTY", "true");
     APPLIED.lock().unwrap().clear();
 
     let context = start_application().await;
@@ -216,7 +230,6 @@ async fn a_configuration_class_is_an_auto_configuration_of_the_application() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-    std::env::set_var("AUTO_CONFIGURATION_PROPERTY", "true");
     APPLIED.lock().unwrap().clear();
 
     let mut context = start_application().await;

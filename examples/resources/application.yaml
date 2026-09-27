@@ -1,15 +1,13 @@
-server_addr: "192.168.1.18"
-
 next:
   server:
     context_path: "/app"
-    port: 8080
+    port: 11000
     address: 127.0.0.1
   application:
     name: "NextWebApplication"
 
   messages:
-    local: "zh_CN"
+    base_name: "/messages"
 
   data:
     redis:
@@ -37,5 +35,3 @@ next:
 
   feature:
     enabled: true
-windows:
-  computername: ${COMPUTERNAME}

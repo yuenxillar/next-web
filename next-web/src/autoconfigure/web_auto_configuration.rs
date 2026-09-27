@@ -70,17 +70,23 @@ impl WebAutoConfiguration {
     ///
     /// * `ctx` - The context the properties were registered in.
     fn publish_server_properties(&self, ctx: &mut dyn ApplicationContext) {
-        let Some(properties) = ctx
+        let server_properties = ctx
             .get_singleton_option_with_default_name::<ServerProperties>()
             .cloned()
-        else {
-            return;
-        };
+            .or_else(|| {
+                ctx.get_singleton_option_with_name::<Arc<dyn ConfigurableEnvironment>>(
+                    APPLICATION_ENVIRONMENT_SINGLETON_NAME,
+                )
+                .and_then(|env| ServerProperties::try_from(env.as_ref()).ok())
+            });
 
-        if let Err(error) = properties.install_global() {
+        if let Err(error) = server_properties
+            .map(ServerProperties::install_global)
+            .transpose()
+        {
             tracing::debug!(
-                error = %error,
-                "the properties of the web server are installed already"
+                    error = %error,
+                    "the properties of the web server are installed already"
             );
         }
     }

@@ -243,6 +243,7 @@ pub struct OwnedTags {
     entries: Vec<Tag>,
 }
 
+#[allow(dead_code)]
 impl OwnedTags {
     /// Creates an empty [`OwnedTags`].
     pub fn new() -> Self {

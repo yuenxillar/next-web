@@ -51,9 +51,6 @@ use super::{HttpProperties, SslProperties};
 /// the attribute, see [`ServerProperties::from_environment`].
 pub const SERVER_PROPERTIES_PREFIX: &str = "next.server";
 
-/// The port the server binds when the environment configures no port.
-pub const DEFAULT_PORT: u16 = APPLICATION_DEFAULT_PORT;
-
 /// The address the server binds when the environment configures
 pub const DEFAULT_ADDRESS: &str = "0.0.0.0";
 
@@ -322,7 +319,7 @@ impl ServerProperties {
 impl Default for ServerProperties {
     fn default() -> Self {
         Self {
-            port: DEFAULT_PORT,
+            port: APPLICATION_DEFAULT_PORT,
             address: None,
             context_path: None,
             http: HttpProperties::default(),
@@ -488,7 +485,7 @@ mod tests {
     fn defaults_describe_the_server_of_an_application_that_configures_nothing() {
         let properties = ServerProperties::default();
 
-        assert_eq!(properties.port(), DEFAULT_PORT);
+        assert_eq!(properties.port(), APPLICATION_DEFAULT_PORT);
         assert_eq!(properties.address(), None);
         assert_eq!(properties.bind_address(), DEFAULT_ADDRESS);
         assert_eq!(properties.context_path(), None);
@@ -497,7 +494,7 @@ mod tests {
         assert!(!properties.ssl().is_enabled());
         assert_eq!(
             properties.socket_addr().map(|address| address.to_string()),
-            Ok(format!("{DEFAULT_ADDRESS}:{DEFAULT_PORT}"))
+            Ok(format!("{DEFAULT_ADDRESS}:{APPLICATION_DEFAULT_PORT}"))
         );
     }
 

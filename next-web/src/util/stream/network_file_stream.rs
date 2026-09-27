@@ -6,7 +6,8 @@ use axum::body::Bytes;
 use axum::http::{HeaderMap, HeaderName};
 use axum::BoxError;
 use axum::{body::Body, response::Response};
-use futures::StreamExt;
+use futures::stream::BoxStream;
+use futures::{stream, StreamExt, TryStreamExt};
 use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
 use reqwest::{header, Client};
 use reqwest::{Method, StatusCode};
@@ -49,62 +50,67 @@ impl IntoRespnoseStream for NetworkFileStream {
         let mut headers = HeaderMap::new();
         if let Some(header_map) = self.headers {
             header_map.into_iter().for_each(|(key, value)| {
-                headers.insert(HeaderName::from_str(&key).unwrap(), value.parse().unwrap());
+                if let (Ok(name), Ok(value)) = (HeaderName::from_str(&key), value.parse()) {
+                    headers.insert(name, value);
+                }
             });
         }
 
-        let source = async_stream::stream! {
-            let resp = match GLOBAL_CLIENT
-                .request(
-                    Method::from_bytes(self.method.as_bytes()).unwrap_or(Method::GET),
-                    self.url,
-                )
+        // Parse the method once, up front, so the async block captures owned data.
+        let method = Method::from_bytes(self.method.as_bytes()).unwrap_or(Method::GET);
+        let request_url = self.url;
+
+        // Build the stream without `async_stream`.
+        //
+        // `stream::once` produces a single future that resolves to
+        // `Result<inner_stream, BoxError>`. `try_flatten_stream` then:
+        //   * yields the error once if the outer future fails, or
+        //   * flattens the inner `bytes_stream` and forwards its items.
+        let source: BoxStream<'static, Result<Bytes, BoxError>> = stream::once(async move {
+            let resp = GLOBAL_CLIENT
+                .request(method, request_url)
                 .headers(headers)
                 .send()
                 .await
                 .map_err(|error| {
                     error!("Error sending request: {}", error);
-                    error
-                }) {
-                Ok(resp) => resp,
-                Err(error) => {
-                    yield Err::<Bytes, BoxError>(Box::new(error));
-                    return;
-                }
-            };
+                    Box::new(error) as BoxError
+                })?;
 
             if !resp.status().is_success() {
-                yield Err::<Bytes, BoxError>(Box::new(std::io::Error::other(format!(
+                return Err(Box::new(std::io::Error::other(format!(
                     "Http status error: {}",
                     resp.status()
-                ))));
-                return;
+                ))) as BoxError);
             }
 
-            let mut stream = resp.bytes_stream();
-            while let Some(item) = stream.next().await {
-                match item {
-                    Ok(chunk) => yield Ok::<Bytes, BoxError>(chunk),
-                    Err(error) => {
-                        yield Err::<Bytes, BoxError>(Box::new(error));
-                        return;
-                    }
-                }
-            }
-        };
+            Ok(resp
+                .bytes_stream()
+                .map_err(|error| Box::new(error) as BoxError)
+                .boxed())
+        })
+        .try_flatten()
+        .boxed();
 
         let header_name = format!(
             "attachment; filename=\"{}\"",
             url.split('/')
+                .filter(|s| !s.is_empty())
                 .last()
                 .unwrap_or(LocalDateTime::now().as_str())
         );
+
+        let body = if target_rate == 0 {
+            Body::from_stream(source)
+        } else {
+            Body::from_stream(throttle_byte_stream(source, target_rate))
+        };
 
         Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/octet-stream")
             .header(header::CONTENT_DISPOSITION, header_name)
-            .body(Body::from_stream(throttle_byte_stream(source, target_rate)))
+            .body(body)
             .unwrap()
     }
 }
