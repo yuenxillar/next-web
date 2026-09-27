@@ -10,7 +10,9 @@
 use std::sync::Arc;
 
 use next_web_context::{ApplicationContext, ApplicationEvent, ApplicationListener};
-use next_web_core::{env::ConfigurableEnvironment, metrics::ApplicationStartup};
+use next_web_core::{
+    env::ConfigurableEnvironment, io::ResourceLoader, metrics::ApplicationStartup,
+};
 use next_web_singletons::factory::{
     support::DefaultListableSingletonFactory, ListableSingletonFactory,
 };
@@ -113,6 +115,16 @@ where
     ///
     /// * `environment` - The new environment.
     fn set_environment(&mut self, environment: Arc<dyn ConfigurableEnvironment>);
+
+    /// Sets the [`ResourceLoader`] used by this context.
+    ///
+    /// The default implementation does nothing; contexts that load resources
+    /// override it.
+    ///
+    /// # Arguments
+    ///
+    /// * `resource_loader` - The loader the context registers and uses.
+    fn set_resource_loader(&mut self, _resource_loader: Arc<dyn ResourceLoader>) {}
 
     /// Returns the [`ConfigurableEnvironment`] for this application context in
     /// configurable form, allowing for further customization.

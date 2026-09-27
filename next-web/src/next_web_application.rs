@@ -375,7 +375,7 @@ where
             .into_iter()
             .map(ToOwned::to_owned)
             .collect::<Vec<_>>();
-        let resource_loader = self.resource_loader.clone();
+        let resource_loader = self.effective_resource_loader();
         self.send_event(|handlers| {
             handlers.environment_prepared(
                 environment.as_mut(),
@@ -406,6 +406,11 @@ where
         application_arguments: &DefaultApplicationArguments,
     ) -> ApplicationResult<()> {
         context.set_environment(environment);
+
+        let resource_loader = self
+            .effective_resource_loader()
+            .unwrap_or_else(crate::resources::default_resource_loader);
+        context.set_resource_loader(resource_loader);
 
         context
             .singleton_factory()?
@@ -526,10 +531,7 @@ where
         // framework falls back to is the shared one rather than a local of this
         // call. It is also the loader the config data reads its locations from,
         // so the resources directory is read once for both.
-        let resource_loader: &'a dyn ResourceLoader = match self.resource_loader.as_deref() {
-            Some(loader) => loader,
-            None => DefaultResourceLoader::shared(),
-        };
+        let resource_loader: &'a dyn ResourceLoader = self.resource_loader_ref();
 
         let banner_printer = ApplicationBannerPrinter::new(resource_loader, self.banner.as_deref());
         if self.properties.get_banner_mode() == BannerMode::Log {
@@ -541,6 +543,47 @@ where
                 .print_to_writer(environment, &mut std::io::stdout())
                 .expect("Failed to print banner to stdout"),
         )
+    }
+
+    #[cfg(feature = "embed-resources")]
+    fn embedded_resource_loader() -> Option<Arc<dyn ResourceLoader>> {
+        crate::resources::embedded_resource_loader()
+    }
+
+    #[cfg(not(feature = "embed-resources"))]
+    fn embedded_resource_loader() -> Option<Arc<dyn ResourceLoader>> {
+        None
+    }
+
+    #[cfg(feature = "embed-resources")]
+    fn embedded_resource_loader_ref() -> Option<&'static dyn ResourceLoader> {
+        crate::resources::embedded_resource_loader_ref()
+    }
+
+    #[cfg(not(feature = "embed-resources"))]
+    fn embedded_resource_loader_ref() -> Option<&'static dyn ResourceLoader> {
+        None
+    }
+
+    /// Returns the resource loader an explicitly configured loader takes
+    /// precedence over.
+    fn resource_loader_ref(&self) -> &dyn ResourceLoader {
+        if let Some(loader) = self.resource_loader.as_deref() {
+            return loader;
+        }
+
+        if let Some(loader) = Self::embedded_resource_loader_ref() {
+            return loader;
+        }
+
+        DefaultResourceLoader::shared()
+    }
+
+    /// Returns the resource loader the configuration data is read with.
+    fn effective_resource_loader(&self) -> Option<Arc<dyn ResourceLoader>> {
+        self.resource_loader
+            .clone()
+            .or_else(Self::embedded_resource_loader)
     }
 
     /// Strategy method used to create the ApplicationContext.

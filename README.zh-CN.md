@@ -145,6 +145,7 @@ next:
 | `enable-state-machine` | 启用状态机 |
 | `enable-thread-pool` | 启用线程池能力 |
 | `embed-resources` | 将资源嵌入二进制 |
+| `embed-resources-debug` | 调试构建也嵌入资源 |
 | `digester` | 启用摘要算法相关能力 |
 | `decrypt-properties` | 启用配置解密（默认启用） |
 | `trace-log` | 追踪特殊的日志 |

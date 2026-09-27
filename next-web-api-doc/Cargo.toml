@@ -2,7 +2,7 @@
 name = "next-web-api-doc"
 version = "0.1.0"
 edition = "2021"
-description = "Api Doc"
+description = "OpenAPI and Swagger documentation support for Next Web"
 authors.workspace = true
 license.workspace = true
 repository.workspace = true

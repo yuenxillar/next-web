@@ -2,9 +2,10 @@
 name = "next-web-retry"
 version = "0.1.0"
 edition = "2024"
-description = "A retry template"
+description = "Retry templates and policies for Next Web applications"
 license.workspace = true
 readme = "README.md"
+repository.workspace = true
 
 [dependencies]
 next-web-core   = { workspace = true }

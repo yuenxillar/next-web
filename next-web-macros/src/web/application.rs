@@ -5,7 +5,7 @@ use proc_macro2::Span;
 use quote::quote;
 use syn::ItemFn;
 #[cfg(feature = "embed-resources")]
-use syn::{spanned::Spanned, Block, Error, LitStr};
+use syn::{spanned::Spanned, Error, LitStr};
 
 use crate::{util::logic::Logic, web::attrs::application_attr::ApplicationAttr};
 
@@ -26,7 +26,7 @@ pub fn impl_macro_application(
         };
 
         #[cfg(feature = "embed-resources")]
-        add_resources(&mut item_fn.block)?;
+        add_resources(&mut item_fn)?;
 
         #[cfg(feature = "embed-resources")]
         let resources = resources
@@ -35,45 +35,10 @@ pub fn impl_macro_application(
 
         #[cfg(feature = "embed-resources")]
         let token_stream = quote! {
-
             #[derive(::next_web::embed::Embed, Debug)]
             #[crate_path = "::next_web::embed"]
             #[folder = #resources]
-            #[include = "*.html"]
-            #[include = "*.json"]
-            #[include = "*.xml"]
-            #[include = "*.yaml"]
-            #[include = "*.yml"]
-            #[include = "*.properties"]
-            #[include = "*.toml"]
-            #[include = "*.txt"]
             pub(crate) struct EmbedResourceLoader;
-
-            impl ::next_web::core::io::ResourceLoader for EmbedResourceLoader {
-
-                fn load(&mut self) -> ::std::io::Result<()> {
-                    core::result::Result::Ok(())
-                }
-
-                fn get_resource(&self, location: &str) -> ::std::io::Result<&dyn ::next_web::core::io::Resource> {
-                    Self::get(location).map(|fs| ::next_web::core::io::BytesResource::new(location, fs.data))
-                }
-
-                fn get_directory(&self, dir: &str) -> ::std::vec::Vec<::std::borrow::Cow<'static, str>> {
-                    let mut s = self.iter();
-                    s.retain(|s| s.starts_with(dir));
-
-                    s
-                }
-
-                fn paths(&self) -> ::std::vec::Vec<::std::borrow::Cow<'static, str>> {
-                    Self::iter().collect()
-                }
-
-                fn exists(&self, location: &str) -> bool {
-                    Self::get(location).is_some()
-                }
-            }
 
             #item_fn
         };
@@ -87,9 +52,24 @@ pub fn impl_macro_application(
 }
 
 #[cfg(feature = "embed-resources")]
-fn add_resources(block: &mut Box<Block>) -> Result<(), Error> {
+fn add_resources(item_fn: &mut ItemFn) -> Result<(), Error> {
     use syn::{Expr, Stmt};
 
+    let install = syn::parse_quote! {
+        ::next_web::resources::install_embedded_resources::<EmbedResourceLoader>();
+    };
+
+    // The attribute is used above `#[tokio::main]` in this case, so the
+    // function still is the async function the user wrote.
+    if item_fn.sig.asyncness.is_some() {
+        item_fn.block.stmts.insert(0, install);
+        return Ok(());
+    }
+
+    // `#[tokio::main]` was applied first: it turned the async function into a
+    // synchronous wrapper whose body starts with `let body = async move {...};`.
+    // The install statement is inserted at the start of that async block.
+    let block = &mut item_fn.block;
     if block.stmts.is_empty() {
         return Err(Error::new(
             block.span(),
@@ -113,13 +93,7 @@ fn add_resources(block: &mut Box<Block>) -> Result<(), Error> {
         _ => return Err(Error::new(expr.span(), "")),
     };
 
-    let _stmt = syn::parse_quote! {
-        let _ = ::next_web::context::application_resources::RESOURCE_LOADER.set(
-            ::std::sync::Arc::new(_ApplicationResources {})
-        );
-
-    };
-    _async_block.stmts.insert(0, _stmt);
+    _async_block.stmts.insert(0, install);
 
     Ok(())
 }

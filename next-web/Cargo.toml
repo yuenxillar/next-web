@@ -114,6 +114,7 @@ enable-thread-pool      = []
 enable-open-api         = ["next-web-api-doc", "utoipa-swagger-ui", "next-web-macros/api-doc"]
 
 embed-resources         = ["next-web-macros/embed-resources", "next-web-core/embed-resources", "dep:rust-embed"]
+embed-resources-debug   = ["embed-resources", "rust-embed/debug-embed"]
 
 
 digester                = ["dep:md5", "dep:sha1", "dep:sha2"]

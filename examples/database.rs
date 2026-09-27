@@ -16,7 +16,7 @@ async fn req_version(
     FindSingleton(service): FindSingleton<DatabaseService>,
 ) -> impl axum::response::IntoResponse {
     let version: String = service
-        .query_decode("SELECT VERSION();", vec![])
+        .exec_decode("SELECT VERSION();", vec![])
         .await
         .unwrap_or("unknown version".to_string());
     version

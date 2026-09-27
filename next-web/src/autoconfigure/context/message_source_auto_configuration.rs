@@ -20,8 +20,6 @@ use next_web_core::{
     Ordered,
 };
 
-#[cfg(feature = "embed-resources")]
-use next_web_core::context::application_resources::RESOURCE_LOADER;
 use next_web_macros::singleton;
 
 use crate::autoconfigure::condition::{ConditionMessage, NextWebCondition};
@@ -40,27 +38,9 @@ pub struct MessageSourceAutoConfiguration {
 #[async_trait]
 impl AutoConfiguration for MessageSourceAutoConfiguration {
     async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
-        #[cfg(feature = "embed-resources")]
-        let bundle_loader: Arc<dyn BundleLoader> = match RESOURCE_LOADER.get().map(Clone::clone) {
-            Some(loader) => Arc::new(EmbeddedBundleLoader(loader)),
-            None => {
-                return Err("Please add the macro #[next_application] to the main function".into());
-            }
-        };
-
-        #[cfg(not(feature = "embed-resources"))]
-        let bundle_loader: Arc<dyn BundleLoader> = {
-            let resource_loader = ctx
-                .get_singleton_option_with_name::<Arc<dyn ResourceLoader>>(
-                    RESOURCE_LOADER_SINGLETON_NAME,
-                )
-                .map(Clone::clone)
-                .ok_or(format!(
-                    "No ResourceLoader found: {RESOURCE_LOADER_SINGLETON_NAME}"
-                ))?;
-
-            Arc::new(ResourceLoaderBundleLoader(resource_loader))
-        };
+        let resource_loader = Self::resource_loader(ctx)?;
+        let bundle_loader: Arc<dyn BundleLoader> =
+            Arc::new(ResourceLoaderBundleLoader(resource_loader));
 
         let mut message_source = ResourceBundleMessageSource::default();
         // The message source reads its bundles with the same loader the common
@@ -118,6 +98,41 @@ impl Ordered for MessageSourceAutoConfiguration {
 }
 
 impl MessageSourceAutoConfiguration {
+    #[cfg(feature = "embed-resources")]
+    fn embedded_resource_loader() -> Option<Arc<dyn ResourceLoader>> {
+        crate::resources::embedded_resource_loader()
+    }
+
+    #[cfg(not(feature = "embed-resources"))]
+    fn embedded_resource_loader() -> Option<Arc<dyn ResourceLoader>> {
+        None
+    }
+
+    /// Returns the loader the message bundles are read with.
+    ///
+    /// The loader of the application context wins, which is where an
+    /// application configures its resource loader explicitly. An embedded
+    /// loader is the fallback for a context that does not register one of its
+    /// own.
+    fn resource_loader(ctx: &dyn ApplicationContext) -> Result<Arc<dyn ResourceLoader>, String> {
+        if let Some(loader) = ctx
+            .get_singleton_option_with_name::<Arc<dyn ResourceLoader>>(
+                RESOURCE_LOADER_SINGLETON_NAME,
+            )
+            .map(Clone::clone)
+        {
+            return Ok(loader);
+        }
+
+        if let Some(loader) = Self::embedded_resource_loader() {
+            return Ok(loader);
+        }
+
+        Err(format!(
+            "No ResourceLoader found: {RESOURCE_LOADER_SINGLETON_NAME}"
+        ))
+    }
+
     pub fn into_auto_configuration(self: Self) -> Box<dyn AutoConfiguration> {
         Box::new(self)
     }
@@ -186,18 +201,6 @@ impl BundleLoader for ResourceLoaderBundleLoader {
 
         let resource = self.0.get_resource(location)?;
         Ok(Some(resource.get_content()?.into_owned()))
-    }
-}
-
-/// Adapts the resource loader of the embedded resources to the loader the
-/// message source reads its bundles with.
-#[cfg(feature = "embed-resources")]
-struct EmbeddedBundleLoader(Arc<dyn next_web_core::context::application_resources::ResourceLoader>);
-
-#[cfg(feature = "embed-resources")]
-impl BundleLoader for EmbeddedBundleLoader {
-    fn load(&self, location: &str) -> io::Result<Option<Vec<u8>>> {
-        Ok(self.0.load(location).map(Cow::into_owned))
     }
 }
 

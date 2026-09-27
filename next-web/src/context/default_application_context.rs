@@ -60,7 +60,7 @@ use next_web_context::{
 use next_web_core::{
     env::ConfigurableEnvironment,
     error::BoxError,
-    io::{DefaultResourceLoader, ResourceLoader},
+    io::ResourceLoader,
     metrics::{ApplicationStartup, DefaultApplicationStartup},
 };
 use next_web_singletons::factory::{
@@ -505,7 +505,7 @@ impl DefaultApplicationContext {
         // they hold.
         let resource_loader: Arc<dyn ResourceLoader> = match self.resource_loader.as_ref() {
             Some(resource_loader) => Arc::clone(resource_loader),
-            None => DefaultResourceLoader::shared_arc(),
+            None => crate::resources::default_resource_loader(),
         };
 
         self.insert_singleton_with_name::<Arc<dyn ResourceLoader>>(
@@ -546,6 +546,10 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
 
     fn set_environment(&mut self, environment: Arc<dyn ConfigurableEnvironment>) {
         self.environment = environment;
+    }
+
+    fn set_resource_loader(&mut self, resource_loader: Arc<dyn ResourceLoader>) {
+        self.resource_loader = Some(resource_loader);
     }
 
     fn environment(&self) -> &dyn ConfigurableEnvironment {

@@ -1,10 +1,12 @@
 [package]
 name = "next-web-state-machine"
 version = "0.1.0"
+description = "State machine modeling and runtime support for Next Web applications"
 rust-version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 next-web-core   = { workspace = true }

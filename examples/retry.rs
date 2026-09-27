@@ -6,7 +6,6 @@ use next_web::retry::retry_callback::with_fn;
 use next_web::retry::retry_operations::RetryOperations;
 use next_web::retry::support::retry_template::RetryTemplate;
 use next_web::util::LocalDateTime;
-use next_web_core::anys::any_value::AnyValue;
 
 #[allow(unused)]
 #[derive(Debug)]

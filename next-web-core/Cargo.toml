@@ -1,9 +1,10 @@
 [package]
 name = "next-web-core"
-version = "0.1.5"
+version = "0.1.6"
 edition.workspace = true
 description = "Core library for the Next Web framework, providing essential web server and middleware abstractions."
 license.workspace = true
+repository.workspace = true
 
 [lib]
 path = "src/lib.rs"

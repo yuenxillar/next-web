@@ -146,6 +146,7 @@ The project is organized as a workspace, keeping the framework itself separate f
 | `enable-state-machine` | Enables the state machine |
 | `enable-thread-pool` | Enables thread pool support |
 | `embed-resources` | Embeds resources into the binary |
+| `embed-resources-debug` | Embeds resources in debug builds too |
 | `digester` | Enables digest algorithm support |
 | `decrypt-properties` | Enables configuration decryption (enabled by default) |
 | `trace-log` | Track special logs |

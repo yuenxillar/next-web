@@ -1,9 +1,10 @@
 [package]
 name = "next-web-macros"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
-description = "Provide a series of commonly used macros"
+description = "Procedural macros for routing, dependency injection, configuration, scheduling, retry, and validation in Next Web"
 license.workspace = true
+repository.workspace = true
 
 [lib]
 proc-macro = true

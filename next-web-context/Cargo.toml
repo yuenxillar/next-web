@@ -1,10 +1,13 @@
 [package]
 name = "next-web-context"
+description = "Application context, dependency injection, event, and message-source layer for Next Web"
 edition.workspace = true
 version.workspace = true
 authors.workspace = true
 keywords.workspace = true
 license.workspace = true
+readme = "README.md"
+repository.workspace = true
 
 
 [dependencies]
