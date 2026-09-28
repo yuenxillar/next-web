@@ -1,7 +1,7 @@
 use crate::{
-    cors::CorsConfiguration,
     error::BoxError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    web::cors::CorsConfiguration,
 };
 
 pub trait CorsProcessor

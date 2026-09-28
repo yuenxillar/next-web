@@ -17,12 +17,22 @@ use syn::{Expr, ExprPath, LitStr};
 ///   `bool`, and the configuration is skipped when one of them returns
 ///   `false`, which is the counterpart of the `#[provider(conditional = ...)]`
 ///   attribute of the methods.
+/// * `before` - The names of the configurations this one is applied before. A
+///   configuration is named after its type, so `before = ["RedisAutoConfiguration"]`
+///   applies the configuration before the auto-configuration of the Redis
+///   starter even when the order it declares is the higher one. A name no
+///   configuration of the application provides is ignored, so a configuration
+///   may name one an application does not use.
+/// * `after` - The names of the configurations this one is applied after, which
+///   is the counterpart of `before`.
 #[derive(FromAttr)]
 #[attribute(idents = [_none])]
 pub(crate) struct AutoConfigurationAttr {
     pub name: Option<LitStr>,
     pub order: Option<Expr>,
     pub conditional: Vec<ExprPath>,
+    pub before: Vec<LitStr>,
+    pub after: Vec<LitStr>,
 }
 
 /// The attributes of a provider of an auto-configuration.

@@ -7,6 +7,7 @@ pub mod support;
 pub mod util;
 
 mod application_context;
+mod application_context_async_ext;
 mod application_context_ext;
 mod application_event;
 mod application_event_publisher;
@@ -16,12 +17,17 @@ mod message_source;
 mod message_source_resolvable;
 mod no_such_message_error;
 
+#[cfg(test)]
+mod test_support;
+
 pub use application_context::{
     APPLICATION_ARGUMENTS_SINGLETON_NAME, APPLICATION_ENVIRONMENT_SINGLETON_NAME,
-    APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME, ApplicationContext, InstanceClone,
-    MESSAGE_SOURCE_SINGLETON_NAME, RESOURCE_LOADER_SINGLETON_NAME, default_singleton_name,
+    APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME, APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME,
+    ApplicationContext, InstanceClone, MESSAGE_SOURCE_SINGLETON_NAME,
+    RESOURCE_LOADER_SINGLETON_NAME,
 };
-pub use application_context_ext::ApplicationContextExt;
+pub use application_context_async_ext::ApplicationContextAsyncExt;
+pub use application_context_ext::{ApplicationContextExt, DynSingleton};
 pub use application_event::{ApplicationEvent, EventAttributes};
 pub use application_event_publisher::ApplicationEventPublisher;
 pub use application_listener::ApplicationListener;

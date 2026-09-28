@@ -341,7 +341,8 @@ pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// configuration class itself is an
 /// [`AutoConfiguration`](next_web_core::traits::config::auto_configuration::AutoConfiguration),
 /// so the framework applies it together with the auto-configurations of the
-/// starters, in the order of [`Ordered`](next_web_core::Ordered).
+/// starters, in the order of [`Ordered`](next_web_core::Ordered), which the
+/// `before` and `after` names a configuration declares refine.
 ///
 /// # Arguments
 ///
@@ -351,6 +352,14 @@ pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///   under. Each names a function that takes `&dyn ApplicationContext` and
 ///   returns a `bool`, and the configuration is skipped when one of them
 ///   returns `false`.
+/// - `before = ["...", ...]` - The names of the configurations this one is
+///   applied before. A configuration is named after its type, so
+///   `before = ["RedisAutoConfiguration"]` applies the configuration before the
+///   auto-configuration of the Redis starter, even when the order it declares is
+///   the higher one. A name no configuration of the application provides is
+///   ignored.
+/// - `after = ["...", ...]` - The names of the configurations this one is
+///   applied after, which is the counterpart of `before`.
 /// - `name = "..."` - The name the configuration is registered under. It
 ///   defaults to the name of the type the macro generates.
 ///
@@ -363,6 +372,15 @@ pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// - `#[autowired(name = "...", default)]` of a parameter resolves the
 ///   parameter from the context by name, and falls back to `Default::default()`
 ///   when the name is not registered.
+/// - A parameter declared as a reference, `&T` or `&mut T`, borrows the
+///   instance the context holds instead of resolving a copy of it, so the
+///   provider sees the instance the other providers see. A method can take any
+///   number of `&T` parameters, or a single `&mut T` one, but a `&mut T`
+///   parameter cannot be combined with another reference parameter, because the
+///   context lends its instances while it is borrowed. `#[autowired(default)]`
+///   is only supported on a parameter the context hands out by value, because
+///   the fallback would be a temporary value rather than an instance of the
+///   context.
 /// - `#[conditional_on_property(name = "...", having_value = "...")]` creates
 ///   the instance only when the property holds the given value.
 ///
@@ -375,7 +393,11 @@ pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```ignore
 /// use next_web::macros::autoconfigure::auto_configuration;
 ///
-/// #[auto_configuration(order = 200, conditional = [Self::feature_enabled])]
+/// #[auto_configuration(
+///     order = 200,
+///     after = ["RedisAutoConfiguration"],
+///     conditional = [Self::feature_enabled]
+/// )]
 /// impl MyConfiguration {
 ///     #[provider(name = "myClient", order = 10)]
 ///     fn my_client(#[autowired(name = "myProperties")] properties: MyProperties) -> Client {

@@ -242,7 +242,7 @@ where
                 environment.clone(),
                 &application_arguments,
             )?;
-            self.refresh_context(context.as_mut())?;
+            self.refresh_context(context.as_mut()).await?;
             self.after_refresh(context.as_mut(), &application_arguments)
                 .await?;
             let time_taken_to_started = startup.started();
@@ -434,12 +434,17 @@ where
         Ok(())
     }
 
-    fn refresh_context(
+    async fn refresh_context(
         &self,
         application_context: &mut dyn ConfigurableApplicationContext,
     ) -> ApplicationResult<()> {
-        // Refresh the underlying ApplicationContext.
-        application_context.refresh().map_err(Into::into)
+        // Refresh the underlying ApplicationContext. The application waits for
+        // the instances of the providers that are created asynchronously, which
+        // is what the asynchronous refresh does.
+        application_context
+            .refresh_async()
+            .await
+            .map_err(Into::into)
     }
 
     fn send_event<'a, F>(&'a mut self, handler_action: F)

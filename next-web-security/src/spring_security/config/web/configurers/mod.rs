@@ -4,6 +4,7 @@ mod base_authentication_filter_configurer;
 mod base_http_configurer;
 mod cors_configurer;
 mod csrf_configurer;
+mod default_login_page_configurer;
 mod error_handling_configurer;
 mod expression_url_authorization_configurer;
 mod form_login_configurer;
@@ -41,6 +42,7 @@ pub use base_authentication_filter_configurer::{
 pub use base_http_configurer::BaseHttpConfigurer;
 pub use cors_configurer::CorsConfigurer;
 pub use csrf_configurer::CsrfConfigurer;
+pub use default_login_page_configurer::DefaultLoginPageConfigurer;
 pub use error_handling_configurer::ErrorHandlingConfigurer;
 pub use form_login_configurer::FormLoginConfigurer;
 pub use headers_configurer::HeadersConfigurer;

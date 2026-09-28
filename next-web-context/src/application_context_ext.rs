@@ -13,15 +13,156 @@
 //!     let _ = context.get_singleton_option::<u32>();
 //! }
 //! ```
+//!
+//! The accessors are generic over a sized type, so an instance of a dynamic
+//! trait is registered as `Arc<dyn Trait>` or as `Box<dyn Trait>`. The methods
+//! whose name holds `dyn_singleton` register and look such an instance up under
+//! the name derived from the trait object, because the default name of the
+//! pointer type itself is not a name a singleton can hold. [`DynSingleton`] is
+//! what makes code generic over the pointer type work with the trait object it
+//! points at.
 
 use std::any::{Any, TypeId};
 use std::borrow::Cow;
 use std::sync::Arc;
 
 use next_web_singletons::factory::support::Key;
+use next_web_singletons::util::SingletonUtil;
 
 use crate::ApplicationContext;
-use crate::application_context::{InstanceClone, default_singleton_name};
+use crate::application_context::InstanceClone;
+
+/// A singleton a context stores behind a pointer to a trait object.
+///
+/// The type safe accessors of [`ApplicationContextExt`] are generic over a
+/// sized type, because a context identifies an instance by the [`TypeId`] of
+/// its type and hands it out by downcasting it. A trait object such as
+/// `dyn UserDetails` is unsized and cannot be the type parameter of an
+/// accessor, so a context stores an instance of a dynamic trait behind a
+/// pointer: as `Arc<dyn UserDetails>` or as `Box<dyn UserDetails>`. The pointer,
+/// and not the trait object, is the type a context keys the instance by, which
+/// is why the dynamic accessors of [`ApplicationContextExt`] take the pointer
+/// type as their type parameter.
+///
+/// `DynSingleton` is the seam between the two worlds: it hands out the unsized
+/// target of the pointer, which is the trait object the callers work with. Code
+/// that is generic over the pointer can accept an `Arc` and a `Box` alike and
+/// still reach the trait object:
+///
+/// ```
+/// use std::sync::Arc;
+///
+/// use next_web_context::{ApplicationContext, ApplicationContextExt, DynSingleton};
+///
+/// trait UserDetails: Send + Sync {
+///     fn is_enabled(&self) -> bool;
+/// }
+///
+/// struct User;
+///
+/// impl UserDetails for User {
+///     fn is_enabled(&self) -> bool {
+///         true
+///     }
+/// }
+///
+/// /// Accepts `Arc<dyn UserDetails>` and `Box<dyn UserDetails>` alike.
+/// fn is_enabled<P>(user_details: P) -> bool
+/// where
+///     P: DynSingleton,
+///     P::Target: UserDetails,
+/// {
+///     user_details.target().is_enabled()
+/// }
+///
+/// fn configure(context: &mut dyn ApplicationContext) {
+///     // The instance is registered under the name of the trait object.
+///     context.insert_dyn_singleton_with_default_name::<Arc<dyn UserDetails>>(Arc::new(User));
+///
+///     // The accessor peels the pointer, so the instance is a trait object.
+///     let user_details: &dyn UserDetails =
+///         context.get_dyn_singleton_with_default_name::<Arc<dyn UserDetails>>();
+///     assert!(user_details.is_enabled());
+///
+///     let shared: Arc<dyn UserDetails> = Arc::new(User);
+///     let boxed: Box<dyn UserDetails> = Box::new(User);
+///
+///     assert!(is_enabled(shared));
+///     assert!(is_enabled(boxed));
+/// }
+/// ```
+///
+/// # Provided implementations
+///
+/// * `Arc<T>` - borrows the instance that is already shared,
+/// * `Box<T>` - owns the instance, which [`Self::into_target_arc`] moves into an
+///   `Arc` without copying it.
+///
+/// Those are the two pointers the framework registers an instance of a dynamic
+/// trait in. Another pointer type can hand out its target the same way by
+/// implementing the trait as well.
+pub trait DynSingleton {
+    /// The unsized target of the pointer, for example `dyn UserDetails`.
+    type Target: ?Sized + 'static;
+
+    /// Borrows the target of the pointer.
+    fn target(&self) -> &Self::Target;
+
+    /// Moves the target into an [`Arc`], which is the pointer the framework
+    /// hands the instances of a dynamic trait out with.
+    ///
+    /// An instance that lives in an `Arc` already is shared as it is, so the
+    /// `Arc` is returned unchanged. Moving a `Box` into an `Arc` keeps the
+    /// allocation of the box instead of copying the instance into a new one.
+    fn into_target_arc(self) -> Arc<Self::Target>
+    where
+        Self: Sized;
+
+    /// Returns the name a provider registers a singleton of this pointer type
+    /// under by default.
+    ///
+    /// The name is the one [`SingletonUtil::default_singleton_name`] derives
+    /// from the *target* of the pointer, so `Arc<dyn UserDetails>` and
+    /// `Box<dyn UserDetails>` both provide `userDetails`. The name cannot be
+    /// derived from the pointer type, because its type name
+    /// (`alloc::sync::Arc<dyn ...::UserDetails>`) holds characters a name cannot
+    /// hold. A provider of a dynamic trait registers its instance under this
+    /// name, which is the name
+    /// [`ApplicationContextExt::get_dyn_singleton_with_default_name`] looks up.
+    fn default_singleton_name() -> String {
+        SingletonUtil::default_singleton_name::<Self::Target>()
+    }
+}
+
+impl<T> DynSingleton for Arc<T>
+where
+    T: ?Sized + 'static,
+{
+    type Target = T;
+
+    fn target(&self) -> &T {
+        self
+    }
+
+    fn into_target_arc(self) -> Arc<T> {
+        self
+    }
+}
+
+impl<T> DynSingleton for Box<T>
+where
+    T: ?Sized + 'static,
+{
+    type Target = T;
+
+    fn target(&self) -> &T {
+        self
+    }
+
+    fn into_target_arc(self) -> Arc<T> {
+        Arc::from(self)
+    }
+}
 
 /// Type safe access to the singletons of an [`ApplicationContext`].
 ///
@@ -44,7 +185,7 @@ use crate::application_context::{InstanceClone, default_singleton_name};
 /// - no suffix: the instance is registered under the empty name `""`,
 /// - `with_name`: the instance is registered under the given name,
 /// - `with_default_name`: the instance is registered under the name derived
-///   from its type by [`default_singleton_name`].
+///   from its type by [`SingletonUtil::default_singleton_name`].
 ///
 /// The type erased counterpart of a method is the `_boxed` method of
 /// [`ApplicationContext`], which takes a [`Key`] instead of a type parameter.
@@ -97,7 +238,46 @@ pub trait ApplicationContextExt: ApplicationContext {
     where
         T: Clone + Send + Sync + 'static,
     {
-        self.insert_singleton_with_name(instance, default_singleton_name::<T>());
+        self.insert_singleton_with_name(instance, SingletonUtil::default_singleton_name::<T>());
+    }
+
+    /// Inserts `instance` under the name derived from the trait object.
+    ///
+    /// This is the dynamic counterpart of
+    /// [`Self::insert_singleton_with_default_name`], which cannot name an
+    /// instance of a dynamic trait: the default name of a pointer type such as
+    /// `Arc<dyn UserDetails>` holds the characters of the pointer
+    /// (`alloc::sync::Arc<dyn ...::UserDetails>`) and is not a name a singleton
+    /// can be registered under. The name is therefore the one
+    /// [`DynSingleton::default_singleton_name`] derives from the trait object,
+    /// which is the name a provider of a dynamic trait registers its instance
+    /// under.
+    ///
+    /// An instance of a dynamic trait is shared, so the context stores it as an
+    /// `Arc<dyn UserDetails>`: an `Arc` is stored as it is, and a `Box` is moved
+    /// into an `Arc` first, which keeps the allocation of the box. The instance
+    /// is registered with a clone function, so that the context hands out owned
+    /// copies of it as well, and the pointer to look it up with afterwards is
+    /// the `Arc`. Registering the instance under another name, and registering
+    /// it in another pointer type than the `Arc`, is what the ordinary
+    /// [`Self::insert_singleton_with_name`] is for.
+    ///
+    /// # Arguments
+    ///
+    /// * `instance` - The instance to insert.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `P` - The pointer type, for example `Arc<dyn UserDetails>`.
+    fn insert_dyn_singleton_with_default_name<P>(&mut self, instance: P)
+    where
+        P: DynSingleton,
+        P::Target: Send + Sync + 'static,
+    {
+        self.insert_singleton_with_name::<Arc<P::Target>>(
+            instance.into_target_arc(),
+            P::default_singleton_name(),
+        );
     }
 
     /// Returns whether an instance is registered under the empty name `""`.
@@ -135,7 +315,33 @@ pub trait ApplicationContextExt: ApplicationContext {
     where
         T: 'static,
     {
-        self.contains_singleton_with_name::<T>(default_singleton_name::<T>())
+        self.contains_singleton_with_name::<T>(SingletonUtil::default_singleton_name::<T>())
+    }
+
+    /// Returns whether an instance of a dynamic trait is registered under the
+    /// name derived from the trait object.
+    ///
+    /// This is the dynamic counterpart of
+    /// [`Self::contains_singleton_with_default_name`], which cannot name an
+    /// instance of a dynamic trait, see
+    /// [`Self::insert_dyn_singleton_with_default_name`]. The name is the one
+    /// [`DynSingleton::default_singleton_name`] derives from the trait object,
+    /// so this reports the instance a provider of a dynamic trait registered by
+    /// default.
+    ///
+    /// The pointer the instance is stored in is the type parameter, because it
+    /// is part of the key: an instance registered as an `Arc<dyn UserDetails>`
+    /// and an instance registered as a `Box<dyn UserDetails>` are two different
+    /// singletons.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `P` - The pointer type, for example `Arc<dyn UserDetails>`.
+    fn contains_dyn_singleton_with_default_name<P>(&self) -> bool
+    where
+        P: DynSingleton + 'static,
+    {
+        self.contains_singleton_with_name::<P>(P::default_singleton_name())
     }
 
     /// Returns a reference to the instance registered under the empty name `""`.
@@ -186,7 +392,7 @@ pub trait ApplicationContextExt: ApplicationContext {
     where
         T: 'static,
     {
-        self.get_singleton_option_with_name::<T>(default_singleton_name::<T>())
+        self.get_singleton_option_with_name::<T>(SingletonUtil::default_singleton_name::<T>())
     }
 
     /// Returns a reference to the instance registered under the empty name `""`,
@@ -216,6 +422,39 @@ pub trait ApplicationContextExt: ApplicationContext {
         let key = Key::new::<T>(name.into());
         self.get_singleton_boxed(&key)
             .and_then(|instance| instance.downcast_ref::<T>())
+    }
+
+    /// Returns the trait object of the singleton registered under the name
+    /// derived from the trait object.
+    ///
+    /// This is the dynamic counterpart of [`Self::get_singleton_with_name`]: the
+    /// type parameter is the pointer the instance is stored in, and the
+    /// returned reference points at the unsized target of that pointer, which
+    /// is the trait object the callers work with. The name is the one
+    /// [`DynSingleton::default_singleton_name`] derives from the trait object,
+    /// which is the name a provider of a dynamic trait registers its instance
+    /// under, see [`Self::insert_dyn_singleton_with_default_name`]. A pointer
+    /// type has no default name a singleton could be registered under, so the
+    /// ordinary accessors cannot look the instance up by a default name.
+    ///
+    /// The pointer is part of the key, so an instance registered as an
+    /// `Arc<dyn UserDetails>` and an instance registered as a
+    /// `Box<dyn UserDetails>` are two different singletons.
+    ///
+    /// # Panics
+    ///
+    /// Panics when no instance is registered for the pointer type.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `P` - The pointer type, for example `Arc<dyn UserDetails>`.
+    #[track_caller]
+    fn get_dyn_singleton_with_default_name<P>(&self) -> &P::Target
+    where
+        P: DynSingleton + 'static,
+    {
+        self.get_singleton_with_name::<P>(P::default_singleton_name())
+            .target()
     }
 
     /// Returns a mutable reference to the instance registered under the empty
@@ -320,8 +559,8 @@ pub trait ApplicationContextExt: ApplicationContext {
     ///
     /// Only the instance is removed; the provider that created it is kept, so
     /// resolving the instance again builds a new one. The name is the one
-    /// [`default_singleton_name`] derives from the type, which is the name the
-    /// attribute macros register an instance under.
+    /// [`SingletonUtil::default_singleton_name`] derives from the type, which is
+    /// the name the attribute macros register an instance under.
     ///
     /// # Type Parameters
     ///
@@ -330,7 +569,7 @@ pub trait ApplicationContextExt: ApplicationContext {
     where
         T: Send + Sync + 'static,
     {
-        self.remove_singleton_with_name::<T>(default_singleton_name::<T>())
+        self.remove_singleton_with_name::<T>(SingletonUtil::default_singleton_name::<T>())
     }
 
     /// Creates the instance registered under the given name, when it does not
@@ -523,7 +762,7 @@ pub trait ApplicationContextExt: ApplicationContext {
     where
         T: Send + Sync + 'static,
     {
-        self.resolve_with_name::<T>(default_singleton_name::<T>())
+        self.resolve_with_name::<T>(SingletonUtil::default_singleton_name::<T>())
     }
 
     /// Resolves the instance registered under the name derived from its type,
@@ -536,7 +775,7 @@ pub trait ApplicationContextExt: ApplicationContext {
     where
         T: Send + Sync + 'static,
     {
-        self.resolve_option_with_name::<T>(default_singleton_name::<T>())
+        self.resolve_option_with_name::<T>(SingletonUtil::default_singleton_name::<T>())
     }
 
     /// Resolves every instance of the given type.
@@ -558,7 +797,8 @@ pub trait ApplicationContextExt: ApplicationContext {
     ///
     /// The instance is downcast to the type of the key. This is the shared,
     /// typed implementation of the `resolve*` methods; use
-    /// [`Self::resolve_boxed`] to resolve an instance whose type is erased.
+    /// [`ApplicationContext::resolve_boxed`] to resolve an instance whose type
+    /// is erased.
     ///
     /// # Type Parameters
     ///
@@ -579,149 +819,44 @@ impl<C> ApplicationContextExt for C where C: ApplicationContext + ?Sized {}
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::fmt;
-    use std::{any::Any, fmt::Debug};
-
-    use crate::{
-        ApplicationEvent, ApplicationEventPublisher, Locale, MessageSource,
-        MessageSourceResolvable, NoSuchMessageError,
-    };
-
     use super::*;
-
-    /// Minimal in-memory context used to exercise the helpers.
-    #[derive(Default)]
-    struct FakeContext {
-        instances: HashMap<Key, (Box<dyn Any + Send + Sync>, Option<InstanceClone>)>,
-    }
-
-    impl FakeContext {
-        fn find(&self, key: &Key) -> Option<&(Box<dyn Any + Send + Sync>, Option<InstanceClone>)> {
-            self.instances.get(key)
-        }
-    }
-
-    impl ApplicationContext for FakeContext {
-        fn id(&self) -> &str {
-            "fake"
-        }
-
-        fn application_name(&self) -> &str {
-            "fake"
-        }
-
-        fn startup_date(&self) -> i64 {
-            0
-        }
-
-        fn insert_singleton_boxed(
-            &mut self,
-            key: Key,
-            instance: Box<dyn Any + Send + Sync>,
-            clone: Option<InstanceClone>,
-        ) {
-            self.instances.insert(key, (instance, clone));
-        }
-
-        fn contains_singleton_boxed(&self, key: &Key) -> bool {
-            self.instances.contains_key(key)
-        }
-
-        fn get_singleton_boxed(&self, key: &Key) -> Option<&(dyn Any + Send + Sync)> {
-            self.find(key).map(|(instance, _)| instance.as_ref())
-        }
-
-        fn get_singleton_boxed_mut(&mut self, key: &Key) -> Option<&mut (dyn Any + Send + Sync)> {
-            self.instances
-                .get_mut(key)
-                .map(|(instance, _)| instance.as_mut())
-        }
-
-        fn remove_singleton_boxed(&mut self, key: &Key) -> Option<Box<dyn Any + Send + Sync>> {
-            self.instances.remove(key).map(|(instance, _)| instance)
-        }
-
-        fn resolve_boxed(&mut self, key: &Key) -> Option<Box<dyn Any + Send + Sync>> {
-            let clone = self.find(key)?.1.clone()?;
-            Some(clone(self.instances.get(key)?.0.as_ref()))
-        }
-
-        fn resolve_all_of_type(&mut self, ty: TypeId) -> Vec<Box<dyn Any + Send + Sync>> {
-            let keys = self.keys_of_type(ty);
-
-            keys.iter()
-                .filter_map(|key| self.resolve_boxed(key))
-                .collect()
-        }
-
-        fn keys_of_type(&self, ty: TypeId) -> Vec<Key> {
-            let mut keys: Vec<Key> = self
-                .instances
-                .keys()
-                .filter(|key| key.ty.id == ty)
-                .cloned()
-                .collect();
-            keys.sort();
-            keys
-        }
-    }
-
-    impl ApplicationEventPublisher for FakeContext {
-        fn publish_event(
-            &self,
-            _event: Box<dyn ApplicationEvent>,
-        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-            Ok(())
-        }
-    }
-
-    impl MessageSource for FakeContext {
-        fn message_or_default(
-            &self,
-            _code: &str,
-            _args: &[&dyn fmt::Display],
-            default_message: Option<&str>,
-            _locale: Option<&Locale>,
-        ) -> Option<String> {
-            default_message.map(|message| message.to_owned())
-        }
-
-        fn message(
-            &self,
-            code: &str,
-            _args: &[&dyn fmt::Display],
-            locale: Option<&Locale>,
-        ) -> Result<String, NoSuchMessageError> {
-            Err(NoSuchMessageError::new(code, locale))
-        }
-
-        fn message_from_resolvable(
-            &self,
-            resolvable: &dyn MessageSourceResolvable,
-            locale: Option<&Locale>,
-        ) -> Result<String, NoSuchMessageError> {
-            let code = resolvable
-                .codes()
-                .and_then(|codes| codes.last())
-                .map(String::as_str)
-                .unwrap_or_default();
-
-            Err(NoSuchMessageError::new(code, locale))
-        }
-    }
-
-    impl Debug for FakeContext {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("FakeContext")
-                .field("instances", &"none")
-                .finish()
-        }
-    }
+    use crate::test_support::FakeContext;
 
     /// Type used to check the default name convention.
     #[derive(Clone)]
     struct MyService;
+
+    /// Trait that is used the way the framework uses a dynamic trait: the
+    /// instance of such a trait is registered as `Arc<dyn Greeter>` or as
+    /// `Box<dyn Greeter>`, because the trait object itself cannot be named as
+    /// the type of a stored instance.
+    trait Greeter: Send + Sync {
+        fn greet(&self) -> String;
+    }
+
+    struct HelloGreeter;
+
+    impl Greeter for HelloGreeter {
+        fn greet(&self) -> String {
+            "hello".to_owned()
+        }
+    }
+
+    /// Function that is generic over the pointer type the trait object is
+    /// stored in, which is what [`DynSingleton`] is for.
+    fn greet_generically<P>(greeter: P) -> String
+    where
+        P: DynSingleton,
+        P::Target: Greeter,
+    {
+        let greeting = greeter.target().greet();
+        let shared: Arc<P::Target> = greeter.into_target_arc();
+
+        // Both pointers lead to the same instance.
+        assert_eq!(shared.greet(), greeting);
+
+        greeting
+    }
 
     #[test]
     fn inserts_and_reads_instances_by_name() {
@@ -793,7 +928,10 @@ mod tests {
         );
         assert_eq!(context.resolve_with_default_name::<u64>(), 1);
         assert!(context.contains_singleton_with_default_name::<MyService>());
-        assert_eq!(default_singleton_name::<MyService>(), "myService");
+        assert_eq!(
+            SingletonUtil::default_singleton_name::<MyService>(),
+            "myService"
+        );
     }
 
     #[test]
@@ -912,5 +1050,97 @@ mod tests {
                 .try_just_create_singletons_by_type::<u32>()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn peels_the_trait_object_generically_over_the_pointer() {
+        let shared: Arc<dyn Greeter> = Arc::new(HelloGreeter);
+        let boxed: Box<dyn Greeter> = Box::new(HelloGreeter);
+
+        assert_eq!(greet_generically(shared), "hello");
+        assert_eq!(greet_generically(boxed), "hello");
+    }
+
+    #[test]
+    fn derives_the_default_name_of_a_dynamic_trait_from_the_trait_object() {
+        // The name of the trait object is the one that can be a singleton name,
+        // so both pointers provide the same default name.
+        assert_eq!(Arc::<dyn Greeter>::default_singleton_name(), "greeter");
+        assert_eq!(Box::<dyn Greeter>::default_singleton_name(), "greeter");
+
+        let mut context = FakeContext::default();
+        let greeter: Box<dyn Greeter> = Box::new(HelloGreeter);
+        context.insert_singleton_boxed(
+            Key::new::<Box<dyn Greeter>>(Box::<dyn Greeter>::default_singleton_name().into()),
+            Box::new(greeter),
+            None,
+        );
+
+        assert_eq!(
+            context
+                .get_dyn_singleton_with_default_name::<Box<dyn Greeter>>()
+                .greet(),
+            "hello"
+        );
+        // The pointer is part of the key, so the other one holds no instance.
+        assert!(!context.contains_dyn_singleton_with_default_name::<Arc<dyn Greeter>>());
+    }
+
+    #[test]
+    #[should_panic(expected = "no instance is registered")]
+    fn peeling_an_unknown_dynamic_singleton_panics() {
+        let context = FakeContext::default();
+
+        let _ = context.get_dyn_singleton_with_default_name::<Arc<dyn Greeter>>();
+    }
+
+    #[test]
+    fn registers_and_reads_a_dynamic_singleton_under_the_default_name() {
+        let mut context = FakeContext::default();
+        context.insert_dyn_singleton_with_default_name::<Box<dyn Greeter>>(Box::new(HelloGreeter));
+
+        // The instance is stored as a shared trait object under the name of the
+        // trait object, so the `Arc` is the pointer it is read with.
+        assert!(context.contains_dyn_singleton_with_default_name::<Arc<dyn Greeter>>());
+        assert_eq!(
+            context
+                .get_dyn_singleton_with_default_name::<Arc<dyn Greeter>>()
+                .greet(),
+            "hello"
+        );
+
+        // The instance is registered with a clone function, so the context hands
+        // out owned copies of it as well.
+        let name = Arc::<dyn Greeter>::default_singleton_name();
+        assert_eq!(
+            context.resolve_with_name::<Arc<dyn Greeter>>(name).greet(),
+            "hello"
+        );
+
+        // The default name of the pointer type is not the name the instance is
+        // registered under, which is why the dynamic accessors derive the name
+        // from the trait object.
+        assert!(!context.contains_singleton_with_default_name::<Arc<dyn Greeter>>());
+    }
+
+    #[test]
+    fn registers_a_dynamic_singleton_under_a_name_through_the_ordinary_method() {
+        let mut context = FakeContext::default();
+
+        // Another name than the default name of the trait object, and another
+        // pointer than the `Arc` a dynamic insert stores, is what the ordinary
+        // accessors are for.
+        let boxed: Box<dyn Greeter> = Box::new(HelloGreeter);
+        context.insert_singleton_with_name::<Arc<dyn Greeter>>(Arc::from(boxed), "greeter");
+
+        assert!(context.contains_singleton_with_name::<Arc<dyn Greeter>>("greeter"));
+        // The pointer is part of the key, so the box is not registered.
+        assert!(!context.contains_singleton_with_name::<Box<dyn Greeter>>("greeter"));
+
+        // The caller peels the pointer itself, which is all a dynamic accessor
+        // of a named instance would do as well.
+        let greeter: &dyn Greeter =
+            &**context.get_singleton_with_name::<Arc<dyn Greeter>>("greeter");
+        assert_eq!(greeter.greet(), "hello");
     }
 }

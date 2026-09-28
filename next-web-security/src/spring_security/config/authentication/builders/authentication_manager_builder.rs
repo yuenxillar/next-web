@@ -7,15 +7,11 @@ use tracing::debug;
 use crate::authentication::provider_manager::ProviderManager;
 use crate::authentication::{
     account_status_user_details_exceptions::provider_not_found,
-    authentication_event_publisher::{
-        AuthenticationEventPublisher, NullAuthenticationEventPublisher,
-    },
-    AuthenticationProvider,
+    AuthenticationProvider, {AuthenticationEventPublisher, NullAuthenticationEventPublisher},
 };
 use crate::config::base_configured_security_builder::{
     BaseConfiguredSecurityBuilder, BaseConfiguredSecurityBuilderExt,
 };
-use crate::config::object_post_processor::ObjectPostProcessor;
 use crate::core::{
     userdetails::UserDetailsService,
     Authentication, {AuthenticationError, AuthenticationErrorKind},
@@ -45,7 +41,7 @@ pub struct AuthenticationManagerBuilder {
 
 impl AuthenticationManagerBuilder {
     /// Creates a new instance
-    pub fn new(object_post_processor: Arc<dyn ObjectPostProcessor<&mut dyn Any>>) -> Self {
+    pub fn new() -> Self {
         Self {
             authentication_manager: Default::default(),
             parent_authentication_manager: Default::default(),

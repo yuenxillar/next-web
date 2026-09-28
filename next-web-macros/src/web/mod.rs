@@ -12,3 +12,6 @@ pub mod routing;
 pub mod scheduled;
 
 mod attrs;
+
+#[cfg(test)]
+mod tests;

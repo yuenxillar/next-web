@@ -3,13 +3,13 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use next_web_context::ApplicationContextExt;
 use next_web_core::{
-    cors::{CorsConfigurationSource, PreFlightRequestHandler},
     filter::{CorsFilter, PreFlightRequestFilter},
     traits::required::Required,
+    web::cors::{CorsConfigurationSource, PreFlightRequestHandler},
     ApplicationContext,
 };
-use next_web_context::ApplicationContextExt;
 
 use crate::{
     config::{
@@ -93,7 +93,11 @@ where
         context: Option<&Arc<RwLock<Box<dyn ApplicationContext>>>>,
     ) -> Option<Arc<dyn CorsConfigurationSource>> {
         context
-            .map(|context| context.read().expect("the application context lock is poisoned"))
+            .map(|context| {
+                context
+                    .read()
+                    .expect("the application context lock is poisoned")
+            })
             .and_then(|ctx| {
                 ctx.get_singleton_option_with_name::<Arc<dyn CorsConfigurationSource>>(
                     CORS_CONFIGURATION_SOURCE_BEAN_NAME,
@@ -207,10 +211,3 @@ where
         }
     }
 }
-
-
-
-
-
-
-

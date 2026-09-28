@@ -3,8 +3,9 @@
 //! The test drives the auto-configurations through [`WebAutoConfiguration`],
 //! which is what the configuration channel is about: a configuration class
 //! declared with `#[auto_configuration]` is applied the same way as the
-//! auto-configuration of a starter, in the order of `Ordered`, and only when its
-//! conditions hold.
+//! auto-configuration of a starter, in the order of `Ordered` refined by the
+//! configurations it declares it has to be applied before and after, and only
+//! when its conditions hold.
 
 use std::sync::{Arc, Mutex};
 
@@ -145,6 +146,61 @@ impl DisabledConfiguration {
     }
 }
 
+/// A configuration class that declares the place it has to hold relative to
+/// another auto-configuration, which wins over the order it declares.
+#[derive(Clone)]
+struct ConstrainedConfiguration;
+
+#[auto_configuration(order = 200, before = ["ProvidedAutoConfiguration"])]
+impl ConstrainedConfiguration {
+    #[provider(name = "constrainedName")]
+    fn constrained() -> String {
+        record("configuration with a before constraint");
+
+        String::from("constrained")
+    }
+}
+
+/// The instance the providers of the configuration below share.
+#[derive(Clone, Debug)]
+struct Counter {
+    value: u32,
+}
+
+/// A configuration class whose providers borrow the instances of the context.
+///
+/// A reference parameter borrows the instance the context holds instead of
+/// resolving a copy of it, which is what lets a provider change the instance the
+/// rest of the application sees.
+#[derive(Clone)]
+struct BorrowConfiguration;
+
+#[auto_configuration(order = 40)]
+impl BorrowConfiguration {
+    /// Creates the instance the other providers of the configuration borrow.
+    #[provider(name = "counter")]
+    fn counter() -> Counter {
+        Counter { value: 0 }
+    }
+
+    /// Two references to the instance of the same name are the same instance.
+    #[provider(name = "sameInstance")]
+    fn same_instance(
+        #[autowired(name = "counter")] first: &Counter,
+        #[autowired(name = "counter")] second: &Counter,
+    ) -> bool {
+        std::ptr::eq(first, second)
+    }
+
+    /// A mutable reference changes the instance the context holds.
+    #[provider(name = "incremented")]
+    fn increment(#[autowired(name = "counter")] counter: &mut Counter) -> u32 {
+        counter.value += 1;
+
+        counter.value
+    }
+}
+
 /// Starts a context and applies the auto-configurations of the application.
 async fn start_application() -> DefaultApplicationContext {
     // The condition of the configuration class reads
@@ -186,6 +242,16 @@ async fn the_configurations_of_the_application_are_applied_in_their_order() {
 
     let context = start_application().await;
 
+    // The configuration that declares it is applied before
+    // `ProvidedAutoConfiguration` ran first, even though it declares the higher
+    // order, and registered the instance of its provider.
+    assert_eq!(
+        context
+            .get_singleton_option_with_name::<String>("constrainedName")
+            .map(String::as_str),
+        Some("constrained")
+    );
+
     // The auto-configuration of the test ran before the configuration class,
     // which resolved the instance it created.
     assert_eq!(
@@ -216,6 +282,7 @@ async fn the_configurations_of_the_application_are_applied_in_their_order() {
     assert_eq!(
         *APPLIED.lock().unwrap(),
         vec![
+            "configuration with a before constraint",
             "auto-configuration",
             "first provider",
             "second provider",
@@ -243,5 +310,37 @@ async fn a_configuration_class_is_an_auto_configuration_of_the_application() {
             .len()
             >= 3,
         "the configuration classes of the test are auto-configurations of the application"
+    );
+}
+
+#[tokio::test]
+async fn the_parameters_of_a_provider_borrow_the_instances_of_the_context() {
+    let _test = TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    APPLIED.lock().unwrap().clear();
+
+    let context = start_application().await;
+
+    // Two references of the same name are the same instance, which the provider
+    // of the test reads from the addresses of its parameters: a reference
+    // borrows the instance of the context instead of a copy of it.
+    assert_eq!(
+        context.get_singleton_option_with_name::<bool>("sameInstance"),
+        Some(&true)
+    );
+
+    // The mutable reference changed the instance the context holds, so the value
+    // the application reads afterwards is the changed one.
+    assert_eq!(
+        context.get_singleton_option_with_name::<u32>("incremented"),
+        Some(&1)
+    );
+    assert_eq!(
+        context
+            .get_singleton_option_with_name::<Counter>("counter")
+            .map(|counter| counter.value),
+        Some(1)
     );
 }

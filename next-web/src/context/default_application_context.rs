@@ -43,37 +43,38 @@ use std::{
     collections::HashMap,
     fmt::{self, Debug},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use next_web_context::{
-    event::{ApplicationEventMulticaster, DefaultApplicationEventMulticaster},
-    support::DelegatingMessageSource,
+    APPLICATION_ENVIRONMENT_SINGLETON_NAME, APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
     ApplicationContext, ApplicationContextExt, ApplicationEvent, ApplicationEventPublisher,
     ApplicationListener, Definition, DynProvider, EagerCreateFunction, InstanceClone, Locale,
-    MessageSource, MessageSourceResolvable, NoSuchMessageError, Scope,
-    APPLICATION_ENVIRONMENT_SINGLETON_NAME, APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
-    MESSAGE_SOURCE_SINGLETON_NAME, RESOURCE_LOADER_SINGLETON_NAME,
+    MESSAGE_SOURCE_SINGLETON_NAME, MessageSource, MessageSourceResolvable, NoSuchMessageError,
+    RESOURCE_LOADER_SINGLETON_NAME, Scope,
+    event::{ApplicationEventMulticaster, DefaultApplicationEventMulticaster},
+    support::DelegatingMessageSource,
 };
 use next_web_core::{
+    async_trait,
     env::ConfigurableEnvironment,
     error::BoxError,
     io::ResourceLoader,
     metrics::{ApplicationStartup, DefaultApplicationStartup},
 };
 use next_web_singletons::factory::{
+    SingletonFactory,
     config::SingletonRegistry,
     support::{DefaultListableSingletonFactory, DynSingle, Key},
-    SingletonFactory,
 };
-use tracing::{enabled, Level};
+use tracing::{Level, enabled};
 
 use crate::{
+    ApplicationEnvironment, ConfigurableApplicationContext,
     configurable_application_context::ContextError,
-    next_web_application::APPLICATION_SHUTDOWN_HOOK, ApplicationEnvironment,
-    ConfigurableApplicationContext,
+    next_web_application::APPLICATION_SHUTDOWN_HOOK,
 };
 
 /// Lifecycle flags shared between the context and its shutdown hook.
@@ -331,6 +332,57 @@ impl DefaultApplicationContext {
         }
     }
 
+    /// Runs the steps a refresh performs before it creates the instances the
+    /// providers ask to exist eagerly.
+    ///
+    /// Both [`ConfigurableApplicationContext::refresh`] and
+    /// [`ConfigurableApplicationContext::refresh_async`] run them, because the
+    /// two only differ in the constructors they can await: the steps verify
+    /// that the context may be refreshed, prepare it, initialize the message
+    /// source and the event multicaster, load the providers the attribute
+    /// macros submitted, and register the providers whose condition holds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContextError::IllegalState`] when the context is closed or was
+    /// refreshed already, and the error a message source or an event
+    /// multicaster that cannot be created reports.
+    fn prepare_refresh_steps(&mut self) -> Result<(), ContextError> {
+        if self.is_closed() {
+            return Err(ContextError::IllegalState(
+                "cannot refresh an application context that has been closed".to_owned(),
+            ));
+        }
+
+        if self.is_active() {
+            return Err(ContextError::IllegalState(
+                "the application context has already been refreshed".to_owned(),
+            ));
+        }
+
+        // Prepare this context for refreshing.
+        self.prepare_refresh();
+
+        // Initialize message source for this context.
+        self.init_message_source()?;
+
+        // Initialize event multicaster for this context.
+        self.init_application_event_multicaster()?;
+
+        // Initialize other special instances
+        self.on_refresh();
+
+        // The providers the attribute macros submitted, such as the singleton
+        // providers of `#[singleton]`, are loaded first, so that the singletons
+        // of the application are known to the context.
+        self.context.register_auto_providers();
+        // A provider that declares a condition is only registered when its
+        // condition holds.
+        self.evaluate_conditional_providers();
+
+        Ok(())
+    }
+
     /// Creates the instances of the providers that are eager.
     ///
     /// The functions are taken out of the container before they run, because
@@ -339,15 +391,39 @@ impl DefaultApplicationContext {
     ///
     /// # Panics
     ///
-    /// Panics when a provider asks for an asynchronous instance to be created
-    /// eagerly, because a context resolves its providers synchronously.
+    /// Panics when a provider a caller resolved has an asynchronous
+    /// constructor: await the instance with the asynchronous accessors instead.
+    ///
+    /// A provider that is created asynchronously is skipped when it asks for an
+    /// instance to be created eagerly, because a synchronous refresh cannot
+    /// await its constructor. The instance is created when it is resolved, or
+    /// while the context is refreshed by [`Self::refresh_async`].
     fn create_eager_instances(&mut self) {
         for (definition, create) in self.context.take_eager_create_functions() {
             match create {
                 EagerCreateFunction::Sync(create) => create(self, definition.key.name),
-                EagerCreateFunction::Async(_) => panic!(
-                    "an asynchronous provider cannot be created eagerly by a synchronous context: {definition:?}"
+                EagerCreateFunction::Async(_) => tracing::warn!(
+                    "the instance of an asynchronous provider is created when it is resolved, \
+                     because a synchronous refresh cannot await its constructor: {definition:?}"
                 ),
+                EagerCreateFunction::None => {
+                    unreachable!("the container only records providers it has to create eagerly")
+                }
+            }
+        }
+    }
+
+    /// Creates the instances of the providers that are eager, awaiting the
+    /// constructors of the providers that are created asynchronously.
+    ///
+    /// The functions are taken out of the container before they run, because
+    /// they create their instance through the context, which owns the
+    /// container.
+    async fn create_eager_instances_async(&mut self) {
+        for (definition, create) in self.context.take_eager_create_functions() {
+            match create {
+                EagerCreateFunction::Sync(create) => create(self, definition.key.name),
+                EagerCreateFunction::Async(create) => create(self, definition.key.name).await,
                 EagerCreateFunction::None => {
                     unreachable!("the container only records providers it has to create eagerly")
                 }
@@ -535,6 +611,7 @@ impl Default for DefaultApplicationContext {
     }
 }
 
+#[async_trait]
 impl ConfigurableApplicationContext for DefaultApplicationContext {
     fn set_id(&mut self, id: String) {
         self.id = id;
@@ -602,44 +679,30 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
     }
 
     fn refresh(&mut self) -> Result<(), ContextError> {
-        if self.is_closed() {
-            return Err(ContextError::IllegalState(
-                "cannot refresh an application context that has been closed".to_owned(),
-            ));
-        }
-
-        if self.is_active() {
-            return Err(ContextError::IllegalState(
-                "the application context has already been refreshed".to_owned(),
-            ));
-        }
-
         let started = std::time::Instant::now();
         let mut context_refresh = self.application_startup.start("next.context.refresh");
 
-        // Prepare this context for refreshing.
-        self.prepare_refresh();
-
-        // Initialize message source for this context.
-        self.init_message_source()?;
-
-        // Initialize event multicaster for this context.
-        self.init_application_event_multicaster()?;
-
-        // Initialize other special instances
-        self.on_refresh();
-
-        // The providers the attribute macros submitted, such as the singleton
-        // providers of `#[singleton]`, are loaded first, so that the singletons
-        // of the application are known to the context.
-        self.context.register_auto_providers();
-        // A provider that declares a condition is only registered when its
-        // condition holds.
-        self.evaluate_conditional_providers();
-        // The singletons that have to exist eagerly are created while
-        // refreshing, mirroring the "finishRefresh" phase of the original
-        // context. Every other singleton is created when it is resolved.
+        self.prepare_refresh_steps()?;
         self.create_eager_instances();
+        // Last chance for the container to install the singletons it considers
+        // essential.
+        self.context.singleton_factory_mut().initialize_defaults();
+        context_refresh.end();
+
+        tracing::info!(
+            "Application context refreshed elapsed: {:?}",
+            started.elapsed()
+        );
+
+        Ok(())
+    }
+
+    async fn refresh_async(&mut self) -> Result<(), ContextError> {
+        let started = std::time::Instant::now();
+        let mut context_refresh = self.application_startup.start("next.context.refresh");
+
+        self.prepare_refresh_steps()?;
+        self.create_eager_instances_async().await;
         // Last chance for the container to install the singletons it considers
         // essential.
         self.context.singleton_factory_mut().initialize_defaults();
@@ -723,6 +786,7 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
     }
 }
 
+#[async_trait]
 impl ApplicationContext for DefaultApplicationContext {
     fn application_name(&self) -> &str {
         &self.application_name
@@ -854,6 +918,73 @@ impl ApplicationContext for DefaultApplicationContext {
         keys.iter()
             .filter_map(|key| self.resolve_boxed(key))
             .collect()
+    }
+
+    async fn resolve_boxed_async(&mut self, key: &Key) -> Option<Box<dyn Any + Send + Sync>> {
+        // An instance that was created before is handed out as it is.
+        if let Some(instance) = self.context.singleton_factory().registry().get_dyn(key) {
+            return instance.get_owned_boxed();
+        }
+
+        let provider = self.context.provider(key)?.clone();
+        let definition = provider.definition().clone();
+        let scope = definition.scope;
+
+        if scope == Scope::SingleOwner {
+            // A single owner instance belongs to the context, so it can only be
+            // borrowed from it once it was created.
+            panic!("a single owner instance cannot be resolved as an owned value: {definition:?}");
+        }
+
+        if self.context.is_resolving(key) {
+            panic!("a circular dependency was detected while resolving: {definition:?}");
+        }
+
+        self.context.push_dependency_chain(key.clone());
+        let instance = provider.build_boxed_async(self).await;
+        self.context.pop_dependency_chain();
+
+        if scope != Scope::Singleton {
+            // A transient instance is created for every resolution and is not
+            // stored in the context.
+            return Some(instance);
+        }
+
+        let erased_clone: Option<InstanceClone> = provider.clone_instance().map(|clone| {
+            let origin = provider.origin();
+
+            let erased: InstanceClone = Arc::new(move |instance: &(dyn Any + Send + Sync)| {
+                clone(origin.as_ref(), instance)
+            });
+
+            erased
+        });
+
+        match erased_clone {
+            Some(clone) => {
+                // Keep one copy in the context and return the other one.
+                let stored = clone(instance.as_ref());
+                self.context
+                    .singleton_factory_mut()
+                    .registry_mut()
+                    .insert_dyn(
+                        key.clone(),
+                        DynSingle::new(stored, Some(Arc::clone(&clone))),
+                    );
+
+                Some(instance)
+            }
+            None => {
+                // The instance cannot be copied, so it can only be borrowed from
+                // the context afterwards.
+                self.context
+                    .singleton_factory_mut()
+                    .registry_mut()
+                    .insert_dyn(key.clone(), DynSingle::new(instance, None));
+
+                None
+            }
+        }
     }
 
     fn keys_of_type(&self, ty: TypeId) -> Vec<Key> {
@@ -1195,8 +1326,8 @@ mod tests {
     use std::pin::Pin;
     use std::sync::atomic::AtomicUsize;
 
-    use next_web_context::{singleton, transient, ApplicationContextExt, Provider};
-    use next_web_singletons::factory::config::SingletonRegistry;
+    use next_web_context::{ApplicationContextExt, Provider, singleton, transient};
+    use next_web_singletons::{factory::config::SingletonRegistry, util::SingletonUtil};
 
     use super::*;
 
@@ -1404,7 +1535,7 @@ mod tests {
         // The provider the macro registered has to be known to the context, so
         // that the instance can be created and is then held by the context.
         context.just_create_singleton_with_name::<AutoRegisteredService>(
-            next_web_context::default_singleton_name::<AutoRegisteredService>(),
+            SingletonUtil::default_singleton_name::<AutoRegisteredService>(),
         );
 
         assert!(context.contains_singleton_with_default_name::<AutoRegisteredService>());
@@ -1458,7 +1589,7 @@ mod tests {
         let mut context = DefaultApplicationContext::default();
         context.refresh().expect("refreshing succeeds");
 
-        let name = next_web_context::default_singleton_name::<AutoRegisteredService>();
+        let name = SingletonUtil::default_singleton_name::<AutoRegisteredService>();
 
         // The provider of the macro is known, so the instance is created on
         // demand and the context holds it afterwards.
@@ -1483,12 +1614,14 @@ mod tests {
         let mut context = DefaultApplicationContext::default();
         context.refresh().expect("refreshing succeeds");
 
-        let name = next_web_context::default_singleton_name::<AutoRegisteredService>();
+        let name = SingletonUtil::default_singleton_name::<AutoRegisteredService>();
         context.just_create_singleton_with_name::<AutoRegisteredService>(name.clone());
 
-        assert!(context
-            .remove_singleton_with_name::<AutoRegisteredService>(name.clone())
-            .is_some());
+        assert!(
+            context
+                .remove_singleton_with_name::<AutoRegisteredService>(name.clone())
+                .is_some()
+        );
         assert!(!context.contains_singleton_with_name::<AutoRegisteredService>(name.clone()));
 
         // Only the instance was removed, so the context creates it again.

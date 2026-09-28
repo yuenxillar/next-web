@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    cors::{CorsConfiguration, CorsProcessor, DefaultCorsProcessor, PreFlightRequestHandler},
     error::BoxError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    web::cors::{CorsConfiguration, CorsProcessor, DefaultCorsProcessor, PreFlightRequestHandler},
 };
 
 #[derive(Clone)]

@@ -30,25 +30,14 @@ use crate::{
 /// * Any other kind maps to an `AuthenticationFailureServiceExceptionEvent`.
 ///
 /// When no publisher has been configured, publishing is a no-op.
+#[derive(Clone)]
 pub struct DefaultAuthenticationEventPublisher {
     application_event_publisher: Option<Arc<dyn ApplicationEventPublisher>>,
 }
 
 impl DefaultAuthenticationEventPublisher {
-    /// Creates a new publisher without an `ApplicationEventPublisher`. Use
-    /// [`set_application_event_publisher`](Self::set_application_event_publisher) or
-    /// [`with_application_event_publisher`](Self::with_application_event_publisher) to
-    /// supply one before publishing.
-    pub fn new() -> Self {
-        Self {
-            application_event_publisher: None,
-        }
-    }
-
     /// Creates a new publisher with the given `ApplicationEventPublisher`.
-    pub fn with_application_event_publisher(
-        application_event_publisher: Arc<dyn ApplicationEventPublisher>,
-    ) -> Self {
+    pub fn new(application_event_publisher: Arc<dyn ApplicationEventPublisher>) -> Self {
         Self {
             application_event_publisher: Some(application_event_publisher),
         }
@@ -89,7 +78,9 @@ impl DefaultAuthenticationEventPublisher {
 
 impl Default for DefaultAuthenticationEventPublisher {
     fn default() -> Self {
-        Self::new()
+        Self {
+            application_event_publisher: None,
+        }
     }
 }
 
@@ -154,7 +145,7 @@ mod tests {
 
     #[test]
     fn does_not_publish_without_publisher() {
-        let publisher = DefaultAuthenticationEventPublisher::new();
+        let publisher = DefaultAuthenticationEventPublisher::default();
         publisher.publish_authentication_success(authentication());
         publisher.publish_authentication_failure(
             AuthenticationError::with_kind(
@@ -168,9 +159,7 @@ mod tests {
     #[test]
     fn publishes_success_event() {
         let publisher = Arc::new(RecordingPublisher::default());
-        let event_publisher = DefaultAuthenticationEventPublisher::with_application_event_publisher(
-            publisher.clone(),
-        );
+        let event_publisher = DefaultAuthenticationEventPublisher::new(publisher.clone());
         event_publisher.publish_authentication_success(authentication());
 
         let types = publisher.events.lock().unwrap();
@@ -180,9 +169,7 @@ mod tests {
     #[test]
     fn publishes_bad_credentials_event_for_bad_credentials_kind() {
         let publisher = Arc::new(RecordingPublisher::default());
-        let event_publisher = DefaultAuthenticationEventPublisher::with_application_event_publisher(
-            publisher.clone(),
-        );
+        let event_publisher = DefaultAuthenticationEventPublisher::new(publisher.clone());
         event_publisher.publish_authentication_failure(
             AuthenticationError::with_kind(
                 "Bad credentials",
@@ -201,9 +188,7 @@ mod tests {
     #[test]
     fn publishes_provider_not_found_event_for_provider_not_found_kind() {
         let publisher = Arc::new(RecordingPublisher::default());
-        let event_publisher = DefaultAuthenticationEventPublisher::with_application_event_publisher(
-            publisher.clone(),
-        );
+        let event_publisher = DefaultAuthenticationEventPublisher::new(publisher.clone());
         event_publisher.publish_authentication_failure(
             AuthenticationError::with_kind(
                 "No provider",
@@ -222,9 +207,7 @@ mod tests {
     #[test]
     fn falls_back_to_service_exception_event_for_unmapped_kinds() {
         let publisher = Arc::new(RecordingPublisher::default());
-        let event_publisher = DefaultAuthenticationEventPublisher::with_application_event_publisher(
-            publisher.clone(),
-        );
+        let event_publisher = DefaultAuthenticationEventPublisher::new(publisher.clone());
         event_publisher.publish_authentication_failure(
             AuthenticationError::with_kind("Boom", AuthenticationErrorKind::General),
             authentication(),

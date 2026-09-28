@@ -3,14 +3,16 @@ use std::{marker::PhantomData, sync::Arc};
 use next_web_core::http::HttpMethod;
 use tracing::warn;
 
-use crate::web::util::matcher::{AnyRequestMatcher, Builder, MatcherInput, RequestMatcher};
+use crate::web::util::matcher::{
+    AnyRequestMatcher, MatcherInput, PathPatternRequestMatcherBuilder, RequestMatcher,
+};
 
 /// A base class for registering RequestMatcher's.
 /// For example, it might allow for specifying which RequestMatcher require a certain level of authorization.
 #[derive(Clone)]
 pub struct BaseRequestMatcherRegistry<C> {
     any_request_configured: bool,
-    request_matcher_builder: Option<Builder>,
+    request_matcher_builder: Option<PathPatternRequestMatcherBuilder>,
     pub(crate) _req_matchers: Vec<Arc<dyn RequestMatcher>>,
 
     _marker: PhantomData<C>,
@@ -89,7 +91,7 @@ impl<C> BaseRequestMatcherRegistry<C> {
     }
 
     /// Sets the request matcher builder to use for creating RequestMatchers.
-    pub fn set_request_matcher_builder(&mut self, builder: Builder) {
+    pub fn set_request_matcher_builder(&mut self, builder: PathPatternRequestMatcherBuilder) {
         self.request_matcher_builder = Some(builder);
     }
 
@@ -98,7 +100,7 @@ impl<C> BaseRequestMatcherRegistry<C> {
         std::mem::take(&mut self._req_matchers)
     }
 
-    fn get_request_matcher_builder(&mut self) -> &Builder {
+    fn get_request_matcher_builder(&mut self) -> &PathPatternRequestMatcherBuilder {
         self.request_matcher_builder
             .as_ref()
             .expect("Builder not found. Ensure it is registered with the ApplicationContext.")

@@ -19,17 +19,32 @@ use std::sync::Arc;
 
 use next_web_singletons::factory::support::{Key, Type};
 
-use crate::{ApplicationContext, ApplicationContextExt};
+use crate::{ApplicationContext, ApplicationContextAsyncExt, ApplicationContextExt};
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
-impl<T: ?Sized + Send + Sync> FutureExt for T where T: Future {}
+/// Signature of the function a provider stores so that a context can create the
+/// instance of an asynchronous provider with its type erased.
+///
+/// The function is shared instead of being a bare `fn` pointer, because the
+/// future of an asynchronous constructor borrows the context, which a pointer
+/// to a function with a higher ranked lifetime cannot express.
+type AsyncBuild = Arc<
+    dyn for<'a> Fn(
+            &'a (dyn Any + Send + Sync),
+            &'a mut dyn ApplicationContext,
+        ) -> BoxFuture<'a, Box<dyn Any + Send + Sync>>
+        + Send
+        + Sync,
+>;
+
+impl<T: ?Sized + Send> FutureExt for T where T: Future {}
 
 /// An extension trait for `Future`s that provides a convenient adapter.
 pub trait FutureExt: Future {
     /// Wrap the future in a Box, pinning it.
     fn boxed<'a>(self) -> BoxFuture<'a, Self::Output>
     where
-        Self: Sized + 'static + Send + Sync,
+        Self: Sized + Send + 'a,
     {
         Box::pin(self)
     }
@@ -186,7 +201,7 @@ pub enum Color {
 /// # Example
 ///
 /// ```rust
-/// use next-web-context::{DefaultProvider, Provider, Singleton, Transient};
+/// use next_web_context::{DefaultProvider, Provider, Singleton, Transient};
 ///
 /// #[Transient]
 /// struct A;
@@ -227,8 +242,12 @@ impl<T: Send + Sync> Clone for Constructor<T> {
 /// Represents the eager create function.
 #[derive(Clone)]
 pub enum EagerCreateFunction {
-    /// async eager create function.
-    Async(fn(&mut dyn ApplicationContext, Cow<'static, str>) -> BoxFuture<'static, ()>),
+    /// Creates the instance eagerly, awaiting a provider that is created
+    /// asynchronously.
+    ///
+    /// The function receives the context, so the future it returns borrows the
+    /// context: the instance is created before the refresh returns.
+    Async(for<'a> fn(&'a mut dyn ApplicationContext, Cow<'static, str>) -> BoxFuture<'a, ()>),
     /// sync eager create function.
     Sync(fn(&mut dyn ApplicationContext, Cow<'static, str>)),
     /// no eager create function.
@@ -371,6 +390,9 @@ pub struct DynProvider {
     origin: Arc<dyn Any + Send + Sync>,
     /// Creates the instance of the origin [`Provider`], with its type erased.
     build: fn(&(dyn Any + Send + Sync), &mut dyn ApplicationContext) -> Box<dyn Any + Send + Sync>,
+    /// Creates the instance of the origin [`Provider`] with its type erased,
+    /// awaiting the constructor of a provider that is created asynchronously.
+    build_async: AsyncBuild,
     /// Produces an owned copy of an instance created by the origin provider.
     ///
     /// The function receives the origin provider and the instance, so that it
@@ -391,6 +413,7 @@ impl Clone for DynProvider {
             binding_definitions: self.binding_definitions.clone(),
             origin: Arc::clone(&self.origin),
             build: self.build,
+            build_async: Arc::clone(&self.build_async),
             clone_instance: self.clone_instance,
         }
     }
@@ -446,14 +469,34 @@ impl DynProvider {
     ///
     /// # Panics
     ///
-    /// Panics when the provider has an asynchronous constructor, because a
-    /// context resolves its providers synchronously.
+    /// Panics when the provider has an asynchronous constructor, which only a
+    /// context that resolves asynchronously can await, see
+    /// [`Self::build_boxed_async`].
     ///
     /// # Arguments
     ///
     /// * `cx` - The context used to resolve the dependencies of the instance.
     pub fn build_boxed(&self, cx: &mut dyn ApplicationContext) -> Box<dyn Any + Send + Sync> {
         (self.build)(self.origin.as_ref(), cx)
+    }
+
+    /// Creates the instance of the provider, awaiting its constructor when the
+    /// provider is created asynchronously, and returns the instance with its
+    /// type erased.
+    ///
+    /// This is the counterpart of [`Self::build_boxed`] for the providers whose
+    /// constructor is an `async fn`: the constructor is awaited, so a provider
+    /// that is created asynchronously can be created by a context that resolves
+    /// asynchronously.
+    ///
+    /// # Arguments
+    ///
+    /// * `cx` - The context used to resolve the dependencies of the instance.
+    pub fn build_boxed_async<'a>(
+        &'a self,
+        cx: &'a mut dyn ApplicationContext,
+    ) -> BoxFuture<'a, Box<dyn Any + Send + Sync>> {
+        (self.build_async)(self.origin.as_ref(), cx)
     }
 
     /// Returns the function producing owned copies of an instance of the
@@ -483,9 +526,36 @@ impl<T: 'static + Send + Sync> From<Provider<T>> for DynProvider {
             match provider.constructor() {
                 Constructor::Sync(constructor) => Box::new(constructor(cx)),
                 Constructor::Async(_) => panic!(
-                    "an asynchronous provider is not supported by the context yet: {:?}",
+                    "the provider is created asynchronously, so it is resolved by the \
+                     asynchronous methods of the context: {:?}",
                     provider.definition()
                 ),
+            }
+        }
+
+        /// Creates the instance of the origin provider, awaiting its
+        /// asynchronous constructor.
+        fn build_async<'a, T: 'static + Send + Sync>(
+            origin: &'a (dyn Any + Send + Sync),
+            cx: &'a mut dyn ApplicationContext,
+        ) -> BoxFuture<'a, Box<dyn Any + Send + Sync>> {
+            let provider = origin
+                .downcast_ref::<Provider<T>>()
+                .expect("the erased provider holds its own type");
+
+            // The constructor is copied out of the provider, so that the future
+            // borrows the context alone.
+            match provider.constructor() {
+                Constructor::Async(constructor) => Box::pin(async move {
+                    let instance = constructor(cx).await;
+
+                    Box::new(instance) as Box<dyn Any + Send + Sync>
+                }),
+                Constructor::Sync(constructor) => Box::pin(async move {
+                    let instance = constructor(cx);
+
+                    Box::new(instance) as Box<dyn Any + Send + Sync>
+                }),
             }
         }
 
@@ -524,6 +594,7 @@ impl<T: 'static + Send + Sync> From<Provider<T>> for DynProvider {
             binding_definitions: value.binding_definitions.clone(),
             origin: Arc::new(value),
             build: build::<T>,
+            build_async: Arc::new(build_async::<T>),
             clone_instance,
         }
     }
@@ -559,19 +630,20 @@ fn sync_eager_create_function<T: 'static + Send + Sync>()
     }
 }
 
-fn create_async<T: 'static + Send + Sync>(
-    _cx: &mut dyn ApplicationContext,
+fn create_async<'a, T: 'static + Send + Sync>(
+    cx: &'a mut dyn ApplicationContext,
     name: Cow<'static, str>,
-) -> BoxFuture<'static, ()> {
-    // Asynchronous eager creation is not supported yet: the instance is created
-    // when it is resolved for the first time instead.
-    let _ = name;
-    let _ = std::marker::PhantomData::<fn() -> T>;
-    Box::pin(async {})
+) -> BoxFuture<'a, ()> {
+    Box::pin(async move {
+        // Resolving the instance is enough: a singleton is cached by the
+        // context, so the instance that is resolved later is the one created
+        // here.
+        let _ = cx.resolve_option_with_name_async::<T>(name).await;
+    })
 }
 
 fn async_eager_create_function<T: 'static + Send + Sync>()
--> fn(&mut dyn ApplicationContext, Cow<'static, str>) -> BoxFuture<'static, ()> {
+-> for<'a> fn(&'a mut dyn ApplicationContext, Cow<'static, str>) -> BoxFuture<'a, ()> {
     create_async::<T>
 }
 
@@ -686,7 +758,7 @@ macro_rules! define_provider_sync {
         /// # Example
         ///
         /// ```rust
-        #[doc = concat!("use next-web-context::{", stringify!($function), ", ", stringify!($provider), "};")]
+        #[doc = concat!("use next_web_context::{", stringify!($function), ", ", stringify!($provider), ", ApplicationContextExt as _};")]
         ///
         /// #[derive(Clone)]
         /// struct A(i32);
@@ -722,14 +794,14 @@ macro_rules! define_provider_sync {
             /// # Example
             ///
             /// ```rust
-            /// use std::{fmt::Debug, rc::Arc, sync::Arc};
+            /// use std::{fmt::Debug, sync::Arc};
             ///
-            #[doc = concat!("use next-web-context::{", stringify!($function), ", Provider, ", stringify!($provider), "};")]
+            #[doc = concat!("use next_web_context::{", stringify!($function), ", Provider, ", stringify!($provider), ", ApplicationContextExt as _};")]
             ///
             /// #[derive(Clone, Debug)]
             /// struct A(i32);
             ///
-            /// fn into_debug(a: A) -> Arc<dyn Debug> {
+            /// fn into_debug(a: A) -> Arc<dyn Debug + Send + Sync> {
             ///     Arc::new(a)
             /// }
             ///
@@ -830,7 +902,7 @@ macro_rules! define_provider_async {
         /// # Example
         ///
         /// ```rust
-        #[doc = concat!("use next-web-context::{", stringify!($function), ", FutureExt, ", stringify!($provider), "};")]
+        #[doc = concat!("use next_web_context::{", stringify!($function), ", FutureExt, ", stringify!($provider), ", ApplicationContextAsyncExt as _};")]
         ///
         /// #[derive(Clone)]
         /// struct A(i32);
@@ -840,15 +912,18 @@ macro_rules! define_provider_async {
         #[doc = concat!("        ", stringify!($function), "(|cx| async { A(cx.resolve_async().await) }.boxed());")]
         /// }
         /// ```
+        /// The constructor receives the context, so the future it returns
+        /// borrows the context: the closure is called once per resolution, and
+        /// the future it returns is awaited before the context is used again.
         pub fn $function<T: Send + Sync + 'static, C>(constructor: C) -> $provider<T>
         where
-            C: Fn(&mut dyn ApplicationContext) -> BoxFuture<'static, T> + 'static + Send + Sync,
+            C: for<'a> Fn(&'a mut dyn ApplicationContext) -> BoxFuture<'a, T>
+                + 'static
+                + Send
+                + Sync,
         {
             $provider {
-                constructor: Constructor::Async(Arc::new(move |cx| {
-                    let fut = constructor(cx);
-                    Box::pin(async move { fut.await }) as BoxFuture<'_, T>
-                })),
+                constructor: Constructor::Async(Arc::new(move |cx| constructor(cx))),
                 name: Cow::Borrowed(""),
                 eager_create: false,
                 condition: None,
@@ -870,14 +945,14 @@ macro_rules! define_provider_async {
             /// # Example
             ///
             /// ```rust
-            /// use std::{fmt::Debug, rc::Arc, sync::Arc};
+            /// use std::{fmt::Debug, sync::Arc};
             ///
-            #[doc = concat!("use next-web-context::{", stringify!($function), ", FutureExt, Provider, ", stringify!($provider), "};")]
+            #[doc = concat!("use next_web_context::{", stringify!($function), ", FutureExt, Provider, ", stringify!($provider), ", ApplicationContextAsyncExt as _};")]
             ///
             /// #[derive(Clone, Debug)]
             /// struct A(i32);
             ///
-            /// fn into_debug(a: A) -> Arc<dyn Debug> {
+            /// fn into_debug(a: A) -> Arc<dyn Debug + Send + Sync> {
             ///     Arc::new(a)
             /// }
             ///
@@ -907,9 +982,17 @@ macro_rules! define_provider_async {
                         eager_create,
                         condition,
                         Constructor::Async(Arc::new(move |cx| {
-                            let instance = cx.resolve_with_name(name.clone());
+                            let name = name.clone();
                             let transform_clone = transform.clone();
-                            Box::pin(async move { transform_clone(instance) }) as BoxFuture<'_, U>
+
+                            // The instance the binding is built from is created
+                            // asynchronously as well, because the provider it is
+                            // bound to may be created asynchronously.
+                            Box::pin(async move {
+                                let instance = cx.resolve_with_name_async(name).await;
+
+                                transform_clone(instance)
+                            }) as BoxFuture<'_, U>
                         })),
                         $clone_instance,
                         EagerCreateFunction::Async(

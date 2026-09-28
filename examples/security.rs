@@ -29,7 +29,10 @@ use next_web_security::{
         security_builder::SecurityBuilder,
         web::{WebSecurityConfigurer, builders::HttpSecurity},
     },
-    web::{FilterChainProxy, security_filter_chain::SecurityFilterChain, util::matcher::Builder},
+    web::{
+        FilterChainProxy, security_filter_chain::SecurityFilterChain,
+        util::matcher::PathPatternRequestMatcherBuilder,
+    },
 };
 use tokio::sync::Mutex;
 

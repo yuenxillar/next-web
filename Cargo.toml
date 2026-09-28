@@ -225,9 +225,10 @@ amqprs = { version = "2.1.1", features = ["traces"] }
 
 # macro dependencies
 proc-macro2 = { version = "1" }
-quote = { version = "1" }
-syn = { version = "2" }
-from-attr = { version = "0.1.3" }
+quote       = { version = "1" }
+syn         = { version = "2" }
+from-attr   = { version = "0.1.3" }
+zyn         = { version = "0.5.4" }
 
 # optional dependencies
 inventory = { version = "0.3.21" }

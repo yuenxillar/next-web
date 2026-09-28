@@ -1,11 +1,8 @@
 pub mod account_status_user_details_exceptions;
 pub mod anonymous_authentication_provider;
 pub mod authentication_details_source;
-pub mod authentication_event_publisher;
-pub mod authentication_manager_resolver;
 pub mod caching_user_details_service;
 pub mod dao;
-pub mod default_authentication_event_publisher;
 pub mod delegating_authentication_manager;
 pub mod event;
 pub mod ott;
@@ -20,18 +17,26 @@ pub mod testing_authentication_token;
 
 mod account_status_user_details_checker;
 mod anonymous_authentication_token;
+mod authentication_event_publisher;
 mod authentication_events;
+mod authentication_manager_resolver;
 mod authentication_provider;
 mod authentication_trust_resolver_impl;
 mod base_authentication_token;
+mod default_authentication_event_publisher;
 mod remember_me_authentication_token;
 mod username_password_authentication_token;
 
 pub use account_status_user_details_checker::AccountStatusUserDetailsChecker;
 pub use anonymous_authentication_token::{string_hash, AnonymousAuthenticationToken, EMPTY_STRING};
+pub use authentication_event_publisher::{
+    AuthenticationEventPublisher, NullAuthenticationEventPublisher,
+};
 pub use authentication_events::*;
+pub use authentication_manager_resolver::AuthenticationManagerResolver;
 pub use authentication_provider::AuthenticationProvider;
 pub use authentication_trust_resolver_impl::AuthenticationTrustResolverImpl;
 pub use base_authentication_token::{BaseAuthenticationBuilder, BaseAuthenticationToken};
+pub use default_authentication_event_publisher::DefaultAuthenticationEventPublisher;
 pub use remember_me_authentication_token::RememberMeAuthenticationToken;
 pub use username_password_authentication_token::UsernamePasswordAuthenticationToken;

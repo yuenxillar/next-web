@@ -23,24 +23,24 @@
 use std::any::{Any, TypeId};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use next_web_singletons::factory::support::Key;
 
 use crate::{ApplicationEventPublisher, MessageSource};
 
 /// The name of the  singleton in the context.
-/// If none is supplied, message resolution is delegated to the parent.
 pub const MESSAGE_SOURCE_SINGLETON_NAME: &str = "messageSource";
 
 /// The name of the ApplicationEventMulticaster singleton in the context.
-/// If none is supplied, a SimpleApplicationEventMulticaster is used.
 pub const APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME: &str = "applicationEventMulticaster";
 
+/// The name of the ApplicationEventPublisher singleton in the context.
+pub const APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME: &str = "applicationEventPublisher";
+
 /// The name of the ResourceLoader singleton in the context.
-/// If none is supplied, a SimpleResourceLoader is used.
 pub const RESOURCE_LOADER_SINGLETON_NAME: &str = "resourceLoader";
 
 /// The name of the ApplicationEnvironment singleton in the context.
-/// If none is supplied, a SimpleApplicationEnvironment is used.
 pub const APPLICATION_ENVIRONMENT_SINGLETON_NAME: &str = "applicationEnvironment";
 
 /// The name of the ApplicationArguments singleton in the context.
@@ -55,31 +55,6 @@ pub const APPLICATION_ARGUMENTS_SINGLETON_NAME: &str = "applicationArguments";
 /// their concrete type.
 pub type InstanceClone =
     Arc<dyn Fn(&(dyn Any + Send + Sync)) -> Box<dyn Any + Send + Sync> + Send + Sync>;
-
-/// Returns the name a singleton of type `T` is registered with by default.
-///
-/// The name is the last segment of the type name with its first character lower
-/// cased, so `MyService` becomes `myService` and
-/// `crate::service::MyService` becomes `myService` as well.
-///
-/// # Type Parameters
-///
-/// * `T` - The type whose default name is returned.
-pub fn default_singleton_name<T: ?Sized>() -> String {
-    let type_name = std::any::type_name::<T>();
-    let name = type_name.rsplit("::").next().unwrap_or_default();
-
-    let mut characters = name.chars();
-    match characters.next() {
-        Some(first) => {
-            let mut default_name = String::with_capacity(name.len());
-            default_name.extend(first.to_lowercase());
-            default_name.push_str(characters.as_str());
-            default_name
-        }
-        None => name.to_string(),
-    }
-}
 
 /// The application context service provider interface.
 ///
@@ -98,6 +73,7 @@ pub fn default_singleton_name<T: ?Sized>() -> String {
 ///
 /// Implementations are expected to be usable as `&mut dyn ApplicationContext`,
 /// which is why every method of this trait is object safe.
+#[async_trait]
 pub trait ApplicationContext
 where
     Self: Send + Sync,
@@ -172,6 +148,23 @@ where
     /// * `key` - The key identifying the instance.
     fn resolve_boxed(&mut self, key: &Key) -> Option<Box<dyn Any + Send + Sync>>;
 
+    /// Produces an owned, type erased instance for the given key, awaiting the
+    /// constructor of a provider that creates its instance asynchronously.
+    ///
+    /// This is the counterpart of [`Self::resolve_boxed`] for the constructors
+    /// that are `async fn`s. The client methods of the asynchronous accessors
+    /// are provided by
+    /// [`ApplicationContextAsyncExt`](crate::ApplicationContextAsyncExt).
+    ///
+    /// A context that cannot create an instance asynchronously and that only
+    /// holds providers with a synchronous constructor can delegate to
+    /// [`Self::resolve_boxed`], which creates every one of them.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key identifying the instance.
+    async fn resolve_boxed_async(&mut self, key: &Key) -> Option<Box<dyn Any + Send + Sync>>;
+
     /// Produces owned, type erased instances for every key whose instance has
     /// the given type.
     ///
@@ -182,6 +175,30 @@ where
     ///
     /// * `ty` - The [`TypeId`] of the instances to produce.
     fn resolve_all_of_type(&mut self, ty: TypeId) -> Vec<Box<dyn Any + Send + Sync>>;
+
+    /// Produces owned, type erased instances for every key whose instance has
+    /// the given type, awaiting the constructors that create their instance
+    /// asynchronously.
+    ///
+    /// This is the counterpart of [`Self::resolve_all_of_type`] for the
+    /// asynchronous resolution, and its default implementation resolves every
+    /// key with [`Self::resolve_boxed_async`].
+    ///
+    /// # Arguments
+    ///
+    /// * `ty` - The [`TypeId`] of the instances to produce.
+    async fn resolve_all_of_type_async(&mut self, ty: TypeId) -> Vec<Box<dyn Any + Send + Sync>> {
+        let keys = self.keys_of_type(ty);
+        let mut instances = Vec::with_capacity(keys.len());
+
+        for key in keys {
+            if let Some(instance) = self.resolve_boxed_async(&key).await {
+                instances.push(instance);
+            }
+        }
+
+        instances
+    }
 
     /// Returns the keys of the instances whose type has the given [`TypeId`].
     ///

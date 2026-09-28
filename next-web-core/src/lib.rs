@@ -4,7 +4,6 @@ pub mod common;
 pub mod constants;
 pub mod context;
 pub mod convert;
-pub mod cors;
 pub mod env;
 pub mod error;
 pub mod filter;

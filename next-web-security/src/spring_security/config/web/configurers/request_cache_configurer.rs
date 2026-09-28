@@ -25,8 +25,8 @@ use crate::{
             HttpSessionRequestCache, NullRequestCache, RequestCache, RequestCacheAwareFilter,
         },
         util::matcher::{
-            AndRequestMatcher, Builder, MediaTypeRequestMatcher, NegatedRequestMatcher,
-            RequestHeaderRequestMatcher, RequestMatcher,
+            AndRequestMatcher, MediaTypeRequestMatcher, NegatedRequestMatcher,
+            PathPatternRequestMatcherBuilder, RequestHeaderRequestMatcher, RequestMatcher,
         },
     },
 };
@@ -94,7 +94,7 @@ where
         H: 'static,
     {
         let builder = http
-            .shared_object::<Builder>()
+            .shared_object::<PathPatternRequestMatcherBuilder>()
             .map(Clone::clone)
             .unwrap_or_default();
 

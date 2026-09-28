@@ -302,6 +302,29 @@ fn a_reference_argument_of_an_async_function_is_created_async() {
 }
 
 #[test]
+fn an_async_constructor_imports_the_asynchronous_accessors() {
+    let (context, _, _) = resolve_of(
+        r#"fn test_name(#[autowired(name = "testName")] name: String) -> String"#,
+        Color::Async,
+    );
+
+    // The statements that await a constructor call the asynchronous methods of
+    // the context, which live in an extension trait of their own.
+    assert!(
+        context.contains("use :: next_web_context :: ApplicationContextAsyncExt as _ ;"),
+        "{context}"
+    );
+    assert!(
+        context.contains("use :: next_web_context :: ApplicationContextExt as _ ;"),
+        "{context}"
+    );
+    assert!(
+        context.contains(r#"let owned_0 = cx . resolve_with_name_async ("testName") . await ;"#),
+        "{context}"
+    );
+}
+
+#[test]
 fn an_explicit_ref_argument_is_taken_from_the_context() {
     let (context, instances, args) = resolve_of(
         r#"fn test_name(#[autowired(ref, name = "testName")] name: &String) -> String"#,

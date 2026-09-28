@@ -76,17 +76,18 @@ impl PathPatternRequestMatcher {
         Self::with_defaults().matcher(method, pattern)
     }
 
-    /// Creates a new `Builder` with default settings.
+    /// Creates a new `PathPatternRequestMatcherBuilder` with default settings.
     ///
     /// # Returns
     ///
     /// A `Builder` that treats URIs as relative to the context path, if any.
-    pub fn with_defaults() -> Builder {
-        Builder::default()
+    pub fn with_defaults() -> PathPatternRequestMatcherBuilder {
+        PathPatternRequestMatcherBuilder::default()
     }
 
-    pub fn with_path_pattern_parser(parser: PathPatternParser) -> Builder {
-        Builder::with_parser(Arc::new(parser))
+    /// Creates a new `PathPatternRequestMatcherBuilder` with a custom path pattern parser.
+    pub fn with_path_pattern_parser(parser: PathPatternParser) -> PathPatternRequestMatcherBuilder {
+        PathPatternRequestMatcherBuilder::with_parser(Arc::new(parser))
     }
 }
 
@@ -274,7 +275,7 @@ fn simple_regex_match(expr: &str, value: &str) -> bool {
     segment_match(expr, value)
 }
 
-pub static DEFAULT_BUILDER: OnceLock<Builder> = OnceLock::new();
+pub static DEFAULT_BUILDER: OnceLock<PathPatternRequestMatcherBuilder> = OnceLock::new();
 
 /// A builder for specifying various elements of a request for the purpose
 /// of creating a `PathPatternRequestMatcher`.
@@ -302,12 +303,12 @@ pub static DEFAULT_BUILDER: OnceLock<Builder> = OnceLock::new();
 /// let admin_matcher = mvc.matcher(None, "/admin/**");
 /// ```
 #[derive(Debug, Clone)]
-pub struct Builder {
+pub struct PathPatternRequestMatcherBuilder {
     parser: Arc<PathPatternParser>,
     base_path: String,
 }
 
-impl Builder {
+impl PathPatternRequestMatcherBuilder {
     /// Creates a new `Builder` with an empty base path.
     #[allow(unused)]
     fn new(parser: Arc<PathPatternParser>, base_path: impl Into<String>) -> Self {
@@ -400,7 +401,7 @@ impl Builder {
     }
 }
 
-impl Default for Builder {
+impl Default for PathPatternRequestMatcherBuilder {
     fn default() -> Self {
         Self {
             parser: PathPatternParser::default_instance(),
@@ -451,7 +452,7 @@ mod tests {
 
     #[test]
     fn test_base_path_builder() {
-        let builder = Builder::default().base_path("/mvc");
+        let builder = PathPatternRequestMatcherBuilder::default().base_path("/mvc");
 
         let matcher = builder.matcher(None, "/user/**");
 

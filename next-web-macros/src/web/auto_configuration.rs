@@ -12,217 +12,311 @@
 //! the framework applies it together with every other auto-configuration of the
 //! application, in the order of [`Ordered`](::next_web_core::Ordered), and only
 //! when its conditions hold.
+//!
+//! The configurations a configuration has to be applied before or after are
+//! declared with the `before` and `after` attributes, which name the
+//! configurations after their types.
 
 use std::collections::HashSet;
 
 use from_attr::FromAttr;
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::spanned::Spanned;
 use syn::{
     Error, Expr, ExprPath, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, LitStr, Pat, PatType,
     ReturnType, Signature, Type,
 };
+use syn::{Stmt, parse_quote, parse2};
 
-use crate::{util::logic::Logic, web::attrs::auto_configuration_attr::*};
+use crate::{
+    di::commons::{
+        BorrowedReference, ResolveOneValue, check_reference_borrows, push_resolve_stmts,
+    },
+    util::logic::Logic,
+    web::attrs::auto_configuration_attr::*,
+};
 
 /// The order a provider runs in when the configuration does not declare one,
 /// which is the default order of [`Ordered`](::next_web_core::Ordered).
 const DEFAULT_ORDER: &str = "100";
 
-pub fn impl_macro_auto_configuration(attrs: TokenStream, mut item_impl: ItemImpl) -> TokenStream {
-    Logic::generate(|| {
-        safety_check(&item_impl)?;
+pub fn impl_macro_auto_configuration(attrs: TokenStream, item_impl: ItemImpl) -> TokenStream {
+    Logic::generate(|| generate_auto_configuration(attrs.into(), item_impl))
+}
 
-        let configuration = AutoConfigurationAttr::from_tokens(attrs.into())?;
+/// Generates the configuration class of an annotated implementation block, and
+/// returns the code of the class.
+///
+/// The function is the body of [`impl_macro_auto_configuration`] with the token
+/// streams of the procedural macro API replaced by the ones a test can build, so
+/// that the code the macro generates can be asserted on without an application.
+///
+/// # Errors
+///
+/// Returns an error when the annotated item is not an implementation block of a
+/// configuration class, or when an attribute of the macro is invalid.
+///
+/// # Arguments
+///
+/// * `attrs` - The attributes of the macro.
+/// * `item_impl` - The annotated implementation block.
+pub(crate) fn generate_auto_configuration(
+    attrs: TokenStream2,
+    mut item_impl: ItemImpl,
+) -> Result<TokenStream2, Error> {
+    safety_check(&item_impl)?;
 
-        let type_path = match item_impl.self_ty.as_ref() {
-            Type::Path(type_path) => type_path.path.segments.last(),
-            _ => return Err(Error::new(item_impl.self_ty.span(), "")),
-        };
+    let configuration = AutoConfigurationAttr::from_tokens(attrs)?;
 
-        let path = match type_path {
-            Some(path) => path,
-            None => return Err(Error::new(type_path.span(), "")),
-        };
+    let type_path = match item_impl.self_ty.as_ref() {
+        Type::Path(type_path) => type_path.path.segments.last(),
+        _ => return Err(Error::new(item_impl.self_ty.span(), "")),
+    };
 
-        // The type the configuration is generated for, which the conditions of
-        // the configuration name with `Self`.
-        let annotated = path.ident.clone();
+    let path = match type_path {
+        Some(path) => path,
+        None => return Err(Error::new(type_path.span(), "")),
+    };
 
-        // The type that carries the generated implementation. Its name is
-        // derived from the annotated type, so the configurations of two types do
-        // not collide.
-        let registration = Ident::new(&format!("__{}Gen", annotated), Span::call_site());
+    // The type the configuration is generated for, which the conditions of
+    // the configuration name with `Self`.
+    let annotated = path.ident.clone();
 
-        // The provider that hands the configuration out is registered under the
-        // name of the generated type, which keeps it apart from the provider of
-        // the annotated type itself, when that type declares one as well.
-        let name = match configuration.name {
-            Some(name) if name.value().trim().is_empty() => {
-                return Err(Error::new(name.span(), "name must not be empty"));
-            }
-            Some(name) => name,
-            None => LitStr::new(&registration.to_string(), registration.span()),
-        };
+    // The type that carries the generated implementation. Its name is
+    // derived from the annotated type, so the configurations of two types do
+    // not collide.
+    let registration = Ident::new(&format!("__{}Gen", annotated), Span::call_site());
 
-        let order: Expr = match configuration.order {
-            Some(order) => order,
-            None => syn::parse_str(DEFAULT_ORDER).expect("the default order is an integer"),
-        };
+    // The provider that hands the configuration out is registered under the
+    // name of the generated type, which keeps it apart from the provider of
+    // the annotated type itself, when that type declares one as well.
+    let name = match configuration.name {
+        Some(name) if name.value().trim().is_empty() => {
+            return Err(Error::new(name.span(), "name must not be empty"));
+        }
+        Some(name) => name,
+        None => LitStr::new(&registration.to_string(), registration.span()),
+    };
 
-        let conditions = configuration
-            .conditional
-            .into_iter()
-            .map(|mut condition| {
-                qualify_self(&mut condition, &annotated);
-                condition
-            })
-            .collect::<Vec<_>>();
+    let order: Expr = match configuration.order {
+        Some(order) => order,
+        None => syn::parse_str(DEFAULT_ORDER).expect("the default order is an integer"),
+    };
 
-        let mut attributes = attributes(&mut item_impl.items)?;
+    let conditions = configuration
+        .conditional
+        .into_iter()
+        .map(|mut condition| {
+            qualify_self(&mut condition, &annotated);
+            condition
+        })
+        .collect::<Vec<_>>();
 
-        // The functions the providers name as their conditions. A condition
-        // that is named without a path, `conditional = [enabled]`, is a
-        // function of the module of the configuration, which is emitted with
-        // the configuration so that the name resolves.
-        let condition_names = attributes
-            .iter_mut()
-            .map(|(_index, _attrs, function)| function.provider_attr.as_mut())
-            .map(|attr| {
-                attr.map(|attr| attr.conditional.iter_mut())
-                    .unwrap_or_default()
-            })
-            .flat_map(|conditions| {
-                conditions
-                    .map(|condition| {
-                        qualify_self(condition, &annotated);
-                        condition.to_token_stream().to_string()
-                    })
-                    .filter(|condition| !condition.contains("::"))
-                    .collect::<Vec<_>>()
-            })
-            .collect::<HashSet<String>>()
-            .into_iter()
-            .map(|condition| Ident::new(&condition, Span::call_site()))
-            .collect::<Vec<_>>();
+    let mut attributes = attributes(&mut item_impl.items)?;
 
-        let providers = gen_code(&item_impl.items, attributes)?;
+    // The functions the providers name as their conditions. A condition
+    // that is named without a path, `conditional = [enabled]`, is a
+    // function of the module of the configuration, which is emitted with
+    // the configuration so that the name resolves.
+    let condition_names = attributes
+        .iter_mut()
+        .map(|(_index, _attrs, function)| function.provider_attr.as_mut())
+        .map(|attr| {
+            attr.map(|attr| attr.conditional.iter_mut())
+                .unwrap_or_default()
+        })
+        .flat_map(|conditions| {
+            conditions
+                .map(|condition| {
+                    qualify_self(condition, &annotated);
+                    condition.to_token_stream().to_string()
+                })
+                .filter(|condition| !condition.contains("::"))
+                .collect::<Vec<_>>()
+        })
+        .collect::<HashSet<String>>()
+        .into_iter()
+        .map(|condition| Ident::new(&condition, Span::call_site()))
+        .collect::<Vec<_>>();
 
-        let mut condition_functions = Vec::new();
-        for item_fn in item_impl.items.iter().filter_map(|item| match item {
-            ImplItem::Fn(impl_item_fn) => Some(impl_item_fn),
-            _ => None,
-        }) {
-            if condition_names
-                .iter()
-                .any(|name| &item_fn.sig.ident == name)
-            {
-                match &item_fn.sig.output {
-                    ReturnType::Default => {
-                        return Err(Error::new(
-                            item_fn.span(),
-                            "the condition function has to declare the return type bool",
-                        ));
-                    }
-                    ReturnType::Type(_, ty) => match ty.as_ref() {
-                        Type::Path(type_path) => {
-                            if !type_path.path.is_ident("bool") {
-                                return Err(Error::new(
-                                    item_fn.span(),
-                                    "the condition function has to return a boolean value",
-                                ));
-                            }
-                            condition_functions.push(item_fn);
-                        }
-                        _ => {
+    let providers = gen_code(&item_impl.items, attributes)?;
+
+    let mut condition_functions = Vec::new();
+    for item_fn in item_impl.items.iter().filter_map(|item| match item {
+        ImplItem::Fn(impl_item_fn) => Some(impl_item_fn),
+        _ => None,
+    }) {
+        if condition_names
+            .iter()
+            .any(|name| &item_fn.sig.ident == name)
+        {
+            match &item_fn.sig.output {
+                ReturnType::Default => {
+                    return Err(Error::new(
+                        item_fn.span(),
+                        "the condition function has to declare the return type bool",
+                    ));
+                }
+                ReturnType::Type(_, ty) => match ty.as_ref() {
+                    Type::Path(type_path) => {
+                        if !type_path.path.is_ident("bool") {
                             return Err(Error::new(
                                 item_fn.span(),
                                 "the condition function has to return a boolean value",
                             ));
                         }
-                    },
+                        condition_functions.push(item_fn);
+                    }
+                    _ => {
+                        return Err(Error::new(
+                            item_fn.span(),
+                            "the condition function has to return a boolean value",
+                        ));
+                    }
+                },
+            }
+        }
+    }
+
+    let matches = if conditions.is_empty() {
+        quote! {}
+    } else {
+        let conditions = conditions.iter();
+
+        quote! {
+            fn matches(&self, ctx: &dyn ::next_web_core::ApplicationContext) -> bool {
+                #[allow(unused_parens)]
+                if !( #(#conditions(ctx))&&* ) {
+                    return false;
                 }
+
+                true
+            }
+        }
+    };
+
+    let before = configuration_names(configuration.before, "before")?;
+    let after = configuration_names(configuration.after, "after")?;
+
+    // The name of the configuration is the name of the annotated type and
+    // not the name of the type the macro generates for it, because the name
+    // is the one the `before` and `after` lists of the other configurations
+    // refer to this one with.
+    let configuration_name = LitStr::new(&annotated.to_string(), annotated.span());
+
+    let before = if before.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            fn auto_configure_before(&self) -> &'static [&'static str] {
+                &[ #(#before),* ]
+            }
+        }
+    };
+
+    let after = if after.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            fn auto_configure_after(&self) -> &'static [&'static str] {
+                &[ #(#after),* ]
+            }
+        }
+    };
+
+    let expanded = quote! {
+
+        #item_impl
+
+        #[doc(hidden)]
+        #[derive(Clone)]
+        #[allow(non_camel_case_types)]
+        struct #registration;
+
+        #[::next_web_core::async_trait]
+        impl ::next_web_core::traits::config::auto_configuration::AutoConfiguration
+            for #registration
+        {
+            async fn configure(
+                &mut self,
+                ctx: &mut dyn ::next_web_core::ApplicationContext,
+            ) -> ::core::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error>> {
+                use ::next_web_context::ApplicationContextExt as _;
+
+                #(#condition_functions)*
+
+                #providers
+
+                ::core::result::Result::Ok(())
+            }
+
+            #matches
+
+            fn auto_configuration_name(&self) -> &'static str {
+                #configuration_name
+            }
+
+            #before
+            #after
+        }
+
+        impl ::next_web_core::Ordered for #registration {
+            fn order(&self) -> i32 {
+                #order
             }
         }
 
-        let matches = if conditions.is_empty() {
-            quote! {}
-        } else {
-            let conditions = conditions.iter();
-
-            quote! {
-                fn matches(&self, ctx: &dyn ::next_web_core::ApplicationContext) -> bool {
-                    #[allow(unused_parens)]
-                    if !( #(#conditions(ctx))&&* ) {
-                        return false;
+        // The configuration is an auto-configuration of the application,
+        // so it is registered like the auto-configurations of a starter,
+        // and applied by the context while it refreshes.
+        ::next_web_core::register_provider!(
+            <::next_web_context::Provider<
+                ::std::boxed::Box<
+                    dyn ::next_web_core::traits::config::auto_configuration::AutoConfiguration
+                >
+            > as ::core::convert::From<_>>::from(
+                ::next_web_context::singleton(
+                    |_: &mut dyn ::next_web_core::ApplicationContext| {
+                        ::std::boxed::Box::new(#registration)
+                            as ::std::boxed::Box<
+                                dyn ::next_web_core::traits::config::auto_configuration::AutoConfiguration
+                            >
                     }
-
-                    true
-                }
-            }
-        };
-
-        let expanded = quote! {
-
-            #item_impl
-
-            #[doc(hidden)]
-            #[derive(Clone)]
-            #[allow(non_camel_case_types)]
-            struct #registration;
-
-            #[::next_web_core::async_trait]
-            impl ::next_web_core::traits::config::auto_configuration::AutoConfiguration
-                for #registration
-            {
-                async fn configure(
-                    &mut self,
-                    ctx: &mut dyn ::next_web_core::ApplicationContext,
-                ) -> ::core::result::Result<(), ::std::boxed::Box<dyn ::std::error::Error>> {
-                    use ::next_web_context::ApplicationContextExt as _;
-
-                    #(#condition_functions)*
-
-                    #providers
-
-                    ::core::result::Result::Ok(())
-                }
-
-                #matches
-            }
-
-            impl ::next_web_core::Ordered for #registration {
-                fn order(&self) -> i32 {
-                    #order
-                }
-            }
-
-            // The configuration is an auto-configuration of the application,
-            // so it is registered like the auto-configurations of a starter,
-            // and applied by the context while it refreshes.
-            ::next_web_core::register_provider!(
-                <::next_web_context::Provider<
-                    ::std::boxed::Box<
-                        dyn ::next_web_core::traits::config::auto_configuration::AutoConfiguration
-                    >
-                > as ::core::convert::From<_>>::from(
-                    ::next_web_context::singleton(
-                        |_: &mut dyn ::next_web_core::ApplicationContext| {
-                            ::std::boxed::Box::new(#registration)
-                                as ::std::boxed::Box<
-                                    dyn ::next_web_core::traits::config::auto_configuration::AutoConfiguration
-                                >
-                        }
-                    )
-                    .name(#name)
                 )
-            );
-        };
+                .name(#name)
+            )
+        );
+    };
 
-        Ok(expanded)
-    })
+    Ok(expanded)
+}
+
+/// Returns the names a `before` or an `after` attribute of an
+/// `#[auto_configuration]` declares.
+///
+/// # Errors
+///
+/// Returns an error when a name is empty, because an empty name can never name a
+/// configuration.
+///
+/// # Arguments
+///
+/// * `names` - The names the attribute declares.
+/// * `attribute` - The attribute the names were declared in, which the error
+///   names.
+fn configuration_names(names: Vec<LitStr>, attribute: &str) -> Result<Vec<LitStr>, Error> {
+    for name in &names {
+        if name.value().trim().is_empty() {
+            return Err(Error::new(
+                name.span(),
+                format!("a name of the `{attribute}` attribute must not be empty"),
+            ));
+        }
+    }
+
+    Ok(names)
 }
 
 /// Rewrites the `Self` of a condition into the annotated type, so that a
@@ -241,6 +335,21 @@ fn qualify_self(condition: &mut ExprPath, annotated: &Ident) {
     }
 }
 
+/// Checks that the annotated item can be a configuration class.
+///
+/// The block has to be an inherent implementation, because the configuration is
+/// generated as a type of its own, and the methods of the block cannot take
+/// `self`, because the framework calls them with the dependencies they declare
+/// as their parameters.
+///
+/// # Errors
+///
+/// Returns an error when the block implements a trait, or when one of its
+/// methods takes a `self` parameter.
+///
+/// # Arguments
+///
+/// * `item_impl` - The annotated implementation block.
 fn safety_check(item_impl: &ItemImpl) -> Result<(), Error> {
     // 1. Check if the trait has been implemented
     if let Some(trait_name) = match item_impl.trait_.as_ref() {
@@ -260,29 +369,11 @@ fn safety_check(item_impl: &ItemImpl) -> Result<(), Error> {
     for item in item_impl.items.iter() {
         if let ImplItem::Fn(item_fn) = item {
             for fn_arg in item_fn.sig.inputs.iter() {
-                match fn_arg {
-                    FnArg::Receiver(receiver) => {
-                        return Err(Error::new(
-                            receiver.span(),
-                            "the method of an auto-configuration cannot have a self parameter",
-                        ));
-                    }
-                    FnArg::Typed(typed) => match typed.ty.as_ref() {
-                        Type::Reference(refer) => {
-                            if refer.mutability.is_some() {
-                                return Err(Error::new(
-                                    refer.span(),
-                                    format!(
-                                        "the method `{}` takes a mutable parameter, which is not \
-                                         allowed; a method of an auto-configuration takes its \
-                                         dependencies by reference or by value",
-                                        item_fn.sig.ident
-                                    ),
-                                ));
-                            }
-                        }
-                        _ => {}
-                    },
+                if let FnArg::Receiver(receiver) = fn_arg {
+                    return Err(Error::new(
+                        receiver.span(),
+                        "the method of an auto-configuration cannot have a self parameter",
+                    ));
                 }
             }
         }
@@ -474,10 +565,6 @@ fn expand_provider(
         conditional_on_property_attr,
     } = function;
 
-    let arg_names = (0..sig.inputs.len())
-        .map(|index| Ident::new(&format!("arg{index}"), Span::call_site()))
-        .collect::<Vec<_>>();
-
     let is_async = if is_async {
         quote! { .await }
     } else {
@@ -533,7 +620,19 @@ fn expand_provider(
         }
     });
 
-    let args = sig
+    // The arguments of the provider are resolved in two steps, because the
+    // context lends a reference only while it is borrowed: the values and the
+    // instances a reference borrows are resolved first, which needs the context
+    // mutably, and the references are taken afterwards, which borrows it.
+    let mut ref_mut_cx_stmts = Vec::new();
+    let mut ref_cx_stmts = Vec::new();
+    let mut args = Vec::new();
+
+    // The references the context lends to the provider, paired with their
+    // mutability, which the rules of the borrow are checked against.
+    let mut references: Vec<BorrowedReference> = Vec::new();
+
+    for (index, (input, autowired_attr)) in sig
         .inputs
         .iter()
         .filter_map(|input| match input {
@@ -542,64 +641,98 @@ fn expand_provider(
         })
         .zip(autowired_attrs)
         .enumerate()
-        .map(|(index, (input, autowired_attr))| {
-            let default_name = match input.pat.as_ref() {
-                Pat::Ident(pat) => LitStr::new(&pat.ident.to_string(), Span::call_site()),
-                _ => LitStr::new("", Span::call_site()),
-            };
+    {
+        let default_name = match input.pat.as_ref() {
+            Pat::Ident(pat) => LitStr::new(&pat.ident.to_string(), Span::call_site()),
+            _ => LitStr::new("", Span::call_site()),
+        };
 
-            let is_ref = matches!(input.ty.as_ref(), Type::Reference(_));
-
-            ItemFnArgAttr {
-                ty: match input.ty.as_ref() {
-                    Type::Reference(val) => val.elem.as_ref().clone(),
-                    _ => input.ty.as_ref().clone(),
-                },
-                arg_name: &arg_names[index],
-                default_name,
-                autowired_attr,
-                is_ref,
+        let (name, default) = match autowired_attr {
+            Some(AutowiredAttr { name, default }) => {
+                (name.unwrap_or(default_name), default.unwrap_or_default())
             }
-        })
-        .map(|fn_attr| {
-            let ItemFnArgAttr {
-                ty,
-                default_name,
-                autowired_attr,
-                arg_name,
-                is_ref,
-            } = fn_attr;
+            None => (default_name, false),
+        };
 
-            let (name, default) = match autowired_attr {
-                Some(AutowiredAttr { name, default }) => {
-                    (name.unwrap_or(default_name), default.unwrap_or_default())
+        let (ty, is_reference, is_mut) = match input.ty.as_ref() {
+            Type::Reference(reference) => (
+                reference.elem.as_ref(),
+                true,
+                reference.mutability.is_some(),
+            ),
+            ty => (ty, false, false),
+        };
+
+        if !is_reference {
+            let arg = Ident::new(&format!("owned{index}"), Span::call_site());
+
+            let resolve = if default {
+                quote! {
+                    let #arg = ctx
+                        .resolve_option_with_name::<#ty>(#name)
+                        .unwrap_or_default();
                 }
-                None => (default_name, false),
+            } else {
+                quote! { let #arg = ctx.resolve_with_name::<#ty>(#name); }
             };
 
-            let resolve = match (is_ref, default) {
-                (true, true) => quote! {
-                    let #arg_name =
-                        &ctx.resolve_option_with_name::<#ty>(#name).unwrap_or_default();
+            push_resolve_stmts(
+                ResolveOneValue::Owned {
+                    resolve: parse2::<Stmt>(resolve)?,
                 },
-                (true, false) => quote! {
-                    let #arg_name = &ctx.resolve_with_name::<#ty>(#name);
-                },
-                (false, true) => quote! {
-                    let #arg_name =
-                        ctx.resolve_option_with_name::<#ty>(#name).unwrap_or_default();
-                },
-                (false, false) => quote! {
-                    let #arg_name = ctx.resolve_with_name::<#ty>(#name);
-                },
-            };
+                &mut ref_mut_cx_stmts,
+                &mut ref_cx_stmts,
+            );
 
-            quote! { #resolve }
-        });
+            args.push(arg);
+
+            continue;
+        }
+
+        if default {
+            return Err(Error::new(
+                input.ty.span(),
+                "a reference parameter borrows an instance of the context, so it cannot \
+                 fall back to a default; make the parameter owned",
+            ));
+        }
+
+        let arg = Ident::new(&format!("ref{index}"), Span::call_site());
+
+        // The instance a reference parameter borrows has to exist before it can
+        // be lent, so it is created first, when the context does not hold it
+        // yet. A reference borrows an instance the context holds, and not a
+        // value it resolved for the caller, so the provider sees the instance
+        // the other providers and the application see.
+        let create_single = parse_quote! {
+            ctx.try_just_create_singleton_with_name::<#ty>(#name);
+        };
+
+        let get_singleton = if is_mut {
+            parse_quote! { let #arg = ctx.get_singleton_mut_with_name::<#ty>(#name); }
+        } else {
+            parse_quote! { let #arg = ctx.get_singleton_with_name::<#ty>(#name); }
+        };
+
+        references.push((input.ty.span(), is_mut));
+
+        push_resolve_stmts(
+            ResolveOneValue::Ref {
+                create_single,
+                get_singleton,
+            },
+            &mut ref_mut_cx_stmts,
+            &mut ref_cx_stmts,
+        );
+
+        args.push(arg);
+    }
+
+    check_reference_borrows(&references)?;
 
     let result_unwrap = provider_result_unwrap(&sig);
     let instance = quote! {
-        let instance = #ident( #(#arg_names),* ) #is_async #result_unwrap;
+        let instance = #ident( #(#args),* ) #is_async #result_unwrap;
     };
 
     let singleton_name = provider_attr
@@ -620,7 +753,9 @@ fn expand_provider(
                 #conditional_on_property
                 #conditional
 
-                #(#args)*
+                #(#ref_mut_cx_stmts)*
+
+                #(#ref_cx_stmts)*
 
                 #instance
                 #register_singleton
@@ -688,14 +823,6 @@ struct ItemFnAttr {
     pub signature: Signature,
     pub provider_attr: Option<ProviderAttr>,
     pub conditional_on_property_attr: Option<ConditionalOnPropertyAttr>,
-}
-
-struct ItemFnArgAttr<'a> {
-    pub ty: Type,
-    pub default_name: LitStr,
-    pub autowired_attr: Option<AutowiredAttr>,
-    pub arg_name: &'a Ident,
-    pub is_ref: bool,
 }
 
 #[cfg(test)]

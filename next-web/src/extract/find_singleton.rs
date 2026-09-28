@@ -3,10 +3,10 @@ use std::ops::{Deref, DerefMut};
 use crate::ApplicationState;
 use axum::{
     extract::FromRequestParts,
-    http::{request::Parts, StatusCode},
+    http::{StatusCode, request::Parts},
 };
 use next_web_context::ApplicationContextExt;
-use next_web_core::util::SingletonUtil;
+use next_web_singletons::util::SingletonUtil;
 
 #[derive(Clone)]
 pub struct FindSingleton<T>(pub T);
@@ -45,7 +45,7 @@ where
             .get::<ApplicationState>()
             .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
 
-        let name = SingletonUtil::name::<T>();
+        let name = SingletonUtil::default_singleton_name::<T>();
 
         let instance = find(state, name)
             .await

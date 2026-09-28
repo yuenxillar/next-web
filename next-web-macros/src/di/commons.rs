@@ -19,6 +19,42 @@ fn context_ext_import() -> Stmt {
     parse_quote! { use ::next_web_context::ApplicationContextExt as _; }
 }
 
+/// The import that the generated statements need in order to call the
+/// asynchronous methods of the application context.
+///
+/// The asynchronous client methods live in an extension trait of their own, so
+/// a statement that awaits the constructor of a provider has to import it as
+/// well.
+fn async_context_ext_import() -> Stmt {
+    parse_quote! { use ::next_web_context::ApplicationContextAsyncExt as _; }
+}
+
+/// Adds the imports the generated statements need in front of them.
+///
+/// A statement resolves an instance through the context, so it needs the
+/// extension trait that provides the client methods, and the asynchronous ones
+/// need the trait that awaits the constructors of the providers.
+///
+/// # Arguments
+///
+/// * `stmts` - The statements that need the context.
+/// * `color` - Whether the statements were generated for an asynchronous
+///   constructor.
+fn with_context_imports(stmts: Vec<Stmt>, color: Color) -> Vec<Stmt> {
+    if stmts.is_empty() {
+        return stmts;
+    }
+
+    let mut imports = vec![context_ext_import()];
+
+    if color == Color::Async {
+        imports.push(async_context_ext_import());
+    }
+
+    imports.extend(stmts);
+    imports
+}
+
 pub(crate) fn generate_create_provider(scope: Scope, color: Color) -> TokenStream {
     match (scope, color) {
         (Scope::Singleton, Color::Async) => quote! {
@@ -286,10 +322,17 @@ fn extract_hashmap_type(ty: &Type) -> syn::Result<Type> {
     extract_path_type_with_owned_type(ty, "HashMap")
 }
 
-enum ResolveOneValue {
-    Owned {
-        resolve: Stmt,
-    },
+/// The statement that resolves one field or argument of an item, which is
+/// either a value the context hands out or a reference the context lends.
+///
+/// A reference cannot be lent before the instance exists, so it carries the
+/// statement that creates the instance as well: the two statements end up in
+/// the two sets of statements an item runs before it is built.
+pub(crate) enum ResolveOneValue {
+    /// The statement that resolves an owned value.
+    Owned { resolve: Stmt },
+    /// The statement that creates the instance, and the statement that borrows
+    /// it from the context.
     Ref {
         create_single: Stmt,
         get_singleton: Stmt,
@@ -758,7 +801,7 @@ pub(crate) struct ArgumentResolveStmts {
 /// * `ref_mut_cx_stmts` - The statements that need the context mutably.
 /// * `ref_cx_stmts` - The statements that borrow the instances the first set
 ///   stored in the context.
-fn push_resolve_stmts(
+pub(crate) fn push_resolve_stmts(
     stmt: ResolveOneValue,
     ref_mut_cx_stmts: &mut Vec<Stmt>,
     ref_cx_stmts: &mut Vec<Stmt>,
@@ -777,7 +820,7 @@ fn push_resolve_stmts(
 
 /// The mutability of a reference the context hands out, and where it was
 /// written down.
-type BorrowedReference = (Span, bool);
+pub(crate) type BorrowedReference = (Span, bool);
 
 /// Checks that the references the context hands out to an item can exist at the
 /// same time.
@@ -791,7 +834,7 @@ type BorrowedReference = (Span, bool);
 ///
 /// * `references` - The references of the fields or arguments of the item,
 ///   paired with their mutability.
-fn check_reference_borrows(references: &[BorrowedReference]) -> syn::Result<()> {
+pub(crate) fn check_reference_borrows(references: &[BorrowedReference]) -> syn::Result<()> {
     let mut mutables = references
         .iter()
         .filter(|(_, is_mut)| *is_mut)
@@ -866,12 +909,8 @@ pub(crate) fn generate_argument_resolve_methods(
 
     check_reference_borrows(&references)?;
 
-    if !ref_mut_cx_stmts.is_empty() {
-        ref_mut_cx_stmts.insert(0, context_ext_import());
-    }
-
     Ok(ArgumentResolveStmts {
-        ref_mut_cx_stmts,
+        ref_mut_cx_stmts: with_context_imports(ref_mut_cx_stmts, color),
         ref_cx_stmts,
         args,
     })
@@ -990,12 +1029,8 @@ pub(crate) fn generate_field_resolve_stmts(
 
             check_reference_borrows(&references)?;
 
-            if !ref_mut_cx_stmts.is_empty() {
-                ref_mut_cx_stmts.insert(0, context_ext_import());
-            }
-
             Ok(FieldResolveStmts {
-                ref_mut_cx_stmts,
+                ref_mut_cx_stmts: with_context_imports(ref_mut_cx_stmts, color),
                 ref_cx_stmts,
                 fields: ResolvedFields::Named {
                     field_names,
@@ -1031,12 +1066,8 @@ pub(crate) fn generate_field_resolve_stmts(
 
             check_reference_borrows(&references)?;
 
-            if !ref_mut_cx_stmts.is_empty() {
-                ref_mut_cx_stmts.insert(0, context_ext_import());
-            }
-
             Ok(FieldResolveStmts {
-                ref_mut_cx_stmts,
+                ref_mut_cx_stmts: with_context_imports(ref_mut_cx_stmts, color),
                 ref_cx_stmts,
                 fields: ResolvedFields::Unnamed(field_values),
             })

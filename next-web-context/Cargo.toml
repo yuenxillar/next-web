@@ -11,13 +11,14 @@ repository.workspace = true
 
 
 [dependencies]
+next-web-singletons     = { workspace = true }
+tokio                   = { workspace = true, features = ["time"] }
+
 arc-swap.workspace      = true
 async-trait.workspace   = true
 dyn-clone.workspace     = true
 indexmap.workspace      = true
 inventory.workspace     = true
-next-web-singletons     = { workspace = true }
-tokio                   = { workspace = true, features = ["time"] }
 tracing.workspace       = true
 
 [lints]

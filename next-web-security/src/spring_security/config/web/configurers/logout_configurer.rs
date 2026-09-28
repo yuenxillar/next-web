@@ -28,7 +28,7 @@ use crate::{
         },
         context::{HttpSessionSecurityContextRepository, SecurityContextRepository},
         default_security_filter_chain::DefaultSecurityFilterChain,
-        util::matcher::{Builder, OrRequestMatcher, RequestMatcher},
+        util::matcher::{OrRequestMatcher, PathPatternRequestMatcherBuilder, RequestMatcher},
     },
 };
 
@@ -247,7 +247,7 @@ where
     }
 
     fn create_logout_request_matcher(&self, http: &H) -> Arc<dyn RequestMatcher> {
-        http.shared_object::<Builder>()
+        http.shared_object::<PathPatternRequestMatcherBuilder>()
             .map(|builder| {
                 let post = builder.matcher(Some(HttpMethod::POST), &self.logout_url);
                 if http.configurer::<CsrfConfigurer<H>>().is_some() {

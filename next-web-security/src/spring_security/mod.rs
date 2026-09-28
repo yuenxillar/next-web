@@ -14,6 +14,7 @@ pub mod messaging;
 pub mod oauth2;
 pub mod oauth2_resource_server;
 pub mod permission;
+pub mod provisioning;
 pub mod rsocket;
 pub mod saml2;
 pub mod web;

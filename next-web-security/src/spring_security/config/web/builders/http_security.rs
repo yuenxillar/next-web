@@ -52,7 +52,9 @@ use crate::{
     core::userdetails::UserDetailsService,
     web::{
         default_security_filter_chain::DefaultSecurityFilterChain,
-        util::matcher::{AnyRequestMatcher, Builder, OrRequestMatcher, RequestMatcher},
+        util::matcher::{
+            AnyRequestMatcher, OrRequestMatcher, PathPatternRequestMatcherBuilder, RequestMatcher,
+        },
     },
 };
 
@@ -73,8 +75,8 @@ impl HttpSecurity {
         shared_objects: HashMap<TypeId, Box<dyn AnyClone>>,
     ) -> Self {
         let builder = shared_objects
-            .get(&TypeId::of::<Builder>())
-            .and_then(|s| (s.as_any()).downcast_ref::<Builder>())
+            .get(&TypeId::of::<PathPatternRequestMatcherBuilder>())
+            .and_then(|s| (s.as_any()).downcast_ref::<PathPatternRequestMatcherBuilder>())
             .cloned()
             .unwrap_or_default();
 
@@ -436,7 +438,7 @@ impl HttpSecurity {
     }
 
     pub fn security_matcher_with_strs(&mut self, patterns: &[&str]) -> &mut Self {
-        if let Some(builder) = self.get_shared_object::<Builder>() {
+        if let Some(builder) = self.get_shared_object::<PathPatternRequestMatcherBuilder>() {
             let matchers = patterns
                 .into_iter()
                 .map(|s| builder.matcher(None, s))
@@ -633,7 +635,7 @@ pub struct RequestMatcherConfigurer {
 }
 
 impl RequestMatcherConfigurer {
-    pub fn new(builder: Builder) -> Self {
+    pub fn new(builder: PathPatternRequestMatcherBuilder) -> Self {
         let mut base = BaseRequestMatcherRegistry::<Self>::default();
         base.set_request_matcher_builder(builder);
 

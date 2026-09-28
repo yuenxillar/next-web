@@ -15,6 +15,8 @@ full framework.
   type-erased singleton operations.
 - `ApplicationContextExt`: the generic, type-safe API used by generated code and
   application code.
+- `ApplicationContextAsyncExt`: the same API for the providers whose constructor
+  is an `async fn`, which awaits the constructor.
 - `Provider`: the dependency injection model with singleton, transient, and
   single-owner scopes, synchronous and asynchronous constructors, module
   composition, eager creation, binding providers, and conditions.
@@ -58,6 +60,20 @@ fn configure(context: &mut dyn ApplicationContext) {
 }
 ```
 
+A provider whose constructor is an `async fn` is created by awaiting it, so it
+is resolved with the asynchronous helpers, which await the constructors of the
+providers they resolve:
+
+```rust
+use next_web_context::{ApplicationContext, ApplicationContextAsyncExt};
+
+async fn configure(context: &mut dyn ApplicationContext) {
+    let greeting = context
+        .resolve_with_name_async::<Greeting>("greeting")
+        .await;
+}
+```
+
 ## Providers and Scopes
 
 Providers describe how an instance is created, which name it is registered
@@ -89,7 +105,9 @@ fn greeting_provider() -> Provider<Greeting> {
 
 Providers can also use `bind` to expose the same instance as another type, set
 a condition with `condition`, request eager creation with `eager_create`, or be
-grouped into a `Module`.
+grouped into a `Module`. Eager creation awaits the constructors of the
+asynchronous providers while the context is refreshed, which is what the
+asynchronous refresh of the application context is for.
 
 ## Events
 

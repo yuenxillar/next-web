@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use next_web_context::{ApplicationContext, ApplicationEvent, ApplicationListener};
 use next_web_core::{
-    env::ConfigurableEnvironment, io::ResourceLoader, metrics::ApplicationStartup,
+    async_trait, env::ConfigurableEnvironment, io::ResourceLoader, metrics::ApplicationStartup,
 };
 use next_web_singletons::factory::{
     support::DefaultListableSingletonFactory, ListableSingletonFactory,
@@ -85,6 +85,7 @@ impl From<std::io::Error> for ContextError {
 /// This trait extends [`ApplicationContext`], [`Lifecycle`], and is expected to
 /// behave like a closeable resource. In Rust, `Closeable` maps to
 /// [`Self::close`] returning a [`Result`].
+#[async_trait]
 pub trait ConfigurableApplicationContext<F = DefaultListableSingletonFactory>
 where
     Self: ApplicationContext,
@@ -193,6 +194,24 @@ where
     /// initialized, or [`ContextError::IllegalState`] if the context is already
     /// initialized and multiple refresh attempts are not supported.
     fn refresh(&mut self) -> Result<(), ContextError>;
+
+    /// Refreshes the context like [`Self::refresh`], awaiting the providers that
+    /// are created asynchronously.
+    ///
+    /// [`Self::refresh`] cannot await a provider whose constructor is an
+    /// `async fn`, so it skips the instances such a provider asks to create
+    /// eagerly, and they are created when they are resolved. This method awaits
+    /// them instead, which is what an application that uses asynchronous
+    /// providers refreshes its context with.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error [`Self::refresh`] returns.
+    async fn refresh_async(&mut self) -> Result<(), ContextError>;
 
     /// Pauses all singletons in this application context if necessary, and
     /// subsequently restarts all auto-startup singletons, effectively restoring the

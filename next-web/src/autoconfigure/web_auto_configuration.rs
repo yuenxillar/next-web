@@ -1,9 +1,10 @@
-use next_web_context::ApplicationContextExt;
 use next_web_context::APPLICATION_ENVIRONMENT_SINGLETON_NAME;
+use next_web_context::ApplicationContextExt;
 use next_web_core::context::ConfigurationProperties;
 use next_web_core::{
-    async_trait, env::ConfigurableEnvironment,
-    traits::config::auto_configuration::AutoConfiguration, ApplicationContext, Ordered,
+    ApplicationContext, Ordered, async_trait, env::ConfigurableEnvironment,
+    traits::config::auto_configuration::AutoConfiguration,
+    traits::config::auto_configuration_sorter::AutoConfigurationSorter,
 };
 use std::{error::Error, sync::Arc};
 
@@ -102,16 +103,27 @@ impl WebAutoConfiguration {
     /// - the configuration classes of an application are declared with
     ///   `#[auto_configuration]`, which registers them the same way.
     ///
-    /// They are applied in the order of [`Ordered`](next_web_core::Ordered), and
+    /// They are applied in the order of [`Ordered`](next_web_core::Ordered),
+    /// which the `before` and `after` names a configuration declares refine, and
     /// a configuration whose condition does not hold is skipped.
     async fn run_auto_configurations(
         &mut self,
         ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn Error>> {
-        let mut auto_configurations = ctx.resolve_by_type::<Box<dyn AutoConfiguration>>();
-        auto_configurations.sort_by_key(|ac| ac.order());
-        auto_configurations.retain(|ac| ac.matches(ctx));
-        for mut auto_configuration in auto_configurations.into_iter() {
+        let auto_configurations = ctx.resolve_by_type::<Box<dyn AutoConfiguration>>();
+        let mut auto_configurations = AutoConfigurationSorter::sort(auto_configurations)?;
+
+        auto_configurations.retain(|configuration| configuration.matches(ctx));
+
+        tracing::debug!(
+            configurations = ?auto_configurations
+                .iter()
+                .map(|configuration| configuration.auto_configuration_name())
+                .collect::<Vec<_>>(),
+            "the auto-configurations of the application are applied in this order"
+        );
+
+        for mut auto_configuration in auto_configurations {
             auto_configuration.configure(ctx).await?;
         }
 

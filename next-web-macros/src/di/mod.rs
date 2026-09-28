@@ -16,7 +16,7 @@
 //! The generated code refers to `::next_web_context` by default; the path can
 //! be changed with `#[resource(path = ...)]`.
 
-mod commons;
+pub(crate) mod commons;
 mod field_or_argument_attr;
 mod impl_fn_or_enum_variant_attr;
 mod item_enum_gen;

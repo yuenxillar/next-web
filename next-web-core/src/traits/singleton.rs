@@ -1,4 +1,4 @@
-use crate::{traits::group::Group, util::SingletonUtil};
+use crate::traits::group::Group;
 
 /// 单例
 ///
@@ -47,7 +47,19 @@ where
     Self: Send + Sync,
 {
     fn singleton_name(&self) -> String {
-        SingletonUtil::name::<Self>()
+        let type_name = std::any::type_name::<Self>();
+        let name = type_name.rsplit("::").next().unwrap_or_default();
+
+        let mut characters = name.chars();
+        match characters.next() {
+            Some(first) => {
+                let mut default_name = String::with_capacity(name.len());
+                default_name.extend(first.to_lowercase());
+                default_name.push_str(characters.as_str());
+                default_name
+            }
+            None => name.to_string(),
+        }
     }
 }
 

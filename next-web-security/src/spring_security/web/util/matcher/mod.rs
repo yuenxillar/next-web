@@ -16,7 +16,9 @@ pub use any_request_matcher::AnyRequestMatcher;
 pub use media_type_request_matcher::MediaTypeRequestMatcher;
 pub use negated_request_matcher::NegatedRequestMatcher;
 pub use or_request_matcher::OrRequestMatcher;
-pub use path_pattern_request_matcher::{Builder, PathPatternRequestMatcher, DEFAULT_BUILDER};
+pub use path_pattern_request_matcher::{
+    PathPatternRequestMatcher, PathPatternRequestMatcherBuilder, DEFAULT_BUILDER,
+};
 pub use request_header_request_matcher::RequestHeaderRequestMatcher;
 pub use request_matcher::{MatchResult, RequestMatcher};
 pub use request_matcher_entry::RequestMatcherEntry;

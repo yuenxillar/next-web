@@ -3,9 +3,9 @@ use std::{
     sync::{Arc, Mutex, RwLock},
 };
 
+use next_web_context::ApplicationContextExt;
 use next_web_context::ApplicationEventPublisher;
 use next_web_core::ApplicationContext;
-use next_web_context::ApplicationContextExt;
 
 use crate::{
     access::hierarchicalroles::NullRoleHierarchy, authorization::AuthorizationDecision,
@@ -14,7 +14,7 @@ use crate::{
 use crate::{
     access::hierarchicalroles::RoleHierarchy,
     config::core::granted_authority_defaults::GrantedAuthorityDefaults,
-    web::util::matcher::{Builder, MatcherInput},
+    web::util::matcher::{MatcherInput, PathPatternRequestMatcherBuilder},
 };
 use crate::{
     access::intercept::RequestAuthorizationContext,
@@ -65,7 +65,7 @@ where
                 authorization_manager_factory.clone(),
             );
         registry.base.set_request_matcher_builder(
-            ctx.get_singleton_option::<Builder>()
+            ctx.get_singleton_option::<PathPatternRequestMatcherBuilder>()
                 .map(Clone::clone)
                 .unwrap_or_default(),
         );
@@ -666,7 +666,3 @@ where
         &mut self.base
     }
 }
-
-
-
-

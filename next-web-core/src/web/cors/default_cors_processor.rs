@@ -7,10 +7,10 @@ use std::str::FromStr;
 use tracing::{debug, trace};
 
 use crate::{
-    cors::{CorsConfiguration, CorsProcessor, CorsUtils},
     error::BoxError,
     http::HttpMethod,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    web::cors::{CorsConfiguration, CorsProcessor, CorsUtils},
 };
 
 /// The Access-Control-Request-Private-Network request header field name.

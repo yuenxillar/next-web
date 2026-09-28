@@ -3,13 +3,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::{
-    cors::{CorsUtils, PreFlightRequestHandler},
     filter::FilterError,
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
+    web::cors::{CorsUtils, PreFlightRequestHandler},
 };
 
 /// Servlet filter that handles pre-flight requests through a

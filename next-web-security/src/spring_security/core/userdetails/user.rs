@@ -280,7 +280,7 @@ impl UserBuilder {
     ///
     /// # Returns
     /// The [`UserBuilder`] for method chaining.
-    pub fn roles(mut self, roles: &[&str]) -> Self {
+    pub fn roles(mut self, roles: &[String]) -> Self {
         let mut authorities = Vec::with_capacity(roles.len());
         for role in roles {
             assert!(
