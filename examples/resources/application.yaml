@@ -30,8 +30,8 @@ next:
   logging:
     format: "%Y-%m-%d %H:%M:%S%.3f"
     level: info
-    file:
-      name: next.log
+    # file:
+    #   name: next.log
 
   feature:
     enabled: true

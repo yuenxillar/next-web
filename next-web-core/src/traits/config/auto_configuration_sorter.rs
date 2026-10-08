@@ -1,13 +1,17 @@
-//! Ordering of the auto-configurations of an application.
+//! Ordering of the configurations of an application.
 //!
 //! The configurations of an application are applied in the order of
 //! [`Ordered::order`](crate::Ordered::order), except for the pairs of
 //! configurations that declare a place relative to each other with
-//! [`AutoConfiguration::auto_configure_before`] and
-//! [`AutoConfiguration::auto_configure_after`]. The sorting is a topological
+//! [`ConfigurationOrder::configuration_before`] and
+//! [`ConfigurationOrder::configuration_after`]. The sorting is a topological
 //! sort, so that a configuration is applied before every configuration its
 //! names ask for, and the order and the name of a configuration decide the
 //! order of the configurations that are not constrained at the same time.
+//!
+//! The same sorter orders the [`AutoConfiguration`]s of a starter and the
+//! [`Configuration`]s of an application, because the two declare the same place
+//! with the same rules.
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -15,7 +19,65 @@ use std::fmt;
 
 use tracing::trace;
 
+use crate::Ordered;
 use crate::traits::config::auto_configuration::AutoConfiguration;
+use crate::traits::config::configuration::Configuration;
+
+/// The metadata the sorter of the configurations of an application reads.
+///
+/// Both the [`AutoConfiguration`]s of a starter and the [`Configuration`]s of
+/// an application are sorted by the same rules, so the sorter is generic over
+/// the two and reads their metadata through this trait.
+pub trait ConfigurationOrder {
+    /// Returns the name the `before` and `after` lists refer to the
+    /// configuration with.
+    fn configuration_name(&self) -> &'static str;
+
+    /// Returns the names of the configurations this one is applied before.
+    fn configuration_before(&self) -> &'static [&'static str];
+
+    /// Returns the names of the configurations this one is applied after.
+    fn configuration_after(&self) -> &'static [&'static str];
+
+    /// Returns the order the configuration is applied in.
+    fn configuration_order(&self) -> i32;
+}
+
+impl ConfigurationOrder for Box<dyn AutoConfiguration> {
+    fn configuration_name(&self) -> &'static str {
+        AutoConfiguration::auto_configuration_name(&**self)
+    }
+
+    fn configuration_before(&self) -> &'static [&'static str] {
+        AutoConfiguration::auto_configure_before(&**self)
+    }
+
+    fn configuration_after(&self) -> &'static [&'static str] {
+        AutoConfiguration::auto_configure_after(&**self)
+    }
+
+    fn configuration_order(&self) -> i32 {
+        Ordered::order(&**self)
+    }
+}
+
+impl ConfigurationOrder for Box<dyn Configuration> {
+    fn configuration_name(&self) -> &'static str {
+        Configuration::configuration_name(&**self)
+    }
+
+    fn configuration_before(&self) -> &'static [&'static str] {
+        Configuration::configure_before(&**self)
+    }
+
+    fn configuration_after(&self) -> &'static [&'static str] {
+        Configuration::configure_after(&**self)
+    }
+
+    fn configuration_order(&self) -> i32 {
+        Ordered::order(&**self)
+    }
+}
 
 /// Orders the auto-configurations of an application.
 ///
@@ -26,6 +88,13 @@ use crate::traits::config::auto_configuration::AutoConfiguration;
 /// configuration provides is ignored, so that a starter can name a
 /// configuration an application may or may not use.
 pub struct AutoConfigurationSorter;
+
+/// Orders the configurations of an application.
+///
+/// The configurations of an application are ordered by the same rules the
+/// auto-configurations of a starter are ordered by, so this is the same sorter
+/// under the name the application side of the framework uses.
+pub type ConfigurationSorter = AutoConfigurationSorter;
 
 impl AutoConfigurationSorter {
     /// Returns the configurations in the order they are applied in.
@@ -42,13 +111,13 @@ impl AutoConfigurationSorter {
     /// Returns an error when the names the configurations declare form a cycle,
     /// which is a cycle of configurations that each has to be applied before
     /// the next one.
-    pub fn sort(
-        configurations: Vec<Box<dyn AutoConfiguration>>,
-    ) -> Result<Vec<Box<dyn AutoConfiguration>>, AutoConfigurationOrderError> {
+    pub fn sort<T>(configurations: Vec<T>) -> Result<Vec<T>, AutoConfigurationOrderError>
+    where
+        T: ConfigurationOrder,
+    {
         let order = Self::sort_indices(&configurations)?;
 
-        let mut configurations: Vec<Option<Box<dyn AutoConfiguration>>> =
-            configurations.into_iter().map(Some).collect();
+        let mut configurations: Vec<Option<T>> = configurations.into_iter().map(Some).collect();
 
         Ok(order
             .into_iter()
@@ -66,9 +135,10 @@ impl AutoConfigurationSorter {
     /// # Arguments
     ///
     /// * `configurations` - The configurations to order.
-    fn sort_indices(
-        configurations: &[Box<dyn AutoConfiguration>],
-    ) -> Result<Vec<usize>, AutoConfigurationOrderError> {
+    fn sort_indices<T>(configurations: &[T]) -> Result<Vec<usize>, AutoConfigurationOrderError>
+    where
+        T: ConfigurationOrder,
+    {
         let count = configurations.len();
 
         // A name is the identity of a configuration, and a name more than one
@@ -76,7 +146,7 @@ impl AutoConfigurationSorter {
         let mut by_name: HashMap<&'static str, Vec<usize>> = HashMap::new();
         for (index, configuration) in configurations.iter().enumerate() {
             by_name
-                .entry(configuration.auto_configuration_name())
+                .entry(configuration.configuration_name())
                 .or_default()
                 .push(index);
         }
@@ -85,9 +155,9 @@ impl AutoConfigurationSorter {
         let mut prerequisites: Vec<Vec<usize>> = vec![Vec::new(); count];
 
         for (index, configuration) in configurations.iter().enumerate() {
-            let name = configuration.auto_configuration_name();
+            let name = configuration.configuration_name();
 
-            for &target_name in configuration.auto_configure_before() {
+            for &target_name in configuration.configuration_before() {
                 let Some(targets) = by_name.get(target_name) else {
                     trace!(
                         configuration = name,
@@ -108,7 +178,7 @@ impl AutoConfigurationSorter {
                 }
             }
 
-            for &source_name in configuration.auto_configure_after() {
+            for &source_name in configuration.configuration_after() {
                 let Some(sources) = by_name.get(source_name) else {
                     trace!(
                         configuration = name,
@@ -137,8 +207,8 @@ impl AutoConfigurationSorter {
             let configuration = &configurations[*index];
 
             (
-                configuration.order(),
-                configuration.auto_configuration_name(),
+                configuration.configuration_order(),
+                configuration.configuration_name(),
                 *index,
             )
         });
@@ -169,11 +239,14 @@ impl AutoConfigurationSorter {
     /// * `prerequisites` - The configurations that have to be applied before a
     ///   configuration.
     /// * `configurations` - The configurations to order.
-    fn visit(
+    fn visit<T>(
         in_order: &[usize],
         prerequisites: &[Vec<usize>],
-        configurations: &[Box<dyn AutoConfiguration>],
-    ) -> Result<Vec<usize>, AutoConfigurationOrderError> {
+        configurations: &[T],
+    ) -> Result<Vec<usize>, AutoConfigurationOrderError>
+    where
+        T: ConfigurationOrder,
+    {
         /// Whether the configurations that have to be applied before a
         /// configuration were visited.
         #[derive(Clone, Copy, PartialEq)]
@@ -219,8 +292,8 @@ impl AutoConfigurationSorter {
                             chain
                                 .iter()
                                 .skip_while(|(index, _)| *index != prerequisite)
-                                .map(|(index, _)| configurations[*index].auto_configuration_name())
-                                .chain([configurations[prerequisite].auto_configuration_name()])
+                                .map(|(index, _)| configurations[*index].configuration_name())
+                                .chain([configurations[prerequisite].configuration_name()])
                                 .collect(),
                         ));
                     }

@@ -55,6 +55,27 @@ pub(crate) struct ProviderAttr {
     pub order: Option<Expr>,
 }
 
+/// The attributes of an `#[init]` method of a `#[configuration]`.
+///
+/// An initializer is a method of the configuration that runs without
+/// registering the value it computes; it resolves its parameters from the
+/// context and does not return a value.
+///
+/// # Attributes
+///
+/// * `conditional` - The conditions the initializer runs under. Each names a
+///   function that takes `&dyn ApplicationContext` and returns a `bool`, and
+///   the initializer is skipped when one of them returns `false`.
+/// * `order` - The order the initializer runs in, as an integer. It defaults to
+///   `100`, so an initializer runs next to the providers and the initializers of
+///   the same order, in the order they are declared in.
+#[derive(FromAttr)]
+#[attribute(idents = [init])]
+pub(crate) struct InitAttr {
+    pub conditional: Vec<ExprPath>,
+    pub order: Option<Expr>,
+}
+
 /// The attributes of `#[conditional_on_property]`.
 ///
 /// # Attributes

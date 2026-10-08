@@ -1,4 +1,5 @@
-//! Tests of the code the `#[auto_configuration]` macro generates.
+//! Tests of the code the `#[configuration]` and `#[auto_configuration]` macros
+//! generate.
 //!
 //! The macro is exercised through the function that produces its code, so that
 //! the generated code can be asserted on without an application. The assertions
@@ -8,7 +9,7 @@
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
-use crate::web::auto_configuration::generate_auto_configuration;
+use crate::web::auto_configuration::{generate_auto_configuration, generate_configuration};
 
 /// Returns the code of the configuration class of an annotated implementation
 /// block.
@@ -254,4 +255,145 @@ fn rejects_a_default_on_a_reference() {
             "the error explains the rule: {error}"
         );
     }
+}
+
+/// Returns the code of the configuration class of a `#[configuration]` block.
+///
+/// # Arguments
+///
+/// * `attrs` - The attributes of the macro.
+/// * `item_impl` - The annotated implementation block.
+fn configuration_code_of(attrs: TokenStream2, item_impl: TokenStream2) -> TokenStream2 {
+    let item_impl = syn::parse2(item_impl).expect("the implementation block is parsable");
+
+    generate_configuration(attrs, item_impl).expect("the configuration is generated")
+}
+
+#[test]
+fn names_the_configuration_class_after_the_annotated_type() {
+    let code = configuration_code_of(quote! {}, configuration());
+
+    zyn::assert_tokens_contain!(
+        code,
+        r#"fn configuration_name (& self) -> & 'static str { "MyConfiguration" }"#
+    );
+}
+
+#[test]
+fn declares_the_place_of_the_configuration_class() {
+    let code = configuration_code_of(
+        quote! {
+            before = ["RedisConfiguration"],
+            after = ["MessageSourceConfiguration"]
+        },
+        configuration(),
+    );
+
+    zyn::assert_tokens_contain!(
+        code,
+        r#"fn configure_before (& self) -> & 'static [& 'static str] { & ["RedisConfiguration"] }"#
+    );
+    zyn::assert_tokens_contain!(
+        code,
+        r#"fn configure_after (& self) -> & 'static [& 'static str] { & ["MessageSourceConfiguration"] }"#
+    );
+}
+
+#[test]
+fn runs_an_initializer_without_registering_a_value() {
+    let code = configuration_code_of(
+        quote! {},
+        quote! {
+            impl MyConfiguration {
+                #[init]
+                fn register(registry: &mut ServiceRegistry, name: String) {
+                    registry.register(&name);
+                }
+            }
+        },
+    );
+
+    zyn::assert_tokens_contain!(
+        code,
+        r#"ctx . try_just_create_singleton_with_name :: < ServiceRegistry > ("registry") ;"#
+    );
+    zyn::assert_tokens_contain!(
+        code,
+        r#"let ref0 = ctx . get_singleton_mut_with_name :: < ServiceRegistry > ("registry") ;"#
+    );
+    zyn::assert_tokens_contain!(
+        code,
+        r#"let owned1 = ctx . resolve_with_name :: < String > ("name") ;"#
+    );
+    zyn::assert_tokens_contain!(code, "register (ref0 , owned1) ;");
+
+    // An initializer does not register a value, which is what keeps it apart
+    // from a provider.
+    let generated = code.to_string();
+    assert!(
+        !generated.contains("insert_singleton_with_name (instance"),
+        "an initializer does not register a value: {generated}"
+    );
+}
+
+#[test]
+fn rejects_an_initializer_with_a_return_type() {
+    let item_impl = syn::parse2(quote! {
+        impl MyConfiguration {
+            #[init]
+            fn register() -> String {
+                String::new()
+            }
+        }
+    })
+    .expect("the implementation block is parsable");
+
+    let error = generate_configuration(TokenStream2::new(), item_impl)
+        .err()
+        .expect("an initializer with a return type is rejected");
+
+    assert!(
+        error.to_string().contains("does not return a value"),
+        "the error explains the rule: {error}"
+    );
+}
+
+#[test]
+fn rejects_an_initializer_in_an_auto_configuration() {
+    let item_impl = syn::parse2(quote! {
+        impl MyConfiguration {
+            #[init]
+            fn register() {}
+        }
+    })
+    .expect("the implementation block is parsable");
+
+    let error = generate_auto_configuration(TokenStream2::new(), item_impl)
+        .err()
+        .expect("`#[init]` is rejected in an auto-configuration");
+
+    assert!(
+        error.to_string().contains("only supported in a `#[configuration]`"),
+        "the error explains the rule: {error}"
+    );
+}
+
+#[test]
+fn rejects_a_provider_without_a_return_type() {
+    let item_impl = syn::parse2(quote! {
+        impl MyConfiguration {
+            #[provider]
+            fn register() {}
+        }
+    })
+    .expect("the implementation block is parsable");
+
+    let error = generate_auto_configuration(TokenStream2::new(), item_impl)
+        .err()
+        .expect("a provider without a return type is rejected");
+
+    assert!(
+        error.to_string().contains("has to return the instance"),
+        "the error explains the rule: {error}"
+    );
 }

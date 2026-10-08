@@ -1,4 +1,5 @@
 pub mod event;
+pub mod method;
 
 mod all_authorities_authorization_manager;
 mod all_required_factors_authorization_manager;

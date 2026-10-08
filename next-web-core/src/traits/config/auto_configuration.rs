@@ -104,7 +104,7 @@ clone_trait_object!(AutoConfiguration where Self: Send + Sync);
 /// of a generic type, so `crate::redis::RedisAutoConfiguration` is named
 /// `RedisAutoConfiguration`, and `crate::config::MyConfiguration<MyProperties>`
 /// is named `MyConfiguration`.
-fn configuration_name<T: ?Sized>() -> &'static str {
+pub(crate) fn configuration_name<T: ?Sized>() -> &'static str {
     let name = std::any::type_name::<T>();
 
     // The arguments of a generic type are named with the separators of a path

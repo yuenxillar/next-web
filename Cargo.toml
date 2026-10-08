@@ -73,33 +73,16 @@ todo = "warn"
 
 [workspace.dependencies]
 # next dependencies
-next-web            = { version = "0.1.7", path = "./next-web"            }
-next-web-core       = { version = "0.1.5", path = "./next-web-core"       }
-next-web-context    = { version = "0.1.0", path = "./next-web-context"    }
-next-web-singletons = { version = "0.1.0", path = "./next-web-singletons" }
-
-next-web-ai = { version = "0.1.0", path = "./next-web-ai" }
-next-web-api-doc = { version = "0.1.0", path = "./next-web-api-doc" }
-next-web-document = { version = "0.1.0", path = "./next-web-document" }
-next-web-mail = { version = "0.1.0", path = "./next-web-mail" }
-next-web-ip = { version = "0.1.0", path = "./next-web-ip" }
-next-web-macros = { version = "0.2.0", path = "./next-web-macros" }
-next-web-mqtt = { version = "0.1.4", path = "./next-web-mqtt" }
-next-web-open-api = { version = "0.1.0", path = "./next-web-open-api" }
-next-web-retry = { version = "0.1.0", path = "./next-web-retry" }
-next-web-security = { version = "0.1.0", path = "./next-web-security" }
-next-web-sms = { version = "0.1.0", path = "./next-web-sms" }
-next-web-utils = { version = "0.1.0", path = "./next-web-utils" }
-next-web-websocket = { version = "0.1.2", path = "./next-web-websocket" }
-next-web-mq-kafka = { version = "0.1.0", path = "./next-web-mq/next-web-mq-kafka" }
-next-web-mq-rabbitmq = { version = "0.1.0", path = "./next-web-mq/next-web-mq-rabbitmq" }
-next-web-mq-rocketmq = { version = "0.1.0", path = "./next-web-mq/next-web-mq-rocketmq" }
-next-web-wechat = { version = "0.1.0", path = "./next-web-wechat" }
-next-web-xxl-job = { version = "0.1.0", path = "./next-web-xxl-job" }
-next-web-state-machine = { version = "0.1.0", path = "./next-web-state-machine" }
-
-# next-web-common = { version = "0.1.0" }
-# next-web-mq = {  version = "0.1.0", path = "./next-web-mq"}
+next-web-core               = { path = "./next-web-core"            }
+next-web-context            = { path = "./next-web-context"         }
+next-web-singletons         = { path = "./next-web-singletons"      }
+next-web-util               = { path = "./next-web-util"            }
+next-web-macros             = { path = "./next-web-macros"          }
+next-web-retry              = { path = "./next-web-retry"           }
+next-web-security           = { path = "./next-web-security"        }
+next-web-api-doc            = { path = "./next-web-api-doc"         }
+next-web-state-machine      = { path = "./next-web-state-machine"   }
+next-web-websocket          = { path = "./next-web-websocket"       }
 
 # main dependencies
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
@@ -216,7 +199,7 @@ rslock = { version = "0.9.1", default-features = false, features = [
 ] }
 deadpool-redis = { version = "0.23.1" }
 minio-rsc = { version = "0.2.3" }
-rumqttc = { version = "0.24.0" }
+rumqttc = { version = "0.25.1" }
 elasticsearch = { version = "9.0.0-alpha.1", features = [] }
 
 # mq

@@ -1,21 +1,25 @@
 [package]
 name = "next-web-mqtt"
-version = "0.1.4"
-edition = "2021"
+version = "0.1.6"
 description = "Next Web Mqtt."
+readme = "./README.md"
 license.workspace = true
+edition.workspace = true
 
 [dependencies]
-next-web-context.workspace = true
-next-web-core   = { workspace = true }
-next-web-macros = { workspace = true }
+next-web-context    = { workspace = true }
+next-web-core       = { workspace = true }
+next-web-macros     = { workspace = true }
 
-serde           = { workspace = true }
-rumqttc         = { workspace = true }
+serde               = { workspace = true }
+rumqttc             = { workspace = true }
 
-tokio           = { workspace = true }
-tracing         = { workspace = true }
+tokio               = { workspace = true }
+tracing             = { workspace = true }
 
 
 [features]
+# Plain (`ws`) and TLS-secured (`wss`) WebSocket transports.
+ws        = ["rumqttc/websocket", "rumqttc/use-rustls"]
+
 trace-log = []

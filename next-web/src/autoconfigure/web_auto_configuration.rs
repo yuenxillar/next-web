@@ -5,6 +5,8 @@ use next_web_core::{
     ApplicationContext, Ordered, async_trait, env::ConfigurableEnvironment,
     traits::config::auto_configuration::AutoConfiguration,
     traits::config::auto_configuration_sorter::AutoConfigurationSorter,
+    traits::config::auto_configuration_sorter::ConfigurationSorter,
+    traits::config::configuration::Configuration,
 };
 use std::{error::Error, sync::Arc};
 
@@ -100,8 +102,12 @@ impl WebAutoConfiguration {
     ///
     /// - the auto-configurations of a starter declare a `#[singleton(binds =
     ///   [Self::into_auto_configuration])]`,
-    /// - the configuration classes of an application are declared with
+    /// - the auto-configuration classes of an application are declared with
     ///   `#[auto_configuration]`, which registers them the same way.
+    ///
+    /// The configurations of an application, which are declared with
+    /// `#[configuration]`, are applied before these, see
+    /// [`Self::run_configurations`].
     ///
     /// They are applied in the order of [`Ordered`](next_web_core::Ordered),
     /// which the `before` and `after` names a configuration declares refine, and
@@ -141,6 +147,41 @@ impl WebAutoConfiguration {
 
         Ok(())
     }
+
+    /// Applies the configurations of the application.
+    ///
+    /// The configurations of an application are the types that implement
+    /// [`Configuration`], which the configuration classes of the application are
+    /// declared with: a class declared with `#[configuration]` registers one.
+    ///
+    /// They are applied **before** the auto-configurations, so that they can
+    /// contribute the state an auto-configuration of a starter depends on, and
+    /// they are applied in the order of [`Ordered`](next_web_core::Ordered),
+    /// which the `before` and `after` names a configuration declares refine. A
+    /// configuration whose condition does not hold is skipped.
+    async fn run_configurations(
+        &mut self,
+        ctx: &mut dyn ApplicationContext,
+    ) -> Result<(), Box<dyn Error>> {
+        let configurations = ctx.resolve_by_type::<Box<dyn Configuration>>();
+        let mut configurations = ConfigurationSorter::sort(configurations)?;
+
+        configurations.retain(|configuration| configuration.matches(ctx));
+
+        tracing::debug!(
+            configurations = ?configurations
+                .iter()
+                .map(|configuration| configuration.configuration_name())
+                .collect::<Vec<_>>(),
+            "the configurations of the application are applied in this order"
+        );
+
+        for mut configuration in configurations {
+            configuration.configure(ctx).await?;
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -148,6 +189,12 @@ impl AutoConfiguration for WebAutoConfiguration {
     async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
         self.bind_configuration_properties(ctx)?;
         self.publish_server_properties(ctx);
+
+        // The configurations of the application run first, so that a
+        // configuration can contribute the state the auto-configurations of the
+        // starters depend on.
+        self.run_configurations(ctx).await?;
+
         self.run_auto_configurations(ctx).await?;
 
         // The tasks an application declared with `#[scheduled]` are resolved

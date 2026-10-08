@@ -37,14 +37,14 @@ pub struct HttpSecurityConfiguration<'a> {
 
 impl<'a> HttpSecurityConfiguration<'a> {
     fn http_security(&mut self) -> HttpSecurity {
-        let password_encoder = Arc::new(SimplePasswordEncoder::from(&*self.context));
+        let password_encoder = Arc::new(SimplePasswordEncoder::new(&*self.context));
         let mut authentication_builder =
             DefaultPasswordEncoderAuthenticationManagerBuilder::new(password_encoder);
-        authentication_builder.parent_authentication_manager(self.authentication_manager());
+        // authentication_builder.parent_authentication_manager(todo!());
         authentication_builder
             .authentication_event_publisher(self.get_authentication_event_publisher());
 
-        let mut http = HttpSecurity::new(authentication_builder, self.create_shared_objects());
+        let mut http = HttpSecurity::new(todo!(), self.create_shared_objects());
 
         http.csrf(|_| {})
             .error_handling(|_| {})

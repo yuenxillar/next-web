@@ -69,13 +69,16 @@ impl ApplyRouter for SecurityRouter {
 
         let web_security_configurers = ctx.resolve_by_type::<Box<dyn WebSecurityConfigurer>>();
         let mut ctx = DefaultApplicationContext::default();
-        ctx.insert_singleton(Builder::default());
+        ctx.insert_singleton(PathPatternRequestMatcherBuilder::default());
         ctx.insert_singleton::<Arc<dyn ApplicationEventPublisher>>(Arc::new(
             DefaultApplicationEventPublisher,
         ));
         let mut shared_objects: HashMap<TypeId, Box<dyn AnyClone>> = HashMap::new();
         // shared_objects.insert(TypeId::of::<Box<dyn ApplicationContext>>(), Box::new(ctx));
-        shared_objects.insert(TypeId::of::<Builder>(), Box::new(Builder::default()));
+        shared_objects.insert(
+            TypeId::of::<PathPatternRequestMatcherBuilder>(),
+            Box::new(PathPatternRequestMatcherBuilder::default()),
+        );
 
         #[derive(Clone)]
         struct DefaultApplicationEventPublisher;

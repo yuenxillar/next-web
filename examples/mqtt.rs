@@ -5,9 +5,7 @@ use next_web::extract::find_singleton::FindSingleton;
 use next_web::macros::bind::{post_mapping, singleton};
 use next_web::{Application, NextWebApplication};
 use next_web_core::async_trait;
-use next_web_mqtt::{
-    service::default_mqtt_service::DefaultMQTTService, topic_listener::TopicListener,
-};
+use next_web_mqtt::{MqttClient, TopicListener};
 
 #[derive(Default)]
 struct TestApplication;
@@ -16,11 +14,11 @@ impl Application for TestApplication {}
 
 #[post_mapping(path = "/publish")]
 async fn publish_message(
-    FindSingleton(mqtt_service): FindSingleton<DefaultMQTTService>,
+    FindSingleton(mqtt_client): FindSingleton<MqttClient>,
     Json(msg): Json<String>,
 ) -> impl IntoResponse {
     let topic = "test/1/event";
-    mqtt_service.publish(topic, msg).await.ok();
+    mqtt_client.publish(topic, msg).await.ok();
     "Ok"
 }
 

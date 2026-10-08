@@ -2,20 +2,24 @@ use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use crate::topic_listener::TopicListener;
 
-/// MQTT topic router entry.
+/// Routes published topics to the listeners that subscribed to them.
 ///
-/// It stores one subscription filter plus the consumer that should receive a
-/// published message when the filter matches the incoming topic name.
+/// An exact subscription (`sensors/room1`) is matched by name, and a wildcard
+/// subscription (`sensors/+/temperature` or `alerts/#`) is matched against the
+/// published topic. A topic is handed to every listener it matches.
 #[derive(Clone, Default)]
 pub struct TopicRouter {
-    pub(crate) exact: HashMap<String, Arc<dyn TopicListener>>,
+    /// Listeners registered under an exact topic name.
+    pub(crate) exact: HashMap<String, Vec<Arc<dyn TopicListener>>>,
+    /// Listeners registered under a wildcard topic filter.
     pub(crate) match_: Vec<TopicRouteMatch>,
 }
 
 impl TopicRouter {
+    /// Creates a router out of exact and wildcard subscriptions.
     pub fn new<T1, T2>(exact: T1, match_: T2) -> Self
     where
-        T1: IntoIterator<Item = (String, Arc<dyn TopicListener>)>,
+        T1: IntoIterator<Item = (String, Vec<Arc<dyn TopicListener>>)>,
         T2: IntoIterator<Item = TopicRouteMatch>,
     {
         let exact = exact.into_iter().collect();
@@ -24,29 +28,43 @@ impl TopicRouter {
         Self { exact, match_ }
     }
 
-    pub fn route(&self, topic: &str) -> Option<&dyn TopicListener> {
-        self.exact.get(topic).map(AsRef::as_ref).or_else(|| {
-            self.match_
-                .iter()
-                .find(|route| route.matches(topic))
-                .map(|route| route.listener.as_ref())
-        })
+    /// Returns every listener whose subscription matches `topic`.
+    ///
+    /// The listeners registered under the exact topic name come first, followed
+    /// by the listeners whose wildcard filter matches the topic. The returned
+    /// vector is empty when no subscription matches.
+    pub fn route(&self, topic: &str) -> Vec<&dyn TopicListener> {
+        let exact = self
+            .exact
+            .get(topic)
+            .into_iter()
+            .flatten()
+            .map(AsRef::as_ref);
+
+        let wildcard = self
+            .match_
+            .iter()
+            .filter(|route| route.matches(topic))
+            .map(|route| route.listener.as_ref());
+
+        exact.chain(wildcard).collect()
     }
 }
 
+/// A subscription filter and the listener it is registered for.
 #[derive(Clone)]
 pub struct TopicRouteMatch {
     /// Subscription filter, for example `sensor/+/temperature` or `test/#`.
     pub topic: Cow<'static, str>,
     /// Pre-classified match type for quick inspection and debugging.
-    pub match_type: MacthType,
-    /// Topic Listener.
+    pub match_type: MatchType,
+    /// Listener that receives the matching messages.
     pub listener: Arc<dyn TopicListener>,
 }
 
 /// MQTT topic filter kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MacthType {
+pub enum MatchType {
     /// Multi-level wildcard filter containing `#`.
     Multilayer,
     /// Single-level wildcard filter containing `+` but no `#`.
@@ -56,6 +74,11 @@ pub enum MacthType {
 }
 
 impl TopicRouteMatch {
+    /// Builds a wildcard route from a filter and its listener.
+    ///
+    /// # Errors
+    ///
+    /// Returns the reason the filter is not a valid wildcard filter.
     pub fn new<M: Into<Cow<'static, str>>>(
         topic: M,
         listener: Arc<dyn TopicListener>,
@@ -76,15 +99,15 @@ impl TopicRouteMatch {
     }
 }
 
-fn classify_filter(filter: &str) -> Result<MacthType, String> {
+fn classify_filter(filter: &str) -> Result<MatchType, String> {
     validate_filter(filter)?;
 
     if filter == "#" {
-        Ok(MacthType::Anything)
+        Ok(MatchType::Anything)
     } else if filter.contains('#') {
-        Ok(MacthType::Multilayer)
+        Ok(MatchType::Multilayer)
     } else if filter.contains('+') {
-        Ok(MacthType::Singlelayer)
+        Ok(MatchType::Singlelayer)
     } else {
         Err(format!(
             "topic '{filter}' does not contain a supported wildcard pattern"
@@ -176,7 +199,7 @@ mod tests {
 
     use crate::{topic_listener::TopicListener, topic_router::TopicRouteMatch};
 
-    use super::{mqtt_filter_matches, MacthType};
+    use super::{mqtt_filter_matches, MatchType, TopicRouter};
     use next_web_core::async_trait;
 
     #[derive(Clone)]
@@ -186,6 +209,20 @@ mod tests {
     impl TopicListener for DummyTopic {
         fn topic(&self) -> &'static str {
             "#"
+        }
+
+        async fn on_message(&self, _topic: &str, _message: &[u8]) {}
+    }
+
+    /// A listener that is named after the filter it stands for, so that a test
+    /// can tell the listeners of a route apart.
+    #[derive(Clone)]
+    struct NamedTopic(&'static str);
+
+    #[async_trait]
+    impl TopicListener for NamedTopic {
+        fn topic(&self) -> &'static str {
+            self.0
         }
 
         async fn on_message(&self, _topic: &str, _message: &[u8]) {}
@@ -201,14 +238,16 @@ mod tests {
     #[test]
     fn classifies_anything_route() {
         let route = TopicRouteMatch::new("#", Arc::new(DummyTopic)).unwrap();
-        assert_eq!(route.match_type, MacthType::Anything);
+        assert_eq!(route.match_type, MatchType::Anything);
     }
 
     #[test]
     fn matches_multilevel_wildcard() {
         assert!(mqtt_filter_matches("sport/#", "sport"));
+        assert!(mqtt_filter_matches("sport/#", "sport/"));
         assert!(mqtt_filter_matches("sport/#", "sport/tennis/player1"));
         assert!(!mqtt_filter_matches("sport/#", "finance/stock"));
+        assert!(!mqtt_filter_matches("sport/#", "sportx"));
     }
 
     #[test]
@@ -219,6 +258,7 @@ mod tests {
         ));
         assert!(mqtt_filter_matches("sport/+", "sport/"));
         assert!(!mqtt_filter_matches("sport/+", "sport"));
+        assert!(!mqtt_filter_matches("sport/+", "sport/tennis/player1"));
         assert!(!mqtt_filter_matches(
             "sport/+/player1",
             "sport/tennis/player1/ranking"
@@ -233,5 +273,51 @@ mod tests {
             "$SYS/broker/uptime"
         ));
         assert!(mqtt_filter_matches("$SYS/#", "$SYS/broker/uptime"));
+    }
+
+    /// Pushes a named listener under an exact topic.
+    fn add_exact(router: &mut TopicRouter, topic: &str, listener: &'static str) {
+        router
+            .exact
+            .entry(topic.to_owned())
+            .or_default()
+            .push(Arc::new(NamedTopic(listener)));
+    }
+
+    #[test]
+    fn routes_to_every_listener_of_an_exact_topic() {
+        let mut router = TopicRouter::default();
+        add_exact(&mut router, "test/123", "first");
+        add_exact(&mut router, "test/123", "second");
+
+        assert_eq!(router.route("test/123").len(), 2);
+    }
+
+    #[test]
+    fn routes_exact_and_wildcard_listeners_together() {
+        let mut router = TopicRouter::default();
+        add_exact(&mut router, "test/123", "test/123");
+        router.match_.push(
+            TopicRouteMatch::new("test/+", Arc::new(NamedTopic("test/+")))
+                .expect("the filter is a valid single-level wildcard"),
+        );
+
+        let matched: Vec<&str> = router
+            .route("test/123")
+            .iter()
+            .map(|listener| listener.topic())
+            .collect();
+        assert_eq!(matched, vec!["test/123", "test/+"]);
+
+        // The wildcard matches a topic the exact listener does not.
+        assert_eq!(router.route("test/other").len(), 1);
+    }
+
+    #[test]
+    fn routes_nothing_when_no_subscription_matches() {
+        let mut router = TopicRouter::default();
+        add_exact(&mut router, "test/123", "test/123");
+
+        assert!(router.route("other/1").is_empty());
     }
 }

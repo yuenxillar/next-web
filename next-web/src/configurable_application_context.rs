@@ -14,21 +14,8 @@ use next_web_core::{
     async_trait, env::ConfigurableEnvironment, io::ResourceLoader, metrics::ApplicationStartup,
 };
 use next_web_singletons::factory::{
-    support::DefaultListableSingletonFactory, ListableSingletonFactory,
+    ListableSingletonFactory, support::DefaultListableSingletonFactory,
 };
-
-/// Any number of these characters are considered delimiters between multiple
-/// context config paths in a single string value.
-pub const CONFIG_LOCATION_DELIMITERS: &str = ",; \t\n";
-
-/// Name of the system properties singleton in the factory.
-pub const SYSTEM_PROPERTIES_SINGLETON_NAME: &str = "systemProperties";
-
-/// Name of the operating system environment singleton in the factory.
-pub const SYSTEM_ENVIRONMENT_SINGLETON_NAME: &str = "systemEnvironment";
-
-/// Name of the application startup singleton in the factory.
-pub const APPLICATION_STARTUP_SINGLETON_NAME: &str = "applicationStartup";
 
 /// Errors returned by [`ConfigurableApplicationContext`] operations.
 #[derive(Debug)]

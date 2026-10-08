@@ -1,38 +1,28 @@
 use next_web_core::{async_trait, clone_trait_object, DynClone};
 
+/// A message interceptor of the MQTT client.
 ///
-/// MQTT message interceptor interface
-/// Used to intercept and process MQTT messages, can pre-process messages before they enter the system
-///
-/// MQTT消息拦截器接口
-/// 用于拦截和处理MQTT消息，可在消息进入系统前进行预处理
+/// Interceptors run before a received message is dispatched to its
+/// [`TopicListener`](crate::topic_listener::TopicListener), so a message can be
+/// inspected and rejected before the application handles it.
 #[async_trait]
 pub trait MessageInterceptor
 where
     Self: DynClone,
     Self: Send + Sync,
 {
-    ///
-    /// Message entry interception method
+    /// Intercepts an incoming message and decides whether it is dispatched.
     ///
     /// # Parameters
-    /// - topic: Message topic
-    /// - data:  Raw message data
     ///
-    /// # Return value
-    /// - bool: Whether to allow the message to continue passing
+    /// * `topic` - The topic the message was published to.
+    /// * `data` - The raw payload of the message.
     ///
-    /// 消息入口拦截方法
+    /// # Returns
     ///
-    /// # 参数
-    /// - topic: 消息主题
-    /// - data: 消息原始数据
-    ///
-    /// # 返回值
-    /// - bool: 是否允许消息继续传递
+    /// `true` to let the message continue to the topic listeners, `false` to
+    /// drop it.
     async fn message_entry(&self, topic: &str, data: &[u8]) -> bool;
-
-    // async fn message_push(&self) -> bool;
 }
 
 clone_trait_object!(MessageInterceptor);

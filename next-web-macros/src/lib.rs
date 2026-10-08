@@ -23,32 +23,6 @@ mod di;
 mod util;
 mod web;
 
-/// 为结构体自动生成 getter 和 setter 方法。
-///
-/// 该宏会为结构体的每个字段生成对应的 `get_{field}` 和 `set_{field}` 方法，
-/// 除非字段上使用了 `#[get_set(...)]` 属性进行跳过控制。
-///
-/// # 字段属性控制
-///
-/// - `#[get_set(skip)]`：跳过该字段的 getter 和 setter 生成。
-/// - `#[get_set(skip_get)]`：仅跳过 getter 方法的生成。
-/// - `#[get_set(skip_set)]`：仅跳过 setter 方法的生成。
-///
-/// # 示例
-///
-/// ```rust
-/// #[derive(GetSet)]
-/// struct MyStruct {
-///     #[get_set(skip)]
-///     field1: i32,        // 不生成任何方法
-///     field2: i32,        // 生成 get_field2() 和 set_field2()
-///     #[get_set(skip_get)]
-///     field3: i32,        // 仅生成 set_field3()
-///     #[get_set(skip_set)]
-///     field4: i32,        // 仅生成 get_field4()
-/// }
-/// ```
-///
 /// Automatically generate getter and setter methods for structures.
 ///
 /// This macro will generate corresponding 'get_ {field}' and 'set_ {field}' methods for each field of the structure,
@@ -80,31 +54,6 @@ pub fn get_set(input: TokenStream) -> TokenStream {
     impl_macro_get_set(&input)
 }
 
-/// 为结构体的每个字段生成对应获取的字段名的方法 （字符串字面量）
-///
-/// 方法名为 `field_{field_name}`, 返回类型为 `&'static str`（如 `field_name`）, 值为字段的原始名称（如 `"name"`）.
-///
-/// # 示例
-///
-/// ```rust
-/// #[derive(FieldName)]
-/// struct Person {
-///     name: String,
-///     age: u32,
-/// }
-///
-/// impl Person {
-///
-///     pub fn field_name() -> &'static str {
-///         "name"
-///     }
-///
-///     pub fn field_age() -> &'static str {
-///         "age"
-///     }
-/// }
-/// ```
-///
 /// Method for generating corresponding field names for each field of a structure (string literal)
 ///
 /// The method name is' field_ {field_name} ', the return type is' static str' (such as' field_name '), and the value is the original name of the field (such as' name')
@@ -135,43 +84,6 @@ pub fn field_name(input: TokenStream) -> TokenStream {
     impl_macro_field_name(&input)
 }
 
-/// 为结构体实现构建器（Builder）模式
-///
-/// 该宏会生成一个同名的 `Builder` 结构体，并为每个字段提供链式调用的 setter 方法
-/// 最终通过 `build()` 方法构造原始结构体实例
-///
-/// ## 注意
-/// 1. 默认情况下，即使字段为 Option , 在build方法之前使用者也需要对这个字段进行赋值, 除非使用了 default 辅助参数
-///
-/// 支持通过 `#[builder(...)]` 属性对字段行为进行定制<br>
-/// 辅助参数:<br>
-///  `into`: builer 所生成的方法的入参将会是一个实现了 `Into<field>` 的类型<br>
-///  `default`:<br>   1. 在 build 方法中, 如果 builder 结构体中这个字段没有用户的输入, 将会使用 Default::default() 来赋值给原始实例<br>
-///                   2. 如 #\[builder(default = "default_name")\], 将会使用该函数返回值进行赋值
-///
-/// # 示例
-///
-/// ```rust
-/// #[derive(Builder)]
-/// struct User {
-///     #[builder(into)]
-///     name: String,
-///     age: u32,
-/// }
-///
-/// // 生成 UserBuilder 结构体
-///  sturct UserBuilder {
-///     name: Option<String>,
-///     age: Option<u32>,
-/// }
-///
-/// let user = User::builder()
-///     .name("Alice")
-///     .age(30)
-///     .build()
-///     .unwrap();
-/// ```
-///
 /// Implement the Builder pattern for structures
 ///
 /// This macro will generate a 'Builder' struct with the same name and provide a chain call setter method for each field
@@ -313,18 +225,6 @@ pub fn desensitized(input: TokenStream) -> TokenStream {
 ///     // Access embedded resources via ApplicationResources
 /// }
 /// ```
-///
-/// 用于拓展 Next-web 应用入口点的过程宏
-///
-/// # 属性
-/// * `resources` - 可选参数，指定包含嵌入资源的文件夹
-///                 示例: `#[next_application(resources = "static/")]`
-///
-/// # 行为
-/// - 将函数转换为 Next-web 应用入口点
-/// - 如果提供了 `resources` 属性，启用从指定文件夹嵌入资源
-///
-/// ```
 #[proc_macro_attribute]
 pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
     use crate::web::application::impl_macro_application;
@@ -417,6 +317,77 @@ pub fn auto_configuration(attr: TokenStream, item: TokenStream) -> TokenStream {
     impl_macro_auto_configuration(attr, item_impl)
 }
 
+/// Declares an `impl` block as the configuration class of an application.
+///
+/// A configuration class is applied **before** the auto-configurations of the
+/// application, so that it can contribute the state an auto-configuration of a
+/// starter depends on. A method that declares a provider is called while the
+/// application starts: it resolves the parameters of the method from the
+/// application context, and registers the value it returns as a singleton. A
+/// method declared with `#[init]` is an initializer: it resolves its parameters
+/// the same way, runs without registering a value, and does not return a value.
+///
+/// The configuration class itself implements
+/// [`Configuration`](next_web_core::traits::config::configuration::Configuration),
+/// and its `before` and `after` names place it among the configurations of the
+/// application.
+///
+/// # Arguments
+///
+/// - `order` - The order the configuration is applied in. It defaults to `100`,
+///   the default of [`Ordered`](next_web_core::Ordered).
+/// - `conditional = [path, ...]` - The conditions the configuration is applied
+///   under. Each names a function that takes `&dyn ApplicationContext` and
+///   returns a `bool`, and the configuration is skipped when one of them
+///   returns `false`.
+/// - `before = ["...", ...]` - The names of the configurations this one is
+///   applied before, which is the counterpart of `after`.
+/// - `after = ["...", ...]` - The names of the configurations this one is
+///   applied after.
+/// - `name = "..."` - The name the configuration is registered under. It
+///   defaults to the name of the type the macro generates.
+///
+/// # Method attributes
+///
+/// - `#[provider]`, which is required for a method to register a value, takes
+///   `name = "..."`, `conditional = [path, ...]` and `order = <integer>`.
+/// - `#[init]` declares an initializer. It takes `conditional = [path, ...]` and
+///   `order = <integer>`, does not return a value, and runs next to the
+///   providers and the initializers of the same order.
+/// - `#[autowired(name = "...", default)]` of a parameter resolves the parameter
+///   from the context by name, and falls back to `Default::default()` when the
+///   name is not registered.
+/// - A parameter declared as a reference, `&T` or `&mut T`, borrows the instance
+///   the context holds instead of resolving a copy of it. A method can take any
+///   number of `&T` parameters, or a single `&mut T` one, but a `&mut T`
+///   parameter cannot be combined with another reference parameter.
+///
+/// # Example
+///
+/// ```ignore
+/// use next_web::macros::autoconfigure::configuration;
+///
+/// #[configuration]
+/// impl MyConfiguration {
+///     #[provider(name = "myClient")]
+///     fn my_client(properties: MyProperties) -> Client {
+///         Client::with_properties(&properties)
+///     }
+///
+///     #[init]
+///     fn register(registry: &mut ServiceRegistry, client: &Client) {
+///         registry.register(client);
+///     }
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn configuration(attr: TokenStream, item: TokenStream) -> TokenStream {
+    use crate::web::auto_configuration::impl_macro_configuration;
+
+    let item_impl = parse_macro_input!(item as ItemImpl);
+    impl_macro_configuration(attr, item_impl)
+}
+
 /// Declares the configuration properties of a struct.
 ///
 /// The properties below the prefix are bound from the environment of the
@@ -452,15 +423,86 @@ pub fn configuration_properties(attr: TokenStream, item: TokenStream) -> TokenSt
     impl_macro_configuration_properties(attr, item)
 }
 
-#[doc = ""]
+/// Registers the annotated function as a route of the application.
+///
+/// The macro turns the function into a handler that the router picks up while
+/// the application starts, so the function itself is not called directly. It
+/// has to be `async`, must not take `self` and has to return a response; every
+/// other argument is treated as an axum extractor and is resolved from the
+/// request. The declared return type is replaced by `impl IntoResponse`, while a
+/// `Result<_, _>` type is kept on the body so its error type stays inferable.
+///
+/// The macro can also be applied to an `impl` block that holds `#[*_mapping]`
+/// methods. The `path` of the block is then prepended to the `path` of every
+/// annotated method, and those methods are hoisted out of the block as ordinary
+/// handlers.
+///
+/// # Attributes
+///
+/// * `path` - the route pattern, for example `"/orders/{id}"`. Required.
+/// * `method` - the HTTP method the route answers, one of `GET`, `POST`, `PUT`,
+///   `DELETE`, `HEAD`, `CONNECT`, `OPTIONS`, `TRACE`, `PATCH` or `ANY`. Required
+///   here, because `request_mapping` is the macro without an implied method; the
+///   per-method macros set it themselves and reject it. It cannot be used on an
+///   `impl` block.
+/// * `headers` - names of headers a request has to carry, for example
+///   `["Authorization"]`. Each name adds a
+///   `RequiredHeader<header_names::Name>` extractor argument, so a request that
+///   misses one is answered with `400 Bad Request` before the body runs.
+/// * `consume` - the media type expected in the request. A request whose
+///   `Content-Type` does not contain it is answered with
+///   `415 Unsupported Media Type`.
+/// * `produce` - the media type of the response. It is written to the
+///   `Content-Type` header of whatever the handler returns.
+///
+/// # Ordering
+///
+/// Attributes that wrap a handler, such as [`pre_authorize`] or
+/// `#[idempotency]`, have to be placed *above* the routing attribute. The
+/// routing macro rebuilds the function and only re-emits the attributes it is
+/// given, so an attribute placed below it is dropped.
+///
+/// # Example
+///
+/// ```ignore
+/// use next_web::macros::bind::{get_mapping, request_mapping};
+///
+/// #[request_mapping(method = "POST", path = "/orders", consume = "application/json")]
+/// async fn create_order(order: axum::Json<Order>) -> impl IntoResponse {
+///     // ...
+/// }
+///
+/// #[request_mapping(path = "/admin")]
+/// impl AdminApi {
+///     #[get_mapping(path = "/users")]
+///     async fn users() -> &'static str {
+///         "[]"
+///     }
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn request_mapping(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::routing::with_method(None, args, input)
 }
 
+/// Generates one routing attribute macro per HTTP method.
+///
+/// Each invocation expands to a `#[proc_macro_attribute]` that forwards to
+/// [`crate::web::routing::with_method`] with the method baked in. The generated
+/// macros therefore share the options and the behaviour of [`request_mapping`];
+/// they differ from it only in that `method` must not be given, because the name
+/// of the macro already selects the method.
 macro_rules! http_method_macro {
-    ($method:ident, $variant:ident) => {
-        #[doc = ""]
+    ($(#[$meta:meta])* $method:ident, $variant:ident, $http:literal) => {
+        /// Registers the annotated function as a route of the application.
+        ///
+        #[doc = concat!(
+            "The route answers HTTP `", $http, "` requests, that is, this macro is ",
+            "[`request_mapping`] with `method = \"", $http, "\"` already applied. The ",
+            "`path` (required), `headers`, `consume` and `produce` attributes behave ",
+            "exactly as described there, and `method` must not be given again."
+        )]
+        $(#[$meta])*
         #[proc_macro_attribute]
         pub fn $method(args: TokenStream, input: TokenStream) -> TokenStream {
             crate::web::routing::with_method(
@@ -472,12 +514,51 @@ macro_rules! http_method_macro {
     };
 }
 
-http_method_macro!(get_mapping, Get);
-http_method_macro!(post_mapping, Post);
-http_method_macro!(put_mapping, Put);
-http_method_macro!(delete_mapping, Delete);
-http_method_macro!(patch_mapping, Patch);
-http_method_macro!(any_mapping, Any);
+http_method_macro! {
+    /// # Example
+    ///
+    /// ```ignore
+    /// use next_web::macros::bind::get_mapping;
+    ///
+    /// #[get_mapping(path = "/hello")]
+    /// async fn hello() -> &'static str {
+    ///     "Hello!"
+    /// }
+    /// ```
+    get_mapping, Get, "GET"
+}
+
+http_method_macro! {
+    post_mapping, Post, "POST"
+}
+
+http_method_macro! {
+    put_mapping, Put, "PUT"
+}
+
+http_method_macro! {
+    delete_mapping, Delete, "DELETE"
+}
+
+http_method_macro! {
+    patch_mapping, Patch, "PATCH"
+}
+
+http_method_macro! {
+    /// A route that answers any HTTP method.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use next_web::macros::bind::any_mapping;
+    ///
+    /// #[any_mapping(path = "/webhook")]
+    /// async fn webhook() -> &'static str {
+    ///     "ok"
+    /// }
+    /// ```
+    any_mapping, Any, "ANY"
+}
 
 // #[cfg(feature = "api-doc")]
 #[proc_macro_attribute]
@@ -543,28 +624,6 @@ pub fn scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::scheduled::impl_macro_scheduled(args, input)
 }
 
-/// 实现幂等性属性的过程宏
-///
-/// # 属性参数说明
-/// - `name`:   可选字符串字面量，指定 IdempotencyStore 的单例名称, 可以指定名称使用自己实现的 Store, 默认为`memoryIdempotencyStore`
-/// - `key`:    可选字符串字面量，用于获取请求头的键值，默认值为 `Idempotency-key`
-/// - `cache_key_prefix`: 可选字符串字面量，应用再缓存键的前缀
-/// - `ttl`: 可选整数字面量，缓存存活时间(Time To Live), 默认为秒
-///
-/// # 注意
-/// 当前宏 只支持 Mehod 为 `POST`
-/// 你应该使用 `PostMapping` 或者 `RequestMapping(method = "POST")`
-///
-/// # 示例
-/// ```rust
-/// #[Idempotency(name = "myIdempotencyStore", key = "Idempotency-key", cache_key_prefix = "test", ttl = 6)]
-/// #[PostMapping(path = "/createOrder")]
-/// async fn create_order(order: String) -> impl IntoResponse {
-///
-///     "Ok"
-/// }
-///
-/// ```
 ///
 /// Process macros for implementing idempotent properties
 ///
@@ -594,57 +653,81 @@ pub fn idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
     impl_macro_idempotency(attr, item_fn)
 }
 
-#[doc = ""]
+/// Restricts a handler to the callers that satisfy an access-control rule.
+///
+/// The annotated function has to be `async`, must not take `self` and has to
+/// return a response. Before its body runs, the rule is evaluated against the
+/// authentication held by the security context of the current request; when the
+/// rule does not hold, the handler answers `403 Forbidden` and the body is
+/// skipped. Like the routing macros, the annotation rewrites the return type to
+/// `impl IntoResponse`.
+///
+/// Roles are compared with the `ROLE_` prefix of Spring Security, so
+/// `has_role("ADMIN")` matches a granted authority called `ROLE_ADMIN`;
+/// authorities are compared as they are.
+///
+/// The macro is available with the `enable-web-security` feature, which exposes
+/// it as `next_web::macros::security::pre_authorize`.
+///
+/// # Expression form
+///
+/// `#[pre_authorize("...")]` takes a Spring Security style expression built from
+/// the functions `has_role`, `has_any_role`, `has_authority`,
+/// `has_any_authority`, `permit_all` and `deny_all`, and from the operators
+/// `and` (`&&`), `or` (`||`) and `!` (`not`). Parentheses group sub-expressions,
+/// `and` binds tighter than `or`, and the camel case spellings such as
+/// `hasRole` are accepted as well.
+///
+/// # Structured form
+///
+/// The same rule can be built from key/value attributes:
+///
+/// * `has_role` - a single required role.
+/// * `has_any_role` - a list of roles, any of which grants access.
+/// * `has_authority` - a single required authority.
+/// * `has_any_authority` - a list of authorities, any of which grants access.
+/// * `role` / `permission` - lists of roles and authorities kept for
+///   compatibility, combined like the checks above.
+/// * `mode` - how the configured checks are combined, either `"And"` (the
+///   default: every check has to hold) or `"Or"` (at least one has to hold).
+/// * `negate` - inverts the whole rule when it is `true`, which is how "the
+///   caller must *not* have this role" is written.
+/// * `expr` - the same expression string as the positional form.
+/// * `ignore` - skips the check and emits the handler unchanged.
+/// * `basic` - reserved for HTTP basic authorization. It is rejected at compile
+///   time, so a rule is never dropped silently.
+///
+/// # Ordering
+///
+/// Like the other wrapping handler attributes, `#[pre_authorize]` has to be
+/// placed *above* the routing attribute. The routing macro only re-emits the
+/// attributes it receives, so an inner `#[pre_authorize]` would be dropped and
+/// the handler would be left unguarded.
+///
+/// # Example
+///
+/// ```ignore
+/// use next_web::macros::bind::get_mapping;
+/// use next_web::macros::security::pre_authorize;
+///
+/// #[pre_authorize("has_role('ADMIN') and has_authority('order:read')")]
+/// #[get_mapping(path = "/admin/orders")]
+/// async fn orders() -> &'static str {
+///     "[]"
+/// }
+///
+/// #[pre_authorize(has_any_role = ["ADMIN", "AUDITOR"], mode = "Or")]
+/// #[get_mapping(path = "/reports")]
+/// async fn reports() -> &'static str {
+///     "[]"
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn pre_authorize(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_pre_authorize(attr, item_fn)
 }
 
-/// 实现可重试逻辑的过程宏
-///
-/// # 属性参数说明
-/// - `max_attempts`:   最大重试次数，默认为 1
-/// - `delay`:          每次重试的延迟时间，默认为 1000 毫秒
-/// - `backoff`:        可选退避策略路径
-/// - `retry_for`:      需要重试的错误类型列表，匹配这些错误时会触发重试, 这里的类型应该和重试函数的返回类型一致
-/// - `multiplier`:     可选乘数表达式，用于计算每次重试的延迟时间
-///
-/// # 注意
-/// 当前函数应返回 std::result::Result<T, E> 类型，其中 T 为正常返回值类型，E 为需要重试的错误类型
-///
-/// # 示例
-///
-/// ```rust
-/// #[derive(Debug)]
-/// enum TestMatch {
-///    A,
-///    B(u64),
-/// }
-///
-/// #[Retryable(
-///     max_attempts = 3,
-///     delay = 100,
-///     backoff = test_backoff,
-///     retry_for = [TestMatch::A],
-///     multiplier = 2
-/// )]
-/// fn test_retry() -> Result<(), TestMatch> {
-///    let timestamp_sec = std::time::SystemTime::now()
-///       .duration_since(std::time::UNIX_EPOCH)
-///       .unwrap()
-///       .as_secs();
-///     match timestamp_sec % 2 {
-///         0 => Err(TestMatch::B(123)),
-///         _ => Err(TestMatch::A),
-///     }
-/// }
-///
-/// fn test_backoff(error: &TestMatch) {
-///    println!("function test_retry backoff: {:?}", error);
-/// }
-/// ```
-///
 /// Process macros for implementing retry logic
 ///
 /// # Description of Attribute Parameters
