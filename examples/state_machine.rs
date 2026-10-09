@@ -3,7 +3,7 @@ use std::sync::Arc;
 use next_web::core::{
     async_trait, messaging::generic_message::GenericMessage, traits::message::Message,
 };
-use next_web_core::{anys::any_value::AnyValue, error::BoxError};
+use next_web_core::{any::AnyValue, error::BoxError};
 use next_web_state_machine::{
     autoconfigure::state_machine_auto_configuration::StateMachineAutoConfiguration,
     config::{

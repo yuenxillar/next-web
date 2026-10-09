@@ -1,7 +1,7 @@
 use std::{any::Any, collections::BTreeMap, sync::Arc};
 
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     error::BoxError,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };

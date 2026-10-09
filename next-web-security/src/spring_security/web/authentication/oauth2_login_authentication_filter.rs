@@ -227,7 +227,7 @@ impl OAuth2LoginAuthenticationConverter {
 impl AuthenticationConverter for OAuth2LoginAuthenticationConverter {
     fn convert(
         &self,
-        request: &dyn HttpRequest,
+        request: &mut dyn HttpRequest,
     ) -> Result<Option<Box<dyn Authentication>>, AuthenticationError> {
         if let Some(error) = request_parameter(request, "error") {
             let description = request_parameter(request, "error_description")

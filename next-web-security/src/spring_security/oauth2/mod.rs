@@ -14,7 +14,7 @@ use std::{
 };
 
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     async_trait,
     filter::{FilterChainError, FilterError},
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
@@ -473,7 +473,7 @@ pub trait AuthorizationRequestRepository: Send + Sync {
 
     fn remove_authorization_request(
         &self,
-        request: &dyn HttpRequest,
+        request: &mut dyn HttpRequest,
     ) -> Option<OAuth2AuthorizationRequest>;
 }
 
@@ -528,7 +528,7 @@ impl AuthorizationRequestRepository for HttpSessionOAuth2AuthorizationRequestRep
                 }
             }
             None => {
-                if let Some(session) = request.session() {
+                if let Some(session) = request.session_mut(false) {
                     session.remove_attribute(&self.session_attribute_name);
                 }
             }
@@ -537,9 +537,9 @@ impl AuthorizationRequestRepository for HttpSessionOAuth2AuthorizationRequestRep
 
     fn remove_authorization_request(
         &self,
-        request: &dyn HttpRequest,
+        request: &mut dyn HttpRequest,
     ) -> Option<OAuth2AuthorizationRequest> {
-        let session = request.session()?;
+        let session = request.session_mut(false)?;
         let authorization_request = session
             .attribute(&self.session_attribute_name)
             .and_then(|value| value.as_ref_value::<OAuth2AuthorizationRequest>())

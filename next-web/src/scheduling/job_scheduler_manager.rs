@@ -5,16 +5,16 @@ use std::{
     sync::Arc,
 };
 
+use crate::util::Uuid;
 use next_web_core::{error::BoxError, traits::singleton::Singleton, util::time::TimeUnit};
 use tokio::sync::RwLock;
 use tokio_cron_scheduler::{Job, JobScheduler, JobSchedulerError};
 use tracing::{error, warn};
-use uuid::Uuid;
 
 use super::{
-    JobExecutionContext, PersistedScheduledJob, ScheduledJobRegistry, ScheduledJobHandler,
-    ScheduledJobReader, ScheduledJobRepository, ScheduledJobStore, InMemoryScheduledJobRepository,
-    ScheduleType, WithArgs,
+    InMemoryScheduledJobRepository, JobExecutionContext, PersistedScheduledJob, ScheduleType,
+    ScheduledJobHandler, ScheduledJobReader, ScheduledJobRegistry, ScheduledJobRepository,
+    ScheduledJobStore, WithArgs,
 };
 
 type JobFuture = Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync + 'static>;
@@ -536,10 +536,7 @@ impl JobSchedulerManager {
     ///
     /// * `duration` - The duration the task declared.
     /// * `name` - The name of the duration, for the report.
-    fn round_up_to_a_second(
-        duration: std::time::Duration,
-        name: &str,
-    ) -> std::time::Duration {
+    fn round_up_to_a_second(duration: std::time::Duration, name: &str) -> std::time::Duration {
         let seconds = duration.as_secs();
 
         if seconds > 0 && duration == std::time::Duration::from_secs(seconds) {
@@ -638,20 +635,20 @@ mod tests {
         future::Future,
         pin::Pin,
         sync::{
-            atomic::{AtomicUsize, Ordering},
             Arc,
+            atomic::{AtomicUsize, Ordering},
         },
         time::{Duration, Instant},
     };
 
     use next_web_core::error::BoxError;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
     use tokio::sync::RwLock;
 
     use super::{
         BoxedJob, InMemoryScheduledJobRepository, JobExecutionContext, JobSchedulerManager,
-        PersistedScheduledJob, ScheduledJobHandler, ScheduledJobRegistry, ScheduledJobReader,
-        ScheduledJobStore, ScheduleType, WithArgs,
+        PersistedScheduledJob, ScheduleType, ScheduledJobHandler, ScheduledJobReader,
+        ScheduledJobRegistry, ScheduledJobStore, WithArgs,
     };
 
     struct CountingHandler {
@@ -668,7 +665,7 @@ mod tests {
 
         async fn execute(
             &self,
-        _context: super::JobExecutionContext,
+            _context: super::JobExecutionContext,
             payload: Option<Value>,
         ) -> Result<(), BoxError> {
             self.executions.fetch_add(1, Ordering::SeqCst);
@@ -718,10 +715,7 @@ mod tests {
         let job =
             PersistedScheduledJob::new("job-1", "missing", one_shot_schedule(2)).enabled(false);
         manager
-            .create_persisted(
-                job.clone(),
-                JobExecutionContext::default(),
-            )
+            .create_persisted(job.clone(), JobExecutionContext::default())
             .await
             .unwrap();
 
@@ -819,17 +813,11 @@ mod tests {
                 .await;
 
         manager
-            .create_persisted(
-                one_shot_job,
-                JobExecutionContext::default(),
-            )
+            .create_persisted(one_shot_job, JobExecutionContext::default())
             .await
             .unwrap();
         manager
-            .create_persisted(
-                repeating_job,
-                JobExecutionContext::default(),
-            )
+            .create_persisted(repeating_job, JobExecutionContext::default())
             .await
             .unwrap();
         manager.start().await.unwrap();

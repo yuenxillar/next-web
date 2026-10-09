@@ -10,16 +10,11 @@ use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
 use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::OnceLock};
 
 use crate::{
-    anys::any_value::AnyValue,
-    http::{Cookie, HttpMethod, auth_type::AuthType},
-    traits::http::{HttpSession, request_dispatcher::RequestDispatcher},
+    any::AnyValue,
+    http::{Cookie, HttpMethod, session::HttpSession},
+    traits::http::request_dispatcher::RequestDispatcher,
 };
 use next_web_context::Locale;
-
-pub const IDENTITY_REMOVED_KEY: &str = stringify!(format!(
-    "{}_IDENTITY_REMOVED_KEY",
-    std::any::type_name::<HttpRequest>()
-));
 
 pub trait HttpRequest
 where
@@ -34,8 +29,6 @@ where
     fn is_requested_session_id_valid(&self) -> bool;
 
     fn requested_session_id(&self) -> Option<&str>;
-
-    fn auth_type(&self) -> AuthType;
 
     fn cookie(&self) -> Option<&Cookie>;
 
@@ -100,13 +93,9 @@ where
     fn shared(&mut self) -> &HttpRequestShare;
 }
 
-pub type OneMap = HashMap<String, AnyValue>;
+type OneMap = HashMap<String, AnyValue>;
 
 impl HttpRequest for Request {
-    fn auth_type(&self) -> AuthType {
-        AuthType::from_request(self)
-    }
-
     fn session(&self) -> Option<&dyn HttpSession> {
         None
     }
@@ -241,26 +230,13 @@ impl HttpRequest for Request {
     }
 
     fn locale(&self) -> Option<Locale> {
-        // The preferred locale is the first language of the header; the
-        // optional parameters of a language, such as its quality, are not part
-        // of the tag.
         self.header(ACCEPT_LANGUAGE.as_str())
-            .and_then(|accept_language| accept_language.split(',').next())
-            .and_then(|language| language.split(';').next())
-            .map(str::trim)
-            .filter(|language| !language.is_empty())
-            .and_then(|language| Locale::for_language_tag(language).ok())
+            .and_then(Locale::from_accept_language)
     }
 
     fn locales(&self) -> Option<Vec<Locale>> {
         let accept_language = self.header(ACCEPT_LANGUAGE.as_str())?;
-        let locales = accept_language
-            .split(',')
-            .filter_map(|language| language.split(';').next())
-            .map(str::trim)
-            .filter(|language| !language.is_empty())
-            .filter_map(|language| Locale::for_language_tag(language).ok())
-            .collect::<Vec<Locale>>();
+        let locales = Locale::parse_accept_language(accept_language);
 
         if locales.is_empty() {
             Some(vec![Locale::system_locale()])
@@ -325,6 +301,6 @@ fn parse_cookies(request: &Request) -> Vec<Cookie> {
     };
     cookie_header
         .iter()
-        .map(|(name, value)| Cookie::new(name, Some(value.to_string())))
+        .map(|(name, value)| Cookie::new(name, Some(value.to_owned())))
         .collect()
 }

@@ -51,7 +51,7 @@ impl SimpleUrlAuthenticationFailureHandler {
         if self.forward_to_destination {
             request.set_attribute(WebAttributes::AUTHENTICATION_ERROR, error);
         } else {
-            if let Some(session) = request.session() {
+            if let Some(session) = request.session_mut(false) {
                 if self.allow_session_creation {
                     session.set_attribute(WebAttributes::AUTHENTICATION_ERROR, error);
                 }

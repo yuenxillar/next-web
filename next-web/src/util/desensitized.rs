@@ -1,6 +1,5 @@
+use super::Regex;
 use std::sync::LazyLock;
-
-use regex::Regex;
 
 /// Regular expression for email desensitization.
 ///

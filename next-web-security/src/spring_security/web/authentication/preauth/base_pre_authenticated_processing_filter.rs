@@ -2,7 +2,7 @@ use std::{any::TypeId, sync::Arc};
 
 use next_web_context::ApplicationEventPublisher;
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     error::BoxError,
     filter::FilterError,
     traits::{

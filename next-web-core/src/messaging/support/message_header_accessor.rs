@@ -6,10 +6,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use uuid::Uuid;
 
-use crate::anys::any_value::AnyValue;
+use crate::any::AnyClone;
+use crate::any::AnyValue;
 use crate::messaging::message_channel::MessageChannel;
 use crate::messaging::message_headers::MessageHeaders;
-use crate::traits::any_clone::AnyClone;
 use crate::traits::message::Message;
 use crate::util::MimeType;
 use crate::util::pattern_match::PatternMatchUtils;

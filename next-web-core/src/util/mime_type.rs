@@ -525,6 +525,7 @@ impl MimeTypeUtils {
 /// Comparator for MIME types that orders by specificity.
 pub struct SpecificityComparator;
 
+#[allow(dead_code)]
 impl SpecificityComparator {
     /// Compare two MIME types by specificity.
     pub fn compare<T: AsRef<MimeType>>(mime_type1: T, mime_type2: T) -> Ordering {

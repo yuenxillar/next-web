@@ -1,19 +1,20 @@
 [package]
 name = "next-web-open-api"
-version = "0.1.0"
-edition = "2024"
+version = "0.2.2"
+description = "OpenAPI and Swagger documentation support for Next Web"
+readme = "README.md"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
-reqwest.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-async-trait.workspace = true
+utoipa = { workspace = true, features = ["macros"] }
 
-[dev-dependencies]
-tokio.workspace = true
+paste = "1.0.15"
 
+[lints]
+workspace = true
 
 [features]
-default = ["open-weather"]
-open-weather = []
-
+default = ["utoipa/debug"]

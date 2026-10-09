@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use next_web_core::{anys::any_error::AnyError, error::BoxError};
+use next_web_core::{any::AnyError, error::BoxError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RetryError {

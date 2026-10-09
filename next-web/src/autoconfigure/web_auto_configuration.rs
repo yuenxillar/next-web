@@ -129,21 +129,9 @@ impl WebAutoConfiguration {
             "the auto-configurations of the application are applied in this order"
         );
 
-        for mut auto_configuration in auto_configurations {
+        for auto_configuration in auto_configurations.into_iter().as_mut_slice() {
             auto_configuration.configure(ctx).await?;
         }
-
-        // Resolve autoRegister
-        // for auto_register in ctx
-        //     .resolve_by_type::<Arc<dyn AutoRegister>>()
-        //     .iter()
-        //     .map(|s| s.as_ref())
-        // {
-        //     auto_register
-        //         .register(ctx, application_properties)
-        //         .await
-        //         .map_err(|err| Into::<Box<dyn Error>>::into(err.to_string()))?;
-        // }
 
         Ok(())
     }

@@ -1,5 +1,5 @@
 use std::{
-    any::{type_name_of_val, Any},
+    any::{Any, type_name_of_val},
     collections::{HashMap, HashSet},
     error::Error,
     panic::AssertUnwindSafe,
@@ -9,18 +9,18 @@ use std::{
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::{
-    response::{IntoResponse, Response},
     Router,
+    response::{IntoResponse, Response},
 };
 
-use next_web_context::{ApplicationContextExt, APPLICATION_ARGUMENTS_SINGLETON_NAME};
+use next_web_context::{APPLICATION_ARGUMENTS_SINGLETON_NAME, ApplicationContextExt};
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     constants::application_constants::APPLICATION_DEFAULT_PORT,
     env::{
-        CompositePropertySource, ConfigurableEnvironment, MutablePropertySources, PropertySource,
-        SimpleCommandLinePropertySource, COMMAND_LINE_PROPERTY_SOURCE_NAME,
-        DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME,
+        COMMAND_LINE_PROPERTY_SOURCE_NAME, CompositePropertySource, ConfigurableEnvironment,
+        DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME, MutablePropertySources, PropertySource,
+        SimpleCommandLinePropertySource,
     },
     io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup, StartupStep},
@@ -30,36 +30,35 @@ use next_web_core::{
     },
     util::indexmap::IndexMap,
 };
-use next_web_singletons::factory::{config::SingletonRegistry, SingletonFactory};
+use next_web_singletons::factory::{SingletonFactory, config::SingletonRegistry};
 use reqwest::StatusCode;
 use tokio::sync::RwLock;
-use tracing::{enabled, Level};
+use tracing::{Level, enabled};
 
 use crate::{
+    ApplicationArguments, ApplicationBannerPrinter, ApplicationContextFactory,
+    ApplicationContextInitializer, ApplicationEnvironment, ApplicationEventHandler,
+    ApplicationInfoPropertySource, ApplicationProperties, ApplicationRunner,
+    ApplicationShutdownHook, Banner, ConfigurableApplicationContext, DefaultApplicationArguments,
+    DefaultApplicationContextFactory, ErrorHandler, Event, NextWebErrorReporter, StartupInfoLogger,
     application_banner_printer::PrintedBanner,
     autoconfigure::web_auto_configuration::WebAutoConfiguration,
     autoregister::http_handler_autoregister::HttpHandlerAutoRegister,
     banner::BannerMode,
-    configurer::http_method_handler_configurer::RouterContext,
     context::{
-        logging::LoggingEventHandler, properties::source::ConfigurationPropertySources,
-        ContextIdApplicationContextInitializer,
+        ContextIdApplicationContextInitializer, RouterContext, logging::LoggingEventHandler,
+        properties::source::ConfigurationPropertySources,
     },
     diagnostics::error_analyzers::ErrorAnalyzers,
     env::{DefaultPropertiesPropertySource, MapPropertySource},
     support::EnvironmentPostProcessorEventHandler,
     util::InventoryHelper,
     web::server::{Server, WebServer},
-    ApplicationArguments, ApplicationBannerPrinter, ApplicationContextFactory,
-    ApplicationContextInitializer, ApplicationEnvironment, ApplicationEventHandler,
-    ApplicationInfoPropertySource, ApplicationProperties, ApplicationRunner,
-    ApplicationShutdownHook, Banner, ConfigurableApplicationContext, DefaultApplicationArguments,
-    DefaultApplicationContextFactory, ErrorHandler, Event, NextWebErrorReporter, StartupInfoLogger,
 };
 
-use crate::web::server::autoconfigure::ServerProperties;
 #[cfg(feature = "tls-rustls")]
 use crate::web::server::TlsWebServer;
+use crate::web::server::autoconfigure::ServerProperties;
 
 /// The application shutdown hook, used to clean up resources on shutdown.
 pub static APPLICATION_SHUTDOWN_HOOK: OnceLock<ApplicationShutdownHook> = OnceLock::new();
@@ -70,10 +69,66 @@ pub type ApplicationResult<T> = Result<T, Box<dyn Error>>;
 /// The application state, wrapped in an [`Arc`] and [`RwLock`] to allow shared access.
 pub type ApplicationState = Arc<RwLock<Box<dyn ConfigurableApplicationContext>>>;
 
+/// The entry point of an application.
+///
+/// The trait describes what the framework needs to know about an application:
+/// the routes it serves, the OpenAPI document that describes them, and the
+/// responses it returns for a request that no route matches and for a handler
+/// that panics. An application implements the trait on its root type and hands
+/// that type to [`NextWebApplication`], which prepares the environment, creates
+/// the application context, applies the auto-configurations, and runs the
+/// server:
+///
+/// ```ignore
+/// #[derive(Default)]
+/// struct MyApplication;
+///
+/// impl Application for MyApplication {}
+///
+/// #[tokio::main]
+/// async fn main() {
+///     NextWebApplication::<MyApplication>::default().run().await
+/// }
+/// ```
+///
+/// Every method has a default implementation, and the routes do not have to be
+/// declared by hand: [`Application::router`] collects the handlers that are
+/// annotated with the request mapping macros, so an application that only
+/// serves routes is often an empty `impl` block. A method is overridden when the
+/// default behavior is not the right one, for example to describe the API with a
+/// custom OpenAPI document or to format the errors the framework generates
+/// itself.
+///
+/// The methods are called by [`NextWebApplication`] while it starts, so an
+/// implementation must not assume that the application context of the
+/// application is available before [`Application::router`] is called.
+///
+/// # Type Parameters
+///
+/// * `E` - The [`ErrorHandler`] that formats the responses the framework
+///   generates itself: the `404 Not Found` response of
+///   [`Application::fallback`] and the `500 Internal Server Error` response of
+///   [`Application::catch_panic`]. The default is `()`, which serves the
+///   message of the error as plain text.
 pub trait Application<E = ()>
 where
     E: ErrorHandler,
 {
+    /// Returns the background services the application contributes.
+    ///
+    /// A background service is a long-running task that runs next to the web
+    /// server, for example a scheduler, a message consumer, or a maintenance
+    /// job. The default implementation returns an empty collection, so an
+    /// application that contributes no service does not have to implement the
+    /// method.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The application context of the application.
+    ///
+    /// # Returns
+    ///
+    /// The services the application contributes.
     fn background_services(
         &self,
         _ctx: &mut dyn ConfigurableApplicationContext,
@@ -81,78 +136,147 @@ where
         Vec::new()
     }
 
+    /// Builds the router of the application.
+    ///
+    /// The default implementation collects every handler that is registered
+    /// with the request mapping macros, lets each handler register its route in
+    /// a [`RouterContext`], and folds the routes into a single [`Router`]. When
+    /// the `enable-open-api` feature is enabled it also builds the OpenAPI
+    /// document of the application with [`Application::open_api`], stores the
+    /// document in the context, and mounts the JSON document and the Swagger UI
+    /// that serve it.
+    ///
+    /// The framework completes the router before the server binds: the routers
+    /// of the [`ApplyRouter`] singletons are merged into it, the fallback of
+    /// [`Application::fallback`] is installed, and the layers that handle
+    /// timeouts, panics, CORS, and tracing are added.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The application context of the application, which the OpenAPI
+    ///   document is stored in.
+    ///
+    /// # Returns
+    ///
+    /// The router the web server serves.
     #[allow(unused_variables)]
     fn router(&self, ctx: &mut dyn ConfigurableApplicationContext) -> Router {
-        #[cfg(feature = "enable-open-api")]
-        use next_web_context::ApplicationContextExt;
-
         #[cfg(feature = "enable-open-api")]
         let mut context = RouterContext::with_openapi(self.open_api(ctx));
 
         #[cfg(not(feature = "enable-open-api"))]
-        let mut context = RouterContext::default();
+        let mut context = RouterContext::new();
 
-        let router = InventoryHelper::iter::<&dyn HttpHandlerAutoRegister>()
+        let mut router = InventoryHelper::iter::<&dyn HttpHandlerAutoRegister>()
             .into_iter()
-            .fold(Router::new(), |router, item| {
-                item.register(router, &mut context)
+            .fold(Router::new(), |router, handler| {
+                handler.register(router, &mut context)
             });
 
         #[cfg(feature = "enable-open-api")]
-        ctx.insert_singleton_with_default_name(
-            context.open_api.take().expect("open_api is not available"),
-        );
+        {
+            ctx.insert_singleton_with_default_name(
+                context.open_api.take().expect("open_api is not available"),
+            );
+
+            // Expose the collected OpenAPI document as a JSON endpoint. The handler
+            // pulls the `OpenApi` singleton from the application context, so it always
+            // serves the same document that the handlers registered above contributed to.
+            router = router
+                .route("/api-docs/openapi.json", axum::routing::get(openapi))
+                .merge(
+                    utoipa_swagger_ui::SwaggerUi::new("/swagger-ui").config(
+                        utoipa_swagger_ui::Config::new(["/api-docs/openapi.json"])
+                            .filter(true)
+                            .with_credentials(true)
+                            .persist_authorization(true),
+                    ),
+                );
+        }
 
         router
     }
 
+    /// Builds the OpenAPI document that describes the API of the application.
+    ///
+    /// The default implementation describes the API with the
+    /// [`OpenApiProperties`](crate::open_api::OpenApiProperties) that the
+    /// framework binds from the `next.open_api` prefix of the environment and
+    /// registers as a singleton, and falls back to the defaults of the
+    /// properties when the application configures none of them. The document
+    /// starts without paths or components: the handlers contribute their
+    /// operations to it while [`Application::router`] registers them.
+    ///
+    /// The method only exists when the crate is built with the
+    /// `enable-open-api` feature, which is what mounts the endpoints that serve
+    /// the document.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The application context of the application, which holds the
+    ///   properties the document is described by.
+    ///
+    /// # Returns
+    ///
+    /// The OpenAPI document of the application.
     #[cfg(feature = "enable-open-api")]
-    #[allow(unused_variables)]
-    fn open_api(&self, ctx: &mut dyn ConfigurableApplicationContext) {
-        use next_web_api_doc::OpenApi;
+    fn open_api(
+        &self,
+        ctx: &mut dyn ConfigurableApplicationContext,
+    ) -> next_web_open_api::openapi::OpenApi {
+        use crate::open_api::OpenApiProperties;
 
-        struct OpenApiDoc;
+        // The properties are registered as a singleton while the application
+        // starts, and an application that configures none falls back to the
+        // defaults of the framework.
+        let info = ctx
+            .get_singleton_option_with_default_name::<OpenApiProperties>()
+            .map(OpenApiProperties::to_info)
+            .unwrap_or_else(|| OpenApiProperties::default().to_info());
 
-        impl next_web_api_doc::OpenApi for OpenApiDoc {
-            fn openapi() -> next_web_api_doc::openapi::OpenApi {
-                next_web_api_doc::openapi::OpenApiBuilder::new()
-                    .info(
-                        next_web_api_doc::openapi::InfoBuilder::new()
-                            .title("API Documentation")
-                            .version("0.1.0")
-                            .description(Some(
-                                std::env::var("CARGO_PKG_DESCRIPTION")
-                                    .unwrap_or(String::from("Empty")),
-                            ))
-                            .license(Some(next_web_api_doc::openapi::License::new(
-                                "MIT or Apache-2.0",
-                            )))
-                            .contact(Some(
-                                next_web_api_doc::openapi::ContactBuilder::new()
-                                    .name(Some(
-                                        std::env::var("CARGO_PKG_AUTHORS")
-                                            .unwrap_or(String::from("Listeing")),
-                                    ))
-                                    .email(None::<String>)
-                                    .build(),
-                            ))
-                            .build(),
-                    )
-                    .paths(next_web_api_doc::openapi::path::Paths::new())
-                    .components(Some(next_web_api_doc::openapi::Components::new()))
-                    .build()
-            }
-        }
-
-        OpenApiDoc::openapi()
+        next_web_open_api::openapi::OpenApiBuilder::new()
+            .info(info)
+            .paths(next_web_open_api::openapi::path::Paths::new())
+            .components(Some(next_web_open_api::openapi::Components::new()))
+            .build()
     }
 
+    /// Handles a request that no route matches.
+    ///
+    /// The framework installs this as the fallback of the router, so the
+    /// response it returns is served for every request the application does not
+    /// route. The default implementation delegates to
+    /// [`ErrorHandler::handle_error`] and sets the status of the response to
+    /// [`StatusCode::NOT_FOUND`].
+    ///
+    /// # Returns
+    ///
+    /// The response the framework serves for an unmatched request.
     fn fallback() -> impl IntoResponse {
         let mut resp = E::handle_error("Not Found").into_response();
         *resp.status_mut() = StatusCode::NOT_FOUND;
         resp
     }
 
+    /// Turns the payload of a panicking handler into a response.
+    ///
+    /// The framework registers this as the panic handler of the router, so a
+    /// handler that panics does not take the server down with it. The default
+    /// implementation recovers the message of the panic from the payload, logs
+    /// it at the error level, delegates to [`ErrorHandler::handle_error`], and
+    /// sets the status of the response to
+    /// [`StatusCode::INTERNAL_SERVER_ERROR`].
+    ///
+    /// # Arguments
+    ///
+    /// * `err` - The payload the panic was resumed with, which is the boxed
+    ///   value a [`std::panic::catch_unwind`] yields. The message is read from
+    ///   the [`String`] and `&str` payloads a panic carries, and the other
+    ///   payloads are reported as `Unknown error`.
+    ///
+    /// # Returns
+    ///
+    /// The response the framework serves for the failed request.
     fn catch_panic(err: Box<dyn Any + Send + 'static>) -> Response {
         let error = err
             .downcast_ref::<String>()
@@ -468,7 +592,7 @@ where
             None => {
                 return DefaultApplicationContextFactory::default()
                     .create_environment()
-                    .unwrap_or(Box::new(ApplicationEnvironment::default()))
+                    .unwrap_or(Box::new(ApplicationEnvironment::default()));
             }
         }
     }
@@ -1250,6 +1374,24 @@ fn configure_command_line_property_source(sources: &mut MutablePropertySources, 
             command_line_properties(args),
         ))),
     }
+}
+/// Serves the OpenAPI document as a JSON response.
+///
+/// The [`next_web_open_api::openapi::OpenApi`] instance is pulled from the application
+/// context via [`FindSingleton`], which resolves a singleton of the requested type.
+/// This keeps the handler independent of how the document was built: it only needs
+/// the context to already contain an `OpenApi` value, which is inserted during router
+/// setup when the `enable-open-api` feature is on.
+///
+/// The handler is gated behind `enable-open-api` because both the extractor's target
+/// type and the OpenAPI document only exist when that feature is enabled.
+#[cfg(feature = "enable-open-api")]
+async fn openapi(
+    crate::extract::FindSingleton(openapi): crate::extract::FindSingleton<
+        next_web_open_api::openapi::OpenApi,
+    >,
+) -> axum::Json<next_web_open_api::openapi::OpenApi> {
+    axum::Json(openapi)
 }
 
 #[cfg(test)]

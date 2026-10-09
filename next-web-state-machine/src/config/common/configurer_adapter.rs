@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::config::common::builder::Builder;
 use crate::config::common::configurer::Configurer;
 use crate::config::common::object_post_processor::ObjectPostProcessor;
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 use next_web_core::error::BoxError;
 
 /// Base adapter for annotation configurers.

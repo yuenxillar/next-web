@@ -35,3 +35,15 @@ next:
 
   feature:
     enabled: true
+
+  open_api:
+    title: "Next Web Examples API"
+    version: "0.1.0"
+    description: "The API of the next-web examples."
+    terms_of_service: "https://github.com/yuenxillar/next-web"
+    license:
+      name: "MIT OR Apache-2.0"
+      url: "https://github.com/yuenxillar/next-web/blob/main/LICENSE-MIT"
+    contact:
+      name: "Listening"
+      email: "yuenxillar@163.com"

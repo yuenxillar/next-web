@@ -1,6 +1,6 @@
 //! Optional strategy used by a [`Binder`] to resolve property placeholders.
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 
 /// Optional strategy that used by a [`Binder`] to resolve property placeholders.
 ///

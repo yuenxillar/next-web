@@ -1,8 +1,5 @@
 use axum::http::{StatusCode, header};
-use reqwest::header::{
-    ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_REQUEST_HEADERS, ACCESS_CONTROL_REQUEST_METHOD,
-    ORIGIN, VARY,
-};
+
 use std::str::FromStr;
 use tracing::{debug, trace};
 
@@ -189,28 +186,28 @@ impl CorsProcessor for DefaultCorsProcessor {
             }
         };
 
-        let vary_headers = response.headers(VARY.as_str()).unwrap_or_default();
+        let vary_headers = response.headers(header::VARY.as_str()).unwrap_or_default();
         let mut headers_to_add = [
-            (false, ORIGIN.as_str()),
-            (false, ACCESS_CONTROL_REQUEST_METHOD.as_str()),
-            (false, ACCESS_CONTROL_REQUEST_HEADERS.as_str()),
+            (false, header::ORIGIN.as_str()),
+            (false, header::ACCESS_CONTROL_REQUEST_METHOD.as_str()),
+            (false, header::ACCESS_CONTROL_REQUEST_HEADERS.as_str()),
         ];
 
-        if !vary_headers.contains(&ORIGIN.as_str()) {
+        if !vary_headers.contains(&header::ORIGIN.as_str()) {
             headers_to_add[0].0 = true;
         }
 
-        if !vary_headers.contains(&ACCESS_CONTROL_REQUEST_METHOD.as_str()) {
+        if !vary_headers.contains(&header::ACCESS_CONTROL_REQUEST_METHOD.as_str()) {
             headers_to_add[1].0 = true;
         }
 
-        if !vary_headers.contains(&ACCESS_CONTROL_REQUEST_HEADERS.as_str()) {
+        if !vary_headers.contains(&header::ACCESS_CONTROL_REQUEST_HEADERS.as_str()) {
             headers_to_add[2].0 = true;
         }
 
         for (is_vary, name) in headers_to_add {
             if is_vary {
-                response.append_header(VARY.as_str(), name);
+                response.append_header(header::VARY.as_str(), name);
             }
         }
 
@@ -220,7 +217,7 @@ impl CorsProcessor for DefaultCorsProcessor {
         }
 
         if response
-            .header(ACCESS_CONTROL_ALLOW_ORIGIN.as_str())
+            .header(header::ACCESS_CONTROL_ALLOW_ORIGIN.as_str())
             .is_some()
         {
             trace!("Skip: response already contains \"Access-Control-Allow-Origin\"");

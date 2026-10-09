@@ -1,5 +1,5 @@
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     error::BoxError,
     http::StatusCode,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},

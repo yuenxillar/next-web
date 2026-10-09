@@ -1,7 +1,8 @@
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     async_trait,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse, HttpSession},
+    http::session::HttpSession,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 use std::sync::Arc;
 use tracing::{debug, enabled, trace, warn, Level};
@@ -77,7 +78,7 @@ impl HttpSessionSecurityContextRepository {
 
         let empty_context = self.generate_new_context();
         if Arc::ptr_eq(&empty_context, context) {
-            let session = request.session();
+            let session = request.session_mut(false);
             self.remove_context_from_session(context.as_ref(), session);
         } else {
             let session = request.session_mut(self.allow_session_creation);
@@ -95,17 +96,14 @@ impl HttpSessionSecurityContextRepository {
                 &self.next_security_context_key,
                 AnyValue::BoxedValue(Box::new(context.to_owned())),
             );
-            debug!(
-                "Stored SecurityContext to HttpSession [{}]",
-                session.to_string()
-            );
+            debug!("Stored SecurityContext to HttpSession [{:?}]", session);
         }
     }
 
     fn remove_context_from_session(
         &self,
         _context: &dyn SecurityContext,
-        session: Option<&dyn HttpSession>,
+        session: Option<&mut dyn HttpSession>,
     ) {
         if let Some(session) = session {
             session.remove_attribute(&self.next_security_context_key);

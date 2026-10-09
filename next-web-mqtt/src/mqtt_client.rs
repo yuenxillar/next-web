@@ -289,11 +289,6 @@ impl MqttClient {
         self.client.publish(topic, qos, retain, message).await
     }
 
-    /// Returns a reference to the MQTT client.
-    pub fn client(&self) -> &AsyncClient {
-        &self.client
-    }
-
     /// Returns a reference to the MQTT properties.
     pub fn properties(&self) -> &MQTTClientProperties {
         &self.properties

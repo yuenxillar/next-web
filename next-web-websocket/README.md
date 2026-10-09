@@ -11,7 +11,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use axum::extract::ws::CloseFrame;
-use next_web::anys::any_value::AnyValue;
+use next_web::any::AnyValue;
 use next_web::application::Application;
 use next_web::traits::http::http_request::HttpRequest;
 use next_web::traits::http::http_response::HttpResponse;

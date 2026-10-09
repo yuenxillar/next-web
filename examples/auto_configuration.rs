@@ -16,18 +16,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use next_web::{
+    Application, NextWebApplication,
     core::{
-        async_trait, traits::config::auto_configuration::AutoConfiguration, ApplicationContext,
+        ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
     },
     extract::find_singleton::FindSingleton,
     macros::{
         autoconfigure::{auto_configuration, configuration_properties},
         bind::{get_mapping, singleton},
     },
-    Application, NextWebApplication,
 };
 use next_web_context::ApplicationContextExt;
-use next_web_core::{anys::any_value::AnyValue, Ordered};
+use next_web_core::{Ordered, any::AnyValue};
 
 #[derive(Default)]
 pub struct TestApplication;

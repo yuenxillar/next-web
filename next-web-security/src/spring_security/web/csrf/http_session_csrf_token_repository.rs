@@ -1,4 +1,4 @@
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 use next_web_core::error::BoxError;
 use next_web_core::traits::http::http_request::HttpRequest;
 use next_web_core::{async_trait, traits::http::http_response::HttpResponse};
@@ -90,7 +90,7 @@ impl CsrfTokenRepository for HttpSessionCsrfTokenRepository {
     ) -> Result<(), BoxError> {
         match token {
             None => {
-                if let Some(session) = request.session() {
+                if let Some(session) = request.session_mut(false) {
                     session.remove_attribute(&self.session_attribute_name);
                 }
             }

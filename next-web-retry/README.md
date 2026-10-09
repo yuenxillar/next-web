@@ -8,7 +8,7 @@ From: Spring Retry
 ```rust
 use std::error::Error;
 
-use next_web_core::models::any_value::AnyValue;
+use next_web_core::models::AnyValue;
 use next_web::util::local_date_time::LocalDateTime;
 
 use next_web_retry::{

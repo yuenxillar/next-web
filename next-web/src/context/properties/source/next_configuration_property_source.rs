@@ -1,7 +1,7 @@
 //! A configuration property source adapted from a classic property source.
 
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     env::{PropertySource, PropertySourceValue},
     util::indexmap::IndexMap,
 };

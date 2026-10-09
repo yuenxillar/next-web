@@ -1,7 +1,7 @@
 use std::char;
 
 use indexmap::IndexMap;
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 use once_cell::sync::Lazy;
 use regex::Regex;
 

@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 
 /// Generic record interface (simplified version)
 pub trait GenericRecord {

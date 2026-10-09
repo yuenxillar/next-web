@@ -1,4 +1,3 @@
-pub mod locale;
 pub mod matcher;
 pub mod pattern;
 pub mod pattern_match;

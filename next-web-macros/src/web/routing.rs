@@ -92,13 +92,6 @@ fn impl_item_fn(
         }
     };
 
-    // Build http method handler configurer
-    // let http_method_handler_configurer = quote! {
-    //     ::next_web::configurer::http_method_handler_configurer::HttpMethodHandlerConfigurer::default()
-    //     .with_idempotency_configurer();
-    // };
-    // let conditioned = quote! { true };
-
     let doc_attributes: Vec<syn::Attribute> = item_fn
         .attrs
         .iter()
@@ -109,14 +102,14 @@ fn impl_item_fn(
     let vis = &item_fn.vis;
     let name = &item_fn.sig.ident;
 
-    let has_api_doc = item_fn
+    let has_open_api = item_fn
         .attrs
         .iter()
-        .any(|attr| attr.path().is_ident("api_doc"));
-    let api_doc_block = if has_api_doc && cfg!(feature = "api-doc") {
+        .any(|attr| attr.path().is_ident("open_api"));
+    let open_api_block = if has_open_api && cfg!(feature = "open-api") {
         quote! {
             if let Some(mut __open_api) =  __context.open_api.take() {
-                __open_api = __open_api.routes( ::next_web::api_doc::routes!(#name));
+                __open_api = __open_api.routes( ::next_web::open_api::routes!(#name));
                 __context.open_api.replace(__open_api);
             };
         }
@@ -132,11 +125,11 @@ fn impl_item_fn(
         impl ::next_web::autoregister::http_handler_autoregister::HttpHandlerAutoRegister for #name {
             fn register<'a>(& self,
                 __router:           ::next_web::Router,
-                __context:  &'a mut ::next_web::configurer::http_method_handler_configurer::RouterContext
+                __context:  &'a mut ::next_web::context::RouterContext
             ) -> ::next_web::Router {
                 #block
 
-                #api_doc_block
+                #open_api_block
 
                 __router.route(#path, ::next_web::routing::#method(#name))
             }

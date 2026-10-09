@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     async_trait,
     filter::FilterError,
     traits::{

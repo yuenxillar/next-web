@@ -1,4 +1,4 @@
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 use next_web_core::clone_box;
 use next_web_core::error::BoxError;
 use next_web_core::traits::required::Required;

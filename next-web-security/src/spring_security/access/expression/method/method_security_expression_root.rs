@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 
 use crate::{
     access::{

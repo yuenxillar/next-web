@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 
 use crate::{
     extended_state::{ExtendedState, ExtendedStateChangeListener},

@@ -3,7 +3,8 @@ use std::{fmt::Debug, ops::Deref, sync::Arc};
 use next_web_context::ApplicationEventPublisher;
 use next_web_core::{
     async_trait,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse, HttpSession},
+    http::session::HttpSession,
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 use tracing::{debug, enabled, warn, Level};
 

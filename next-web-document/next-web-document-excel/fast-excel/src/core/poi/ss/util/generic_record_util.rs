@@ -1,7 +1,7 @@
 use std::fmt;
 
 use indexmap::IndexMap;
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 
 /// A utility class for working with generic record properties
 pub struct GenericRecordUtil;

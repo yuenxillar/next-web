@@ -163,7 +163,7 @@ impl RequestCache for CookieRequestCache {
         Some(Box::new(SavedRequestAwareWrapper::new(saved?, request)))
     }
 
-    fn remove_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {
+    fn remove_request(&self, request: &mut dyn HttpRequest, response: &mut dyn HttpResponse) {
         let mut remove_saved_request_cookie = Cookie::new(COOKIE_NAME, None);
         remove_saved_request_cookie.set_secure(request.is_secure());
         remove_saved_request_cookie.set_http_only(true);

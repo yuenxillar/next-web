@@ -60,19 +60,15 @@ impl DefaultRequestDispatcher {
         // Mapping is against the normalized uri
 
         // Decode
-        let decoded_uri = urlencoding::decode(&normalized_uri).map_err(Into::<BoxError>::into)?;
-        // Security check to catch attempts to encode /../ sequences
-        let _normalized_uri = Self::normalize(&decoded_uri);
-
-        if !(decoded_uri == _normalized_uri.unwrap_or_default()) {
-            return Err(format!("Invalid path: {}", path).into());
-        }
+        //         let decoded_uri = urlencoding::decode(&normalized_uri).map_err(Into::<BoxError>::into)?;
+        //         // Security check to catch attempts to encode /../ sequences
+        //         let _normalized_uri = Self::normalize(&decoded_uri);
+        //
+        //         if !(decoded_uri == _normalized_uri.unwrap_or_default()) {
+        //             return Err(format!("Invalid path: {}", path).into());
+        //         }
 
         // URI needs to include the context path
-        let uri = urlencoding::encode("") + uri.unwrap_or_default();
-
-        // Use the thread local URI and mapping data
-        // TODO
 
         Ok(DefaultRequestDispatcher {})
     }

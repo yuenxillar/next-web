@@ -7,7 +7,7 @@ use std::{
 };
 
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     async_trait,
     error::BoxError,
     filter::FilterError,

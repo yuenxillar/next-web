@@ -7,7 +7,7 @@ use std::{
 
 use next_web_context::ApplicationContextExt;
 use next_web_core::{
-    traits::any_clone::AnyClone,
+    any::AnyClone,
     web::{accept::ContentNegotiationStrategy, cors::UrlBasedCorsConfigurationSource},
     ApplicationContext,
 };

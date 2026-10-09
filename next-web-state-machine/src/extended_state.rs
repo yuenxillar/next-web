@@ -7,7 +7,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use next_web_core::{anys::any_value::AnyValue, async_trait};
+use next_web_core::{any::AnyValue, async_trait};
 
 /// Extended states are used to supplement state machines with variables.
 /// When extended state is used, the complete condition of a state machine

@@ -18,7 +18,7 @@ members = [
     "next-web-mq/next-web-mq-rocketmq",
     "next-web-data/next-web-data-redis",
     "next-web-wechat",
-    "next-web-api-doc",
+    "next-web-open-api",
     "next-web-actuator",
     "next-web-pay/next-web-pay-alipay",
     "next-web-pay/next-web-pay-wechatpay",
@@ -80,7 +80,7 @@ next-web-util               = { path = "./next-web-util"            }
 next-web-macros             = { path = "./next-web-macros"          }
 next-web-retry              = { path = "./next-web-retry"           }
 next-web-security           = { path = "./next-web-security"        }
-next-web-api-doc            = { path = "./next-web-api-doc"         }
+next-web-open-api           = { path = "./next-web-open-api"        }
 next-web-state-machine      = { path = "./next-web-state-machine"   }
 next-web-websocket          = { path = "./next-web-websocket"       }
 
@@ -107,8 +107,8 @@ serde_path_to_error = { version = "0.1.17" }
 quick-xml = { version = "0.37.4", features = ["serialize"] }
 strum = { version = "0.27", features = ["derive"] }
 
-utoipa = { version = "5.4.0" }
-utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "reqwest"] }
+utoipa = { version = "6.0.0", default-features = false }
+utoipa-swagger-ui = { version = "10.0.1", features = ["axum", "reqwest", "cache"] }
 
 # document
 calamine = { version = "0.26.1" }

@@ -1,7 +1,7 @@
-pub mod auth_type;
 pub mod default_request_dispatcher;
 
 pub mod server;
+pub mod session;
 
 mod cookie;
 mod http_filter_chain_share;

@@ -2,7 +2,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 use next_web_core::traits::http::http_request::HttpRequest;
 use next_web_core::traits::http::http_response::HttpResponse;
 use next_web_core::util::HttpMethod;

@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use axum::extract::ws::CloseFrame;
 
-use next_web::core::anys::any_value::AnyValue;
+use next_web::core::any::AnyValue;
 use next_web::core::error::BoxError;
 use next_web::core::traits::http::http_request::HttpRequest;
 use next_web::core::traits::http::http_response::HttpResponse;

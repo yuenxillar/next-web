@@ -113,7 +113,7 @@ The project is organized as a workspace, keeping the framework itself separate f
 | `next-web-macros` | Procedural macros for routes, dependency injection, configuration properties, scheduling, retries, and desensitization |
 | `next-web-security` | Security, authentication, and authorization extensions |
 | `next-web-websocket` | WebSocket server support |
-| `next-web-api-doc`  | OpenAPI / Swagger documentation based on utoipa |
+| `next-web-open-api`  | OpenAPI / Swagger documentation based on utoipa |
 | `next-web-data-redis` | Redis integration, with optional distributed locking |
 | `next-web-data-database` | MySQL / PostgreSQL data access and transaction support |
 | `next-web-mqtt` / `next-web-mq-*` | MQTT, Kafka, RabbitMQ, RocketMQ, and other messaging integrations |
@@ -141,7 +141,7 @@ The project is organized as a workspace, keeping the framework itself separate f
 | `enable-scheduling` | Enables scheduled tasks |
 | `enable-retry` | Enables retry support |
 | `enable-i18n` | Enables internationalization |
-| `enable-api-doc` / `enable-open-api` | Enables OpenAPI / Swagger documentation |
+| `enable-open-api` | Enables OpenAPI / Swagger documentation |
 | `enable-prometheus` | Enables Prometheus metrics |
 | `enable-state-machine` | Enables the state machine |
 | `enable-thread-pool` | Enables thread pool support |
@@ -171,7 +171,7 @@ The `examples` directory contains runnable examples:
 | Database | `cargo run -p next-web-examples --bin database` | Database services and transactions |
 | Retry | `cargo run -p next-web-examples --bin retry` | Retry templates and `#[retryable]` |
 | State machine | `cargo run -p next-web-examples --bin state_machine` | State machine configuration and runtime |
-| OpenAPI | `cargo run -p next-web-examples --bin api_doc` | API documentation generation |
+| OpenAPI | `cargo run -p next-web-examples --bin open_api` | API documentation generation |
 
 More examples — mail, MQTT, XXL-JOB, payments, AI, streaming responses, and others — are available in the `examples/` directory.
 

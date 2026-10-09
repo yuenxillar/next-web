@@ -79,7 +79,7 @@ struct UniformRandomBackOffContext {
 }
 
 impl BackOffContext for UniformRandomBackOffContext {
-    fn get_value(&self) -> Option<&next_web_core::anys::any_value::AnyValue> {
+    fn get_value(&self) -> Option<&next_web_core::any::AnyValue> {
         None
     }
 }

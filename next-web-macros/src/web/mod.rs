@@ -1,4 +1,4 @@
-pub mod api_doc;
+pub mod open_api;
 pub mod retry;
 pub mod translation;
 

@@ -1,14 +1,14 @@
 use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::Arc};
 
+use axum::http::header::ACCEPT_LANGUAGE;
 use axum::http::{HeaderMap, HeaderValue, Uri, header::CONTENT_TYPE, uri::Scheme};
 use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
 use next_web_context::Locale;
-use reqwest::header::ACCEPT_LANGUAGE;
 
 use crate::{
-    anys::any_value::AnyValue,
-    http::{Cookie, HttpMethod, HttpVersion, auth_type::AuthType},
-    traits::http::{HttpSession, http_request::HttpRequest, request_dispatcher::RequestDispatcher},
+    any::AnyValue,
+    http::{Cookie, HttpMethod, HttpVersion, session::HttpSession},
+    traits::http::{http_request::HttpRequest, request_dispatcher::RequestDispatcher},
 };
 
 pub struct HttpRequestShare {
@@ -43,10 +43,6 @@ impl HttpRequest for HttpRequestShare {
 
     fn requested_session_id(&self) -> Option<&str> {
         None
-    }
-
-    fn auth_type(&self) -> AuthType {
-        AuthType::from_request(self)
     }
 
     fn cookie(&self) -> Option<&Cookie> {
@@ -151,18 +147,15 @@ impl HttpRequest for HttpRequestShare {
 
     fn locale(&self) -> Option<Locale> {
         self.header(ACCEPT_LANGUAGE.as_str())
-            .map(|s| Locale::for_language_tag(s).ok())
-            .flatten()
+            .and_then(Locale::from_accept_language)
     }
 
     fn locales(&self) -> Option<Vec<Locale>> {
         let accept_language = self.header(ACCEPT_LANGUAGE.as_str())?;
-        let locales: Vec<Locale> = accept_language
-            .split(',')
-            .filter_map(|s| Locale::for_language_tag(s).ok())
-            .collect();
+        let locales = Locale::parse_accept_language(accept_language);
+
         if locales.is_empty() {
-            Some(vec![Locale::default()])
+            Some(vec![Locale::system_locale()])
         } else {
             Some(locales)
         }

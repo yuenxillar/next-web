@@ -1,5 +1,5 @@
+use crate::util::Uuid;
 use next_web_macros::configuration_properties;
-use uuid::Uuid;
 
 /// Configuration properties for Web Security.
 ///

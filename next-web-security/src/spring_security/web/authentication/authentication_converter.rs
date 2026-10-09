@@ -20,7 +20,7 @@ where
     /// if no authentication attempt should be made.
     fn convert(
         &self,
-        request: &dyn HttpRequest,
+        request: &mut dyn HttpRequest,
     ) -> Result<Option<Box<dyn Authentication>>, AuthenticationError>;
 
     fn as_any_mut(&mut self) -> &mut dyn Any;

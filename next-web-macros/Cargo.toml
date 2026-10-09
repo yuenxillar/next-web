@@ -23,7 +23,7 @@ zyn         = { workspace = true }
 default = ["data", "translation", "auto-register"]
 
 data = []
-api-doc = []
+open-api = []
 translation = []
 embed-resources = []
 auto-register = []

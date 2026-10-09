@@ -15,10 +15,10 @@ use next_web::{
 };
 use next_web_context::{ApplicationContextExt, ApplicationEvent, ApplicationEventPublisher};
 use next_web_core::{
+    any::AnyClone,
     error::BoxError,
     filter::{CompositeFilter, application_filter_chain::ApplicationFilterChain},
     traits::{
-        any_clone::AnyClone,
         filter::{HttpFilter, HttpFilterChain},
         http::http_response::HttpResponse,
     },

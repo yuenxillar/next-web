@@ -5,8 +5,7 @@ use std::{
 };
 
 use next_web_core::{
-    anys::any_value::AnyValue,
-    traits::http::{http_request::HttpRequest, HttpSession},
+    any::AnyValue, http::session::HttpSession, traits::http::http_request::HttpRequest,
 };
 use tracing::debug;
 
@@ -161,10 +160,9 @@ impl Default for SessionFixationProtectionStrategy {
 mod tests {
     use std::{fmt, sync::Mutex};
 
-    use next_web_core::anys::any_value::AnyValue;
+    use next_web_core::{any::AnyValue, http::session::HttpSession};
 
     use super::SessionFixationProtectionStrategy;
-    use next_web_core::traits::http::HttpSession;
 
     struct MockSession {
         id: String,
@@ -188,7 +186,7 @@ mod tests {
         }
     }
 
-    impl fmt::Display for MockSession {
+    impl fmt::Debug for MockSession {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "MockSession")
         }
@@ -229,11 +227,11 @@ mod tests {
                 .collect()
         }
 
-        fn set_attribute(&self, name: &str, value: AnyValue) {
+        fn set_attribute(&mut self, name: &str, value: AnyValue) {
             self.written.lock().unwrap().push((name.to_string(), value));
         }
 
-        fn remove_attribute(&self, _name: &str) {}
+        fn remove_attribute(&mut self, _name: &str) {}
 
         fn invalidate(&mut self) {}
 

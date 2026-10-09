@@ -1,7 +1,7 @@
 use std::{any::Any, sync::Arc};
 
 use dashmap::DashMap;
-use next_web_core::{DynClone, anys::any_value::AnyValue};
+use next_web_core::{DynClone, any::AnyValue};
 
 use crate::error::retry_error::RetryError;
 
@@ -102,21 +102,15 @@ macro_rules! impl_retry_context {
                 self.context_support.has_attribute(name)
             }
 
-            fn set_attribute(&self, name: &str, value: next_web_core::anys::any_value::AnyValue) {
+            fn set_attribute(&self, name: &str, value: next_web_core::any::AnyValue) {
                 self.context_support.set_attribute(name, value)
             }
 
-            fn remove_attribute(
-                &self,
-                name: &str,
-            ) -> Option<next_web_core::anys::any_value::AnyValue> {
+            fn remove_attribute(&self, name: &str) -> Option<next_web_core::any::AnyValue> {
                 self.context_support.remove_attribute(name)
             }
 
-            fn get_attribute(
-                &self,
-                name: &str,
-            ) -> Option<next_web_core::anys::any_value::AnyValue> {
+            fn get_attribute(&self, name: &str) -> Option<next_web_core::any::AnyValue> {
                 self.context_support.get_attribute(name)
             }
         }

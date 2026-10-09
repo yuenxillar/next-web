@@ -28,6 +28,8 @@ pub use hash_slot::HashSlot;
 pub use inventory_helper::InventoryHelper;
 pub use json_object::JsonObject;
 pub use local_date_time::LocalDateTime;
+pub use next_web_core::Regex;
+pub use next_web_core::Uuid;
 pub use rest_client::RestClient;
 pub use stop_watch::StopWatch;
 pub use thread::ThreadUtil;

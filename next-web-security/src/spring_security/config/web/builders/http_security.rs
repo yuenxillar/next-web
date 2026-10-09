@@ -7,10 +7,10 @@ use std::{
 };
 
 use next_web_core::{
+    any::AnyClone,
     async_trait,
     filter::FilterError,
     traits::{
-        any_clone::AnyClone,
         filter::{HttpFilter, HttpFilterChain},
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,

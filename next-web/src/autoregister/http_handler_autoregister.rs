@@ -1,6 +1,6 @@
 use axum::Router;
 
-use crate::configurer::http_method_handler_configurer::RouterContext;
+use crate::context::RouterContext;
 
 pub trait HttpHandlerAutoRegister
 where

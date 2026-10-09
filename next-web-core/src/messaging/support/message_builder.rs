@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use crate::anys::any_value::AnyValue;
+use crate::any::AnyClone;
+use crate::any::AnyValue;
 use crate::messaging::generic_message::GenericMessage;
 use crate::messaging::message_channel::MessageChannel;
 use crate::messaging::message_headers::MessageHeaders;
 use crate::messaging::support::message_header_accessor::MessageHeaderAccessor;
-use crate::traits::any_clone::AnyClone;
 use crate::traits::message::Message;
 
 /// A builder for creating messages.

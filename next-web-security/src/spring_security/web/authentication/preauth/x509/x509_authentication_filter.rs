@@ -175,7 +175,7 @@ mod tests {
     };
 
     use axum::{body::Body, extract::Request as AxumRequest, response::Response as AxumResponse};
-    use next_web_core::{anys::any_value::AnyValue, async_trait};
+    use next_web_core::{any::AnyValue, async_trait};
     use tokio::sync::Mutex;
 
     use crate::core::{

@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 
 use crate::{
     chat::observation::ai_operation_metadata::AiOperationMetadata, util::key_value::KeyValue,

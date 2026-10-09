@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 use next_web_core::async_trait;
 use next_web_core::error::BoxError;
 use next_web_core::traits::http::http_request::HttpRequest;

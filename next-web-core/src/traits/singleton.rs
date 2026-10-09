@@ -1,5 +1,3 @@
-use crate::traits::group::Group;
-
 /// 单例
 ///
 /// 该 trait 定义了单例对象的基本行为，要求实现类型是线程安全的（Send + Sync）
@@ -62,6 +60,3 @@ where
         }
     }
 }
-
-/// Implementation of the Group trait for singleton objects
-impl<T: ?Sized + Singleton> Group for T {}

@@ -31,7 +31,7 @@ impl SimpleUrlAuthenticationSuccessHandler {
 
     /// Removes temporary authentication-related data which may have been stored in the session during the authentication process.
     pub fn clear_authentication_attributes(&self, request: &mut dyn HttpRequest) {
-        request.session().map(|session| {
+        request.session_mut(false).map(|session| {
             session.remove_attribute(WebAttributes::AUTHENTICATION_ERROR);
         });
     }

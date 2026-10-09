@@ -3,7 +3,8 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use next_web_core::traits::http::{http_request::HttpRequest, HttpSession};
+use next_web_core::http::session::HttpSession;
+use next_web_core::traits::http::http_request::HttpRequest;
 
 use crate::web::authentication::session::{
     BaseSessionFixationProtectionStrategy, BaseSessionFixationProtectionStrategyExt,

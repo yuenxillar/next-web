@@ -1,8 +1,9 @@
-use crate::{http::HttpMethod, traits::http::http_request::HttpRequest};
-use reqwest::{
-    Url,
+use axum::http::{
+    Uri,
     header::{ACCESS_CONTROL_REQUEST_METHOD, ORIGIN},
 };
+
+use crate::{http::HttpMethod, traits::http::http_request::HttpRequest};
 
 pub struct CorsUtils;
 
@@ -17,17 +18,17 @@ impl CorsUtils {
             return false;
         }
 
-        let origin_url = match Url::parse(origin) {
+        let origin_url: Uri = match origin.parse() {
             Ok(u) => u,
             Err(_) => return true, // malformed Origin → treat as CORS
         };
 
         // 3. Compare scheme, host, port
-        let origin_scheme = origin_url.scheme();
-        let origin_host = origin_url.host_str();
-        let origin_port = Self::get_port(origin_scheme, origin_url.port());
+        let origin_scheme = origin_url.scheme().map(|s| s.as_str());
+        let origin_host = origin_url.host();
+        let origin_port = Self::get_port(origin_scheme, origin_url.port_u16());
 
-        let server_scheme = req.scheme().unwrap_or_default();
+        let server_scheme = req.scheme();
         let server_host = req.host();
         let server_port = Self::get_port(server_scheme, req.server_port());
 
@@ -36,11 +37,11 @@ impl CorsUtils {
             && origin_port == server_port)
     }
 
-    fn get_port(scheme: &str, port: Option<u16>) -> u16 {
+    fn get_port(scheme: Option<&str>, port: Option<u16>) -> u16 {
         match port {
             None | Some(0) => match scheme {
-                "http" | "ws" => 80,
-                "https" | "wss" => 443,
+                Some("http") | Some("ws") => 80,
+                Some("https") | Some("wss") => 443,
                 _ => 0,
             },
             Some(p) => p,

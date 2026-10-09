@@ -2,10 +2,10 @@ use std::borrow::Cow;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
+use next_web_core::http::session::HttpSession;
 use next_web_core::http::{HeaderMap, HeaderValue, HttpRequestShare, Uri};
 use next_web_core::traits::http::request_dispatcher::RequestDispatcher;
-use next_web_core::traits::http::HttpSession;
 use next_web_core::{
     http::{header::CONTENT_TYPE, Cookie, HttpMethod},
     traits::http::http_request::HttpRequest,
@@ -64,10 +64,6 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
 
     fn requested_session_id(&self) -> Option<&str> {
         self.request.requested_session_id()
-    }
-
-    fn auth_type(&self) -> next_web_core::http::auth_type::AuthType {
-        self.request.auth_type()
     }
 
     fn cookie(&self) -> Option<&Cookie> {

@@ -4,7 +4,7 @@ use std::{
 };
 
 use next_web_context::{ApplicationEvent, EventAttributes};
-use next_web_core::traits::http::HttpSession;
+use next_web_core::http::session::HttpSession;
 
 /// Published by the HttpSessionEventPublisher when an HttpSession is created by the container
 #[derive(Clone)]

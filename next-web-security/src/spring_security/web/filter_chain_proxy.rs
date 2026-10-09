@@ -97,10 +97,7 @@ impl HttpFilter for FilterChainProxy {
         self.validate_once();
         let applied = request.get_attribute(FILTER_APPLIED).is_some();
         if !applied {
-            request.set_attribute(
-                FILTER_APPLIED,
-                next_web_core::anys::any_value::AnyValue::Boolean(true),
-            );
+            request.set_attribute(FILTER_APPLIED, next_web_core::any::AnyValue::Boolean(true));
         }
         let result = match self.firewall.validate_request(request) {
             Ok(()) => {

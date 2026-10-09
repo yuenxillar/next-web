@@ -243,8 +243,8 @@ impl HttpFilter for ErrorTranslationFilter {
                     }
                     FilterChainError::AnyError(err) => {
                         if response.is_committed() {
-                            return Err(FilterError::Custom(
-                                    "Unable to handle the Next Security Error because the response is already committed.".to_string()
+                            return Err(FilterError::custom(
+                                    "Unable to handle the Next Security Error because the response is already committed."
                                 ));
                         }
                         let any_err = err.as_ref() as &dyn Any;

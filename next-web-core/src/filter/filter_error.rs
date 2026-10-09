@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 use std::io;
@@ -17,7 +18,7 @@ pub enum FilterError {
     Chain(FilterChainError),
 
     /// A general-purpose custom error with a descriptive message.
-    Custom(String),
+    Custom(Cow<'static, str>),
 }
 
 impl FilterError {
@@ -26,7 +27,7 @@ impl FilterError {
     /// # Arguments
     ///
     /// * `message` - A human-readable description of the error.
-    pub fn custom(message: impl Into<String>) -> Self {
+    pub fn custom(message: impl Into<Cow<'static, str>>) -> Self {
         FilterError::Custom(message.into())
     }
 

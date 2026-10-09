@@ -3,6 +3,7 @@ use std::{
     vec,
 };
 
+use crate::util::Regex;
 use next_web_context::{APPLICATION_ENVIRONMENT_SINGLETON_NAME, ApplicationContextExt};
 use next_web_core::{ApplicationContext, env::ConfigurableEnvironment};
 use next_web_macros::auto_configuration;
@@ -13,7 +14,6 @@ use next_web_security::{
     crypto::password::PasswordEncoder,
     provisioning::{InMemoryUserDetailsManager, UserDetailsManager},
 };
-use regex::Regex;
 
 use crate::autoconfigure::security::SecurityProperties;
 

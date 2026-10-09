@@ -523,7 +523,7 @@ fn extract_registration_id(path: &str) -> Option<String> {
 impl AuthenticationConverter for OidcLogoutAuthenticationConverter {
     fn convert(
         &self,
-        request: &dyn HttpRequest,
+        request: &mut dyn HttpRequest,
     ) -> Result<Option<Box<dyn Authentication>>, AuthenticationError> {
         if request.method() != HttpMethod::POST {
             return Ok(None);

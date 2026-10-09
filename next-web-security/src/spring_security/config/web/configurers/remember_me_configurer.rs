@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use next_web_core::traits::any_clone::AnyClone;
+use next_web_core::any::AnyClone;
 
 use crate::{
     authentication::remember_me_authentication_provider::RememberMeAuthenticationProvider,

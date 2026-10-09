@@ -15,7 +15,7 @@ pub struct OneTimeTokenAuthenticationConverter;
 impl AuthenticationConverter for OneTimeTokenAuthenticationConverter {
     fn convert(
         &self,
-        request: &dyn HttpRequest,
+        request: &mut dyn HttpRequest,
     ) -> Result<Option<Box<dyn Authentication>>, AuthenticationError> {
         let token = request.parameter("token").unwrap_or_default();
 

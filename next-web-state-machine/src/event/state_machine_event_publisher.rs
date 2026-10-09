@@ -1,4 +1,4 @@
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 use next_web_core::async_trait;
 use next_web_core::traits::message::Message;
 use std::any::Any;

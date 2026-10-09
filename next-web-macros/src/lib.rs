@@ -560,10 +560,10 @@ http_method_macro! {
     any_mapping, Any, "ANY"
 }
 
-// #[cfg(feature = "api-doc")]
+// #[cfg(feature = "open-api")]
 #[proc_macro_attribute]
-pub fn api_doc(args: TokenStream, input: TokenStream) -> TokenStream {
-    crate::web::api_doc::impl_macro_api_doc(args, input)
+pub fn open_api(args: TokenStream, input: TokenStream) -> TokenStream {
+    crate::web::open_api::impl_macro_open_api(args, input)
 }
 
 /// Declares a function as a task of the scheduler of the application.

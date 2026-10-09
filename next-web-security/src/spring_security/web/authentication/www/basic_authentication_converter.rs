@@ -90,7 +90,7 @@ impl AuthenticationConverter for BasicAuthenticationConverter {
     /// malformed, or if Base64 decoding fails.
     fn convert(
         &self,
-        request: &dyn HttpRequest,
+        request: &mut dyn HttpRequest,
     ) -> Result<Option<Box<dyn Authentication>>, AuthenticationError> {
         // Extract the Authorization header.
         let header = match request.header("authorization").map(str::trim) {

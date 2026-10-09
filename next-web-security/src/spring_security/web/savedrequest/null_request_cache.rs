@@ -22,7 +22,7 @@ impl RequestCache for NullRequestCache {
     }
 
     #[allow(unused_variables)]
-    fn remove_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse) {}
+    fn remove_request(&self, request: &mut dyn HttpRequest, response: &mut dyn HttpResponse) {}
 
     #[allow(unused_variables)]
     fn get_matching_request<'a>(

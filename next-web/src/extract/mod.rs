@@ -6,3 +6,4 @@ pub mod validated;
 pub use axum::extract::*;
 
 pub use crate::extract::required_header::{RequiredHeader, ToHeaderName};
+pub use find_singleton::FindSingleton;

@@ -1,4 +1,4 @@
-use next_web_core::anys::{any_map::AnyMap, any_value::AnyValue};
+use next_web_core::any::{AnyMap, AnyValue};
 
 #[derive(Clone)]
 pub struct JobExecutionContext {

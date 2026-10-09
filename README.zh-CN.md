@@ -113,7 +113,7 @@ next:
 | `next-web-macros` | 路由、依赖注入、配置属性、定时任务、重试、脱敏等过程宏 |
 | `next-web-security` | 安全与认证授权扩展 |
 | `next-web-websocket` | WebSocket 服务端支持 |
-| `next-web-api-doc` | 基于 utoipa 的 OpenAPI / Swagger 文档能力 |
+| `next-web-open-api` | 基于 utoipa 的 OpenAPI / Swagger 文档能力 |
 | `next-web-data-redis` | Redis 集成，可选分布式锁 |
 | `next-web-data-database` | MySQL / PostgreSQL 数据访问与事务支持 |
 | `next-web-mqtt` / `next-web-mq-*` | MQTT 与 Kafka、RabbitMQ、RocketMQ 等消息集成 |
@@ -140,7 +140,7 @@ next:
 | `enable-scheduling` | 启用定时任务 |
 | `enable-retry` | 启用重试能力 |
 | `enable-i18n` | 启用国际化 |
-| `enable-api-doc` / `enable-open-api` | 启用 OpenAPI / Swagger 文档 |
+| `enable-open-api` | 启用 OpenAPI / Swagger 文档 |
 | `enable-prometheus` | 启用 Prometheus 指标 |
 | `enable-state-machine` | 启用状态机 |
 | `enable-thread-pool` | 启用线程池能力 |
@@ -170,7 +170,7 @@ next:
 | 数据库 | `cargo run -p next-web-examples --bin database` | 数据库服务与事务 |
 | 重试 | `cargo run -p next-web-examples --bin retry` | 重试模板与 `#[retryable]` |
 | 状态机 | `cargo run -p next-web-examples --bin state_machine` | 状态机配置与运行 |
-| OpenAPI | `cargo run -p next-web-examples --bin api_doc` | API 文档生成 |
+| OpenAPI | `cargo run -p next-web-examples --bin open_api` | API 文档生成 |
 
 更多示例（邮件、MQTT、XXL-JOB、支付、AI、流式响应等）见 `examples/` 目录。
 

@@ -7,7 +7,7 @@ use crate::config::security_configurer::SecurityConfigurer;
 use crate::config::{
     base_security_builder::BaseSecurityBuilder, security_builder::SecurityBuilder,
 };
-use next_web_core::traits::any_clone::AnyClone;
+use next_web_core::any::AnyClone;
 
 /// Combined trait for configurers that are both `AnyClone` and `SecurityConfigurer`.
 ///

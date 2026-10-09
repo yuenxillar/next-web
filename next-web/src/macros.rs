@@ -29,8 +29,8 @@ pub mod event {
 #[cfg(feature = "enable-scheduling")]
 pub use next_web_macros::scheduled;
 
-#[cfg(feature = "enable-api-doc")]
-pub use next_web_macros::api_doc;
+#[cfg(feature = "enable-open-api")]
+pub use next_web_macros::open_api;
 
 pub mod application {
     pub use next_web_macros::next_application;

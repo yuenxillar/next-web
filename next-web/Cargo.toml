@@ -22,7 +22,7 @@ next-web-singletons     = { workspace = true }
 next-web-security       = { workspace = true, optional = true }
 next-web-websocket      = { workspace = true, optional = true }
 next-web-retry          = { workspace = true, optional = true }
-next-web-api-doc        = { workspace = true, optional = true }
+next-web-open-api       = { workspace = true, optional = true }
 next-web-state-machine  = { workspace = true, optional = true }
 
 tokio                   = { workspace = true, features = ["sync", "signal","net", "fs"] }
@@ -52,7 +52,6 @@ chrono-tz           = { workspace = true }
 tracing             = { workspace = true }
 tracing-appender    = { workspace = true }
 tracing-subscriber  = { workspace = true }
-regex               = { workspace = true }
 flume               = { workspace = true }
 validator           = { workspace = true }
 # thiserror           = { workspace = true }
@@ -61,7 +60,6 @@ inventory           = { workspace = true }
 utoipa-swagger-ui   = { workspace = true, optional = true }
 
 reqwest             = { workspace = true, features = ["stream"] }
-# async-stream        = { workspace = true }
 
 md5                 = { workspace = true, optional = true }
 sha1                = { workspace = true, optional = true }
@@ -75,7 +73,6 @@ quick-xml           = { workspace = true }
 serde_path_to_error = { workspace = true }
 mime                = { workspace = true }
 
-uuid                = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 mimalloc        = { workspace = true }
@@ -93,7 +90,7 @@ full = [
     "enable-thread-pool",
 
     "decrypt-properties",
-    # "enable-api-doc",
+    # "enable-open-api",
     "trace-log"
 ]
 
@@ -103,15 +100,13 @@ tls-rustls  = ["axum-server/tls-rustls"]
 # web
 enable-web-security     = ["next-web-security"]
 enable-websocket        = ["next-web-websocket"]
-
+enable-open-api         = ["next-web-open-api", "utoipa-swagger-ui", "next-web-macros/open-api"]
 enable-scheduling       = ["tokio-cron-scheduler"]
 enable-retry            = ["next-web-retry"]
-enable-api-doc          = ["next-web-api-doc", "utoipa-swagger-ui", "next-web-macros/api-doc"]
 enable-prometheus       = ["axum-prometheus"]
 enable-i18n             = ["next-web-macros/translation"]
 enable-state-machine    = ["next-web-state-machine"]
 enable-thread-pool      = []
-enable-open-api         = ["next-web-api-doc", "utoipa-swagger-ui", "next-web-macros/api-doc"]
 
 embed-resources         = ["next-web-macros/embed-resources", "next-web-core/embed-resources", "dep:rust-embed"]
 embed-resources-debug   = ["embed-resources", "rust-embed/debug-embed"]

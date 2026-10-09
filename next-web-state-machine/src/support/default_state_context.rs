@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::Arc;
 
-use next_web_core::anys::any_value::AnyValue;
+use next_web_core::any::AnyValue;
 use next_web_core::error::BoxError;
 use next_web_core::messaging::message_headers::MessageHeaders;
 use next_web_core::traits::message::Message;

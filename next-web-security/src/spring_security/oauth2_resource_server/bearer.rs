@@ -276,7 +276,7 @@ impl BearerTokenAuthenticationConverter {
 impl AuthenticationConverter for BearerTokenAuthenticationConverter {
     fn convert(
         &self,
-        request: &dyn HttpRequest,
+        request: &mut dyn HttpRequest,
     ) -> Result<Option<Box<dyn Authentication>>, AuthenticationError> {
         let token = match self.bearer_token_resolver.resolve(request) {
             Some(token) => token,

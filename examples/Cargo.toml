@@ -6,7 +6,7 @@ publish = false
 license = "MIT"
 
 [dependencies]
-next-web                = { path = "../next-web", version = "*", features = ["full"]}
+next-web                = { path = "../next-web", version = "*", features = ["full", "enable-open-api"]}
 next-web-core           = { path = "../next-web-core", version = "*" }
 next-web-context        = { path = "../next-web-context", version = "*" }
 next-web-ai             = { path = "../next-web-ai", version = "*", features = ["deep-seek"]}
@@ -36,18 +36,18 @@ tokio-util      = { workspace = true }
 futures         = { workspace = true }
 utoipa          = { workspace = true }
 
-tracing         = { workspace = true}
+tracing         = { workspace = true }
 
 [features]
-enable-api-doc = ["next-web/enable-api-doc"]
+default = []
 
 [[bin]]
 name = "ai"
 path = "ai.rs"
 
 [[bin]]
-name = "api_doc"
-path = "api_doc.rs"
+name = "open_api"
+path = "open_api.rs"
 
 [[bin]]
 name = "application"

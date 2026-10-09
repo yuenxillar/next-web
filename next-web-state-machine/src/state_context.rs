@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use next_web_core::{
-    anys::any_value::AnyValue, error::BoxError, messaging::message_headers::MessageHeaders,
+    any::AnyValue, error::BoxError, messaging::message_headers::MessageHeaders,
     traits::message::Message,
 };
 

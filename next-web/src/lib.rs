@@ -93,8 +93,8 @@ pub use next_web_websocket as ws;
 #[cfg(feature = "enable-retry")]
 pub use next_web_retry as retry;
 
-#[cfg(feature = "enable-api-doc")]
-pub use next_web_api_doc as api_doc;
+#[cfg(feature = "enable-open-api")]
+pub mod open_api;
 
 #[cfg(feature = "embed-resources")]
 pub mod embed {

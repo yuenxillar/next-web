@@ -1,5 +1,5 @@
 use reqwest::{Client, ClientBuilder, Method, RequestBuilder, Url};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::time::Duration;
 
 /// A high-level, easy-to-use HTTP client inspired by Spring's `RestTemplate`.
@@ -207,11 +207,11 @@ impl RestClientBuilder {
         self
     }
 
-    /// Enables or disables gzip compression.
-    pub fn gzip(mut self, enabled: bool) -> Self {
-        self.client_builder = self.client_builder.gzip(enabled);
-        self
-    }
+    // /// Enables or disables gzip compression.
+    // pub fn gzip(mut self, enabled: bool) -> Self {
+    //     self.client_builder = self.client_builder.gzip(enabled);
+    //     self
+    // }
 
     /// Sets the maximum number of idle connections kept per host.
     pub fn max_connections(mut self, max_connections: usize) -> Self {
@@ -277,7 +277,6 @@ impl Default for RestClientBuilder {
     fn default() -> Self {
         Self {
             client_builder: Client::builder()
-                .gzip(true)
                 .timeout(Duration::from_secs(30))
                 .connect_timeout(Duration::from_secs(10)),
             base_url: None,

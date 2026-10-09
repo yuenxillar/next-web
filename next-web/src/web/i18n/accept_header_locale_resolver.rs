@@ -9,7 +9,6 @@
 //! [`set_locale`](LocaleResolver::set_locale) always reports an
 //! [unsupported operation](crate::i18n::LocaleResolverErrorKind::Unsupported).
 
-use std::cmp::Ordering;
 use std::ops::{Deref, DerefMut};
 
 use next_web_context::Locale;
@@ -98,7 +97,7 @@ impl AcceptHeaderLocaleResolver {
             return default_locale.clone();
         }
 
-        let request_locales = request_locales(accept_language.unwrap_or_default());
+        let request_locales = Locale::parse_accept_language(accept_language.unwrap_or_default());
         let request_locale = request_locales
             .first()
             .cloned()
@@ -180,64 +179,6 @@ impl LocaleResolver for AcceptHeaderLocaleResolver {
     }
 }
 
-/// Returns the locales the given `Accept-Language` header asks for, from the
-/// most to the least preferred one.
-///
-/// The quality a client declares for a language is honored, and the languages
-/// without a quality are ranked by the order they appear in. A language tag this
-/// framework cannot read, such as `*`, is skipped.
-///
-/// # Arguments
-///
-/// * `accept_language` - The value of the `Accept-Language` header.
-fn request_locales(accept_language: &str) -> Vec<Locale> {
-    let mut preferences: Vec<(usize, f32, Locale)> = Vec::new();
-
-    for (index, part) in accept_language.split(',').enumerate() {
-        let mut quality = 1.0_f32;
-        let mut tag = part.trim();
-
-        if let Some((value, options)) = tag.split_once(';') {
-            tag = value.trim();
-
-            for option in options.split(';') {
-                let Some((name, value)) = option.split_once('=') else {
-                    continue;
-                };
-
-                if name.trim().eq_ignore_ascii_case("q") {
-                    if let Ok(parsed) = value.trim().parse::<f32>() {
-                        if (0.0..=1.0).contains(&parsed) {
-                            quality = parsed;
-                        }
-                    }
-                }
-            }
-        }
-
-        if tag.is_empty() || quality <= 0.0 {
-            continue;
-        }
-
-        if let Ok(locale) = Locale::for_language_tag(tag) {
-            preferences.push((index, quality, locale));
-        }
-    }
-
-    preferences.sort_by(|left, right| {
-        right
-            .1
-            .partial_cmp(&left.1)
-            .unwrap_or(Ordering::Equal)
-            .then(left.0.cmp(&right.0))
-    });
-
-    preferences
-        .into_iter()
-        .map(|(_, _, locale)| locale)
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use axum::{body::Body, extract::Request};
@@ -268,16 +209,20 @@ mod tests {
     #[test]
     fn orders_the_requested_locales_by_quality() {
         assert_eq!(
-            request_locales("en-US;q=0.5, zh-CN;q=0.9, de-DE"),
+            Locale::parse_accept_language("en-US;q=0.5, zh-CN;q=0.9, de-DE"),
             [locale("de-DE"), locale("zh-CN"), locale("en-US")]
         );
         assert_eq!(
-            request_locales("zh-CN;q=0, en-US"),
+            Locale::parse_accept_language("zh-CN;q=0, en-US"),
             [locale("en-US")],
             "a language the client rejects is not requested"
         );
-        assert_eq!(request_locales("  "), []);
-        assert_eq!(request_locales("*"), [], "a wildcard names no locale");
+        assert_eq!(Locale::parse_accept_language("  "), []);
+        assert_eq!(
+            Locale::parse_accept_language("*"),
+            [],
+            "a wildcard names no locale"
+        );
     }
 
     #[test]

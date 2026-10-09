@@ -22,5 +22,5 @@ where
         response: &mut dyn HttpResponse,
     ) -> Option<Box<dyn HttpRequest + 'a>>;
 
-    fn remove_request(&self, request: &dyn HttpRequest, response: &mut dyn HttpResponse);
+    fn remove_request(&self, request: &mut dyn HttpRequest, response: &mut dyn HttpResponse);
 }

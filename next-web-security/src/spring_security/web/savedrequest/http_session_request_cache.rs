@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use next_web_core::{
-    anys::any_value::AnyValue,
+    any::AnyValue,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
     util::StringUtils,
 };
@@ -169,8 +169,8 @@ impl RequestCache for HttpSessionRequestCache {
         Some(Box::new(SavedRequestAwareWrapper::new(saved, request)))
     }
 
-    fn remove_request(&self, request: &dyn HttpRequest, _response: &mut dyn HttpResponse) {
-        if let Some(session) = request.session() {
+    fn remove_request(&self, request: &mut dyn HttpRequest, _response: &mut dyn HttpResponse) {
+        if let Some(session) = request.session_mut(false) {
             trace!("Removing DefaultSavedRequest from session if present");
             session.remove_attribute(&self.session_attr_name);
         }
