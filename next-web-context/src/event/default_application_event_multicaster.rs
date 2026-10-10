@@ -22,7 +22,7 @@ pub enum DispatchMode {
     /// Runs the listeners as part of the publishing call.
     ///
     /// The call returns once every listener has run, so a caller that publishes
-    /// an event knows the listeners have seen it. This is what Spring calls a
+    /// an event knows the listeners have seen it. This is what Next calls a
     /// synchronous multicaster, and it is the default.
     #[default]
     Inline,
@@ -657,8 +657,8 @@ mod tests {
         Arc<RecordingErrorHandler>,
     ) {
         let error_handler = Arc::new(RecordingErrorHandler::default());
-        let multicaster = DefaultApplicationEventMulticaster::default()
-            .with_error_handler(error_handler.clone());
+        let multicaster =
+            DefaultApplicationEventMulticaster::default().with_error_handler(error_handler.clone());
 
         let listener: ErasedApplicationListener = Arc::new(RecordingListener {
             events: Arc::clone(events),
@@ -764,8 +764,8 @@ mod tests {
     fn a_listener_that_panics_does_not_stop_the_others() {
         let events = Arc::new(Mutex::new(Vec::new()));
         let error_handler = Arc::new(RecordingErrorHandler::default());
-        let multicaster = DefaultApplicationEventMulticaster::default()
-            .with_error_handler(error_handler.clone());
+        let multicaster =
+            DefaultApplicationEventMulticaster::default().with_error_handler(error_handler.clone());
 
         multicaster
             .add_application_listener(String::from("panicking"), Arc::new(PanickingListener));
@@ -886,8 +886,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn a_spawned_dispatch_does_not_wait_for_the_listeners() {
         let ran = Arc::new(AtomicUsize::new(0));
-        let multicaster = DefaultApplicationEventMulticaster::default()
-            .with_dispatch_mode(DispatchMode::Spawned);
+        let multicaster =
+            DefaultApplicationEventMulticaster::default().with_dispatch_mode(DispatchMode::Spawned);
         multicaster.add_application_listener(
             String::from("slow"),
             Arc::new(SlowListener {

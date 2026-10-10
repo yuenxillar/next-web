@@ -68,7 +68,7 @@ impl GenerateOneTimeTokenFilter {
     pub const DEFAULT_GENERATE_URL: &'static str = "/ott/generate";
 
     /// The suffix appended to the already-filtered attribute name, matching
-    /// Spring Security's `OncePerRequestFilter.ALREADY_FILTERED_SUFFIX`.
+    /// Next Security's `OncePerRequestFilter.ALREADY_FILTERED_SUFFIX`.
     const ALREADY_FILTERED_SUFFIX: &'static str = ".FILTERED";
 
     /// Creates a new `GenerateOneTimeTokenFilter`.

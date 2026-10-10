@@ -1,47 +1,24 @@
-use std::{any::TypeId, collections::HashMap, fs::File, io::Read, sync::Arc};
+use std::{fs::File, io::Read, sync::Arc};
 
 use axum::{
-    body::Body,
-    extract::{Request, State},
-    middleware::Next,
-    response::{Html, Response},
+    response::Html,
     routing::{get, post},
 };
 use next_web::{
     Application, NextWebApplication,
-    context::DefaultApplicationContext,
     core::{ApplicationContext, Ordered, traits::apply_router::ApplyRouter},
+    macros::autoconfigure::configuration,
     macros::bind::singleton,
 };
-use next_web_context::{ApplicationContextExt, ApplicationEvent, ApplicationEventPublisher};
-use next_web_core::{
-    any::AnyClone,
-    error::BoxError,
-    filter::{CompositeFilter, application_filter_chain::ApplicationFilterChain},
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::http_response::HttpResponse,
-    },
-};
-use next_web_security::{
-    config::{
-        authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
-        security_builder::SecurityBuilder,
-        web::{WebSecurityConfigurer, builders::HttpSecurity},
-    },
-    web::{
-        FilterChainProxy, security_filter_chain::SecurityFilterChain,
-        util::matcher::PathPatternRequestMatcherBuilder,
-    },
-};
-use tokio::sync::Mutex;
+use next_web_context::{ApplicationEvent, ApplicationEventPublisher};
+use next_web_core::error::BoxError;
 
 #[derive(Default)]
 struct TestApplication;
 
 impl Application for TestApplication {}
 
-/// Contributes the router of the security configuration of the application.
+/// Contributes the router of the security example.
 #[singleton(binds = [Self::into_apply_router])]
 #[derive(Clone)]
 pub struct SecurityRouter;
@@ -59,57 +36,15 @@ impl Ordered for SecurityRouter {
 }
 
 impl ApplyRouter for SecurityRouter {
-    /// Builds the router of the security configuration of the application.
+    /// Builds the router of the security example.
     ///
-    /// # Arguments
+    /// The security filter chain is not built here. The auto-configuration of
+    /// the framework builds it from the HTTP security and the web security
+    /// configurers of the application, and the web layer installs the filter
+    /// chain proxy in front of these routes.
     ///
-    /// * `ctx` - The context the security configurers are read from.
-    fn apply(&mut self, ctx: &mut dyn ApplicationContext) -> axum::Router {
-        ctx.insert_singleton_with_name(Arc::new(Mutex::new(Vec::<String>::new())), "tokenStore");
-
-        let web_security_configurers = ctx.resolve_by_type::<Box<dyn WebSecurityConfigurer>>();
-        let mut ctx = DefaultApplicationContext::default();
-        ctx.insert_singleton(PathPatternRequestMatcherBuilder::default());
-        ctx.insert_singleton::<Arc<dyn ApplicationEventPublisher>>(Arc::new(
-            DefaultApplicationEventPublisher,
-        ));
-        let mut shared_objects: HashMap<TypeId, Box<dyn AnyClone>> = HashMap::new();
-        // shared_objects.insert(TypeId::of::<Box<dyn ApplicationContext>>(), Box::new(ctx));
-        shared_objects.insert(
-            TypeId::of::<PathPatternRequestMatcherBuilder>(),
-            Box::new(PathPatternRequestMatcherBuilder::default()),
-        );
-
-        #[derive(Clone)]
-        struct DefaultApplicationEventPublisher;
-
-        impl ApplicationEventPublisher for DefaultApplicationEventPublisher {
-            fn publish_event(&self, _event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
-                Ok(())
-            }
-        }
-
-        let mut http = HttpSecurity::new(AuthenticationManagerBuilder::default(), shared_objects);
-        for mut web_security_configurer in web_security_configurers {
-            web_security_configurer.configure(&mut http);
-        }
-        let chain = http.build();
-
-        println!(
-            "{}",
-            chain
-                .get_filters()
-                .iter()
-                .map(|f| f.name())
-                .collect::<Vec<_>>()
-                .join(",")
-        );
-        let filter: Arc<dyn HttpFilter> = {
-            let mut filter = CompositeFilter::default();
-            filter.set_filters(vec![Arc::new(FilterChainProxy::new(vec![Arc::new(chain)]))]);
-            Arc::new(filter)
-        };
-
+    /// * `_ctx` - The context of the application.
+    fn apply(&mut self, _ctx: &mut dyn ApplicationContext) -> axum::Router {
         axum::Router::new()
             .route(
                 "/login.jsp",
@@ -128,35 +63,29 @@ impl ApplyRouter for SecurityRouter {
                 "/auth",
                 axum::Router::new()
                     .route("/hello", get(async || "Hello!"))
-                    .route("/get", post(async || "Authorized"))
-                    .route_layer(axum::middleware::from_fn_with_state(
-                        filter,
-                        http_filter_layer,
-                    )),
+                    .route("/get", post(async || "Authorized")),
             )
     }
 }
 
-type FilterResult = std::result::Result<Response, Response>;
+#[derive(Clone)]
+struct SecurityAutoConfig {}
 
-pub async fn http_filter_layer(
-    State(filter): State<Arc<dyn HttpFilter>>,
-    mut req: Request,
-    next: Next,
-) -> FilterResult {
-    let filter_chain = ApplicationFilterChain::new(vec![filter]);
-    let mut resp = Response::new(Body::empty());
+#[configuration]
+impl SecurityAutoConfig {
+    #[provider(name = "applicationEventPublisher")]
+    fn application_event_publisher() -> Arc<dyn ApplicationEventPublisher> {
+        #[derive(Clone)]
+        struct DefaultApplicationEventPublisher;
 
-    if let Err(err) = filter_chain.do_filter(&mut req, &mut resp).await {
-        tracing::error!("{}", err);
-        return Err(Response::new(err.to_string().into()));
+        impl ApplicationEventPublisher for DefaultApplicationEventPublisher {
+            fn publish_event(&self, _event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
+                Ok(())
+            }
+        }
+
+        Arc::new(DefaultApplicationEventPublisher)
     }
-
-    if resp.is_committed() {
-        return Ok(resp);
-    }
-
-    Ok(next.run(req).await)
 }
 
 mod t2 {
@@ -207,7 +136,9 @@ mod t2 {
                         resp.insert_header("Content-Type", "application/json;charset=UTF-8");
                         resp.set_status_code(StatusCode::UNAUTHORIZED);
                         resp.set_body(
-                            r#"{"code": 401, "message": "未认证，请先登录"}"#.as_bytes().to_vec(),
+                            r#"{"code": 401, "message": "Not authenticated, please log in first"}"#
+                                .as_bytes()
+                                .to_vec(),
                         );
 
                         Ok(())
@@ -216,7 +147,11 @@ mod t2 {
                 .access_denied_handler(access_denied_handler_fn_wrapper(|_req, resp, _err| {
                     resp.insert_header("Content-Type", "application/json;charset=UTF-8");
                     resp.set_status_code(StatusCode::FORBIDDEN);
-                    resp.set_body(r#"{"code": 403, "message": "权限不足"}"#.as_bytes().to_vec());
+                    resp.set_body(
+                        r#"{"code": 403, "message": "Insufficient permissions"}"#
+                            .as_bytes()
+                            .to_vec(),
+                    );
 
                     Ok(())
                 }));

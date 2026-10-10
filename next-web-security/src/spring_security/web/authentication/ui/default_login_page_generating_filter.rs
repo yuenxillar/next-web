@@ -226,7 +226,9 @@ impl DefaultLoginPageGeneratingFilter {
         logout_success: bool,
     ) -> String {
         let error_msg = "Invalid credentials";
-        let context_path = request.context_path().unwrap_or("/");
+        // The context path of the root context is empty, so a page that is
+        // served under it links to `/login` and not to `//login`.
+        let context_path = request.context_path().unwrap_or_default();
 
         let mut builder = HtmlTemplates::from_template(LOGIN_PAGE_TEMPLATE)
             .with_raw_html("contextPath", context_path)

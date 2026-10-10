@@ -37,7 +37,7 @@ pub type SessionHandle = Arc<Mutex<StandardSession>>;
 ///
 /// # Required methods
 ///
-/// * [`SessionManager::create_session_with_id`]
+/// * [`SessionManager::put_session`]
 /// * [`SessionManager::get_session`]
 /// * [`SessionManager::remove_session`]
 /// * [`SessionManager::session_ids`]
@@ -49,13 +49,12 @@ pub trait SessionManager: Send + Sync + Debug {
     // Storage primitives.
     // ------------------------------------------------------------------
 
-    /// Creates a new empty session with the given identifier, registers it, and
+    /// Stores `session` (replacing any session that shares its identifier) and
     /// returns a handle to it.
     ///
-    /// The idle timeout is initialized from
-    /// [`SessionManager::default_max_inactive_interval`]. If a session with the
-    /// same id already exists it is replaced.
-    fn create_session_with_id(&self, id: String) -> SessionHandle;
+    /// This is the write primitive used both when a session is created and when
+    /// a working copy is saved back at the end of a request.
+    fn put_session(&self, session: StandardSession) -> SessionHandle;
 
     /// Returns a handle to the session with the given id, if it exists.
     fn get_session(&self, id: &str) -> Option<SessionHandle>;
@@ -88,6 +87,26 @@ pub trait SessionManager: Send + Sync + Debug {
     /// Creates a new session with a freshly generated identifier.
     fn create_session(&self) -> SessionHandle {
         self.create_session_with_id(generate_session_id())
+    }
+
+    /// Creates a new empty session with the given identifier, registers it, and
+    /// returns a handle to it.
+    ///
+    /// The idle timeout is initialized from
+    /// [`SessionManager::default_max_inactive_interval`]. If a session with the
+    /// same id already exists it is replaced.
+    fn create_session_with_id(&self, id: String) -> SessionHandle {
+        let mut session = StandardSession::new(id);
+        session.set_max_inactive_interval(self.default_max_inactive_interval());
+        self.put_session(session)
+    }
+
+    /// Returns an owned copy of the session with the given id.
+    ///
+    /// A request uses this to load its working copy; mutations to that copy are
+    /// written back with [`SessionManager::put_session`].
+    fn load_session(&self, id: &str) -> Option<StandardSession> {
+        self.get_session(id).map(|handle| lock(&handle).clone())
     }
 
     /// Returns `true` when a session with the given id exists.

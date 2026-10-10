@@ -5,7 +5,7 @@ use crate::web::firewall::request_rejected_error::RequestRejectedError;
 /// A request accepted and optionally normalized by an [`HttpFirewall`].
 ///
 /// Implementations retain the original request so temporary path changes can
-/// be undone by [`FirewalledRequest::reset`] before control leaves Spring
+/// be undone by [`FirewalledRequest::reset`] before control leaves Next
 /// Security's filter chain.
 pub trait FirewalledRequest: Send {
     /// Return the request view used for matching and security filters.

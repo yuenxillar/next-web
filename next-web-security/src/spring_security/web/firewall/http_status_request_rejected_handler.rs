@@ -9,15 +9,23 @@ use super::{
     request_rejected_error::RequestRejectedError, request_rejected_handler::RequestRejectedHandler,
 };
 
+/// A simple implementation of RequestRejectedHandler that sends an error with configurable status code.
 #[derive(Clone)]
 pub struct HttpStatusRequestRejectedHandler {
-    pub http_status: StatusCode,
+    pub status_code: StatusCode,
 }
 
+impl HttpStatusRequestRejectedHandler {
+    /// Constructs an instance which uses a configurable http code as response.
+    pub fn new(status_code: StatusCode) -> Self {
+        Self { status_code }
+    }
+}
 impl Default for HttpStatusRequestRejectedHandler {
+    /// Constructs an instance which uses 400 as response code.
     fn default() -> Self {
         Self {
-            http_status: StatusCode::BAD_REQUEST,
+            status_code: StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -31,7 +39,7 @@ impl RequestRejectedHandler for HttpStatusRequestRejectedHandler {
     ) -> Result<(), BoxError> {
         debug!("Rejecting request due to: {}", request_rejected_error.0);
 
-        response.set_status_code(self.http_status);
+        response.set_status_code(self.status_code);
         Ok(())
     }
 }

@@ -1,5 +1,5 @@
-use std::sync::{Arc, RwLock};
 use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, RwLock};
 
 use next_web_core::{traits::required::Required, ApplicationContext};
 
@@ -107,6 +107,3 @@ where
         &mut self.base
     }
 }
-
-
-

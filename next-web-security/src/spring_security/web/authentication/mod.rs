@@ -1,4 +1,3 @@
-pub mod bearer_token_authentication_filter;
 pub mod logout;
 pub mod ott;
 pub mod preauth;
@@ -24,9 +23,6 @@ mod forward_authentication_success_handler;
 mod http403_forbidden_entry_point;
 mod http_status_entry_point;
 mod login_url_authentication_entry_point;
-mod oauth2_authorization_code_grant_filter;
-mod oauth2_authorization_request_redirect_filter;
-mod oauth2_login_authentication_filter;
 mod remember_me_authentication_filter;
 mod remember_me_services;
 mod saved_request_aware_authentication_success_handler;
@@ -47,7 +43,6 @@ pub use base_authentication_processing_filter::{
 pub use base_authentication_target_url_request_handler::BaseAuthenticationTargetUrlRequestHandler;
 pub use basic_authentication_entry_point::BasicAuthenticationEntryPoint;
 pub use basic_authentication_filter::BasicAuthenticationFilter;
-pub use bearer_token_authentication_filter::BearerTokenAuthenticationFilter;
 pub use delegating_authentication_entry_point::{
     DelegatingAuthenticationEntryPoint, DelegatingAuthenticationEntryPointBuilder,
 };
@@ -56,11 +51,6 @@ pub use forward_authentication_success_handler::ForwardAuthenticationSuccessHand
 pub use http403_forbidden_entry_point::Http403ForbiddenEntryPoint;
 pub use http_status_entry_point::HttpStatusEntryPoint;
 pub use login_url_authentication_entry_point::LoginUrlAuthenticationEntryPoint;
-pub use oauth2_authorization_code_grant_filter::OAuth2AuthorizationCodeGrantFilter;
-pub use oauth2_authorization_request_redirect_filter::OAuth2AuthorizationRequestRedirectFilter;
-pub use oauth2_login_authentication_filter::{
-    OAuth2LoginAuthenticationFilter, OAuth2LoginRequestMatcher,
-};
 pub use remember_me_authentication_filter::RememberMeAuthenticationFilter;
 pub use remember_me_services::RememberMeServices;
 pub use saved_request_aware_authentication_success_handler::SavedRequestAwareAuthenticationSuccessHandler;

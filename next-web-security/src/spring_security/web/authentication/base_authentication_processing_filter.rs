@@ -102,7 +102,7 @@ pub struct BaseAuthenticationProcessingFilter {
     messages: MessageSourceAccessor,
     remember_me_services: Option<Arc<dyn RememberMeServices>>,
     requires_authentication_request_matcher: Arc<dyn RequestMatcher>,
-    continue_chain_before_successful_authentication: bool,
+    continue_chain_after_successful_authentication: bool,
     continue_chain_when_no_authentication_result: bool,
     session_strategy: Option<Arc<dyn SessionAuthenticationStrategy>>,
     allow_session_creation: bool,
@@ -133,7 +133,7 @@ impl BaseAuthenticationProcessingFilter {
             messages: NextSecurityMessageSource::get_accessor(),
             remember_me_services: None,
             requires_authentication_request_matcher,
-            continue_chain_before_successful_authentication: false,
+            continue_chain_after_successful_authentication: false,
             continue_chain_when_no_authentication_result: false,
             session_strategy: None,
             allow_session_creation: true,
@@ -383,15 +383,20 @@ impl BaseAuthenticationProcessingFilter {
         self.remember_me_services.as_deref()
     }
 
-    /// Indicates if the filter chain should be continued prior to delegation to
-    /// `successful_authentication`, which may be useful in certain environment
-    /// (such as Tapestry applications). Defaults to `false`.
-    pub fn set_continue_chain_before_successful_authentication(
+    /// Indicates if the filter chain should be continued after the successful
+    /// authentication has been stored in the security context.
+    ///
+    /// This is the behavior of a filter that authenticates a request without
+    /// producing a response of its own, such as the bearer token filter of a
+    /// resource server: the request that was authenticated continues to the
+    /// rest of the chain. Defaults to `false`, which leaves the response to the
+    /// `AuthenticationSuccessHandler`.
+    pub fn set_continue_chain_after_successful_authentication(
         &mut self,
-        continue_chain_before_successful_authentication: bool,
+        continue_chain_after_successful_authentication: bool,
     ) {
-        self.continue_chain_before_successful_authentication =
-            continue_chain_before_successful_authentication;
+        self.continue_chain_after_successful_authentication =
+            continue_chain_after_successful_authentication;
     }
 
     /// Sets the `ApplicationEventPublisher`.
@@ -553,11 +558,6 @@ impl BaseAuthenticationProcessingFilter {
                         .await?;
                 }
 
-                // Authentication success
-                if this.continue_chain_before_successful_authentication {
-                    filter_chain.do_filter(request, response).await?;
-                }
-
                 this.successful_authentication(
                     request,
                     response,
@@ -565,6 +565,11 @@ impl BaseAuthenticationProcessingFilter {
                     &authentication_result,
                 )
                 .await?;
+
+                // Authentication success
+                if this.continue_chain_after_successful_authentication {
+                    filter_chain.do_filter(request, response).await?;
+                }
             }
             Ok(None) => {
                 if this.continue_chain_when_no_authentication_result {

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Represents the health status of a component.
 ///
-/// This is the Rust equivalent of Spring Boot's `Status` class.
+/// This is the Rust equivalent of Next `Status`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum Status {
     #[default]

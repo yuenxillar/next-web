@@ -1,11 +1,1 @@
-pub mod web;
 
-mod management_web_security_auto_configuration;
-mod security_auto_configuration;
-mod security_properties;
-mod user_details_service_auto_configuration;
-
-pub use management_web_security_auto_configuration::ManagementWebSecurityAutoConfiguration;
-pub use security_auto_configuration::SecurityAutoConfiguration;
-pub use security_properties::SecurityProperties;
-pub use user_details_service_auto_configuration::UserDetailsServiceAutoConfiguration;

@@ -2,7 +2,7 @@ use reqwest::{Client, ClientBuilder, Method, RequestBuilder, Url};
 use serde::{Serialize, de::DeserializeOwned};
 use std::time::Duration;
 
-/// A high-level, easy-to-use HTTP client inspired by Spring's `RestTemplate`.
+/// A high-level, easy-to-use HTTP client inspired by Next's `RestTemplate`.
 ///
 /// `RestClient` provides builder-style configuration, base URL support,
 /// default headers, and convenient "for object" helpers that combine
@@ -88,7 +88,7 @@ impl RestClient {
 
     /// Sends a GET request and deserializes the JSON response body.
     ///
-    /// Equivalent to Spring's `RestTemplate#getForObject`.
+    /// Equivalent to Next's `RestTemplate#getForObject`.
     pub async fn get_for_object<T: DeserializeOwned>(
         &self,
         url: &str,
@@ -103,7 +103,7 @@ impl RestClient {
 
     /// Sends a POST request with a JSON body and deserializes the JSON response.
     ///
-    /// Equivalent to Spring's `RestTemplate#postForObject`.
+    /// Equivalent to Next's `RestTemplate#postForObject`.
     pub async fn post_for_object<B: Serialize, T: DeserializeOwned>(
         &self,
         url: &str,
@@ -151,7 +151,7 @@ impl RestClient {
     ///
     /// * Absolute URLs (`http://` or `https://`) are returned unchanged.
     /// * Relative URLs are concatenated with the base URL, mirroring the
-    ///   behavior of Spring's `RestTemplate` (the base path is preserved).
+    ///   behavior of Next's `RestTemplate` (the base path is preserved).
     /// * When no base URL is configured, the URL is returned unchanged.
     fn resolve_url(&self, url: &str) -> String {
         if url.starts_with("http://") || url.starts_with("https://") {
@@ -161,7 +161,7 @@ impl RestClient {
         match &self.base_url {
             Some(base) => {
                 // Concatenate the base URL and the relative path so that the
-                // base path is preserved. This matches Spring's behavior.
+                // base path is preserved. This matches Next's behavior.
                 if url.is_empty() {
                     return base.clone();
                 }

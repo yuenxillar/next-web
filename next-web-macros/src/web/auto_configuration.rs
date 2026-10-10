@@ -527,6 +527,24 @@ fn get_autowired_attr(pat_type: &mut PatType) -> Result<Option<AutowiredAttr>, E
     Ok(attribute.value.into())
 }
 
+/// Returns the name a provider or a parameter is registered or resolved under
+/// when it does not declare one.
+///
+/// The name is the one of the method or of the parameter in camel case, so that
+/// `fn application_event_publisher()` provides `applicationEventPublisher` and
+/// `security_properties: SecurityProperties` resolves `securityProperties`. A
+/// leading underscore only marks a name that is not used, so it is not part of
+/// the name.
+///
+/// # Arguments
+///
+/// * `name` - The name of the method or of the parameter.
+fn default_singleton_name(name: &str) -> LitStr {
+    let name = crate::util::name::field_name_to_singleton_name(name.trim_start_matches('_'));
+
+    LitStr::new(&name, Span::call_site())
+}
+
 /// Expands a provider into the step that registers the instance it returns.
 ///
 /// # Arguments
@@ -599,9 +617,9 @@ fn expand_provider(
 
     let singleton_name = provider_attr
         .as_mut()
-        .map(|attr| attr.name.take())
-        .unwrap_or_default()
-        .unwrap_or_else(|| LitStr::new(&item_fn.sig.ident.to_string(), Span::call_site()));
+        .and_then(|attr| attr.name.take())
+        .filter(|name| !name.value().is_empty())
+        .unwrap_or_else(|| default_singleton_name(&item_fn.sig.ident.to_string()));
     let register_singleton = quote! { ctx.insert_singleton_with_name(instance, #singleton_name); };
 
     Ok(Step {
@@ -729,14 +747,16 @@ fn expand_arguments(
         .enumerate()
     {
         let default_name = match input.pat.as_ref() {
-            Pat::Ident(pat) => LitStr::new(&pat.ident.to_string(), Span::call_site()),
+            Pat::Ident(pat) => default_singleton_name(&pat.ident.to_string()),
             _ => LitStr::new("", Span::call_site()),
         };
 
         let (name, default) = match autowired_attr {
-            Some(AutowiredAttr { name, default }) => {
-                (name.unwrap_or(default_name), default.unwrap_or_default())
-            }
+            Some(AutowiredAttr { name, default }) => (
+                name.filter(|name| !name.value().is_empty())
+                    .unwrap_or(default_name),
+                default.unwrap_or_default(),
+            ),
             None => (default_name, false),
         };
 

@@ -32,7 +32,7 @@ use crate::{
 /// whatsoever. All the protection is assumed to be provided externally and if this
 /// filter is included inappropriately in a configuration, it would be possible to
 /// assume the identity of a user merely by setting the correct header name. This also
-/// means it should not generally be used in combination with other Spring Security
+/// means it should not generally be used in combination with other Next Security
 /// authentication mechanisms such as form login, as this would imply there was a means
 /// of bypassing the external system which would be risky.
 ///

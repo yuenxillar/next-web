@@ -19,7 +19,7 @@ const DEFAULT_WEBAUTHN_JS: &str = include_str!("resources/spring-security-webaut
 /// Serve common static assets used in default UIs, such as CSS or Javascript
 /// files. For internal use only.
 ///
-/// Ported from Spring Security's `DefaultResourcesFilter`.
+/// Ported from Next Security's `DefaultResourcesFilter`.
 #[derive(Clone)]
 pub struct DefaultResourcesFilter {
     matcher: Arc<dyn RequestMatcher>,
@@ -42,7 +42,7 @@ impl DefaultResourcesFilter {
         }
     }
 
-    /// Create an instance of `DefaultResourcesFilter` serving Spring Security's
+    /// Create an instance of `DefaultResourcesFilter` serving Next Security's
     /// default CSS stylesheet.
     ///
     /// The created filter matches requests `GET /default-ui.css`, and returns
@@ -58,7 +58,7 @@ impl DefaultResourcesFilter {
         )
     }
 
-    /// Create an instance of `DefaultResourcesFilter` serving Spring Security's
+    /// Create an instance of `DefaultResourcesFilter` serving Next Security's
     /// default webauthn javascript.
     ///
     /// The created filter matches requests `GET /login/webauthn.js`, and returns

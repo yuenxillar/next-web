@@ -1,4 +1,4 @@
-//! Port of `org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver`.
+//! Port of `next_web.web.i18n.AcceptHeaderLocaleResolver`.
 //!
 //! Resolves the locale of a request by matching the locales of its
 //! `Accept-Language` header against the

@@ -75,7 +75,7 @@ impl BaseRememberMeServices {
         assert!(!self.key.is_empty(), "key cannot be empty ");
     }
 
-    /// Locates the Spring Security remember me cookie in the request and returns its
+    /// Locates the Next Security remember me cookie in the request and returns its
     /// value. The cookie is searched for by name and also by matching the context path to
     /// the cookie path.
     fn extract_remember_me_cookie(&self, request: &dyn HttpRequest) -> Option<String> {
@@ -349,7 +349,7 @@ where
     T: BaseRememberMeServicesExt,
     T: 'static,
 {
-    /// Template implementation which locates the Spring Security cookie, decodes it into a
+    /// Template implementation which locates the Next Security cookie, decodes it into a
     /// delimited array of tokens and submits it to subclasses for processing via the
     /// `process_auto_login_cookie` method.
     ///

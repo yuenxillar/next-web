@@ -1,4 +1,4 @@
-//! Port of `org.springframework.web.servlet.i18n.SessionLocaleResolver`.
+//! Port of `next_web.web.i18n.SessionLocaleResolver`.
 //!
 //! Resolves the locale of a request from an attribute of its session, falling
 //! back to the configured default locale and then to the locale the request asks

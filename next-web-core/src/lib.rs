@@ -28,7 +28,7 @@ pub use next_web_context::{
 pub use arc_swap::*;
 pub use async_trait::async_trait;
 pub use dyn_clone::{DynClone, clone_box, clone_trait_object};
-pub use regex::Regex;
+pub use regex::{Regex, RegexBuilder};
 pub use uuid::Uuid;
 
 #[cfg(feature = "http-request")]

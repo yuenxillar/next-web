@@ -1,119 +1,318 @@
-use crate::http::{HttpRequestShare, HttpVersion};
+//! The [`HttpRequest`] abstraction and its implementation for
+//! [`axum::extract::Request`].
+//!
+//! `HttpRequest` is the framework's servlet-style view of an incoming request.
+//! It exposes the request line, headers, cookies, query parameters, attributes,
+//! and the [`HttpSession`] associated with the client, while hiding the
+//! concrete transport.
+//!
+//! # Request lifecycle
+//!
+//! A request is prepared by calling [`HttpRequest::ready`] once, at the start of
+//! the filter chain. That call initializes the per-request state (attributes,
+//! the cookie cache, the [`SessionManager`], and the working session loaded from
+//! the session cookie). At the end of the chain,
+//! [`HttpRequest::clean_up`] persists the session and releases the per-request
+//! state.
+
+use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::Arc};
+
 use axum::{
     extract::Request,
     http::{
-        HeaderMap, HeaderValue, Uri, header::ACCEPT_LANGUAGE, header::CONTENT_TYPE, uri::Scheme,
+        header::ACCEPT_LANGUAGE, header::CONTENT_TYPE, uri::Scheme, HeaderMap, HeaderValue, Uri,
     },
 };
 
 use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
-use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::OnceLock};
+use next_web_context::Locale;
 
 use crate::{
     any::AnyValue,
-    http::{Cookie, HttpMethod, session::HttpSession},
+    http::{
+        session::{
+            global_session_manager, HttpSession, SessionManager, StandardSession,
+            SESSION_COOKIE_NAME,
+        },
+        Cookie, HttpMethod, HttpRequestShare, HttpVersion,
+    },
     traits::http::request_dispatcher::RequestDispatcher,
 };
-use next_web_context::Locale;
 
+/// The request attributes of a servlet-style request.
+///
+/// Attributes live for the duration of a single request and are stored in the
+/// request extensions. They are distinct from [`HttpSession`] attributes, which
+/// outlive the request.
+type OneMap = HashMap<String, AnyValue>;
+
+/// The servlet-style view of an HTTP request.
+///
+/// The trait is implemented for [`axum::extract::Request`], so the transport
+/// types of the web layer can be used directly by filters and handlers without
+/// an adapter. Methods are grouped below by the part of the request they read
+/// or mutate.
 pub trait HttpRequest
 where
     Self: Send,
 {
+    // ------------------------------------------------------------------
+    // Session access.
+    // ------------------------------------------------------------------
+
+    /// Returns the session associated with the client, if one is present.
+    ///
+    /// A session is present once [`HttpRequest::ready`] has loaded one from the
+    /// session cookie, or once [`HttpRequest::session_mut`] created one. Use
+    /// [`HttpRequest::session_mut`] when the session must be created on demand.
     fn session(&self) -> Option<&dyn HttpSession>;
 
+    /// Returns the session associated with the client, optionally creating it.
+    ///
+    /// When `create` is `true` and the request has no session yet, a fresh
+    /// session is created, registered with the [`SessionManager`], and returned.
+    /// When `create` is `false` this only returns an already existing session.
     fn session_mut(&mut self, create: bool) -> Option<&mut dyn HttpSession>;
 
+    /// Assigns a new identifier to the request's session and returns it.
+    ///
+    /// This is used to defend against session-fixation attacks: the session
+    /// state is migrated to a fresh identifier and the old identifier is
+    /// dropped. Returns the new identifier, or an empty string when no session
+    /// could be created.
     fn change_session_id(&mut self) -> String;
 
+    /// Returns `true` when the session identifier requested by the client
+    /// resolves to a live session.
+    ///
+    /// A request that carries a session cookie for an unknown or expired
+    /// session reports `false`, which lets a filter react to the lost session.
     fn is_requested_session_id_valid(&self) -> bool;
 
+    /// Returns the session identifier requested by the client, if any.
+    ///
+    /// This is the value from the session cookie, even when it does not resolve
+    /// to a live session; pair it with
+    /// [`HttpRequest::is_requested_session_id_valid`] to distinguish a valid
+    /// session from a stale cookie.
     fn requested_session_id(&self) -> Option<&str>;
 
+    // ------------------------------------------------------------------
+    // Cookies.
+    // ------------------------------------------------------------------
+
+    /// Returns the first cookie of the request, if any.
     fn cookie(&self) -> Option<&Cookie>;
 
+    /// Returns every cookie of the request.
+    ///
+    /// Cookies are parsed once, during [`HttpRequest::ready`], and cached for
+    /// the rest of the request.
     fn cookies(&self) -> Option<&[Cookie]>;
 
+    // ------------------------------------------------------------------
+    // Dispatching.
+    // ------------------------------------------------------------------
+
+    /// Returns the [`RequestDispatcher`] to use for `default_failure_url`, if
+    /// the application installed one.
+    ///
+    /// The dispatcher is looked up from the request extensions, where the web
+    /// layer (or a filter) stores it. It returns `None` when no dispatcher is
+    /// configured, which lets callers fall back to a redirect.
     fn request_dispatcher(&self, default_failure_url: &str) -> Option<&dyn RequestDispatcher>;
 
+    // ------------------------------------------------------------------
+    // Request line and headers.
+    // ------------------------------------------------------------------
+
+    /// Returns the request method.
     fn method(&self) -> HttpMethod;
 
+    /// Returns the HTTP version of the request.
     fn version(&self) -> HttpVersion;
 
+    /// Returns all request headers.
     fn headers(&self) -> &HeaderMap<HeaderValue>;
 
+    /// Returns the first value of the named header, when it is valid UTF-8.
     fn header(&self, header_name: &str) -> Option<&str>;
 
+    /// Returns every value of the named header, skipping invalid UTF-8 values.
     fn header_values(&self, header_name: &str) -> Vec<&str>;
 
+    /// Returns the names of all request headers.
     fn header_names(&self) -> Vec<&str>;
 
+    /// Returns the request URI.
     fn uri(&self) -> &Uri;
 
+    /// Returns the raw query string of the request, without the `?`.
     fn query(&self) -> Option<&str>;
 
+    /// Returns the first value of the named query parameter.
     fn parameter(&self, name: &str) -> Option<&str>;
 
+    /// Returns every query parameter as percent-decoded name/value pairs.
     fn parameters(&self) -> Option<Vec<(Cow<'_, str>, Cow<'_, str>)>>;
 
+    /// Returns every value of the named query parameter.
     fn parameter_values(&self, name: &str) -> Option<Vec<Cow<'_, str>>>;
 
+    /// Returns the bytes of the request body when the transport buffered them.
+    ///
+    /// The body is buffered by the web layer for the requests whose filters
+    /// have to read it, such as a url-encoded form post, and it is `None` when
+    /// the body was not buffered.
+    fn body_bytes(&self) -> Option<&[u8]> {
+        None
+    }
+
+    /// Returns the path of the request URI.
     fn path(&self) -> &str;
 
+    /// Returns the host of the request URI, if the URI is absolute.
     fn host(&self) -> Option<&str>;
 
+    /// Returns the scheme of the request URI, if the URI is absolute.
     fn scheme(&self) -> Option<&str>;
 
+    /// Returns the port of the request URI, if the URI carries one.
     fn server_port(&self) -> Option<u16>;
 
+    /// Returns the server name, taken from the `Host` header.
     fn server_name(&self) -> Option<String>;
 
+    /// Returns the context path the application is nested under, if configured.
+    ///
+    /// The web layer installs the context path with
+    /// [`install_global_context_path`](crate::http::install_global_context_path);
+    /// a request may also override it by storing a context path in its
+    /// extensions.
     fn context_path(&self) -> Option<&str>;
 
+    // ------------------------------------------------------------------
+    // Negotiated locale.
+    // ------------------------------------------------------------------
+
+    /// Returns the locale preferred by the client, from the `Accept-Language`
+    /// header.
     fn locale(&self) -> Option<Locale>;
 
+    /// Returns the locales preferred by the client, from the `Accept-Language`
+    /// header.
+    ///
+    /// Falls back to the system locale when the header is present but empty.
     fn locales(&self) -> Option<Vec<Locale>>;
 
+    /// Returns the media type of the request body, from the `Content-Type`
+    /// header.
     fn content_type(&self) -> Option<&str>;
 
+    // ------------------------------------------------------------------
+    // Attributes.
+    // ------------------------------------------------------------------
+
+    /// Returns the request attribute bound to `name`, if any.
     fn get_attribute(&self, name: &str) -> Option<&AnyValue>;
 
+    /// Removes the request attribute bound to `name`.
     fn remove_attribute(&mut self, name: &str);
 
+    /// Binds `value` to `name` as a request attribute.
     fn set_attribute(&mut self, name: &str, value: AnyValue);
 
+    // ------------------------------------------------------------------
+    // Lifecycle and transport.
+    // ------------------------------------------------------------------
+
+    /// Prepares the request for the filter chain.
+    ///
+    /// Initializes the per-request state (attributes, cookie cache, session
+    /// manager) and loads the working session from the session cookie. Calling
+    /// it more than once has no effect.
     fn ready(&mut self);
 
+    /// Finalizes the request at the end of the filter chain.
+    ///
+    /// Persists the working session and releases the per-request state.
     fn clean_up(&mut self);
 
+    /// Returns `true` when the request was made over a secure transport.
     fn is_secure(&self) -> bool;
 
+    /// Returns the address of the peer that sent the request, if known.
     fn remote_addr(&self) -> Option<&SocketAddr>;
 
+    /// Returns the shared, transport-independent snapshot of the request.
+    ///
+    /// The snapshot is created on first use and cached for the request.
     fn shared(&mut self) -> &HttpRequestShare;
 }
 
-type OneMap = HashMap<String, AnyValue>;
+/// The session identifier requested by the client, parsed from the session
+/// cookie during [`HttpRequest::ready`].
+#[derive(Clone)]
+struct RequestedSessionId(String);
+
+/// A context path installed on a single request, overriding the global one.
+#[derive(Clone)]
+struct RequestContextPath(String);
 
 impl HttpRequest for Request {
     fn session(&self) -> Option<&dyn HttpSession> {
-        None
+        self.extensions()
+            .get::<StandardSession>()
+            .map(|session| session as &dyn HttpSession)
     }
 
-    fn session_mut(&mut self, _create: bool) -> Option<&mut dyn HttpSession> {
-        None
+    fn session_mut(&mut self, create: bool) -> Option<&mut dyn HttpSession> {
+        if create && self.extensions().get::<StandardSession>().is_none() {
+            create_working_session(self);
+        }
+
+        self.extensions_mut()
+            .get_mut::<StandardSession>()
+            .map(|session| session as &mut dyn HttpSession)
     }
 
     fn change_session_id(&mut self) -> String {
-        String::new()
+        if self.extensions().get::<StandardSession>().is_none() {
+            create_working_session(self);
+        }
+
+        let manager = session_manager(self);
+        let Some(old_id) = self
+            .extensions()
+            .get::<StandardSession>()
+            .map(|session| session.id().to_string())
+        else {
+            return String::new();
+        };
+
+        // Persist the working copy first so the migration sees the latest
+        // attributes, then migrate the stored session onto a fresh id and load
+        // the migrated copy back into the request.
+        save_working_session(self, &manager);
+        let new_id = manager.change_session_id(&old_id).unwrap_or(old_id);
+        if let Some(session) = manager.load_session(&new_id) {
+            self.extensions_mut().insert(session);
+        }
+
+        new_id
     }
 
     fn is_requested_session_id_valid(&self) -> bool {
-        false
+        match self.extensions().get::<RequestedSessionId>() {
+            Some(RequestedSessionId(id)) => session_manager(self).contains_session(id),
+            None => false,
+        }
     }
 
     fn requested_session_id(&self) -> Option<&str> {
-        None
+        self.extensions()
+            .get::<RequestedSessionId>()
+            .map(|requested| requested.0.as_str())
     }
 
     fn cookie(&self) -> Option<&Cookie> {
@@ -121,12 +320,13 @@ impl HttpRequest for Request {
     }
 
     fn cookies(&self) -> Option<&[Cookie]> {
-        let lock = self.extensions().get::<OnceLock<Vec<Cookie>>>()?;
-        Some(lock.get_or_init(|| parse_cookies(self)).as_slice())
+        self.extensions().get::<Vec<Cookie>>().map(Vec::as_slice)
     }
 
     fn request_dispatcher(&self, _default_failure_url: &str) -> Option<&dyn RequestDispatcher> {
-        None
+        self.extensions()
+            .get::<Arc<dyn RequestDispatcher + Send + Sync>>()
+            .map(|dispatcher| &**dispatcher as &dyn RequestDispatcher)
     }
 
     fn method(&self) -> HttpMethod {
@@ -150,23 +350,19 @@ impl HttpRequest for Request {
     fn header(&self, header_name: &str) -> Option<&str> {
         self.headers()
             .get(header_name)
-            .map(|value| value.to_str().ok().unwrap_or_default())
+            .and_then(|value| value.to_str().ok())
     }
 
     fn header_values(&self, header_name: &str) -> Vec<&str> {
         self.headers()
             .get_all(header_name)
             .iter()
-            .filter_map(|v| v.to_str().ok())
+            .filter_map(|value| value.to_str().ok())
             .collect()
     }
 
     fn header_names(&self) -> Vec<&str> {
-        self.headers()
-            .keys()
-            .into_iter()
-            .map(|k| k.as_str())
-            .collect()
+        self.headers().keys().map(|name| name.as_str()).collect()
     }
 
     fn uri(&self) -> &Uri {
@@ -200,6 +396,12 @@ impl HttpRequest for Request {
         })
     }
 
+    fn body_bytes(&self) -> Option<&[u8]> {
+        self.extensions()
+            .get::<crate::http::RequestBody>()
+            .map(crate::http::RequestBody::as_bytes)
+    }
+
     fn path(&self) -> &str {
         self.uri().path()
     }
@@ -209,7 +411,7 @@ impl HttpRequest for Request {
     }
 
     fn scheme(&self) -> Option<&str> {
-        self.uri().scheme().map(|s| s.as_str())
+        self.uri().scheme().map(|scheme| scheme.as_str())
     }
 
     fn server_port(&self) -> Option<u16> {
@@ -223,10 +425,9 @@ impl HttpRequest for Request {
     }
 
     fn context_path(&self) -> Option<&str> {
-        // GLOBAL_SERVER_PROPERTIES
-        //     .get()
-        //     .map(|var| var.context_path())?
-        None
+        self.extensions()
+            .get::<RequestContextPath>()
+            .map(|s| s.0.as_str())
     }
 
     fn locale(&self) -> Option<Locale> {
@@ -245,32 +446,52 @@ impl HttpRequest for Request {
         }
     }
 
+    fn get_attribute(&self, name: &str) -> Option<&AnyValue> {
+        self.extensions()
+            .get::<OneMap>()
+            .and_then(|attributes| attributes.get(name))
+    }
+
     fn remove_attribute(&mut self, name: &str) {
-        if let Some(map) = self.extensions_mut().get_mut::<OneMap>() {
-            map.remove(name);
+        if let Some(attributes) = self.extensions_mut().get_mut::<OneMap>() {
+            attributes.remove(name);
         }
     }
 
     fn set_attribute(&mut self, name: &str, value: AnyValue) {
-        if let Some(map) = self.extensions_mut().get_mut::<OneMap>() {
-            map.insert(name.to_string(), value);
-        }
-    }
-
-    fn get_attribute(&self, name: &str) -> Option<&AnyValue> {
-        self.extensions()
-            .get::<OneMap>()
-            .map(|map| map.get(name))
-            .unwrap_or_default()
+        attribute_map(self).insert(name.to_owned(), value);
     }
 
     fn ready(&mut self) {
-        self.extensions_mut().insert(OneMap::new());
-        self.extensions_mut().insert(OnceLock::<Vec<Cookie>>::new());
+        if self.extensions().get::<OneMap>().is_none() {
+            self.extensions_mut().insert(OneMap::new());
+        }
+
+        if self.extensions().get::<Vec<Cookie>>().is_none() {
+            let cookies = parse_cookies(self);
+            self.extensions_mut().insert(cookies);
+        }
+
+        if self.extensions().get::<Arc<dyn SessionManager>>().is_none() {
+            self.extensions_mut().insert(global_session_manager());
+        }
+
+        if self.extensions().get::<StandardSession>().is_none() {
+            load_working_session(self);
+        }
     }
 
     fn clean_up(&mut self) {
-        self.extensions_mut().remove::<OneMap>();
+        let manager = session_manager(self);
+        save_working_session(self, &manager);
+
+        let extensions = self.extensions_mut();
+        extensions.remove::<OneMap>();
+        extensions.remove::<Vec<Cookie>>();
+        extensions.remove::<StandardSession>();
+        extensions.remove::<RequestedSessionId>();
+        extensions.remove::<Arc<dyn SessionManager>>();
+        extensions.remove::<RequestContextPath>();
     }
 
     fn is_secure(&self) -> bool {
@@ -282,19 +503,95 @@ impl HttpRequest for Request {
     }
 
     fn shared(&mut self) -> &HttpRequestShare {
-        let has_shared = self.extensions().get::<HttpRequestShare>().is_some();
-
-        if !has_shared {
+        if self.extensions().get::<HttpRequestShare>().is_none() {
             let shared = HttpRequestShare::from(self as &dyn HttpRequest);
             self.extensions_mut().insert(shared);
         }
 
         self.extensions()
             .get::<HttpRequestShare>()
-            .expect("HttpRequestShare not found")
+            .expect("HttpRequestShare was just inserted")
     }
 }
 
+/// Returns the session manager of the request, falling back to the
+/// process-wide default.
+fn session_manager(request: &Request) -> Arc<dyn SessionManager> {
+    request
+        .extensions()
+        .get::<Arc<dyn SessionManager>>()
+        .cloned()
+        .unwrap_or_else(global_session_manager)
+}
+
+/// Returns the request attribute map, creating it when it is missing.
+fn attribute_map(request: &mut Request) -> &mut OneMap {
+    if request.extensions().get::<OneMap>().is_none() {
+        request.extensions_mut().insert(OneMap::new());
+    }
+
+    request
+        .extensions_mut()
+        .get_mut::<OneMap>()
+        .expect("attribute map was just inserted")
+}
+
+/// Loads the session named by the session cookie into the request, if it
+/// resolves to a live session.
+fn load_working_session(request: &mut Request) {
+    let Some(id) = session_cookie_value(request) else {
+        return;
+    };
+
+    let manager = session_manager(request);
+    let Some(mut session) = manager.load_session(&id) else {
+        // Keep the requested id so `is_requested_session_id_valid` and
+        // `requested_session_id` can report the stale cookie.
+        request.extensions_mut().insert(RequestedSessionId(id));
+        return;
+    };
+
+    // The client echoed the cookie, so it knows about the session already.
+    session.set_new(false);
+
+    let extensions = request.extensions_mut();
+    extensions.insert(RequestedSessionId(id));
+    extensions.insert(session);
+}
+
+/// Creates a new session registered with the manager and stores a working copy
+/// on the request.
+fn create_working_session(request: &mut Request) {
+    let manager = session_manager(request);
+    let id = crate::http::session::generate_session_id();
+    manager.create_session_with_id(id.clone());
+
+    if let Some(session) = manager.load_session(&id) {
+        request.extensions_mut().insert(session);
+    }
+}
+
+/// Writes the working session of the request back to the manager.
+fn save_working_session(request: &Request, manager: &Arc<dyn SessionManager>) {
+    if let Some(session) = request.extensions().get::<StandardSession>() {
+        manager.put_session(session.clone());
+    }
+}
+
+/// Returns the value of the session cookie, if the request carries one.
+fn session_cookie_value(request: &Request) -> Option<String> {
+    request
+        .extensions()
+        .get::<Vec<Cookie>>()
+        .and_then(|cookies| {
+            cookies
+                .iter()
+                .find(|cookie| cookie.name() == SESSION_COOKIE_NAME)
+        })
+        .map(|cookie| cookie.value().to_string())
+}
+
+/// Parses the `Cookie` header of the request into [`Cookie`] values.
 fn parse_cookies(request: &Request) -> Vec<Cookie> {
     let Some(cookie_header) = request.headers().typed_get::<HeaderCookie>() else {
         return Vec::new();
@@ -303,4 +600,165 @@ fn parse_cookies(request: &Request) -> Vec<Cookie> {
         .iter()
         .map(|(name, value)| Cookie::new(name, Some(value.to_owned())))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use axum::{
+        body::Body,
+        http::header::{HeaderName, COOKIE},
+    };
+
+    use super::{HttpRequest, Request, RequestContextPath};
+    use crate::{
+        error::BoxError,
+        http::session::SESSION_COOKIE_NAME,
+        traits::http::{http_response::HttpResponse, request_dispatcher::RequestDispatcher},
+    };
+
+    fn session_request(id: &str) -> Request {
+        Request::builder()
+            .header(
+                HeaderName::from_static("cookie"),
+                format!("{SESSION_COOKIE_NAME}={id}"),
+            )
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    #[test]
+    fn attributes_work_without_an_explicit_ready() {
+        let mut request = Request::builder().body(Body::empty()).unwrap();
+
+        assert!(request.get_attribute("missing").is_none());
+        request.set_attribute("user", "alice".into());
+        assert_eq!(
+            request
+                .get_attribute("user")
+                .and_then(|value| value.as_str()),
+            Some("alice")
+        );
+
+        request.remove_attribute("user");
+        assert!(request.get_attribute("user").is_none());
+    }
+
+    #[test]
+    fn cookies_are_parsed_during_ready() {
+        let mut request = Request::builder()
+            .header(COOKIE, "first=1; second=2")
+            .body(Body::empty())
+            .unwrap();
+        request.ready();
+
+        let cookies = request.cookies().expect("cookies are parsed by ready");
+        assert_eq!(cookies.len(), 2);
+        assert_eq!(request.cookie().map(|cookie| cookie.name()), Some("first"));
+        assert_eq!(request.cookie().map(|cookie| cookie.value()), Some("1"));
+    }
+
+    #[test]
+    fn a_session_survives_between_requests() {
+        let mut first = Request::builder().body(Body::empty()).unwrap();
+        first.ready();
+
+        let id = {
+            let session = first.session_mut(true).expect("a session is created");
+            session.set_attribute("user", "alice".into());
+            session.id().to_string()
+        };
+        first.clean_up();
+
+        let mut second = session_request(&id);
+        second.ready();
+
+        assert!(second.is_requested_session_id_valid());
+        assert_eq!(second.requested_session_id(), Some(id.as_str()));
+        let session = second.session().expect("the session was loaded");
+        assert!(!session.is_new());
+        assert_eq!(
+            session.attribute("user").and_then(|value| value.as_str()),
+            Some("alice")
+        );
+    }
+
+    #[test]
+    fn changing_the_session_id_moves_the_state() {
+        let mut request = Request::builder().body(Body::empty()).unwrap();
+        request.ready();
+
+        let old_id = {
+            let session = request.session_mut(true).expect("a session is created");
+            session.set_attribute("user", "alice".into());
+            session.id().to_string()
+        };
+
+        let new_id = request.change_session_id();
+        assert_ne!(new_id, old_id);
+        assert_eq!(
+            request.session().map(|session| session.id()),
+            Some(new_id.as_str())
+        );
+        assert_eq!(
+            request
+                .session()
+                .and_then(|session| session.attribute("user"))
+                .and_then(|value| value.as_str()),
+            Some("alice")
+        );
+    }
+
+    #[test]
+    fn a_stale_session_cookie_is_reported_but_not_valid() {
+        let mut request = session_request("does-not-exist");
+        request.ready();
+
+        assert_eq!(request.requested_session_id(), Some("does-not-exist"));
+        assert!(!request.is_requested_session_id_valid());
+        assert!(request.session().is_none());
+    }
+
+    #[test]
+    fn a_request_may_override_the_context_path() {
+        let mut request = Request::builder().body(Body::empty()).unwrap();
+        request
+            .extensions_mut()
+            .insert(RequestContextPath("/custom".to_string()));
+
+        assert_eq!(request.context_path(), Some("/custom"));
+    }
+
+    #[test]
+    fn an_installed_dispatcher_is_returned() {
+        #[derive(Debug)]
+        struct NoopDispatcher;
+
+        impl RequestDispatcher for NoopDispatcher {
+            fn forward(
+                &self,
+                _request: &dyn HttpRequest,
+                _response: &mut dyn HttpResponse,
+            ) -> Result<(), BoxError> {
+                Ok(())
+            }
+
+            fn include(
+                &self,
+                _request: &mut dyn HttpRequest,
+                _response: &mut dyn HttpResponse,
+            ) -> Result<(), BoxError> {
+                Ok(())
+            }
+        }
+
+        let mut request = Request::builder().body(Body::empty()).unwrap();
+        assert!(request.request_dispatcher("/login").is_none());
+
+        let dispatcher: Arc<dyn RequestDispatcher + Send + Sync> = Arc::new(NoopDispatcher);
+        request.extensions_mut().insert(dispatcher);
+
+        assert!(request.request_dispatcher("/login").is_some());
+    }
 }

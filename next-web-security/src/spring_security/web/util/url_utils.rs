@@ -1,8 +1,7 @@
 use next_web_core::{
     constants::application_constants::APPLICATION_DEFAULT_PORT,
-    traits::http::http_request::HttpRequest,
+    traits::http::http_request::HttpRequest, Regex,
 };
-use regex::Regex;
 use std::sync::LazyLock;
 
 /// Provides static methods for composing URLs.

@@ -13,6 +13,9 @@ use crate::{
     },
     core::context::SecurityContextHolderStrategy,
     oauth2::{
+        client::web::{
+            OAuth2AuthorizationCodeGrantFilter, OAuth2AuthorizationRequestRedirectFilter,
+        },
         AuthenticatedPrincipalOAuth2AuthorizedClientRepository, AuthorizationRequestRepository,
         ClientRegistrationRepository, DefaultOAuth2AuthorizationRequestResolver,
         NullOAuth2AuthorizedClientService, OAuth2AccessTokenResponseClient,
@@ -21,11 +24,7 @@ use crate::{
         RestClientAuthorizationCodeTokenResponseClient,
     },
     web::{
-        authentication::{
-            OAuth2AuthorizationCodeGrantFilter, OAuth2AuthorizationRequestRedirectFilter,
-        },
-        default_security_filter_chain::DefaultSecurityFilterChain,
-        savedrequest::RequestCache,
+        default_security_filter_chain::DefaultSecurityFilterChain, savedrequest::RequestCache,
         RedirectStrategy,
     },
 };

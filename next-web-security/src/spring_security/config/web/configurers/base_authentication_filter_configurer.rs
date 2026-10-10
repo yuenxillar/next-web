@@ -293,9 +293,13 @@ where
     where
         B: 'static,
     {
-        if let Some(s) = self.login_processing_url.to_owned() {
-            self.login_processing_url(s.as_ref());
+        // The URL a login request is submitted to defaults to the login page,
+        // which is the URL the generated login page posts the form to.
+        if self.login_processing_url.is_none() {
+            let login_page = self.login_page.to_string();
+            self.login_processing_url(&login_page);
         }
+
         if self.failure_handler.is_none() {
             self.failure_url(&format!("{}?error", self.login_page));
         }

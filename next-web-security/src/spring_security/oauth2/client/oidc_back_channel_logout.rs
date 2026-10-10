@@ -25,11 +25,11 @@ use crate::{
         Authentication, AuthenticationBuilder, AuthenticationError, AuthenticationErrorKind,
         GrantedAuthority, Principal,
     },
+    oauth2::server::resource::jwt::{Jwt, JwtDecoder},
     oauth2::{
         request_parameter, ClientRegistration, ClientRegistrationRepository,
         InMemoryClientRegistrationRepository,
     },
-    oauth2_resource_server::jwt::{Jwt, JwtDecoder},
     web::{
         authentication::logout::LogoutHandler,
         authentication::{AuthPrincipal, AuthenticationConverter},
@@ -733,7 +733,7 @@ impl LogoutHandler for EitherLogoutHandler {
     }
 }
 
-/// The filter that processes OIDC back-channel logout requests. Mirrors Spring
+/// The filter that processes OIDC back-channel logout requests. Mirrors Next
 /// Security's `OidcBackChannelLogoutFilter`, which converts the request,
 /// authenticates the logout token, and then invokes the `LogoutHandler`.
 #[derive(Clone)]
@@ -807,7 +807,7 @@ impl Named for OidcBackChannelLogoutFilter {
 }
 
 /// Convenience helpers for resolving shared objects during OIDC logout
-/// configuration. Mirrors Spring Security's `OAuth2ClientConfigurerUtils`.
+/// configuration. Mirrors Next Security's `OAuth2ClientConfigurerUtils`.
 pub struct OAuth2ClientConfigurerUtils;
 
 impl OAuth2ClientConfigurerUtils {

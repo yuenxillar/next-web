@@ -253,7 +253,7 @@ fn segment_match(pattern: &str, value: &str) -> bool {
 }
 
 fn simple_regex_match(expr: &str, value: &str) -> bool {
-    // Covers the expressions commonly used by Spring path variables.
+    // Covers the expressions commonly used by Next path variables.
     if expr == ".*" {
         return true;
     }

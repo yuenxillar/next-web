@@ -352,7 +352,7 @@ where
                             .map(|s| s.get_key()))
                         .map(ToString::to_string)
                 })
-                .unwrap_or(uuid::Uuid::new_v4().to_string()),
+                .unwrap_or(next_web_core::Uuid::new_v4().to_string()),
         }
     }
 

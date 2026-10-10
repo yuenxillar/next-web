@@ -91,7 +91,7 @@ pub struct AuthenticationFilter {
 
 impl AuthenticationFilter {
     /// The suffix appended to the already-filtered attribute name, matching
-    /// Spring Security's `OncePerRequestFilter.ALREADY_FILTERED_SUFFIX`.
+    /// Next Security's `OncePerRequestFilter.ALREADY_FILTERED_SUFFIX`.
     const ALREADY_FILTERED_SUFFIX: &'static str = ".FILTERED";
 
     /// Creates a new `AuthenticationFilter` with a fixed `AuthenticationManager`.

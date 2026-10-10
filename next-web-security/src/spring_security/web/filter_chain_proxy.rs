@@ -1,9 +1,10 @@
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
+    atomic::{AtomicUsize, Ordering},
     Arc,
 };
 
 use next_web_core::{
+    any::AnyValue,
     async_trait,
     filter::FilterError,
     traits::{
@@ -31,10 +32,11 @@ pub struct FilterChainProxy {
     pub(crate) firewall: Arc<dyn HttpFirewall>,
     pub(crate) request_rejected_handler: Arc<dyn RequestRejectedHandler>,
     security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
-    validated: Arc<AtomicBool>,
 }
 
 impl FilterChainProxy {
+    const FILTER_APPLIED: &str = "next_web.security.web.FilterChainProxy.APPLIED";
+
     pub fn new(filter_chains: Vec<Arc<dyn SecurityFilterChain>>) -> Self {
         Self {
             filter_chains,
@@ -42,7 +44,6 @@ impl FilterChainProxy {
             firewall: Arc::new(StrictHttpFirewall::default()),
             request_rejected_handler: Arc::new(HttpStatusRequestRejectedHandler::default()),
             security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
-            validated: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -64,7 +65,6 @@ impl FilterChainProxy {
     /// Replace the validator and arrange for the new validator to run once.
     pub fn set_filter_chain_validator(&mut self, validator: Arc<dyn FilterChainValidator>) {
         self.filter_chain_validator = validator;
-        self.validated.store(false, Ordering::Release);
     }
 
     /// Configure the strategy cleared when the outermost proxy invocation ends.
@@ -75,14 +75,8 @@ impl FilterChainProxy {
         self.security_context_holder_strategy = strategy;
     }
 
-    fn validate_once(&self) {
-        if self
-            .validated
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_ok()
-        {
-            self.filter_chain_validator.validate(self);
-        }
+    pub fn after_properties_set(&self) {
+        self.filter_chain_validator.validate(self);
     }
 }
 
@@ -94,10 +88,9 @@ impl HttpFilter for FilterChainProxy {
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
-        self.validate_once();
-        let applied = request.get_attribute(FILTER_APPLIED).is_some();
+        let applied = request.get_attribute(Self::FILTER_APPLIED).is_some();
         if !applied {
-            request.set_attribute(FILTER_APPLIED, next_web_core::any::AnyValue::Boolean(true));
+            request.set_attribute(Self::FILTER_APPLIED, AnyValue::Boolean(true));
         }
         let result = match self.firewall.validate_request(request) {
             Ok(()) => {
@@ -130,16 +123,14 @@ impl HttpFilter for FilterChainProxy {
                 .map_err(|e| FilterError::from(e)),
         };
         if !applied {
-            // Spring clears the holder for every outermost invocation, even if
+            // clears the holder for every outermost invocation, even if
             // a firewall or an internal filter returned an error.
             self.security_context_holder_strategy.clear_context();
-            request.remove_attribute(FILTER_APPLIED);
+            request.remove_attribute(Self::FILTER_APPLIED);
         }
         result
     }
 }
-
-const FILTER_APPLIED: &str = "web.FilterChainProxy.APPLIED";
 
 /// Internal chain that advances one security filter at a time and delegates to
 /// the original application chain after the last filter.

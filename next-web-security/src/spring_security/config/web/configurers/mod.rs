@@ -6,15 +6,18 @@ mod cors_configurer;
 mod csrf_configurer;
 mod default_login_page_configurer;
 mod error_handling_configurer;
-mod expression_url_authorization_configurer;
 mod form_login_configurer;
 mod headers_configurer;
 mod http_basic_configurer;
 mod https_redirect_configurer;
 mod logout_configurer;
+#[cfg(feature = "oauth2-authorization-server")]
 mod oauth2_authorization_server_configurer;
+#[cfg(feature = "oauth2-client")]
 mod oauth2_client_configurer;
+#[cfg(feature = "oauth2-client")]
 mod oauth2_login_configurer;
+#[cfg(feature = "oauth2-resource-server")]
 mod oauth2_resource_server_configurer;
 mod one_time_token_login_configurer;
 mod password_management_configurer;
@@ -30,6 +33,7 @@ mod session_management_configurer;
 mod web_authn_configurer;
 mod x509_configurer;
 
+#[cfg(all(feature = "oauth2-client", feature = "oauth2-resource-server"))]
 pub mod oauth2;
 
 pub use anonymous_configurer::AnonymousConfigurer;
@@ -49,9 +53,13 @@ pub use headers_configurer::HeadersConfigurer;
 pub use http_basic_configurer::HttpBasicConfigurer;
 pub use https_redirect_configurer::HttpsRedirectConfigurer;
 pub use logout_configurer::LogoutConfigurer;
+#[cfg(feature = "oauth2-authorization-server")]
 pub use oauth2_authorization_server_configurer::OAuth2AuthorizationServerConfigurer;
+#[cfg(feature = "oauth2-client")]
 pub use oauth2_client_configurer::OAuth2ClientConfigurer;
+#[cfg(feature = "oauth2-client")]
 pub use oauth2_login_configurer::OAuth2LoginConfigurer;
+#[cfg(feature = "oauth2-resource-server")]
 pub use oauth2_resource_server_configurer::OAuth2ResourceServerConfigurer;
 pub use one_time_token_login_configurer::OneTimeTokenLoginConfigurer;
 pub use password_management_configurer::PasswordManagementConfigurer;

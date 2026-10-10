@@ -84,9 +84,6 @@ pub use web::i18n;
 #[cfg(feature = "enable-state-machine")]
 pub use next_web_state_machine as state_machine;
 
-#[cfg(feature = "enable-web-security")]
-pub use next_web_security as security;
-
 #[cfg(feature = "enable-websocket")]
 pub use next_web_websocket as ws;
 

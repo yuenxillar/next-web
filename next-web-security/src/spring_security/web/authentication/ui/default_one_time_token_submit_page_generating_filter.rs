@@ -53,7 +53,7 @@ const HIDDEN_HTML_INPUT_TEMPLATE: &str =
 /// `token` query param the page will automatically fill the form with the
 /// token value.
 ///
-/// Ported from Spring Security's `DefaultOneTimeTokenSubmitPageGeneratingFilter`.
+/// Ported from Next Security's `DefaultOneTimeTokenSubmitPageGeneratingFilter`.
 #[derive(Clone)]
 pub struct DefaultOneTimeTokenSubmitPageGeneratingFilter {
     request_matcher: Arc<dyn RequestMatcher>,

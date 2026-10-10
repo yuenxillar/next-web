@@ -38,7 +38,7 @@ use crate::{
 
 /// Switch User processing filter responsible for user context switching.
 ///
-/// This filter is similar to Unix 'su' however for Spring Security-managed web
+/// This filter is similar to Unix 'su' however for Next Security-managed web
 /// applications. A common use-case for this feature is the ability to allow
 /// higher-authority users (e.g. `ROLE_ADMIN`) to switch to a regular user
 /// (e.g. `ROLE_USER`).

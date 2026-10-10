@@ -8,7 +8,7 @@ use next_web_core::{
 /// Strategy for handling an invalid (expired or otherwise invalid) session ID
 /// detected during request processing.
 ///
-/// This mirrors the Spring Security `InvalidSessionStrategy` interface.
+/// This mirrors the Next Security `InvalidSessionStrategy` interface.
 pub trait InvalidSessionStrategy
 where
     Self: Send + Sync,

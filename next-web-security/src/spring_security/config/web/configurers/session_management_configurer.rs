@@ -4,11 +4,11 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use next_web_context::ApplicationContextExt;
 use next_web_context::{
     event::GenericApplicationListenerAdapter, ApplicationEvent, ApplicationListener,
 };
 use next_web_core::{traits::required::Required, ApplicationContext};
-use next_web_context::ApplicationContextExt;
 
 use crate::{
     authorization::AuthenticationTrustResolver,
@@ -604,7 +604,9 @@ where
                 .write()
                 .expect("the application context lock is poisoned");
 
-            if let Some(delegating) = context.get_singleton_option_mut::<DelegatingApplicationListener>() {
+            if let Some(delegating) =
+                context.get_singleton_option_mut::<DelegatingApplicationListener>()
+            {
                 let smart_listener = GenericApplicationListenerAdapter::new(delegate);
                 delegating.add_listener(Arc::new(smart_listener));
             }
@@ -917,6 +919,3 @@ where
         self.parent
     }
 }
-
-
-

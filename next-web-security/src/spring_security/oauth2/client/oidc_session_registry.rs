@@ -6,7 +6,7 @@ use std::{
 use crate::oauth2::client::oidc_back_channel_logout::OidcLogoutToken;
 
 /// The state persisted by an `OidcSessionRegistry` for a single provider session
-/// that has been logged in via OIDC. Mirrors Spring Security's
+/// that has been logged in via OIDC. Mirrors Next Security's
 /// `OidcSessionInformation`, which carries the session id, the authorities
 /// granted to the session, and the `OidcUser` principal.
 #[derive(Clone, Debug)]
@@ -59,7 +59,7 @@ pub trait OidcSessionRegistry: Send + Sync {
     ) -> Vec<OidcSessionInformation>;
 }
 
-/// The default, in-memory `OidcSessionRegistry`. Mirrors Spring Security's
+/// The default, in-memory `OidcSessionRegistry`. Mirrors Next Security's
 /// `InMemoryOidcSessionRegistry`.
 #[derive(Clone, Default)]
 pub struct InMemoryOidcSessionRegistry {

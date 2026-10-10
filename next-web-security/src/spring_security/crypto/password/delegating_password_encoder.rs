@@ -224,10 +224,7 @@ impl DelegatingPasswordEncoder {
         let id = self.extract_id(encoded_password);
         if let Some(id) = id {
             if !id.trim().is_empty() {
-                error!(
-                    "{}",
-                    NO_PASSWORD_ENCODER_MAPPED.replace("%s", id)
-                );
+                error!("{}", NO_PASSWORD_ENCODER_MAPPED.replace("%s", id));
                 return false;
             }
         }

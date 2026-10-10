@@ -13,7 +13,7 @@ use crate::{
 };
 use crate::{
     access::hierarchicalroles::RoleHierarchy,
-    config::core::granted_authority_defaults::GrantedAuthorityDefaults,
+    config::http::core::granted_authority_defaults::GrantedAuthorityDefaults,
     web::util::matcher::{MatcherInput, PathPatternRequestMatcherBuilder},
 };
 use crate::{
@@ -70,6 +70,43 @@ where
                 .unwrap_or_default(),
         );
         let publisher = Self::get_authorization_event_publisher(ctx);
+
+        Self {
+            registry,
+            publisher,
+
+            base: Default::default(),
+        }
+    }
+
+    /// Creates an instance from the values the authorization rules are created
+    /// with.
+    ///
+    /// The values are the ones a builder resolves from its own shared objects,
+    /// which is what lets the HTTP security be configured without holding the
+    /// application context.
+    ///
+    /// # Arguments
+    ///
+    /// * `authorization_manager_factory` - The factory the authorization
+    ///   managers of the rules are created with.
+    /// * `request_matcher_builder` - The builder the request matchers of the
+    ///   rules are created with.
+    /// * `publisher` - The publisher the authorization events are published to.
+    pub fn with_parts(
+        authorization_manager_factory: Arc<
+            dyn AuthorizationManagerFactory<RequestAuthorizationContext>,
+        >,
+        request_matcher_builder: PathPatternRequestMatcherBuilder,
+        publisher: Arc<dyn AuthorizationEventPublisher>,
+    ) -> Self {
+        let mut registry =
+            AuthorizationManagerRequestMatcherRegistry::with_authorization_manager_factory(
+                authorization_manager_factory,
+            );
+        registry
+            .base
+            .set_request_matcher_builder(request_matcher_builder);
 
         Self {
             registry,

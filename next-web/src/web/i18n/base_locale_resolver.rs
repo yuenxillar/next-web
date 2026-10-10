@@ -1,4 +1,4 @@
-//! Port of `org.springframework.web.servlet.i18n.AbstractLocaleResolver`.
+//! Port of `next_web.web.i18n.AbstractLocaleResolver`.
 //!
 //! The base of the locale resolvers. It holds the locale that a resolver returns
 //! when it finds no other locale, and the concrete resolvers embed it and expose

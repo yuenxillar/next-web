@@ -18,7 +18,7 @@ use crate::context::properties::source::{
 /// [`from`](Self::from) is called.
 ///
 /// Note: Next Boot maps the names of system environment sources, looking up
-/// `next.datasource.url` as `SPRING_DATASOURCE_URL` for example. Those name
+/// `next.datasource.url` as `NEXT_DATASOURCE_URL` for example. Those name
 /// mappings are not part of this conversion yet, so names are looked up as-is.
 #[derive(Debug, Clone, Default)]
 pub struct NextConfigurationPropertySource {

@@ -16,6 +16,10 @@ use crate::{
     },
     core::authority::mapping::GrantedAuthoritiesMapper,
     oauth2::{
+        client::web::{
+            OAuth2AuthorizationRequestRedirectFilter, OAuth2LoginAuthenticationFilter,
+            OAuth2LoginRequestMatcher,
+        },
         AuthenticatedPrincipalOAuth2AuthorizedClientRepository, AuthorizationGrantType,
         AuthorizationRequestRepository, ClientRegistrationRepository,
         DefaultOAuth2AuthorizationRequestResolver, DefaultOAuth2UserService,
@@ -27,11 +31,7 @@ use crate::{
         OidcUserRequest, OidcUserService, RestClientAuthorizationCodeTokenResponseClient,
     },
     web::{
-        authentication::{
-            ui::DefaultLoginPageGeneratingFilter, LoginUrlAuthenticationEntryPoint,
-            OAuth2AuthorizationRequestRedirectFilter, OAuth2LoginAuthenticationFilter,
-            OAuth2LoginRequestMatcher,
-        },
+        authentication::{ui::DefaultLoginPageGeneratingFilter, LoginUrlAuthenticationEntryPoint},
         context::SecurityContextRepository,
         default_security_filter_chain::DefaultSecurityFilterChain,
         DefaultRedirectStrategy, RedirectStrategy,
@@ -105,7 +105,23 @@ where
         );
         self.login_processing_url = login_processing_url.into();
         self.base.login_processing_url(login_processing_url);
+        self.set_login_processing_matcher();
         self
+    }
+
+    /// Installs the matcher of the login processing URL on the authentication
+    /// filter.
+    ///
+    /// The redirect back from the provider is a GET request, so the matcher
+    /// must not restrict the method and must match the registration id the
+    /// callback names.
+    fn set_login_processing_matcher(&mut self) {
+        let matcher = Arc::new(OAuth2LoginRequestMatcher::new(
+            self.login_processing_url.as_ref(),
+        ));
+        if let Some(authentication_filter) = self.base.get_authentication_filter_mut() {
+            authentication_filter.set_requires_authentication_request_matcher(matcher);
+        }
     }
 
     pub fn security_context_repository(
@@ -314,6 +330,7 @@ where
         self.base.set_authentication_filter(authentication_filter);
         self.base
             .login_processing_url(self.login_processing_url.as_ref());
+        self.set_login_processing_matcher();
 
         let login_links = self.get_login_links(&client_registration_repository);
         if let Some(login_page) = self.login_page.as_deref() {

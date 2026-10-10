@@ -3,8 +3,8 @@
 use std::{
     fmt,
     sync::{
-        Arc, Mutex, OnceLock, Weak,
         atomic::{AtomicU64, Ordering},
+        Arc, Mutex, OnceLock, Weak,
     },
 };
 
@@ -102,9 +102,7 @@ impl DefaultSessionManager {
 }
 
 impl SessionManager for DefaultSessionManager {
-    fn create_session_with_id(&self, id: String) -> SessionHandle {
-        let mut session = StandardSession::new(id);
-        session.set_max_inactive_interval(self.default_max_inactive_interval());
+    fn put_session(&self, mut session: StandardSession) -> SessionHandle {
         if let Some(manager) = self.manager.get() {
             session.attach_manager(manager.clone());
         }

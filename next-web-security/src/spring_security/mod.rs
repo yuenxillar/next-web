@@ -2,6 +2,7 @@ pub mod access;
 pub mod acl;
 pub mod authentication;
 pub mod authorization;
+pub mod autoconfigure;
 pub mod cas;
 pub mod config;
 pub mod context;
@@ -12,6 +13,7 @@ pub mod kerberos;
 pub mod ldap;
 pub mod messaging;
 pub mod oauth2;
+#[cfg(feature = "oauth2-resource-server")]
 pub mod oauth2_resource_server;
 pub mod permission;
 pub mod provisioning;

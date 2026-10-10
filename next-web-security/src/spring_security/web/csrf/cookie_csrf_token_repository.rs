@@ -7,8 +7,8 @@ use next_web_core::{
     http::CookieBuilder,
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
     util::WebUtils,
+    Uuid,
 };
-use uuid::Uuid;
 
 use crate::web::csrf::{CsrfToken, CsrfTokenRepository, DefaultCsrfToken};
 

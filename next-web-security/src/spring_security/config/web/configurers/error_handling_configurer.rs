@@ -235,8 +235,11 @@ where
         &mut self,
         http: &mut H,
     ) -> Arc<dyn AuthenticationEntryPoint> {
-        if let Some(entry_point) = self.authentication_entry_point.take() {
-            return entry_point.clone();
+        // The configured entry point is kept, because the configurations that
+        // run next, such as the default login page, have to be able to tell
+        // whether the application contributed one.
+        if let Some(entry_point) = self.authentication_entry_point.clone() {
+            return entry_point;
         }
         self.create_default_entry_point(http)
     }

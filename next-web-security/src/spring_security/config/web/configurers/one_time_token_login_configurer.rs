@@ -4,10 +4,10 @@ use std::{
     sync::Arc,
 };
 
+use next_web_context::ApplicationContextExt;
 use next_web_core::{
     http::HttpMethod, traits::http::http_request::HttpRequest, ApplicationContext,
 };
-use next_web_context::ApplicationContextExt;
 
 use crate::{
     authentication::{
@@ -117,7 +117,10 @@ where
                 .cloned();
         }
 
-        if configurer.one_time_token_generation_success_handler.is_none() {
+        if configurer
+            .one_time_token_generation_success_handler
+            .is_none()
+        {
             configurer.one_time_token_generation_success_handler = context
                 .get_singleton_option::<Arc<dyn OneTimeTokenGenerationSuccessHandler>>()
                 .cloned();
@@ -229,9 +232,9 @@ where
         self.one_time_token_generation_success_handler
             .clone()
             .expect(
-                "A OneTimeTokenGenerationSuccessHandler is required to enable oneTimeTokenLogin(). \
+            "A OneTimeTokenGenerationSuccessHandler is required to enable oneTimeTokenLogin(). \
                  Please provide it as a bean or pass it to the oneTimeTokenLogin() DSL.",
-            )
+        )
     }
 
     /// Resolves the `GenerateOneTimeTokenRequestResolver` to use. Falls back to a
@@ -248,13 +251,10 @@ where
         if let Some(provider) = &self.authentication_provider {
             return provider.clone();
         }
-        let user_details_service = self
-            .user_details_service
-            .clone()
-            .expect(
-                "A UserDetailsService is required to enable oneTimeTokenLogin(). \
+        let user_details_service = self.user_details_service.clone().expect(
+            "A UserDetailsService is required to enable oneTimeTokenLogin(). \
                  Please provide it as a bean.",
-            );
+        );
         Arc::new(OneTimeTokenAuthenticationProvider::new(
             self.get_one_time_token_service(),
             user_details_service,

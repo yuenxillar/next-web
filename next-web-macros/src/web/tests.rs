@@ -91,6 +91,46 @@ fn rejects_a_name_that_is_empty() {
     );
 }
 
+#[test]
+fn names_a_provider_after_the_method_in_camel_case() {
+    let code = code_of(
+        quote! {},
+        quote! {
+            impl MyConfiguration {
+                #[provider]
+                fn application_event_publisher() -> String {
+                    String::from("publisher")
+                }
+            }
+        },
+    );
+
+    zyn::assert_tokens_contain!(
+        code,
+        r#"ctx . insert_singleton_with_name (instance , "applicationEventPublisher") ;"#
+    );
+}
+
+#[test]
+fn names_a_provider_after_the_method_when_the_name_is_empty() {
+    let code = code_of(
+        quote! {},
+        quote! {
+            impl MyConfiguration {
+                #[provider(name = "")]
+                fn application_event_publisher() -> String {
+                    String::from("publisher")
+                }
+            }
+        },
+    );
+
+    zyn::assert_tokens_contain!(
+        code,
+        r#"ctx . insert_singleton_with_name (instance , "applicationEventPublisher") ;"#
+    );
+}
+
 /// Returns the implementation block of a configuration whose single provider
 /// declares the given signature, which the tests of the arguments of a provider
 /// expand.
@@ -175,6 +215,40 @@ fn borrows_the_instance_a_mutable_reference_argument_names() {
         r#"let owned1 = ctx . resolve_with_name :: < String > ("name") ;"#
     );
     zyn::assert_tokens_contain!(code, "let instance = my_name (ref0 , owned1) ;");
+}
+
+#[test]
+fn resolves_an_argument_under_the_name_of_the_parameter_in_camel_case() {
+    let code = code_of(
+        quote! {},
+        provider_with(
+            "fn my_name(security_properties: SecurityProperties) -> String { String::new() }",
+        ),
+    );
+
+    zyn::assert_tokens_contain!(
+        code,
+        r#"let owned0 = ctx . resolve_with_name :: < SecurityProperties > ("securityProperties") ;"#
+    );
+}
+
+#[test]
+fn resolves_a_reference_argument_under_the_name_of_the_parameter_in_camel_case() {
+    let code = code_of(
+        quote! {},
+        provider_with(
+            "fn my_name(security_properties: &SecurityProperties) -> String { String::new() }",
+        ),
+    );
+
+    zyn::assert_tokens_contain!(
+        code,
+        r#"ctx . try_just_create_singleton_with_name :: < SecurityProperties > ("securityProperties") ;"#
+    );
+    zyn::assert_tokens_contain!(
+        code,
+        r#"let ref0 = ctx . get_singleton_with_name :: < SecurityProperties > ("securityProperties") ;"#
+    );
 }
 
 #[test]

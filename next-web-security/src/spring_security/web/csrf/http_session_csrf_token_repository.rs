@@ -1,9 +1,8 @@
 use next_web_core::any::AnyValue;
 use next_web_core::error::BoxError;
 use next_web_core::traits::http::http_request::HttpRequest;
-use next_web_core::{async_trait, traits::http::http_response::HttpResponse};
+use next_web_core::{async_trait, traits::http::http_response::HttpResponse, Uuid};
 use std::sync::Arc;
-use uuid::Uuid;
 
 use crate::web::csrf::{CsrfToken, CsrfTokenRepository, DefaultCsrfToken};
 

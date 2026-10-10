@@ -52,8 +52,11 @@ impl AutoConfiguration for MQTTAutoConfiguration {
     /// Returns an error when a wildcard subscription filter of a listener is
     /// malformed, or when the client cannot be built from the properties.
     async fn configure(&mut self, ctx: &mut dyn ApplicationContext) -> Result<(), Box<dyn Error>> {
-        let mqtt_properties = self.mqtt_client_properties.clone();
+        if ctx.contains_singleton_with_default_name::<MqttClient>() {
+            return Ok(());
+        }
 
+        let mqtt_properties = self.mqtt_client_properties.clone();
         let listeners = ctx.resolve_by_type::<Arc<dyn TopicListener>>();
 
         if listeners.is_empty() {

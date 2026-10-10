@@ -1,13 +1,14 @@
 use std::any::{type_name, Any, TypeId};
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use std::{collections::BTreeMap, marker::PhantomData};
 
 use crate::config::security_configurer::SecurityConfigurer;
 use crate::config::{
     base_security_builder::BaseSecurityBuilder, security_builder::SecurityBuilder,
 };
 use next_web_core::any::AnyClone;
+use next_web_core::util::indexmap::IndexMap;
 
 /// Combined trait for configurers that are both `AnyClone` and `SecurityConfigurer`.
 ///
@@ -37,7 +38,12 @@ where
     B: SecurityBuilder<O>,
     O: Send + Sync,
 {
-    configurers: BTreeMap<TypeId, Vec<Box<dyn AnyCloneSecurityConfigurer<O, B>>>>,
+    /// The configurers of the builder, in the order they were added.
+    ///
+    /// The order is what the `init` and `configure` phases run in, so a
+    /// configuration that contributes a shared object another configuration
+    /// uses has to be added before it.
+    configurers: IndexMap<TypeId, Vec<Box<dyn AnyCloneSecurityConfigurer<O, B>>>>,
     configurers_added_in_initializing: Vec<Box<dyn AnyCloneSecurityConfigurer<O, B>>>,
     pub(crate) shared_objects: HashMap<TypeId, Box<dyn AnyClone>>,
     pub(crate) build_state: BuildState,
@@ -161,7 +167,9 @@ where
         C: SecurityConfigurer<O, B>,
     {
         let key = TypeId::of::<C>();
-        let mut configs = self.configurers.remove(&key)?;
+        // The order of the remaining configurers is preserved, because it is
+        // the order the `init` and `configure` phases run in.
+        let mut configs = self.configurers.shift_remove(&key)?;
         self.remove_from_configurers_added_in_initializing::<C>();
 
         if configs.len() != 1 {
@@ -193,7 +201,9 @@ where
         C: SecurityConfigurer<O, B>,
     {
         let key = TypeId::of::<C>();
-        let Some(configs) = self.configurers.remove(&key) else {
+        // The order of the remaining configurers is preserved, because it is
+        // the order the `init` and `configure` phases run in.
+        let Some(configs) = self.configurers.shift_remove(&key) else {
             return Default::default();
         };
 
@@ -208,33 +218,34 @@ where
             .collect()
     }
 
-    /// Initialize all registered configurers.
+    /// Initializes all registered configurers.
     ///
-    /// Takes `builder: &mut B` instead of `&mut self` to avoid overlapping borrows:
-    /// the configurer references are extracted from `builder`'s configurers map via
-    /// `std::mem::take`, processed while `builder` has no configurers, then merged back.
+    /// Takes `builder: &mut B` instead of `&mut self` to avoid overlapping
+    /// borrows: the configurers of one key are taken out of the map while they
+    /// run, so that a configurer can still look up the other configurers
+    /// through the builder.
     pub(crate) fn init_configurers(builder: &mut B)
     where
         B: DerefMut<Target = Self> + SecurityBuilder<O>,
         O: 'static,
     {
-        // 1. Take configurers map out of builder
-        let mut configurers = std::mem::take(&mut builder.configurers);
+        let keys: Vec<TypeId> = builder.configurers.keys().copied().collect();
 
-        // 2. Init all configurers (refs are into the local `configurers`, not `builder`)
-        {
-            let configs: Vec<&mut dyn SecurityConfigurer<O, B>> = configurers
-                .values_mut()
-                .flatten()
-                .map(|boxed| &mut **boxed as &mut dyn SecurityConfigurer<O, B>)
-                .collect();
+        for (index, key) in keys.into_iter().enumerate() {
+            let Some(mut configs) = builder.configurers.shift_remove(&key) else {
+                continue;
+            };
 
-            for configurer in configs {
+            for configurer in configs.iter_mut() {
                 configurer.init(builder);
             }
+
+            // The configurers are put back where they were, so that the order
+            // the configure phase runs in is the order they were added in.
+            builder.configurers.shift_insert(index, key, configs);
         }
 
-        // 3. Handle configurers added during initialization
+        // Handle the configurers added while an initializer ran.
         while !builder.configurers_added_in_initializing.is_empty() {
             let to_init = std::mem::take(&mut builder.configurers_added_in_initializing);
 
@@ -243,38 +254,31 @@ where
                 sc.init(builder);
             }
         }
-
-        // 4. Merge: new configurers may have been added to builder.configurers during init
-        for (key, mut new_configs) in std::mem::take(&mut builder.configurers) {
-            configurers.entry(key).or_default().append(&mut new_configs);
-        }
-        builder.configurers = configurers;
     }
 
-    /// Configure all registered configurers.
+    /// Configures all registered configurers.
     ///
-    /// Same pattern as `init_configurers`: takes `builder: &mut B` and uses
-    /// `std::mem::take` to avoid overlapping borrows.
+    /// Same pattern as [`Self::init_configurers`]: the configurers of one key
+    /// are taken out of the map while they run, so that a configurer can look
+    /// up the other configurers through the builder.
     pub(crate) fn configure_configurers(builder: &mut B)
     where
         B: DerefMut<Target = Self> + SecurityBuilder<O>,
         O: 'static,
     {
-        let mut configurers = std::mem::take(&mut builder.configurers);
+        let keys: Vec<TypeId> = builder.configurers.keys().copied().collect();
 
-        {
-            let configs: Vec<&mut dyn SecurityConfigurer<O, B>> = configurers
-                .values_mut()
-                .flatten()
-                .map(|boxed| &mut **boxed as &mut dyn SecurityConfigurer<O, B>)
-                .collect();
+        for (index, key) in keys.into_iter().enumerate() {
+            let Some(mut configs) = builder.configurers.shift_remove(&key) else {
+                continue;
+            };
 
-            for configurer in configs {
+            for configurer in configs.iter_mut() {
                 configurer.configure(builder);
             }
-        }
 
-        builder.configurers = configurers;
+            builder.configurers.shift_insert(index, key, configs);
+        }
     }
 
     pub fn is_unbuilt(&self) -> bool {
@@ -291,7 +295,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            configurers: BTreeMap::new(),
+            configurers: IndexMap::new(),
             configurers_added_in_initializing: Vec::new(),
             shared_objects: self.shared_objects.clone(),
             build_state: self.build_state,
@@ -308,7 +312,7 @@ where
 {
     fn default() -> Self {
         Self {
-            configurers: BTreeMap::new(),
+            configurers: IndexMap::new(),
             configurers_added_in_initializing: Default::default(),
             shared_objects: Default::default(),
             build_state: BuildState::UNBUILT,

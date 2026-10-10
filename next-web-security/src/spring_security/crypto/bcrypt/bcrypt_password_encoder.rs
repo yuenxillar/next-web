@@ -1,7 +1,7 @@
 use crate::crypto::password::PasswordEncoder;
 use bcrypt::{hash, verify};
 use next_web_core::error::BoxError;
-use regex::Regex;
+use next_web_core::Regex;
 
 /// Minimum allowed BCrypt log rounds.
 const MIN_LOG_ROUNDS: i32 = 4;

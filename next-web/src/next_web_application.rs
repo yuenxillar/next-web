@@ -1,5 +1,6 @@
 use std::{
-    any::{Any, type_name_of_val},
+    any::{type_name_of_val, Any},
+    borrow::Cow,
     collections::{HashMap, HashSet},
     error::Error,
     panic::AssertUnwindSafe,
@@ -9,18 +10,18 @@ use std::{
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::{
-    Router,
     response::{IntoResponse, Response},
+    Router,
 };
 
-use next_web_context::{APPLICATION_ARGUMENTS_SINGLETON_NAME, ApplicationContextExt};
+use next_web_context::{ApplicationContextExt, APPLICATION_ARGUMENTS_SINGLETON_NAME};
 use next_web_core::{
     any::AnyValue,
     constants::application_constants::APPLICATION_DEFAULT_PORT,
     env::{
-        COMMAND_LINE_PROPERTY_SOURCE_NAME, CompositePropertySource, ConfigurableEnvironment,
-        DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME, MutablePropertySources, PropertySource,
-        SimpleCommandLinePropertySource,
+        CompositePropertySource, ConfigurableEnvironment, MutablePropertySources, PropertySource,
+        SimpleCommandLinePropertySource, COMMAND_LINE_PROPERTY_SOURCE_NAME,
+        DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME,
     },
     io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup, StartupStep},
@@ -30,35 +31,50 @@ use next_web_core::{
     },
     util::indexmap::IndexMap,
 };
-use next_web_singletons::factory::{SingletonFactory, config::SingletonRegistry};
+use next_web_singletons::factory::{config::SingletonRegistry, SingletonFactory};
 use reqwest::StatusCode;
 use tokio::sync::RwLock;
-use tracing::{Level, enabled};
+use tracing::{enabled, Level};
 
 use crate::{
-    ApplicationArguments, ApplicationBannerPrinter, ApplicationContextFactory,
-    ApplicationContextInitializer, ApplicationEnvironment, ApplicationEventHandler,
-    ApplicationInfoPropertySource, ApplicationProperties, ApplicationRunner,
-    ApplicationShutdownHook, Banner, ConfigurableApplicationContext, DefaultApplicationArguments,
-    DefaultApplicationContextFactory, ErrorHandler, Event, NextWebErrorReporter, StartupInfoLogger,
     application_banner_printer::PrintedBanner,
     autoconfigure::web_auto_configuration::WebAutoConfiguration,
     autoregister::http_handler_autoregister::HttpHandlerAutoRegister,
     banner::BannerMode,
     context::{
-        ContextIdApplicationContextInitializer, RouterContext, logging::LoggingEventHandler,
-        properties::source::ConfigurationPropertySources,
+        logging::LoggingEventHandler, properties::source::ConfigurationPropertySources,
+        ContextIdApplicationContextInitializer, RouterContext,
     },
     diagnostics::error_analyzers::ErrorAnalyzers,
     env::{DefaultPropertiesPropertySource, MapPropertySource},
     support::EnvironmentPostProcessorEventHandler,
     util::InventoryHelper,
     web::server::{Server, WebServer},
+    ApplicationArguments, ApplicationBannerPrinter, ApplicationContextFactory,
+    ApplicationContextInitializer, ApplicationEnvironment, ApplicationEventHandler,
+    ApplicationInfoPropertySource, ApplicationProperties, ApplicationRunner,
+    ApplicationShutdownHook, Banner, ConfigurableApplicationContext, DefaultApplicationArguments,
+    DefaultApplicationContextFactory, ErrorHandler, Event, NextWebErrorReporter, StartupInfoLogger,
 };
 
+use crate::web::server::autoconfigure::ServerProperties;
 #[cfg(feature = "tls-rustls")]
 use crate::web::server::TlsWebServer;
-use crate::web::server::autoconfigure::ServerProperties;
+
+#[cfg(feature = "enable-web-security")]
+use axum::{
+    body::Body,
+    extract::{Request, State},
+    middleware::Next,
+};
+#[cfg(feature = "enable-web-security")]
+use next_web_core::{
+    filter::application_filter_chain::ApplicationFilterChain,
+    traits::{
+        filter::{HttpFilter, HttpFilterChain},
+        http::http_response::HttpResponse,
+    },
+};
 
 /// The application shutdown hook, used to clean up resources on shutdown.
 pub static APPLICATION_SHUTDOWN_HOOK: OnceLock<ApplicationShutdownHook> = OnceLock::new();
@@ -288,7 +304,28 @@ where
             });
 
         tracing::error!("Service panicked: {}", error);
-        let mut resp = E::handle_error(error).into_response();
+        Self::to_error_response(error)
+    }
+
+    /// Converts an error into an HTTP 500 Internal Server Error response.
+    ///
+    /// The provided error is converted into a `Cow<'static, str>` and passed to
+    /// the framework-specific error handler `E::handle_error`. The resulting
+    /// response is then forced to use `StatusCode::INTERNAL_SERVER_ERROR`,
+    /// regardless of the status code originally produced by the handler.
+    ///
+    /// # Arguments
+    ///
+    /// * `err` - The error value to convert. It can be any type that implements
+    ///   `Into<Cow<'static, str>>`, such as `&'static str`, `String`, or
+    ///   `Cow<'static, str>`.
+    ///
+    /// # Returns
+    ///
+    /// A `Response` representing an HTTP 500 Internal Server Error.
+    fn to_error_response<'a>(err: impl Into<Cow<'a, str>>) -> Response {
+        let error = err.into();
+        let mut resp = E::handle_error(error.as_ref()).into_response();
         *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
         resp
     }
@@ -415,7 +452,7 @@ where
             .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
         router = self.apply_routers(ctx.as_mut(), router)?;
         router = self
-            .add_layers(router)
+            .add_layers(ctx.as_mut(), router)
             .route_layer(axum::Extension::<ApplicationState>(Arc::new(RwLock::new(
                 ctx,
             ))));
@@ -446,7 +483,15 @@ where
     }
 
     /// Adds the necessary layers to the router.
-    fn add_layers(&self, router: Router) -> Router {
+    ///
+    /// The filter layer is installed first, so the panic, the timeout, and the
+    /// CORS layers that are added afterwards wrap it: a filter that panics or
+    /// that takes too long is still handled by them, and the CORS headers are
+    /// added to the response of a filter that rejects the request.
+    fn add_layers(&self, ctx: &mut dyn ConfigurableApplicationContext, router: Router) -> Router {
+        #[cfg(feature = "enable-web-security")]
+        let router = self.add_filter_layer(ctx, router);
+
         router
             .route_layer(tower_http::catch_panic::CatchPanicLayer::custom(
                 T::catch_panic,
@@ -463,6 +508,49 @@ where
                     .max_age(std::time::Duration::from_secs(60) * 10),
             )
             .route_layer(tower_http::trace::TraceLayer::new_for_http())
+    }
+
+    /// Installs the layer that runs the [`HttpFilter`]s of the application.
+    ///
+    /// The filters are resolved from the application context once, when the
+    /// router is built, and are run by an [`ApplicationFilterChain`] in front of
+    /// the routes. The router is returned unchanged when the application does
+    /// not register a filter, so an application that does not use filters pays
+    /// nothing for the layer.
+    ///
+    /// The pool of filters that has to run before every other filter is read
+    /// from the application context when the optional web security support
+    /// contributed it, and is skipped otherwise, so this layer also works for
+    /// an application that only registers filters of its own.
+    #[cfg(feature = "enable-web-security")]
+    fn add_filter_layer(
+        &self,
+        ctx: &mut dyn ConfigurableApplicationContext,
+        router: Router,
+    ) -> Router {
+        // Security filters (authn/authz, CSRF, CORS, etc.) are pushed first so they
+        // run before regular business filters in the middleware chain. This ensures
+        // requests are rejected as early as possible and later filters can rely on
+        // an already-established security context.
+        let mut http_filters = Vec::new();
+
+        if let Some(security_filters) = ctx
+            .get_singleton_option_with_name::<Arc<[Arc<dyn HttpFilter>]>>(
+                next_web_context::SECURITY_FILTERS_SINGLETON_NAME,
+            )
+        {
+            http_filters.extend(security_filters.iter().cloned());
+        }
+
+        http_filters.extend(ctx.resolve_by_type::<Arc<dyn HttpFilter>>());
+        if http_filters.is_empty() {
+            return router;
+        }
+
+        router.layer(axum::middleware::from_fn_with_state(
+            Arc::from(http_filters),
+            http_filter_layer::<T>,
+        ))
     }
 
     /// Applies all routers registered in the application context to the router.
@@ -1029,6 +1117,90 @@ where
 {
     fn default() -> Self {
         Self::new(None)
+    }
+}
+
+/// Runs the filters registered in the application context before the routes.
+///
+/// This is the layer installed by [`NextWebApplication::add_layers`] when the
+/// `enable-web-security` feature is enabled. The filters run in one
+/// [`ApplicationFilterChain`]: a filter continues the request by calling the
+/// chain it received, a filter that commits the response ends the request, and
+/// a filter that stops the chain without committing the response lets the
+/// request continue to the routes. A filter that returns an error is formatted
+/// by [`Application::filter_error`].
+#[cfg(feature = "enable-web-security")]
+async fn http_filter_layer<T>(
+    State(filters): State<Arc<[Arc<dyn HttpFilter>]>>,
+    mut request: Request,
+    next: Next,
+) -> Response
+where
+    T: Application,
+{
+    // The filters of the security chain read the parameters of a url-encoded
+    // form post (a login, or a request to the token endpoint of an
+    // authorization server), and a transport hands the body as a stream, so the
+    // body of those requests is buffered before the filters run.
+    request = buffer_form_body(request).await;
+
+    let filter_chain = ApplicationFilterChain::new(filters);
+    let mut response = Response::new(Body::empty());
+
+    match filter_chain.do_filter(&mut request, &mut response).await {
+        // The filter already produced the response, so the routes are skipped.
+        Ok(()) if response.is_committed() => response,
+        Ok(()) => next.run(request).await,
+        Err(error) => {
+            let mut resp = T::to_error_response(error.to_string());
+            *resp.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            resp
+        }
+    }
+}
+
+/// The content type of a url-encoded form.
+#[cfg(feature = "enable-web-security")]
+const FORM_URLENCODED: &str = "application/x-www-form-urlencoded";
+
+/// The largest form body that is buffered for the filters.
+#[cfg(feature = "enable-web-security")]
+const MAX_FORM_BODY_BYTES: usize = 64 * 1024;
+
+/// Buffers the body of a url-encoded form post so the filters can read it.
+///
+/// The body of every other request is left untouched, so a request that
+/// streams a large payload is not buffered.
+///
+/// # Arguments
+///
+/// * `request` - The request of the filter layer.
+///
+/// # Returns
+///
+/// The request, with the body buffered when it was a form post.
+#[cfg(feature = "enable-web-security")]
+async fn buffer_form_body(request: Request) -> Request {
+    let is_form = request
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|content_type| content_type.starts_with(FORM_URLENCODED));
+    if !is_form {
+        return request;
+    }
+
+    let (parts, body) = request.into_parts();
+    match axum::body::to_bytes(body, MAX_FORM_BODY_BYTES).await {
+        Ok(bytes) => {
+            let mut request = Request::from_parts(parts, Body::from(bytes.clone()));
+            next_web_core::http::buffer_request_body(&mut request, bytes);
+            request
+        }
+        Err(error) => {
+            tracing::warn!("the form body of the request is not buffered: {error}");
+            Request::from_parts(parts, Body::empty())
+        }
     }
 }
 

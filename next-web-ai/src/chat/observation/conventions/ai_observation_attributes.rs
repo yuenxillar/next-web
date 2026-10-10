@@ -38,7 +38,7 @@ impl AiObservationAttributes {
             AiObservationAttributes::RequestPresencePenalty => "gen_ai.request.presence_penalty",
             AiObservationAttributes::RequestStopSequences => "gen_ai.request.stop_sequences",
             AiObservationAttributes::RequestTemperature => "gen_ai.request.temperature",
-            AiObservationAttributes::RequestToolNames => "spring.ai.model.request.tool.names",
+            AiObservationAttributes::RequestToolNames => "next.ai.model.request.tool.names",
             AiObservationAttributes::RequestTopK => "gen_ai.request.top_k",
             AiObservationAttributes::RequestTopP => "gen_ai.request.top_p",
             AiObservationAttributes::RequestEmbeddingDimensions => {

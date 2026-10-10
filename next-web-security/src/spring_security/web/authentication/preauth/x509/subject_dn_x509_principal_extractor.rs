@@ -1,4 +1,4 @@
-use regex::RegexBuilder;
+use next_web_core::{Regex, RegexBuilder};
 
 use crate::core::{AuthenticationError, AuthenticationErrorKind};
 
@@ -14,7 +14,7 @@ use super::{x509_certificate::X509Certificate, x509_principal_extractor::X509Pri
 #[derive(Clone, Debug)]
 #[allow(deprecated)]
 pub struct SubjectDnX509PrincipalExtractor {
-    pattern: regex::Regex,
+    pattern: Regex,
 }
 
 #[allow(deprecated)]

@@ -1,16 +1,16 @@
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
     Arc,
+    atomic::{AtomicU64, Ordering},
 };
 
 use next_web_context::ApplicationContextExt;
-use next_web_core::{env::ConfigurableEnvironment, Ordered};
+use next_web_core::{Ordered, env::ConfigurableEnvironment};
 
 use crate::{ApplicationContextInitializer, ConfigurableApplicationContext};
 
 /// `ApplicationContextInitializer` that sets the application context id.
 ///
-/// The `spring.application.name` property is used to build the id. If the property
+/// The `next.application.name` property is used to build the id. If the property
 /// is not set, `application` is used instead.
 pub struct ContextIdApplicationContextInitializer {
     order: i32,

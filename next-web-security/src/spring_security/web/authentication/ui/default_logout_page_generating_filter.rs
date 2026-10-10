@@ -50,7 +50,7 @@ const HIDDEN_HTML_INPUT_TEMPLATE: &str =
 /// via a GET request. The page contains a form that POSTs to `/logout` to
 /// complete the logout action.
 ///
-/// Ported from Spring Security's `DefaultLogoutPageGeneratingFilter`.
+/// Ported from Next Security's `DefaultLogoutPageGeneratingFilter`.
 #[derive(Clone)]
 pub struct DefaultLogoutPageGeneratingFilter {
     matcher: Arc<dyn RequestMatcher>,

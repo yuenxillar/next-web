@@ -19,7 +19,6 @@ next-web-context        = { workspace = true }
 next-web-macros         = { workspace = true }
 next-web-singletons     = { workspace = true }
 
-next-web-security       = { workspace = true, optional = true }
 next-web-websocket      = { workspace = true, optional = true }
 next-web-retry          = { workspace = true, optional = true }
 next-web-open-api       = { workspace = true, optional = true }
@@ -98,7 +97,10 @@ full = [
 tls-rustls  = ["axum-server/tls-rustls"]
 
 # web
-enable-web-security     = ["next-web-security"]
+# Installs the layer that runs the `HttpFilter`s registered in the application
+# context. The security support itself lives in its own crate, so an
+# application that wants it depends on that crate directly.
+enable-web-security     = []
 enable-websocket        = ["next-web-websocket"]
 enable-open-api         = ["next-web-open-api", "utoipa-swagger-ui", "next-web-macros/open-api"]
 enable-scheduling       = ["tokio-cron-scheduler"]

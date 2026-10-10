@@ -70,7 +70,7 @@ impl Default for FilterOrderRegistration {
         filter_order.put::<LogoutFilter>(order.next());
 
         #[cfg(feature = "oauth2-client")]
-        filter_order.put::<crate::web::authentication::OAuth2AuthorizationRequestRedirectFilter>(
+        filter_order.put::<crate::oauth2::client::web::OAuth2AuthorizationRequestRedirectFilter>(
             order.next(),
         );
         filter_order.put::<GenerateOneTimeTokenFilter>(order.next());
@@ -78,7 +78,7 @@ impl Default for FilterOrderRegistration {
 
         #[cfg(feature = "oauth2-client")]
         filter_order
-            .put::<crate::web::authentication::OAuth2LoginAuthenticationFilter>(order.next());
+            .put::<crate::oauth2::client::web::OAuth2LoginAuthenticationFilter>(order.next());
 
         filter_order.put::<UsernamePasswordAuthenticationFilter>(order.next());
         filter_order.put::<OneTimeTokenAuthenticationFilter>(order.next());
@@ -91,8 +91,33 @@ impl Default for FilterOrderRegistration {
         filter_order.put::<DigestAuthenticationFilter>(order.next());
 
         #[cfg(feature = "oauth2-resource-server")]
-        filter_order
-            .put::<crate::web::authentication::BearerTokenAuthenticationFilter>(order.next());
+        filter_order.put::<crate::oauth2::server::resource::web::BearerTokenAuthenticationFilter>(
+            order.next(),
+        );
+
+        // The endpoints that are used by a client run before the filters that
+        // authenticate a resource owner, so that the credentials a client
+        // presents are not read as the credentials of a resource owner. The
+        // authorization endpoint runs after the error translation filter, so
+        // that a resource owner that is not logged in is sent to the login
+        // page, and before the authorization filter, so that the endpoint
+        // handles its own request.
+        #[cfg(feature = "oauth2-authorization-server")]
+        {
+            use crate::oauth2::server::authorization::{
+                AuthorizationEndpointFilter, AuthorizationServerMetadataEndpointFilter,
+                JwkSetEndpointFilter, TokenEndpointFilter, TokenIntrospectionEndpointFilter,
+                TokenRevocationEndpointFilter,
+            };
+
+            filter_order.put::<AuthorizationServerMetadataEndpointFilter>(710);
+            filter_order.put::<JwkSetEndpointFilter>(720);
+            filter_order.put::<TokenIntrospectionEndpointFilter>(730);
+            filter_order.put::<TokenRevocationEndpointFilter>(740);
+            filter_order.put::<TokenEndpointFilter>(750);
+            filter_order.put::<AuthorizationEndpointFilter>(2810);
+        }
+
         filter_order.put::<BasicAuthenticationFilter>(order.next());
         filter_order.put::<AuthenticationFilter>(order.next());
         filter_order.put::<RequestCacheAwareFilter>(order.next());

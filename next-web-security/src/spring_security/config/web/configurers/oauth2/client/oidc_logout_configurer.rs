@@ -16,6 +16,7 @@ use crate::{
             HttpSecurityBuilder,
         },
     },
+    oauth2::server::resource::jwt::{JwtDecoder, NimbusJwtDecoder},
     oauth2::{
         client::{
             oidc_back_channel_logout::{
@@ -27,7 +28,6 @@ use crate::{
         },
         ClientRegistrationRepository,
     },
-    oauth2_resource_server::jwt::{JwtDecoder, NimbusJwtDecoder},
     web::{
         authentication::{
             logout::{CompositeLogoutHandler, LogoutHandler, SecurityContextLogoutHandler},
@@ -244,6 +244,3 @@ impl BackChannelLogoutConfigurer {
         http.add_filter_before::<OidcBackChannelLogoutFilter, CsrfFilter>(filter);
     }
 }
-
-
-

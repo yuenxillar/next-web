@@ -56,6 +56,7 @@ pub(crate) fn current_time_millis() -> u64 {
 /// session.invalidate();
 /// assert!(session.attribute("user").is_none());
 /// ```
+#[derive(Clone)]
 pub struct StandardSession {
     /// The unique session identifier. Immutable for the lifetime of the
     /// session; a new id means a new session (see

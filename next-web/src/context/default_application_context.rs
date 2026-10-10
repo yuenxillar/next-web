@@ -649,7 +649,7 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
 
         // A concrete listener type is registered at most once. Adding another
         // instance of the same type replaces the previous one, which mirrors the
-        // set semantics of the original Spring implementation.
+        // set semantics of the original Next implementation.
         match self.listeners.iter_mut().find(|(key, _)| *key == id) {
             Some((_, registered)) => *registered = Arc::clone(&listener),
             None => self.listeners.push((id.clone(), Arc::clone(&listener))),

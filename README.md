@@ -136,7 +136,7 @@ The project is organized as a workspace, keeping the framework itself separate f
 | --- | --- |
 | `full` | Enables a combination of commonly used optional capabilities |
 | `tls-rustls` | TLS support based on rustls |
-| `enable-web-security` | Enables the security module |
+| `enable-web-security` | Installs the layer that runs the `HttpFilter`s registered in the application context (the security support lives in `next-web-security`) |
 | `enable-websocket` | Enables WebSocket support |
 | `enable-scheduling` | Enables scheduled tasks |
 | `enable-retry` | Enables retry support |

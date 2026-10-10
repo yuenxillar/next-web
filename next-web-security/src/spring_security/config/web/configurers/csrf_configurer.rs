@@ -1,7 +1,7 @@
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use next_web_core::{
@@ -11,7 +11,6 @@ use next_web_core::{
         required::Required,
     },
     util::StringUtils,
-    ApplicationContext,
 };
 
 use crate::{
@@ -57,11 +56,21 @@ where
     base: BaseHttpConfigurer<Self, H>,
 }
 
+impl<H> Default for CsrfConfigurer<H>
+where
+    H: HttpSecurityBuilder<H>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<H> CsrfConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
-    pub fn new(_context: Arc<RwLock<Box<dyn ApplicationContext>>>) -> Self {
+    /// Creates a new `CsrfConfigurer` with the default configuration.
+    pub fn new() -> Self {
         Self {
             csrf_token_repository: Arc::new(HttpSessionCsrfTokenRepository::default()),
             require_csrf_protection_matcher: CsrfFilter::default_csrf_matcher(),
@@ -113,6 +122,24 @@ where
             .extend(request_matchers);
 
         self
+    }
+
+    /// Adds the requests that should not use CSRF protection even if they
+    /// match the matcher of the protection.
+    ///
+    /// The method adds the matchers in place, so a configurer that does not own
+    /// the CSRF configurer, such as the configurer of another set of endpoints,
+    /// can extend it without cloning it.
+    ///
+    /// # Arguments
+    ///
+    /// * `request_matchers` - The matchers of the requests that are ignored.
+    pub fn add_ignored_csrf_protection_matchers(
+        &mut self,
+        request_matchers: Vec<Arc<dyn RequestMatcher>>,
+    ) {
+        self.ignored_csrf_protection_matchers
+            .extend(request_matchers);
     }
 
     /// Allows specifying HttpRequest that should not use CSRF Protection even if they match the require_csrf_protection_matcher(request_matcher).
@@ -337,6 +364,3 @@ impl Default for SpaCsrfTokenRequestHandler {
         }
     }
 }
-
-
-

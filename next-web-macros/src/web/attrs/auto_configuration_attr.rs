@@ -40,7 +40,8 @@ pub(crate) struct AutoConfigurationAttr {
 /// # Attributes
 ///
 /// * `name` - The name the instance is registered under. It defaults to the
-///   name of the method, which is lower cased at its first character.
+///   name of the method in camel case, so that `fn application_event_publisher()`
+///   provides `applicationEventPublisher`.
 /// * `conditional` - The conditions the provider is created under. Each names a
 ///   function that takes `&dyn ApplicationContext` and returns a `bool`, and
 ///   the instance is not created when one of them returns `false`.
@@ -96,7 +97,8 @@ pub(crate) struct ConditionalOnPropertyAttr {
 /// # Attributes
 ///
 /// * `name` - The name the parameter is resolved under. It defaults to the name
-///   of the parameter.
+///   of the parameter in camel case, so that `security_properties` resolves
+///   `securityProperties`.
 /// * `default` - Whether the parameter falls back to `Default::default()` when
 ///   no instance is registered under its name.
 #[derive(FromAttr)]

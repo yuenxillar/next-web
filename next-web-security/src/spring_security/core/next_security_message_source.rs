@@ -22,6 +22,8 @@ impl NextSecurityMessageSource {
 }
 
 impl MessageSource for NextSecurityMessageSource {
+    /// Resolves the message from the resource bundles of the source, and falls
+    /// back to the given default message.
     fn message_or_default(
         &self,
         code: &str,
@@ -29,24 +31,38 @@ impl MessageSource for NextSecurityMessageSource {
         default_message: Option<&str>,
         locale: Option<&Locale>,
     ) -> Option<String> {
-        todo!()
+        self.0
+            .message_or_default(code, args, default_message, locale)
     }
 
+    /// Resolves the message from the resource bundles of the source.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NoSuchMessageError`] when the bundles do not contain the code
+    /// and the source does not hold a default message for it.
     fn message(
         &self,
         code: &str,
         args: &[&dyn fmt::Display],
         locale: Option<&Locale>,
     ) -> Result<String, NoSuchMessageError> {
-        todo!()
+        self.0.message(code, args, locale)
     }
 
+    /// Resolves the message the resolvable describes from the resource bundles
+    /// of the source.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NoSuchMessageError`] when the bundles do not contain the codes
+    /// of the resolvable and it does not carry a default message.
     fn message_from_resolvable(
         &self,
         resolvable: &dyn MessageSourceResolvable,
         locale: Option<&Locale>,
     ) -> Result<String, NoSuchMessageError> {
-        todo!()
+        self.0.message_from_resolvable(resolvable, locale)
     }
 }
 

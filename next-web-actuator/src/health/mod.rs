@@ -13,7 +13,7 @@ use crate::health::status::Status;
 
 /// Represents the health information for a component.
 ///
-/// This is the Rust equivalent of Spring Boot's `Health` class.
+/// This is the Rust equivalent of Next `Health` struct.
 /// Contains status and optional details.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Health {
@@ -62,7 +62,7 @@ impl fmt::Display for Health {
 
 /// Builder for constructing Health instances.
 ///
-/// This is the Rust equivalent of Spring Boot's `Health.Builder` inner class.
+/// This is the Rust equivalent of Next `Health.Builder` inner struct.
 #[derive(Debug, Default, Clone)]
 pub struct HealthBuilder {
     status: Status,

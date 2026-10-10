@@ -1,4 +1,4 @@
-//! Port of `org.springframework.web.servlet.i18n.CookieLocaleResolver`.
+//! Port of `next_web.web.i18n.CookieLocaleResolver`.
 //!
 //! Resolves the locale of a request from a cookie that is sent back to the
 //! client when the locale is changed, falling back to the configured default

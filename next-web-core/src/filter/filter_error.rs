@@ -46,7 +46,7 @@ impl fmt::Display for FilterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             FilterError::Io(e) => write!(f, "I/O error: {e}"),
-            FilterError::Chain(e) => write!(f, "chain error: {e}"),
+            FilterError::Chain(e) => write!(f, "FilterChain error: {e}"),
             FilterError::Custom(msg) => write!(f, "{msg}"),
         }
     }

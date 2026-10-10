@@ -1,23 +1,7 @@
-pub mod bearer;
-pub mod entry;
-pub mod jwt;
-pub mod opaque;
+//! OAuth 2.0 Resource Server support.
+//!
+//! The module keeps the path the support was originally reached under, and it
+//! re-exports the module the support moved to, which follows the layout of the
+//! packages of the original sources.
 
-pub use bearer::{
-    BearerTokenAuthenticationConverter, BearerTokenAuthenticationToken, BearerTokenRequestMatcher,
-    BearerTokenResolver, DefaultBearerTokenResolver,
-};
-pub use entry::{
-    AuthenticationEntryPointFailureHandler, BearerTokenAccessDeniedHandler,
-    BearerTokenAuthenticationEntryPoint, DPoPConfigurer, OAuth2ProtectedResourceMetadataFilter,
-    ProtectedResourceMetadataConfigurer,
-};
-pub use jwt::{
-    DefaultJwtAuthenticationConverter, Jwt, JwtAuthenticationConverter, JwtAuthenticationProvider,
-    JwtConfigurer, JwtDecoder, NimbusJwtDecoder,
-};
-pub use opaque::{
-    OAuth2AuthenticatedPrincipal, OAuth2ProtectedResourceMetadata,
-    OpaqueTokenAuthenticationConverter, OpaqueTokenAuthenticationProvider, OpaqueTokenConfigurer,
-    OpaqueTokenIntrospector, SpringOpaqueTokenIntrospector,
-};
+pub use crate::oauth2::server::resource::*;

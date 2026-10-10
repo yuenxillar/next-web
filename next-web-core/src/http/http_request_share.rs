@@ -1,13 +1,13 @@
 use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::http::header::ACCEPT_LANGUAGE;
-use axum::http::{HeaderMap, HeaderValue, Uri, header::CONTENT_TYPE, uri::Scheme};
+use axum::http::{header::CONTENT_TYPE, uri::Scheme, HeaderMap, HeaderValue, Uri};
 use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
 use next_web_context::Locale;
 
 use crate::{
     any::AnyValue,
-    http::{Cookie, HttpMethod, HttpVersion, session::HttpSession},
+    http::{session::HttpSession, Cookie, HttpMethod, HttpVersion},
     traits::http::{http_request::HttpRequest, request_dispatcher::RequestDispatcher},
 };
 

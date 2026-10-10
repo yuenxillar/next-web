@@ -25,7 +25,7 @@ use crate::{
     },
 };
 
-use uuid::Uuid;
+use next_web_core::Uuid;
 
 /// Configures Anonymous authentication (i.e. populate an `Authentication` that
 /// represents an anonymous user instead of having a null value) for an

@@ -47,6 +47,9 @@ pub const APPLICATION_ENVIRONMENT_SINGLETON_NAME: &str = "applicationEnvironment
 /// If none is supplied, the default arguments are used.
 pub const APPLICATION_ARGUMENTS_SINGLETON_NAME: &str = "applicationArguments";
 
+/// The name of the Filters singleton in the context.
+pub const SECURITY_FILTERS_SINGLETON_NAME: &str = "nextSecurityFilters";
+
 /// Signature of the function a context stores next to an instance so that owned
 /// copies of it can be produced later.
 ///

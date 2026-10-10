@@ -24,7 +24,7 @@ pub use application_context::{
     APPLICATION_ARGUMENTS_SINGLETON_NAME, APPLICATION_ENVIRONMENT_SINGLETON_NAME,
     APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME, APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME,
     ApplicationContext, InstanceClone, MESSAGE_SOURCE_SINGLETON_NAME,
-    RESOURCE_LOADER_SINGLETON_NAME,
+    RESOURCE_LOADER_SINGLETON_NAME, SECURITY_FILTERS_SINGLETON_NAME,
 };
 pub use application_context_async_ext::ApplicationContextAsyncExt;
 pub use application_context_ext::{ApplicationContextExt, DynSingleton};

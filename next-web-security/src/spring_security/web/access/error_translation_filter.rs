@@ -249,24 +249,35 @@ impl HttpFilter for ErrorTranslationFilter {
                         }
                         let any_err = err.as_ref() as &dyn Any;
                         if let Some(auth_err) = any_err.downcast_ref::<AuthenticationError>() {
-                            return self
-                                .handle_authentication_error(
-                                    request,
-                                    response,
-                                    filter_chain,
-                                    auth_err,
-                                )
-                                .map_err(Into::into);
+                            self.handle_authentication_error(
+                                request,
+                                response,
+                                filter_chain,
+                                auth_err,
+                            )
+                            .map_err(FilterError::from)?;
+                            // The error is handled, so the response the handler
+                            // produced is the response of the request. The
+                            // request must not continue to the routes, which is
+                            // what a handler that only sets the status and the
+                            // headers of the response would let it do.
+                            response.commit();
+
+                            return Ok(());
                         }
                         if let Some(auth_err) = any_err.downcast_ref::<AccessDeniedError>() {
-                            return self
-                                .handle_access_denied_error(
-                                    request,
-                                    response,
-                                    filter_chain,
-                                    auth_err,
-                                )
-                                .map_err(Into::into);
+                            self.handle_access_denied_error(
+                                request,
+                                response,
+                                filter_chain,
+                                auth_err,
+                            )
+                            .map_err(FilterError::from)?;
+                            // The error is handled, so the response the handler
+                            // produced is the response of the request.
+                            response.commit();
+
+                            return Ok(());
                         }
                     }
                 },

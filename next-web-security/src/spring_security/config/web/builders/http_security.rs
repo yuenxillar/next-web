@@ -15,12 +15,21 @@ use next_web_core::{
         http::{http_request::HttpRequest, http_response::HttpResponse},
         named::Named,
     },
-    ApplicationContext, Ordered,
+    ApplicationContext, BoxAny, Ordered,
 };
 
+use next_web_context::ApplicationEventPublisher;
+
 use crate::{
+    access::{
+        hierarchicalroles::{NullRoleHierarchy, RoleHierarchy},
+        intercept::RequestAuthorizationContext,
+    },
     authentication::AuthenticationProvider,
-    authorization::AuthenticationManager,
+    authorization::{
+        AuthenticationManager, AuthorizationEventPublisher, AuthorizationManagerFactory,
+        AuthorizationResult, DefaultAuthorizationManagerFactory, NextAuthorizationEventPublisher,
+    },
     config::{
         authentication::{
             builders::authentication_manager_builder::AuthenticationManagerBuilder,
@@ -29,27 +38,26 @@ use crate::{
         base_configured_security_builder::{
             BaseConfiguredSecurityBuilder, BaseConfiguredSecurityBuilderExt, BuildState,
         },
+        http::core::granted_authority_defaults::GrantedAuthorityDefaults,
         security_builder::SecurityBuilder,
         security_configurer::SecurityConfigurer,
         web::{
             base_request_matcher_registry::BaseRequestMatcherRegistry,
             builders::filter_order_registration::FilterOrderRegistration,
             configurers::{
-                oauth2::client::OidcLogoutConfigurer, AnonymousConfigurer,
-                AuthorizationManagerRequestMatcherRegistry, AuthorizeHttpRequestsConfigurer,
-                CorsConfigurer, CsrfConfigurer, ErrorHandlingConfigurer, FormLoginConfigurer,
-                HeadersConfigurer, HttpBasicConfigurer, HttpsRedirectConfigurer, LogoutConfigurer,
-                OAuth2AuthorizationServerConfigurer, OAuth2ClientConfigurer, OAuth2LoginConfigurer,
-                OAuth2ResourceServerConfigurer, OneTimeTokenLoginConfigurer,
-                PasswordManagementConfigurer, PortMapperConfigurer, RememberMeConfigurer,
-                RequestCacheConfigurer, Saml2LoginConfigurer, Saml2LogoutConfigurer,
-                Saml2MetadataConfigurer, SecurityContextConfigurer, SessionManagementConfigurer,
-                WebAuthnConfigurer, X509Configurer,
+                AnonymousConfigurer, AuthorizationManagerRequestMatcherRegistry,
+                AuthorizeHttpRequestsConfigurer, CorsConfigurer, CsrfConfigurer,
+                ErrorHandlingConfigurer, FormLoginConfigurer, HeadersConfigurer,
+                HttpBasicConfigurer, HttpsRedirectConfigurer, LogoutConfigurer,
+                OneTimeTokenLoginConfigurer, PasswordManagementConfigurer, PortMapperConfigurer,
+                RememberMeConfigurer, RequestCacheConfigurer, Saml2LoginConfigurer,
+                Saml2LogoutConfigurer, Saml2MetadataConfigurer, SecurityContextConfigurer,
+                SessionManagementConfigurer, WebAuthnConfigurer, X509Configurer,
             },
             http_security_builder::HttpSecurityBuilder,
         },
     },
-    core::userdetails::UserDetailsService,
+    core::{userdetails::UserDetailsService, Authentication},
     web::{
         default_security_filter_chain::DefaultSecurityFilterChain,
         util::matcher::{
@@ -57,6 +65,15 @@ use crate::{
         },
     },
 };
+
+#[cfg(all(feature = "oauth2-client", feature = "oauth2-resource-server"))]
+use crate::config::web::configurers::oauth2::client::OidcLogoutConfigurer;
+#[cfg(feature = "oauth2-authorization-server")]
+use crate::config::web::configurers::OAuth2AuthorizationServerConfigurer;
+#[cfg(feature = "oauth2-resource-server")]
+use crate::config::web::configurers::OAuth2ResourceServerConfigurer;
+#[cfg(feature = "oauth2-client")]
+use crate::config::web::configurers::{OAuth2ClientConfigurer, OAuth2LoginConfigurer};
 
 /// Configures the security settings for an HTTP request.
 pub struct HttpSecurity {
@@ -139,6 +156,84 @@ impl HttpSecurity {
             .push(OrderedFilter::new(Arc::new(filter), order));
         self.filter_orders.put::<F>(order);
     }
+
+    /// Returns the factory the authorization managers of the authorization
+    /// rules are created with.
+    ///
+    /// The factory of the application is used when it shared one, and a factory
+    /// built from the role hierarchy and the granted authority defaults of the
+    /// application is used otherwise.
+    fn authorization_manager_factory(
+        &self,
+    ) -> Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>> {
+        if let Some(factory) = self
+            .get_shared_object::<Arc<dyn AuthorizationManagerFactory<RequestAuthorizationContext>>>(
+            )
+        {
+            return factory.clone();
+        }
+
+        let role_hierarchy = self
+            .get_shared_object::<Arc<dyn RoleHierarchy>>()
+            .cloned()
+            .unwrap_or_else(|| Arc::new(NullRoleHierarchy::default()));
+
+        let role_prefix = self
+            .get_shared_object::<GrantedAuthorityDefaults>()
+            .map(|defaults| defaults.role_prefix().to_owned())
+            .unwrap_or_else(|| DEFAULT_ROLE_PREFIX.to_owned());
+
+        let mut factory = DefaultAuthorizationManagerFactory::default();
+        factory.set_role_hierarchy(role_hierarchy);
+        factory.set_role_prefix(role_prefix.as_str());
+
+        Arc::new(factory)
+    }
+
+    /// Returns the builder the request matchers of the authorization rules are
+    /// created with.
+    fn authorization_request_matcher_builder(&self) -> PathPatternRequestMatcherBuilder {
+        self.get_shared_object::<PathPatternRequestMatcherBuilder>()
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Returns the publisher the authorization events are published to.
+    ///
+    /// The publisher of the application is used when it shared one, a publisher
+    /// that publishes the events of an application event publisher is used next,
+    /// and a publisher that drops every event is the fallback.
+    fn authorization_event_publisher(&self) -> Arc<dyn AuthorizationEventPublisher> {
+        if let Some(publisher) = self.get_shared_object::<Arc<dyn AuthorizationEventPublisher>>() {
+            return publisher.clone();
+        }
+
+        if let Some(publisher) = self.get_shared_object::<Arc<dyn ApplicationEventPublisher>>() {
+            return Arc::new(NextAuthorizationEventPublisher::new(publisher.clone()));
+        }
+
+        Arc::new(NullAuthorizationEventPublisher)
+    }
+}
+
+/// The prefix of the role authority a role hierarchy adds by default.
+const DEFAULT_ROLE_PREFIX: &str = "ROLE_";
+
+/// An [`AuthorizationEventPublisher`] that drops every event.
+///
+/// The publisher is the fallback of an HTTP security the application did not
+/// contribute a publisher for, which keeps a configuration that does not use
+/// authorization events working.
+struct NullAuthorizationEventPublisher;
+
+impl AuthorizationEventPublisher for NullAuthorizationEventPublisher {
+    fn publish_authorization_event(
+        &self,
+        _authentication: Arc<dyn Authentication>,
+        _value: BoxAny,
+        _result: Option<Arc<dyn AuthorizationResult>>,
+    ) {
+    }
 }
 
 impl HttpSecurity {
@@ -198,7 +293,11 @@ impl HttpSecurity {
     where
         F: FnMut(&mut AuthorizationManagerRequestMatcherRegistry),
     {
-        let configurer = AuthorizeHttpRequestsConfigurer::<Self>::new(self.get_context());
+        let configurer = AuthorizeHttpRequestsConfigurer::<Self>::with_parts(
+            self.authorization_manager_factory(),
+            self.authorization_request_matcher_builder(),
+            self.authorization_event_publisher(),
+        );
         self.get_or_apply(configurer, |configurer| {
             authorize_http_requests(configurer.registry_mut());
         });
@@ -241,7 +340,7 @@ impl HttpSecurity {
     where
         F: FnMut(&mut CsrfConfigurer<Self>),
     {
-        let configurer = CsrfConfigurer::new(self.get_context());
+        let configurer = CsrfConfigurer::new();
         self.get_or_apply(configurer, csrf);
 
         self
@@ -307,6 +406,7 @@ impl HttpSecurity {
     }
 
     /// now
+    #[cfg(feature = "oauth2-client")]
     pub fn oauth2_login<F>(&mut self, oauth2_login: F) -> &mut Self
     where
         F: FnMut(&mut OAuth2LoginConfigurer<Self>),
@@ -316,6 +416,7 @@ impl HttpSecurity {
         self
     }
 
+    #[cfg(all(feature = "oauth2-client", feature = "oauth2-resource-server"))]
     pub fn oidc_logout<F>(&mut self, oidc_logout: F) -> &mut Self
     where
         F: FnMut(&mut OidcLogoutConfigurer<Self>),
@@ -325,6 +426,7 @@ impl HttpSecurity {
         self
     }
 
+    #[cfg(feature = "oauth2-client")]
     pub fn oauth2_client<F>(&mut self, oauth2_client: F) -> &mut Self
     where
         F: FnMut(&mut OAuth2ClientConfigurer<Self>),
@@ -334,16 +436,20 @@ impl HttpSecurity {
         self
     }
 
+    #[cfg(feature = "oauth2-resource-server")]
     pub fn oauth2_resource_server<F>(&mut self, oauth2_resource_server: F) -> &mut Self
     where
         F: FnMut(&mut OAuth2ResourceServerConfigurer<Self>),
     {
-        let configurer = OAuth2ResourceServerConfigurer::new(self.get_context());
-        self.get_or_apply(configurer, oauth2_resource_server);
+        self.get_or_apply(
+            OAuth2ResourceServerConfigurer::default(),
+            oauth2_resource_server,
+        );
 
         self
     }
 
+    #[cfg(feature = "oauth2-authorization-server")]
     pub fn oauth2_authorization_server<F>(&mut self, oauth2_authorization_server: F) -> &mut Self
     where
         F: FnMut(&mut OAuth2AuthorizationServerConfigurer<Self>),

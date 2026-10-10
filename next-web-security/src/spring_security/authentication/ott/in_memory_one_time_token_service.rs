@@ -4,7 +4,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
+use next_web_core::Uuid;
 
 use super::{
     default_one_time_token::DefaultOneTimeToken,
@@ -137,7 +137,7 @@ mod tests {
 
         let one_time_token = service.generate(GenerateOneTimeTokenRequest::new("user"));
 
-        assert!(uuid::Uuid::parse_str(one_time_token.token_value()).is_ok());
+        assert!(next_web_core::Uuid::parse_str(one_time_token.token_value()).is_ok());
         assert_eq!(one_time_token.username(), "user");
     }
 

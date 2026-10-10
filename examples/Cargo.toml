@@ -38,8 +38,22 @@ utoipa          = { workspace = true }
 
 tracing         = { workspace = true }
 
+[dev-dependencies]
+# The tests of the OAuth 2.0 examples build signed requests and authorization
+# requests the way a client of an authorization server does.
+base64          = { workspace = true }
+sha2            = { workspace = true }
+urlencoding     = { workspace = true }
+form_urlencoded = { workspace = true }
+
 [features]
 default = []
+# Enables the OAuth 2.0 support the `oauth2` example exercises.
+oauth2 = [
+    "next-web-security/oauth2-client",
+    "next-web-security/oauth2-resource-server",
+    "next-web-security/oauth2-authorization-server",
+]
 
 [[bin]]
 name = "ai"
@@ -48,6 +62,21 @@ path = "ai.rs"
 [[bin]]
 name = "open_api"
 path = "open_api.rs"
+
+[[bin]]
+name = "oauth2_client"
+path = "oauth2_client.rs"
+required-features = ["oauth2"]
+
+[[bin]]
+name = "oauth2_resource_server"
+path = "oauth2_resource_server.rs"
+required-features = ["oauth2"]
+
+[[bin]]
+name = "oauth2_authorization_server"
+path = "oauth2_authorization_server.rs"
+required-features = ["oauth2"]
 
 [[bin]]
 name = "application"

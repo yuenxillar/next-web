@@ -1,4 +1,4 @@
-//! Rust translation entry point for Spring Security `webauthn`.
+//! Rust translation entry point for Next Security `webauthn`.
 //!
 //! Baseline Java sources:
 //! `\webauthn`

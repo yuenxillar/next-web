@@ -131,13 +131,11 @@ impl RedirectStrategy for DefaultRedirectStrategy {
             debug!("Redirecting to {}", redirect_url.as_str());
         }
 
-        if self.status_code == StatusCode::FOUND {
-            response.set_redirect(&redirect_url);
-        } else {
-            response.insert_header(LOCATION.as_str(), redirect_url.as_str());
-            response.set_status_code(self.status_code);
-            response.commit();
-        }
+        // The status is set explicitly, because the response of the transport
+        // may redirect with a status of its own.
+        response.insert_header(LOCATION.as_str(), redirect_url.as_str());
+        response.set_status_code(self.status_code);
+        response.commit();
 
         Ok(())
     }

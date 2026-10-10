@@ -248,7 +248,7 @@ where
     fn remove_action_listener(&mut self, _listener: &dyn ActionListener<S, E>) {}
 }
 
-/// Base factory translating Spring's machine-building flow into the current Rust API.
+/// Base factory translating Next machine-building flow into the current Rust API.
 #[derive(Clone)]
 pub struct BaseStateMachineFactory<S, E> {
     default_state_machine_model: Arc<dyn StateMachineModel<S, E>>,

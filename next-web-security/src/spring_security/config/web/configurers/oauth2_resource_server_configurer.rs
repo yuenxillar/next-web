@@ -1,4 +1,9 @@
-use std::{fmt, ops::Deref, ops::DerefMut, sync::{Arc, RwLock}};
+use std::{
+    fmt,
+    ops::Deref,
+    ops::DerefMut,
+    sync::{Arc, RwLock},
+};
 
 use next_web_core::{traits::required::Required, ApplicationContext};
 
@@ -11,7 +16,7 @@ use crate::{
             HttpSecurityBuilder,
         },
     },
-    oauth2_resource_server::{
+    oauth2::server::resource::{
         bearer::{
             BearerTokenAuthenticationConverter, BearerTokenRequestMatcher, BearerTokenResolver,
             DefaultBearerTokenResolver,
@@ -22,15 +27,11 @@ use crate::{
         },
         jwt::JwtConfigurer,
         opaque::OpaqueTokenConfigurer,
+        web::BearerTokenAuthenticationFilter,
     },
     web::{
-        access::AccessDeniedHandler,
-        authentication::{
-            bearer_token_authentication_filter::BearerTokenAuthenticationFilter,
-            AuthenticationConverter,
-        },
-        default_security_filter_chain::DefaultSecurityFilterChain,
-        AuthenticationEntryPoint,
+        access::AccessDeniedHandler, authentication::AuthenticationConverter,
+        default_security_filter_chain::DefaultSecurityFilterChain, AuthenticationEntryPoint,
     },
 };
 
@@ -198,20 +199,6 @@ where
     H: crate::config::security_builder::SecurityBuilder<DefaultSecurityFilterChain>,
 {
     fn init(&mut self, http: &mut H) {
-        let authentication_manager =
-            match http.shared_object::<Arc<dyn crate::authorization::AuthenticationManager>>() {
-                Some(authentication_manager) => authentication_manager.clone(),
-                None => return,
-            };
-
-        let bearer_token_resolver: Arc<dyn BearerTokenResolver> = self
-            .bearer_token_resolver
-            .clone()
-            .unwrap_or_else(|| Arc::new(DefaultBearerTokenResolver::default()));
-        let authentication_converter: Arc<dyn AuthenticationConverter> =
-            self.authentication_converter.clone().unwrap_or_else(|| {
-                Arc::new(BearerTokenAuthenticationConverter::with_default_resolver())
-            });
         let authentication_entry_point: Arc<dyn AuthenticationEntryPoint> = self
             .authentication_entry_point
             .clone()
@@ -236,11 +223,6 @@ where
             SecurityConfigurer::init(protected_resource_metadata_configurer, http);
         }
 
-        let mut filter =
-            BearerTokenAuthenticationFilter::new(authentication_manager, bearer_token_resolver);
-        filter.set_authentication_entry_point(authentication_entry_point.clone());
-        filter.set_authentication_converter(authentication_converter);
-
         if let Some(error_handling) = http.configurer_mut::<ErrorHandlingConfigurer<H>>() {
             error_handling.authentication_entry_point(authentication_entry_point.clone());
             error_handling.access_denied_handler(access_denied_handler.clone());
@@ -249,11 +231,36 @@ where
                 Arc::new(BearerTokenRequestMatcher::default()),
             );
         }
-
-        http.add_filter(filter);
     }
 
     fn configure(&mut self, http: &mut H) {
+        // The filter authenticates with the `AuthenticationManager` of the
+        // builder, which is shared once the authentication providers of the
+        // application have been registered, so the filter is added while
+        // configuring instead of while initializing.
+        let authentication_manager = http
+            .shared_object::<Arc<dyn crate::authorization::AuthenticationManager>>()
+            .cloned()
+            .expect("AuthenticationManager is required for the OAuth2 resource server");
+        let bearer_token_resolver: Arc<dyn BearerTokenResolver> = self
+            .bearer_token_resolver
+            .clone()
+            .unwrap_or_else(|| Arc::new(DefaultBearerTokenResolver::default()));
+        let authentication_converter: Arc<dyn AuthenticationConverter> =
+            self.authentication_converter.clone().unwrap_or_else(|| {
+                Arc::new(BearerTokenAuthenticationConverter::with_default_resolver())
+            });
+        let authentication_entry_point: Arc<dyn AuthenticationEntryPoint> = self
+            .authentication_entry_point
+            .clone()
+            .unwrap_or_else(|| Arc::new(BearerTokenAuthenticationEntryPoint::default()));
+
+        let mut filter =
+            BearerTokenAuthenticationFilter::new(authentication_manager, bearer_token_resolver);
+        filter.set_authentication_entry_point(authentication_entry_point);
+        filter.set_authentication_converter(authentication_converter);
+        http.add_filter(filter);
+
         if let Some(jwt_configurer) = self.jwt_configurer.as_mut() {
             SecurityConfigurer::configure(jwt_configurer, http);
         }
@@ -306,6 +313,3 @@ where
             .finish()
     }
 }
-
-
-
