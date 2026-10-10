@@ -40,7 +40,7 @@ pub(crate) fn json_response(response: &mut dyn HttpResponse, status: StatusCode,
 /// * `response` - The response of the endpoint.
 /// * `error` - The error of the endpoint.
 pub(crate) fn error_response(response: &mut dyn HttpResponse, error: &OAuth2Error) {
-    let status = if error.error() == "invalid_client" {
+    let status = if error.error() == "invalid_client" || error.error() == "invalid_token" {
         response.insert_header("WWW-Authenticate", &error.www_authenticate());
         StatusCode::UNAUTHORIZED
     } else {
@@ -124,7 +124,7 @@ pub(crate) fn verify_proof_key(
             use sha2::{Digest, Sha256};
 
             let digest = Sha256::digest(code_verifier.as_bytes());
-            super::super::jose::base64_url(&digest) == code_challenge
+            crate::oauth2::jose::base64_url(&digest) == code_challenge
         }
         _ => code_challenge == code_verifier,
     }

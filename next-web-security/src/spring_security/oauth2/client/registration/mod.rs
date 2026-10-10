@@ -2,15 +2,48 @@
 
 use crate::oauth2::AuthorizationGrantType;
 
+/// The way a client authenticates at the token endpoint of a provider.
+///
+/// The methods are those of the specification. A public client does not
+/// authenticate at all, which is why it has to use a proof key for the
+/// authorization code grant.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum ClientAuthenticationMethod {
+    /// The client sends its credentials with the `Authorization` header.
+    ClientSecretBasic,
+    /// The client sends its credentials as form parameters.
+    ClientSecretPost,
+    /// The client does not authenticate.
+    None,
+}
+
+impl ClientAuthenticationMethod {
+    /// Returns the value of the method in the specifications.
+    pub fn value(&self) -> &'static str {
+        match self {
+            Self::ClientSecretBasic => "client_secret_basic",
+            Self::ClientSecretPost => "client_secret_post",
+            Self::None => "none",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClientRegistration {
     registration_id: String,
     client_name: String,
     client_id: String,
+    client_secret: Option<String>,
     authorization_uri: String,
+    token_uri: Option<String>,
+    user_info_uri: Option<String>,
+    issuer_uri: Option<String>,
+    jwk_set_uri: Option<String>,
     redirect_uri: Option<String>,
     scopes: Vec<String>,
     authorization_grant_type: AuthorizationGrantType,
+    client_authentication_method: ClientAuthenticationMethod,
+    require_proof_key: bool,
 }
 
 impl ClientRegistration {
@@ -38,16 +71,139 @@ impl ClientRegistration {
             registration_id,
             client_name,
             client_id: String::new(),
+            client_secret: None,
             authorization_uri,
+            token_uri: None,
+            user_info_uri: None,
+            issuer_uri: None,
+            jwk_set_uri: None,
             redirect_uri: None,
             scopes: Vec::new(),
             authorization_grant_type: AuthorizationGrantType::AuthorizationCode,
+            client_authentication_method: ClientAuthenticationMethod::ClientSecretBasic,
+            require_proof_key: false,
         }
     }
 
     pub fn set_client_id(mut self, client_id: impl Into<String>) -> Self {
         self.client_id = client_id.into();
         self
+    }
+
+    /// Sets the secret of the client.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_secret` - The secret of the client.
+    pub fn set_client_secret(mut self, client_secret: impl Into<String>) -> Self {
+        self.client_secret = Some(client_secret.into());
+        self
+    }
+
+    /// Sets the URI of the token endpoint of the provider.
+    ///
+    /// # Arguments
+    ///
+    /// * `token_uri` - The URI of the token endpoint.
+    pub fn set_token_uri(mut self, token_uri: impl Into<String>) -> Self {
+        self.token_uri = Some(token_uri.into());
+        self
+    }
+
+    /// Sets the URI of the user info endpoint of the provider.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_info_uri` - The URI of the user info endpoint.
+    pub fn set_user_info_uri(mut self, user_info_uri: impl Into<String>) -> Self {
+        self.user_info_uri = Some(user_info_uri.into());
+        self
+    }
+
+    /// Sets the issuer of the provider.
+    ///
+    /// The issuer is the value the `iss` claim of an identifier token has to
+    /// name.
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer_uri` - The identifier of the provider.
+    pub fn set_issuer_uri(mut self, issuer_uri: impl Into<String>) -> Self {
+        self.issuer_uri = Some(issuer_uri.into());
+        self
+    }
+
+    /// Sets the URI of the JWK set of the provider.
+    ///
+    /// The keys of the set verify the signature of an identifier token. A
+    /// client that does not name the set cannot verify the tokens of the
+    /// provider, so it refuses them.
+    ///
+    /// # Arguments
+    ///
+    /// * `jwk_set_uri` - The URI of the JWK set of the provider.
+    pub fn set_jwk_set_uri(mut self, jwk_set_uri: impl Into<String>) -> Self {
+        self.jwk_set_uri = Some(jwk_set_uri.into());
+        self
+    }
+
+    /// Sets the way the client authenticates at the token endpoint.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_authentication_method` - The method of the client.
+    pub fn set_client_authentication_method(
+        mut self,
+        client_authentication_method: ClientAuthenticationMethod,
+    ) -> Self {
+        self.client_authentication_method = client_authentication_method;
+        self
+    }
+
+    /// Sets whether the client uses a proof key for the authorization code
+    /// grant.
+    ///
+    /// # Arguments
+    ///
+    /// * `require_proof_key` - Whether a proof key is used.
+    pub fn set_require_proof_key(mut self, require_proof_key: bool) -> Self {
+        self.require_proof_key = require_proof_key;
+        self
+    }
+
+    /// Returns the secret of the client, if one is set.
+    pub fn client_secret(&self) -> Option<&str> {
+        self.client_secret.as_deref()
+    }
+
+    /// Returns the URI of the token endpoint of the provider, if one is set.
+    pub fn token_uri(&self) -> Option<&str> {
+        self.token_uri.as_deref()
+    }
+
+    /// Returns the URI of the user info endpoint of the provider, if one is set.
+    pub fn user_info_uri(&self) -> Option<&str> {
+        self.user_info_uri.as_deref()
+    }
+
+    /// Returns the issuer of the provider, if one is set.
+    pub fn issuer_uri(&self) -> Option<&str> {
+        self.issuer_uri.as_deref()
+    }
+
+    /// Returns the URI of the JWK set of the provider, if one is set.
+    pub fn jwk_set_uri(&self) -> Option<&str> {
+        self.jwk_set_uri.as_deref()
+    }
+
+    /// Returns the way the client authenticates at the token endpoint.
+    pub fn client_authentication_method(&self) -> ClientAuthenticationMethod {
+        self.client_authentication_method
+    }
+
+    /// Returns whether the client uses a proof key.
+    pub fn require_proof_key(&self) -> bool {
+        self.require_proof_key
     }
 
     pub fn set_redirect_uri(mut self, redirect_uri: impl Into<String>) -> Self {

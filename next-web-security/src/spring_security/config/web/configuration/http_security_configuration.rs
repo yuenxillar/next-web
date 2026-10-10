@@ -18,15 +18,25 @@ use next_web_macros::singleton;
 
 use crate::{
     access::{hierarchicalroles::RoleHierarchy, intercept::RequestAuthorizationContext},
-    authentication::{AuthenticationEventPublisher, DefaultAuthenticationEventPublisher},
+    authentication::{
+        dao::DaoAuthenticationProvider, AuthenticationEventPublisher,
+        DefaultAuthenticationEventPublisher,
+    },
     authorization::{AuthorizationEventPublisher, AuthorizationManagerFactory},
     config::{
-        authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
+        authentication::{
+            builders::authentication_manager_builder::AuthenticationManagerBuilder,
+            provider_manager_builder::ProviderManagerBuilder,
+        },
         http::core::granted_authority_defaults::GrantedAuthorityDefaults,
         web::{
-            builders::HttpSecurity, configurers::DefaultLoginPageConfigurer, WebSecurityConfigurer,
+            builders::HttpSecurity,
+            configurers::{DefaultLoginPageConfigurer, PreAuthorizeConfigurer},
+            http_security_builder::HttpSecurityBuilder,
+            WebSecurityConfigurer,
         },
     },
+    core::userdetails::UserDetailsService,
     crypto::{bcrypt::BCryptPasswordEncoder, password::PasswordEncoder},
     web::util::matcher::PathPatternRequestMatcherBuilder,
 };
@@ -108,8 +118,12 @@ impl HttpSecurityConfiguration {
             .session_management(|_| {})
             .security_context(|_| {})
             .request_cache(|_| {})
-            .anonymous(|_| {})
-            .with(DefaultLoginPageConfigurer::default(), |_| {});
+            .anonymous(|_| {});
+        http.with(DefaultLoginPageConfigurer::default(), |_| {});
+        // The rules a handler is guarded with read the authorities of the
+        // request, so the authorities of the authentication the chain
+        // established are written into the request by this configurer.
+        http.with(PreAuthorizeConfigurer::default(), |_| {});
         http.logout(|_| {});
 
         apply_cors_if_available(ctx, &mut http);
@@ -120,8 +134,53 @@ impl HttpSecurityConfiguration {
             configurer.configure(&mut http);
         }
 
+        // The users of the application are authenticated with a provider built
+        // from the user details service of the application, unless the
+        // application configured an authentication provider or a parent
+        // authentication manager of its own.
+        apply_default_authentication_provider(ctx, &mut http);
+
         http
     }
+}
+
+/// Registers the authentication provider that authenticates a user of the
+/// application.
+///
+/// The provider is built from the user details service of the application and
+/// the password encoder the HTTP security shares, and it is registered only
+/// when the application did not configure an authentication provider of its
+/// own.
+///
+/// # Arguments
+///
+/// * `ctx` - The context the user details service is resolved from.
+/// * `http` - The HTTP security the provider is registered with.
+fn apply_default_authentication_provider(
+    ctx: &mut dyn ApplicationContext,
+    http: &mut HttpSecurity,
+) {
+    let Some(user_details_service) = ctx
+        .resolve_by_type::<Arc<dyn UserDetailsService>>()
+        .into_iter()
+        .next()
+    else {
+        return;
+    };
+
+    let password_encoder = http.shared_object::<Arc<dyn PasswordEncoder>>().cloned();
+    let Some(builder) = http.shared_object_mut::<AuthenticationManagerBuilder>() else {
+        return;
+    };
+    if builder.is_configured() {
+        return;
+    }
+
+    let mut provider = DaoAuthenticationProvider::new(user_details_service);
+    if let Some(password_encoder) = password_encoder {
+        provider.set_password_encoder(password_encoder);
+    }
+    builder.authentication_provider(Arc::new(provider));
 }
 
 #[async_trait]
@@ -245,6 +304,18 @@ fn create_shared_objects(ctx: &mut dyn ApplicationContext) -> HashMap<TypeId, Bo
         );
     }
 
+    // The user details service of the application is shared, because a
+    // configurer that authenticates a user (such as the one-time token login)
+    // loads the user with it.
+    if let Some(user_details_service) =
+        ctx.resolve_option::<Arc<dyn crate::core::userdetails::UserDetailsService>>()
+    {
+        shared_objects.insert(
+            TypeId::of::<Arc<dyn crate::core::userdetails::UserDetailsService>>(),
+            Box::new(user_details_service),
+        );
+    }
+
     if let Some(role_hierarchy) = ctx.resolve_option::<Arc<dyn RoleHierarchy>>() {
         shared_objects.insert(
             TypeId::of::<Arc<dyn RoleHierarchy>>(),
@@ -262,8 +333,8 @@ fn create_shared_objects(ctx: &mut dyn ApplicationContext) -> HashMap<TypeId, Bo
     #[cfg(feature = "oauth2-authorization-server")]
     {
         use crate::oauth2::server::authorization::{
-            AuthorizationServerSettings, JwkSource, OAuth2AuthorizationService,
-            OAuth2TokenGenerator, RegisteredClientRepository,
+            AuthorizationServerSettings, JwtSigner, OAuth2AuthorizationConsentService,
+            OAuth2AuthorizationService, OAuth2TokenGenerator, RegisteredClientRepository,
         };
 
         if let Some(settings) = ctx.resolve_option::<AuthorizationServerSettings>() {
@@ -286,14 +357,22 @@ fn create_shared_objects(ctx: &mut dyn ApplicationContext) -> HashMap<TypeId, Bo
                 Box::new(authorizations),
             );
         }
+        if let Some(authorization_consents) =
+            ctx.resolve_option::<Arc<dyn OAuth2AuthorizationConsentService>>()
+        {
+            shared_objects.insert(
+                TypeId::of::<Arc<dyn OAuth2AuthorizationConsentService>>(),
+                Box::new(authorization_consents),
+            );
+        }
         if let Some(token_generator) = ctx.resolve_option::<Arc<dyn OAuth2TokenGenerator>>() {
             shared_objects.insert(
                 TypeId::of::<Arc<dyn OAuth2TokenGenerator>>(),
                 Box::new(token_generator),
             );
         }
-        if let Some(jwk_source) = ctx.resolve_option::<Arc<dyn JwkSource>>() {
-            shared_objects.insert(TypeId::of::<Arc<dyn JwkSource>>(), Box::new(jwk_source));
+        if let Some(jwt_signer) = ctx.resolve_option::<Arc<dyn JwtSigner>>() {
+            shared_objects.insert(TypeId::of::<Arc<dyn JwtSigner>>(), Box::new(jwt_signer));
         }
     }
 
@@ -344,12 +423,66 @@ impl PasswordEncoder for LazyPasswordEncoder {
 
 #[cfg(test)]
 mod tests {
-    use super::HTTP_SECURITY_SINGLETON_NAME;
+    use std::{collections::HashMap, sync::Arc};
+
+    use next_web_context::ApplicationContextExt;
+
+    use super::{apply_default_authentication_provider, HTTP_SECURITY_SINGLETON_NAME};
+    use crate::{
+        config::{
+            authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
+            web::{
+                builders::{HttpSecurity, StandaloneApplicationContext},
+                http_security_builder::HttpSecurityBuilder,
+            },
+        },
+        core::userdetails::{User, UserDetailsService},
+        provisioning::InMemoryUserDetailsManager,
+    };
+
+    /// Returns the user details service of a test.
+    fn user_details_service() -> Arc<dyn UserDetailsService> {
+        Arc::new(InMemoryUserDetailsManager::with_users(vec![Arc::new(
+            User::with_username("user")
+                .password(Some("password".to_string()))
+                .build(),
+        )]))
+    }
 
     #[test]
     fn names_the_http_security_after_the_type() {
         // The name is the one the framework derives from the type, which is
         // what `contains_singleton_with_default_name` looks up.
         assert_eq!(HTTP_SECURITY_SINGLETON_NAME, "httpSecurity");
+    }
+
+    #[test]
+    fn the_users_of_the_application_are_authenticated_with_its_user_details_service() {
+        let mut context = StandaloneApplicationContext::default();
+        context.insert_singleton_with_name(user_details_service(), "userDetailsService");
+        let mut http = HttpSecurity::new(AuthenticationManagerBuilder::default(), HashMap::new());
+
+        apply_default_authentication_provider(&mut context, &mut http);
+
+        let builder = http
+            .shared_object::<AuthenticationManagerBuilder>()
+            .expect("the builder is shared");
+        assert!(
+            builder.is_configured(),
+            "the provider of the user details service is registered"
+        );
+    }
+
+    #[test]
+    fn an_application_without_a_user_details_service_is_left_alone() {
+        let mut context = StandaloneApplicationContext::default();
+        let mut http = HttpSecurity::new(AuthenticationManagerBuilder::default(), HashMap::new());
+
+        apply_default_authentication_provider(&mut context, &mut http);
+
+        let builder = http
+            .shared_object::<AuthenticationManagerBuilder>()
+            .expect("the builder is shared");
+        assert!(!builder.is_configured());
     }
 }

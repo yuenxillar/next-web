@@ -117,12 +117,23 @@ impl HttpSecurity {
     ///
     /// The context is shared as `Arc<RwLock<Box<dyn ApplicationContext>>>`, so
     /// that a configurer can keep a handle on it while the application keeps
-    /// owning the context itself.
+    /// owning the context itself. A builder that was not given one uses an
+    /// empty context, so a feature that only may take a value from the context
+    /// falls back to its own default instead of failing.
     fn get_context(&mut self) -> Arc<RwLock<Box<dyn ApplicationContext>>> {
         self.base
             .get_shared_object::<Arc<RwLock<Box<dyn ApplicationContext>>>>()
-            .expect("ApplicationContext must be registered as a HttpSecurity shared object")
-            .clone()
+            .cloned()
+            .unwrap_or_else(|| {
+                tracing::debug!(
+                    "No application context was shared with the security builder, so an empty \
+                     context is used"
+                );
+                Arc::new(RwLock::new(
+                    Box::new(super::StandaloneApplicationContext::default())
+                        as Box<dyn ApplicationContext>,
+                ))
+            })
     }
 
     /// If a configurer of type `C` is already registered, clone and return it.
@@ -466,7 +477,18 @@ impl HttpSecurity {
     where
         F: FnMut(&mut OneTimeTokenLoginConfigurer<Self>),
     {
-        let configurer = OneTimeTokenLoginConfigurer::new(self.get_context());
+        let mut configurer = OneTimeTokenLoginConfigurer::new(self.get_context());
+        // The user details service of the application is shared by the HTTP
+        // security, because the one-time token authentication loads the user of
+        // a token with it. The value of the DSL takes precedence over it.
+        if configurer.get_user_details_service().is_none() {
+            if let Some(user_details_service) = self
+                .shared_object::<Arc<dyn crate::core::userdetails::UserDetailsService>>()
+                .cloned()
+            {
+                configurer.user_details_service(user_details_service);
+            }
+        }
         self.get_or_apply(configurer, one_time_token_login);
 
         self

@@ -13,6 +13,16 @@ pub mod core;
 ))]
 pub mod server;
 
+// The keys of an authorization server are shared by the server that signs the
+// tokens and the resource server that verifies them, and the client uses the
+// encodings of the module for the proof key of the authorization code grant.
+#[cfg(any(
+    feature = "oauth2-resource-server",
+    feature = "oauth2-authorization-server",
+    feature = "oauth2-client"
+))]
+pub mod jose;
+
 use next_web_core::traits::http::http_request::HttpRequest;
 
 #[cfg(feature = "oauth2-client")]
@@ -35,7 +45,9 @@ pub use client::{
     OAuth2LoginAuthenticationProvider, OAuth2LoginAuthenticationToken,
     OAuth2LoginAuthenticationTokenBuilder, OAuth2UserRequest, OAuth2UserService,
     OidcAuthenticationRequestChecker, OidcUser, OidcUserRequest, OidcUserService,
-    RestClientAuthorizationCodeTokenResponseClient, REQUEST_SCOPE_ATTRIBUTE_NAME,
+    DefaultOidcIdTokenValidator, OidcIdToken, OidcIdTokenValidator,
+    OidcLoginAuthenticationProvider, RestClientAuthorizationCodeTokenResponseClient,
+    OidcUserAuthority, REQUEST_SCOPE_ATTRIBUTE_NAME,
 };
 pub use core::{
     endpoint::{
@@ -163,5 +175,42 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(authorization_request.registration_id(), "registration-id");
+    }
+
+    #[test]
+    fn an_openid_authorization_request_carries_a_nonce() {
+        let resolver = DefaultOAuth2AuthorizationRequestResolver::new(
+            Arc::new(InMemoryClientRegistrationRepository::new([
+                client_registration("registration-id", AuthorizationGrantType::AuthorizationCode)
+                    .set_scopes(["openid", "read"]),
+            ])),
+            "/oauth2/authorization",
+        );
+        let request = get_request("/oauth2/authorization/registration-id");
+
+        let authorization_request = resolver.resolve(&request).unwrap().unwrap();
+
+        let nonce = authorization_request
+            .nonce()
+            .expect("an OpenID Connect request carries a nonce");
+        assert!(
+            authorization_request
+                .authorization_request_uri()
+                .contains(&format!("nonce={nonce}")),
+            "the authorization endpoint is asked with the nonce"
+        );
+    }
+
+    #[test]
+    fn an_authorization_request_without_openid_carries_no_nonce() {
+        let resolver = resolver();
+        let request = get_request("/oauth2/authorization/registration-id");
+
+        let authorization_request = resolver.resolve(&request).unwrap().unwrap();
+
+        assert_eq!(authorization_request.nonce(), None);
+        assert!(!authorization_request
+            .authorization_request_uri()
+            .contains("nonce="));
     }
 }

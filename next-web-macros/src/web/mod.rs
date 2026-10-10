@@ -7,6 +7,7 @@ pub mod auto_configuration;
 pub mod configuration_properties;
 pub mod event;
 pub mod idempotency;
+pub mod order;
 pub mod pre_authorize;
 pub mod routing;
 pub mod scheduled;

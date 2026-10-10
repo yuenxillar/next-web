@@ -175,20 +175,26 @@ impl SessionRegistry for SessionRegistryImpl {
         self.session_ids.write().await.remove(session_id);
 
         let principal_key = info.principal().to_string();
-        if let Some(sessions_used_by_principal) =
-            self.principals.write().await.get_mut(&principal_key)
-        {
-            debug!(
-                "Removing session {} from principal's set of registered sessions",
-                session_id
-            );
-            sessions_used_by_principal.remove(session_id);
-            if sessions_used_by_principal.is_empty() {
-                if enabled!(Level::DEBUG) {
-                    debug!("Removing principal {} from registry", principal_key);
-                }
-                sessions_used_by_principal.remove(&principal_key);
+        let mut principals = self.principals.write().await;
+        let remove_principal = match principals.get_mut(&principal_key) {
+            Some(sessions_used_by_principal) => {
+                debug!(
+                    "Removing session {} from principal's set of registered sessions",
+                    session_id
+                );
+                sessions_used_by_principal.remove(session_id);
+                sessions_used_by_principal.is_empty()
             }
+            None => false,
+        };
+        // The principal is removed from the registry when the session was the
+        // last one the principal had, so that the registry does not keep an
+        // entry without a session.
+        if remove_principal {
+            if enabled!(Level::DEBUG) {
+                debug!("Removing principal {} from registry", principal_key);
+            }
+            principals.remove(&principal_key);
         }
     }
 }

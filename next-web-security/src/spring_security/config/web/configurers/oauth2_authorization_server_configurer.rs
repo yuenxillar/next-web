@@ -22,9 +22,12 @@ use crate::{
         AuthorizationEndpointFilter, AuthorizationServerContext,
         AuthorizationServerMetadataEndpointFilter, AuthorizationServerSettings,
         InMemoryOAuth2AuthorizationService, InMemoryRegisteredClientRepository,
-        JwkSetEndpointFilter, JwkSource, OAuth2AuthorizationService, OAuth2TokenGenerator,
+        JwkSetEndpointFilter, JwtSigner, LogoutEndpointFilter, OAuth2AuthorizationConsentService,
+        OAuth2AuthorizationService, OAuth2ClientRegistrationEndpointFilter,
+        OAuth2DeviceAuthorizationEndpointFilter, OAuth2DeviceVerificationEndpointFilter,
+        OAuth2PushedAuthorizationRequestEndpointFilter, OAuth2TokenGenerator,
         RegisteredClientRepository, TokenEndpointFilter, TokenIntrospectionEndpointFilter,
-        TokenRevocationEndpointFilter,
+        TokenRevocationEndpointFilter, UserInfoEndpointFilter,
     },
     web::{
         default_security_filter_chain::DefaultSecurityFilterChain,
@@ -87,9 +90,11 @@ where
     settings: Option<AuthorizationServerSettings>,
     registered_clients: Option<Arc<dyn RegisteredClientRepository>>,
     authorizations: Option<Arc<dyn OAuth2AuthorizationService>>,
+    authorization_consents: Option<Arc<dyn OAuth2AuthorizationConsentService>>,
     token_generator: Option<Arc<dyn OAuth2TokenGenerator>>,
-    jwk_source: Option<Arc<dyn JwkSource>>,
+    jwt_signer: Option<Arc<dyn JwtSigner>>,
     password_encoder: Option<Arc<dyn PasswordEncoder>>,
+    consent_page: Option<String>,
     authorization_code_time_to_live: Option<u64>,
 
     base: BaseHttpConfigurer<OAuth2AuthorizationServerConfigurer<H>, H>,
@@ -139,6 +144,36 @@ where
         self
     }
 
+    /// Sets the service that stores the consents of the resource owners.
+    ///
+    /// # Arguments
+    ///
+    /// * `authorization_consents` - The service that stores the consents.
+    pub fn authorization_consent_service(
+        &mut self,
+        authorization_consents: Arc<dyn OAuth2AuthorizationConsentService>,
+    ) -> &mut Self {
+        self.authorization_consents = Some(authorization_consents);
+        self
+    }
+
+    /// Sets the page the resource owner is asked for consent on.
+    ///
+    /// The application serves the page. Consent is asked only when the page is
+    /// configured, and only for the clients that require it.
+    ///
+    /// # Arguments
+    ///
+    /// * `consent_page` - The path of the page of the application.
+    pub fn consent_page(&mut self, consent_page: &str) -> &mut Self {
+        assert!(
+            !consent_page.trim().is_empty(),
+            "consent_page cannot be empty"
+        );
+        self.consent_page = Some(consent_page.to_string());
+        self
+    }
+
     /// Sets the generator of the tokens of the server.
     ///
     /// # Arguments
@@ -149,13 +184,14 @@ where
         self
     }
 
-    /// Sets the keys the tokens of the server are signed with.
+    /// Sets the signer the tokens of the server are signed with.
     ///
     /// # Arguments
     ///
-    /// * `jwk_source` - The keys of the server.
-    pub fn jwk_source(&mut self, jwk_source: Arc<dyn JwkSource>) -> &mut Self {
-        self.jwk_source = Some(jwk_source);
+    /// * `jwt_signer` - The signer of the server. Its public keys are published
+    ///   by the JWK set endpoint.
+    pub fn jwt_signer(&mut self, jwt_signer: Arc<dyn JwtSigner>) -> &mut Self {
+        self.jwt_signer = Some(jwt_signer);
         self
     }
 
@@ -231,10 +267,14 @@ where
             http.shared_object::<Arc<dyn OAuth2TokenGenerator>>()
                 .cloned()
         });
-        let jwk_source = self
-            .jwk_source
+        let jwt_signer = self
+            .jwt_signer
             .clone()
-            .or_else(|| http.shared_object::<Arc<dyn JwkSource>>().cloned());
+            .or_else(|| http.shared_object::<Arc<dyn JwtSigner>>().cloned());
+        let authorization_consents = self.authorization_consents.clone().or_else(|| {
+            http.shared_object::<Arc<dyn OAuth2AuthorizationConsentService>>()
+                .cloned()
+        });
         let password_encoder = self
             .password_encoder
             .clone()
@@ -247,8 +287,14 @@ where
         if let Some(token_generator) = token_generator {
             builder = builder.token_generator(token_generator);
         }
-        if let Some(jwk_source) = jwk_source {
-            builder = builder.jwk_source(jwk_source);
+        if let Some(jwt_signer) = jwt_signer {
+            builder = builder.jwt_signer(jwt_signer);
+        }
+        if let Some(authorization_consents) = authorization_consents {
+            builder = builder.authorization_consents(authorization_consents);
+        }
+        if let Some(consent_page) = self.consent_page.as_ref() {
+            builder = builder.consent_page(consent_page);
         }
         if let Some(password_encoder) = password_encoder {
             builder = builder.password_encoder(password_encoder);
@@ -263,22 +309,35 @@ where
     /// Renews the CSRF protection of the endpoints of the server.
     ///
     /// A client of the token, introspection, and revocation endpoints
-    /// authenticates with its own credentials, so those endpoints are not
-    /// protected by a CSRF token.
+    /// authenticates with its own credentials, and the consent of the resource
+    /// owner and the answer to a device authorization are submitted to the
+    /// endpoints of the server, so the endpoints are not protected by a CSRF
+    /// token. An application that serves the consent page or the page of a
+    /// device authorization itself protects those pages with its own rules.
     ///
     /// # Arguments
     ///
     /// * `http` - The HTTP security the configurer is applied to.
     /// * `context` - The context of the authorization server.
     fn ignore_csrf_protection(&self, http: &mut H, context: &AuthorizationServerContext) {
+        let settings = context.settings();
         let matchers = [
-            context.settings().token_endpoint(),
-            context.settings().introspection_endpoint(),
-            context.settings().revocation_endpoint(),
+            settings.token_endpoint(),
+            settings.introspection_endpoint(),
+            settings.revocation_endpoint(),
+            settings.authorization_endpoint(),
+            settings.pushed_authorization_request_endpoint(),
+            settings.device_authorization_endpoint(),
+            settings.device_verification_endpoint(),
+            settings.client_registration_endpoint(),
         ]
         .into_iter()
+        .map(ToString::to_string)
+        // The registration endpoint manages a registered client under its path,
+        // so the whole subtree of the endpoint is exempt.
+        .chain([format!("{}/**", settings.client_registration_endpoint())])
         .map(|path| {
-            Arc::new(PathPatternRequestMatcherBuilder::default().matcher(None, path))
+            Arc::new(PathPatternRequestMatcherBuilder::default().matcher(None, &path))
                 as Arc<dyn RequestMatcher>
         })
         .collect::<Vec<_>>();
@@ -298,9 +357,11 @@ where
             settings: None,
             registered_clients: None,
             authorizations: None,
+            authorization_consents: None,
             token_generator: None,
-            jwk_source: None,
+            jwt_signer: None,
             password_encoder: None,
+            consent_page: None,
             authorization_code_time_to_live: None,
 
             base: Default::default(),
@@ -353,13 +414,21 @@ where
         http.add_filter(AuthorizationServerMetadataEndpointFilter::new(
             context.clone(),
         ));
-        if context.jwk_source().is_some() {
-            http.add_filter(JwkSetEndpointFilter::new(context.clone()));
-        }
+        http.add_filter(OAuth2ClientRegistrationEndpointFilter::new(context.clone()));
+        http.add_filter(JwkSetEndpointFilter::new(context.clone()));
         http.add_filter(TokenIntrospectionEndpointFilter::new(context.clone()));
         http.add_filter(TokenRevocationEndpointFilter::new(context.clone()));
+        http.add_filter(OAuth2PushedAuthorizationRequestEndpointFilter::new(
+            context.clone(),
+        ));
+        http.add_filter(OAuth2DeviceAuthorizationEndpointFilter::new(
+            context.clone(),
+        ));
+        http.add_filter(UserInfoEndpointFilter::new(context.clone()));
+        http.add_filter(OAuth2DeviceVerificationEndpointFilter::new(context.clone()));
         http.add_filter(AuthorizationEndpointFilter::new(context.clone()));
         http.add_filter(TokenEndpointFilter::new(context.clone()));
+        http.add_filter(LogoutEndpointFilter::new(context.clone()));
     }
 
     fn configure(&mut self, _http: &mut H) {}

@@ -8,6 +8,7 @@ pub mod extract;
 pub mod macros;
 pub mod manager;
 pub mod resources;
+pub mod security;
 pub mod scheduling;
 pub mod support;
 pub mod util;

@@ -246,14 +246,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Mapper is not properly configured")]
-    fn test_mapper_with_both_case_conversions_panics() {
+    fn a_mapper_with_both_case_conversions_is_not_properly_configured() {
         let mut mapper = SimpleAttributes2GrantedAuthoritiesMapper::default();
         mapper.set_convert_attribute_to_upper_case(true);
         mapper.set_convert_attribute_to_lower_case(true);
 
-        // This should panic because both flags are true
-        let _authorities = mapper.get_granted_authorities(&["ADMIN".to_string()]);
+        // Both conversions cannot be applied at once, so the configuration is
+        // refused when the properties are checked instead of failing while an
+        // attribute is mapped.
+        assert!(mapper.after_properties_set().is_err());
     }
 
     #[test]

@@ -26,6 +26,12 @@ impl SecurityContextHolderFilter {
     const FILTER_APPLIED: &str = "SecurityContextHolderFilter.APPLIED";
 
     pub fn new(security_context_repository: Arc<dyn SecurityContextRepository>) -> Self {
+        // The security context of a request is where the rules a handler is
+        // guarded with read the authorities of the request from. The filter
+        // chain is built while the application starts, so this is the step the
+        // source of the authorities is installed in.
+        crate::web::access::prepost::install_pre_authorize_authorities();
+
         Self {
             security_context_repository,
             security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),

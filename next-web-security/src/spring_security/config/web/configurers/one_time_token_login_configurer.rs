@@ -33,7 +33,8 @@ use crate::{
     web::{
         authentication::{
             ott::{
-                DefaultGenerateOneTimeTokenRequestResolver, GenerateOneTimeTokenFilter,
+                DefaultGenerateOneTimeTokenRequestResolver,
+                DefaultOneTimeTokenGenerationSuccessHandler, GenerateOneTimeTokenFilter,
                 GenerateOneTimeTokenRequestResolver, OneTimeTokenAuthenticationFilter,
                 OneTimeTokenGenerationSuccessHandler,
             },
@@ -150,6 +151,30 @@ where
         self
     }
 
+    /// Sets the user details service the one-time token authentication uses to
+    /// load the user of a token.
+    ///
+    /// A value set here takes precedence over the one resolved from the
+    /// application context or the shared objects of the HTTP security.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_details_service` - The service that loads the user of a token.
+    pub fn user_details_service(
+        &mut self,
+        user_details_service: Arc<dyn crate::core::userdetails::UserDetailsService>,
+    ) -> &mut Self {
+        self.user_details_service = Some(user_details_service);
+        self
+    }
+
+    /// Returns the user details service of the configurer, if one is set.
+    pub fn get_user_details_service(
+        &self,
+    ) -> Option<&Arc<dyn crate::core::userdetails::UserDetailsService>> {
+        self.user_details_service.as_ref()
+    }
+
     /// Specifies the URL that a one-time token generation request will be processed
     /// on. Defaults to `/ott/generate`.
     pub fn token_generating_url(&mut self, token_generating_url: &str) -> &mut Self {
@@ -224,17 +249,18 @@ where
     }
 
     /// Resolves the `OneTimeTokenGenerationSuccessHandler` to use. Falls back to a
-    /// bean from the `ApplicationContext`. A handler is required, so this method
-    /// panics if none can be resolved.
+    /// bean from the `ApplicationContext`, and finally to a handler that sends
+    /// the user to the page the token is submitted on.
     fn get_one_time_token_generation_success_handler(
         &self,
     ) -> Arc<dyn OneTimeTokenGenerationSuccessHandler> {
         self.one_time_token_generation_success_handler
             .clone()
-            .expect(
-            "A OneTimeTokenGenerationSuccessHandler is required to enable oneTimeTokenLogin(). \
-                 Please provide it as a bean or pass it to the oneTimeTokenLogin() DSL.",
-        )
+            .unwrap_or_else(|| {
+                Arc::new(DefaultOneTimeTokenGenerationSuccessHandler::new(
+                    self.default_submit_page_url.clone(),
+                ))
+            })
     }
 
     /// Resolves the `GenerateOneTimeTokenRequestResolver` to use. Falls back to a

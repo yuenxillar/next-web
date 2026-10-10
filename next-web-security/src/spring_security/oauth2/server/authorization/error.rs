@@ -149,6 +149,42 @@ impl OAuth2Error {
         Self::new("invalid_scope", description)
     }
 
+    /// Returns `invalid_client_metadata`.
+    ///
+    /// # Arguments
+    ///
+    /// * `description` - The description of the error.
+    pub fn invalid_client_metadata(description: impl Into<String>) -> Self {
+        Self::new("invalid_client_metadata", description)
+    }
+
+    /// Returns `authorization_pending`.
+    ///
+    /// # Arguments
+    ///
+    /// * `description` - The description of the error.
+    pub fn authorization_pending(description: impl Into<String>) -> Self {
+        Self::new("authorization_pending", description)
+    }
+
+    /// Returns `slow_down`.
+    ///
+    /// # Arguments
+    ///
+    /// * `description` - The description of the error.
+    pub fn slow_down(description: impl Into<String>) -> Self {
+        Self::new("slow_down", description)
+    }
+
+    /// Returns `expired_token`.
+    ///
+    /// # Arguments
+    ///
+    /// * `description` - The description of the error.
+    pub fn expired_token(description: impl Into<String>) -> Self {
+        Self::new("expired_token", description)
+    }
+
     /// Returns `access_denied`.
     ///
     /// # Arguments

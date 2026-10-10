@@ -88,7 +88,8 @@ impl AuthenticationProvider for OAuth2AuthorizationCodeAuthenticationProvider {
             OAuth2AuthorizationCodeGrantRequest::new(client_registration.clone(), exchange);
         let response = self
             .access_token_response_client
-            .get_token_response(&grant_request)?;
+            .get_token_response(&grant_request)
+            .await?;
         let access_token = OAuth2AccessToken::from_response(&response);
         let principal_name = client_registration.registration_id().to_string();
         let authorized_client = OAuth2AuthorizedClient::new(

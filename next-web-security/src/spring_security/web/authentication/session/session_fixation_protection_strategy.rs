@@ -257,8 +257,11 @@ mod tests {
 
         let extracted = strategy.extract_attributes(&session);
 
-        let keys: Vec<&str> = extracted.iter().map(|(key, _)| key.as_str()).collect();
-        assert_eq!(keys, vec!["name", "NEXT_SECURITY_CSRF"]);
+        // The attributes are held in a map, so the keys are compared in a
+        // stable order.
+        let mut keys: Vec<&str> = extracted.iter().map(|(key, _)| key.as_str()).collect();
+        keys.sort();
+        assert_eq!(keys, vec!["NEXT_SECURITY_CSRF", "name"]);
         assert_eq!(extracted["name"].as_str(), Some("alice"));
     }
 
@@ -290,8 +293,15 @@ mod tests {
         );
 
         let written = new_session.written();
-        let keys: Vec<&str> = written.iter().map(|(key, _)| key.as_str()).collect();
-        assert_eq!(keys, vec!["name", "NEXT_SECURITY_CSRF"]);
-        assert_eq!(written[0].1.as_str(), Some("alice"));
+        let mut keys: Vec<&str> = written.iter().map(|(key, _)| key.as_str()).collect();
+        keys.sort();
+        assert_eq!(keys, vec!["NEXT_SECURITY_CSRF", "name"]);
+        assert_eq!(
+            written
+                .iter()
+                .find(|(key, _)| key.as_str() == "name")
+                .and_then(|(_, value)| value.as_str()),
+            Some("alice")
+        );
     }
 }

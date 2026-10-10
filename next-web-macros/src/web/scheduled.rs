@@ -2,7 +2,7 @@ use from_attr::FromAttr;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
-use syn::{FnArg, Ident, Pat, PatType, ReturnType, Type, Visibility, spanned::Spanned};
+use syn::{spanned::Spanned, FnArg, Ident, Pat, PatType, ReturnType, Type, Visibility};
 
 use super::attrs::scheduled_attr::ScheduledAttr;
 
@@ -342,7 +342,11 @@ impl ScheduledTask {
             }
         });
 
-        let await_task = if is_async { quote! { .await } } else { quote! {} };
+        let await_task = if is_async {
+            quote! { .await }
+        } else {
+            quote! {}
+        };
 
         let run = if returns_result {
             // A task that fails reports the failure to the scheduler, which
@@ -548,7 +552,7 @@ mod tests {
     use from_attr::FromAttr;
     use quote::ToTokens;
 
-    use super::{ScheduledAttr, ScheduledFunction, ScheduledTask, is_result};
+    use super::{is_result, ScheduledAttr, ScheduledFunction, ScheduledTask};
 
     #[test]
     fn a_cron_task_becomes_a_cron_schedule() {
@@ -689,8 +693,8 @@ mod tests {
         };
 
         let function = ScheduledFunction::new(item).unwrap();
-        let error = ScheduledTask::schedule(&function, None, None, None, None, None, false)
-            .unwrap_err();
+        let error =
+            ScheduledTask::schedule(&function, None, None, None, None, None, false).unwrap_err();
 
         assert!(error.to_string().contains("cron"));
     }
@@ -763,7 +767,10 @@ mod tests {
 
         assert!(function.parameters[0].by_reference);
         assert_eq!(
-            function.parameters[0].stored_type.to_token_stream().to_string(),
+            function.parameters[0]
+                .stored_type
+                .to_token_stream()
+                .to_string(),
             "Clock"
         );
     }
@@ -792,9 +799,8 @@ mod tests {
 
     #[test]
     fn cron_and_a_fixed_rate_cannot_be_combined() {
-        let attributes = ScheduledAttr::from_tokens(
-            quote::quote! { cron = "* * * * * *", fixed_rate = 5 },
-        );
+        let attributes =
+            ScheduledAttr::from_tokens(quote::quote! { cron = "* * * * * *", fixed_rate = 5 });
 
         assert!(attributes.is_err());
     }

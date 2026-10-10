@@ -10,24 +10,40 @@
 pub mod authorization;
 pub mod client;
 pub mod client_authentication;
+pub mod consent;
 pub mod context;
+pub mod device;
 pub mod error;
-pub mod jose;
+pub mod pushed_authorization_request;
 pub mod settings;
 pub mod token;
 pub mod web;
 
+pub use crate::oauth2::jose::{
+    Jwk, JwkSet, JwkSource, JwtSigner, RsaJwtSigner, SecretJwtSigner, SignerJwkSource,
+};
 pub use authorization::{
     InMemoryOAuth2AuthorizationService, OAuth2Authorization, OAuth2AuthorizationService,
 };
 pub use client::{
     AuthorizationGrantType, ClientAuthenticationMethod, ClientSettings,
     InMemoryRegisteredClientRepository, RegisteredClient, RegisteredClientRepository,
-    TokenSettings,
+    TokenSettings, CLIENT_ASSERTION_TYPE_JWT_BEARER,
+};
+pub use device::{
+    DeviceAuthorizationStatus, InMemoryOAuth2DeviceAuthorizationService, OAuth2DeviceAuthorization,
+    OAuth2DeviceAuthorizationService,
+};
+pub use consent::{
+    InMemoryOAuth2AuthorizationConsentService, OAuth2AuthorizationConsent,
+    OAuth2AuthorizationConsentService,
 };
 pub use context::{AuthorizationServerContext, AuthorizationServerContextBuilder};
 pub use error::OAuth2Error;
-pub use jose::{Jwk, JwkSet, JwkSource, SecretJwkSource};
+pub use pushed_authorization_request::{
+    InMemoryOAuth2PushedAuthorizationRequestRepository, OAuth2PushedAuthorizationRequestRepository,
+    PushedAuthorizationRequest,
+};
 pub use settings::{AuthorizationServerSettings, AuthorizationServerSettingsBuilder};
 pub use token::{
     DelegatingOAuth2TokenGenerator, JwtGenerator, OAuth2AccessToken, OAuth2AccessTokenGenerator,
@@ -36,5 +52,8 @@ pub use token::{
 };
 pub use web::{
     AuthorizationEndpointFilter, AuthorizationServerMetadataEndpointFilter, JwkSetEndpointFilter,
-    TokenEndpointFilter, TokenIntrospectionEndpointFilter, TokenRevocationEndpointFilter,
+    LogoutEndpointFilter, OAuth2ClientRegistrationEndpointFilter,
+    OAuth2DeviceAuthorizationEndpointFilter, OAuth2DeviceVerificationEndpointFilter,
+    OAuth2PushedAuthorizationRequestEndpointFilter, TokenEndpointFilter,
+    TokenIntrospectionEndpointFilter, TokenRevocationEndpointFilter, UserInfoEndpointFilter,
 };

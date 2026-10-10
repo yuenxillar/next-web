@@ -1,5 +1,13 @@
 //! The OpenID Connect authentication support of the OAuth 2.0 client.
 
+mod oidc_id_token_validator;
+mod oidc_login_authentication_provider;
+
+pub use oidc_id_token_validator::{
+    access_token_hash_of, DefaultOidcIdTokenValidator, OidcIdToken, OidcIdTokenValidator,
+};
+pub use oidc_login_authentication_provider::OidcLoginAuthenticationProvider;
+
 use std::{any::TypeId, sync::Arc};
 
 use next_web_core::async_trait;

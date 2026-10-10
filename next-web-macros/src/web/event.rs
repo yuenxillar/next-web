@@ -144,4 +144,3 @@ fn extract_event_type_from_impl(input: &ItemImpl) -> Option<&Type> {
         _ => None,
     }
 }
-

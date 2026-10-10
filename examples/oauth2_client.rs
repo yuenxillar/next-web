@@ -22,9 +22,9 @@ use std::sync::{Arc, Mutex};
 
 use axum::routing::get;
 use next_web::{
-    Application, NextWebApplication,
-    core::{ApplicationContext, Ordered, traits::apply_router::ApplyRouter},
+    core::{traits::apply_router::ApplyRouter, ApplicationContext, Ordered},
     macros::{autoconfigure::configuration, bind::singleton},
+    Application, NextWebApplication,
 };
 use next_web_context::{ApplicationEvent, ApplicationEventPublisher};
 use next_web_core::{
@@ -32,7 +32,7 @@ use next_web_core::{
     traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 use next_web_security::{
-    config::web::{WebSecurityConfigurer, builders::HttpSecurity},
+    config::web::{builders::HttpSecurity, WebSecurityConfigurer},
     oauth2::{
         AuthorizationRequestRepository, ClientRegistration, InMemoryClientRegistrationRepository,
         OAuth2AuthorizationRequest,
@@ -84,6 +84,8 @@ pub fn demo_client_registration() -> ClientRegistration {
         "https://provider.example/authorize",
     )
     .set_client_id(DEMO_CLIENT_ID)
+    .set_token_uri("https://provider.example/token")
+    .set_user_info_uri("https://provider.example/userinfo")
     .set_redirect_uri("http://127.0.0.1:11000/login/oauth2/code/demo")
     .set_scopes(["read", "admin"])
 }
@@ -234,7 +236,7 @@ mod tests {
     use axum::{
         body::Body,
         extract::Request,
-        http::{StatusCode, header},
+        http::{header, StatusCode},
         response::Response,
     };
     use next_web_core::{
@@ -249,14 +251,74 @@ mod tests {
             authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
             security_builder::SecurityBuilder, web::builders::HttpSecurity,
         },
-        oauth2::AuthorizationRequestRepository,
+        core::AuthenticationError,
+        oauth2::{
+            AuthorizationRequestRepository, OAuth2AccessTokenResponse,
+            OAuth2AccessTokenResponseClient, OAuth2AuthorizationCodeGrantRequest,
+        },
         web::security_filter_chain::SecurityFilterChain,
     };
 
     use super::{
-        DEMO_CLIENT_ID, DEMO_REGISTRATION_ID, InMemoryAuthorizationRequestRepository,
-        configure_oauth2_client,
+        configure_oauth2_client, InMemoryAuthorizationRequestRepository, DEMO_CLIENT_ID,
+        DEMO_REGISTRATION_ID,
     };
+
+    /// Exchanges an authorization code for a token without a provider.
+    ///
+    /// The login of a real application sends the code to the provider with the
+    /// token endpoint client of the framework. The test does not have a
+    /// provider, so the token of the grant is produced here: the test covers
+    /// the login of the client, and the token endpoint client is exercised
+    /// against the running authorization server in the
+    /// `oauth2_authorization_server` example.
+    #[derive(Clone, Debug, Default)]
+    struct StubTokenResponseClient;
+
+    #[next_web_core::async_trait]
+    impl OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
+        for StubTokenResponseClient
+    {
+        async fn get_token_response(
+            &self,
+            request: &OAuth2AuthorizationCodeGrantRequest,
+        ) -> Result<OAuth2AccessTokenResponse, AuthenticationError> {
+            let code = request
+                .authorization_code()
+                .expect("the grant carries the authorization code");
+
+            Ok(OAuth2AccessTokenResponse::new(format!("token-of-{code}"))
+                .set_token_type("Bearer")
+                .set_scopes(request.client_registration().scopes().to_vec()))
+        }
+    }
+
+    /// Loads the user of a grant without a provider.
+    ///
+    /// The login of a real application reads the user from the user info
+    /// endpoint of the provider. The test does not have a provider, so the user
+    /// of the grant is produced here, in the same way the token of the grant
+    /// is.
+    #[derive(Clone, Debug, Default)]
+    struct StubUserService;
+
+    #[next_web_core::async_trait]
+    impl
+        next_web_security::oauth2::OAuth2UserService<
+            next_web_security::oauth2::OAuth2UserRequest,
+            next_web_security::oauth2::OAuth2User,
+        > for StubUserService
+    {
+        async fn load_user(
+            &self,
+            _request: &next_web_security::oauth2::OAuth2UserRequest,
+        ) -> Result<next_web_security::oauth2::OAuth2User, AuthenticationError> {
+            Ok(next_web_security::oauth2::OAuth2User::new(
+                "the-user",
+                Default::default(),
+            ))
+        }
+    }
 
     /// Builds the filters of the example the way a real application gets them.
     ///
@@ -283,6 +345,16 @@ mod tests {
             .request_cache(|_| {})
             .anonymous(|_| {});
         configure_oauth2_client(&mut http, authorization_request_repository);
+        // The login of the test exchanges the code with the token client of the
+        // example.
+        http.oauth2_login(|login| {
+            login.token_endpoint(|token| {
+                token.access_token_response_client(Arc::new(StubTokenResponseClient));
+            });
+            login.user_info_endpoint(|user_info| {
+                user_info.user_service(Arc::new(StubUserService));
+            });
+        });
 
         let filter_chain = http.build();
         Arc::from(filter_chain.get_filters().to_vec())

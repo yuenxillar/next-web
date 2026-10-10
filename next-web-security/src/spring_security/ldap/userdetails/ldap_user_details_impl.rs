@@ -14,12 +14,12 @@ use crate::{
     web::authentication::Identity,
 };
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct LdapUserDetailsImpl {
     dn: String,
     username: String,
     password: String,
-    authorities: Vec<Arc<LdapGrantedAuthority>>,
+    authorities: Vec<Arc<dyn GrantedAuthority>>,
     account_non_expired: bool,
     account_non_locked: bool,
     credentials_non_expired: bool,
@@ -48,17 +48,18 @@ impl LdapUserDetailsImpl {
         &mut self,
         authorities: impl IntoIterator<Item = Arc<LdapGrantedAuthority>>,
     ) {
-        self.authorities = authorities.into_iter().collect();
+        // The authorities are stored as the trait objects of the user details
+        // contract, so the getter can hand out the slice it holds.
+        self.authorities = authorities
+            .into_iter()
+            .map(|authority| authority as Arc<dyn GrantedAuthority>)
+            .collect();
     }
 }
 
 impl UserDetails for LdapUserDetailsImpl {
     fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
-        // self.authorities
-        //     .iter()
-        //     .map(|authority| authority.as_ref() as &dyn GrantedAuthority)
-        //     .collect()
-        todo!()
+        &self.authorities
     }
 
     fn password(&self) -> Option<&str> {
@@ -102,5 +103,19 @@ impl Identity for LdapUserDetailsImpl {
 impl fmt::Display for LdapUserDetailsImpl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "LdapUserDetailsImpl(username={})", self.username)
+    }
+}
+
+impl fmt::Debug for LdapUserDetailsImpl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LdapUserDetailsImpl")
+            .field("dn", &self.dn)
+            .field("username", &self.username)
+            .field("authorities", &self.authorities.len())
+            .field("account_non_expired", &self.account_non_expired)
+            .field("account_non_locked", &self.account_non_locked)
+            .field("credentials_non_expired", &self.credentials_non_expired)
+            .field("enabled", &self.enabled)
+            .finish()
     }
 }

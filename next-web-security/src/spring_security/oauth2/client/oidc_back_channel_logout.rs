@@ -603,7 +603,7 @@ impl AuthenticationProvider for OidcBackChannelLogoutAuthenticationProvider {
                     AuthenticationErrorKind::AuthenticationService,
                 )
             })?;
-        let jwt = self.decoder.decode(token.logout_token())?;
+        let jwt = self.decoder.decode(token.logout_token()).await?;
         let logout_token = OidcLogoutToken::from_jwt(&jwt);
         let authenticated = OidcBackChannelLogoutAuthentication::authenticated(
             logout_token,

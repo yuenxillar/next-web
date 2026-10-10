@@ -6,6 +6,7 @@ use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
 use crate::web::configuration_properties::impl_macro_configuration_properties;
 use crate::web::idempotency::impl_macro_idempotency;
+use crate::web::order::generate_order;
 use crate::web::pre_authorize::impl_macro_pre_authorize;
 
 use data::desensitized::impl_macro_desensitized;
@@ -704,6 +705,16 @@ pub fn idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// attributes it receives, so an inner `#[pre_authorize]` would be dropped and
 /// the handler would be left unguarded.
 ///
+/// # Refusal
+///
+/// The rule is evaluated against the authorities of the request, which the
+/// crate that authenticates the requests writes into it. A request the rule
+/// refuses is answered by the handler the application configured for a refused
+/// request (`ErrorHandlingConfigurer::access_denied_handler`), and with `403
+/// Forbidden` when the application configured none. The guard is the first
+/// argument of the handler, so a handler that consumes the request body still
+/// receives it last.
+///
 /// # Example
 ///
 /// ```ignore
@@ -726,6 +737,37 @@ pub fn idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn pre_authorize(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_pre_authorize(attr, item_fn)
+}
+
+/// Implements `Ordered` for the annotated item with the order it is given.
+///
+/// The trait is the one of `next-web-core`, so the annotated item declares its
+/// place among the values the framework orders without an implementation block
+/// of its own. The attribute is applied to a type definition (a struct, an enum,
+/// or a union) or to an implementation block, and the crate that annotates an
+/// item depends on `next-web-core`.
+///
+/// ```ignore
+/// use next_web::macros::order;
+///
+/// #[order(12)]
+/// struct App;
+///
+/// #[order(-1)]
+/// struct Early;
+/// ```
+///
+/// The order is the value the `order` method of `Ordered` returns: a lower value
+/// is placed earlier and a higher value later. The value is written as an
+/// expression, so a constant such as `i32::MIN` is accepted as well.
+#[proc_macro_attribute]
+pub fn order(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as syn::Item);
+
+    match generate_order(attr.into(), item) {
+        Ok(order) => order.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
 }
 
 /// Process macros for implementing retry logic

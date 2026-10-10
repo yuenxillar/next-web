@@ -1,7 +1,9 @@
 //! Example that wires the OAuth 2.0 resource server of an application.
 //!
 //! The application turns on the resource server support with the JWT decoder of
-//! the framework, so the routes under `/api` require a bearer token.
+//! the framework, so the routes under `/api` require a bearer token. The tokens
+//! are signed with the key of the example, and the decoder verifies the
+//! signature of every token it is given.
 //!
 //! Run it with:
 //!
@@ -9,12 +11,12 @@
 //! cargo run -p next-web-examples --bin oauth2_resource_server --features oauth2
 //! ```
 //!
-//! The example accepts the unsigned demo tokens below, which only a resource
-//! server that trusts unsigned tokens would accept:
+//! The application prints the demo tokens it accepts while it starts, because
+//! the tokens are signed with a key that is only known to the process:
 //!
 //! ```text
-//! read scope:  eyJhbGciOiJub25lIn0.eyJzdWIiOiJkZW1vIiwic2NvcGUiOiJyZWFkIn0.sig
-//! admin scope: eyJhbGciOiJub25lIn0.eyJzdWIiOiJkZW1vIiwic2NvcGUiOiJhZG1pbiJ9.sig
+//! the read token:  <printed while the application starts>
+//! the admin token: <printed while the application starts>
 //! ```
 //!
 //! With the application running:
@@ -37,19 +39,60 @@ use next_web_context::{ApplicationEvent, ApplicationEventPublisher};
 use next_web_core::error::BoxError;
 use next_web_security::{
     config::web::{builders::HttpSecurity, WebSecurityConfigurer},
-    oauth2::server::resource::jwt::NimbusJwtDecoder,
+    oauth2::{
+        jose::{JwkSource, JwtSigner, SecretJwtSigner},
+        server::resource::jwt::NimbusJwtDecoder,
+    },
 };
 
-/// An unsigned demo token that carries the `read` scope.
-pub const DEMO_READ_TOKEN: &str = "eyJhbGciOiJub25lIn0.eyJzdWIiOiJkZW1vIiwic2NvcGUiOiJyZWFkIn0.sig";
+/// The secret the demo tokens are signed with.
+pub const DEMO_SIGNING_SECRET: &str = "the-demo-secret-of-the-resource-server";
 
-/// An unsigned demo token that carries the `admin` scope.
-pub const DEMO_ADMIN_TOKEN: &str =
-    "eyJhbGciOiJub25lIn0.eyJzdWIiOiJkZW1vIiwic2NvcGUiOiJhZG1pbiJ9.sig";
+/// The issuer of the demo tokens.
+pub const DEMO_ISSUER: &str = "https://server.example";
 
-/// An unsigned demo token that carries neither the `read` nor the `admin` scope.
-pub const DEMO_WRITE_TOKEN: &str =
-    "eyJhbGciOiJub25lIn0.eyJzdWIiOiJkZW1vIiwic2NvcGUiOiJ3cml0ZSJ9.sig";
+/// Returns the signer of the demo tokens.
+///
+/// The example signs its own tokens, so that a token can be presented with
+/// `curl` without an authorization server that issues one. A real resource
+/// server verifies the tokens of the authorization server it trusts, and it
+/// reads the keys of that server from its JWK set.
+pub fn demo_jwt_signer() -> Arc<dyn JwtSigner> {
+    Arc::new(SecretJwtSigner::new(DEMO_SIGNING_SECRET))
+}
+
+/// Returns a token that carries the given scopes.
+///
+/// # Arguments
+///
+/// * `scopes` - The scopes of the token.
+pub fn demo_token(scopes: &[&str]) -> String {
+    demo_jwt_signer()
+        .sign(&serde_json::json!({
+            "iss": DEMO_ISSUER,
+            "aud": "demo-client",
+            "sub": "demo",
+            "scope": scopes.join(" "),
+            "iat": 1_700_000_000_u64,
+            "exp": 4_102_444_800_u64,
+        }))
+        .expect("the demo token is signed")
+}
+
+/// Returns a token that carries the `read` scope.
+pub fn demo_read_token() -> String {
+    demo_token(&["read"])
+}
+
+/// Returns a token that carries the `admin` scope.
+pub fn demo_admin_token() -> String {
+    demo_token(&["admin"])
+}
+
+/// Returns a token that carries neither the `read` nor the `admin` scope.
+pub fn demo_write_token() -> String {
+    demo_token(&["write"])
+}
 
 /// The application of the example.
 #[derive(Default)]
@@ -148,13 +191,20 @@ pub fn configure_oauth2_resource_server(http: &mut HttpSecurity) {
     })
     .oauth2_resource_server(|resource_server| {
         resource_server.jwt(|jwt| {
-            jwt.decoder(Arc::new(NimbusJwtDecoder::default()));
+            let jwk_source: Arc<dyn JwkSource> = demo_jwt_signer();
+            jwt.decoder(Arc::new(
+                NimbusJwtDecoder::default().with_jwk_source(jwk_source),
+            ));
         });
     });
 }
 
 #[tokio::main]
 async fn main() {
+    println!("The read token of the example:  {}", demo_read_token());
+    println!("The admin token of the example: {}", demo_admin_token());
+    println!("The write token of the example: {}", demo_write_token());
+
     NextWebApplication::<OAuth2ResourceServerApplication>::default()
         .run()
         .await
@@ -188,7 +238,8 @@ mod tests {
     };
 
     use super::{
-        configure_oauth2_resource_server, DEMO_ADMIN_TOKEN, DEMO_READ_TOKEN, DEMO_WRITE_TOKEN,
+        configure_oauth2_resource_server, demo_admin_token, demo_jwt_signer, demo_read_token,
+        demo_write_token, DEMO_ISSUER,
     };
 
     /// The opaque token the example introspection accepts.
@@ -198,8 +249,9 @@ mod tests {
     #[derive(Clone, Debug, Default)]
     struct DemoOpaqueTokenIntrospector;
 
+    #[next_web_core::async_trait]
     impl OpaqueTokenIntrospector for DemoOpaqueTokenIntrospector {
-        fn introspect(
+        async fn introspect(
             &self,
             token: &str,
         ) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError> {
@@ -329,7 +381,7 @@ mod tests {
     async fn the_resource_server_authenticates_a_jwt() {
         let filters = jwt_security_filters();
 
-        let response = run(&filters, request("/api/me", Some(DEMO_READ_TOKEN))).await;
+        let response = run(&filters, request("/api/me", Some(&demo_read_token()))).await;
 
         assert!(!response.is_committed());
     }
@@ -363,7 +415,7 @@ mod tests {
 
         let response = run(
             &filters,
-            request("/api/admin/report", Some(DEMO_WRITE_TOKEN)),
+            request("/api/admin/report", Some(&demo_write_token())),
         )
         .await;
 
@@ -376,7 +428,7 @@ mod tests {
 
         let response = run(
             &filters,
-            request("/api/admin/report", Some(DEMO_ADMIN_TOKEN)),
+            request("/api/admin/report", Some(&demo_admin_token())),
         )
         .await;
 
@@ -384,15 +436,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_jwt_decoder_decodes_the_demo_token() {
+    async fn the_jwt_decoder_verifies_the_demo_token() {
         use next_web_security::oauth2::server::resource::jwt::{JwtDecoder, NimbusJwtDecoder};
 
         let jwt = NimbusJwtDecoder::default()
-            .decode(DEMO_READ_TOKEN)
-            .expect("the demo token decodes");
+            .with_jwk_source(demo_jwt_signer())
+            .decode(&demo_read_token())
+            .await
+            .expect("the demo token is verified");
 
         assert_eq!(jwt.claim("sub").map(String::as_str), Some("demo"));
         assert_eq!(jwt.claim("scope").map(String::as_str), Some("read"));
+    }
+
+    #[tokio::test]
+    async fn the_resource_server_rejects_a_token_of_another_key() {
+        use next_web_security::oauth2::jose::{JwtSigner, SecretJwtSigner};
+
+        let filters = jwt_security_filters();
+        let foreign_token = Arc::new(SecretJwtSigner::new("another-secret"))
+            .sign(&serde_json::json!({
+                "iss": DEMO_ISSUER,
+                "sub": "demo",
+                "scope": "read",
+                "exp": 4_102_444_800_u64,
+            }))
+            .expect("the foreign token is signed");
+
+        let response = run(&filters, request("/api/me", Some(&foreign_token))).await;
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]
@@ -409,12 +482,12 @@ mod tests {
         };
 
         let provider = JwtAuthenticationProvider::with_default_converter(Arc::new(
-            NimbusJwtDecoder::default(),
+            NimbusJwtDecoder::default().with_jwk_source(demo_jwt_signer()),
         ));
         assert!(provider.supports(TypeId::of::<BearerTokenAuthenticationToken>()));
 
         let token: Arc<dyn Authentication> = Arc::new(
-            BearerTokenAuthenticationToken::unauthenticated(DEMO_READ_TOKEN),
+            BearerTokenAuthenticationToken::unauthenticated(demo_read_token()),
         );
         let authenticated = provider
             .authenticate(&token)
@@ -445,7 +518,7 @@ mod tests {
         };
 
         let converter = BearerTokenAuthenticationConverter::with_default_resolver();
-        let mut request = request("/api/me", Some(DEMO_READ_TOKEN));
+        let mut request = request("/api/me", Some(&demo_read_token()));
         request.ready();
 
         let converted = converter

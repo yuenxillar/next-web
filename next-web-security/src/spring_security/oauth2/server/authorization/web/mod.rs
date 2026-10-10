@@ -1,19 +1,31 @@
 //! The endpoints of the authorization server.
 
 mod authorization_endpoint_filter;
+mod client_registration_endpoint_filter;
+mod device_authorization_endpoint_filter;
+mod device_verification_endpoint_filter;
 mod jwk_set_endpoint_filter;
+mod logout_endpoint_filter;
 mod metadata_endpoint_filter;
+mod pushed_authorization_request_endpoint_filter;
 pub(crate) mod support;
 mod token_endpoint_filter;
 mod token_introspection_endpoint_filter;
 mod token_revocation_endpoint_filter;
+mod user_info_endpoint_filter;
 
 pub use authorization_endpoint_filter::AuthorizationEndpointFilter;
+pub use client_registration_endpoint_filter::OAuth2ClientRegistrationEndpointFilter;
+pub use device_authorization_endpoint_filter::OAuth2DeviceAuthorizationEndpointFilter;
+pub use device_verification_endpoint_filter::OAuth2DeviceVerificationEndpointFilter;
 pub use jwk_set_endpoint_filter::JwkSetEndpointFilter;
+pub use logout_endpoint_filter::LogoutEndpointFilter;
 pub use metadata_endpoint_filter::AuthorizationServerMetadataEndpointFilter;
+pub use pushed_authorization_request_endpoint_filter::OAuth2PushedAuthorizationRequestEndpointFilter;
 pub use token_endpoint_filter::TokenEndpointFilter;
 pub use token_introspection_endpoint_filter::TokenIntrospectionEndpointFilter;
 pub use token_revocation_endpoint_filter::TokenRevocationEndpointFilter;
+pub use user_info_endpoint_filter::UserInfoEndpointFilter;
 
 /// The helpers the tests of the endpoints share.
 #[cfg(test)]

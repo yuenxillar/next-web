@@ -27,8 +27,9 @@ use crate::{
         OAuth2AccessTokenResponseClient, OAuth2AuthorizationCodeGrantRequest,
         OAuth2AuthorizationRequestResolver, OAuth2AuthorizedClientRepository,
         OAuth2AuthorizedClientService, OAuth2LoginAuthenticationProvider, OAuth2User,
-        OAuth2UserRequest, OAuth2UserService, OidcAuthenticationRequestChecker, OidcUser,
-        OidcUserRequest, OidcUserService, RestClientAuthorizationCodeTokenResponseClient,
+        OAuth2UserRequest, OAuth2UserService, OidcAuthenticationRequestChecker,
+        OidcLoginAuthenticationProvider, OidcUser, OidcUserRequest, OidcUserService,
+        RestClientAuthorizationCodeTokenResponseClient,
     },
     web::{
         authentication::{ui::DefaultLoginPageGeneratingFilter, LoginUrlAuthenticationEntryPoint},
@@ -346,24 +347,37 @@ where
             }
         }
 
-        let mut oauth2_login_authentication_provider = OAuth2LoginAuthenticationProvider::new(
-            self.get_access_token_response_client(),
-            self.get_oauth2_user_service(),
-        );
-        if let Some(authorities_mapper) = self
+        let access_token_response_client = self.get_access_token_response_client();
+        let authorities_mapper = self
             .user_info_endpoint_config
             .user_authorities_mapper
             .as_ref()
-        {
+            .cloned()
+            .or_else(|| {
+                http.shared_object::<Arc<dyn GrantedAuthoritiesMapper>>()
+                    .cloned()
+            });
+        if let Some(authorities_mapper) = authorities_mapper.as_ref() {
             http.set_shared_object::<Arc<dyn GrantedAuthoritiesMapper>>(authorities_mapper.clone());
-            oauth2_login_authentication_provider.set_authorities_mapper(authorities_mapper.clone());
-        } else if let Some(authorities_mapper) =
-            http.shared_object::<Arc<dyn GrantedAuthoritiesMapper>>()
-        {
-            oauth2_login_authentication_provider.set_authorities_mapper(authorities_mapper.clone());
         }
 
-        let _oidc_user_service = self.get_oidc_user_service();
+        // The OpenID Connect login runs before the plain OAuth 2.0 login, so
+        // that a grant that asks for the `openid` scope is authenticated with
+        // the identifier token it receives.
+        let mut oidc_login_authentication_provider = OidcLoginAuthenticationProvider::new(
+            access_token_response_client.clone(),
+            self.get_oidc_user_service(),
+        );
+        let mut oauth2_login_authentication_provider = OAuth2LoginAuthenticationProvider::new(
+            access_token_response_client,
+            self.get_oauth2_user_service(),
+        );
+        if let Some(authorities_mapper) = authorities_mapper {
+            oidc_login_authentication_provider.set_authorities_mapper(authorities_mapper.clone());
+            oauth2_login_authentication_provider.set_authorities_mapper(authorities_mapper);
+        }
+
+        http.authentication_provider(Arc::new(oidc_login_authentication_provider));
         http.authentication_provider(Arc::new(oauth2_login_authentication_provider));
         http.authentication_provider(Arc::new(OidcAuthenticationRequestChecker::default()));
 

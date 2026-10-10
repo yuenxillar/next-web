@@ -447,7 +447,9 @@ fn rejects_an_initializer_in_an_auto_configuration() {
         .expect("`#[init]` is rejected in an auto-configuration");
 
     assert!(
-        error.to_string().contains("only supported in a `#[configuration]`"),
+        error
+            .to_string()
+            .contains("only supported in a `#[configuration]`"),
         "the error explains the rule: {error}"
     );
 }

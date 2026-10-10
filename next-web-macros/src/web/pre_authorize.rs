@@ -1,8 +1,10 @@
 //! Implementation of the `#[pre_authorize]` attribute macro.
 //!
 //! The macro turns a declarative access-control rule into a runtime guard that
-//! runs before the annotated handler and returns `403 Forbidden` when the
-//! current authentication does not satisfy the rule.
+//! runs before the body of the annotated handler. The guard reads the
+//! authorities of the request, evaluates the rule against them, and answers a
+//! request the rule refuses with the refusal of the application (and with
+//! `403 Forbidden` when the application configured none).
 //!
 //! Two notations are supported.
 //!
@@ -44,10 +46,16 @@
 //!
 //! # Behaviour
 //!
-//! The annotation rewrites the handler so that it returns
-//! `impl IntoResponse`: the guard runs first and answers `403 Forbidden` when
-//! the rule does not hold, otherwise the original body runs and its result is
-//! converted into the response.
+//! The annotation rewrites the handler so that it returns `impl IntoResponse`
+//! and takes the guard of the request as its first argument, which is extracted
+//! before the handler runs (a handler that consumes the body still receives it
+//! last). The rule is evaluated against the authorities the request carries, so
+//! it is the authority of the request that is checked and not the state of the
+//! thread that happens to run the handler; the crate that authenticates the
+//! requests writes them into the request. A request the rule refuses is
+//! answered by the refusal the application configured for its filter chain,
+//! otherwise the original body runs and its result is converted into the
+//! response.
 
 use from_attr::FromAttr;
 use proc_macro::TokenStream;
@@ -99,6 +107,15 @@ pub fn impl_macro_pre_authorize(macro_attrs: TokenStream, item_fn: ItemFn) -> To
 
         let mut sig = item_fn.sig.clone();
         sig.output = syn::parse_quote!(-> impl ::next_web::response::IntoResponse);
+        // The guard reads the authorities of the request, so the guard of the
+        // request is extracted before the handler runs. It is extracted first,
+        // so a handler that consumes the body still receives it last.
+        sig.inputs.insert(
+            0,
+            syn::parse_quote!(
+                __next_web_pre_authorize: ::next_web::security::access::prepost::pre_authorize::PreAuthorizeContext
+            ),
+        );
 
         let expression = expression.into_tokens();
 
@@ -109,11 +126,9 @@ pub fn impl_macro_pre_authorize(macro_attrs: TokenStream, item_fn: ItemFn) -> To
                     ::next_web::security::access::prepost::pre_authorize::PreAuthorizeExpression =
                     #expression;
 
-                if !::next_web::security::access::prepost::pre_authorize::evaluate(
-                    &__NEXT_WEB_PRE_AUTHORIZE_EXPRESSION,
-                ) {
+                if !__next_web_pre_authorize.evaluate(&__NEXT_WEB_PRE_AUTHORIZE_EXPRESSION) {
                     return ::next_web::response::IntoResponse::into_response(
-                        ::next_web::http::StatusCode::FORBIDDEN,
+                        __next_web_pre_authorize.denied(),
                     );
                 }
 

@@ -11,6 +11,7 @@ pub mod macros;
 pub mod messaging;
 pub mod metrics;
 pub mod mime_type;
+pub mod security;
 pub mod server;
 pub mod traits;
 pub mod util;

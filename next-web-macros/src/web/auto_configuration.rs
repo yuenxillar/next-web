@@ -26,17 +26,17 @@ use std::collections::HashSet;
 use from_attr::FromAttr;
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
+use syn::{parse2, parse_quote, Stmt};
 use syn::{
     Error, Expr, ExprPath, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, LitStr, Pat, PatType,
     ReturnType, Signature, Type,
 };
-use syn::{Stmt, parse_quote, parse2};
 
 use crate::{
     di::commons::{
-        BorrowedReference, ResolveOneValue, check_reference_borrows, push_resolve_stmts,
+        check_reference_borrows, push_resolve_stmts, BorrowedReference, ResolveOneValue,
     },
     util::logic::Logic,
     web::attrs::auto_configuration_attr::*,
@@ -401,9 +401,10 @@ fn collect_steps(
         let init_attr = InitAttr::remove_attributes(&mut item_fn.attrs)
             .map_err(|error| error.value)?
             .map(|attribute| attribute.value);
-        let conditional_on_property = ConditionalOnPropertyAttr::remove_attributes(&mut item_fn.attrs)
-            .map_err(|error| error.value)?
-            .map(|attribute| attribute.value);
+        let conditional_on_property =
+            ConditionalOnPropertyAttr::remove_attributes(&mut item_fn.attrs)
+                .map_err(|error| error.value)?
+                .map(|attribute| attribute.value);
 
         let is_provider = provider_attr.is_some() || conditional_on_property.is_some();
 
@@ -850,10 +851,7 @@ fn expand_arguments(
 ///
 /// * `steps` - The steps of the configuration.
 fn gen_code(steps: Vec<Step>) -> TokenStream2 {
-    let indices = steps
-        .iter()
-        .map(|step| step.index)
-        .collect::<Vec<_>>();
+    let indices = steps.iter().map(|step| step.index).collect::<Vec<_>>();
     let pushed_indices = indices.iter();
     let matched_indices = indices.iter();
     let orders = steps.iter().map(|step| &step.order);

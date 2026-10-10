@@ -43,13 +43,18 @@ pub struct CompositeObjectPostProcessor {
 }
 
 impl CompositeObjectPostProcessor {
-    fn add_object_post_processor<T>(&mut self, object_post_processor: T)
+    /// Adds a post processor to the ones the composite applies.
+    ///
+    /// The post processors are applied in the order they were added.
+    ///
+    /// # Arguments
+    ///
+    /// * `object_post_processor` - The post processor to add.
+    pub fn add_object_post_processor<T>(&mut self, object_post_processor: T)
     where
-        T: ObjectPostProcessor<dyn Any>,
+        T: ObjectPostProcessor<dyn Any> + 'static,
     {
-        // self.post_processors.push(Box::new(object_post_processor));
-
-        todo!()
+        self.post_processors.push(Arc::new(object_post_processor));
     }
 }
 

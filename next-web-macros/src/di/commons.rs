@@ -5,7 +5,8 @@ use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
     Attribute, Expr, Field, Fields, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, Ident, Pat,
-    PatIdent, PatType, Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath, TypeReference,
+    PatIdent, PatType, Path, PathArguments, PathSegment, Stmt, Token, Type, TypePath,
+    TypeReference,
 };
 
 use crate::di::{field_or_argument_attr::FieldOrArgumentAttr, value_attr::ValueAttr};
@@ -880,9 +881,7 @@ pub(crate) fn generate_argument_resolve_methods(
             FnArg::Receiver(r) => {
                 return Err(syn::Error::new(r.span(), "not support `self` receiver"));
             }
-            FnArg::Typed(PatType {
-                attrs, pat, ty, ..
-            }) => {
+            FnArg::Typed(PatType { attrs, pat, ty, .. }) => {
                 if let Type::Reference(TypeReference { mutability, .. }) = &**ty {
                     references.push((ty.span(), mutability.is_some()));
                 }
@@ -897,7 +896,11 @@ pub(crate) fn generate_argument_resolve_methods(
 
                 let ResolveOne { stmt, variable } =
                     generate_only_one_field_or_argument_resolve_stmt(
-                        argument_name, attrs, color, index, ty,
+                        argument_name,
+                        attrs,
+                        color,
+                        index,
+                        ty,
                     )?;
 
                 push_resolve_stmts(stmt, &mut ref_mut_cx_stmts, &mut ref_cx_stmts);

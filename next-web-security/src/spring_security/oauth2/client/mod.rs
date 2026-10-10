@@ -52,7 +52,11 @@ pub use endpoint::{
     RestClientAuthorizationCodeTokenResponseClient,
 };
 pub use oidc::authentication::OidcAuthenticationRequestChecker;
-pub use oidc::userinfo::{OidcUser, OidcUserRequest, OidcUserService};
+pub use oidc::authentication::{
+    access_token_hash_of, DefaultOidcIdTokenValidator, OidcIdToken, OidcIdTokenValidator,
+    OidcLoginAuthenticationProvider,
+};
+pub use oidc::userinfo::{OidcUser, OidcUserAuthority, OidcUserRequest, OidcUserService};
 pub use registration::{
     ClientRegistration, ClientRegistrationRepository, InMemoryClientRegistrationRepository,
 };

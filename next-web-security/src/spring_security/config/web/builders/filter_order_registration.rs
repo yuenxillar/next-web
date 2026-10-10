@@ -106,16 +106,25 @@ impl Default for FilterOrderRegistration {
         {
             use crate::oauth2::server::authorization::{
                 AuthorizationEndpointFilter, AuthorizationServerMetadataEndpointFilter,
-                JwkSetEndpointFilter, TokenEndpointFilter, TokenIntrospectionEndpointFilter,
-                TokenRevocationEndpointFilter,
+                JwkSetEndpointFilter, LogoutEndpointFilter, OAuth2ClientRegistrationEndpointFilter,
+                OAuth2DeviceAuthorizationEndpointFilter, OAuth2DeviceVerificationEndpointFilter,
+                OAuth2PushedAuthorizationRequestEndpointFilter, TokenEndpointFilter,
+                TokenIntrospectionEndpointFilter, TokenRevocationEndpointFilter,
+                UserInfoEndpointFilter,
             };
 
+            filter_order.put::<OAuth2ClientRegistrationEndpointFilter>(705);
             filter_order.put::<AuthorizationServerMetadataEndpointFilter>(710);
             filter_order.put::<JwkSetEndpointFilter>(720);
             filter_order.put::<TokenIntrospectionEndpointFilter>(730);
             filter_order.put::<TokenRevocationEndpointFilter>(740);
+            filter_order.put::<OAuth2PushedAuthorizationRequestEndpointFilter>(745);
+            filter_order.put::<OAuth2DeviceAuthorizationEndpointFilter>(746);
             filter_order.put::<TokenEndpointFilter>(750);
+            filter_order.put::<UserInfoEndpointFilter>(760);
+            filter_order.put::<OAuth2DeviceVerificationEndpointFilter>(2805);
             filter_order.put::<AuthorizationEndpointFilter>(2810);
+            filter_order.put::<LogoutEndpointFilter>(2820);
         }
 
         filter_order.put::<BasicAuthenticationFilter>(order.next());
@@ -124,6 +133,10 @@ impl Default for FilterOrderRegistration {
         filter_order.put::<RememberMeAuthenticationFilter>(order.next());
         filter_order.put::<AnonymousAuthenticationFilter>(order.next());
         filter_order.put::<SessionManagementFilter>(order.next());
+        // The authorities a guarded handler reads are written after the filters
+        // that authenticate the request ran, and before the filter that
+        // authorizes it.
+        filter_order.put::<crate::web::access::prepost::PreAuthorizeAuthoritiesFilter>(2750);
         filter_order.put::<ErrorTranslationFilter>(order.next());
         filter_order.put::<AuthorizationFilter>(order.next());
         filter_order.put::<SwitchUserFilter>(order.next());

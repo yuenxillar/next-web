@@ -1,4 +1,5 @@
 pub mod intercept;
+pub mod prepost;
 
 mod access_denied_handler;
 mod access_denied_handler_impl;
@@ -15,4 +16,5 @@ pub use delegating_missing_authority_access_denied_handler::{
     DelegatingMissingAuthorityAccessDeniedHandlerBuilder,
 };
 pub use error_translation_filter::ErrorTranslationFilter;
+pub use prepost::{install_pre_authorize_authorities, SecurityContextAuthorities};
 pub use request_matcher_delegating_access_denied_handler::RequestMatcherDelegatingAccessDeniedHandler;

@@ -291,8 +291,9 @@ fn a_reference_argument_of_an_async_function_is_created_async() {
     );
 
     assert!(
-        context
-            .contains(r#"just_create_singleton_with_name_async :: < String > ("testName") . await"#),
+        context.contains(
+            r#"just_create_singleton_with_name_async :: < String > ("testName") . await"#
+        ),
         "{context}"
     );
     assert!(
@@ -384,9 +385,8 @@ fn a_missing_instance_of_an_optional_reference_is_created_without_failing() {
     // The instance is created when it is missing, and the item still resolves
     // when the context has no provider for it.
     assert!(
-        context.contains(
-            r#"cx . try_just_create_singleton_with_name :: < String > ("testName") ;"#
-        ),
+        context
+            .contains(r#"cx . try_just_create_singleton_with_name :: < String > ("testName") ;"#),
         "{context}"
     );
     assert!(

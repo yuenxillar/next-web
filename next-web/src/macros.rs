@@ -1,6 +1,7 @@
 pub use inventory::submit;
 
 pub use next_web_macros::idempotency;
+pub use next_web_macros::order;
 
 pub mod bind {
 

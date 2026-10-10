@@ -6,6 +6,7 @@ use std::{
 };
 
 use super::error::OAuth2Error;
+use crate::oauth2::jose::JwkSet;
 
 /// The way a client authenticates at the token endpoint.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -14,6 +15,13 @@ pub enum ClientAuthenticationMethod {
     ClientSecretBasic,
     /// The client sends its credentials as form parameters.
     ClientSecretPost,
+    /// The client proves its identity with a signed assertion.
+    PrivateKeyJwt,
+    /// The client proves its identity with the certificate of a mutual TLS
+    /// connection.
+    TlsClientAuth,
+    /// The client proves its identity with a self-signed certificate.
+    SelfSignedTlsClientAuth,
     /// The client does not authenticate, which is what a public client does.
     None,
 }
@@ -24,10 +32,34 @@ impl ClientAuthenticationMethod {
         match self {
             Self::ClientSecretBasic => "client_secret_basic",
             Self::ClientSecretPost => "client_secret_post",
+            Self::PrivateKeyJwt => "private_key_jwt",
+            Self::TlsClientAuth => "tls_client_auth",
+            Self::SelfSignedTlsClientAuth => "self_signed_tls_client_auth",
             Self::None => "none",
         }
     }
+
+    /// Returns the method of the given value, if the value names one.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value of the method.
+    pub fn from_value(value: &str) -> Option<Self> {
+        match value {
+            "client_secret_basic" => Some(Self::ClientSecretBasic),
+            "client_secret_post" => Some(Self::ClientSecretPost),
+            "private_key_jwt" => Some(Self::PrivateKeyJwt),
+            "tls_client_auth" => Some(Self::TlsClientAuth),
+            "self_signed_tls_client_auth" => Some(Self::SelfSignedTlsClientAuth),
+            "none" => Some(Self::None),
+            _ => None,
+        }
+    }
 }
+
+/// The media type of a client assertion that is a JWT.
+pub const CLIENT_ASSERTION_TYPE_JWT_BEARER: &str =
+    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
 /// The grant a client is allowed to use.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -36,6 +68,8 @@ pub enum AuthorizationGrantType {
     AuthorizationCode,
     /// The client credentials grant.
     ClientCredentials,
+    /// The device authorization grant.
+    DeviceCode,
     /// The refresh token grant.
     RefreshToken,
 }
@@ -46,6 +80,7 @@ impl AuthorizationGrantType {
         match self {
             Self::AuthorizationCode => "authorization_code",
             Self::ClientCredentials => "client_credentials",
+            Self::DeviceCode => "urn:ietf:params:oauth:grant-type:device_code",
             Self::RefreshToken => "refresh_token",
         }
     }
@@ -59,6 +94,7 @@ impl AuthorizationGrantType {
         match value {
             "authorization_code" => Some(Self::AuthorizationCode),
             "client_credentials" => Some(Self::ClientCredentials),
+            "urn:ietf:params:oauth:grant-type:device_code" => Some(Self::DeviceCode),
             "refresh_token" => Some(Self::RefreshToken),
             _ => None,
         }
@@ -70,6 +106,8 @@ impl AuthorizationGrantType {
 pub struct ClientSettings {
     require_proof_key: bool,
     require_authorization_consent: bool,
+    jwk_set: Option<JwkSet>,
+    x509_certificate_subject_dn: Option<String>,
 }
 
 impl ClientSettings {
@@ -88,6 +126,18 @@ impl ClientSettings {
     pub fn require_authorization_consent(&self) -> bool {
         self.require_authorization_consent
     }
+
+    /// Returns the keys the client signs its assertions with, if a set is
+    /// configured.
+    pub fn jwk_set(&self) -> Option<&JwkSet> {
+        self.jwk_set.as_ref()
+    }
+
+    /// Returns the subject of the certificate of the client, if one is
+    /// configured.
+    pub fn x509_certificate_subject_dn(&self) -> Option<&str> {
+        self.x509_certificate_subject_dn.as_deref()
+    }
 }
 
 impl Default for ClientSettings {
@@ -95,6 +145,8 @@ impl Default for ClientSettings {
         Self {
             require_proof_key: true,
             require_authorization_consent: true,
+            jwk_set: None,
+            x509_certificate_subject_dn: None,
         }
     }
 }
@@ -123,6 +175,29 @@ impl ClientSettingsBuilder {
     /// * `require_authorization_consent` - Whether consent is required.
     pub fn require_authorization_consent(mut self, require_authorization_consent: bool) -> Self {
         self.settings.require_authorization_consent = require_authorization_consent;
+        self
+    }
+
+    /// Sets the keys the client signs its assertions with.
+    ///
+    /// # Arguments
+    ///
+    /// * `jwk_set` - The public keys of the client.
+    pub fn jwk_set(mut self, jwk_set: JwkSet) -> Self {
+        self.settings.jwk_set = Some(jwk_set);
+        self
+    }
+
+    /// Sets the subject of the certificate of the client.
+    ///
+    /// # Arguments
+    ///
+    /// * `x509_certificate_subject_dn` - The subject of the certificate.
+    pub fn x509_certificate_subject_dn(
+        mut self,
+        x509_certificate_subject_dn: impl Into<String>,
+    ) -> Self {
+        self.settings.x509_certificate_subject_dn = Some(x509_certificate_subject_dn.into());
         self
     }
 
@@ -467,6 +542,25 @@ pub trait RegisteredClientRepository: Send + Sync {
     ///
     /// * `registered_client` - The registration to store.
     fn save(&self, registered_client: RegisteredClient);
+
+    /// Removes the registration of a client and returns whether one was stored.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - The identifier of the client.
+    fn remove(&self, client_id: &str) -> bool {
+        let _ = client_id;
+        false
+    }
+
+    /// Returns every registration the repository holds.
+    ///
+    /// The registrations are what a request that names one of their URIs is
+    /// validated against, such as the request that ends the session of a
+    /// resource owner.
+    fn list(&self) -> Vec<RegisteredClient> {
+        Vec::new()
+    }
 }
 
 /// A [`RegisteredClientRepository`] that keeps its registrations in memory.
@@ -518,6 +612,23 @@ impl RegisteredClientRepository for InMemoryRegisteredClientRepository {
             .write()
             .expect("the registered clients lock is not poisoned")
             .insert(registered_client.client_id().to_string(), registered_client);
+    }
+
+    fn remove(&self, client_id: &str) -> bool {
+        self.clients
+            .write()
+            .expect("the registered clients lock is not poisoned")
+            .remove(client_id)
+            .is_some()
+    }
+
+    fn list(&self) -> Vec<RegisteredClient> {
+        self.clients
+            .read()
+            .expect("the registered clients lock is not poisoned")
+            .values()
+            .cloned()
+            .collect()
     }
 }
 

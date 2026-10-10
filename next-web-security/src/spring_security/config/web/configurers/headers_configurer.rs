@@ -199,7 +199,9 @@ where
         let writers = self.get_header_writers();
         assert!(!writers.is_empty(), "Headers security is enabled, but no headers will be added. Either add headers or disable headers security");
 
-        // todo!(postProcess);
+        // The writers are applied as they are: the filter is built from the
+        // configuration of the application, which is what the post processor of
+        // the builder would have received.
         HeaderWriterFilter::new(writers)
     }
 

@@ -12,11 +12,13 @@ use next_web_core::{
 
 use super::{super::context::AuthorizationServerContext, support::json_response};
 
-/// Serves the metadata document of the authorization server.
+/// Serves the metadata document of the authorization server, and the discovery
+/// document of the OpenID Connect provider.
 ///
-/// The document is the `oauth-authorization-server` metadata of the
+/// The first document is the `oauth-authorization-server` metadata of the
 /// specification, which is what a client reads to discover the endpoints and
-/// the capabilities of the server.
+/// the capabilities of the server. The second document adds the endpoints an
+/// OpenID Connect client reads.
 #[derive(Clone)]
 pub struct AuthorizationServerMetadataEndpointFilter {
     context: AuthorizationServerContext,
@@ -42,9 +44,16 @@ impl HttpFilter for AuthorizationServerMetadataEndpointFilter {
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), next_web_core::filter::FilterError> {
         let settings = self.context.settings();
-        if request.path() != settings.authorization_server_metadata_endpoint() {
+        let metadata = if request.path() == settings.authorization_server_metadata_endpoint() {
+            Some(settings.metadata())
+        } else if request.path() == settings.openid_configuration_endpoint() {
+            Some(settings.openid_configuration())
+        } else {
+            None
+        };
+        let Some(metadata) = metadata else {
             return filter_chain.do_filter(request, response).await;
-        }
+        };
 
         if request.method() != next_web_core::http::HttpMethod::GET {
             response.set_status_code(StatusCode::METHOD_NOT_ALLOWED);
@@ -52,7 +61,7 @@ impl HttpFilter for AuthorizationServerMetadataEndpointFilter {
             return Ok(());
         }
 
-        json_response(response, StatusCode::OK, &settings.metadata());
+        json_response(response, StatusCode::OK, &metadata);
         Ok(())
     }
 }

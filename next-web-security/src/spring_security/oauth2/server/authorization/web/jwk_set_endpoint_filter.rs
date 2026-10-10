@@ -11,10 +11,7 @@ use next_web_core::{
     },
 };
 
-use super::{
-    super::context::AuthorizationServerContext, support::error_response, support::json_response,
-};
-use crate::oauth2::server::authorization::error::OAuth2Error;
+use super::{super::context::AuthorizationServerContext, support::json_response};
 
 /// Serves the JWK set of the authorization server.
 ///
@@ -54,15 +51,8 @@ impl HttpFilter for JwkSetEndpointFilter {
             return Ok(());
         }
 
-        match self.context.jwk_source() {
-            Some(jwk_source) => {
-                json_response(response, StatusCode::OK, &jwk_source.jwk_set().to_json());
-            }
-            None => error_response(
-                response,
-                &OAuth2Error::server_error("The authorization server has no key to publish"),
-            ),
-        }
+        let jwk_source = self.context.jwk_source();
+        json_response(response, StatusCode::OK, &jwk_source.jwk_set().to_json());
 
         Ok(())
     }
@@ -81,18 +71,18 @@ mod tests {
     use next_web_core::{http::StatusCode, traits::filter::HttpFilter};
 
     use super::{super::test_support, JwkSetEndpointFilter};
-    use crate::oauth2::server::authorization::{
-        client::InMemoryRegisteredClientRepository,
-        context::AuthorizationServerContext,
-        jose::{JwkSource, SecretJwkSource},
+    use crate::oauth2::{
+        jose::{JwtSigner, SecretJwtSigner},
+        server::authorization::{
+            client::InMemoryRegisteredClientRepository, context::AuthorizationServerContext,
+        },
     };
 
     #[tokio::test]
     async fn the_endpoint_publishes_the_keys_of_the_server() {
-        let jwk_source: Arc<dyn JwkSource> = Arc::new(SecretJwkSource::new("secret"));
         let context = AuthorizationServerContext::builder()
             .registered_clients(Arc::new(InMemoryRegisteredClientRepository::default()))
-            .jwk_source(jwk_source)
+            .jwt_signer(Arc::new(SecretJwtSigner::new("secret")) as Arc<dyn JwtSigner>)
             .build();
         let filters: Arc<[Arc<dyn HttpFilter>]> =
             Arc::from(vec![

@@ -1,4 +1,6 @@
-use crate::authorization::authorization_decision::AuthorizationDecision;
+use crate::authorization::{
+    authorization_decision::AuthorizationDecision, AuthorizationResult,
+};
 
 /// An AuthorizationDecision that also carries the expression that produced the decision.
 #[derive(Clone, Debug)]
@@ -16,7 +18,7 @@ impl ExpressionAuthorizationDecision {
     }
 
     pub fn is_granted(&self) -> bool {
-        todo!()
+        self.decision.is_granted()
     }
 
     pub fn expression(&self) -> &str {

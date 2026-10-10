@@ -15,7 +15,8 @@ use super::{
     super::{
         authorization::{
             consume_authorization_code, OAuth2Authorization, CODE_CHALLENGE_ATTRIBUTE,
-            CODE_CHALLENGE_METHOD_ATTRIBUTE, REDIRECT_URI_ATTRIBUTE, SCOPES_ATTRIBUTE,
+            CODE_CHALLENGE_METHOD_ATTRIBUTE, NONCE_ATTRIBUTE, REDIRECT_URI_ATTRIBUTE,
+            SCOPES_ATTRIBUTE,
         },
         client::{AuthorizationGrantType, RegisteredClient},
         client_authentication::{authenticate_client, form_parameter},
@@ -112,6 +113,131 @@ impl TokenEndpointFilter {
             AuthorizationGrantType::ClientCredentials => {
                 self.client_credentials(request, response, &registered_client)
             }
+            AuthorizationGrantType::DeviceCode => {
+                self.device_code(request, response, &registered_client)
+            }
+        }
+    }
+
+    /// Issues the tokens of the device authorization grant.
+    ///
+    /// The device polls the endpoint with its device code. A poll that arrives
+    /// before the resource owner answered reports `authorization_pending`, a
+    /// poll that arrives too soon reports `slow_down`, and a request the
+    /// resource owner denied or that expired is refused. The tokens are issued
+    /// once the resource owner approved the request.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The request of the endpoint.
+    /// * `response` - The response of the endpoint.
+    /// * `registered_client` - The authenticated client.
+    fn device_code(
+        &self,
+        request: &dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        registered_client: &RegisteredClient,
+    ) -> Result<(), OAuth2Error> {
+        use crate::oauth2::server::authorization::device::DeviceAuthorizationStatus;
+
+        let device_code = form_parameter(request, "device_code")
+            .ok_or_else(|| OAuth2Error::invalid_request("The device_code parameter is required"))?;
+
+        let mut device_authorization = self
+            .context
+            .device_authorizations()
+            .find_by_device_code(&device_code)
+            .ok_or_else(|| OAuth2Error::invalid_grant("The device code is invalid"))?;
+        if device_authorization.registered_client_id() != registered_client.id_value() {
+            return Err(OAuth2Error::invalid_grant(
+                "The device code was issued to another client",
+            ));
+        }
+
+        let now = now();
+        if device_authorization.is_expired(now) {
+            return Err(OAuth2Error::expired_token("The device code is expired"));
+        }
+
+        match device_authorization.status() {
+            DeviceAuthorizationStatus::Pending => {
+                // A device that polls again before the interval of the
+                // authorization passed is told to slow down. The check applies
+                // while the request is pending, because an approved request is
+                // answered with the tokens as soon as it is polled.
+                let polled_too_soon = device_authorization
+                    .last_polled_at()
+                    .is_some_and(|last_polled_at| {
+                        now.saturating_sub(last_polled_at) < device_authorization.interval()
+                    });
+                device_authorization.record_poll(now);
+                self.context
+                    .device_authorizations()
+                    .save(device_authorization);
+                if polled_too_soon {
+                    Err(OAuth2Error::slow_down("The device polls too quickly"))
+                } else {
+                    Err(OAuth2Error::authorization_pending(
+                        "The resource owner has not answered the request yet",
+                    ))
+                }
+            }
+            DeviceAuthorizationStatus::Denied => {
+                device_authorization.record_poll(now);
+                self.context
+                    .device_authorizations()
+                    .save(device_authorization);
+                Err(OAuth2Error::access_denied(
+                    "The resource owner denied the request",
+                ))
+            }
+            DeviceAuthorizationStatus::Approved => {
+                device_authorization.record_poll(now);
+                let principal_name = device_authorization
+                    .principal_name()
+                    .unwrap_or(registered_client.client_id())
+                    .to_string();
+                let scopes = device_authorization.scopes().to_vec();
+                self.context
+                    .device_authorizations()
+                    .save(device_authorization);
+
+                let (access_token, refresh_token) = self.generate_tokens(
+                    registered_client,
+                    None,
+                    Some(&principal_name),
+                    &scopes,
+                )?;
+
+                let mut authorization = OAuth2Authorization::new(
+                    next_web_core::Uuid::new_v4().to_string(),
+                    registered_client.id_value(),
+                    principal_name.clone(),
+                )
+                .set_grant_type(AuthorizationGrantType::DeviceCode)
+                .set_attribute(SCOPES_ATTRIBUTE, scopes.join(" "))
+                .access_token(access_token.clone());
+                if let Some(refresh_token) = refresh_token.as_ref() {
+                    authorization.set_refresh_token(refresh_token.clone());
+                }
+                self.context.authorizations().save(authorization);
+
+                let id_token = self.id_token(
+                    registered_client,
+                    &principal_name,
+                    &scopes,
+                    None,
+                    &access_token,
+                )?;
+                write_token_response(
+                    response,
+                    &access_token,
+                    refresh_token.as_ref(),
+                    &scopes,
+                    id_token.as_deref(),
+                );
+                Ok(())
+            }
         }
     }
 
@@ -186,13 +312,31 @@ impl TokenEndpointFilter {
             &scopes,
         )?;
 
+        let principal_name = authorization.principal_name().to_string();
+        let nonce = authorization
+            .attribute(NONCE_ATTRIBUTE)
+            .map(ToString::to_string);
+
         authorization.set_access_token(access_token.clone());
         if let Some(refresh_token) = refresh_token.as_ref() {
             authorization.set_refresh_token(refresh_token.clone());
         }
         self.context.authorizations().save(authorization);
 
-        write_token_response(response, &access_token, refresh_token.as_ref(), &scopes);
+        let id_token = self.id_token(
+            registered_client,
+            &principal_name,
+            &scopes,
+            nonce.as_deref(),
+            &access_token,
+        )?;
+        write_token_response(
+            response,
+            &access_token,
+            refresh_token.as_ref(),
+            &scopes,
+            id_token.as_deref(),
+        );
         Ok(())
     }
 
@@ -258,6 +402,11 @@ impl TokenEndpointFilter {
             rotated_refresh_token.clone()
         };
 
+        let principal_name = authorization.principal_name().to_string();
+        let nonce = authorization
+            .attribute(NONCE_ATTRIBUTE)
+            .map(ToString::to_string);
+
         authorization.set_access_token(access_token.clone());
         if let Some(rotated_refresh_token) = rotated_refresh_token {
             if !registered_client.token_settings().reuse_refresh_tokens() {
@@ -266,7 +415,20 @@ impl TokenEndpointFilter {
         }
         self.context.authorizations().save(authorization);
 
-        write_token_response(response, &access_token, refresh_token.as_ref(), &scopes);
+        let id_token = self.id_token(
+            registered_client,
+            &principal_name,
+            &scopes,
+            nonce.as_deref(),
+            &access_token,
+        )?;
+        write_token_response(
+            response,
+            &access_token,
+            refresh_token.as_ref(),
+            &scopes,
+            id_token.as_deref(),
+        );
         Ok(())
     }
 
@@ -309,7 +471,7 @@ impl TokenEndpointFilter {
         .access_token(access_token.clone());
         self.context.authorizations().save(authorization);
 
-        write_token_response(response, &access_token, None, &scopes);
+        write_token_response(response, &access_token, None, &scopes, None);
         Ok(())
     }
 
@@ -376,6 +538,46 @@ impl TokenEndpointFilter {
 
         Ok((access_token, refresh_token))
     }
+
+    /// Returns the identifier token of a grant that asks for one.
+    ///
+    /// An OpenID Connect client asks for the `openid` scope, and the identifier
+    /// token it receives names the resource owner, the client, and the nonce of
+    /// the authorization request.
+    ///
+    /// # Arguments
+    ///
+    /// * `registered_client` - The client the grant was issued to.
+    /// * `principal_name` - The name of the resource owner.
+    /// * `scopes` - The scopes of the grant.
+    /// * `nonce` - The nonce of the authorization request, if one was sent.
+    /// * `access_token` - The access token of the grant.
+    fn id_token(
+        &self,
+        registered_client: &RegisteredClient,
+        principal_name: &str,
+        scopes: &[String],
+        nonce: Option<&str>,
+        access_token: &OAuth2AccessToken,
+    ) -> Result<Option<String>, OAuth2Error> {
+        if !scopes.iter().any(|scope| scope == "openid") {
+            return Ok(None);
+        }
+
+        let issuer = self.context.issuer();
+        let mut claims = json!({
+            "iss": issuer,
+            "sub": principal_name,
+            "aud": registered_client.client_id(),
+            "iat": access_token.issued_at(),
+            "exp": access_token.expires_at(),
+        });
+        if let Some(nonce) = nonce {
+            claims["nonce"] = json!(nonce);
+        }
+
+        self.context.jwt_signer().sign(&claims).map(Some)
+    }
 }
 
 #[async_trait]
@@ -413,6 +615,7 @@ pub(crate) fn write_token_response(
     access_token: &OAuth2AccessToken,
     refresh_token: Option<&OAuth2RefreshToken>,
     scopes: &[String],
+    id_token: Option<&str>,
 ) {
     let mut body = json!({
         "access_token": access_token.token_value(),
@@ -424,6 +627,9 @@ pub(crate) fn write_token_response(
     }
     if !scopes.is_empty() {
         body["scope"] = json!(scopes.join(" "));
+    }
+    if let Some(id_token) = id_token {
+        body["id_token"] = json!(id_token);
     }
 
     json_response(response, StatusCode::OK, &body);

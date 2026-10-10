@@ -361,11 +361,11 @@ where
         T: AnyClone,
         T: Clone,
     {
-        if let Some(shared) = http.shared_object::<T>().map(Clone::clone) {
-            return Some(shared);
-        }
-
-        todo!("Application context get singleton")
+        // The value is resolved from the shared objects of the HTTP security,
+        // which is where the framework puts the values of the application. A
+        // value the application did not contribute is not resolved, and the
+        // caller decides how to report it.
+        http.shared_object::<T>().map(Clone::clone)
     }
 }
 

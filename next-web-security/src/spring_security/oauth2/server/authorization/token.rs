@@ -7,10 +7,11 @@ use std::{
 
 use serde_json::json;
 
+use crate::oauth2::jose::JwtSigner;
+
 use super::{
     client::{AuthorizationGrantType, RegisteredClient},
     error::OAuth2Error,
-    jose::{encode_jwt, JwkSource},
 };
 
 /// The type of a token.
@@ -375,17 +376,17 @@ impl OAuth2TokenGenerator for OAuth2RefreshTokenGenerator {
 /// authorization server.
 #[derive(Clone)]
 pub struct JwtGenerator {
-    jwk_source: Arc<dyn JwkSource>,
+    signer: Arc<dyn JwtSigner>,
 }
 
 impl JwtGenerator {
-    /// Creates a generator from the keys of the authorization server.
+    /// Creates a generator from the signer of the authorization server.
     ///
     /// # Arguments
     ///
-    /// * `jwk_source` - The keys the tokens are signed with.
-    pub fn new(jwk_source: Arc<dyn JwkSource>) -> Self {
-        Self { jwk_source }
+    /// * `signer` - The signer the tokens are signed with.
+    pub fn new(signer: Arc<dyn JwtSigner>) -> Self {
+        Self { signer }
     }
 }
 
@@ -394,11 +395,6 @@ impl OAuth2TokenGenerator for JwtGenerator {
         if context.token_type() != OAuth2TokenType::AccessToken {
             return Ok(None);
         }
-
-        let jwk_set = self.jwk_source.jwk_set();
-        let jwk = jwk_set.keys().first().ok_or_else(|| {
-            OAuth2Error::server_error("The authorization server has no key to sign with")
-        })?;
 
         let issued_at = now();
         let time_to_live = context
@@ -426,7 +422,7 @@ impl OAuth2TokenGenerator for JwtGenerator {
             claims["authorization_id"] = json!(authorization_id);
         }
 
-        let token_value = encode_jwt(jwk, &claims);
+        let token_value = self.signer.sign(&claims)?;
         Ok(Some(OAuth2Token::Access(OAuth2AccessToken::new(
             token_value,
             issued_at,
@@ -498,9 +494,9 @@ mod tests {
         OAuth2RefreshTokenGenerator, OAuth2Token, OAuth2TokenContext, OAuth2TokenGenerator,
         OAuth2TokenType,
     };
-    use crate::oauth2::server::authorization::{
-        client::RegisteredClient,
-        jose::{decode_jwt_claims, JwkSource, SecretJwkSource},
+    use crate::oauth2::{
+        jose::{base64_url_decode, JwtSigner, SecretJwtSigner},
+        server::authorization::client::RegisteredClient,
     };
 
     fn client() -> RegisteredClient {
@@ -509,8 +505,8 @@ mod tests {
 
     #[test]
     fn the_jwt_generator_signs_a_token_with_the_claims_of_the_context() {
-        let source: Arc<dyn JwkSource> = Arc::new(SecretJwkSource::new("secret"));
-        let generator = JwtGenerator::new(source);
+        let signer: Arc<dyn JwtSigner> = Arc::new(SecretJwtSigner::new("secret"));
+        let generator = JwtGenerator::new(signer);
         let context = OAuth2TokenContext::new(
             OAuth2TokenType::AccessToken,
             client(),
@@ -527,7 +523,14 @@ mod tests {
         let OAuth2Token::Access(token) = token else {
             panic!("the generator produces an access token");
         };
-        let claims = decode_jwt_claims(token.token_value()).expect("the token is a JWT");
+        let payload = token
+            .token_value()
+            .split('.')
+            .nth(1)
+            .and_then(base64_url_decode)
+            .expect("the token is a JWT");
+        let claims: serde_json::Value =
+            serde_json::from_slice(&payload).expect("the payload of the token is JSON");
         assert_eq!(claims["iss"], "https://server.example");
         assert_eq!(claims["sub"], "user");
         assert_eq!(claims["aud"], "demo-client");

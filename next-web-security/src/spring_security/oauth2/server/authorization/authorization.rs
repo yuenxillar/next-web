@@ -22,6 +22,8 @@ pub const REDIRECT_URI_ATTRIBUTE: &str = "redirect_uri";
 pub const STATE_ATTRIBUTE: &str = "state";
 /// The name of the attribute that holds the scopes of the request.
 pub const SCOPES_ATTRIBUTE: &str = "scopes";
+/// The name of the attribute that holds the nonce of the request.
+pub const NONCE_ATTRIBUTE: &str = "nonce";
 
 /// An authorization the authorization server granted, and the tokens it issued
 /// for it.
@@ -287,8 +289,12 @@ impl OAuth2AuthorizationService for InMemoryOAuth2AuthorizationService {
                         .is_some_and(|refresh_token| refresh_token.token_value() == token);
                 let matches_code =
                     authorization.attribute(AUTHORIZATION_CODE_ATTRIBUTE) == Some(token);
+                let matches_state = authorization.attribute(STATE_ATTRIBUTE) == Some(token)
+                    && token_type
+                        .map(|token_type| token_type == OAuth2TokenType::State)
+                        .unwrap_or(true);
 
-                matches_access || matches_refresh || matches_code
+                matches_access || matches_refresh || matches_code || matches_state
             })
             .cloned()
     }

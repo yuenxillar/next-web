@@ -54,14 +54,65 @@ impl DefaultOAuth2AuthorizationRequestResolver {
         client_registration: ClientRegistration,
     ) -> OAuth2AuthorizationRequest {
         let state = Uuid::new_v4().to_string();
-        let authorization_request_uri = authorization_request_uri(&client_registration, &state);
-        OAuth2AuthorizationRequest::new(
+        // A client that uses a proof key sends the digest of a verifier it
+        // keeps, and the verifier is what it exchanges the code with.
+        let proof_key = client_registration
+            .require_proof_key()
+            .then(|| ProofKey::generate());
+        // An OpenID Connect client sends a nonce, and the identifier token the
+        // grant receives has to carry it back.
+        let nonce = client_registration
+            .scopes()
+            .iter()
+            .any(|scope| scope == "openid")
+            .then(|| Uuid::new_v4().to_string());
+        let authorization_request_uri = authorization_request_uri(
+            &client_registration,
+            &state,
+            proof_key.as_ref(),
+            nonce.as_deref(),
+        );
+        let mut authorization_request = OAuth2AuthorizationRequest::new(
             client_registration.registration_id().to_string(),
             authorization_request_uri,
             state,
             client_registration.redirect_uri().map(ToOwned::to_owned),
             client_registration.scopes().to_vec(),
-        )
+        );
+        if let Some(nonce) = nonce {
+            authorization_request = authorization_request.set_nonce(nonce);
+        }
+
+        match proof_key {
+            Some(proof_key) => authorization_request.set_code_verifier(proof_key.verifier),
+            None => authorization_request,
+        }
+    }
+}
+
+/// The proof key a client uses for the authorization code grant.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ProofKey {
+    verifier: String,
+    challenge: String,
+    method: &'static str,
+}
+
+impl ProofKey {
+    /// Generates a proof key with its challenge.
+    fn generate() -> Self {
+        use sha2::{Digest, Sha256};
+
+        // The verifier is a random value of the characters the specification
+        // allows, and the challenge is its base64url encoded SHA-256 digest.
+        let verifier = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+        let challenge = crate::oauth2::jose::base64_url(&Sha256::digest(verifier.as_bytes()));
+
+        Self {
+            verifier,
+            challenge,
+            method: "S256",
+        }
     }
 }
 
@@ -115,7 +166,12 @@ pub fn extract_registration_id(path: &str, authorization_request_base_uri: &str)
     }
 }
 
-fn authorization_request_uri(client_registration: &ClientRegistration, state: &str) -> String {
+fn authorization_request_uri(
+    client_registration: &ClientRegistration,
+    state: &str,
+    proof_key: Option<&ProofKey>,
+    nonce: Option<&str>,
+) -> String {
     let mut params = Vec::new();
     params.push(("response_type", "code".to_string()));
     if !client_registration.client_id().is_empty() {
@@ -126,6 +182,13 @@ fn authorization_request_uri(client_registration: &ClientRegistration, state: &s
     }
     if let Some(redirect_uri) = client_registration.redirect_uri() {
         params.push(("redirect_uri", redirect_uri.to_string()));
+    }
+    if let Some(proof_key) = proof_key {
+        params.push(("code_challenge", proof_key.challenge.clone()));
+        params.push(("code_challenge_method", proof_key.method.to_string()));
+    }
+    if let Some(nonce) = nonce {
+        params.push(("nonce", nonce.to_string()));
     }
     params.push(("state", state.to_string()));
 

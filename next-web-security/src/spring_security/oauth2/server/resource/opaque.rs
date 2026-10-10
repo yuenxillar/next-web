@@ -48,6 +48,11 @@ impl OAuth2AuthenticatedPrincipal {
     pub fn attributes(&self) -> &HashMap<String, String> {
         &self.attributes
     }
+
+    /// Returns the authorities of the principal.
+    pub fn authorities(&self) -> &[Arc<dyn GrantedAuthority>] {
+        &self.authorities
+    }
 }
 
 impl Principal for OAuth2AuthenticatedPrincipal {
@@ -99,6 +104,20 @@ impl OAuth2ProtectedResourceMetadata {
         self.authorization_servers = authorization_servers;
     }
 
+    /// Returns the signing algorithms of the resource.
+    pub fn resource_signing_algorithms(&self) -> &[String] {
+        &self.resource_signing_algorithms
+    }
+
+    /// Sets the signing algorithms of the resource.
+    ///
+    /// # Arguments
+    ///
+    /// * `resource_signing_algorithms` - The algorithms the resource accepts.
+    pub fn set_resource_signing_algorithms(&mut self, resource_signing_algorithms: Vec<String>) {
+        self.resource_signing_algorithms = resource_signing_algorithms;
+    }
+
     pub fn jwk_set_url(&self) -> Option<&String> {
         self.jwk_set_url.as_ref()
     }
@@ -110,21 +129,44 @@ impl OAuth2ProtectedResourceMetadata {
 
 /// Introspects an opaque bearer token, returning the associated authenticated
 /// principal.
+#[async_trait]
 pub trait OpaqueTokenIntrospector: Send + Sync {
-    fn introspect(&self, token: &str) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError>;
+    /// Returns the principal of an opaque token.
+    ///
+    /// A token that is not active is reported as a bad credential, which is
+    /// what ends the authentication of the request.
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - The opaque token of the request.
+    async fn introspect(&self, token: &str)
+        -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError>;
 }
 
-/// The default introspector backed by Next's `OAuth2AuthenticatedPrincipal`
-/// Introspector for opaque tokens. It accepts a compact `name|authority1,authority2`
-/// representation, which is useful for local deployments without a remote endpoint.
+/// The introspector of an opaque token, backed by the introspection endpoint of
+/// an authorization server.
+///
+/// The introspector asks the endpoint for the state of the token, which is what
+/// the specification names token introspection. The endpoint is called with the
+/// credentials of the resource server, and a token the endpoint reports as
+/// inactive is rejected.
 #[derive(Clone, Debug)]
 pub struct SpringOpaqueTokenIntrospector {
     introspection_uri: String,
-    client_id: Option<String>,
-    client_secret: Option<String>,
+    client_id: String,
+    client_secret: String,
+    http_client: reqwest::Client,
 }
 
 impl SpringOpaqueTokenIntrospector {
+    /// Creates an introspector that calls the given introspection endpoint with
+    /// the given client credentials.
+    ///
+    /// # Arguments
+    ///
+    /// * `introspection_uri` - The URI of the introspection endpoint.
+    /// * `client_id` - The identifier of the resource server.
+    /// * `client_secret` - The secret of the resource server.
     pub fn new(
         introspection_uri: impl Into<String>,
         client_id: impl Into<String>,
@@ -132,39 +174,194 @@ impl SpringOpaqueTokenIntrospector {
     ) -> Self {
         Self {
             introspection_uri: introspection_uri.into(),
-            client_id: Some(client_id.into()),
-            client_secret: Some(client_secret.into()),
+            client_id: client_id.into(),
+            client_secret: client_secret.into(),
+            http_client: reqwest::Client::new(),
         }
+    }
+
+    /// Creates an introspector that calls the endpoint with the given HTTP
+    /// client.
+    ///
+    /// # Arguments
+    ///
+    /// * `introspection_uri` - The URI of the introspection endpoint.
+    /// * `client_id` - The identifier of the resource server.
+    /// * `client_secret` - The secret of the resource server.
+    /// * `http_client` - The HTTP client of the introspector.
+    pub fn with_http_client(
+        introspection_uri: impl Into<String>,
+        client_id: impl Into<String>,
+        client_secret: impl Into<String>,
+        http_client: reqwest::Client,
+    ) -> Self {
+        Self {
+            introspection_uri: introspection_uri.into(),
+            client_id: client_id.into(),
+            client_secret: client_secret.into(),
+            http_client,
+        }
+    }
+
+    /// Returns the URI of the introspection endpoint.
+    pub fn introspection_uri(&self) -> &str {
+        &self.introspection_uri
     }
 }
 
+#[async_trait]
 impl OpaqueTokenIntrospector for SpringOpaqueTokenIntrospector {
-    fn introspect(&self, token: &str) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError> {
-        let mut parts = token.splitn(2, '|');
-        let name = parts.next().unwrap_or_default().trim();
-        if name.is_empty() {
+    async fn introspect(
+        &self,
+        token: &str,
+    ) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError> {
+        if self.introspection_uri.trim().is_empty() {
             return Err(AuthenticationError::with_kind(
-                "Opaque token is inactive",
+                "The introspection endpoint of the resource server is not configured",
                 AuthenticationErrorKind::BadCredentials,
             ));
         }
-        let authorities = parts
-            .next()
-            .unwrap_or_default()
-            .split(',')
-            .filter(|v| !v.trim().is_empty())
-            .map(|v| {
-                Arc::new(crate::core::authority::SimpleGrantedAuthority::new(
-                    v.trim(),
-                )) as Arc<dyn GrantedAuthority>
-            })
-            .collect();
-        Ok(OAuth2AuthenticatedPrincipal::new(
-            name,
-            authorities,
-            HashMap::new(),
-        ))
+
+        let mut request = self
+            .http_client
+            .post(&self.introspection_uri)
+            .form(&[("token", token), ("token_type_hint", "access_token")]);
+        if !self.client_id.is_empty() {
+            request = request.basic_auth(&self.client_id, Some(&self.client_secret));
+        }
+
+        let response = request.send().await.map_err(|error| {
+            AuthenticationError::with_kind(
+                format!("The introspection endpoint cannot be reached: {error}"),
+                AuthenticationErrorKind::BadCredentials,
+            )
+        })?;
+
+        if !response.status().is_success() {
+            return Err(AuthenticationError::with_kind(
+                format!(
+                    "The introspection endpoint reports the status {}",
+                    response.status()
+                ),
+                AuthenticationErrorKind::BadCredentials,
+            ));
+        }
+
+        let introspection = response.json::<serde_json::Value>().await.map_err(|error| {
+            AuthenticationError::with_kind(
+                format!("The introspection response is not a valid document: {error}"),
+                AuthenticationErrorKind::BadCredentials,
+            )
+        })?;
+
+        principal_of(&introspection)
     }
+}
+
+/// Builds the principal of an introspection response.
+///
+/// A response that does not report the token as active is rejected. The name of
+/// the principal is the subject of the token, or the client the token was
+/// issued to, and the scopes of the token become the authorities of the
+/// principal.
+///
+/// # Arguments
+///
+/// * `introspection` - The document the introspection endpoint returned.
+fn principal_of(
+    introspection: &serde_json::Value,
+) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError> {
+    if !introspection
+        .get("active")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Err(AuthenticationError::with_kind(
+            "The opaque token is not active",
+            AuthenticationErrorKind::BadCredentials,
+        ));
+    }
+
+    let name = introspection
+        .get("sub")
+        .or_else(|| introspection.get("client_id"))
+        .or_else(|| introspection.get("username"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("anonymous")
+        .to_string();
+
+    let authorities = scopes_of(introspection)
+        .into_iter()
+        .map(|scope| {
+            let authority = if scope.starts_with("SCOPE_") {
+                scope
+            } else {
+                format!("SCOPE_{scope}")
+            };
+            Arc::new(crate::core::authority::SimpleGrantedAuthority::new(authority))
+                as Arc<dyn GrantedAuthority>
+        })
+        .collect();
+
+    Ok(OAuth2AuthenticatedPrincipal::new(
+        name,
+        authorities,
+        attributes_of(introspection),
+    ))
+}
+
+/// Returns the scopes an introspection response reports.
+///
+/// # Arguments
+///
+/// * `introspection` - The document the introspection endpoint returned.
+fn scopes_of(introspection: &serde_json::Value) -> Vec<String> {
+    match introspection.get("scope") {
+        Some(serde_json::Value::String(scope)) => scope
+            .split_whitespace()
+            .filter(|scope| !scope.is_empty())
+            .map(ToString::to_string)
+            .collect(),
+        Some(serde_json::Value::Array(scopes)) => scopes
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .map(ToString::to_string)
+            .collect(),
+        _ => introspection
+            .get("scp")
+            .and_then(serde_json::Value::as_array)
+            .map(|scopes| {
+                scopes
+                    .iter()
+                    .filter_map(serde_json::Value::as_str)
+                    .map(ToString::to_string)
+                    .collect()
+            })
+            .unwrap_or_default(),
+    }
+}
+
+/// Returns the claims an introspection response reports as attributes.
+///
+/// # Arguments
+///
+/// * `introspection` - The document the introspection endpoint returned.
+fn attributes_of(introspection: &serde_json::Value) -> HashMap<String, String> {
+    introspection
+        .as_object()
+        .map(|claims| {
+            claims
+                .iter()
+                .map(|(name, value)| {
+                    let value = match value {
+                        serde_json::Value::String(value) => value.clone(),
+                        value => value.to_string(),
+                    };
+                    (name.clone(), value)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Converts an introspected principal into the authenticated bearer token
@@ -241,7 +438,7 @@ impl AuthenticationProvider for OpaqueTokenAuthenticationProvider {
                 AuthenticationErrorKind::BadCredentials,
             )
         })?;
-        let principal = self.introspector.introspect(bearer)?;
+        let principal = self.introspector.introspect(bearer).await?;
         let (principal, authorities) = self.authentication_converter.convert(token, &principal);
         Ok(Some(Arc::new(
             BearerTokenAuthenticationToken::authenticated(principal, authorities, bearer),
@@ -379,5 +576,135 @@ where
 {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        sync::{Arc, Mutex},
+    };
+
+    use axum::{
+        extract::{Form, State},
+        http::HeaderMap,
+        routing::post,
+        Json, Router,
+    };
+    use serde_json::json;
+
+    use crate::core::Principal;
+
+    use super::{
+        OAuth2AuthenticatedPrincipal, OpaqueTokenIntrospector, SpringOpaqueTokenIntrospector,
+    };
+
+    /// The request the introspector made, kept so a test can assert on it.
+    #[derive(Clone, Default)]
+    struct Captured {
+        authorization: Option<String>,
+        token: Option<String>,
+    }
+
+    /// Serves an introspection endpoint that reports the token as active.
+    async fn introspection_server(
+        State(captured): State<Arc<Mutex<Captured>>>,
+        headers: HeaderMap,
+        Form(form): Form<HashMap<String, String>>,
+    ) -> Json<serde_json::Value> {
+        let mut captured = captured.lock().expect("the captured request is not poisoned");
+        captured.authorization = headers
+            .get("authorization")
+            .and_then(|value| value.to_str().ok())
+            .map(ToString::to_string);
+        captured.token = form.get("token").cloned();
+        drop(captured);
+
+        Json(json!({
+            "active": true,
+            "sub": "user",
+            "client_id": "demo-client",
+            "scope": "read write",
+            "exp": 4_102_444_800_u64,
+        }))
+    }
+
+    async fn serve(captured: Arc<Mutex<Captured>>) -> String {
+        let app = Router::new()
+            .route("/oauth2/introspect", post(introspection_server))
+            .with_state(captured);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("the introspection server listens");
+        let address = listener.local_addr().expect("the listener has an address");
+
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        format!("http://{address}/oauth2/introspect")
+    }
+
+    #[test]
+    fn an_active_introspection_becomes_a_principal() {
+        let introspection = json!({
+            "active": true,
+            "sub": "user",
+            "scope": "read write",
+            "client_id": "demo-client",
+        });
+
+        let principal =
+            super::principal_of(&introspection).expect("the token is active");
+
+        assert_eq!(principal.name().as_ref(), "user");
+        assert_eq!(principal.authorities().len(), 2);
+        assert_eq!(
+            principal.attributes().get("client_id"),
+            Some(&"demo-client".to_string())
+        );
+    }
+
+    #[test]
+    fn an_inactive_introspection_is_rejected() {
+        let introspection = json!({ "active": false });
+
+        assert!(super::principal_of(&introspection).is_err());
+    }
+
+    #[tokio::test]
+    async fn the_introspector_calls_the_endpoint_with_the_credentials_of_the_server() {
+        let captured = Arc::new(Mutex::new(Captured::default()));
+        let uri = serve(captured.clone()).await;
+        let introspector =
+            SpringOpaqueTokenIntrospector::new(uri, "resource-server", "resource-secret");
+
+        let principal = introspector
+            .introspect("the-token")
+            .await
+            .expect("the token is active");
+
+        assert_eq!(principal.name().as_ref(), "user");
+        let captured = captured.lock().expect("the captured request is not poisoned");
+        assert_eq!(
+            captured.authorization.as_deref(),
+            Some("Basic cmVzb3VyY2Utc2VydmVyOnJlc291cmNlLXNlY3JldA=="),
+            "the client authenticates with the Authorization header"
+        );
+        assert_eq!(captured.token.as_deref(), Some("the-token"));
+    }
+
+    #[tokio::test]
+    async fn the_introspector_without_an_endpoint_is_rejected() {
+        let introspector = SpringOpaqueTokenIntrospector::new("", "", "");
+
+        assert!(introspector.introspect("the-token").await.is_err());
+    }
+
+    /// Keeps the unused import of the principal type checked by the compiler.
+    #[allow(dead_code)]
+    fn principal_type_is_used(principal: &OAuth2AuthenticatedPrincipal) -> String {
+        principal.name().to_string()
     }
 }

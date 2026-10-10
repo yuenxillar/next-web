@@ -10,6 +10,7 @@ repository.workspace = true
 next-web-core.workspace     = true
 next-web-context.workspace  = true
 next-web-macros.workspace   = true
+next-web-singletons.workspace = true
 
 tokio.workspace         = true
 serde.workspace         = true
@@ -21,8 +22,11 @@ futures.workspace       = true
 urlencoding.workspace   = true
 hex.workspace           = true
 hmac.workspace          = true
+jsonwebtoken.workspace  = true
 rand.workspace          = true
+reqwest.workspace       = true
 md5.workspace           = true
+rsa.workspace           = true
 sha2.workspace          = true
 tracing.workspace       = true
 

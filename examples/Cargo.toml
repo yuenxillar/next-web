@@ -45,6 +45,10 @@ base64          = { workspace = true }
 sha2            = { workspace = true }
 urlencoding     = { workspace = true }
 form_urlencoded = { workspace = true }
+# The tests of the authorization server reach the endpoints of the server over
+# HTTP, the way a client and a resource server do.
+reqwest         = { workspace = true }
+jsonwebtoken    = { workspace = true }
 
 [features]
 default = []

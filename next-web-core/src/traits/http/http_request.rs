@@ -259,6 +259,29 @@ struct RequestedSessionId(String);
 #[derive(Clone)]
 struct RequestContextPath(String);
 
+/// Marks a request whose per-request state was prepared.
+///
+/// The marker is what makes the preparation of a request have no effect the
+/// second time, and it is removed by [`HttpRequest::clean_up`], so a request
+/// that is prepared again after it was released is prepared from its state
+/// again.
+#[derive(Clone, Copy, Debug)]
+struct Prepared;
+
+/// Returns whether the per-request state of the request was prepared.
+///
+/// The outermost layer of an application prepares every request with
+/// [`HttpRequest::ready`], and a layer inside it that has to prepare a request
+/// it owns can ask whether the preparation already ran instead of paying for it
+/// twice.
+///
+/// # Arguments
+///
+/// * `request` - The request to look at.
+pub fn is_request_prepared(request: &Request) -> bool {
+    request.extensions().get::<Prepared>().is_some()
+}
+
 impl HttpRequest for Request {
     fn session(&self) -> Option<&dyn HttpSession> {
         self.extensions()
@@ -463,6 +486,14 @@ impl HttpRequest for Request {
     }
 
     fn ready(&mut self) {
+        // The preparation of a request has no effect when it already ran, which
+        // is what keeps a layer that follows the outermost layer of an
+        // application (the layer that prepares every request) from reading the
+        // state of the client a second time. See [`is_request_prepared`].
+        if self.extensions().get::<Prepared>().is_some() {
+            return;
+        }
+
         if self.extensions().get::<OneMap>().is_none() {
             self.extensions_mut().insert(OneMap::new());
         }
@@ -479,6 +510,8 @@ impl HttpRequest for Request {
         if self.extensions().get::<StandardSession>().is_none() {
             load_working_session(self);
         }
+
+        self.extensions_mut().insert(Prepared);
     }
 
     fn clean_up(&mut self) {
@@ -492,6 +525,7 @@ impl HttpRequest for Request {
         extensions.remove::<RequestedSessionId>();
         extensions.remove::<Arc<dyn SessionManager>>();
         extensions.remove::<RequestContextPath>();
+        extensions.remove::<Prepared>();
     }
 
     fn is_secure(&self) -> bool {

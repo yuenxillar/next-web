@@ -2,12 +2,22 @@
 
 use std::sync::Arc;
 
-use crate::crypto::password::PasswordEncoder;
+use crate::{
+    crypto::password::PasswordEncoder,
+    oauth2::jose::{JwkSource, JwtSigner, SecretJwtSigner, SignerJwkSource},
+};
 
 use super::{
     authorization::OAuth2AuthorizationService,
     client::RegisteredClientRepository,
-    jose::{JwkSource, SecretJwkSource},
+    consent::{InMemoryOAuth2AuthorizationConsentService, OAuth2AuthorizationConsentService},
+    device::{
+        InMemoryOAuth2DeviceAuthorizationService, OAuth2DeviceAuthorizationService,
+    },
+    pushed_authorization_request::{
+        InMemoryOAuth2PushedAuthorizationRequestRepository,
+        OAuth2PushedAuthorizationRequestRepository,
+    },
     settings::AuthorizationServerSettings,
     token::{
         DelegatingOAuth2TokenGenerator, JwtGenerator, OAuth2RefreshTokenGenerator,
@@ -31,9 +41,13 @@ pub struct AuthorizationServerContext {
     settings: AuthorizationServerSettings,
     registered_clients: Arc<dyn RegisteredClientRepository>,
     authorizations: Arc<dyn OAuth2AuthorizationService>,
+    authorization_consents: Arc<dyn OAuth2AuthorizationConsentService>,
+    pushed_authorization_requests: Arc<dyn OAuth2PushedAuthorizationRequestRepository>,
+    device_authorizations: Arc<dyn OAuth2DeviceAuthorizationService>,
     token_generator: Arc<dyn OAuth2TokenGenerator>,
-    jwk_source: Option<Arc<dyn JwkSource>>,
+    jwt_signer: Arc<dyn JwtSigner>,
     password_encoder: Option<Arc<dyn PasswordEncoder>>,
+    consent_page: Option<String>,
     authorization_code_time_to_live: u64,
 }
 
@@ -58,21 +72,56 @@ impl AuthorizationServerContext {
         &self.authorizations
     }
 
+    /// Returns the service that stores the consents of the resource owners.
+    pub fn authorization_consents(&self) -> &Arc<dyn OAuth2AuthorizationConsentService> {
+        &self.authorization_consents
+    }
+
+    /// Returns the repository of the authorization requests the clients
+    /// pushed.
+    pub fn pushed_authorization_requests(
+        &self,
+    ) -> &Arc<dyn OAuth2PushedAuthorizationRequestRepository> {
+        &self.pushed_authorization_requests
+    }
+
+    /// Returns the service that stores the device authorizations.
+    pub fn device_authorizations(&self) -> &Arc<dyn OAuth2DeviceAuthorizationService> {
+        &self.device_authorizations
+    }
+
     /// Returns the generator of the tokens of the server.
     pub fn token_generator(&self) -> &Arc<dyn OAuth2TokenGenerator> {
         &self.token_generator
     }
 
-    /// Returns the keys the tokens of the server are signed with, if any are
-    /// configured.
-    pub fn jwk_source(&self) -> Option<&Arc<dyn JwkSource>> {
-        self.jwk_source.as_ref()
+    /// Returns the signer the tokens of the server are signed with.
+    pub fn jwt_signer(&self) -> &Arc<dyn JwtSigner> {
+        &self.jwt_signer
+    }
+
+    /// Returns the keys the tokens of the server are signed with.
+    ///
+    /// The keys are the public keys of the signer, which is what the JWK set
+    /// endpoint publishes and what a resource server verifies the tokens with.
+    pub fn jwk_source(&self) -> Arc<dyn JwkSource> {
+        Arc::new(SignerJwkSource::new(self.jwt_signer.clone()))
     }
 
     /// Returns the encoder the secrets of the clients are matched with, if one
     /// is configured.
     pub fn password_encoder(&self) -> Option<&Arc<dyn PasswordEncoder>> {
         self.password_encoder.as_ref()
+    }
+
+    /// Returns the page the resource owner is asked for consent on, if one is
+    /// configured.
+    ///
+    /// Consent is asked only when a page is configured, which is what lets an
+    /// application that does not serve a consent page grant the scopes of its
+    /// clients without asking.
+    pub fn consent_page(&self) -> Option<&str> {
+        self.consent_page.as_deref()
     }
 
     /// Returns the lifetime of an authorization code, in seconds.
@@ -92,9 +141,13 @@ pub struct AuthorizationServerContextBuilder {
     settings: Option<AuthorizationServerSettings>,
     registered_clients: Option<Arc<dyn RegisteredClientRepository>>,
     authorizations: Option<Arc<dyn OAuth2AuthorizationService>>,
+    authorization_consents: Option<Arc<dyn OAuth2AuthorizationConsentService>>,
+    pushed_authorization_requests: Option<Arc<dyn OAuth2PushedAuthorizationRequestRepository>>,
+    device_authorizations: Option<Arc<dyn OAuth2DeviceAuthorizationService>>,
     token_generator: Option<Arc<dyn OAuth2TokenGenerator>>,
-    jwk_source: Option<Arc<dyn JwkSource>>,
+    jwt_signer: Option<Arc<dyn JwtSigner>>,
     password_encoder: Option<Arc<dyn PasswordEncoder>>,
+    consent_page: Option<String>,
     authorization_code_time_to_live: Option<u64>,
 }
 
@@ -132,6 +185,55 @@ impl AuthorizationServerContextBuilder {
         self
     }
 
+    /// Sets the service that stores the consents of the resource owners.
+    ///
+    /// # Arguments
+    ///
+    /// * `authorization_consents` - The service that stores the consents.
+    pub fn authorization_consents(
+        mut self,
+        authorization_consents: Arc<dyn OAuth2AuthorizationConsentService>,
+    ) -> Self {
+        self.authorization_consents = Some(authorization_consents);
+        self
+    }
+
+    /// Sets the repository of the authorization requests the clients pushed.
+    ///
+    /// # Arguments
+    ///
+    /// * `pushed_authorization_requests` - The repository of the requests.
+    pub fn pushed_authorization_requests(
+        mut self,
+        pushed_authorization_requests: Arc<dyn OAuth2PushedAuthorizationRequestRepository>,
+    ) -> Self {
+        self.pushed_authorization_requests = Some(pushed_authorization_requests);
+        self
+    }
+
+    /// Sets the service that stores the device authorizations.
+    ///
+    /// # Arguments
+    ///
+    /// * `device_authorizations` - The service that stores the authorizations.
+    pub fn device_authorizations(
+        mut self,
+        device_authorizations: Arc<dyn OAuth2DeviceAuthorizationService>,
+    ) -> Self {
+        self.device_authorizations = Some(device_authorizations);
+        self
+    }
+
+    /// Sets the page the resource owner is asked for consent on.
+    ///
+    /// # Arguments
+    ///
+    /// * `consent_page` - The path of the page of the application.
+    pub fn consent_page(mut self, consent_page: impl Into<String>) -> Self {
+        self.consent_page = Some(consent_page.into());
+        self
+    }
+
     /// Sets the generator of the tokens of the server.
     ///
     /// # Arguments
@@ -142,13 +244,13 @@ impl AuthorizationServerContextBuilder {
         self
     }
 
-    /// Sets the keys the tokens of the server are signed with.
+    /// Sets the signer the tokens of the server are signed with.
     ///
     /// # Arguments
     ///
-    /// * `jwk_source` - The keys of the server.
-    pub fn jwk_source(mut self, jwk_source: Arc<dyn JwkSource>) -> Self {
-        self.jwk_source = Some(jwk_source);
+    /// * `jwt_signer` - The signer of the server.
+    pub fn jwt_signer(mut self, jwt_signer: Arc<dyn JwtSigner>) -> Self {
+        self.jwt_signer = Some(jwt_signer);
         self
     }
 
@@ -183,22 +285,19 @@ impl AuthorizationServerContextBuilder {
         );
         let settings = self.settings.unwrap_or_default();
 
-        let jwk_source = self.jwk_source.or_else(|| {
+        let jwt_signer = self.jwt_signer.unwrap_or_else(|| {
             let secret = next_web_core::Uuid::new_v4().to_string();
             tracing::warn!(
-                "The authorization server signs its tokens with a key that is generated at \
-                 startup. Configure a JWK source with a stable key so the tokens stay valid \
-                 across a restart."
+                "The authorization server signs its tokens with a secret that is generated at \
+                 startup. Configure a signer with a stable key so the tokens stay valid across a \
+                 restart."
             );
-            Some(Arc::new(SecretJwkSource::new(&secret)) as Arc<dyn JwkSource>)
+            Arc::new(SecretJwtSigner::new(&secret)) as Arc<dyn JwtSigner>
         });
 
         let token_generator = self.token_generator.unwrap_or_else(|| {
-            let jwt_generator = Arc::new(JwtGenerator::new(
-                jwk_source
-                    .clone()
-                    .expect("a key source is configured above"),
-            )) as Arc<dyn OAuth2TokenGenerator>;
+            let jwt_generator =
+                Arc::new(JwtGenerator::new(jwt_signer.clone())) as Arc<dyn OAuth2TokenGenerator>;
             Arc::new(DelegatingOAuth2TokenGenerator::new([
                 jwt_generator,
                 Arc::new(OAuth2RefreshTokenGenerator) as Arc<dyn OAuth2TokenGenerator>,
@@ -211,9 +310,22 @@ impl AuthorizationServerContextBuilder {
             authorizations: self.authorizations.unwrap_or_else(|| {
                 Arc::new(super::authorization::InMemoryOAuth2AuthorizationService::default())
             }),
+            authorization_consents: self.authorization_consents.unwrap_or_else(|| {
+                Arc::new(InMemoryOAuth2AuthorizationConsentService::default())
+                    as Arc<dyn OAuth2AuthorizationConsentService>
+            }),
+            pushed_authorization_requests: self.pushed_authorization_requests.unwrap_or_else(|| {
+                Arc::new(InMemoryOAuth2PushedAuthorizationRequestRepository::default())
+                    as Arc<dyn OAuth2PushedAuthorizationRequestRepository>
+            }),
+            device_authorizations: self.device_authorizations.unwrap_or_else(|| {
+                Arc::new(InMemoryOAuth2DeviceAuthorizationService::default())
+                    as Arc<dyn OAuth2DeviceAuthorizationService>
+            }),
             token_generator,
-            jwk_source,
+            jwt_signer,
             password_encoder: self.password_encoder,
+            consent_page: self.consent_page,
             authorization_code_time_to_live: self
                 .authorization_code_time_to_live
                 .unwrap_or(DEFAULT_AUTHORIZATION_CODE_TIME_TO_LIVE),
@@ -243,7 +355,8 @@ mod tests {
             .registered_clients(Arc::new(InMemoryRegisteredClientRepository::default()))
             .build();
 
-        assert!(context.jwk_source().is_some());
+        assert_eq!(context.jwk_source().jwk_set().keys().len(), 1);
+        assert_eq!(context.jwt_signer().jwk_set().keys().len(), 1);
         assert_eq!(context.issuer(), DEFAULT_ISSUER);
         assert!(context
             .token_generator()

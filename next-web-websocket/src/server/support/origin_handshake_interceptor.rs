@@ -287,17 +287,6 @@ fn wildcard_match(value: &str, pattern: &str) -> bool {
 mod tests {
     use super::CorsConfiguration;
 
-    use axum::body::Body;
-    use axum::extract::Request;
-
-    fn build_request(headers: &[(&str, &str)]) -> Request {
-        let mut builder = Request::builder().uri("/ws");
-        for (name, value) in headers {
-            builder = builder.header(*name, *value);
-        }
-        builder.body(Body::empty()).expect("request should build")
-    }
-
     #[test]
     fn wildcard_origin_pattern_matches_full_origin_string() {
         let config = CorsConfiguration::new()

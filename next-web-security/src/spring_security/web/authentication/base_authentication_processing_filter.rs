@@ -579,7 +579,8 @@ impl BaseAuthenticationProcessingFilter {
             }
             Err(err) => {
                 tracing::error!(
-                    "An internal error occurred while trying to authenticate the user."
+                    "An internal error occurred while trying to authenticate the user: {}",
+                    err
                 );
                 // Authentication failed
                 this.unsuccessful_authentication(request, response, &err)?;
