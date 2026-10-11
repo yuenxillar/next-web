@@ -110,7 +110,7 @@ enable-open-api         = ["next-web-open-api", "utoipa-swagger-ui", "next-web-m
 enable-scheduling       = ["tokio-cron-scheduler"]
 enable-retry            = ["next-web-retry"]
 enable-prometheus       = ["axum-prometheus"]
-enable-i18n             = ["next-web-macros/translation"]
+enable-i18n             = []
 enable-state-machine    = ["next-web-state-machine"]
 enable-thread-pool      = []
 

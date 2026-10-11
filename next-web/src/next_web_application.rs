@@ -27,8 +27,7 @@ use next_web_core::{
     io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup, StartupStep},
     traits::{
-        apply_router::ApplyRouter,
-        config::auto_configuration::AutoConfiguration,
+        apply_router::ApplyRouter, config::auto_configuration::AutoConfiguration,
         http::resource_dispatcher::ResourceDispatcher,
         service::background_service::BackgroundService,
     },
@@ -477,7 +476,21 @@ where
     /// outermost layer: the per-request state is read before every other layer
     /// runs and is therefore available to all of them.
     fn add_layers(&self, ctx: &mut dyn ConfigurableApplicationContext, router: Router) -> Router {
-        use crate::web::server::{add_filter_layer, prepare_request_layer};
+        use crate::web::server::{PrepareRequestState, add_filter_layer, prepare_request_layer};
+
+        // The resolver of the locale of a request is resolved when the router is
+        // built, because the layer that prepares a request runs before the
+        // layers that add an extension to it.
+        #[cfg(feature = "enable-i18n")]
+        let locale_resolver = ctx
+            .get_singleton_option_with_name::<Arc<dyn crate::web::i18n::LocaleResolver>>(
+                "localeResolver",
+            )
+            .cloned();
+        #[cfg(feature = "enable-i18n")]
+        let prepare_state = Arc::new(PrepareRequestState::new(locale_resolver));
+        #[cfg(not(feature = "enable-i18n"))]
+        let prepare_state = Arc::new(PrepareRequestState::new());
 
         add_filter_layer::<T>(ctx, router)
             .route_layer(tower_http::catch_panic::CatchPanicLayer::custom(
@@ -495,7 +508,10 @@ where
                     .max_age(std::time::Duration::from_secs(60) * 10),
             )
             .route_layer(tower_http::trace::TraceLayer::new_for_http())
-            .layer(axum::middleware::from_fn(prepare_request_layer))
+            .route_layer(axum::middleware::from_fn_with_state(
+                prepare_state,
+                prepare_request_layer,
+            ))
     }
 
     /// Adds the state of the application to the routes of the router.
@@ -521,7 +537,11 @@ where
     ///
     /// [`HttpRequest::resource_dispatcher`]:
     ///     next_web_core::traits::http::http_request::HttpRequest::resource_dispatcher
-    fn add_state(&self, mut ctx: Box<dyn ConfigurableApplicationContext>, router: Router) -> Router {
+    fn add_state(
+        &self,
+        mut ctx: Box<dyn ConfigurableApplicationContext>,
+        router: Router,
+    ) -> Router {
         let dispatcher = ctx
             .resolve_by_type::<Arc<dyn ResourceDispatcher>>()
             .into_iter()

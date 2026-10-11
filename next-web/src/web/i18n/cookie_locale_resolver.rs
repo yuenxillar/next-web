@@ -11,8 +11,7 @@
 //! The original remembers a locale that was changed while a request is handled
 //! in a request attribute; this framework keeps the locale of the current
 //! request in [`RequestLocaleHolder`](crate::web::i18n::RequestLocaleHolder)
-//! instead, which is what the `#[translation]` macro publishes the resolved
-//! locale with.
+//! instead
 
 use std::fmt;
 use std::ops::{Deref, DerefMut};

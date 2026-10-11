@@ -111,8 +111,8 @@ name = "decoder_and_vaild"
 path = "decoder_and_vaild.rs"
 
 [[bin]]
-name = "desensitized"
-path = "desensitized.rs"
+name = "desensitize"
+path = "desensitize.rs"
 
 [[bin]]
 name = "i18n"

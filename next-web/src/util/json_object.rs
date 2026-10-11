@@ -1,14 +1,15 @@
+use next_web_core::util::indexmap::IndexMap;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
-use std::{borrow::Cow, collections::BTreeMap};
+use std::borrow::Cow;
 
-/// A JSON object backed by a `BTreeMap`, providing a fluent API for
+/// A JSON object backed by a `IndexMap`, providing a fluent API for
 /// reading, writing, and serializing key-value pairs.
 #[derive(Clone, Debug)]
 pub struct JsonObject {
     /// The underlying map storing JSON key-value pairs.
-    entries: BTreeMap<Cow<'static, str>, Value>,
+    entries: IndexMap<Cow<'static, str>, Value>,
 }
 
 impl JsonObject {
@@ -176,8 +177,8 @@ impl JsonObject {
             .extend(data.into_iter().map(|(k, v)| (k.into(), v.into())));
     }
 
-    /// Returns a reference to the underlying `BTreeMap`.
-    pub fn raw_value(&self) -> &BTreeMap<Cow<'static, str>, Value> {
+    /// Returns a reference to the underlying `IndexMap`.
+    pub fn raw_value(&self) -> &IndexMap<Cow<'static, str>, Value> {
         &self.entries
     }
 
@@ -199,7 +200,7 @@ impl JsonObject {
     /// Serializes the object to a compact JSON string.
     ///
     /// Returns an empty string if serialization fails (which should not happen
-    /// for a `BTreeMap<Cow<str>, Value>`).
+    /// for a `IndexMap<Cow<str>, Value>`).
     pub fn to_json_string(&self) -> String {
         serde_json::to_string(&self.entries).unwrap_or_default()
     }
@@ -213,7 +214,7 @@ impl JsonObject {
 impl Default for JsonObject {
     fn default() -> Self {
         Self {
-            entries: BTreeMap::new(),
+            entries: IndexMap::new(),
         }
     }
 }
@@ -274,18 +275,18 @@ impl<'de> Deserialize<'de> for JsonObject {
     where
         D: Deserializer<'de>,
     {
-        let entries: BTreeMap<Cow<'static, str>, Value> = Deserialize::deserialize(deserializer)?;
+        let entries: IndexMap<Cow<'static, str>, Value> = Deserialize::deserialize(deserializer)?;
         Ok(JsonObject { entries })
     }
 }
 
-impl From<BTreeMap<Cow<'static, str>, Value>> for JsonObject {
-    fn from(entries: BTreeMap<Cow<'static, str>, Value>) -> Self {
+impl From<IndexMap<Cow<'static, str>, Value>> for JsonObject {
+    fn from(entries: IndexMap<Cow<'static, str>, Value>) -> Self {
         Self { entries }
     }
 }
 
-impl From<JsonObject> for BTreeMap<Cow<'static, str>, Value> {
+impl From<JsonObject> for IndexMap<Cow<'static, str>, Value> {
     fn from(obj: JsonObject) -> Self {
         obj.entries
     }
@@ -353,7 +354,7 @@ mod tests {
     #[test]
     fn test_parse_object() {
         let json_str = r#"{"name": "Alice", "age": 30}"#;
-        let parsed: BTreeMap<String, Value> = JsonObject::parse_object(json_str).unwrap();
+        let parsed: IndexMap<String, Value> = JsonObject::parse_object(json_str).unwrap();
 
         assert_eq!(parsed["name"], serde_json::json!("Alice"));
         assert_eq!(parsed["age"], serde_json::json!(30));
@@ -367,7 +368,7 @@ mod tests {
             .set("age", 30)
             .to_json_string();
 
-        assert_eq!(json_str, r#"{"age":30,"name":"Alice"}"#);
+        assert_eq!(json_str, r#"{"name":"Alice","age":30}"#);
     }
 
     #[test]
@@ -377,7 +378,7 @@ mod tests {
             .set("name", "Alice")
             .set("age", 30)
             .to_json_string_pretty();
-        assert_eq!(json_str, "{\n  \"age\": 30,\n  \"name\": \"Alice\"\n}");
+        assert_eq!(json_str, "{\n  \"name\": \"Alice\",\n  \"age\": 30\n}");
     }
 
     #[test]

@@ -55,7 +55,6 @@ use next_web_context::{
     MESSAGE_SOURCE_SINGLETON_NAME, MessageSource, MessageSourceResolvable, NoSuchMessageError,
     RESOURCE_LOADER_SINGLETON_NAME, Scope,
     event::{ApplicationEventMulticaster, DefaultApplicationEventMulticaster},
-    support::DelegatingMessageSource,
 };
 use next_web_core::{
     async_trait,
@@ -166,13 +165,17 @@ impl DefaultApplicationContext {
         self.message_source = Some(message_source);
     }
 
-    /// Returns the message source of this context, if one has been installed.
+    /// Returns the message source of this context, if one is configured.
+    ///
+    /// The source registered under [`MESSAGE_SOURCE_SINGLETON_NAME`] wins over
+    /// the one the context was given, so the source an auto-configuration
+    /// installed after the context was refreshed is the one that is returned.
     ///
     /// # Returns
     ///
-    /// The installed message source, or `None`.
-    pub fn message_source(&self) -> Option<&dyn MessageSource> {
-        self.message_source.as_deref()
+    /// The message source, or `None` when none is configured.
+    pub fn message_source(&self) -> Option<Arc<dyn MessageSource>> {
+        self.current_message_source()
     }
 
     /// Sets the loader used to read the resources of the application.
@@ -289,7 +292,7 @@ impl DefaultApplicationContext {
         args: &[&dyn fmt::Display],
         locale: Option<&Locale>,
     ) -> Result<String, NoSuchMessageError> {
-        if let Some(message_source) = self.message_source.as_deref() {
+        if let Some(message_source) = self.current_message_source() {
             if let Ok(message) = message_source.message(code, args, locale) {
                 return Ok(message);
             }
@@ -445,35 +448,42 @@ impl DefaultApplicationContext {
     }
 
     /// Initialize the message source for this context.
+    ///
+    /// Only the source an application registered is adopted here. The source
+    /// that reads the message bundles of an application is installed by the
+    /// auto-configuration of the framework, which runs after the context was
+    /// refreshed, see
+    /// [`MessageSourceAutoConfiguration`](crate::autoconfigure::context::message_source_auto_configuration::MessageSourceAutoConfiguration);
+    /// registering a default here would make that auto-configuration see a
+    /// message source already configured and skip the one it builds. A context
+    /// that none configured resolves no message, which is what the delegating
+    /// source of the original resolves.
     fn init_message_source(&mut self) -> Result<(), ContextError> {
         if let Some(message_source) = self
-            .singleton_factory()?
-            .registry_mut()
-            .get_singleton::<Arc<dyn MessageSource>, &'static str>(MESSAGE_SOURCE_SINGLETON_NAME)
-            .map(Clone::clone)
+            .get_singleton_option_with_name::<Arc<dyn MessageSource>>(MESSAGE_SOURCE_SINGLETON_NAME)
+            .cloned()
         {
             tracing::trace!("Using MessageSource [{:?}]", message_source);
             self.message_source = Some(message_source);
-        } else {
-            let parent_message_source = self
-                .parent
-                .as_ref()
-                .map(Clone::clone)
-                .map(|ctx| ctx as Arc<dyn MessageSource>);
-            let dms = Arc::new(DelegatingMessageSource::new(parent_message_source))
-                as Arc<dyn MessageSource>;
-            self.singleton_factory()?
-                .registry_mut()
-                .register_singleton(MESSAGE_SOURCE_SINGLETON_NAME, Arc::clone(&dms));
-
-            tracing::trace!(
-                "No '{MESSAGE_SOURCE_SINGLETON_NAME}' singleton, using [{:?}]",
-                dms
-            );
-            self.message_source = Some(dms);
         }
 
         Ok(())
+    }
+
+    /// Returns the message source the context resolves its messages with.
+    ///
+    /// The source registered under [`MESSAGE_SOURCE_SINGLETON_NAME`] wins, which
+    /// is where an application and the auto-configuration of the framework
+    /// install the one they built; the source the context was given with
+    /// [`set_message_source`](Self::set_message_source) is the fallback.
+    ///
+    /// The registered source is looked up on every call, so the source an
+    /// auto-configuration installed after the context was refreshed is the one
+    /// that is used.
+    fn current_message_source(&self) -> Option<Arc<dyn MessageSource>> {
+        self.get_singleton_option_with_name::<Arc<dyn MessageSource>>(MESSAGE_SOURCE_SINGLETON_NAME)
+            .cloned()
+            .or_else(|| self.message_source.clone())
     }
 
     /// Initialize the ApplicationEventMulticaster.

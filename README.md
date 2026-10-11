@@ -63,7 +63,9 @@ async fn hello() -> &'static str {
 
 #[tokio::main]
 async fn main() {
-    NextWebApplication::<TestApplication>::default().run().await
+    NextWebApplication::<TestApplication>::default()
+        .run()
+        .await
 }
 
 ```

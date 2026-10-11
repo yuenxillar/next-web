@@ -19,7 +19,7 @@ pub mod autoconfigure {
 }
 
 pub mod data {
-    pub use next_web_macros::Desensitized;
+    pub use next_web_macros::Desensitize;
     pub use next_web_macros::{Builder, FieldName, GetSet, RequiredArgsConstructor};
 }
 
@@ -46,6 +46,4 @@ pub mod security {
 pub use next_web_macros::retryable;
 
 #[cfg(feature = "enable-i18n")]
-pub mod i18n {
-    pub use next_web_macros::translation;
-}
+pub mod i18n {}

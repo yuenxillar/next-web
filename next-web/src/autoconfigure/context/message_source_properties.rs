@@ -17,6 +17,18 @@ pub struct MessageSourceProperties {
     /// falls back to `["messages"]`.
     base_name: Option<String>,
 
+    /// Extensions of the bundle files, comma-separated.
+    ///
+    /// The bundle of a basename and a locale is the first file that exists among
+    /// the candidates `messages_zh_CN.<extension>`, so the order of the
+    /// extensions decides which of them is read when a basename holds a file of
+    /// more than one format. For example `"properties, json"` reads the JSON
+    /// bundle of a basename that has no properties file.
+    ///
+    /// The formats are `properties`, `xml`, `json`, `yaml`, and `yml`. When
+    /// unset, the accessor falls back to `["properties"]`.
+    extensions: Option<String>,
+
     /// Whether to fall back to the system locale if no files for a specific
     /// locale have been found.
     ///
@@ -58,6 +70,25 @@ impl MessageSourceProperties {
             .map(|s| s.trim_end())
             .map(|s| s.split(",").map(str::to_string).collect::<Vec<_>>())
             .unwrap_or(vec!["messages".to_owned()])
+    }
+
+    /// Returns the extensions the bundles are looked for with, in order.
+    ///
+    /// The stored value is comma-separated; a leading dot of an extension is
+    /// ignored, so `".json"` and `"json"` name the same format, and blank
+    /// entries are dropped. When unset, returns `["properties"]`.
+    pub fn extensions(&self) -> Vec<String> {
+        self.extensions
+            .as_ref()
+            .map(|extensions| {
+                extensions
+                    .split(",")
+                    .map(|extension| extension.trim().trim_start_matches('.').to_owned())
+                    .filter(|extension| !extension.is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|extensions| !extensions.is_empty())
+            .unwrap_or_else(|| vec!["properties".to_owned()])
     }
 
     /// Returns whether to fall back to the system locale.
@@ -103,6 +134,18 @@ impl MessageSourceProperties {
         I::Item: Into<String>,
     {
         self.base_name = Some(base_name.into_iter().map(Into::into).collect());
+    }
+
+    /// Sets the extensions the bundles are looked for with.
+    ///
+    /// Each item is converted into a `String` and stored as a comma-separated
+    /// list by the underlying binding layer.
+    pub fn set_extensions<I>(&mut self, extensions: I)
+    where
+        I: IntoIterator,
+        I::Item: Into<String>,
+    {
+        self.extensions = Some(extensions.into_iter().map(Into::into).collect());
     }
 
     /// Sets whether to fall back to the system locale.

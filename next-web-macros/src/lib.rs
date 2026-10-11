@@ -9,7 +9,6 @@ use crate::web::idempotency::impl_macro_idempotency;
 use crate::web::order::generate_order;
 use crate::web::pre_authorize::impl_macro_pre_authorize;
 
-use data::desensitized::impl_macro_desensitized;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 use syn::DeriveInput;
@@ -189,10 +188,54 @@ pub fn required_args_constructor(input: TokenStream) -> TokenStream {
     impl_macro_required_args_constructor(&input)
 }
 
-#[proc_macro_derive(Desensitized, attributes(de))]
-pub fn desensitized(input: TokenStream) -> TokenStream {
+/// Implements `desensitize` for a structure, which masks the fields that name a
+/// desensitizer with `#[de]`.
+///
+/// A field names either a type the framework provides, or a function of the
+/// application that takes `&str` and answers the value of the field:
+///
+/// ```ignore
+/// #[derive(Desensitize, Serialize)]
+/// struct Person {
+///     #[de(phone)]
+///     phone: String,
+///
+///     #[de(email)]
+///     email: Option<String>,
+///
+///     #[de(with = de_plate)]
+///     plate: Cow<'static, str>,
+/// }
+///
+/// /// Masks every character of a plate but the first two.
+/// fn de_plate(value: &str) -> String {
+///     value.chars().take(2).collect::<String>() + "***"
+/// }
+/// ```
+///
+/// # The `de` attribute
+///
+/// A field names one desensitizer, and the two forms are mutually exclusive:
+///
+/// * **a type of the framework**, named on its own: `#[de(phone)]`. The types
+///   are `email`, `phone`, `password`, `name`, `id_card`, `bank_card`,
+///   `address`, and `ip`, and each of them is the function of
+///   [`DesensitizedUtil`] of the same name;
+/// * **a function of the application**, named with `with`:
+///   `#[de(with = de_phone)]`, or by its path, as in
+///   `#[de(my_module::de_phone)]`. The function takes `&str` and answers the
+///   value of the field.
+///
+/// An attribute that names both, a second `de` attribute on the same field, and
+/// a `de` attribute on the field of a type that is not text (`String`,
+/// `Box<str>`, `Cow<str>`, or one of them in an `Option`) are reported as errors
+/// of the derive.
+///
+/// [`DesensitizedUtil`]: next_web::util::desensitized::DesensitizedUtil
+#[proc_macro_derive(Desensitize, attributes(de))]
+pub fn desensitize(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    impl_macro_desensitized(&input)
+    data::desensitize::impl_macro_desensitize(&input)
 }
 
 // =============================== Web ===============================
@@ -827,15 +870,6 @@ pub fn event_listener(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let item_impl = parse_macro_input!(item as ItemImpl);
     impl_macro_event_listener(attr, item_impl)
-}
-
-#[cfg(feature = "translation")]
-#[proc_macro_attribute]
-pub fn translation(attr: TokenStream, item: TokenStream) -> TokenStream {
-    use crate::web::translation::impl_macro_translation;
-
-    let item_fn = parse_macro_input!(item as ItemFn);
-    impl_macro_translation(attr, item_fn)
 }
 
 // ========================= Dependency Injection =========================

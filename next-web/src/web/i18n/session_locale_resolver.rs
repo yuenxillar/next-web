@@ -163,7 +163,10 @@ impl LocaleResolver for SessionLocaleResolver {
         _response: Option<&mut dyn HttpResponse>,
         locale: Option<&Locale>,
     ) -> Result<(), LocaleResolverError> {
-        let Some(session) = request.session_mut(true) else {
+        // The locale is stored in the session of the request, and a request that
+        // carries none is reported instead of a session being created for it: a
+        // resolver only answers where the locale of the client is kept.
+        let Some(session) = request.session_mut(false) else {
             return Err(LocaleResolverError::missing_session(
                 "The request has no session, the locale cannot be stored",
             ));

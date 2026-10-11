@@ -1,6 +1,5 @@
 pub mod open_api;
 pub mod retry;
-pub mod translation;
 
 pub mod application;
 pub mod auto_configuration;

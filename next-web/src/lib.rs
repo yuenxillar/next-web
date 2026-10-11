@@ -8,11 +8,12 @@ pub mod extract;
 pub mod macros;
 pub mod manager;
 pub mod resources;
-pub mod security;
 pub mod scheduling;
+pub mod security;
 pub mod support;
 pub mod util;
 pub mod web;
+pub mod wrapper;
 
 mod ansi;
 mod application_arguments;
@@ -77,8 +78,6 @@ pub use validator as validate;
 
 pub use next_web_core as core;
 
-// The internationalization support is reachable at the root of the crate, which
-// is where the bindings of `#[translation]` look it up.
 #[cfg(feature = "enable-i18n")]
 pub use web::i18n;
 

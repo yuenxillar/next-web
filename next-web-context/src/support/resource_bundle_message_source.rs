@@ -38,6 +38,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tracing::warn;
 
+use crate::i18n::LocaleContextHolder;
 use crate::support::BaseResourceBasedMessageSource;
 use crate::util::{MessageFormat, Properties};
 use crate::{Locale, MessageSource, MessageSourceResolvable, NoSuchMessageError};
@@ -49,9 +50,6 @@ use crate::{Locale, MessageSource, MessageSourceResolvable, NoSuchMessageError};
 /// is resolved to `messages/messages.properties`, and its variants to
 /// `messages/messages_zh_CN.properties`.
 const BUNDLE_DIRECTORY: &str = "messages/";
-
-/// The extension of a property based message bundle.
-const PROPERTIES_EXTENSION: &str = "properties";
 
 /// Reads the content of the resource bundles a
 /// [`ResourceBundleMessageSource`] resolves its messages from.
@@ -262,6 +260,36 @@ impl ResourceBundleMessageSource {
         }
 
         self.base.add_basename(basename);
+        self.clear_cache();
+    }
+
+    /// Returns the extensions the bundles are looked for with, in the order they
+    /// are tried.
+    ///
+    /// The bundle of a basename and a locale is the first file that exists among
+    /// the candidates `messages_zh_CN.<extension>`, so the order of the
+    /// extensions decides which of them is read when a basename holds a file of
+    /// more than one format.
+    pub fn extensions(&self) -> &[String] {
+        self.base.extensions()
+    }
+
+    /// Replaces the extensions the bundles are looked for with.
+    ///
+    /// The formats a bundle may be written in are `properties`, `xml`, `json`,
+    /// `yaml`, and `yml`. The loaded bundles are dropped, since they were
+    /// resolved for the previous extensions.
+    ///
+    /// # Arguments
+    ///
+    /// * `extensions` - The extensions to look the bundles up with, for example
+    ///   `["properties", "json"]`.
+    pub fn set_extensions<I>(&mut self, extensions: I)
+    where
+        I: IntoIterator,
+        I::Item: Into<String>,
+    {
+        self.base.set_extensions(extensions);
         self.clear_cache();
     }
 
@@ -580,10 +608,16 @@ impl ResourceBundleMessageSource {
             .into_iter()
             .rev()
         {
-            let location = to_resource_name(&filename, PROPERTIES_EXTENSION);
-            if let Some(properties) = self.load_bundle_file(&location)? {
-                merged.put_all(&properties);
-                found = true;
+            // The bundle of a candidate is the first file that exists among the
+            // extensions, which is what lets an application write its messages as
+            // properties, JSON, or YAML.
+            for extension in self.base.extensions() {
+                let location = to_resource_name(&filename, extension);
+                if let Some(properties) = self.load_bundle_file(&location, extension)? {
+                    merged.put_all(&properties);
+                    found = true;
+                    break;
+                }
             }
         }
 
@@ -602,7 +636,7 @@ impl ResourceBundleMessageSource {
     /// # Arguments
     ///
     /// * `location` - The location of the bundle file.
-    fn load_bundle_file(&self, location: &str) -> io::Result<Option<Properties>> {
+    fn load_bundle_file(&self, location: &str, extension: &str) -> io::Result<Option<Properties>> {
         let Some(bundle_loader) = self.bundle_loader.as_deref() else {
             return Err(io::Error::new(
                 io::ErrorKind::Unsupported,
@@ -615,7 +649,7 @@ impl ResourceBundleMessageSource {
         };
 
         let mut properties = Properties::new();
-        properties.load_from_bytes(&content)?;
+        properties.load_from_extension(extension, &content)?;
 
         Ok(Some(properties))
     }
@@ -702,7 +736,14 @@ impl ResourceBundleMessageSource {
     /// Resolves the locale a lookup is performed with.
     ///
     /// The locale of the caller wins, then the default locale of the message
-    /// source, then the locale of the system.
+    /// source, then the locale of the request the lookup is performed for.
+    ///
+    /// The locale of the request is the one the layer that prepared the request
+    /// associated with it, see
+    /// [`LocaleContextHolder`](crate::i18n::LocaleContextHolder); a lookup that
+    /// runs outside a request, such as one of a background task or a test, reads
+    /// the shared default locale of the framework and then the locale of the
+    /// system, which is what the holder answers with when it has neither.
     ///
     /// # Arguments
     ///
@@ -711,7 +752,7 @@ impl ResourceBundleMessageSource {
         locale
             .cloned()
             .or_else(|| self.base.default_locale().cloned())
-            .unwrap_or_else(Locale::system_locale)
+            .unwrap_or_else(LocaleContextHolder::locale)
     }
 
     /// Resolves a message, without applying any default message.
@@ -999,6 +1040,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
+    use crate::support::DEFAULT_EXTENSION;
 
     /// A loader that serves the bundles it is given and counts how often it was
     /// asked for one.
@@ -1040,6 +1082,98 @@ mod tests {
         message_source.set_fallback_to_system_locale(false);
         message_source.set_bundle_loader(loader);
         message_source
+    }
+
+    #[test]
+    fn resolves_a_message_of_a_json_bundle() {
+        let loader = InMemoryBundleLoader::new([(
+            "messages/messages.json",
+            r#"{"hello": "Hello, world!"}"#,
+        )]);
+        let mut message_source = message_source(loader, ["messages"]);
+        // An application names the format of its bundles; the dot of the
+        // extension is optional.
+        message_source.set_extensions([".json"]);
+
+        assert_eq!(
+            message_source.message("hello", &[], None).unwrap(),
+            "Hello, world!"
+        );
+    }
+
+    #[test]
+    fn reads_a_nested_json_bundle_by_the_path_of_its_entries() {
+        let loader = InMemoryBundleLoader::new([(
+            "messages/messages.json",
+            r#"{"errors": {"not_found": "Nothing here"}, "retry": 3}"#,
+        )]);
+        let mut message_source = message_source(loader, ["messages"]);
+        message_source.set_extensions(["json"]);
+
+        assert_eq!(
+            message_source
+                .message("errors.not_found", &[], None)
+                .unwrap(),
+            "Nothing here"
+        );
+        assert_eq!(message_source.message("retry", &[], None).unwrap(), "3");
+    }
+
+    #[test]
+    fn a_bundle_of_a_locale_overrides_the_locale_independent_one_of_any_format() {
+        let loader = InMemoryBundleLoader::new([
+            (
+                "messages/messages.json",
+                r#"{"hello": "Hello!", "greeting": "Hi!"}"#,
+            ),
+            ("messages/messages_zh_CN.yaml", "hello: Ni hao, shijie!\n"),
+        ]);
+        let mut message_source = message_source(loader, ["messages"]);
+        message_source.set_extensions(["properties", "json", "yaml"]);
+        let zh_cn = Locale::new("zh", "CN");
+
+        assert_eq!(
+            message_source.message("hello", &[], Some(&zh_cn)).unwrap(),
+            "Ni hao, shijie!"
+        );
+        // An entry the locale specific bundle does not define falls back to the
+        // locale independent bundle, whatever format it is written in.
+        assert_eq!(
+            message_source
+                .message("greeting", &[], Some(&zh_cn))
+                .unwrap(),
+            "Hi!"
+        );
+    }
+
+    #[test]
+    fn the_first_extension_that_exists_is_the_bundle_of_a_candidate() {
+        let loader = InMemoryBundleLoader::new([
+            ("messages/messages.properties", "hello=from properties\n"),
+            ("messages/messages.json", r#"{"hello": "from json"}"#),
+        ]);
+        let mut message_source = message_source(loader, ["messages"]);
+
+        message_source.set_extensions(["json", "properties"]);
+        assert_eq!(
+            message_source.message("hello", &[], None).unwrap(),
+            "from json"
+        );
+
+        message_source.set_extensions(["properties", "json"]);
+        assert_eq!(
+            message_source.message("hello", &[], None).unwrap(),
+            "from properties"
+        );
+    }
+
+    #[test]
+    fn a_bundle_of_an_unknown_format_is_reported() {
+        let loader = InMemoryBundleLoader::new([("messages/messages.toml", "hello = \"Hi\"\n")]);
+        let mut message_source = message_source(loader, ["messages"]);
+        message_source.set_extensions(["toml"]);
+
+        assert!(message_source.message("hello", &[], None).is_err());
     }
 
     #[test]
@@ -1251,13 +1385,41 @@ mod tests {
     }
 
     #[test]
+    fn resolves_the_locale_of_the_request_when_none_is_given() {
+        let loader = InMemoryBundleLoader::new([
+            ("messages/messages.properties", "hello=Hello!\n"),
+            ("messages/messages_zh_CN.properties", "hello=Ni hao!\n"),
+        ]);
+        let message_source = message_source(loader, ["messages"]);
+
+        // A lookup that is given no locale reads the one the request was
+        // associated with, which is what a message source inside a request does.
+        let zh_cn = Locale::new("zh", "CN");
+        LocaleContextHolder::set_locale(Some(zh_cn.clone()));
+        assert_eq!(
+            message_source.message("hello", &[], None).unwrap(),
+            "Ni hao!"
+        );
+
+        // The locale of the caller wins over the one of the request.
+        assert_eq!(
+            message_source
+                .message("hello", &[], Some(&Locale::english()))
+                .unwrap(),
+            "Hello!"
+        );
+
+        LocaleContextHolder::reset_locale_context();
+    }
+
+    #[test]
     fn to_resource_name_replaces_the_package_separators() {
         assert_eq!(
-            to_resource_name("test.theme", PROPERTIES_EXTENSION),
+            to_resource_name("test.theme", DEFAULT_EXTENSION),
             "messages/test/theme.properties"
         );
         assert_eq!(
-            to_resource_name("messages_zh_CN", PROPERTIES_EXTENSION),
+            to_resource_name("messages_zh_CN", DEFAULT_EXTENSION),
             "messages/messages_zh_CN.properties"
         );
     }

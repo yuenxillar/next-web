@@ -20,6 +20,7 @@ use next_web::{
     },
     macros::{autoconfigure::auto_configuration, bind::singleton},
 };
+use next_web_context::{MESSAGE_SOURCE_SINGLETON_NAME, MessageSource};
 use next_web_core::{Ordered, util::indexmap::IndexMap};
 
 /// The configurations of the test that were applied, in the order they were.
@@ -230,6 +231,27 @@ async fn start_application() -> DefaultApplicationContext {
         .expect("the application is configured");
 
     context
+}
+
+/// A context that no message bundle and no application gave a message source
+/// answers with the delegating source of the framework, so a component that
+/// requires a message source always finds one.
+#[tokio::test]
+async fn a_context_without_message_bundles_has_the_default_message_source() {
+    let _test = TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    let context = start_application().await;
+
+    assert!(
+        context
+            .get_singleton_option_with_name::<Arc<dyn MessageSource>>(
+                MESSAGE_SOURCE_SINGLETON_NAME,
+            )
+            .is_some(),
+        "the context answers with the default message source"
+    );
 }
 
 #[tokio::test]

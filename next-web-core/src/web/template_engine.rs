@@ -23,7 +23,6 @@ use crate::{
     error::BoxError,
     io::{ResourceLoader, web_resource_loader},
     traits::http::http_request::HttpRequest,
-    web::ViewModel,
 };
 
 /// The extensions that mark a resource as a template.
@@ -357,7 +356,6 @@ mod tests {
         assert_eq!(name, Some("Alice"));
     }
 
-    #[test]
     #[test]
     fn the_attributes_of_a_request_are_not_the_variables_of_a_template() {
         let mut model = ViewModel::new();

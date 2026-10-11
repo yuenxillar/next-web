@@ -1,11 +1,11 @@
 //! Port of `org.springframework.core.io.support.PropertiesLoaderUtils`.
 //!
 //! The helpers read a [`Resource`] into a
-//! [`Properties`](next_web_context::util::Properties) instance. A resource whose
-//! name ends with [`.xml`](XML_FILE_EXTENSION) is read with the XML format of
-//! `Properties.loadFromXML`, every other resource with the `.properties` format
-//! of `Properties.load`. The content is decoded as UTF-8, since a Rust string is
-//! UTF-8.
+//! [`Properties`](next_web_context::util::Properties) instance. The format of a
+//! resource is named by its extension: `xml`, `json`, `yaml`, and `yml` are read
+//! with the format of that name, and every other resource with the
+//! `.properties` format of `Properties.load`. The content is decoded as UTF-8,
+//! since a Rust string is UTF-8.
 //!
 //! # Examples
 //!
@@ -52,10 +52,13 @@ impl PropertiesLoaderUtils {
     pub fn fill_properties(properties: &mut Properties, resource: &dyn Resource) -> io::Result<()> {
         let content = resource.get_content()?;
 
-        if is_xml(resource) {
-            properties.load_from_xml(&content)?;
-        } else {
-            properties.load_from_bytes(&content)?;
+        match extension(resource).as_deref() {
+            Some(extension @ ("xml" | "json" | "yaml" | "yml")) => {
+                properties.load_from_extension(extension, &content)?;
+            }
+            // A name of another format is read as a properties file, which is
+            // what the original does with a name it does not know.
+            _ => properties.load_from_bytes(&content)?,
         }
 
         Ok(())
@@ -119,11 +122,13 @@ impl std::fmt::Debug for PropertiesLoaderUtils {
     }
 }
 
-/// Returns whether the resource has to be read with the XML format.
-fn is_xml(resource: &dyn Resource) -> bool {
+/// Returns the extension of the resource, without its dot, compared without
+/// case.
+fn extension(resource: &dyn Resource) -> Option<String> {
     resource
         .filename()
-        .is_some_and(|filename| filename.ends_with(XML_FILE_EXTENSION))
+        .and_then(|filename| filename.rsplit_once('.'))
+        .map(|(_, extension)| extension.to_ascii_lowercase())
 }
 
 #[cfg(test)]
@@ -176,6 +181,18 @@ mod tests {
         let properties = PropertiesLoaderUtils::load_properties(&resource).unwrap();
 
         assert_eq!(properties.get_property("hello"), Some("Hello, world!"));
+    }
+
+    #[test]
+    fn fills_the_properties_of_a_json_resource() {
+        let resource = resource(
+            "messages/messages.json",
+            r#"{"hello": "Hello, world!", "user": {"name": "Alice"}}"#,
+        );
+        let properties = PropertiesLoaderUtils::load_properties(&resource).unwrap();
+
+        assert_eq!(properties.get_property("hello"), Some("Hello, world!"));
+        assert_eq!(properties.get_property("user.name"), Some("Alice"));
     }
 
     #[test]

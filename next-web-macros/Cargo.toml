@@ -20,10 +20,9 @@ inventory   = { workspace = true }
 zyn         = { workspace = true }
 
 [features]
-default = ["data", "translation", "auto-register"]
+default = ["data", "auto-register"]
 
 data = []
 open-api = []
-translation = []
 embed-resources = []
 auto-register = []

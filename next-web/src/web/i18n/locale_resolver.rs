@@ -16,7 +16,14 @@ use crate::i18n::LocaleResolverError;
 /// An extended strategy interface may additionally resolve a locale context
 /// object that carries associated time zone information. Implementations
 /// should provide that extended interface wherever appropriate.
-pub trait LocaleResolver {
+/// A resolver is registered as a singleton of the application context and is
+/// used by the layer that prepares a request, which runs on the worker threads
+/// of the runtime, so it has to be shared between threads and moved between
+/// them.
+pub trait LocaleResolver
+where
+    Self: Send + Sync,
+{
     /// Resolves the current locale from the given request.
     ///
     /// May return a default locale as a fallback in any case.

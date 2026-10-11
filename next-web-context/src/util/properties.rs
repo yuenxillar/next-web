@@ -1,12 +1,19 @@
 //! Port of `java.util.Properties`.
 //!
 //! The type is a map from `String` keys to `String` values that knows how to
-//! read the two textual representations the JDK supports:
+//! read the textual representations the JDK supports, and the representations
+//! an application configures its messages with:
 //!
 //! - the `.properties` format ([`Properties::load_from_bytes`] /
 //!   [`Properties::load_from_str`]), and
 //! - the XML format of `Properties.loadFromXML`
-//!   ([`Properties::load_from_xml`]).
+//!   ([`Properties::load_from_xml`]),
+//! - a JSON object ([`Properties::load_from_json`]), and
+//! - a YAML document ([`Properties::load_from_yaml`]).
+//!
+//! A JSON or YAML document is read as a flat map: an entry that holds an object
+//! or an array becomes an entry per leaf, whose key is the path of the entry,
+//! such as `user.name` or `roles.0`.
 //!
 //! Like the JDK type, a fresh instance keeps the insertion order of the entries
 //! unless it is created with [`Properties::create_sorted_properties`]`(true)`,
@@ -17,6 +24,22 @@ use std::fmt;
 use std::io;
 
 use indexmap::IndexMap;
+use serde_json::Value;
+
+/// The extension of a JSON document.
+pub const JSON_EXTENSION: &str = "json";
+
+/// The extension of a YAML document.
+pub const YAML_EXTENSION: &str = "yaml";
+
+/// The other extension of a YAML document.
+pub const YML_EXTENSION: &str = "yml";
+
+/// The extension of a `.properties` document.
+pub const PROPERTIES_EXTENSION: &str = "properties";
+
+/// The extension of an XML document.
+pub const XML_EXTENSION: &str = "xml";
 
 /// A persistent set of properties.
 ///
@@ -333,6 +356,102 @@ impl Properties {
         parse_xml(&content, self)
     }
 
+    /// Loads a JSON object.
+    ///
+    /// Every entry of the object becomes a property, and an entry that holds an
+    /// object or an array becomes a property per leaf, whose key is the path of
+    /// the entry: `{"user": {"name": "Alice"}}` becomes `user.name`, and
+    /// `{"roles": ["admin"]}` becomes `roles.0`.
+    ///
+    /// A value that is not a string is stored as its JSON text, and a `null` is
+    /// stored as an empty string.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The raw content of a `.json` file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`io::Error`] when the content is not a JSON object or array.
+    pub fn load_from_json(&mut self, data: &[u8]) -> io::Result<()> {
+        let value: Value = serde_json::from_slice(data).map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("the document is not JSON: {error}"),
+            )
+        })?;
+
+        self.load_from_value(&value)
+    }
+
+    /// Loads a YAML document, which is read the way a JSON document is.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The raw content of a `.yaml` or a `.yml` file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`io::Error`] when the content is not a YAML object or array.
+    pub fn load_from_yaml(&mut self, data: &[u8]) -> io::Result<()> {
+        let value: Value = serde_yaml::from_slice(data).map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("the document is not YAML: {error}"),
+            )
+        })?;
+
+        self.load_from_value(&value)
+    }
+
+    /// Loads the content of a document whose format is named by `extension`.
+    ///
+    /// The formats are `properties`, `xml`, `json`, `yaml`, and `yml`, compared
+    /// without case.
+    ///
+    /// # Arguments
+    ///
+    /// * `extension` - The extension of the document, with or without its dot.
+    /// * `data` - The raw content of the document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`io::Error`] when the format is unknown, or when the content
+    /// is not a document of that format.
+    pub fn load_from_extension(&mut self, extension: &str, data: &[u8]) -> io::Result<()> {
+        match extension
+            .trim_start_matches('.')
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            PROPERTIES_EXTENSION => self.load_from_bytes(data),
+            XML_EXTENSION => self.load_from_xml(data),
+            JSON_EXTENSION => self.load_from_json(data),
+            YAML_EXTENSION | YML_EXTENSION => self.load_from_yaml(data),
+            extension => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "`{extension}` is not a format of a document; the formats are \
+                     properties, xml, json, yaml, and yml"
+                ),
+            )),
+        }
+    }
+
+    /// Adds the entries of a JSON or YAML document to this instance.
+    fn load_from_value(&mut self, value: &Value) -> io::Result<()> {
+        if !value.is_object() && !value.is_array() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "a document is an object or an array, not a single value",
+            ));
+        }
+
+        flatten(value, "", self);
+
+        Ok(())
+    }
+
     /// Stores a single logical line of a `.properties` file.
     fn insert_line(&mut self, line: &str) {
         let trimmed = line.trim_start();
@@ -393,6 +512,53 @@ impl From<HashMap<String, String>> for Properties {
 impl From<Properties> for HashMap<String, String> {
     fn from(properties: Properties) -> Self {
         properties.to_map()
+    }
+}
+
+/// Adds the leaves of a JSON or YAML document to `properties`.
+///
+/// An entry that holds an object or an array is walked, and the key of a leaf is
+/// the path of the entry it was reached through, such as `user.name` or
+/// `roles.0`.
+///
+/// # Arguments
+///
+/// * `value` - The value to walk.
+/// * `prefix` - The path of `value`, which is empty at the root.
+/// * `properties` - The instance the leaves are added to.
+fn flatten(value: &Value, prefix: &str, properties: &mut Properties) {
+    let path = |key: &str| {
+        if prefix.is_empty() {
+            key.to_owned()
+        } else {
+            format!("{prefix}.{key}")
+        }
+    };
+
+    match value {
+        Value::Object(entries) => {
+            for (key, value) in entries {
+                flatten(value, &path(key), properties);
+            }
+        }
+        Value::Array(values) => {
+            for (index, value) in values.iter().enumerate() {
+                flatten(value, &path(&index.to_string()), properties);
+            }
+        }
+        Value::String(text) => {
+            properties.put(prefix.to_owned(), text.clone());
+        }
+        // A missing value is a message that renders as an empty string, which is
+        // what an empty property holds.
+        Value::Null => {
+            properties.put(prefix.to_owned(), String::new());
+        }
+        // A number and a boolean are stored as their text, so a message that
+        // holds one renders it.
+        value => {
+            properties.put(prefix.to_owned(), value.to_string());
+        }
     }
 }
 
@@ -706,6 +872,56 @@ fn invalid_data(message: impl Into<String>) -> io::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn load_from_json_reads_the_paths_of_the_entries() {
+        let mut properties = Properties::new();
+        properties
+            .load_from_json(
+                br#"{"greeting": "Hello", "user": {"name": "Alice"},
+                     "roles": ["admin", "auditor"], "retry": 3, "enabled": true,
+                     "missing": null}"#,
+            )
+            .unwrap();
+
+        assert_eq!(properties.get_property("greeting"), Some("Hello"));
+        assert_eq!(properties.get_property("user.name"), Some("Alice"));
+        assert_eq!(properties.get_property("roles.0"), Some("admin"));
+        assert_eq!(properties.get_property("roles.1"), Some("auditor"));
+        assert_eq!(properties.get_property("retry"), Some("3"));
+        assert_eq!(properties.get_property("enabled"), Some("true"));
+        assert_eq!(properties.get_property("missing"), Some(""));
+    }
+
+    #[test]
+    fn load_from_yaml_reads_the_paths_of_the_entries() {
+        let mut properties = Properties::new();
+        properties
+            .load_from_yaml(b"greeting: Hello\nuser:\n  name: Alice\nroles:\n  - admin\n")
+            .unwrap();
+
+        assert_eq!(properties.get_property("greeting"), Some("Hello"));
+        assert_eq!(properties.get_property("user.name"), Some("Alice"));
+        assert_eq!(properties.get_property("roles.0"), Some("admin"));
+    }
+
+    #[test]
+    fn load_from_extension_reads_the_format_of_the_name() {
+        let mut properties = Properties::new();
+        properties
+            .load_from_extension(".json", br#"{"hello": "Hi"}"#)
+            .unwrap();
+
+        assert_eq!(properties.get_property("hello"), Some("Hi"));
+
+        assert!(
+            properties
+                .load_from_extension("toml", b"hello = \"Hi\"")
+                .is_err()
+        );
+        assert!(properties.load_from_json(b"\"a value\"").is_err());
+        assert!(properties.load_from_json(b"not a document").is_err());
+    }
 
     #[test]
     fn load_from_str_handles_continuations_comments_and_unicode() {

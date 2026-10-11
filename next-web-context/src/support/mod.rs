@@ -4,7 +4,9 @@ mod message_source_accessor;
 mod property_sources_placeholder_configurer;
 mod resource_bundle_message_source;
 
-pub use base_resource_based_message_source::{BaseResourceBasedMessageSource, DEFAULT_BASENAME};
+pub use base_resource_based_message_source::{
+    BaseResourceBasedMessageSource, DEFAULT_BASENAME, DEFAULT_EXTENSION,
+};
 pub use delegating_message_source::DelegatingMessageSource;
 pub use message_source_accessor::MessageSourceAccessor;
 pub use property_sources_placeholder_configurer::{

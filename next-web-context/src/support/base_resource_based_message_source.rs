@@ -7,18 +7,22 @@ use crate::Locale;
 /// The basename a message source uses when none is configured.
 pub const DEFAULT_BASENAME: &str = "messages";
 
+/// The extension of a message bundle when none is configured.
+pub const DEFAULT_EXTENSION: &str = "properties";
+
 /// The configuration shared by every message source that resolves its messages
 /// from resources.
 ///
 /// The type holds the basenames the messages are searched in, the locale the
-/// lookup falls back to and how long a loaded bundle may stay cached. The
-/// bundles themselves are read as UTF-8, since a Rust string is UTF-8. It is
-/// embedded in
+/// lookup falls back to, the extensions the bundle files are looked for with,
+/// and how long a loaded bundle may stay cached. The bundles themselves are read
+/// as UTF-8, since a Rust string is UTF-8. It is embedded in
 /// [`ResourceBundleMessageSource`](crate::support::ResourceBundleMessageSource),
 /// which is the type applications use.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseResourceBasedMessageSource {
     basenames: Vec<String>,
+    extensions: Vec<String>,
     default_locale: Option<Locale>,
     fallback_to_system_locale: bool,
     cache_duration: Option<Duration>,
@@ -79,6 +83,52 @@ impl BaseResourceBasedMessageSource {
         if !self.basenames.iter().any(|existing| existing == &basename) {
             self.basenames.push(basename);
         }
+    }
+
+    /// Returns the extensions the bundles are looked for with, in the order they
+    /// are tried.
+    ///
+    /// The bundle of a basename and a locale is the first file that exists among
+    /// the candidates `messages_zh_CN.<extension>` of the basename, so the order
+    /// of the extensions decides which of them is read when a basename has a
+    /// file of more than one format.
+    pub fn extensions(&self) -> &[String] {
+        &self.extensions
+    }
+
+    /// Replaces the extensions the bundles are looked for with.
+    ///
+    /// A leading dot is ignored, so `.json` and `json` name the same extension,
+    /// and blank entries are dropped. The formats a bundle may be written in are
+    /// `properties`, `xml`, `json`, `yaml`, and `yml`; an extension of another
+    /// format is reported when the bundle of that format is read.
+    ///
+    /// # Arguments
+    ///
+    /// * `extensions` - The extensions, for example `["properties", "json"]`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when no usable extension is left, which is what a message source
+    /// that cannot look a bundle up would otherwise report later.
+    pub fn set_extensions<I>(&mut self, extensions: I)
+    where
+        I: IntoIterator,
+        I::Item: Into<String>,
+    {
+        let extensions = extensions
+            .into_iter()
+            .map(Into::into)
+            .map(|extension| extension.trim().trim_start_matches('.').to_owned())
+            .filter(|extension| !extension.is_empty())
+            .collect::<Vec<_>>();
+
+        assert!(
+            !extensions.is_empty(),
+            "At least one non-empty extension is required for message resolution"
+        );
+
+        self.extensions = extensions;
     }
 
     /// Returns the locale a lookup falls back to when no locale is requested.
@@ -164,6 +214,7 @@ impl Default for BaseResourceBasedMessageSource {
     fn default() -> Self {
         Self {
             basenames: vec![DEFAULT_BASENAME.to_owned()],
+            extensions: vec![DEFAULT_EXTENSION.to_owned()],
             default_locale: None,
             fallback_to_system_locale: true,
             cache_duration: None,

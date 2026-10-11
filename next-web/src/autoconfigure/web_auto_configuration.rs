@@ -1,5 +1,8 @@
 use next_web_context::APPLICATION_ENVIRONMENT_SINGLETON_NAME;
 use next_web_context::ApplicationContextExt;
+use next_web_context::{
+    MESSAGE_SOURCE_SINGLETON_NAME, MessageSource, support::DelegatingMessageSource,
+};
 use next_web_core::context::ConfigurationProperties;
 use next_web_core::{
     ApplicationContext, Ordered, async_trait, env::ConfigurableEnvironment,
@@ -195,6 +198,21 @@ impl AutoConfiguration for WebAutoConfiguration {
 
         #[cfg(feature = "enable-i18n")]
         self.locale_resolver(ctx);
+
+        // A context that neither an application nor an auto-configuration gave a
+        // message source answers with the delegating source of the framework, so
+        // that a component which requires a `MessageSource` always finds one. The
+        // source resolves no message of its own, which is what a context without
+        // message bundles answers with.
+        if !ctx
+            .contains_singleton_with_name::<Arc<dyn MessageSource>>(MESSAGE_SOURCE_SINGLETON_NAME)
+        {
+            ctx.insert_singleton_with_name::<Arc<dyn MessageSource>>(
+                Arc::new(DelegatingMessageSource::default()),
+                MESSAGE_SOURCE_SINGLETON_NAME,
+            );
+        }
+
         Ok(())
     }
 }

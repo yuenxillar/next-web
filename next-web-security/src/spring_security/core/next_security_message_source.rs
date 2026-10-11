@@ -1,12 +1,14 @@
 use std::{
     fmt::{self, Debug},
+    io,
     sync::Arc,
 };
 
 use next_web_context::{
-    support::{MessageSourceAccessor, ResourceBundleMessageSource},
     Locale, MessageSource, MessageSourceResolvable, NoSuchMessageError,
+    support::{BundleLoader, MessageSourceAccessor, ResourceBundleMessageSource},
 };
+use next_web_core::io::{Resource, web_resource_loader};
 
 /// The default MessageSource used by Next Security.
 /// All Next Security classes requiring message localization will by default use this class. However, all such
@@ -16,8 +18,54 @@ use next_web_context::{
 pub struct NextSecurityMessageSource(ResourceBundleMessageSource);
 
 impl NextSecurityMessageSource {
+    /// Returns the accessor the components of the security support resolve their
+    /// messages with.
+    ///
+    /// The source reads the message bundles of the application, so an
+    /// application that defines the codes of the security support in its own
+    /// bundles answers them in the language it configures:
+    ///
+    /// ```text
+    /// messages/messages.properties
+    /// AbstractUserDetailsAuthenticationProvider.badCredentials=Bad credentials
+    /// ```
+    ///
+    /// A component that has a message source of its own injected keeps using it,
+    /// which is what lets an application replace this default one.
     pub fn get_accessor() -> MessageSourceAccessor {
-        MessageSourceAccessor::new(Arc::new(Self::default()))
+        MessageSourceAccessor::new(Arc::new(Self::with_application_messages()))
+    }
+
+    /// Returns the source that reads the message bundles of the application.
+    fn with_application_messages() -> Self {
+        let mut message_source = ResourceBundleMessageSource::default();
+        message_source.set_bundle_loader(Arc::new(ApplicationBundleLoader));
+        message_source.set_extensions(["properties", "json", "yaml", "yml"]);
+
+        Self(message_source)
+    }
+}
+
+/// Reads the message bundles of the application from the resources of the web
+/// layer.
+///
+/// A component of the security support is built while the application starts,
+/// after the loader of the web layer was installed, so the bundles it reads are
+/// the ones the rest of the framework reads.
+#[derive(Debug, Default, Clone, Copy)]
+struct ApplicationBundleLoader;
+
+impl BundleLoader for ApplicationBundleLoader {
+    fn load(&self, location: &str) -> io::Result<Option<Vec<u8>>> {
+        let resource_loader = web_resource_loader();
+
+        if !resource_loader.exists(location) {
+            return Ok(None);
+        }
+
+        let resource = resource_loader.get_resource(location)?;
+
+        Ok(Some(resource.get_content()?.into_owned()))
     }
 }
 

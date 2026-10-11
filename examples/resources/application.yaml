@@ -7,7 +7,14 @@ next:
     name: "NextWebApplication"
 
   messages:
-    base_name: "/messages"
+    # The basename of the message bundles, resolved to
+    # `messages/<basename>[_locale].properties`. A leading separator would make
+    # the lookup ask for `messages//<basename>.properties`.
+    #
+    # The extensions name the format of the bundle files: `messages` is written
+    # as properties, `extra` as JSON, and `extra_yaml` as YAML.
+    base_name: "messages,extra,extra_yaml"
+    extensions: "properties,json,yaml"
 
   # The resources the web layer serves: the templates a view renders and the
   # files a dispatch answers with. The cache they are read into is limited here,

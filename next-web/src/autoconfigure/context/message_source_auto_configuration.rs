@@ -7,17 +7,15 @@ use std::{error::Error, time::Duration};
 use next_web_context::support::{BundleLoader, ResourceBundleMessageSource};
 use next_web_context::util::Properties;
 use next_web_context::{
-    ApplicationContext, ApplicationContextExt, MessageSource,
-    APPLICATION_ENVIRONMENT_SINGLETON_NAME, MESSAGE_SOURCE_SINGLETON_NAME,
-    RESOURCE_LOADER_SINGLETON_NAME,
+    APPLICATION_ENVIRONMENT_SINGLETON_NAME, ApplicationContext, ApplicationContextExt,
+    MESSAGE_SOURCE_SINGLETON_NAME, MessageSource, RESOURCE_LOADER_SINGLETON_NAME,
 };
 use next_web_core::env::ConfigurableEnvironment;
 use next_web_core::{
-    async_trait,
+    Ordered, async_trait,
     io::support::PropertiesLoaderUtils,
     io::{BytesResource, Resource, ResourceLoader},
     traits::config::auto_configuration::AutoConfiguration,
-    Ordered,
 };
 
 use next_web_macros::singleton;
@@ -51,6 +49,7 @@ impl AutoConfiguration for MessageSourceAutoConfiguration {
         if base_name.iter().any(|s| !s.is_empty()) {
             message_source.set_basenames(base_name);
         }
+        message_source.set_extensions(self.message_source_properties.extensions());
         message_source.set_fallback_to_system_locale(
             self.message_source_properties.fallback_to_system_locale(),
         );
@@ -211,47 +210,64 @@ impl NextWebConditionExt for ResourceBundleCondition {
         &self,
         context: &dyn ApplicationContext,
     ) -> Result<ConditionOutcome, ConditionError> {
-        let basename = context
-            .get_singleton_with_name::<Arc<dyn ConfigurableEnvironment>>(
-                APPLICATION_ENVIRONMENT_SINGLETON_NAME,
-            )
-            .get_property_or_default("next.messages.basename", "messages");
+        // The properties of the message source were bound before the conditions
+        // are evaluated, so the condition sees the same basenames and extensions
+        // the message source is built with.
+        let (basenames, extensions) =
+            match context.get_singleton_option_with_default_name::<MessageSourceProperties>() {
+                Some(properties) => (properties.base_name(), properties.extensions()),
+                None => (
+                    vec![
+                        context
+                            .get_singleton_with_name::<Arc<dyn ConfigurableEnvironment>>(
+                                APPLICATION_ENVIRONMENT_SINGLETON_NAME,
+                            )
+                            .get_property_or_default("next.messages.basename", "messages"),
+                    ],
+                    vec!["properties".to_owned()],
+                ),
+            };
 
-        let outcome = self.get_matches_for_basename(context, &basename)?;
-        Ok(outcome)
+        self.get_matches_for_bundles(context, &basenames, &extensions)
     }
 }
 
 impl ResourceBundleCondition {
-    fn get_matches_for_basename(
+    fn get_matches_for_bundles(
         &self,
         context: &dyn ApplicationContext,
-        basename: &str,
+        basenames: &[String],
+        extensions: &[String],
     ) -> Result<ConditionOutcome, ConditionError> {
         let message = ConditionMessage::for_condition("ResourceBundle", &[]);
 
-        let trimmed: String = basename.chars().filter(|c| !c.is_whitespace()).collect();
-        let names: Vec<&str> = trimmed.split(',').collect();
-
-        let resoure_load = context
+        let resource_loader = context
             .get_singleton_option_with_name::<Arc<dyn ResourceLoader>>(
                 RESOURCE_LOADER_SINGLETON_NAME,
             )
             .ok_or_else(|| ConditionError::Evaluation("ResourceLoader not found".to_string()))?;
-        for name in names {
-            let resources = self.get_resources(resoure_load.as_ref(), name);
-            if resources.len() > 0 {
-                let items = resources
-                    .into_iter()
-                    .filter_map(|s| s.filename())
-                    .collect::<Vec<_>>();
-                return Ok(ConditionOutcome::match_message(
-                    message.found("bundle", "bundle").items(&items),
-                ));
+
+        for basename in basenames
+            .iter()
+            .map(|basename| basename.trim())
+            .filter(|basename| !basename.is_empty())
+        {
+            for extension in extensions {
+                let resources = self.get_resources(resource_loader.as_ref(), basename, extension);
+                if !resources.is_empty() {
+                    let items = resources
+                        .into_iter()
+                        .filter_map(|resource| resource.filename())
+                        .collect::<Vec<_>>();
+
+                    return Ok(ConditionOutcome::match_message(
+                        message.found("bundle", "bundle").items(&items),
+                    ));
+                }
             }
         }
 
-        let s = format!("bundle with basename {}", basename);
+        let s = format!("bundle with basename {basenames:?} and extension {extensions:?}");
         Ok(ConditionOutcome::no_match_message(
             message.did_not_find(&s, &s).at_all(),
         ))
@@ -262,9 +278,10 @@ impl ResourceBundleCondition {
         &'a self,
         resource_loader: &'a dyn ResourceLoader,
         name: &str,
+        extension: &str,
     ) -> Vec<&'a dyn Resource> {
         let target = name.replace('.', "/");
-        let pattern = format!("**/{target}.properties");
+        let pattern = format!("**/{target}.{extension}");
         resource_loader.get_resources(&pattern).unwrap_or_default()
     }
 }
