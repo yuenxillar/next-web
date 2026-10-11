@@ -11,11 +11,17 @@ use tracing::{debug, error, warn};
 
 use crate::{
     constants::application_constants::RESOURCES,
-    io::{ConfigOnlyPolicy, FileResource, Resource, ResourceAccessPolicy, ResourceLoader},
+    io::{FileResource, Resource, ResourceAccessPolicy, ResourceLoader, WebResourcePolicy},
     util::matcher::AntPathMatcher,
 };
 
 /// A default implementation of [`ResourceLoader`] that caches resources in memory.
+///
+/// The loader reads the resources a web application serves by default, which is
+/// what [`WebResourcePolicy`] allows: the configuration, the messages, the
+/// templates, and the static assets of an application. A loader that must only
+/// read the configuration replaces the policy with
+/// [`set_access_policies`](Self::set_access_policies).
 #[derive(Clone)]
 pub struct DefaultResourceLoader {
     root: Arc<Path>,
@@ -113,13 +119,33 @@ impl DefaultResourceLoader {
 
     /// Register an additional access policy.
     ///
-    /// Every registered policy must allow a location for it to be resolved.
+    /// Every registered policy must allow a location for it to be resolved, so
+    /// this only narrows what the loader reads. Use
+    /// [`set_access_policies`](Self::set_access_policies) to replace the
+    /// policies of the loader, for example to widen the default set.
     pub fn add_access_policy<T>(&mut self, policy: T)
     where
         T: ResourceAccessPolicy,
         T: 'static,
     {
         self.access_policy.push(Arc::new(policy));
+    }
+
+    /// Replaces the access policies of the loader.
+    ///
+    /// The default loader allows the resources a web application serves, which
+    /// is [`WebResourcePolicy`]. Use this to read a resource the default policy
+    /// does not cover, or to restrict a loader to the configuration of an
+    /// application with [`ConfigOnlyPolicy`](crate::io::ConfigOnlyPolicy).
+    ///
+    /// The policies are read when the loader scans its directory, so a caller
+    /// replaces them before calling [`load`](ResourceLoader::load) or
+    /// [`refresh`](ResourceLoader::refresh).
+    pub fn set_access_policies(
+        &mut self,
+        policies: impl IntoIterator<Item = Arc<dyn ResourceAccessPolicy>>,
+    ) {
+        self.access_policy = policies.into_iter().collect();
     }
 
     /// Return the currently registered access policies.
@@ -520,7 +546,7 @@ impl Default for DefaultResourceLoader {
             root: Arc::from(Self::resources_dir()),
             resource_caches: HashMap::new(),
             resource_modified_times: HashMap::new(),
-            access_policy: vec![Arc::new(ConfigOnlyPolicy::new())],
+            access_policy: vec![Arc::new(WebResourcePolicy::new())],
             cache_config: Some(ResourceCacheConfig::default()),
             current_cache_size: 0,
         }
@@ -528,7 +554,7 @@ impl Default for DefaultResourceLoader {
 }
 
 /// Caching configuration for [`DefaultResourceLoader`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResourceCacheConfig {
     /// Maximum size, in bytes, for a single resource to be cached.
     ///
@@ -651,5 +677,64 @@ mod tests {
             first.root(),
             DefaultResourceLoader::resources_dir().as_path()
         );
+    }
+
+    #[test]
+    fn the_default_policy_reads_the_static_assets_of_a_page() {
+        let root = temp_root("web-resources");
+        write_file(&root, "static/app.css", "body {}");
+        write_file(&root, "static/logo.png", "not really a png");
+        write_file(&root, "tool.exe", "not a resource of a page");
+
+        let mut loader = DefaultResourceLoader::new(&root, None);
+        loader.load().unwrap();
+
+        assert!(loader.exists("static/app.css"));
+        assert!(loader.exists("static/logo.png"));
+        assert!(!loader.exists("tool.exe"));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_access_policies_of_a_loader_can_be_replaced() {
+        let root = temp_root("replaced-policies");
+        write_file(&root, "application.yaml", "next: {}");
+        write_file(&root, "static/app.css", "body {}");
+
+        let mut loader = DefaultResourceLoader::new(&root, None);
+        let policy: Arc<dyn ResourceAccessPolicy> = Arc::new(crate::io::ConfigOnlyPolicy::new());
+        loader.set_access_policies([policy]);
+        loader.load().unwrap();
+
+        // Only the configuration of the application is read now, so the static
+        // asset is left out.
+        assert!(loader.exists("application.yaml"));
+        assert!(!loader.exists("static/app.css"));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_resource_larger_than_the_cache_limit_is_not_read() {
+        let root = temp_root("cache-limit");
+        write_file(&root, "small.txt", "small");
+        write_file(&root, "large.txt", "a large resource");
+
+        let mut loader = DefaultResourceLoader::new(
+            &root,
+            Some(ResourceCacheConfig {
+                max_file_size: 5,
+                max_total_size: 0,
+                panic_on_overflow: false,
+            }),
+        );
+        loader.load().unwrap();
+
+        // A file of the size of the limit is read, and a larger one is skipped.
+        assert!(loader.exists("small.txt"));
+        assert!(!loader.exists("large.txt"));
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

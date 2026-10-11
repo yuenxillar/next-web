@@ -10,11 +10,8 @@
 use axum::{extract::Request, response::Response};
 
 use crate::{
-    http::{session::SESSION_COOKIE_NAME, Cookie},
-    traits::http::{
-        http_request::{is_request_prepared, HttpRequest},
-        http_response::HttpResponse,
-    },
+    http::{Cookie, session::SESSION_COOKIE_NAME},
+    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
 /// The lifecycle of a request.
@@ -46,11 +43,8 @@ impl RequestLifecycle {
     /// * `request` - The request of the layer.
     pub fn begin(request: &mut Request) -> Self {
         // The request was prepared by the layer that prepares every request of
-        // an application, and the preparation has no effect when it already ran,
-        // so it is skipped here.
-        if !is_request_prepared(request) {
-            HttpRequest::ready(request);
-        }
+        // an application
+        HttpRequest::ready(request);
 
         Self {
             presented_session_id: session_id_of(request),
@@ -114,8 +108,8 @@ mod tests {
     use super::{RequestLifecycle, SESSION_COOKIE_NAME};
     use crate::{
         any::AnyValue,
-        http::session::{generate_session_id, global_session_manager, SessionManager},
-        traits::http::http_request::{is_request_prepared, HttpRequest},
+        http::session::{generate_session_id, global_session_manager},
+        traits::http::http_request::HttpRequest,
     };
 
     /// Returns the session cookie of a response, if the response carries one.
@@ -216,31 +210,6 @@ mod tests {
         assert_eq!(
             HttpRequest::get_attribute(&request, "user").and_then(AnyValue::as_str),
             Some("alice")
-        );
-    }
-
-    #[test]
-    fn a_request_that_was_prepared_is_not_prepared_again() {
-        let mut request = Request::builder()
-            .header(COOKIE, format!("{SESSION_COOKIE_NAME}=the-session"))
-            .body(Body::empty())
-            .expect("the request is built");
-        HttpRequest::ready(&mut request);
-        assert!(is_request_prepared(&request));
-
-        // The lifecycle of a request that was prepared by the outermost layer of
-        // an application keeps the state it read, and it can still see the
-        // session the client presented.
-        let lifecycle = RequestLifecycle::begin(&mut request);
-        assert!(is_request_prepared(&request));
-        let mut response = Response::new(Body::empty());
-        lifecycle.end(&mut request, &mut response);
-
-        assert!(!is_request_prepared(&request), "the state was released");
-        assert_eq!(
-            HttpRequest::cookies(&request).map(<[_]>::len),
-            None,
-            "the cookies were released with the state"
         );
     }
 }

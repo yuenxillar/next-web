@@ -4,6 +4,8 @@ use std::io::{self, BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use tracing::{Level, enabled};
+
 /// MIME type entry containing both MIME type and file extension
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MimeTypeEntry {
@@ -104,6 +106,15 @@ impl MimeTypeFile {
         Ok(parser)
     }
 
+    /// Returns the path this registry was loaded from, if any.
+    ///
+    /// Returns `Some` for registries created via [`MimeTypeFile::from_file`],
+    /// and `None` for in-memory registries. Useful for logging which
+    /// `mime.types` file a mapping came from, or for diagnostics.
+    pub fn get_filename(&self) -> Option<&Path> {
+        self.filename.as_deref()
+    }
+
     /// Returns the MIME type entry for the given file extension
     pub fn get_mime_type_entry(&self, file_ext: &str) -> Option<&MimeTypeEntry> {
         self.type_hash.get(file_ext)
@@ -121,7 +132,11 @@ impl MimeTypeFile {
         self.parse(reader)
     }
 
-    /// Adds a custom MIME type mapping
+    /// Adds a custom MIME type mapping.
+    ///
+    /// Unlike parsed entries, an explicit [`add_mapping`](Self::add_mapping)
+    /// call **overwrites** any existing mapping for the same extension.
+    /// This lets callers intentionally override defaults.
     pub fn add_mapping(&mut self, mime_type: &str, extension: &str) {
         let entry = MimeTypeEntry::new(mime_type.to_string(), extension.to_string());
         self.type_hash.insert(extension.to_string(), entry);
@@ -204,6 +219,10 @@ impl MimeTypeFile {
     }
 
     /// Parses traditional format: "mime_type ext1 ext2 ext3 ..."
+    ///
+    /// The first declaration for a given extension wins; later duplicates
+    /// are ignored so that the mapping is deterministic and independent of
+    /// how many times a type is declared.
     fn parse_traditional_format(&mut self, line: &str) -> io::Result<()> {
         let parts: Vec<&str> = line.split_whitespace().collect();
 
@@ -217,11 +236,12 @@ impl MimeTypeFile {
         for &ext in &parts[1..] {
             let entry = MimeTypeEntry::new(mime_type.to_string(), ext.to_string());
 
-            if log_support::is_loggable() {
-                log_support::log(&format!("Added: {}", entry));
+            if enabled!(Level::INFO) {
+                tracing::info!("Added: {}", entry);
             }
 
-            self.type_hash.insert(ext.to_string(), entry);
+            // First definition wins: do not overwrite an existing mapping.
+            self.type_hash.entry(ext.to_string()).or_insert(entry);
         }
 
         Ok(())
@@ -243,8 +263,8 @@ impl MimeTypeFile {
             };
 
             let Some(value) = value else {
-                if log_support::is_loggable() {
-                    log_support::log(&format!("Bad .mime.types entry: {}", line));
+                if enabled!(Level::INFO) {
+                    tracing::info!("Bad .mime.types entry: {}", line);
                 }
                 return Ok(());
             };
@@ -255,20 +275,20 @@ impl MimeTypeFile {
                 }
                 "exts" => {
                     let Some(mime_type) = mime_type.as_ref() else {
-                        if log_support::is_loggable() {
-                            log_support::log(&format!("Bad .mime.types entry: {}", line));
+                        if enabled!(Level::INFO) {
+                            tracing::info!("Bad .mime.types entry: {}", line);
                         }
                         return Ok(());
                     };
 
                     for ext in value.split(',').filter(|ext| !ext.is_empty()) {
                         let entry = MimeTypeEntry::new(mime_type.clone(), ext.to_string());
-
-                        if log_support::is_loggable() {
-                            log_support::log(&format!("Added: {}", entry));
+                        if enabled!(Level::INFO) {
+                            tracing::info!("Added: {}", entry);
                         }
 
-                        self.type_hash.insert(ext.to_string(), entry);
+                        // First definition wins: do not overwrite an existing mapping.
+                        self.type_hash.entry(ext.to_string()).or_insert(entry);
                     }
                 }
                 _ => {}
@@ -290,34 +310,6 @@ impl FromStr for MimeTypeFile {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         MimeTypeFile::from_str(s)
-    }
-}
-
-/// Simple logging support (matching Java's LogSupport)
-mod log_support {
-    use std::sync::OnceLock;
-
-    static LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
-
-    /// Check if logging is enabled
-    pub fn is_loggable() -> bool {
-        *LOGGING_ENABLED.get_or_init(|| {
-            std::env::var("JAF_LOGGING")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false)
-        })
-    }
-
-    /// Log a message if logging is enabled
-    pub fn log(message: &str) {
-        if is_loggable() {
-            eprintln!("[MimeTypeFile] {}", message);
-        }
-    }
-
-    /// Enable logging programmatically
-    pub fn enable_logging() {
-        let _ = LOGGING_ENABLED.set(true);
     }
 }
 
@@ -591,5 +583,65 @@ text/plain txt text
 
         assert_eq!(mime_file.get_mime_type_string("txt\\"), Some("text/plain"));
         assert_eq!(mime_file.get_mime_type_string("html"), Some("text/html"));
+    }
+
+    #[test]
+    fn test_duplicate_extension_first_wins() {
+        // The same extension is declared twice with different MIME types.
+        let content = "text/plain txt\ntext/html txt";
+        let mime_file = MimeTypeFile::from_str(content).unwrap();
+
+        // First declaration wins.
+        assert_eq!(mime_file.get_mime_type_string("txt"), Some("text/plain"));
+        assert_eq!(mime_file.len(), 1);
+    }
+
+    #[test]
+    fn test_duplicate_extension_first_wins_extended_format() {
+        let content = "type=text/plain exts=txt\ntype=text/html exts=txt";
+        let mime_file = MimeTypeFile::from_str(content).unwrap();
+
+        assert_eq!(mime_file.get_mime_type_string("txt"), Some("text/plain"));
+        assert_eq!(mime_file.len(), 1);
+    }
+
+    #[test]
+    fn test_add_mapping_overrides_existing() {
+        let mut mime_file = MimeTypeFile::new();
+
+        // Parsed entries are first-wins...
+        mime_file.append_to_registry("text/plain txt").unwrap();
+        mime_file.append_to_registry("text/html txt").unwrap();
+        assert_eq!(mime_file.get_mime_type_string("txt"), Some("text/plain"));
+
+        // ...but add_mapping intentionally overrides.
+        mime_file.add_mapping("application/x-custom", "txt");
+        assert_eq!(
+            mime_file.get_mime_type_string("txt"),
+            Some("application/x-custom")
+        );
+        assert_eq!(mime_file.len(), 1);
+    }
+
+    #[test]
+    fn test_get_filename_from_file() -> io::Result<()> {
+        let temp_dir = std::env::temp_dir();
+        let temp_file = temp_dir.join("test_filename_mime.types");
+        std::fs::write(&temp_file, "text/plain txt")?;
+
+        let mime_file = MimeTypeFile::from_file(&temp_file)?;
+        assert_eq!(mime_file.get_filename(), Some(temp_file.as_path()));
+
+        std::fs::remove_file(temp_file)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_filename_in_memory_is_none() {
+        let mime_file = MimeTypeFile::from_str("text/plain txt").unwrap();
+        assert_eq!(mime_file.get_filename(), None);
+
+        let empty = MimeTypeFile::new();
+        assert_eq!(empty.get_filename(), None);
     }
 }

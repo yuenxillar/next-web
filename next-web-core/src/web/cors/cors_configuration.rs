@@ -1080,6 +1080,10 @@ mod tests {
     fn test_from_str_http_method() {
         assert_eq!(HttpMethod::from_str("GET").unwrap(), HttpMethod::GET);
         assert_eq!(HttpMethod::from_str("POST").unwrap(), HttpMethod::POST);
-        assert!(HttpMethod::from_str("INVALID").is_err());
+        // A name that is not one of the standard methods is an extension
+        // method, which the parser accepts.
+        assert!(HttpMethod::from_str("INVALID").is_ok());
+        // A name that is not a valid token is refused.
+        assert!(HttpMethod::from_str("IN VALID").is_err());
     }
 }

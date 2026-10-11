@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+</head>
+<body>
+    <h1>Login</h1>
+
+    {% if error is defined %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+
+    <form method="post" action="/app/template/login">
+        <label>User <input name="username"></label>
+        <label>Password <input type="password" name="password"></label>
+        <button type="submit">Sign in</button>
+    </form>
+
+    <p>
+        This document is <code>resources/views/login.html</code>, rendered by a
+        dispatch with the attributes of the request as its model.
+    </p>
+</body>
+</html>

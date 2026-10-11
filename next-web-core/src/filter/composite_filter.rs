@@ -33,9 +33,8 @@ use crate::{
 /// use next_web_core::filter::CompositeFilter;
 /// use next_web_core::traits::filter::HttpFilter;
 ///
-/// let filters: Arc<[Arc<dyn HttpFilter>]> = Arc::from(Vec::new());
 /// let mut composite = CompositeFilter::default();
-/// composite.set_filters(filters);
+/// composite.set_filters(Vec::<Arc<dyn HttpFilter>>::new());
 /// assert!(composite.filters().is_empty());
 /// ```
 #[derive(Clone, Default)]

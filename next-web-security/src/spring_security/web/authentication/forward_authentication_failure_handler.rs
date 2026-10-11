@@ -34,8 +34,8 @@ impl AuthenticationFailureHandler for ForwardAuthenticationFailureHandler {
         error: &crate::core::AuthenticationError,
     ) -> Result<(), BoxError> {
         request.set_attribute(WebAttributes::AUTHENTICATION_ERROR, error.clone().into());
-        if let Some(request_dispatcher) = request.request_dispatcher(&self.forward_url) {
-            return request_dispatcher.forward(request, response);
+        if let Some(resource_dispatcher) = request.resource_dispatcher() {
+            return resource_dispatcher.forward(&self.forward_url, request, response);
         }
 
         Ok(())

@@ -76,12 +76,10 @@ impl AccessDeniedHandler for AccessDeniedHandlerImpl {
             );
         }
 
-        if let Some(dispatcher) = self
-            .error_page
-            .as_deref()
-            .and_then(|page| request.request_dispatcher(page))
-        {
-            dispatcher.forward(request, response)?;
+        if let Some(page) = self.error_page.as_deref() {
+            if let Some(dispatcher) = request.resource_dispatcher() {
+                dispatcher.forward(page, request, response)?;
+            }
         }
 
         Ok(())

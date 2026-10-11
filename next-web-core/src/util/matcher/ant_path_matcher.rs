@@ -19,7 +19,7 @@ use std::borrow::Cow;
 /// ```
 /// use next_web_core::util::matcher::AntPathMatcher;
 ///
-/// let matcher = AntPathMatcher::new();
+/// let matcher = AntPathMatcher::new("/");
 /// assert!(matcher.matches("messages/*.properties", "messages/zh-CN.properties"));
 /// assert!(matcher.matches("**/*.properties", "messages/zh-CN.properties"));
 /// assert!(!matcher.matches("*.properties", "messages/zh-CN.properties"));

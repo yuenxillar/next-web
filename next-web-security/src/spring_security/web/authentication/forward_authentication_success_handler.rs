@@ -29,9 +29,9 @@ impl AuthenticationSuccessHandler for ForwardAuthenticationSuccessHandler {
         resp: &mut dyn HttpResponse,
         _authentication: &dyn crate::core::Authentication,
     ) {
-        if let Some(dispatcher) = req.request_dispatcher(&self.forward_url) {
+        if let Some(dispatcher) = req.resource_dispatcher() {
             dispatcher
-                .forward(req, resp)
+                .forward(&self.forward_url, req, resp)
                 .inspect_err(|err| {
                     eprintln!("Failed to forward authentication success: {}", err);
                 })

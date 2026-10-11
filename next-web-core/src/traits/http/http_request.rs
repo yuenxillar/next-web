@@ -20,7 +20,7 @@ use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::Arc};
 use axum::{
     extract::Request,
     http::{
-        header::ACCEPT_LANGUAGE, header::CONTENT_TYPE, uri::Scheme, HeaderMap, HeaderValue, Uri,
+        HeaderMap, HeaderValue, Uri, header::ACCEPT_LANGUAGE, header::CONTENT_TYPE, uri::Scheme,
     },
 };
 
@@ -30,13 +30,13 @@ use next_web_context::Locale;
 use crate::{
     any::AnyValue,
     http::{
-        session::{
-            global_session_manager, HttpSession, SessionManager, StandardSession,
-            SESSION_COOKIE_NAME,
-        },
         Cookie, HttpMethod, HttpRequestShare, HttpVersion,
+        session::{
+            HttpSession, SESSION_COOKIE_NAME, SessionManager, StandardSession,
+            global_session_manager,
+        },
     },
-    traits::http::request_dispatcher::RequestDispatcher,
+    traits::http::resource_dispatcher::ResourceDispatcher,
 };
 
 /// The request attributes of a servlet-style request.
@@ -111,16 +111,18 @@ where
     fn cookies(&self) -> Option<&[Cookie]>;
 
     // ------------------------------------------------------------------
-    // Dispatching.
+    // Resource rendering.
     // ------------------------------------------------------------------
 
-    /// Returns the [`RequestDispatcher`] to use for `default_failure_url`, if
-    /// the application installed one.
+    /// Returns the [`ResourceDispatcher`] the application installed, if there
+    /// is one.
     ///
     /// The dispatcher is looked up from the request extensions, where the web
     /// layer (or a filter) stores it. It returns `None` when no dispatcher is
-    /// configured, which lets callers fall back to a redirect.
-    fn request_dispatcher(&self, default_failure_url: &str) -> Option<&dyn RequestDispatcher>;
+    /// configured, which lets callers fall back to a redirect. The resource to
+    /// render is an argument of the dispatcher, so the lookup does not depend
+    /// on the URL.
+    fn resource_dispatcher(&self) -> Option<&dyn ResourceDispatcher>;
 
     // ------------------------------------------------------------------
     // Request line and headers.
@@ -212,6 +214,17 @@ where
     // ------------------------------------------------------------------
     // Attributes.
     // ------------------------------------------------------------------
+
+    /// Returns every attribute of the request, if the transport keeps them.
+    ///
+    /// The attributes are what a view rendered from the request is given as its
+    /// model; [`TemplateEngine::context_of`] turns them into the context of a
+    /// template, which is how an error page renders `{{ error }}`.
+    ///
+    /// [`TemplateEngine::context_of`]: crate::web::TemplateEngine::context_of
+    fn attributes(&self) -> Option<&HashMap<String, AnyValue>> {
+        None
+    }
 
     /// Returns the request attribute bound to `name`, if any.
     fn get_attribute(&self, name: &str) -> Option<&AnyValue>;
@@ -346,10 +359,10 @@ impl HttpRequest for Request {
         self.extensions().get::<Vec<Cookie>>().map(Vec::as_slice)
     }
 
-    fn request_dispatcher(&self, _default_failure_url: &str) -> Option<&dyn RequestDispatcher> {
+    fn resource_dispatcher(&self) -> Option<&dyn ResourceDispatcher> {
         self.extensions()
-            .get::<Arc<dyn RequestDispatcher + Send + Sync>>()
-            .map(|dispatcher| &**dispatcher as &dyn RequestDispatcher)
+            .get::<Arc<dyn ResourceDispatcher>>()
+            .map(|dispatcher| &**dispatcher as &dyn ResourceDispatcher)
     }
 
     fn method(&self) -> HttpMethod {
@@ -473,6 +486,10 @@ impl HttpRequest for Request {
         self.extensions()
             .get::<OneMap>()
             .and_then(|attributes| attributes.get(name))
+    }
+
+    fn attributes(&self) -> Option<&HashMap<String, AnyValue>> {
+        self.extensions().get::<OneMap>()
     }
 
     fn remove_attribute(&mut self, name: &str) {
@@ -642,14 +659,14 @@ mod tests {
 
     use axum::{
         body::Body,
-        http::header::{HeaderName, COOKIE},
+        http::header::{COOKIE, HeaderName},
     };
 
     use super::{HttpRequest, Request, RequestContextPath};
     use crate::{
         error::BoxError,
         http::session::SESSION_COOKIE_NAME,
-        traits::http::{http_response::HttpResponse, request_dispatcher::RequestDispatcher},
+        traits::http::{http_response::HttpResponse, resource_dispatcher::ResourceDispatcher},
     };
 
     fn session_request(id: &str) -> Request {
@@ -766,21 +783,13 @@ mod tests {
 
     #[test]
     fn an_installed_dispatcher_is_returned() {
-        #[derive(Debug)]
         struct NoopDispatcher;
 
-        impl RequestDispatcher for NoopDispatcher {
-            fn forward(
-                &self,
-                _request: &dyn HttpRequest,
-                _response: &mut dyn HttpResponse,
-            ) -> Result<(), BoxError> {
-                Ok(())
-            }
-
+        impl ResourceDispatcher for NoopDispatcher {
             fn include(
                 &self,
-                _request: &mut dyn HttpRequest,
+                _path: &str,
+                _request: &dyn HttpRequest,
                 _response: &mut dyn HttpResponse,
             ) -> Result<(), BoxError> {
                 Ok(())
@@ -788,11 +797,11 @@ mod tests {
         }
 
         let mut request = Request::builder().body(Body::empty()).unwrap();
-        assert!(request.request_dispatcher("/login").is_none());
+        assert!(request.resource_dispatcher().is_none());
 
-        let dispatcher: Arc<dyn RequestDispatcher + Send + Sync> = Arc::new(NoopDispatcher);
+        let dispatcher: Arc<dyn ResourceDispatcher> = Arc::new(NoopDispatcher);
         request.extensions_mut().insert(dispatcher);
 
-        assert!(request.request_dispatcher("/login").is_some());
+        assert!(request.resource_dispatcher().is_some());
     }
 }

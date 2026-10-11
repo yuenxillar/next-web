@@ -3,17 +3,17 @@
 use std::sync::Arc;
 
 use axum::{
+    Router,
     body::Body,
     extract::{Request, State},
     http::StatusCode,
     middleware::Next,
     response::Response,
-    Router,
 };
 use next_web_context::ApplicationContextExt;
 use next_web_core::{
     filter::application_filter_chain::ApplicationFilterChain,
-    http::{buffer_request_body_for, BodyBufferPolicy, RequestLifecycle},
+    http::{BodyBufferPolicy, RequestLifecycle, buffer_request_body_for},
     traits::{
         filter::{HttpFilter, HttpFilterChain},
         http::http_response::HttpResponse,
@@ -70,7 +70,7 @@ where
     // client presented, which is what `end` compares the session it leaves
     // behind with.
     let lifecycle = RequestLifecycle::begin(&mut request);
-    let filter_chain = ApplicationFilterChain::new(state.filters.clone());
+    let filter_chain = ApplicationFilterChain::new(Arc::clone(&state.filters));
     let mut response = Response::new(Body::empty());
 
     match filter_chain.do_filter(&mut request, &mut response).await {

@@ -61,17 +61,21 @@ static PID_WRITTEN: AtomicBool = AtomicBool::new(false);
 /// The events that do not carry an environment, such as the event that is
 /// published while the application is starting, cannot be used as a trigger,
 /// because the name of the file may be configured through the environment.
+///
+/// The default is [`EnvironmentPrepared`](Self::EnvironmentPrepared), the
+/// earliest event that carries the environment, so that the file of a process
+/// is written as soon as the environment that names it is known.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PidFileTrigger {
-    /// The event that is published once the environment is prepared
+    /// The event that is published once the environment is prepared (the
+    /// default).
+    #[default]
     EnvironmentPrepared,
 
     /// The event that is published once the application context is prepared.
     ContextPrepared,
 
-    /// The event that is published once the application context is loaded (the
-    /// default).
-    #[default]
+    /// The event that is published once the application context is loaded.
     ContextLoaded,
 
     /// The event that is published once the application has started.

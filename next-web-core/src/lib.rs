@@ -30,6 +30,10 @@ pub use arc_swap::*;
 pub use async_trait::async_trait;
 pub use dyn_clone::{DynClone, clone_box, clone_trait_object};
 pub use regex::{Regex, RegexBuilder};
+// The template engine the framework renders the views of an application with.
+// It is re-exported so a handler can name `next_web_core::tera::Context`
+// without depending on the version of the crate the framework uses.
+pub use tera;
 pub use uuid::Uuid;
 
 #[cfg(feature = "http-request")]

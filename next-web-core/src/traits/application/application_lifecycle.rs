@@ -14,7 +14,10 @@ use crate::{ApplicationContext, Ordered};
 /// Implementation with error handling and logging:
 /// ```
 /// use async_trait::async_trait;
-/// use next_core::traits::application::application_lifecycle::ApplicationLifecycle;
+/// use next_web_core::traits::application::application_lifecycle::ApplicationLifecycle;
+/// use next_web_core::traits::application::application_lifecycle::ShutdownContext;
+/// use next_web_core::ApplicationContext;
+/// use next_web_core::Ordered;
 /// use tracing::{info, error};
 ///
 /// #[derive(Clone)]
@@ -22,9 +25,14 @@ use crate::{ApplicationContext, Ordered};
 ///     endpoint: String,
 /// }
 ///
+/// impl Ordered for MetricsCollector {}
+///
 /// #[async_trait]
 /// impl ApplicationLifecycle for MetricsCollector {
-///     async fn on_start(&self) -> Result<(), Box<dyn std::error::Error>> {
+///     async fn on_start(
+///         &mut self,
+///         _context: &mut dyn ApplicationContext,
+///     ) -> Result<(), Box<dyn std::error::Error>> {
 ///         info!("Starting metrics collector to {}", self.endpoint);
 ///         // Initialize metrics client
 ///         if self.endpoint.is_empty() {
@@ -33,7 +41,7 @@ use crate::{ApplicationContext, Ordered};
 ///         Ok(())
 ///     }
 ///
-///     async fn on_shutdown(&self) {
+///     async fn on_shutdown(&mut self, _context: &ShutdownContext) {
 ///         info!("Flushing metrics before shutdown...");
 ///         // Flush any pending metrics
 ///     }
@@ -57,17 +65,25 @@ use crate::{ApplicationContext, Ordered};
 /// 带有错误处理和日志的实现：
 /// ```
 /// use async_trait::async_trait;
-/// use application_lifecycle::ApplicationLifecycle;
-/// use log::{info, error};
+/// use next_web_core::traits::application::application_lifecycle::ApplicationLifecycle;
+/// use next_web_core::traits::application::application_lifecycle::ShutdownContext;
+/// use next_web_core::ApplicationContext;
+/// use next_web_core::Ordered;
+/// use tracing::{info, error};
 ///
 /// #[derive(Clone)]
 /// struct MetricsCollector {
 ///     endpoint: String,
 /// }
 ///
+/// impl Ordered for MetricsCollector {}
+///
 /// #[async_trait]
 /// impl ApplicationLifecycle for MetricsCollector {
-///     async fn on_start(&self) -> Result<(), Box<dyn std::error::Error>> {
+///     async fn on_start(
+///         &mut self,
+///         _context: &mut dyn ApplicationContext,
+///     ) -> Result<(), Box<dyn std::error::Error>> {
 ///         info!("启动指标收集器，上报地址: {}", self.endpoint);
 ///         // 初始化指标客户端
 ///         if self.endpoint.is_empty() {
@@ -76,7 +92,7 @@ use crate::{ApplicationContext, Ordered};
 ///         Ok(())
 ///     }
 ///
-///     async fn on_shutdown(&self) {
+///     async fn on_shutdown(&mut self, _context: &ShutdownContext) {
 ///         info!("关闭前刷新指标...");
 ///         // 刷新待上报的指标数据
 ///     }

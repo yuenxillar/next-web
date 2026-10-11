@@ -1,6 +1,4 @@
-use std::path::Path;
-
-use crate::io::ResourceAccessPolicy;
+use crate::io::{ResourceAccessPolicy, allows};
 
 /// A policy that only allows configuration files to be loaded.
 pub struct ConfigOnlyPolicy {
@@ -68,50 +66,15 @@ impl ResourceAccessPolicy for ConfigOnlyPolicy {
     /// Return `true` if the given location points to a configuration file
     /// permitted by this policy.
     ///
-    /// The check is performed against the path portion of the location,
-    /// ignoring any known protocol prefix such as `classpath:` or `file:`.
-    /// A location is allowed when either:
+    /// A location is allowed when its file stem is one of the allowed names
+    /// (for example, `application` for `application.yml`, or `.env` for
+    /// `.env.local`), or when its extension is one of the allowed extensions,
+    /// compared case-insensitively. Any other location, including one with no
+    /// recognizable file name or extension, is rejected.
     ///
-    /// 1. its file stem matches one of the allowed names (for example,
-    ///    `application` for `application.yml`, or `.env` for `.env.local`), or
-    /// 2. its file extension matches one of the allowed extensions,
-    ///    compared case-insensitively.
-    ///
-    /// Any other location, including one with no recognizable file name or
-    /// extension, is rejected.
+    /// Use [`WebResourcePolicy`](crate::io::WebResourcePolicy) for a loader that
+    /// also has to answer with the static assets of an application.
     fn is_allowed(&self, location: &str) -> bool {
-        // Normalize separators and reject any path that attempts to escape
-        // its base directory via `..`.
-        let normalized = location.replace('\\', "/");
-        if normalized.split('/').any(|segment| segment == "..") {
-            return false;
-        }
-
-        let path = Path::new(&normalized);
-
-        // 1. Check whether the file stem matches one of the allowed names.
-        //    This covers configuration files that either carry no extension
-        //    at all (`config`) or are known by their base name regardless of
-        //    extension (`application.yml`).
-        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-            if self
-                .allowed_names
-                .iter()
-                .any(|name| stem.eq_ignore_ascii_case(name))
-            {
-                return true;
-            }
-        }
-
-        // 2. Check whether the file extension matches one of the allowed
-        //    extensions, compared case-insensitively.
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            return self
-                .allowed_extensions
-                .iter()
-                .any(|allowed| ext.eq_ignore_ascii_case(allowed));
-        }
-
-        false
+        allows(location, &self.allowed_extensions, &self.allowed_names)
     }
 }

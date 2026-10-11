@@ -9,6 +9,15 @@ next:
   messages:
     base_name: "/messages"
 
+  # The resources the web layer serves: the templates a view renders and the
+  # files a dispatch answers with. The cache they are read into is limited here,
+  # so an application can raise the limits of a large deployment.
+  resources:
+    cache:
+      max_file_size: 5mb
+      max_total_size: 64mb
+      panic_on_overflow: false
+
   data:
     redis:
       host: "192.168.1.19"

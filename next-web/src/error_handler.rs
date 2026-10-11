@@ -18,12 +18,12 @@ use axum::response::IntoResponse;
 /// # Examples
 ///
 /// ```
-/// use axum::response::IntoResponse;
-/// use your_crate::ErrorSolver;
+/// use next_web::ErrorHandler;
 ///
 /// // Using the default string implementation
-/// let error = "Something went wrong".to_string();
-/// let response = <() as ErrorSolver>::solve_error(error);
+/// let error = "Something went wrong";
+/// let response = <() as ErrorHandler>::handle_error(error);
+/// # let _ = response;
 /// ```
 pub trait ErrorHandler {
     /// Transforms an error string into an appropriate response type
@@ -61,12 +61,10 @@ impl ErrorHandler for () {
     /// # Examples
     ///
     /// ```
-    /// use your_crate::ErrorSolver;
+    /// use next_web::ErrorHandler;
     ///
-    /// let error_message = "Database connection failed".to_string();
-    /// let response = <() as ErrorSolver>::solve_error(error_message);
-    ///
-    /// println!("{:?}", response);
+    /// let response = <() as ErrorHandler>::handle_error("Database connection failed");
+    /// # let _ = response;
     /// ```
     fn handle_error<'a>(error: &'a str) -> impl IntoResponse {
         error.to_owned()

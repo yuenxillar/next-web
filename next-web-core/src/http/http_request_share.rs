@@ -8,7 +8,7 @@ use next_web_context::Locale;
 use crate::{
     any::AnyValue,
     http::{session::HttpSession, Cookie, HttpMethod, HttpVersion},
-    traits::http::{http_request::HttpRequest, request_dispatcher::RequestDispatcher},
+    traits::http::{http_request::HttpRequest, resource_dispatcher::ResourceDispatcher},
 };
 
 pub struct HttpRequestShare {
@@ -53,7 +53,11 @@ impl HttpRequest for HttpRequestShare {
         Some(&self.cookies)
     }
 
-    fn request_dispatcher(&self, _default_failure_url: &str) -> Option<&dyn RequestDispatcher> {
+    fn attributes(&self) -> Option<&HashMap<String, AnyValue>> {
+        Some(&self.attributes)
+    }
+
+    fn resource_dispatcher(&self) -> Option<&dyn ResourceDispatcher> {
         None
     }
 

@@ -10,7 +10,7 @@
 //! Creating a session cookie with security attributes:
 //!
 //! ```
-//! use cookie::{Cookie, SameSite};
+//! use next_web_core::http::{Cookie, SameSite};
 //!
 //! let mut cookie = Cookie::new("session_id", Some("abc123".to_string()));
 //! cookie.set_path("/");
@@ -26,14 +26,15 @@
 //! Using the builder pattern:
 //!
 //! ```
-//! use cookie::{Cookie, SameSite};
+//! use next_web_core::http::{Cookie, SameSite};
 //!
 //! let cookie = Cookie::builder("session_id", Some("abc123".to_string()))
 //!     .path("/")
 //!     .secure(true)
 //!     .http_only(true)
 //!     .same_site(SameSite::Lax)
-//!     .build();
+//!     .build()
+//!     .unwrap();
 //!
 //! assert_eq!(
 //!     cookie.to_string(),
@@ -81,7 +82,7 @@ impl Cookie {
     /// # Examples
     ///
     /// ```
-    /// use cookie::Cookie;
+    /// use next_web_core::http::Cookie;
     ///
     /// let cookie = Cookie::new("session_id", Some("abc123".to_string()));
     /// assert_eq!(cookie.name(), "session_id");
@@ -106,7 +107,7 @@ impl Cookie {
     /// # Examples
     ///
     /// ```
-    /// use cookie::{Cookie, SameSite};
+    /// use next_web_core::http::{Cookie, SameSite};
     ///
     /// let cookie = Cookie::builder("session_id", Some("abc123".to_string()))
     ///     .path("/")
@@ -141,7 +142,7 @@ impl Cookie {
     ///
     /// ```
     /// use std::time::Duration;
-    /// use cookie::Cookie;
+    /// use next_web_core::http::Cookie;
     ///
     /// let mut cookie = Cookie::new("session_id", Some("abc123".to_string()));
     ///
@@ -182,7 +183,7 @@ impl Cookie {
     /// # Examples
     ///
     /// ```
-    /// use cookie::Cookie;
+    /// use next_web_core::http::Cookie;
     ///
     /// let mut cookie = Cookie::new("session_id", Some("abc123".to_string()));
     ///
@@ -314,7 +315,7 @@ impl Cookie {
     /// # Examples
     ///
     /// ```
-    /// use cookie::{Cookie, SameSite};
+    /// use next_web_core::http::{Cookie, SameSite};
     ///
     /// let mut cookie = Cookie::new("session_id", Some("abc123".to_string()));
     /// cookie.set_same_site(SameSite::None);
@@ -332,6 +333,12 @@ impl Cookie {
             if let Some(SameSite::None) = self.same_site {
                 return Err(CookieError::PartitionedWithSameSiteNone);
             }
+        }
+
+        // A browser rejects `SameSite=None` over an insecure transport, so the
+        // cookie is refused before it is written to a header.
+        if !self.secure && matches!(self.same_site, Some(SameSite::None)) {
+            return Err(CookieError::SameSiteNoneRequiresSecure);
         }
 
         Rfc6265Utils::validate_cookie_name(&self.name)?;
@@ -444,7 +451,7 @@ impl fmt::Display for Cookie {
     /// # Examples
     ///
     /// ```
-    /// use cookie::{Cookie, SameSite};
+    /// use next_web_core::http::{Cookie, SameSite};
     ///
     /// let mut cookie = Cookie::new("session_id", Some("abc123".to_string()));
     /// cookie.set_path("/");
@@ -502,7 +509,7 @@ impl fmt::Display for Cookie {
 /// # Examples
 ///
 /// ```
-/// use cookie::SameSite;
+/// use next_web_core::http::SameSite;
 ///
 /// // Parse from a string
 /// let same_site: SameSite = "Strict".parse().unwrap();
@@ -541,7 +548,7 @@ impl SameSite {
     /// # Examples
     ///
     /// ```
-    /// use cookie::SameSite;
+    /// use next_web_core::http::SameSite;
     ///
     /// assert_eq!(SameSite::Strict.as_str(), "Strict");
     /// assert_eq!(SameSite::Lax.as_str(), "Lax");
@@ -639,7 +646,7 @@ impl From<CookieValidationError> for CookieError {
 /// These validators ensure that cookie attributes conform to the HTTP State
 /// Management Mechanism specification (RFC 6265) and the token specification
 /// (RFC 2616).
-struct Rfc6265Utils;
+pub struct Rfc6265Utils;
 
 impl Rfc6265Utils {
     /// Separator characters that are not allowed in cookie names per RFC 2616.
@@ -670,7 +677,7 @@ impl Rfc6265Utils {
     /// # Examples
     ///
     /// ```
-    /// use cookie::validators::Rfc6265Utils;
+    /// use next_web_core::http::Rfc6265Utils;
     ///
     /// // Valid cookie names
     /// assert!(Rfc6265Utils::validate_cookie_name("session_id").is_ok());
@@ -734,15 +741,15 @@ impl Rfc6265Utils {
     /// # Examples
     ///
     /// ```
-    /// use cookie::validators::Rfc6265Utils;
+    /// use next_web_core::http::Rfc6265Utils;
     ///
     /// // Valid cookie values
     /// assert!(Rfc6265Utils::validate_cookie_value(Some("abc123")).is_ok());
-    /// assert!(Rfc6265Utils::validate_cookie_value(Some("value with spaces")).is_ok());
-    /// assert!(Rfc6265Utils::validate_cookie_value(Some("\"quoted value\"")).is_ok());
+    /// assert!(Rfc6265Utils::validate_cookie_value(Some("\"quoted\"")).is_ok());
     /// assert!(Rfc6265Utils::validate_cookie_value(None).is_ok());
     ///
     /// // Invalid cookie values
+    /// assert!(Rfc6265Utils::validate_cookie_value(Some("value with spaces")).is_err());
     /// assert!(Rfc6265Utils::validate_cookie_value(Some("value;with;semicolon")).is_err());
     /// assert!(Rfc6265Utils::validate_cookie_value(Some("value,with,comma")).is_err());
     /// ```
@@ -812,7 +819,7 @@ impl Rfc6265Utils {
     /// # Examples
     ///
     /// ```
-    /// use cookie::validators::Rfc6265Utils;
+    /// use next_web_core::http::Rfc6265Utils;
     ///
     /// // Valid domains
     /// assert!(Rfc6265Utils::validate_domain(Some("example.com")).is_ok());
@@ -889,7 +896,7 @@ impl Rfc6265Utils {
     /// # Examples
     ///
     /// ```
-    /// use cookie::validators::Rfc6265Utils;
+    /// use next_web_core::http::Rfc6265Utils;
     ///
     /// // Valid paths
     /// assert!(Rfc6265Utils::validate_path(Some("/")).is_ok());

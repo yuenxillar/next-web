@@ -202,8 +202,13 @@ impl<'a> HashSlot<'a> {
     ///
     /// # Examples
     /// ```
-    /// // For key "user:{1001}:profile", only "1001" is used for hashing
+    /// use next_web::util::HashSlot;
+    ///
+    /// let hash_slot = HashSlot::new(vec!["node-1", "node-2"], 16_384);
+    ///
+    /// // For the key "user:{1001}:profile", only "1001" is used for hashing.
     /// let node = hash_slot.get_node("user:{1001}:profile");
+    /// # let _ = node;
     /// ```
     pub fn get_node(&self, key: &str) -> &str {
         let slot = self.get_slot(key);

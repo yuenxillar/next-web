@@ -11,6 +11,7 @@
 /// # 示例
 /// ```
 /// use std::sync::Arc;
+/// use next_web_core::traits::singleton::Singleton;
 ///
 /// struct MyService;
 ///
@@ -32,6 +33,7 @@
 /// # Example
 /// ```
 /// use std::sync::Arc;
+/// use next_web_core::traits::singleton::Singleton;
 ///
 /// struct MyService;
 ///

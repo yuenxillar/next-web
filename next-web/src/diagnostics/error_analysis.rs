@@ -19,7 +19,7 @@ use std::panic::PanicHookInfo;
 /// let cause = io::Error::new(io::ErrorKind::NotFound, "redis.conf not found");
 /// let analysis = ErrorAnalysis::new(
 ///     "Failed to load Redis configuration file",
-///     Some("Ensure that redis.conf exists in the config directory"),
+///     Some("Ensure that redis.conf exists in the config directory".to_string()),
 ///     Some(&cause),
 /// );
 ///

@@ -25,7 +25,8 @@ impl ThreadUtil {
     /// # Example
     ///
     /// ```
-    /// use std::thread;
+    /// use next_web::util::ThreadUtil;
+    ///
     /// let id = ThreadUtil::id();
     /// println!("Current thread ID: {:?}", id);
     /// ```
@@ -93,6 +94,8 @@ impl ThreadUtil {
     /// # Example
     ///
     /// ```no_run
+    /// use next_web::util::ThreadUtil;
+    ///
     /// let cores = ThreadUtil::num_cores();
     /// println!("Available parallelism: {}", cores);
     /// ```
@@ -156,6 +159,8 @@ impl ThreadUtil {
     ///
     /// ```
     /// # async fn example() {
+    /// use next_web::util::ThreadUtil;
+    ///
     /// let handle = ThreadUtil::spawn(async { 42 });
     /// let result = handle.await.unwrap();
     /// assert_eq!(result, 42);
@@ -187,6 +192,8 @@ impl ThreadUtil {
     ///
     /// ```
     /// # async fn example() {
+    /// use next_web::util::ThreadUtil;
+    ///
     /// let result = ThreadUtil::spawn_blocking(|| {
     ///     // 模拟耗时计算
     ///     (0..1_000_000).sum::<u64>()
@@ -258,7 +265,9 @@ impl ThreadUtil {
     ///
     /// ```
     /// # async fn example() {
-    ///     ThreadUtil::sleep(std::time::Duration::from_secs(1)).await;
+    /// use next_web::util::ThreadUtil;
+    ///
+    /// ThreadUtil::sleep(std::time::Duration::from_secs(1)).await;
     ///     println!("Slept for 1 second");
     /// # }
     /// ```
@@ -279,6 +288,8 @@ impl ThreadUtil {
     ///
     /// ```
     /// # async fn long_task() {
+    /// use next_web::util::ThreadUtil;
+    ///
     /// for i in 0..1000 {
     ///     if i % 100 == 0 {
     ///         ThreadUtil::yield_now().await;

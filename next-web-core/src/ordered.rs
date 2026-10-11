@@ -7,6 +7,8 @@
 ///
 /// # Example
 /// ```
+/// use next_web_core::Ordered;
+///
 /// struct TestOrder;
 ///
 /// impl Ordered for TestOrder {

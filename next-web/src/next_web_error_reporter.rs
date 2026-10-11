@@ -18,13 +18,15 @@
 /// # Example
 ///
 /// ```
+/// use next_web::NextWebErrorReporter;
 /// use std::error::Error;
 ///
 /// struct LogErrorReporter;
 ///
 /// impl NextWebErrorReporter for LogErrorReporter {
-///     fn report_error(&mut self, error: &(dyn Error + 'static)) {
+///     fn report_error(&mut self, error: &(dyn Error + 'static)) -> bool {
 ///         eprintln!("[error] {error}");
+///         true
 ///     }
 /// }
 /// ```

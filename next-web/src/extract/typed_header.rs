@@ -23,8 +23,8 @@ use next_web_core::headers;
 ///     routing::get,
 ///     Router,
 /// };
-/// use headers::UserAgent;
-/// use axum_extra::TypedHeader;
+/// use next_web::extract::typed_header::TypedHeader;
+/// use next_web_core::headers::UserAgent;
 ///
 /// async fn users_teams_show(
 ///     TypedHeader(user_agent): TypedHeader<UserAgent>,
@@ -42,8 +42,8 @@ use next_web_core::headers;
 /// use axum::{
 ///     response::IntoResponse,
 /// };
-/// use headers::ContentType;
-/// use axum_extra::TypedHeader;
+/// use next_web::extract::typed_header::TypedHeader;
+/// use next_web_core::headers::ContentType;
 ///
 /// async fn handler() -> (TypedHeader<ContentType>, &'static str) {
 ///     (

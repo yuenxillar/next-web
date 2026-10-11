@@ -163,6 +163,10 @@ name = "stream"
 path = "stream.rs"
 
 [[bin]]
+name = "template"
+path = "template.rs"
+
+[[bin]]
 name = "ws"
 path = "ws.rs"
 

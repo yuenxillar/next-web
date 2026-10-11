@@ -344,7 +344,7 @@ impl LoginUrlAuthenticationEntryPoint {
     }
 
     /// Tells if we are to do a forward to the `login_form_url` using the
-    /// `RequestDispatcher`, instead of a 302 redirect.
+    /// resource dispatcher, instead of a 302 redirect.
     ///
     /// # Arguments
     /// * `use_forward` - true if a forward to the login page should be used. Must be false
@@ -405,8 +405,8 @@ impl AuthenticationEntryPoint for LoginUrlAuthenticationEntryPoint {
         let login_form = self.determine_url_to_use_for_this_request(request, response, auth_error);
         debug!("Server side forward to: {}", login_form);
 
-        if let Some(request_dispatcher) = request.request_dispatcher(&login_form) {
-            request_dispatcher.forward(request, response)?;
+        if let Some(resource_dispatcher) = request.resource_dispatcher() {
+            resource_dispatcher.forward(&login_form, request, response)?;
         }
 
         Ok(())

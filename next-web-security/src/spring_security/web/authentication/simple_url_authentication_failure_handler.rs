@@ -22,7 +22,8 @@ use crate::{
 /// property when the onAuthenticationFailure method is called. If the property has not been set it will
 /// send a 401 response to the client, with the error message from the AuthenticationException which caused the failure.
 ///
-/// If the useForward property is set, a RequestDispatcher.forward call will be made to the destination
+/// If the useForward property is set, the destination is rendered by the
+/// resource dispatcher instead of being redirected to.
 /// instead of a redirect.
 #[derive(Clone)]
 pub struct SimpleUrlAuthenticationFailureHandler {
@@ -122,10 +123,8 @@ impl AuthenticationFailureHandler for SimpleUrlAuthenticationFailureHandler {
             if self.forward_to_destination {
                 if let Some(default_failure_url) = self.default_failure_url.as_deref() {
                     debug!("Forwarding to {}", default_failure_url);
-                    if let Some(request_dispatcher) =
-                        request.request_dispatcher(default_failure_url)
-                    {
-                        request_dispatcher.forward(request, response)?;
+                    if let Some(resource_dispatcher) = request.resource_dispatcher() {
+                        resource_dispatcher.forward(default_failure_url, request, response)?;
                     }
                 }
             } else {

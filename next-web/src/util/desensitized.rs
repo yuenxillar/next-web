@@ -69,7 +69,8 @@ impl DesensitizedUtil {
     }
 
     /// Desensitizes an ID card number by keeping the first 4 and last 4
-    /// characters and replacing the middle with `********`.
+    /// characters and replacing the middle with up to eight asterisks, and at
+    /// least four of them, so a short number is not left unmasked.
     ///
     /// Returns the original string if it has fewer than 8 characters.
     pub fn id_card(id_card: &str) -> String {
@@ -80,23 +81,33 @@ impl DesensitizedUtil {
 
         let prefix: String = chars[..4].iter().collect();
         let suffix: String = chars[chars.len() - 4..].iter().collect();
-        format!("{}********{}", prefix, suffix)
+        let stars = "*".repeat((chars.len() - 8).clamp(4, 8));
+        format!("{}{}{}", prefix, stars, suffix)
     }
 
-    /// Desensitizes a bank card number by keeping the first 4 and last 4
-    /// characters and replacing the middle with asterisks.
+    /// Desensitizes a bank card number by keeping the first 4 characters and
+    /// masking the middle, at least two characters of it, so a short number is
+    /// not left unmasked. The characters after the mask are kept, which keeps
+    /// the last 4 characters of a number that is long enough for them.
+    ///
+    /// The masked value has the length of the number.
     ///
     /// Returns the original string if it has fewer than 8 characters.
     pub fn bank_card(card_number: &str) -> String {
-        let chars: Vec<char> = card_number.chars().collect();
+        let mut chars: Vec<char> = card_number.chars().collect();
         if chars.len() < 8 {
             return card_number.to_string();
         }
 
-        let prefix: String = chars[..4].iter().collect();
-        let suffix: String = chars[chars.len() - 4..].iter().collect();
-        let stars = "*".repeat(chars.len() - 8);
-        format!("{}{}{}", prefix, stars, suffix)
+        // The middle of a number that is long enough is the part between the
+        // first 4 and the last 4 characters; a shorter number hides two
+        // characters so that it is never returned as it is.
+        let hidden = (chars.len() - 8).max(2);
+        for character in chars.iter_mut().skip(4).take(hidden) {
+            *character = '*';
+        }
+
+        chars.into_iter().collect()
     }
 
     /// Desensitizes a name by keeping the first character (surname) and

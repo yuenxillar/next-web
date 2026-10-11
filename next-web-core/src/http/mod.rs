@@ -1,4 +1,4 @@
-pub mod default_request_dispatcher;
+pub mod default_resource_dispatcher;
 
 pub mod server;
 pub mod session;
@@ -18,11 +18,14 @@ pub use axum::http::{
     header, HeaderMap, HeaderName, HeaderValue, Method as HttpMethod, StatusCode, Uri,
     Version as HttpVersion,
 };
-pub use cookie::{Cookie, CookieBuilder, CookieError, CookieValidationError, SameSite};
+pub use cookie::{
+    Cookie, CookieBuilder, CookieError, CookieValidationError, Rfc6265Utils, SameSite,
+};
 pub use http_filter_chain_share::HttpFilterChainShare;
 pub use http_request_share::HttpRequestShare;
 pub use http_response_share::HttpResponseShare;
 pub use media_type::MediaType;
+pub use default_resource_dispatcher::DefaultResourceDispatcher;
 pub use request_body::{
     buffer_request_body, buffer_request_body_for, form_parameters, BodyBufferError,
     BodyBufferPolicy, RequestBody, APPLICATION_JSON, DEFAULT_MAX_BUFFERED_BODY_BYTES,

@@ -38,8 +38,8 @@ impl LogoutSuccessHandler for ForwardLogoutSuccessHandler {
         response: &mut dyn HttpResponse,
         _authentication: Option<&Arc<dyn Authentication>>,
     ) -> Result<(), BoxError> {
-        if let Some(rd) = request.request_dispatcher(&self.target_url) {
-            rd.forward(request, response)?;
+        if let Some(rd) = request.resource_dispatcher() {
+            rd.forward(&self.target_url, request, response)?;
         }
 
         Ok(())

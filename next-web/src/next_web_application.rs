@@ -449,7 +449,6 @@ where
         {
             let new_router = Router::new();
             router = new_router.nest(&context_path, router);
-            // info!("Nest context path: {}", context_path);
         }
 
         // TLS is used when it is enabled for the environment, which requires
@@ -563,11 +562,22 @@ where
         environment: Arc<dyn ConfigurableEnvironment>,
         application_arguments: &DefaultApplicationArguments,
     ) -> ApplicationResult<()> {
+        // The loader is built from the environment before the environment is
+        // handed to the context, because the context owns it afterwards.
+        let resource_loader = self.effective_resource_loader().unwrap_or_else(|| {
+            crate::resources::resource_loader_from_environment(environment.as_ref())
+        });
+
         context.set_environment(environment);
 
-        let resource_loader = self
-            .effective_resource_loader()
-            .unwrap_or_else(crate::resources::default_resource_loader);
+        // The views and the dispatches of the process read the loader installed
+        // here, so that they serve the resources with the configuration of the
+        // application. The first installation wins, which is the loader of the
+        // first application of the process.
+        if next_web_core::io::install_web_resource_loader(Arc::clone(&resource_loader)).is_err() {
+            tracing::debug!("the web layer keeps the resource loader that was installed first");
+        }
+
         context.set_resource_loader(resource_loader);
 
         context

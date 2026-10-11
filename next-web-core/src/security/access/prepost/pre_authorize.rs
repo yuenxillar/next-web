@@ -20,7 +20,7 @@ use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use axum::{
     body::Body,
     extract::Request,
-    http::{request::Parts, Extensions, HeaderMap, Method, StatusCode, Uri, Version},
+    http::{HeaderMap, Method, StatusCode, Uri, Version, request::Parts},
     response::Response,
 };
 
@@ -30,7 +30,7 @@ use crate::{
     security::current_authorities,
     traits::http::{
         http_request::HttpRequest, http_response::HttpResponse,
-        request_dispatcher::RequestDispatcher,
+        resource_dispatcher::ResourceDispatcher,
     },
 };
 
@@ -91,8 +91,8 @@ pub struct PreAuthorizeContext {
     /// The attributes of the request, which the refusal is rendered with.
     attributes: HashMap<String, AnyValue>,
     /// The dispatcher the application installed, which an error page of a
-    /// refusal is dispatched with.
-    request_dispatcher: Option<Arc<dyn RequestDispatcher + Send + Sync>>,
+    /// refusal is rendered with.
+    resource_dispatcher: Option<Arc<dyn ResourceDispatcher>>,
 }
 
 impl PreAuthorizeContext {
@@ -117,7 +117,7 @@ impl PreAuthorizeContext {
             version: Version::HTTP_11,
             headers: HeaderMap::new(),
             attributes: HashMap::new(),
-            request_dispatcher: None,
+            resource_dispatcher: None,
         }
     }
 
@@ -174,8 +174,8 @@ impl PreAuthorizeContext {
             // refusal of the filter chain.
             let extensions = request.extensions_mut();
             extensions.insert(self.attributes.clone());
-            if let Some(request_dispatcher) = self.request_dispatcher.clone() {
-                extensions.insert(request_dispatcher);
+            if let Some(resource_dispatcher) = self.resource_dispatcher.clone() {
+                extensions.insert(resource_dispatcher);
             }
 
             // A handler that rendered the refusal produced a response, which is
@@ -208,9 +208,9 @@ where
             version: parts.version,
             headers: parts.headers.clone(),
             attributes: attributes(parts),
-            request_dispatcher: parts
+            resource_dispatcher: parts
                 .extensions
-                .get::<Arc<dyn RequestDispatcher + Send + Sync>>()
+                .get::<Arc<dyn ResourceDispatcher>>()
                 .cloned(),
         })
     }
@@ -371,7 +371,7 @@ fn has_role(authorities: &[String], role: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{evaluate_with_authorities, PreAuthorizeContext, PreAuthorizeExpression};
+    use super::{PreAuthorizeContext, PreAuthorizeExpression, evaluate_with_authorities};
 
     // The rules of the tests are declared the way the attribute declares them:
     // as constants, so the references a rule holds are `'static`.

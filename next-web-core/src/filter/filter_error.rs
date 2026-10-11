@@ -69,7 +69,9 @@ pub enum FilterChainError {
     ///
     /// # Examples
     /// ```
+    /// use next_web_core::filter::FilterChainError;
     /// use std::io;
+    ///
     /// let err = FilterChainError::Boxed(Box::new(io::Error::new(
     ///     io::ErrorKind::NotFound,
     ///     "file not found"
@@ -85,6 +87,8 @@ pub enum FilterChainError {
     ///
     /// # Examples
     /// ```
+    /// use next_web_core::filter::FilterChainError;
+    ///
     /// #[derive(Debug, thiserror::Error)]
     /// #[error("custom error")]
     /// struct CustomError;
@@ -127,12 +131,17 @@ impl FilterChainError {
     /// # Examples
     /// ```
     /// use std::io;
-    /// let err = FilterChainError::from(io::Error::new(io::ErrorKind::NotFound, "test"));
+    /// use next_web_core::filter::FilterChainError;
+    ///
+    /// let error = io::Error::new(io::ErrorKind::NotFound, "test");
+    /// let err = FilterChainError::AnyError(Box::new(error));
     /// assert!(err.is::<io::Error>());
     /// ```
     pub fn is<T: Error + Any + 'static>(&self) -> bool {
         match self {
-            FilterChainError::AnyError(e) => (e as &dyn Any).is::<T>(),
+            // The box is upcast to the error it holds; casting the box itself
+            // would ask about `Box<dyn ChainError>` instead of the error.
+            FilterChainError::AnyError(e) => (&**e as &dyn Any).is::<T>(),
             _ => false,
         }
     }
@@ -147,14 +156,17 @@ impl FilterChainError {
     /// # Examples
     /// ```
     /// use std::io;
-    /// let err = FilterChainError::from(io::Error::new(io::ErrorKind::NotFound, "test"));
+    /// use next_web_core::filter::FilterChainError;
+    ///
+    /// let error = io::Error::new(io::ErrorKind::NotFound, "test");
+    /// let err = FilterChainError::AnyError(Box::new(error));
     /// if let Some(io_err) = err.downcast_ref::<io::Error>() {
     ///     println!("IO error: {}", io_err);
     /// }
     /// ```
     pub fn downcast_ref<T: Error + Any + 'static>(&self) -> Option<&T> {
         match self {
-            FilterChainError::AnyError(e) => (e as &dyn Any).downcast_ref::<T>(),
+            FilterChainError::AnyError(e) => (&**e as &dyn Any).downcast_ref::<T>(),
             _ => None,
         }
     }
