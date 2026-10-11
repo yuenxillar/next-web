@@ -364,13 +364,13 @@ mod tests {
 
     use super::{DefaultResourceDispatcher, content_type, percent_decode, resource_location};
     use crate::{
-        any::AnyValue,
         http::{HttpResponseShare, StatusCode},
         io::{DefaultResourceLoader, ResourceLoader},
         traits::http::{
             http_request::HttpRequest, http_response::HttpResponse,
             resource_dispatcher::ResourceDispatcher,
         },
+        web::ViewModel,
     };
 
     /// The number of resources directories this process has created.
@@ -560,12 +560,14 @@ mod tests {
     }
 
     #[test]
-    fn a_forward_renders_the_template_with_the_attributes_of_the_request() {
+    fn a_forward_renders_the_template_with_the_view_model_of_the_request() {
         let (root, loader) = resources(&[("error.html", "<p>{{ error }}</p>")]);
         let dispatcher = DefaultResourceDispatcher::with_loader(loader);
 
         let mut request = request();
-        request.set_attribute("error", AnyValue::from("Bad credentials"));
+        let mut model = ViewModel::new();
+        model.insert("error", tera::Value::from("Bad credentials"));
+        request.set_view_model(model);
 
         let mut response = HttpResponseShare::new();
         dispatcher

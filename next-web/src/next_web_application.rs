@@ -23,10 +23,13 @@ use next_web_core::{
         DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME, MutablePropertySources, PropertySource,
         SimpleCommandLinePropertySource,
     },
+    http::DefaultResourceDispatcher,
     io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup, StartupStep},
     traits::{
-        apply_router::ApplyRouter, config::auto_configuration::AutoConfiguration,
+        apply_router::ApplyRouter,
+        config::auto_configuration::AutoConfiguration,
+        http::resource_dispatcher::ResourceDispatcher,
         service::background_service::BackgroundService,
     },
     util::indexmap::IndexMap,
@@ -436,11 +439,8 @@ where
             // Prevent program panic caused by users not setting routes
             .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
         router = self.apply_routers(ctx.as_mut(), router)?;
-        router = self
-            .add_layers(ctx.as_mut(), router)
-            .route_layer(axum::Extension::<ApplicationState>(Arc::new(RwLock::new(
-                ctx,
-            ))));
+        router = self.add_layers(ctx.as_mut(), router);
+        router = self.add_state(ctx, router);
 
         if let Some(context_path) = environment
             .get_property("next.server.context_path")
@@ -496,6 +496,43 @@ where
             )
             .route_layer(tower_http::trace::TraceLayer::new_for_http())
             .layer(axum::middleware::from_fn(prepare_request_layer))
+    }
+
+    /// Adds the state of the application to the routes of the router.
+    ///
+    /// Every request that matches a route is given two extensions:
+    ///
+    /// * [`ApplicationState`], the context of the running application, which the
+    ///   handlers of an application reach through the `FindSingleton`
+    ///   extractors, and
+    /// * `Arc<dyn ResourceDispatcher>`, the dispatcher that renders a resource
+    ///   of the application, which a filter or a handler reaches through
+    ///   [`HttpRequest::resource_dispatcher`].
+    ///
+    /// A dispatcher registered with the context wins, so an application that
+    /// renders its views with a dispatcher of its own registers one and this
+    /// uses it; without one the dispatcher reads the loader the web layer is
+    /// configured with, which the application installed while it started, see
+    /// [`resource_loader_from_environment`](crate::resources::resource_loader_from_environment).
+    ///
+    /// The extensions are added to the routes rather than to the whole router,
+    /// so a request that matches no route is answered by the fallback without
+    /// the state of the application being built for it.
+    ///
+    /// [`HttpRequest::resource_dispatcher`]:
+    ///     next_web_core::traits::http::http_request::HttpRequest::resource_dispatcher
+    fn add_state(&self, mut ctx: Box<dyn ConfigurableApplicationContext>, router: Router) -> Router {
+        let dispatcher = ctx
+            .resolve_by_type::<Arc<dyn ResourceDispatcher>>()
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| Arc::new(DefaultResourceDispatcher::new()));
+
+        router
+            .route_layer(axum::Extension::<ApplicationState>(Arc::new(RwLock::new(
+                ctx,
+            ))))
+            .route_layer(axum::Extension::<Arc<dyn ResourceDispatcher>>(dispatcher))
     }
 
     /// Applies all routers registered in the application context to the router.
@@ -1449,6 +1486,41 @@ mod tests {
     struct TestApplication;
 
     impl Application for TestApplication {}
+
+    /// The state of the application and the dispatcher of the resources are
+    /// installed on the routes, so a filter or a handler reaches them through
+    /// the extensions of the request it was given.
+    #[tokio::test]
+    async fn the_state_and_the_resource_dispatcher_are_installed_on_the_routes() {
+        use axum::{body::Body, routing::get};
+        use next_web_core::traits::http::http_request::HttpRequest;
+        use tower::ServiceExt;
+
+        /// Answers after checking what the request carries.
+        async fn inspect(request: axum::extract::Request) -> &'static str {
+            assert!(request.extensions().get::<ApplicationState>().is_some());
+            assert!(request.resource_dispatcher().is_some());
+
+            "inspected"
+        }
+
+        let application = NextWebApplication::<TestApplication>::default();
+        let context: Box<dyn ConfigurableApplicationContext> =
+            Box::new(crate::context::DefaultApplicationContext::default());
+        let router = application.add_state(context, Router::new().route("/inspect", get(inspect)));
+
+        let response = router
+            .oneshot(
+                axum::extract::Request::builder()
+                    .uri("/inspect")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("the router answers");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 
     /// The environment that is prepared is the one that is used: the property
     /// sources that the config data and the command line contributed must still

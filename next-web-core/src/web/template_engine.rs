@@ -14,16 +14,16 @@
 //! let document = engine.render("home.html", &context)?;
 //! ```
 
-use std::{collections::HashMap, sync::OnceLock};
+use std::borrow::Cow;
+use std::sync::OnceLock;
 
-use tera::Value;
 use tera::{Context, Tera};
 
 use crate::{
-    any::{AnyValue, Number},
     error::BoxError,
     io::{ResourceLoader, web_resource_loader},
     traits::http::http_request::HttpRequest,
+    web::ViewModel,
 };
 
 /// The extensions that mark a resource as a template.
@@ -128,27 +128,21 @@ impl TemplateEngine {
         Ok(self.tera.render(&resolved, context)?)
     }
 
-    /// Builds the model of a request from its attributes.
+    /// Returns the model of a request, which is the context of a template.
     ///
-    /// The attributes become the variables of the template, so an attribute
-    /// named `error` is what `{{ error }}` renders and an attribute that holds a
-    /// map or a vec is turned into the object or the array of the same shape.
-    /// The attributes a request carries are the ones a filter stored with
-    /// [`set_attribute`](HttpRequest::set_attribute), which is how a filter
-    /// hands the model of an error page to a dispatch.
+    /// The model is what a filter built with
+    /// [`view_model_mut`](HttpRequest::view_model_mut), so the variables of a
+    /// template are its view variables and not the
+    /// [attributes](HttpRequest::attributes) it passes around.
     ///
-    /// An attribute that holds a type-erased object has no representation in a
-    /// template and becomes null.
-    pub fn context_of(request: &dyn HttpRequest) -> Context {
-        let mut context = Context::new();
-
-        if let Some(attributes) = request.attributes() {
-            for (name, value) in attributes {
-                context.insert_value(name.clone(), value_of(value));
-            }
+    /// The model is *borrowed* from the request, and a request that carries no
+    /// model answers an empty context, so a render never copies the variables of
+    /// a model, however large it is.
+    pub fn context_of<'a>(request: &'a dyn HttpRequest) -> Cow<'a, Context> {
+        match request.view_model() {
+            Some(model) => Cow::Borrowed(model.context()),
+            None => Cow::Owned(Context::new()),
         }
-
-        context
     }
 
     /// Returns the template a view name refers to.
@@ -188,27 +182,6 @@ fn is_template(path: &str) -> bool {
         })
 }
 
-/// Turns the value of a request attribute into the value of a template.
-fn value_of(any: &AnyValue) -> Value {
-    match any {
-        AnyValue::String(value) => Value::from(value.clone()),
-        AnyValue::Number(Number::Int(value)) => Value::from(*value),
-        AnyValue::Number(Number::UInt(value)) => Value::from(*value),
-        AnyValue::Number(Number::Float(value)) => Value::from(*value),
-        AnyValue::Boolean(value) => Value::from(*value),
-        AnyValue::Vec(values) => Value::from(values.iter().map(value_of).collect::<Vec<_>>()),
-        AnyValue::Map(values) => Value::from(
-            values
-                .iter()
-                .map(|(name, value)| (name.clone(), value_of(value)))
-                .collect::<HashMap<String, Value>>(),
-        ),
-        // A value that erases its own type, and the absence of a value, have no
-        // representation in a template.
-        AnyValue::BoxedValue(_) | AnyValue::Null => Value::none(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{
@@ -229,6 +202,7 @@ mod tests {
         any::AnyValue,
         io::{DefaultResourceLoader, ResourceLoader},
         traits::http::http_request::HttpRequest,
+        web::ViewModel,
     };
 
     /// The number of resources directories this process has created.
@@ -327,11 +301,14 @@ mod tests {
     }
 
     #[test]
-    fn the_attributes_of_a_request_become_the_model_of_a_template() {
+    fn the_view_model_of_a_request_is_the_context_of_a_template() {
+        let mut model = ViewModel::new();
+        model.insert("error", Value::from("Bad credentials"));
+        model.insert("attempts", Value::from(3));
+        model.insert("locked", Value::from(true));
+
         let mut request = axum::extract::Request::new(axum::body::Body::empty());
-        request.set_attribute("error", AnyValue::from("Bad credentials"));
-        request.set_attribute("attempts", AnyValue::from(3));
-        request.set_attribute("locked", AnyValue::from(true));
+        request.set_view_model(model);
 
         let context = TemplateEngine::context_of(&request);
 
@@ -344,19 +321,19 @@ mod tests {
     }
 
     #[test]
-    fn a_container_attribute_becomes_the_container_of_the_template() {
-        let mut request = axum::extract::Request::new(axum::body::Body::empty());
-        request.set_attribute(
+    fn a_view_variable_that_is_a_container_is_the_container_of_the_template() {
+        let mut model = ViewModel::new();
+        model.insert(
             "tags",
-            AnyValue::Vec(vec![AnyValue::from("first"), AnyValue::from("second")]),
+            Value::from(vec![Value::from("first"), Value::from("second")]),
         );
-        request.set_attribute(
+        model.insert(
             "user",
-            AnyValue::Map(HashMap::from([(
-                "name".to_owned(),
-                AnyValue::from("Alice"),
-            )])),
+            Value::from(HashMap::from([("name".to_owned(), Value::from("Alice"))])),
         );
+
+        let mut request = axum::extract::Request::new(axum::body::Body::empty());
+        request.set_view_model(model);
 
         let context = TemplateEngine::context_of(&request);
 
@@ -381,14 +358,34 @@ mod tests {
     }
 
     #[test]
-    fn an_object_attribute_becomes_null() {
+    #[test]
+    fn the_attributes_of_a_request_are_not_the_variables_of_a_template() {
+        let mut model = ViewModel::new();
+        model.insert("error", Value::from("from the model"));
+
         let mut request = axum::extract::Request::new(axum::body::Body::empty());
-        request.set_attribute("object", AnyValue::BoxedValue(Box::new(7u8)));
-        request.set_attribute("nothing", AnyValue::Null);
+        request.set_attribute("error", AnyValue::from("from an attribute"));
+        request.set_attribute("hidden", AnyValue::from("secret"));
+        request.set_view_model(model);
 
         let context = TemplateEngine::context_of(&request);
 
-        assert!(context.get("object").is_some_and(Value::is_none));
-        assert!(context.get("nothing").is_some_and(Value::is_none));
+        // Only the model is rendered, and the attribute of the same name does
+        // not leak into the template.
+        assert_eq!(
+            context.get("error").and_then(Value::as_str),
+            Some("from the model")
+        );
+        assert!(context.get("hidden").is_none());
+    }
+
+    #[test]
+    fn a_request_without_a_model_renders_with_an_empty_context() {
+        let request = axum::extract::Request::new(axum::body::Body::empty());
+
+        assert_eq!(
+            TemplateEngine::context_of(&request).as_ref(),
+            &Context::new()
+        );
     }
 }

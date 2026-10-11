@@ -8,22 +8,24 @@
 //!   [`ModelAndView`]; the page is rendered from `resources/views/home.html`
 //!   with the model the handler built.
 //! * `http://127.0.0.1:11000/app/template/login` — a dispatch that forwards to
-//!   `resources/views/login.html`; the model is the attributes of the request,
-//!   which is where `{{ error }}` comes from.
+//!   `resources/views/login.html`; the model is the view model of the request,
+//!   which is where `{{ error }}` comes from. Submitting the form answers with
+//!   the home page of the user (POST to the same path).
 //! * `http://127.0.0.1:11000/app/template/raw` — a dispatch that includes
 //!   `resources/hello.json` as it is, without rendering it.
 //! * `http://127.0.0.1:11000/app/template/app.css` — a static asset of
 //!   `resources/static/`, served by the same dispatcher; the default policy of
 //!   the resource loader allows the assets a page links to.
-
-use std::sync::Arc;
+//!
+//! The dispatcher the routes dispatch with is installed by the framework, which
+//! adds it to the extensions of every request that matches a route, so the
+//! example reads it from the request instead of installing one of its own.
 
 use axum::{
-    Router,
+    Form, Router,
     body::Body,
     extract::Request,
     http::StatusCode,
-    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
 };
@@ -32,12 +34,8 @@ use next_web::{
     core::{ApplicationContext, traits::apply_router::ApplyRouter},
     macros::{bind::get_mapping, bind::singleton, order},
 };
-use next_web_core::{
-    any::AnyValue,
-    http::DefaultResourceDispatcher,
-    traits::http::{http_request::HttpRequest, resource_dispatcher::ResourceDispatcher},
-    web::ModelAndView,
-};
+use next_web_core::{tera::Value, traits::http::http_request::HttpRequest, web::ModelAndView};
+use serde::Deserialize;
 
 #[derive(Default)]
 struct TestApplication;
@@ -55,13 +53,38 @@ async fn home() -> ModelAndView {
         .add_object("user", "Alice")
 }
 
-/// Answers with the login page, rendered from the attributes of the request.
+/// Answers with the login page, rendered from the view model of the request.
 async fn login(mut request: Request) -> Response {
-    // The attributes of the request are the model of the template, so this is
-    // what `{{ error }}` renders.
-    request.set_attribute("error", AnyValue::from("Bad credentials"));
+    // The view model of the request is the model of the template, so this is
+    // what `{{ error }}` renders: the attributes of the request are a store of
+    // their own and are not rendered.
+    if let Some(model) = request.view_model_mut() {
+        model.insert("error", Value::from("Bad credentials"));
+    }
 
     dispatch(&mut request, "/views/login.html", Dispatch::Forward)
+}
+
+/// The fields the login page submits.
+#[derive(Deserialize)]
+struct LoginForm {
+    /// The name of the user that signed in.
+    username: String,
+    /// The password of the user, which the example does not read.
+    #[allow(dead_code)]
+    password: String,
+}
+
+/// Answers the submitted form with the home page of the user.
+///
+/// The login page asks for itself, so the form is submitted to the route that
+/// rendered it, and the POST of the same path is what answers it. Without the
+/// POST route the submission would be answered with
+/// `405 Method Not Allowed`.
+async fn submit(Form(form): Form<LoginForm>) -> ModelAndView {
+    ModelAndView::with_view_name("views/home.html")
+        .add_object("title", "Template example")
+        .add_object("user", form.username)
 }
 
 /// Answers with a resource of the application, as it is.
@@ -76,7 +99,7 @@ async fn stylesheet(mut request: Request) -> Response {
 
 /// How the dispatcher writes the resource into the response.
 enum Dispatch {
-    /// Renders the resource as a template, with the attributes of the request
+    /// Renders the resource as a template, with the view model of the request
     /// as its model.
     Forward,
     /// Writes the bytes of the resource as they are.
@@ -105,19 +128,6 @@ fn dispatch(request: &mut Request, path: &str, dispatch: Dispatch) -> Response {
     }
 }
 
-/// Installs the dispatcher the routes of the example dispatch with.
-///
-/// An application installs the dispatcher once, where a request enters the
-/// framework, so that every filter and every handler can reach it. The example
-/// installs it in front of its own routes.
-async fn install_resource_dispatcher(mut request: Request, next: Next) -> Response {
-    request
-        .extensions_mut()
-        .insert(Arc::new(DefaultResourceDispatcher::new()) as Arc<dyn ResourceDispatcher>);
-
-    next.run(request).await
-}
-
 /// Contributes the routes of the example.
 #[order(0)]
 #[singleton(binds = [Self::into_apply_router])]
@@ -133,10 +143,9 @@ impl TemplateRouter {
 impl ApplyRouter for TemplateRouter {
     fn apply(&mut self, _ctx: &mut dyn ApplicationContext) -> Router {
         Router::new()
-            .route("/template/login", get(login))
+            .route("/template/login", get(login).post(submit))
             .route("/template/raw", get(raw))
             .route("/template/app.css", get(stylesheet))
-            .layer(middleware::from_fn(install_resource_dispatcher))
     }
 }
 

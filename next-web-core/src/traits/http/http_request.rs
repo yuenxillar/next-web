@@ -37,6 +37,7 @@ use crate::{
         },
     },
     traits::http::resource_dispatcher::ResourceDispatcher,
+    web::ViewModel,
 };
 
 /// The request attributes of a servlet-style request.
@@ -217,11 +218,9 @@ where
 
     /// Returns every attribute of the request, if the transport keeps them.
     ///
-    /// The attributes are what a view rendered from the request is given as its
-    /// model; [`TemplateEngine::context_of`] turns them into the context of a
-    /// template, which is how an error page renders `{{ error }}`.
-    ///
-    /// [`TemplateEngine::context_of`]: crate::web::TemplateEngine::context_of
+    /// An attribute is a value a filter or a handler passes around, and it may
+    /// hold anything. The variables a view renders are the model of the request,
+    /// see [`HttpRequest::view_model`], which is a store of its own.
     fn attributes(&self) -> Option<&HashMap<String, AnyValue>> {
         None
     }
@@ -234,6 +233,38 @@ where
 
     /// Binds `value` to `name` as a request attribute.
     fn set_attribute(&mut self, name: &str, value: AnyValue);
+
+    // ------------------------------------------------------------------
+    // View model.
+    // ------------------------------------------------------------------
+
+    /// Returns the model the views of the request are rendered with, if the
+    /// transport keeps one.
+    ///
+    /// The model holds the variables of a template as [`Value`]s, which is what
+    /// a dispatch renders, see
+    /// [`TemplateEngine::context_of`](crate::web::TemplateEngine::context_of).
+    /// It is separate from the [`attributes`](HttpRequest::attributes) of the
+    /// request, so what a filter passes around is not what a template renders.
+    fn view_model(&self) -> Option<&ViewModel>;
+
+    /// Returns the model the views of the request are rendered with, mutably,
+    /// so a caller can bind the variables of a template.
+    ///
+    /// Returns `None` when the transport keeps no model, which is the case until
+    /// [`ready`](HttpRequest::ready) prepared the request; use
+    /// [`set_view_model`](HttpRequest::set_view_model) to give a request that
+    /// was not prepared a model.
+    fn view_model_mut(&mut self) -> Option<&mut ViewModel>;
+
+    /// Replaces the model the views of the request are rendered with.
+    fn set_view_model(&mut self, model: ViewModel);
+
+    /// Removes the model the views of the request are rendered with.
+    ///
+    /// A view dispatched after this renders with an empty model, which is what
+    /// a filter uses when it suppresses the model a previous filter built.
+    fn remove_view_model(&mut self);
 
     // ------------------------------------------------------------------
     // Lifecycle and transport.
@@ -502,6 +533,22 @@ impl HttpRequest for Request {
         attribute_map(self).insert(name.to_owned(), value);
     }
 
+    fn view_model(&self) -> Option<&ViewModel> {
+        self.extensions().get::<ViewModel>()
+    }
+
+    fn view_model_mut(&mut self) -> Option<&mut ViewModel> {
+        self.extensions_mut().get_mut::<ViewModel>()
+    }
+
+    fn set_view_model(&mut self, model: ViewModel) {
+        let _ = self.extensions_mut().insert::<ViewModel>(model);
+    }
+
+    fn remove_view_model(&mut self) {
+        let _ = self.extensions_mut().remove::<ViewModel>();
+    }
+
     fn ready(&mut self) {
         // The preparation of a request has no effect when it already ran, which
         // is what keeps a layer that follows the outermost layer of an
@@ -513,6 +560,10 @@ impl HttpRequest for Request {
 
         if self.extensions().get::<OneMap>().is_none() {
             self.extensions_mut().insert(OneMap::new());
+        }
+
+        if self.extensions().get::<ViewModel>().is_none() {
+            self.extensions_mut().insert(ViewModel::new());
         }
 
         if self.extensions().get::<Vec<Cookie>>().is_none() {
@@ -537,6 +588,7 @@ impl HttpRequest for Request {
 
         let extensions = self.extensions_mut();
         extensions.remove::<OneMap>();
+        extensions.remove::<ViewModel>();
         extensions.remove::<Vec<Cookie>>();
         extensions.remove::<StandardSession>();
         extensions.remove::<RequestedSessionId>();

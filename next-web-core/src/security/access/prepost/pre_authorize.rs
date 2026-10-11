@@ -32,6 +32,7 @@ use crate::{
         http_request::HttpRequest, http_response::HttpResponse,
         resource_dispatcher::ResourceDispatcher,
     },
+    web::ViewModel,
 };
 
 /// The prefix a role is looked up with.
@@ -90,6 +91,9 @@ pub struct PreAuthorizeContext {
     headers: HeaderMap,
     /// The attributes of the request, which the refusal is rendered with.
     attributes: HashMap<String, AnyValue>,
+    /// The model of the views of the request, which the refusal is rendered
+    /// with.
+    view_model: Option<ViewModel>,
     /// The dispatcher the application installed, which an error page of a
     /// refusal is rendered with.
     resource_dispatcher: Option<Arc<dyn ResourceDispatcher>>,
@@ -117,6 +121,7 @@ impl PreAuthorizeContext {
             version: Version::HTTP_11,
             headers: HeaderMap::new(),
             attributes: HashMap::new(),
+            view_model: None,
             resource_dispatcher: None,
         }
     }
@@ -155,10 +160,10 @@ impl PreAuthorizeContext {
     ///
     /// The request the refusal is rendered with carries the parts the guard
     /// read: the method, the URI, the headers, the attributes of the request,
-    /// and the dispatcher of the application. The body of the request is empty,
-    /// and the state a transport holds (such as the session of the client) is
-    /// not part of it, because the request of the handler was consumed by its
-    /// extractors.
+    /// the model its views are rendered with, and the dispatcher of the
+    /// application. The body of the request is empty, and the state a transport
+    /// holds (such as the session of the client) is not part of it, because the
+    /// request of the handler was consumed by its extractors.
     pub fn denied(&self) -> Response {
         let mut response = Response::new(Body::empty());
 
@@ -174,6 +179,9 @@ impl PreAuthorizeContext {
             // refusal of the filter chain.
             let extensions = request.extensions_mut();
             extensions.insert(self.attributes.clone());
+            if let Some(view_model) = self.view_model.clone() {
+                extensions.insert(view_model);
+            }
             if let Some(resource_dispatcher) = self.resource_dispatcher.clone() {
                 extensions.insert(resource_dispatcher);
             }
@@ -208,6 +216,7 @@ where
             version: parts.version,
             headers: parts.headers.clone(),
             attributes: attributes(parts),
+            view_model: parts.extensions.get::<ViewModel>().cloned(),
             resource_dispatcher: parts
                 .extensions
                 .get::<Arc<dyn ResourceDispatcher>>()

@@ -8,8 +8,9 @@ use next_web_core::http::session::HttpSession;
 use next_web_core::http::{HeaderMap, HeaderValue, HttpRequestShare, Uri};
 use next_web_core::traits::http::resource_dispatcher::ResourceDispatcher;
 use next_web_core::{
-    http::{header::CONTENT_TYPE, Cookie, HttpMethod},
+    http::{Cookie, HttpMethod, header::CONTENT_TYPE},
     traits::http::http_request::HttpRequest,
+    web::ViewModel,
 };
 
 use next_web_context::Locale;
@@ -210,6 +211,22 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
 
     fn set_attribute(&mut self, name: &str, value: AnyValue) {
         self.request.set_attribute(name, value);
+    }
+
+    fn view_model(&self) -> Option<&ViewModel> {
+        self.request.view_model()
+    }
+
+    fn view_model_mut(&mut self) -> Option<&mut ViewModel> {
+        self.request.view_model_mut()
+    }
+
+    fn set_view_model(&mut self, model: ViewModel) {
+        self.request.set_view_model(model);
+    }
+
+    fn remove_view_model(&mut self) {
+        self.request.remove_view_model();
     }
 
     fn ready(&mut self) {

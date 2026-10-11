@@ -1,14 +1,15 @@
 use std::{borrow::Cow, collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::http::header::ACCEPT_LANGUAGE;
-use axum::http::{header::CONTENT_TYPE, uri::Scheme, HeaderMap, HeaderValue, Uri};
+use axum::http::{HeaderMap, HeaderValue, Uri, header::CONTENT_TYPE, uri::Scheme};
 use headers::{Cookie as HeaderCookie, HeaderMapExt, Host};
 use next_web_context::Locale;
 
 use crate::{
     any::AnyValue,
-    http::{session::HttpSession, Cookie, HttpMethod, HttpVersion},
+    http::{Cookie, HttpMethod, HttpVersion, session::HttpSession},
     traits::http::{http_request::HttpRequest, resource_dispatcher::ResourceDispatcher},
+    web::ViewModel,
 };
 
 pub struct HttpRequestShare {
@@ -19,6 +20,7 @@ pub struct HttpRequestShare {
     headers: Arc<HeaderMap<HeaderValue>>,
     cookies: Vec<Cookie>,
     attributes: HashMap<String, AnyValue>,
+    view_model: Option<ViewModel>,
     remote_addr: Option<SocketAddr>,
 }
 
@@ -55,6 +57,22 @@ impl HttpRequest for HttpRequestShare {
 
     fn attributes(&self) -> Option<&HashMap<String, AnyValue>> {
         Some(&self.attributes)
+    }
+
+    fn view_model(&self) -> Option<&ViewModel> {
+        self.view_model.as_ref()
+    }
+
+    fn view_model_mut(&mut self) -> Option<&mut ViewModel> {
+        self.view_model.as_mut()
+    }
+
+    fn set_view_model(&mut self, model: ViewModel) {
+        self.view_model = Some(model);
+    }
+
+    fn remove_view_model(&mut self) {
+        self.view_model = None;
     }
 
     fn resource_dispatcher(&self) -> Option<&dyn ResourceDispatcher> {
@@ -210,6 +228,7 @@ impl From<&dyn HttpRequest> for HttpRequestShare {
             headers: Arc::new(req.headers().to_owned()),
             cookies: parse_cookies(req.headers()),
             attributes: HashMap::new(),
+            view_model: req.view_model().cloned(),
             remote_addr: req.remote_addr().copied(),
         }
     }
@@ -225,6 +244,7 @@ impl Clone for HttpRequestShare {
             headers: Arc::clone(&self.headers),
             cookies: self.cookies.clone(),
             attributes: self.attributes.clone(),
+            view_model: self.view_model.clone(),
             remote_addr: self.remote_addr,
         }
     }
