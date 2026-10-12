@@ -17,6 +17,7 @@ members = [
     "next-web-mq/next-web-mq-rabbitmq",
     "next-web-mq/next-web-mq-rocketmq",
     "next-web-data/next-web-data-redis",
+    "next-web-data/next-web-data-database",
     "next-web-wechat",
     "next-web-open-api",
     "next-web-actuator",

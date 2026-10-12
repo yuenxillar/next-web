@@ -77,6 +77,7 @@ pub use rand;
 pub use validator as validate;
 
 pub use next_web_core as core;
+pub use next_web_singletons as singletons;
 
 #[cfg(feature = "enable-i18n")]
 pub use web::i18n;

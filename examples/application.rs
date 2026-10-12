@@ -5,7 +5,6 @@ use std::sync::{
 
 use next_web::{
     Application, NextWebApplication,
-    extract::find_singleton::FindSingleton,
     macros::bind::{get_mapping, singleton},
 };
 use next_web_core::env::ConfigurableEnvironment;
@@ -24,7 +23,7 @@ async fn hello() -> &'static str {
 async fn env(
     #[find] application_environment: FindSingleton<Arc<dyn ConfigurableEnvironment>>,
 ) -> String {
-    application_environment.get_property_or_default("key", "unknown")
+    application_environment.get_property_or_default("next.application.name", "unknown")
 }
 
 #[get_mapping(path = "/change")]

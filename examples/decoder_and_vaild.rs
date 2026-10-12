@@ -1,9 +1,10 @@
 use axum::http::StatusCode;
 use next_web::core::traits::data_decoder::DataDecoder;
+use next_web::extract::ValidatedJson;
 use next_web::validate::Validate;
 use next_web::{
     Application, NextWebApplication,
-    extract::{data::Data, validated::Validated},
+    extract::{data::Data, validated::ValidatedForm},
     macros::bind::{get_mapping, post_mapping, singleton},
 };
 use serde::{Deserialize, Serialize};
@@ -31,15 +32,15 @@ struct TestValidator {
     pub weight: u16,
 }
 
-#[get_mapping(path = "/fromValid")]
-async fn from_valid(Validated(data): Validated<TestValidator>) -> impl IntoResponse {
+#[post_mapping(path = "/fromValid")]
+async fn from_valid(ValidatedForm(data): ValidatedForm<TestValidator>) -> impl IntoResponse {
     assert!(data.name.len() > 4);
     assert!(data.age > 1);
     (StatusCode::OK, "Ok")
 }
 
 #[post_mapping(path = "/jsonValid")]
-async fn json_valid(Validated(data): Validated<TestValidator>) -> impl IntoResponse {
+async fn json_valid(ValidatedJson(data): ValidatedJson<TestValidator>) -> impl IntoResponse {
     assert!(data.name.len() > 4);
     assert!(data.weight > 20);
     (StatusCode::OK, "Ok")
@@ -56,7 +57,6 @@ struct TestData {
     pub age: i32,
 }
 
-// 现状是指定这个单例名称 暂时不要改动
 #[singleton(name = "defaultDataDecoder", binds=[Self::into_decoder])]
 #[derive(Clone)]
 pub struct TestDecoder;

@@ -21,6 +21,9 @@ const REGISTER_SHUTDOWN_HOOK: &str = "next.main.register_shutdown_hook";
 /// Property key listing the sources to include in the application context.
 const SOURCES: &str = "next.main.sources";
 
+/// Property key controlling whether handler singletons should remain lazy until the first request.
+const LAZY: &str = "next.main.lazy";
+
 /// Next application properties.
 #[derive(Debug)]
 pub struct ApplicationProperties {
@@ -39,6 +42,9 @@ pub struct ApplicationProperties {
     /// Sources (type names or XML resource locations) to include in the
     /// ApplicationContext.
     sources: HashSet<String>,
+
+    /// Whether handler singletons should remain lazy until the first request.
+    lazy: bool,
 }
 
 #[allow(dead_code)]
@@ -93,6 +99,12 @@ impl ApplicationProperties {
         self.sources = sources;
     }
 
+    /// Returns whether handler singletons should remain lazy until the first request.
+    pub fn is_lazy(&self) -> bool { self.lazy }
+
+    /// Sets whether handler singletons should remain lazy until the first request.
+    pub fn set_lazy(&mut self, lazy: bool) { self.lazy = lazy; }
+
     /// Binds the `next.main.*` properties from the given environment onto this
     /// instance.
     ///
@@ -139,6 +151,12 @@ impl ApplicationProperties {
                 self.sources = sources;
             }
         }
+
+        if let Some(value) = environment.get_property(LAZY) {
+            if let Some(lazy) = parse_bool(&value) {
+                self.lazy = lazy;
+            }
+        }
     }
 }
 
@@ -160,6 +178,7 @@ impl Default for ApplicationProperties {
             log_startup_info: true,
             register_shutdown_hook: true,
             sources: HashSet::new(),
+            lazy: true,
         }
     }
 }

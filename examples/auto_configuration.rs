@@ -20,7 +20,6 @@ use next_web::{
     core::{
         ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
     },
-    extract::find_singleton::FindSingleton,
     macros::{
         autoconfigure::{auto_configuration, configuration_properties},
         bind::{get_mapping, singleton},

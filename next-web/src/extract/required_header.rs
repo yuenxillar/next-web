@@ -1,14 +1,39 @@
+use std::marker::PhantomData;
+
 use axum::{
     extract::FromRequestParts,
-    http::{request::Parts, HeaderName},
+    http::{HeaderName, request::Parts},
 };
 use reqwest::StatusCode;
 
-/// 这个最主要的作用是当请求没有指定的请求时,则返回 400
+/// An extractor that reads the value of a required HTTP header.
+///
+/// The header is identified by the marker type `T`, which implements
+/// [`ToHeaderName`]. If the header is missing, empty, or not valid UTF-8,
+/// the request is rejected with `400 Bad Request`.
+///
+/// `T` is only used at the type level (via [`PhantomData`]) to distinguish
+/// extractors for different headers; it carries no runtime data.
 #[derive(Debug, Clone)]
-pub struct RequiredHeader<T>(Option<T>);
+pub struct RequiredHeader<T>(String, PhantomData<T>);
 
+impl<T> RequiredHeader<T> {
+    /// Create an instance
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into(), PhantomData)
+    }
+    /// Returns the header value as a string slice.
+    pub fn value(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Maps a marker type to the HTTP header it represents.
+///
+/// Implement this trait for zero-sized types to use them with
+/// [`RequiredHeader`].
 pub trait ToHeaderName {
+    /// Returns the header name this type corresponds to.
     fn to_header_name() -> HeaderName;
 }
 
@@ -21,18 +46,27 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let name = T::to_header_name();
-        let is_exists = parts.headers.contains_key(&name);
 
-        if !is_exists {
-            #[cfg(feature = "trace-log")]
-            tracing::debug!("Required header {} not found in request", name.as_str());
-            return Err((StatusCode::BAD_REQUEST, "Bad Request"));
+        match parts
+            .headers
+            .get(&name)
+            .and_then(|value| value.to_str().ok())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+        {
+            Some(s) => Ok(RequiredHeader(s, PhantomData)),
+            None => {
+                #[cfg(feature = "trace-log")]
+                tracing::debug!("Required header {} not found in request", name.as_str());
+                Err((StatusCode::BAD_REQUEST, "Bad Request"))
+            }
         }
-
-        return Ok(RequiredHeader(None));
     }
 }
 
+/// Generates zero-sized marker types and their [`ToHeaderName`] impls.
+///
+/// Each entry maps a type name to a constant in [`axum::http::header`].
 macro_rules! impl_to_header_name {
     ($(($name:ident, $header_const:ident)),* $(,)?) => {
         $(

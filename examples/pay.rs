@@ -7,7 +7,7 @@ use axum::{
 };
 use next_web::{
     Application, NextWebApplication,
-    extract::{find_singleton::FindSingleton, typed_header::TypedHeader},
+    extract::typed_header::TypedHeader,
     macros::bind::{get_mapping, post_mapping, singleton},
     rand::{self, Rng},
 };

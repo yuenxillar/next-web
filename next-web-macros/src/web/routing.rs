@@ -60,6 +60,27 @@ fn impl_item_fn(
     // Add the required parameters to the function's argument list
     Logic::add_args(&mut item_fn, headers);
 
+    // Collect dependencies before generate_block rewrites FindSingleton parameters.
+    let singleton_dependencies = item_fn.sig.inputs.iter().filter_map(|arg| {
+        let FnArg::Typed(pat_type) = arg else { return None };
+        let inner = find_singleton_inner_type(pat_type.ty.as_ref())?;
+        let name = if pat_type.attrs.iter().any(|attr| attr.path().is_ident("find")) {
+            let binding = find_singleton_binding(pat_type.pat.as_ref())?;
+            let name = crate::util::name::field_name_to_singleton_name(&binding.to_string());
+            quote!(#name.to_owned().into())
+        } else {
+            let default_name = default_singleton_name(inner);
+            quote!(#default_name.into())
+        };
+        Some(quote! {
+            __context.register_singleton_dependency(
+                ::next_web::singletons::factory::support::Key::new::<#inner>(
+                    #name
+                )
+            );
+        })
+    }).collect::<Vec<_>>();
+
     let block = match generate_block(&mut item_fn, consume, produce) {
         Ok(stream) => stream,
         Err(e) => return Err(e),
@@ -127,6 +148,7 @@ fn impl_item_fn(
                 __router:           ::next_web::Router,
                 __context:  &'a mut ::next_web::context::RouterContext
             ) -> ::next_web::Router {
+                #(#singleton_dependencies)*
                 #block
 
                 #open_api_block
@@ -141,6 +163,50 @@ fn impl_item_fn(
     // println!("token stream: {}", stream.to_string());
 
     Ok(stream)
+}
+
+fn find_singleton_inner_type(ty: &Type) -> Option<&Type> {
+    let Type::Path(type_path) = ty else { return None };
+    let segment = type_path.path.segments.last()?;
+    if segment.ident != "FindSingleton" {
+        return None;
+    }
+
+    let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+        return None;
+    };
+    match arguments.args.first()? {
+        syn::GenericArgument::Type(inner) => Some(inner),
+        _ => None,
+    }
+}
+
+fn find_singleton_binding(pattern: &syn::Pat) -> Option<Ident> {
+    match pattern {
+        syn::Pat::Ident(pattern) => Some(pattern.ident.clone()),
+        syn::Pat::TupleStruct(pattern) => match pattern.elems.first()? {
+            syn::Pat::Ident(pattern) => Some(pattern.ident.clone()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn default_singleton_name(inner: &Type) -> TokenStream2 {
+    let uses_dynamic_target_name = match inner {
+        Type::Path(type_path) => type_path
+            .path
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident == "Arc" || segment.ident == "Box"),
+        _ => false,
+    };
+
+    if uses_dynamic_target_name {
+        quote!(<#inner as ::next_web::context::DynSingleton>::default_singleton_name())
+    } else {
+        quote!(::next_web::singletons::util::SingletonUtil::default_singleton_name::<#inner>())
+    }
 }
 
 fn impl_item_impl(
@@ -280,143 +346,76 @@ fn impl_item_impl(
 
 fn generate_block(
     item: &mut ItemFn,
-
     consume: Option<LitStr>,
     produce: Option<LitStr>,
 ) -> Result<proc_macro2::TokenStream, syn::Error> {
     let mut variables = Vec::new();
 
     for (index, fn_arg) in item.sig.inputs.iter_mut().enumerate() {
-        match fn_arg {
-            FnArg::Receiver(_) => {}
-            FnArg::Typed(pat_type) => {
-                match pat_type.ty.as_mut() {
-                    syn::Type::Path(type_path) => {
-                        if !pat_type
-                            .attrs
-                            .iter()
-                            .any(|attr| attr.path().is_ident("find"))
-                        {
-                            continue;
-                        }
+        let FnArg::Typed(pat_type) = fn_arg else { continue };
+        let has_find_attr = pat_type
+            .attrs
+            .iter()
+            .any(|attr| attr.path().is_ident("find"));
+        let Some(inner) = find_singleton_inner_type(pat_type.ty.as_ref()).cloned() else {
+            continue;
+        };
 
-                        let is_single = type_path
-                            .path
-                            .segments
-                            .iter()
-                            .any(|seg| seg.ident.to_string().contains("FindSingleton"));
-
-                        for seg in type_path.path.segments.iter_mut() {
-                            if seg.ident.to_string().contains("FindSingleton")
-                                && match &seg.arguments {
-                                    syn::PathArguments::AngleBracketed(_) => true,
-                                    _ => false,
-                                }
-                            {
-                                match &mut seg.arguments {
-                                    syn::PathArguments::AngleBracketed(angle_bracketed) => {
-                                        let mut flag = false;
-                                        if let Some(syn::GenericArgument::Type(typ)) =
-                                            angle_bracketed.args.first()
-                                        {
-                                            if let Type::Path(type_path) = typ {
-                                                let original_variable = match pat_type.pat.as_ref() {
-                                                    syn::Pat::Ident(pat_ident) => {
-                                                        pat_ident.ident.clone()
-                                                    }
-                                                    syn::Pat::TupleStruct(pat_tuple_struct) => {
-                                                        if let Some(syn::Pat::Ident(pat_ident)) =
-                                                            pat_tuple_struct.elems.first()
-                                                        {
-                                                            pat_ident.ident.clone()
-                                                        } else {
-                                                            return Err(syn::Error::new(
-                                                                pat_type.pat.span(),
-                                                                 "The pattern must be an identifier or a tuple struct with one identifier"));
-                                                        }
-                                                    }
-                                                    _ => return Err(syn::Error::new(
-
-                                                                 pat_type.pat.span(),
-                                                                 "The pattern must be an identifier or a tuple struct with one identifier",
-                                                    ))
-                                                };
-
-                                                let arg = Type::Path(type_path.clone());
-
-                                                let variable = Ident::new(
-                                                    &format!("__my_service{}", index),
-                                                    Span::call_site(),
-                                                );
-                                                let single_name = Ident::new(&crate::util::name::field_name_to_singleton_name(&original_variable.to_string()), Span::call_site());
-                                                let stream = quote! {
-                                                    pub use ::next_web::context::ApplicationContextExt;
-
-                                                    let #original_variable =
-                                                        match ::next_web::extract::find_singleton::find::<#arg>(& #variable, stringify!(#single_name).to_owned()).await {
-                                                            Some(value) => value,
-                                                            None => return (::next_web::http::StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response(),
-                                                        };
-                                                };
-
-                                                variables.push(stream);
-
-                                                flag = true;
-                                            }
-                                        }
-
-                                        if flag {
-                                            angle_bracketed.args.clear();
-                                            angle_bracketed.args.push(syn::GenericArgument::Type(
-                                                parse_quote!(::next_web::ApplicationState),
-                                            ));
-
-                                            let inner_ident = Ident::new(
-                                                format!("__my_service{}", index).as_str(),
-                                                Span::call_site(),
-                                            );
-
-                                            let pat = syn::Pat::TupleStruct(syn::PatTupleStruct {
-                                                attrs: vec![],
-                                                qself: None,
-                                                path: parse_quote!(::next_web::extract::Extension),
-                                                paren_token: Default::default(),
-                                                elems: {
-                                                    let mut elems =
-                                                        syn::punctuated::Punctuated::new();
-                                                    elems.push(syn::Pat::Ident(syn::PatIdent {
-                                                        attrs: vec![],
-                                                        by_ref: None,
-                                                        mutability: None,
-                                                        ident: inner_ident,
-                                                        subpat: None,
-                                                    }));
-                                                    elems
-                                                },
-                                            });
-
-                                            pat_type.pat = Box::new(pat);
-                                        }
-                                    }
-
-                                    _ => {}
-                                }
-
-                                pat_type.attrs.retain(|attr| !attr.path().is_ident("find"));
-                            }
-                        }
-
-                        if is_single {
-                            let arg: syn::Type = parse_quote!(::next_web::ApplicationState);
-                            let path: syn::Path =
-                                parse_quote!(::next_web::extract::Extension< #arg>);
-                            type_path.path = path;
-                        }
-                    }
-                    _ => {}
-                };
+        let state_binding = Ident::new(&format!("__my_service{index}"), Span::call_site());
+        let (singleton_name, result_binding) = if has_find_attr {
+            let binding = find_singleton_binding(pat_type.pat.as_ref()).ok_or_else(|| {
+                syn::Error::new(
+                    pat_type.pat.span(),
+                    "The pattern must be an identifier or a tuple struct with one identifier",
+                )
+            })?;
+            let name = crate::util::name::field_name_to_singleton_name(&binding.to_string());
+            (quote!(#name.to_owned()), Some(binding))
+        } else {
+            let name = default_singleton_name(&inner);
+            (quote!(#name), None)
+        };
+        let resolved = quote! {
+            match ::next_web::extract::find_singleton::find::<#inner>(
+                &#state_binding,
+                #singleton_name,
+            ).await {
+                Some(value) => value,
+                None => return (
+                    ::next_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal Server Error",
+                ).into_response(),
             }
+        };
+
+        if let Some(binding) = result_binding {
+            variables.push(quote! {
+                let #binding = #resolved;
+            });
+        } else {
+            let mut pattern = pat_type.pat.as_ref().clone();
+            if let syn::Pat::TupleStruct(tuple_pattern) = &mut pattern {
+                if tuple_pattern
+                    .path
+                    .segments
+                    .last()
+                    .is_some_and(|segment| segment.ident == "FindSingleton")
+                {
+                    tuple_pattern.path = parse_quote!(::next_web::extract::FindSingleton);
+                }
+            }
+            variables.push(quote! {
+                let #pattern = ::next_web::extract::FindSingleton(#resolved);
+            });
         }
+
+        pat_type.ty = Box::new(parse_quote!(
+            ::next_web::extract::Extension<::next_web::ApplicationState>
+        ));
+        pat_type.pat = Box::new(parse_quote!(
+            ::next_web::extract::Extension(#state_binding)
+        ));
+        pat_type.attrs.retain(|attr| !attr.path().is_ident("find"));
     }
 
     let _return = item.block.stmts.iter().any(|stmt| match stmt {

@@ -1,4 +1,6 @@
 next:
+  main:
+    lazy: false
   server:
     context_path: "/app"
     port: 11000

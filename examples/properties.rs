@@ -1,6 +1,5 @@
 use next_web::{
     Application, NextWebApplication,
-    extract::find_singleton::FindSingleton,
     macros::{autoconfigure::configuration_properties, bind::get_mapping},
 };
 

@@ -33,7 +33,7 @@ use next_web_core::{
     },
     util::indexmap::IndexMap,
 };
-use next_web_singletons::factory::{SingletonFactory, config::SingletonRegistry};
+use next_web_singletons::factory::{SingletonFactory, config::SingletonRegistry, support::Key};
 use reqwest::StatusCode;
 use tokio::sync::RwLock;
 use tracing::{Level, enabled};
@@ -331,6 +331,7 @@ pub struct NextWebApplication<T> {
     application_startup: Box<dyn ApplicationStartup>,
     properties: ApplicationProperties,
     application: T,
+    handler_singleton_dependencies: Vec<Key>,
 }
 
 impl<T> NextWebApplication<T>
@@ -359,6 +360,7 @@ where
             application_context_factory: Box::new(DefaultApplicationContextFactory::default()),
             application_startup: Box::new(DefaultApplicationStartup::default()),
             application: T::default(),
+            handler_singleton_dependencies: Vec::new(),
         }
     }
 
@@ -437,6 +439,18 @@ where
             .fallback(|| async { T::fallback() })
             // Prevent program panic caused by users not setting routes
             .route("/_20250101", axum::routing::get(|| async { "a new year!" }));
+
+        // Take ownership of the singleton dependencies registered in the router context,
+        // so they can be preloaded below if lazy initialization is disabled.
+        self.handler_singleton_dependencies =
+            RouterContext::default().take_singleton_dependencies();
+
+        // When lazy initialization is off, eagerly preload all singleton handlers so that
+        // any initialization errors surface at startup rather than on first use.
+        if !self.properties.is_lazy() {
+            self.preload_handler_singletons(ctx.as_mut()).await?;
+        }
+
         router = self.apply_routers(ctx.as_mut(), router)?;
         router = self.add_layers(ctx.as_mut(), router);
         router = self.add_state(ctx, router);
@@ -462,6 +476,41 @@ where
         let mut web_server = WebServer::new(socket_addr, router);
         web_server.run().await?;
 
+        Ok(())
+    }
+
+    /// Preloads all registered handler singletons into the given application context.
+    ///
+    /// Iterates over every key in `handler_singleton_dependencies`, draining the list
+    /// as it goes. For each key, it checks whether the singleton is already available
+    /// in one of three ways:
+    ///
+    /// 1. The key is registered as-is (`contains_singleton_boxed`).
+    /// 2. A "default" variant of the key (with an empty `name`) is registered.
+    /// 3. The key can be resolved asynchronously via `resolve_boxed_async`.
+    ///
+    /// If none of these succeed, the function returns an error, ensuring that
+    /// missing singletons are caught at startup rather than on first use.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApplicationResult`] if any handler singleton cannot be resolved.
+    async fn preload_handler_singletons(
+        &mut self,
+        context: &mut dyn ConfigurableApplicationContext,
+    ) -> ApplicationResult<()> {
+        for key in self.handler_singleton_dependencies.drain(..) {
+            let mut default_key = key.clone();
+            default_key.name = std::borrow::Cow::Borrowed("");
+
+            let is_available = context.contains_singleton_boxed(&key)
+                || context.contains_singleton_boxed(&default_key)
+                || context.resolve_boxed_async(&key).await.is_some();
+
+            if !is_available {
+                return Err(format!("failed to resolve handler singleton: {key:?}").into());
+            }
+        }
         Ok(())
     }
 
@@ -1026,6 +1075,14 @@ where
     /// Sets the sources of the application properties.
     pub fn set_sources(&mut self, sources: HashSet<String>) {
         self.properties.set_sources(sources);
+    }
+
+    pub fn set_lazy(&mut self, lazy: bool) {
+        self.properties.set_lazy(lazy);
+    }
+
+    pub fn is_lazy(&self) -> bool {
+        self.properties.is_lazy()
     }
 
     /// Returns the shutdown hook used to coordinate application shutdown.

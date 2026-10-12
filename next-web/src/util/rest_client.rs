@@ -1,6 +1,6 @@
 use reqwest::{Client, ClientBuilder, Method, RequestBuilder, Url};
 use serde::{Serialize, de::DeserializeOwned};
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 
 /// A high-level, easy-to-use HTTP client inspired by Next's `RestTemplate`.
 ///
@@ -79,7 +79,7 @@ impl RestClient {
     /// * `url`    - The request URL, either absolute or relative to the base URL.
     pub fn request<U: AsRef<str>>(&self, method: Method, url: U) -> RequestBuilder {
         let resolved = self.resolve_url(url.as_ref());
-        let mut builder = self.client.request(method, resolved);
+        let mut builder = self.client.request(method, resolved.as_ref());
         for (name, value) in &self.default_headers {
             builder = builder.header(name.as_str(), value.as_str());
         }
@@ -153,9 +153,9 @@ impl RestClient {
     /// * Relative URLs are concatenated with the base URL, mirroring the
     ///   behavior of Next's `RestTemplate` (the base path is preserved).
     /// * When no base URL is configured, the URL is returned unchanged.
-    fn resolve_url(&self, url: &str) -> String {
+    fn resolve_url<'a>(&'a self, url: &'a str) -> Cow<'a, str> {
         if url.starts_with("http://") || url.starts_with("https://") {
-            return url.to_string();
+            return Cow::Borrowed(url);
         }
 
         match &self.base_url {
@@ -163,7 +163,7 @@ impl RestClient {
                 // Concatenate the base URL and the relative path so that the
                 // base path is preserved. This matches Next's behavior.
                 if url.is_empty() {
-                    return base.clone();
+                    return Cow::Borrowed(base);
                 }
                 let mut result = String::with_capacity(base.len() + url.len() + 1);
                 result.push_str(base.trim_end_matches('/'));
@@ -171,9 +171,10 @@ impl RestClient {
                     result.push('/');
                 }
                 result.push_str(url);
-                result
+
+                Cow::Owned(result)
             }
-            None => url.to_string(),
+            None => Cow::Borrowed(url),
         }
     }
 }

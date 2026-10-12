@@ -2,7 +2,6 @@ use std::str;
 use std::sync::Arc;
 
 use axum::extract::{Path, Query};
-use next_web::extract::find_singleton::FindSingleton;
 use next_web::macros::bind::{post_mapping, singleton};
 use next_web::{Application, NextWebApplication};
 use next_web_core::async_trait;

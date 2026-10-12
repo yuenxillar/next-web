@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use next_web::{
     Application, NextWebApplication,
-    extract::find_singleton::FindSingleton,
     macros::bind::{get_mapping, singleton},
 };
 use next_web_core::traits::singleton::Singleton;

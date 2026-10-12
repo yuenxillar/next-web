@@ -1,6 +1,5 @@
 use next_web::{
     Application, NextWebApplication,
-    extract::FindSingleton,
     macros::{
         bind::{post_mapping, request_mapping},
         open_api,
