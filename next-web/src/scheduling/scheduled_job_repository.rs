@@ -1,6 +1,4 @@
-use super::{
-    scheduled_job_reader::ScheduledJobReader, scheduled_job_store::ScheduledJobStore,
-};
+use super::{scheduled_job_reader::ScheduledJobReader, scheduled_job_store::ScheduledJobStore};
 
 pub trait ScheduledJobRepository
 where

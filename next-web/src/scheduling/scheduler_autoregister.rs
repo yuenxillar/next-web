@@ -135,8 +135,10 @@ where
     /// # Arguments
     ///
     /// * `ctx` - The context the dependencies of the task are resolved from.
-    fn register(&self, ctx: &mut dyn ApplicationContext)
-    -> Result<ScheduledJobRegistration, BoxError>;
+    fn register(
+        &self,
+        ctx: &mut dyn ApplicationContext,
+    ) -> Result<ScheduledJobRegistration, BoxError>;
 }
 
 inventory::collect!(&'static dyn SchedulerAutoRegister);

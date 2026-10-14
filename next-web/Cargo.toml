@@ -21,6 +21,7 @@ next-web-singletons     = { workspace = true }
 
 next-web-websocket      = { workspace = true, optional = true }
 next-web-retry          = { workspace = true, optional = true }
+next-web-resilience     = { workspace = true, optional = true }
 next-web-open-api       = { workspace = true, optional = true }
 next-web-state-machine  = { workspace = true, optional = true }
 
@@ -109,6 +110,7 @@ enable-websocket        = ["next-web-websocket"]
 enable-open-api         = ["next-web-open-api", "utoipa-swagger-ui", "next-web-macros/open-api"]
 enable-scheduling       = ["tokio-cron-scheduler"]
 enable-retry            = ["next-web-retry"]
+enable-resilience       = ["next-web-resilience"]
 enable-prometheus       = ["axum-prometheus"]
 enable-i18n             = []
 enable-state-machine    = ["next-web-state-machine"]

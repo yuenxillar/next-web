@@ -1,4 +1,4 @@
-use next_web_core::{clone_trait_object, DynClone};
+use next_web_core::{DynClone, clone_trait_object};
 
 use crate::diagnostics::error_analysis::ErrorAnalysis;
 

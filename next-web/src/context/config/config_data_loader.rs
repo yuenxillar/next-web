@@ -9,7 +9,7 @@ use next_web_core::{
 };
 
 use crate::context::config::config_data_location::ConfigDataLocation;
-use crate::context::config::config_data_resource::{extension_of, ConfigDataResource};
+use crate::context::config::config_data_resource::{ConfigDataResource, extension_of};
 use crate::env::{PropertiesPropertySourceLoader, PropertySourceLoader, YamlPropertySourceLoader};
 
 /// The property that declares the profile expression a document is active for.
@@ -304,9 +304,11 @@ mod tests {
         write_file(&root, "application.json", "{}");
         let resource_loader = resource_loader(&root);
 
-        assert!(ConfigDataLoader::default()
-            .load(&resource("application.json"), &resource_loader)
-            .unwrap()
-            .is_empty());
+        assert!(
+            ConfigDataLoader::default()
+                .load(&resource("application.json"), &resource_loader)
+                .unwrap()
+                .is_empty()
+        );
     }
 }

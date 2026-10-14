@@ -49,7 +49,8 @@ mod tests {
     use crate::scheduling::{
         PersistedScheduledJob,
         schedule_type::{ScheduleType, WithArgs},
-        scheduled_job_reader::ScheduledJobReader, scheduled_job_store::ScheduledJobStore,
+        scheduled_job_reader::ScheduledJobReader,
+        scheduled_job_store::ScheduledJobStore,
     };
 
     fn one_shot_schedule() -> ScheduleType {

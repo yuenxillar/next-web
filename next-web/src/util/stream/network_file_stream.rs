@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
 
+use axum::BoxError;
 use axum::body::Bytes;
 use axum::http::{HeaderMap, HeaderName};
-use axum::BoxError;
 use axum::{body::Body, response::Response};
 use futures::stream::BoxStream;
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, stream};
 use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
-use reqwest::{header, Client};
+use reqwest::{Client, header};
 use reqwest::{Method, StatusCode};
 use tracing::error;
 

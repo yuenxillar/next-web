@@ -2,7 +2,7 @@ use chrono::Local;
 use next_web_core::env::Environment;
 use tracing::info;
 
-use crate::{next_web_application::StandardStartup, NextWebVersion};
+use crate::{NextWebVersion, next_web_application::StandardStartup};
 
 /// Logs application information on startup.
 pub struct StartupInfoLogger<'a> {

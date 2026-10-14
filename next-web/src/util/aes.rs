@@ -5,13 +5,13 @@ use std::{
 };
 
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
     AeadCore, Aes128Gcm, Key, Nonce,
+    aead::{Aead, KeyInit, OsRng},
 };
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use next_web_core::error::BoxError;
 use rand::RngCore;
-use scrypt::{scrypt, Params};
+use scrypt::{Params, scrypt};
 
 const KEY_LEN: usize = 16;
 const SALT_LEN: usize = 32;

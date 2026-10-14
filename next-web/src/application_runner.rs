@@ -62,5 +62,5 @@ where
     /// A boxed future that resolves to `Ok(())` on success, or an error if the
     /// runner fails to complete its work.
     fn run(&mut self, args: &dyn ApplicationArguments)
-        -> BoxFuture<'_, Result<(), Box<dyn Error>>>;
+    -> BoxFuture<'_, Result<(), Box<dyn Error>>>;
 }

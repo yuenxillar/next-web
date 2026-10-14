@@ -5,8 +5,8 @@ use next_web_core::traits::service::background_service::{
 };
 use tokio::{
     sync::{
-        broadcast::{self, Sender},
         Mutex,
+        broadcast::{self, Sender},
     },
     task::{AbortHandle, JoinHandle},
     time::timeout,

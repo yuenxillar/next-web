@@ -2,17 +2,17 @@
 //! configuration.
 
 use next_web_core::{
+    Ordered,
     constants::application_constants::NEXT_DECRYPT_PASSWORD,
     env::{BoxedPropertySource, ConfigurableEnvironment, PropertySource, PropertySourceValue},
     util::indexmap::IndexMap,
-    Ordered,
 };
 use tracing::{trace, warn};
 
 use super::PropertyDecryptor;
+use crate::EnvironmentPostProcessor;
 use crate::context::properties::source::ConfigurationPropertySources;
 use crate::util::InventoryHelper;
-use crate::EnvironmentPostProcessor;
 
 /// The property that holds the password of the encrypted values.
 pub const DECRYPT_PASSWORD_PROPERTY: &str = "next.decrypt.password";
@@ -438,8 +438,8 @@ impl PropertySource<PropertySourceValue> for DecryptedPropertySource {
 mod tests {
     use next_web_core::{
         env::{
-            MapPropertySource, PropertyResolver, StandardEnvironment,
-            SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+            MapPropertySource, PropertyResolver, SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+            StandardEnvironment,
         },
         error::BoxError,
     };

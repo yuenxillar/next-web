@@ -1,6 +1,7 @@
 pub mod autoconfigure;
 pub mod config;
 pub mod server;
+pub mod sockjs;
 pub mod ws_handle;
 pub mod ws_handler;
 

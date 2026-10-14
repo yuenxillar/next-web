@@ -594,9 +594,11 @@ mod tests {
 
         assert_eq!(error.kind(), ServerPropertiesErrorKind::InvalidAddress);
         assert_eq!(error.key(), Some("not-an-address:8080"));
-        assert!(error
-            .to_string()
-            .starts_with(ServerPropertiesErrorKind::InvalidAddress.description()));
+        assert!(
+            error
+                .to_string()
+                .starts_with(ServerPropertiesErrorKind::InvalidAddress.description())
+        );
         assert!(error.to_string().contains("not-an-address:8080"));
     }
 

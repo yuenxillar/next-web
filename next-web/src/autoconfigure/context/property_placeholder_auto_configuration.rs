@@ -3,14 +3,14 @@ use std::fmt;
 use std::sync::Arc;
 
 use next_web_context::{
-    support::{
-        PropertySource, PropertySourcesPlaceholderConfigurer,
-        ENVIRONMENT_PROPERTIES_PROPERTY_SOURCE_NAME,
-    },
     ApplicationContextExt,
+    support::{
+        ENVIRONMENT_PROPERTIES_PROPERTY_SOURCE_NAME, PropertySource,
+        PropertySourcesPlaceholderConfigurer,
+    },
 };
-use next_web_core::env::ConfigurableEnvironment;
 use next_web_core::ApplicationContext;
+use next_web_core::env::ConfigurableEnvironment;
 use next_web_macros::auto_configuration;
 
 /// Auto-configuration for PropertySourcesPlaceholderConfigurer.

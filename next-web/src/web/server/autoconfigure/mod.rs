@@ -16,10 +16,10 @@ mod server_properties;
 mod ssl_properties;
 
 pub use http_properties::{
-    HttpProperties, RequestProperties, ResponseProperties, DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    DEFAULT_REQUEST_TIMEOUT_SECONDS, HttpProperties, RequestProperties, ResponseProperties,
 };
 pub use server_properties::{
-    ServerProperties, ServerPropertiesError, ServerPropertiesErrorKind, DEFAULT_ADDRESS,
-    GLOBAL_SERVER_PROPERTIES, SERVER_PROPERTIES_PREFIX,
+    DEFAULT_ADDRESS, GLOBAL_SERVER_PROPERTIES, SERVER_PROPERTIES_PREFIX, ServerProperties,
+    ServerPropertiesError, ServerPropertiesErrorKind,
 };
 pub use ssl_properties::SslProperties;

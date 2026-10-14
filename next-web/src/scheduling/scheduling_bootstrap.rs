@@ -29,7 +29,7 @@ use tracing::{debug, warn};
 
 use super::{
     JobExecutionContext, JobSchedulerManager, ScheduledJobHandler, ScheduledJobRegistration,
-    SchedulerAutoRegister, ScheduledTask,
+    ScheduledTask, SchedulerAutoRegister,
 };
 
 /// The singleton the scheduler of an application is registered under.
@@ -109,9 +109,7 @@ impl SchedulingBootstrap {
 
         // Restoring is what schedules every task, including the ones an
         // operator added to the repository while the application ran.
-        manager
-            .restore_all(JobExecutionContext::default())
-            .await?;
+        manager.restore_all(JobExecutionContext::default()).await?;
 
         if let Err(error) = manager.start().await {
             // The scheduler of an application that was started already, which
@@ -182,10 +180,7 @@ impl SchedulingBootstrap {
         }
 
         let manager = JobSchedulerManager::with_channel_size(Self::channel_size(ctx)).await;
-        ctx.insert_singleton_with_name(
-            manager.clone(),
-            JOB_SCHEDULER_MANAGER_SINGLETON_NAME,
-        );
+        ctx.insert_singleton_with_name(manager.clone(), JOB_SCHEDULER_MANAGER_SINGLETON_NAME);
 
         manager
     }
@@ -207,8 +202,9 @@ impl SchedulingBootstrap {
     ///
     /// Returns the error of the first task that cannot be resolved, which keeps
     /// an application from starting with a task that never runs.
-    fn registrations(ctx: &mut dyn ApplicationContext) -> Result<Vec<ScheduledJobRegistration>, BoxError>
-    {
+    fn registrations(
+        ctx: &mut dyn ApplicationContext,
+    ) -> Result<Vec<ScheduledJobRegistration>, BoxError> {
         let mut registrations = Vec::new();
 
         for register in inventory::iter::<&'static dyn SchedulerAutoRegister> {

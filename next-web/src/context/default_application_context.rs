@@ -691,6 +691,10 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
     fn refresh(&mut self) -> Result<(), ContextError> {
         let started = std::time::Instant::now();
         let mut context_refresh = self.application_startup.start("next.context.refresh");
+        let allow_override = self
+            .get_singleton_with_name::<bool>("mainAllowOverride")
+            .clone();
+        self.set_allow_override(allow_override);
 
         self.prepare_refresh_steps()?;
         self.create_eager_instances();
@@ -710,6 +714,10 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
     async fn refresh_async(&mut self) -> Result<(), ContextError> {
         let started = std::time::Instant::now();
         let mut context_refresh = self.application_startup.start("next.context.refresh");
+        let allow_override = self
+            .get_singleton_with_name::<bool>("mainAllowOverride")
+            .clone();
+        self.set_allow_override(allow_override);
 
         self.prepare_refresh_steps()?;
         self.create_eager_instances_async().await;

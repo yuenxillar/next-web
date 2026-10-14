@@ -74,7 +74,7 @@ pub use axum::Router;
 pub use axum::{body, error_handling, handler, http, response, routing};
 
 pub use rand;
-pub use validator as validate;
+pub use validator;
 
 pub use next_web_core as core;
 pub use next_web_singletons as singletons;
@@ -90,6 +90,9 @@ pub use next_web_websocket as ws;
 
 #[cfg(feature = "enable-retry")]
 pub use next_web_retry as retry;
+
+#[cfg(feature = "enable-resilience")]
+pub use next_web_resilience as resilience;
 
 #[cfg(feature = "enable-open-api")]
 pub mod open_api;

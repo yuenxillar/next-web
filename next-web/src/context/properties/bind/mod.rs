@@ -9,6 +9,4 @@ mod placeholders_resolver;
 
 pub use placeholders_resolver::{NoOpPlaceholdersResolver, PlaceholdersResolver};
 
-pub use next_web_core::env::bind::{
-    BindError, Binder, ConfigurableEnvironmentBindExt,
-};
+pub use next_web_core::env::bind::{BindError, Binder, ConfigurableEnvironmentBindExt};

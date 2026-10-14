@@ -3,12 +3,12 @@
 
 use next_web_core::{
     env::{ConfigurableEnvironment, PropertySource},
-    util::{indexmap::IndexMap, StringUtils},
+    util::{StringUtils, indexmap::IndexMap},
 };
 
 use crate::{
-    env::{MapPropertySource, PropertySourceInfo},
     NextWebVersion,
+    env::{MapPropertySource, PropertySourceInfo},
 };
 
 /// The name of the `applicationInfo` property source.

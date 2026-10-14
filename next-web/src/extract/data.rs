@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     body::Bytes,
     extract::{FromRequest, Request},
-    http::{header, HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header},
 };
 use next_web_context::ApplicationContextExt;
 use next_web_core::traits::data_decoder::DataDecoder;

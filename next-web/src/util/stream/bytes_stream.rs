@@ -1,14 +1,14 @@
 use axum::{
-    body::{Body, Bytes},
-    http::{header, StatusCode},
-    response::{IntoResponse, Response},
     BoxError,
+    body::{Body, Bytes},
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
 };
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
 
 use crate::util::{
-    stream::DEFAULT_CHUNK_SIZE, stream_throttle::throttle_byte_stream, LocalDateTime,
+    LocalDateTime, stream::DEFAULT_CHUNK_SIZE, stream_throttle::throttle_byte_stream,
 };
 
 /// A stream that sends a `Bytes` body.

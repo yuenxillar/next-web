@@ -1,8 +1,10 @@
 use std::{collections::HashSet, sync::Arc};
 
 use crate::{
-    config::ws_handler_registration::WebSocketHandlerRegistration,
-    server::handshake_interceptor::HandshakeInterceptor, ws_handler::WebSocketHandler,
+    config::{SockJsServiceRegistration, ws_handler_registration::WebSocketHandlerRegistration},
+    server::handshake_interceptor::HandshakeInterceptor,
+    sockjs::service::SockJsService,
+    ws_handler::WebSocketHandler,
 };
 
 /// That gathers all the configuration options
@@ -11,6 +13,7 @@ pub struct BaseWebSocketHandlerRegistration {
     interceptors: Vec<Arc<dyn HandshakeInterceptor>>,
     allowed_origins: Vec<String>,
     allowed_origin_patterns: Vec<String>,
+    sock_js_service_registration: Option<SockJsServiceRegistration>,
 }
 
 impl BaseWebSocketHandlerRegistration {
@@ -34,6 +37,31 @@ impl BaseWebSocketHandlerRegistration {
     /// Return the allowed origin patterns configured for this registration.
     pub fn allowed_origin_patterns(&self) -> &[String] {
         self.allowed_origin_patterns.as_slice()
+    }
+
+    /// Return the paths and handlers covered by this SockJS registration.
+    pub(crate) fn sockjs_handler_groups(&self) -> Vec<(Vec<String>, Arc<dyn WebSocketHandler>)> {
+        self.handlers
+            .iter()
+            .map(|(paths, handler)| {
+                let mut paths: Vec<_> = paths.iter().cloned().collect();
+                paths.sort_unstable();
+                (paths, handler.clone())
+            })
+            .collect()
+    }
+
+    /// Build the configured SockJS service for one application handler.
+    pub(crate) fn sockjs_service(
+        &self,
+        handler: Arc<dyn WebSocketHandler>,
+        additional_interceptors: &[Arc<dyn HandshakeInterceptor>],
+    ) -> Option<Box<dyn SockJsService>> {
+        self.sock_js_service_registration
+            .as_ref()
+            .map(|registration| {
+                registration.get_sockjs_service_with_handler(handler, additional_interceptors)
+            })
     }
 }
 
@@ -94,6 +122,30 @@ impl WebSocketHandlerRegistration for BaseWebSocketHandlerRegistration {
 
         self
     }
+
+    fn with_sock_js(&mut self) -> &mut SockJsServiceRegistration {
+        // Create a new SockJS registration and configure it with current interceptors
+        let mut sock_js_registration = SockJsServiceRegistration::default();
+
+        // Transfer interceptors from WebSocket registration to SockJS
+        if !self.interceptors.is_empty() {
+            sock_js_registration.set_interceptors(self.interceptors.to_vec());
+        }
+
+        // Transfer CORS configuration
+        if !self.allowed_origins.is_empty() {
+            sock_js_registration.set_allowed_origins(self.allowed_origins.clone());
+        }
+        if !self.allowed_origin_patterns.is_empty() {
+            sock_js_registration.set_allowed_origin_patterns(self.allowed_origin_patterns.clone());
+        }
+
+        self.sock_js_service_registration = Some(sock_js_registration);
+
+        self.sock_js_service_registration
+            .as_mut()
+            .expect("sock_js_service_registration should be initialized before use")
+    }
 }
 
 impl Default for BaseWebSocketHandlerRegistration {
@@ -103,6 +155,7 @@ impl Default for BaseWebSocketHandlerRegistration {
             interceptors: Default::default(),
             allowed_origins: Default::default(),
             allowed_origin_patterns: Default::default(),
+            sock_js_service_registration: Default::default(),
         }
     }
 }

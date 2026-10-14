@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 use next_web::core::traits::data_decoder::DataDecoder;
 use next_web::extract::ValidatedJson;
-use next_web::validate::Validate;
+use next_web::validator::Validate;
 use next_web::{
     Application, NextWebApplication,
     extract::{data::Data, validated::ValidatedForm},
@@ -22,7 +22,7 @@ async fn index() -> &'static str {
 }
 
 #[derive(Clone, Debug, Deserialize, Validate)]
-#[validate(crate = "next_web::validate")]
+#[validate(crate = "next_web::validator")]
 struct TestValidator {
     #[validate(length(min = 5, message = "Can not be empty"))]
     pub name: String,

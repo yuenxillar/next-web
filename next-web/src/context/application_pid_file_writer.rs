@@ -25,7 +25,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use next_web_core::{env::ConfigurableEnvironment, Ordered};
+use next_web_core::{Ordered, env::ConfigurableEnvironment};
 use tracing::warn;
 
 use crate::{ApplicationEventHandler, Event};
@@ -346,9 +346,9 @@ mod tests {
     use next_web_core::env::StandardEnvironment;
     use next_web_core::util::indexmap::IndexMap;
 
+    use crate::EnvironmentPreparedPayload;
     use crate::context::DefaultApplicationContext;
     use crate::env::MapPropertySource;
-    use crate::EnvironmentPreparedPayload;
 
     use super::*;
 

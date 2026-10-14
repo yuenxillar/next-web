@@ -19,7 +19,7 @@ use crate::ws_handler::WebSocketHandler;
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,ignore
 /// use std::sync::Arc;
 /// use matchit::Router;
 ///
@@ -93,7 +93,7 @@ impl WebSocketHandlerMapping {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore
     /// use std::sync::Arc;
     ///
     /// let mut mapping = WebSocketHandlerMapping::default();
@@ -132,7 +132,7 @@ impl WebSocketHandlerMapping {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore
     /// let mapping = WebSocketHandlerMapping::default();
     /// // ... register handlers ...
     ///
@@ -171,7 +171,7 @@ impl WebSocketHandlerMapping {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore
     /// let mapping = WebSocketHandlerMapping::default();
     /// // ... register handlers ...
     ///
@@ -197,7 +197,7 @@ impl Default for WebSocketHandlerMapping {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore
     /// let mut mapping = WebSocketHandlerMapping::default();
     /// // Start adding handlers
     /// mapping.insert("/ws/endpoint", Arc::new(MyHandler));

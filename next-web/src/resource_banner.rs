@@ -7,7 +7,7 @@ use next_web_core::env::{Environment, PropertySource};
 use next_web_core::io::Resource;
 use tracing::warn;
 
-use crate::ansi::{AnsiPropertySource, ANSI_PROPERTY_SOURCE_NAME};
+use crate::ansi::{ANSI_PROPERTY_SOURCE_NAME, AnsiPropertySource};
 use crate::{Banner, NextWebVersion};
 
 /// Property holding the title of the application.
@@ -647,5 +647,4 @@ mod tests {
         assert_eq!(find_placeholder_end("${a}", 0), Some(3));
         assert_eq!(find_placeholder_end("${a", 0), None);
     }
-
 }

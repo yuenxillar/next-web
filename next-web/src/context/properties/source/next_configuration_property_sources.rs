@@ -5,7 +5,7 @@ use std::fmt;
 use next_web_core::env::MutablePropertySources;
 
 use crate::context::properties::source::{
-    stream_property_sources, ConfigurationPropertySource, NextConfigurationPropertySource,
+    ConfigurationPropertySource, NextConfigurationPropertySource, stream_property_sources,
 };
 
 /// A collection of [`ConfigurationPropertySource`] instances adapted from the
@@ -112,12 +112,7 @@ mod tests {
     fn adapts_included_sources() {
         let mut sources = MutablePropertySources::new();
         add_source(&mut sources, "first", "next.application.name", "demo");
-        add_source(
-            &mut sources,
-            "second",
-            "next.application.version",
-            "1.0.0",
-        );
+        add_source(&mut sources, "second", "next.application.version", "1.0.0");
 
         let adapted = NextConfigurationPropertySources::new(&sources);
 
@@ -134,12 +129,7 @@ mod tests {
         let adapted = NextConfigurationPropertySources::new(&sources);
         assert!(adapted.is_using_sources(&sources));
 
-        add_source(
-            &mut sources,
-            "second",
-            "next.application.version",
-            "1.0.0",
-        );
+        add_source(&mut sources, "second", "next.application.version", "1.0.0");
 
         assert!(!adapted.is_using_sources(&sources));
     }

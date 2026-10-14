@@ -1,7 +1,7 @@
 use crate::{
+    ApplicationEventHandler, EnvironmentPostProcessor, EnvironmentPreparedPayload, Event,
     context::config::ConfigDataEnvironmentPostProcessor,
-    env::DecryptPropertiesEnvironmentPostProcessor, ApplicationEventHandler,
-    EnvironmentPostProcessor, EnvironmentPreparedPayload, Event,
+    env::DecryptPropertiesEnvironmentPostProcessor,
 };
 
 /// The decryption must run after the config data has been loaded, so that the

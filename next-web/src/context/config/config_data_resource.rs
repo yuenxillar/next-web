@@ -5,7 +5,7 @@ use std::path::Path;
 
 use next_web_core::io::ResourceLoader;
 
-use crate::context::config::config_data_location::{strip_file_prefix, ConfigDataLocation};
+use crate::context::config::config_data_location::{ConfigDataLocation, strip_file_prefix};
 
 /// The prefix that marks a file system resource key.
 const FILE_SYSTEM_KEY_PREFIX: &str = "file:";

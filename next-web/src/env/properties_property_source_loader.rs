@@ -82,8 +82,8 @@ impl PropertySourceLoader for PropertiesPropertySourceLoader {
     }
 }
 
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 
 /// Load properties from an XML-format properties file.
 ///

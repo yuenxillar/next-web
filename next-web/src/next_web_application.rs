@@ -551,9 +551,30 @@ where
             ))
             .layer(
                 tower_http::cors::CorsLayer::new()
-                    .allow_origin(tower_http::cors::Any)
-                    .allow_methods(tower_http::cors::Any)
-                    .allow_headers(tower_http::cors::Any)
+                    .allow_origin(tower_http::cors::AllowOrigin::mirror_request())
+                    // SockJS fallback POSTs may include browser credentials. Scope
+                    // credential permission to SockJS endpoints instead of
+                    // enabling it for every application route.
+                    .allow_credentials(tower_http::cors::AllowCredentials::predicate(|_, parts| {
+                        let segments = parts
+                            .uri
+                            .path()
+                            .trim_matches('/')
+                            .split('/')
+                            .collect::<Vec<_>>();
+                        let is_sockjs_transport = segments.len() >= 4
+                            && segments.get(segments.len() - 3).is_some_and(|server| {
+                                server.len() == 3
+                                    && server.bytes().all(|byte| byte.is_ascii_digit())
+                            })
+                            && matches!(
+                                segments.last().copied(),
+                                Some("xhr" | "xhr_send" | "xhr_streaming" | "websocket")
+                            );
+                        is_sockjs_transport
+                    }))
+                    .allow_methods(tower_http::cors::AllowMethods::mirror_request())
+                    .allow_headers(tower_http::cors::AllowHeaders::mirror_request())
                     .max_age(std::time::Duration::from_secs(60) * 10),
             )
             .route_layer(tower_http::trace::TraceLayer::new_for_http())
@@ -685,10 +706,9 @@ where
         }
 
         context.set_resource_loader(resource_loader);
-
         context
-            .singleton_factory()?
-            .set_allow_override(self.properties.is_allow_override());
+            .insert_singleton_with_name(self.properties.is_allow_override(), "mainAllowOverride");
+
         self.apply_initializers(context);
         self.send_event(|handlers| handlers.context_prepared(context));
         if self.properties.is_log_startup_info() {
@@ -1563,6 +1583,122 @@ mod tests {
     struct TestApplication;
 
     impl Application for TestApplication {}
+
+    #[tokio::test]
+    async fn global_cors_preserves_credentialed_sockjs_origin_headers() {
+        use axum::{body::Body, routing::get};
+        use tower::ServiceExt;
+
+        async fn sockjs_response() -> Response {
+            Response::builder()
+                .header("access-control-allow-origin", "https://client.example")
+                .header("access-control-allow-credentials", "true")
+                .body(Body::empty())
+                .unwrap()
+        }
+
+        let application = NextWebApplication::<TestApplication>::default();
+        let mut context: Box<dyn ConfigurableApplicationContext> =
+            Box::new(crate::context::DefaultApplicationContext::default());
+        let router = application.add_layers(
+            &mut *context,
+            Router::new().route("/sockjs/info", get(sockjs_response)),
+        );
+
+        let response = router
+            .clone()
+            .oneshot(
+                axum::extract::Request::builder()
+                    .uri("/sockjs/info")
+                    .header("origin", "https://client.example")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("the router answers");
+
+        assert_eq!(
+            response
+                .headers()
+                .get("access-control-allow-origin")
+                .unwrap(),
+            "https://client.example"
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("access-control-allow-credentials")
+                .unwrap(),
+            "true"
+        );
+
+        let preflight = router
+            .oneshot(
+                axum::extract::Request::builder()
+                    .method("OPTIONS")
+                    .uri("/sockjs/000/session/xhr_send")
+                    .header("origin", "https://client.example")
+                    .header("access-control-request-method", "POST")
+                    .header("access-control-request-headers", "content-type")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("the preflight is answered");
+        assert_eq!(
+            preflight
+                .headers()
+                .get("access-control-allow-origin")
+                .unwrap(),
+            "https://client.example"
+        );
+        assert_eq!(
+            preflight
+                .headers()
+                .get("access-control-allow-credentials")
+                .unwrap(),
+            "true"
+        );
+        assert_eq!(
+            preflight
+                .headers()
+                .get("access-control-allow-methods")
+                .unwrap(),
+            "POST"
+        );
+        assert_eq!(
+            preflight
+                .headers()
+                .get("access-control-allow-headers")
+                .unwrap(),
+            "content-type"
+        );
+
+        let mut ordinary_context: Box<dyn ConfigurableApplicationContext> =
+            Box::new(crate::context::DefaultApplicationContext::default());
+        let ordinary_router = application.add_layers(
+            &mut *ordinary_context,
+            Router::new().route("/api/update", get(sockjs_response)),
+        );
+        let ordinary_preflight = ordinary_router
+            .oneshot(
+                axum::extract::Request::builder()
+                    .method("OPTIONS")
+                    .uri("/api/update")
+                    .header("origin", "https://client.example")
+                    .header("access-control-request-method", "POST")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("the ordinary preflight is answered");
+        assert!(
+            ordinary_preflight
+                .headers()
+                .get("access-control-allow-credentials")
+                .is_none()
+        );
+    }
 
     /// The state of the application and the dispatcher of the resources are
     /// installed on the routes, so a filter or a handler reaches them through

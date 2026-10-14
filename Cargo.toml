@@ -8,6 +8,7 @@ members = [
     "next-web-mail",
     "next-web-macros",
     "next-web-open-api",
+    "next-web-resilience",
     "next-web-retry",
     "next-web-security",
     "next-web-sms",
@@ -79,6 +80,7 @@ next-web-context            = { path = "./next-web-context"         }
 next-web-singletons         = { path = "./next-web-singletons"      }
 next-web-util               = { path = "./next-web-util"            }
 next-web-macros             = { path = "./next-web-macros"          }
+next-web-resilience         = { path = "./next-web-resilience"      }
 next-web-retry              = { path = "./next-web-retry"           }
 next-web-security           = { path = "./next-web-security"        }
 next-web-open-api           = { path = "./next-web-open-api"        }

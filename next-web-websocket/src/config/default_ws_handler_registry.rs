@@ -1,10 +1,14 @@
+use std::sync::Arc;
+
 use crate::{
     config::{
         default_ws_handler_registration::DefaultWebSocketHandlerRegistration,
         ws_handler_registration::WebSocketHandlerRegistration,
         ws_handler_registry::WebSocketHandlerRegistry,
     },
+    server::handshake_interceptor::HandshakeInterceptor,
     server::support::ws_handler_mapping::WebSocketHandlerMapping,
+    sockjs::service::SockJsService,
     ws_handler::WebSocketHandler,
 };
 
@@ -36,6 +40,27 @@ impl DefaultWebSocketHandlerRegistry {
         }
 
         hander_mapping
+    }
+
+    /// Build the SockJS services configured by the registered endpoints.
+    pub(crate) fn sockjs_services(
+        &self,
+        additional_interceptors: &[Arc<dyn HandshakeInterceptor>],
+    ) -> Vec<(Vec<String>, Arc<dyn SockJsService>)> {
+        let mut services = Vec::new();
+        for registration in &self.registrations {
+            let groups = registration.sockjs_handler_groups();
+            if groups.is_empty() {
+                continue;
+            }
+            for (paths, handler) in groups {
+                if let Some(service) = registration.sockjs_service(handler, additional_interceptors)
+                {
+                    services.push((paths, Arc::<dyn SockJsService>::from(service)));
+                }
+            }
+        }
+        services
     }
 }
 

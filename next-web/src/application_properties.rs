@@ -100,10 +100,14 @@ impl ApplicationProperties {
     }
 
     /// Returns whether handler singletons should remain lazy until the first request.
-    pub fn is_lazy(&self) -> bool { self.lazy }
+    pub fn is_lazy(&self) -> bool {
+        self.lazy
+    }
 
     /// Sets whether handler singletons should remain lazy until the first request.
-    pub fn set_lazy(&mut self, lazy: bool) { self.lazy = lazy; }
+    pub fn set_lazy(&mut self, lazy: bool) {
+        self.lazy = lazy;
+    }
 
     /// Binds the `next.main.*` properties from the given environment onto this
     /// instance.
@@ -178,7 +182,7 @@ impl Default for ApplicationProperties {
             log_startup_info: true,
             register_shutdown_hook: true,
             sources: HashSet::new(),
-            lazy: true,
+            lazy: false,
         }
     }
 }

@@ -127,34 +127,6 @@ pub fn builder(input: TokenStream) -> TokenStream {
     impl_macro_builder(&input)
 }
 
-/// 为结构体实现有参构造函数
-///
-/// 该宏会为结构体生成一个默认构造函数，并为每个字段提供对应的参数，
-/// 最终通过参数构造原始结构体实例
-///
-/// ## 注意
-///
-/// 1. 如果字段为 Option 类型, 那么在参数列表中将不会有该字段的入参, 除非使用了 required 辅助参数
-///
-/// 辅助参数:
-///
-/// `required`:  那么即使字段为 Option 也将会出现在方法入参中
-/// `default`:   无此字段入参, 使用 Default::default() 进行赋值
-/// `into`:      入参将会以 impl Into<field> 的类型进行转换
-///
-/// # 示例
-///
-/// ```rust
-/// #[derive(RequiredArgsConstructor)]
-/// struct Person {
-///     #[constructor(into)]
-///     name: String,
-///     age: u32,
-/// }
-///
-/// let person = Person::from_args("Alice", 30);
-/// ```
-///
 /// Implement constructor with required arguments for structures
 ///
 /// This macro will generate a default constructor and provide corresponding parameters for each field,
@@ -604,7 +576,7 @@ http_method_macro! {
     any_mapping, Any, "ANY"
 }
 
-// #[cfg(feature = "open-api")]
+#[cfg(feature = "open-api")]
 #[proc_macro_attribute]
 pub fn open_api(args: TokenStream, input: TokenStream) -> TokenStream {
     crate::web::open_api::impl_macro_open_api(args, input)
@@ -975,3 +947,5 @@ pub fn transient(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn singleowner(attr: TokenStream, item: TokenStream) -> TokenStream {
     di::generate(attr, item, Scope::SingleOwner)
 }
+
+// ========================= Resilience =========================

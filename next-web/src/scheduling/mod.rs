@@ -94,12 +94,12 @@ pub use persisted_job::PersistedScheduledJob;
 pub use registry::ScheduledJobRegistry;
 pub use repository::InMemoryScheduledJobRepository;
 pub use schedule_type::{ScheduleType, WithArgs};
-pub use scheduler_autoregister::{ScheduledJobRegistration, SchedulerAutoRegister};
 pub use scheduled_job_handler::ScheduledJobHandler;
 pub use scheduled_job_reader::ScheduledJobReader;
 pub use scheduled_job_repository::ScheduledJobRepository;
 pub use scheduled_job_store::ScheduledJobStore;
 pub use scheduled_task::ScheduledTask;
+pub use scheduler_autoregister::{ScheduledJobRegistration, SchedulerAutoRegister};
 
 #[cfg(feature = "enable-scheduling")]
 pub use job_scheduler_manager::{BoxedJob, JobSchedulerManager};

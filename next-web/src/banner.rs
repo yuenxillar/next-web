@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use next_web_core::{clone_trait_object, env::Environment, DynClone};
+use next_web_core::{DynClone, clone_trait_object, env::Environment};
 
 /// writing a banner programmatically.
 ///

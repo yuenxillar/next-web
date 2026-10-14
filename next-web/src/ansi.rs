@@ -528,9 +528,6 @@ mod tests {
     #[test]
     fn element_display_writes_the_ansi_code() {
         assert_eq!(AnsiElement::Color(AnsiColor::Red).to_string(), "31");
-        assert_eq!(
-            AnsiElement::EightBitColor(208).to_string(),
-            "38;5;208"
-        );
+        assert_eq!(AnsiElement::EightBitColor(208).to_string(), "38;5;208");
     }
 }

@@ -17,4 +17,3 @@ where
 }
 
 clone_trait_object!(WebSocketConfigurer where Self: Send + Sync);
-

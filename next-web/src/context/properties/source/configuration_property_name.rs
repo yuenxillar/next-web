@@ -140,11 +140,7 @@ mod tests {
         assert_eq!(name.as_str(), "next.datasource.url");
         assert_eq!(
             name.elements(),
-            &[
-                "next".to_owned(),
-                "datasource".to_owned(),
-                "url".to_owned()
-            ]
+            &["next".to_owned(), "datasource".to_owned(), "url".to_owned()]
         );
         assert_eq!(name.number_of_elements(), 3);
         assert_eq!(name.to_string(), "next.datasource.url");

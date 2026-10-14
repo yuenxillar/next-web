@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    server::handshake_interceptor::HandshakeInterceptor, ws_handler::WebSocketHandler,
+    config::SockJsServiceRegistration, server::handshake_interceptor::HandshakeInterceptor,
+    ws_handler::WebSocketHandler,
 };
 
 /// Provides methods for configuring a WebSocket handler.
@@ -35,4 +36,7 @@ pub trait WebSocketHandlerRegistration {
         &mut self,
         origin_patterns: Vec<String>,
     ) -> &mut dyn WebSocketHandlerRegistration;
+
+    /// Enable SockJS fallback options.
+    fn with_sock_js(&mut self) -> &mut SockJsServiceRegistration;
 }

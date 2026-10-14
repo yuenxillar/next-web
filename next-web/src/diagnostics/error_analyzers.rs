@@ -1,10 +1,10 @@
 use crate::{
+    NextWebErrorReporter,
     diagnostics::{
         analyzer::*, error_analysis::ErrorAnalysis, error_analysis_reporter::ErrorAnalysisReporter,
         error_analyzer::ErrorAnalyzer,
         logging_error_analysis_reporter::LoggingErrorAnalysisReporter,
     },
-    NextWebErrorReporter,
 };
 
 /// Aggregates a set of [`ErrorAnalyzer`]s and [`ErrorAnalysisReporter`]s

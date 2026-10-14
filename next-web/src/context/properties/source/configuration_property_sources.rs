@@ -181,7 +181,7 @@ fn is_included(source: &dyn PropertySource<PropertySourceValue>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{env::MapPropertySource, ApplicationEnvironment};
+    use crate::{ApplicationEnvironment, env::MapPropertySource};
     use next_web_core::util::indexmap::IndexMap;
 
     /// Creates an environment holding a single application property.

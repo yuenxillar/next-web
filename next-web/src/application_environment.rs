@@ -83,7 +83,9 @@ impl PropertyLookup for ConfigurationPropertyLookup {
             .iter()
             .filter(|source| {
                 !source.is_stub()
-                    && !ConfigurationPropertySources::is_attached_configuration_property_source(*source)
+                    && !ConfigurationPropertySources::is_attached_configuration_property_source(
+                        *source,
+                    )
             })
             .find_map(|source| source.property(name.as_str()))
     }

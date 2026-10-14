@@ -21,6 +21,7 @@ next-web-mail           = { path = "../next-web-mail", version = "*" }
 next-web-ip             = { path = "../next-web-ip", version = "*" }
 next-web-document       = { path = "../next-web-document", version = "*", features = [] }
 next-web-retry          = { path = "../next-web-retry", version = "*" }
+next-web-resilience     = { path = "../next-web-resilience", version = "*" }
 next-web-pay-alipay     = { path = "../next-web-pay/next-web-pay-alipay", version = "*" }
 
 # next-web-data-database = { path = "../next-web-data-database", version = "*" }
@@ -141,6 +142,14 @@ path = "redis.rs"
 [[bin]]
 name = "retry"
 path = "retry.rs"
+
+[[bin]]
+name = "resilience"
+path = "resilience.rs"
+
+[[bin]]
+name = "resilience_macros"
+path = "resilience_macros.rs"
 
 [[bin]]
 name = "scheduled"

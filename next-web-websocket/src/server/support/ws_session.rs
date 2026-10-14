@@ -5,22 +5,8 @@ use axum::{
     http::HeaderMap,
 };
 use flume::Sender;
-use uuid::Uuid;
+use next_web_core::Uuid;
 
-///
-/// 表示一个 WebSocket 会话的结构体。
-///
-/// 该结构用于管理和标识单个 WebSocket 连接。
-/// 包含会话 ID、消息发送通道和客户端远程地址。
-///
-/// # 字段说明
-/// - `id`: 当前会话的唯一标识符（UUID）。
-/// - `msg_channel`: 异步发送 WebSocket 消息的通道发送端。
-/// - `remote_address`: 客户端的远程套接字地址。
-/// - `header`: 请求头
-/// - `path`: 请求路径
-///
-///
 /// Represents a WebSocket session.
 ///
 /// This structure is used to manage and identify an individual WebSocket connection.
@@ -35,7 +21,7 @@ use uuid::Uuid;
 ///
 #[derive(Clone)]
 pub struct WebSocketSession {
-    id: uuid::Uuid,
+    id: Uuid,
     msg_channel: Sender<Message>,
     remote_address: SocketAddr,
     header: HeaderMap,
@@ -43,18 +29,6 @@ pub struct WebSocketSession {
 }
 
 impl WebSocketSession {
-    ///
-    /// 创建一个新的 WebSocket 会话，并生成唯一的会话 ID。
-    ///
-    /// # 参数
-    /// - `msg_channel`: 用于向客户端发送消息的通道发送端。
-    /// - `remote_address`: 客户端的远程地址。
-    /// - `header`: 请求头
-    /// - `path`: 请求路径
-    ///
-    /// # 返回值
-    /// 返回一个新的 `WebSocketSession` 实例。
-    ///
     /// Creates a new WebSocket session with a unique ID.
     ///
     /// # Arguments
@@ -82,16 +56,6 @@ impl WebSocketSession {
         }
     }
 
-    ///
-    /// 向当前 WebSocket 会话发送一条消息。
-    ///
-    /// # 参数
-    /// - `message`: 要发送的 WebSocket 消息。
-    ///
-    /// # 返回值
-    /// - 如果消息成功发送返回 `Ok(())`。
-    /// - 如果发送失败（如通道关闭）返回 `Err(Message)`。
-    ///
     /// Sends a message through the WebSocket session.
     ///
     /// # Arguments
@@ -108,15 +72,6 @@ impl WebSocketSession {
         Ok(())
     }
 
-    ///
-    /// 判断当前 WebSocket 连接是否处于打开状态。
-    ///
-    /// 目前此方法始终返回 `false`，表示连接已关闭。
-    /// 在实际实现中，可以检查底层连接状态。
-    ///
-    /// # 返回值
-    /// 布尔值，表示当前会话是否处于活动状态。
-    ///
     /// Checks whether the WebSocket connection is still open.
     ///
     /// Currently, this method always returns `false`, indicating that the connection is considered closed.
@@ -129,11 +84,6 @@ impl WebSocketSession {
         !self.msg_channel.is_disconnected()
     }
 
-    ///
-    /// 关闭当前 WebSocket 会话。
-    ///
-    /// 发送一个正常的关闭帧（code=1000, reason="0"），通知客户端服务器准备关闭连接。
-    ///
     /// Closes the WebSocket session gracefully.
     ///
     /// Sends a close message with a normal closure code and an empty reason.
@@ -149,12 +99,6 @@ impl WebSocketSession {
             .await;
     }
 
-    ///
-    /// 获取当前会话的唯一标识符。
-    ///
-    /// # 返回值
-    /// 返回对会话 UUID 的引用。
-    ///
     /// Gets the unique identifier of the session.
     ///
     /// # Returns
@@ -164,12 +108,6 @@ impl WebSocketSession {
         &self.id
     }
 
-    ///
-    /// 获取当前连接客户端的远程地址。
-    ///
-    /// # 返回值
-    /// 返回对客户端 `SocketAddr` 的引用。
-    ///
     /// Gets the remote socket address of the connected client.
     ///
     /// # Returns
@@ -179,12 +117,6 @@ impl WebSocketSession {
         &self.remote_address
     }
 
-    ///
-    /// 获取当前连接客户端的请求头部数据
-    ///
-    /// # 返回值
-    /// 返回对 `HeaderMap` 的引用。
-    ///
     /// Get the request header data of the currently connected client
     ///
     /// # Returns
@@ -194,12 +126,6 @@ impl WebSocketSession {
         &self.header
     }
 
-    ///
-    /// 获取当前连接客户端的请求路径
-    ///
-    /// # 返回值
-    /// 返回对 `String` 的引用。
-    ///
     /// Get the request path of the current connected client
     ///
     /// # Returns

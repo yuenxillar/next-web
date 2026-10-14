@@ -354,9 +354,11 @@ mod tests {
             resolver.resolve_placeholders("${app.unknown}"),
             "${app.missing}"
         );
-        assert!(resolver
-            .resolve_required_placeholders("${app.missing}")
-            .is_err());
+        assert!(
+            resolver
+                .resolve_required_placeholders("${app.missing}")
+                .is_err()
+        );
         assert_eq!(
             resolver.resolve_required_placeholders("${app.name}").ok(),
             Some("demo".to_owned())

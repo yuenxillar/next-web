@@ -12,7 +12,7 @@ pub(crate) use request_layer::{PrepareRequestState, prepare_request_layer};
 pub use server::Server;
 #[cfg(feature = "tls-rustls")]
 pub use tls_web_server::{
-    TlsWebServer, TlsWebServerError, SSL_CERTIFICATE_PRIVATE_KEY_PROPERTY,
-    SSL_CERTIFICATE_PROPERTY, SSL_ENABLED_PROPERTY,
+    SSL_CERTIFICATE_PRIVATE_KEY_PROPERTY, SSL_CERTIFICATE_PROPERTY, SSL_ENABLED_PROPERTY,
+    TlsWebServer, TlsWebServerError,
 };
 pub use web_server::WebServer;

@@ -1,8 +1,8 @@
 use axum::{
-    body::Body,
-    http::{header, StatusCode},
-    response::{IntoResponse, Response},
     BoxError,
+    body::Body,
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
 };
 use futures::StreamExt;
 use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
@@ -28,14 +28,14 @@ where
         let metadata = match std::fs::metadata(file_path) {
             Ok(metadata) => metadata,
             Err(_) => {
-                return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response();
             }
         };
 
         let std_file = match std::fs::File::open(file_path) {
             Ok(file) => file,
             Err(error) => {
-                return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+                return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response();
             }
         };
 

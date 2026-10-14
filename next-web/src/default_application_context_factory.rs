@@ -3,10 +3,10 @@
 
 use next_web_core::env::ConfigurableEnvironment;
 
+use crate::ApplicationEnvironment;
 use crate::application_context_factory::ApplicationContextFactory;
 use crate::configurable_application_context::ConfigurableApplicationContext;
 use crate::context::DefaultApplicationContext;
-use crate::ApplicationEnvironment;
 
 /// Default [`ApplicationContextFactory`] implementation.
 ///

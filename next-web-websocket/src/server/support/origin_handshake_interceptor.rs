@@ -60,6 +60,10 @@ impl CorsConfiguration {
             return true;
         };
 
+        if self.allowed_origins.is_empty() && self.allowed_origin_patterns.is_empty() {
+            return false;
+        }
+
         if self.allowed_origins.contains(origin) {
             return true;
         }

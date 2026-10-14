@@ -1,4 +1,4 @@
-use tracing::{enabled, Level};
+use tracing::{Level, enabled};
 
 use crate::diagnostics::{
     error_analysis::ErrorAnalysis, error_analysis_reporter::ErrorAnalysisReporter,

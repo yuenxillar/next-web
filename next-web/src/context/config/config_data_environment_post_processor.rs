@@ -4,17 +4,17 @@
 use std::sync::Arc;
 
 use next_web_core::{
+    Ordered,
     env::ConfigurableEnvironment,
     io::{DefaultResourceLoader, ResourceLoader},
-    Ordered,
 };
 use tracing::error;
 
+use crate::EnvironmentPostProcessor;
 use crate::context::config::{
     ConfigDataEnvironment, ConfigDataEnvironmentError, ConfigDataEnvironmentUpdateListener,
     ConfigDataLoader, NoOpConfigDataEnvironmentUpdateListener, ON_NOT_FOUND_PROPERTY,
 };
-use crate::EnvironmentPostProcessor;
 
 /// Property used to determine what action to take when a config data location
 /// that must exist cannot be found.

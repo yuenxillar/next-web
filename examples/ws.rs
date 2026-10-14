@@ -32,7 +32,8 @@ impl WebSocketConfigurer for TestWebSocketConfigurer {
     ) {
         registry
             .add_handler(Arc::new(TestWSHandler), vec!["/ws".into()])
-            .set_allowed_origins(vec!["https://.*.example.com".into()]);
+            .set_allowed_origin_patterns(vec!["https://*.example.com".into()])
+            .with_sock_js();
     }
 }
 

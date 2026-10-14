@@ -825,7 +825,7 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{mpsc, Barrier};
+    use std::sync::{Barrier, mpsc};
 
     const TIMEOUT: Duration = Duration::from_secs(2);
 

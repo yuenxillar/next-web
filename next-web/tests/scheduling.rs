@@ -4,8 +4,7 @@
 #![cfg(feature = "enable-scheduling")]
 
 use std::sync::{
-    Arc,
-    Mutex,
+    Arc, Mutex,
     atomic::{AtomicUsize, Ordering},
 };
 use std::time::Duration;
@@ -17,9 +16,9 @@ use next_web::{
     core::traits::config::auto_configuration::AutoConfiguration,
     macros::{bind::singleton, scheduled},
     scheduling::{
-        InMemoryScheduledJobRepository, JobExecutionContext, JobSchedulerManager,
-        PersistedScheduledJob, ScheduleType, ScheduledJobReader, ScheduledJobRegistry,
-        ScheduledJobStore, ScheduledTask, WithArgs, JOB_SCHEDULER_MANAGER_SINGLETON_NAME,
+        InMemoryScheduledJobRepository, JOB_SCHEDULER_MANAGER_SINGLETON_NAME, JobExecutionContext,
+        JobSchedulerManager, PersistedScheduledJob, ScheduleType, ScheduledJobReader,
+        ScheduledJobRegistry, ScheduledJobStore, ScheduledTask, WithArgs,
     },
 };
 use next_web_core::async_trait;
@@ -130,7 +129,9 @@ async fn start_application(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_declared_task_runs_and_keeps_the_time_it_last_ran_at() {
-    let _test = TEST_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _test = TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let repository = Arc::new(InMemoryScheduledJobRepository::new());
     let _context = start_application(Arc::clone(&repository)).await;
@@ -170,7 +171,9 @@ async fn a_declared_task_runs_and_keeps_the_time_it_last_ran_at() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_provided_task_is_scheduled_under_the_name_of_its_provider() {
-    let _test = TEST_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _test = TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let repository = Arc::new(InMemoryScheduledJobRepository::new());
     let _context = start_application(Arc::clone(&repository)).await;
@@ -208,7 +211,9 @@ async fn a_provided_task_is_scheduled_under_the_name_of_its_provider() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_schedule_that_is_already_known_is_not_declared_again() {
-    let _test = TEST_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _test = TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     let repository = Arc::new(InMemoryScheduledJobRepository::new());
 

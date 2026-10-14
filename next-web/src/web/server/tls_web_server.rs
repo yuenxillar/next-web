@@ -7,11 +7,11 @@
 use std::{error::Error, fmt, future::Future, io, net::SocketAddr, path::Path, time::Duration};
 
 use axum::Router;
-use axum_server::{tls_rustls::RustlsConfig, Handle};
+use axum_server::{Handle, tls_rustls::RustlsConfig};
 use next_web_core::env::ConfigurableEnvironment;
 use tracing::info;
 
-use crate::web::server::{web_server::shutdown_signal, Server};
+use crate::web::server::{Server, web_server::shutdown_signal};
 
 /// Property that enables TLS for the web server.
 ///
@@ -343,9 +343,11 @@ mod tests {
         .unwrap_err();
 
         assert!(matches!(error, TlsWebServerError::MissingKeyMaterial));
-        assert!(error
-            .to_string()
-            .contains(SSL_CERTIFICATE_PRIVATE_KEY_PROPERTY));
+        assert!(
+            error
+                .to_string()
+                .contains(SSL_CERTIFICATE_PRIVATE_KEY_PROPERTY)
+        );
     }
 
     #[test]

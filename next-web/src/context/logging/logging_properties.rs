@@ -694,9 +694,11 @@ mod tests {
         assert_eq!(directives, "info");
         assert_eq!(warnings.len(), 2, "unexpected warnings: {warnings:?}");
         assert!(warnings.iter().any(|warning| warning.contains("verbose")));
-        assert!(warnings
-            .iter()
-            .any(|warning| warning.contains("logger=with=equals")));
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.contains("logger=with=equals"))
+        );
     }
 
     #[test]

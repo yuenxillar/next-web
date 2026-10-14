@@ -15,14 +15,14 @@ use crate::context::config::config_data_environment_contributors::ConfigDataEnvi
 use crate::context::config::config_data_environment_update_listener::ConfigDataEnvironmentUpdateListener;
 use crate::context::config::config_data_importer::ConfigDataImporter;
 use crate::context::config::config_data_loader::{
-    config_data_locations, ConfigDataLoader, IMPORT_PROPERTY,
+    ConfigDataLoader, IMPORT_PROPERTY, config_data_locations,
 };
 use crate::context::config::config_data_location::ConfigDataLocation;
 use crate::context::config::config_data_location_not_found_error::ConfigDataLocationNotFoundError;
 use crate::context::config::config_data_not_found_action::ConfigDataNotFoundAction;
 use crate::context::config::config_data_profiles::{
-    profiles_from_value, ConfigDataProfiles, ACTIVE_PROFILE_PROPERTY, DEFAULT_PROFILE_PROPERTY,
-    INCLUDE_PROFILES,
+    ACTIVE_PROFILE_PROPERTY, ConfigDataProfiles, DEFAULT_PROFILE_PROPERTY, INCLUDE_PROFILES,
+    profiles_from_value,
 };
 use crate::context::config::invalid_config_data_property_error::InvalidConfigDataPropertyError;
 use crate::env::DefaultPropertiesPropertySource;

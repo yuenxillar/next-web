@@ -886,9 +886,11 @@ mod tests {
     fn test_error_handling() {
         assert!(Amount::new(f64::NAN).is_err());
         assert!(Amount::new(f64::INFINITY).is_err());
-        assert!(Amount::ZERO
-            .div_f64_with_rounding(0.0, RoundingMode::HalfUp)
-            .is_err());
+        assert!(
+            Amount::ZERO
+                .div_f64_with_rounding(0.0, RoundingMode::HalfUp)
+                .is_err()
+        );
     }
 
     #[test]
