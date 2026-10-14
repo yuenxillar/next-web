@@ -82,7 +82,7 @@ jemallocator    = { workspace = true }
 
 [dev-dependencies]
 # The tests drive a router without binding a socket.
-tower = { version = "0.5" }
+tower = { workspace = true }
 
 [features]
 default = ["decrypt-properties"]

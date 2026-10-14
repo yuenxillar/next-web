@@ -1,8 +1,9 @@
 [package]
 name = "next-web-mqtt"
-version = "0.1.6"
-description = "Next Web Mqtt."
+version = "0.2.0"
+description = "MQTT client integration for Next Web, with topic-based listeners and auto-configuration."
 readme = "./README.md"
+homepage = "https://crates.io/crates/next-web-mqtt"
 license.workspace = true
 edition.workspace = true
 
