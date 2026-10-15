@@ -53,7 +53,7 @@ if session.is_expired() { /* cleanup */ }
 | **Message** | `a["msg1","msg2"]` | JSON 数组格式的消息 |
 | **Close** | `c[3000,"Go away!"]` | 关闭帧，带代码和原因 |
 
-**编解码器**: `Jackson2SockJsMessageCodec`
+**编解码器**: `JsonSockJsMessageCodec`
 - JSON 序列化/反序列化
 - 自动转义特殊字符
 - 支持批量消息

@@ -15,14 +15,14 @@ use axum::{
     response::Response,
 };
 use dashmap::DashMap;
-use next_web_core::error::BoxError;
-use tracing::debug;
+use next_web_core::{any::AnyValue, error::BoxError};
+use tracing::{debug, error, warn};
 
 use crate::{
     server::handshake_interceptor::HandshakeInterceptor,
     server::support::origin_handshake_interceptor::OriginHandshakeInterceptor,
     sockjs::{
-        codec::{Jackson2SockJsMessageCodec, SockJsMessageCodec},
+        codec::{JsonSockJsMessageCodec, SockJsMessageCodec},
         info::SockJsInfo,
         session::SockJsSession,
         transport::{SockJsServiceConfig, TransportHandler, TransportType},
@@ -30,7 +30,7 @@ use crate::{
     ws_handler::WebSocketHandler,
 };
 
-use super::SockJsService;
+use super::{Authorization, SockJsService};
 
 /// Base implementation of SockJS service with transport handling.
 ///
@@ -78,7 +78,7 @@ impl TransportHandlingSockJsService {
             cleanup_task_started: AtomicBool::new(false),
             transport_handlers,
             interceptors: Vec::new(),
-            codec: Arc::new(Jackson2SockJsMessageCodec),
+            codec: Arc::new(JsonSockJsMessageCodec),
             websocket_handler: None,
         }
     }
@@ -107,18 +107,131 @@ impl TransportHandlingSockJsService {
     ///
     /// Returns JSON with server capabilities and configuration.
     fn handle_info(&self) -> Response {
-        SockJsInfo::new(
+        SockJsInfo::with_origins(
             self.config.websocket_enabled,
             self.config.session_cookie_needed,
+            // Report the origins this service actually accepts. The field used to
+            // be hard-coded to `*:*`, so a deployment with a strict allowlist
+            // still told every client that any origin was welcome.
+            self.advertised_origins(),
         )
         .to_response()
+    }
+
+    /// The origins to advertise in `/info`.
+    ///
+    /// A service with no origin restriction accepts anything, which SockJS writes
+    /// as `*:*`. With one configured, the lists are reported as they are.
+    fn advertised_origins(&self) -> Vec<String> {
+        if self.config.allowed_origins.is_empty() && self.config.allowed_origin_patterns.is_empty() {
+            return vec!["*:*".to_string()];
+        }
+
+        self.config
+            .allowed_origins
+            .iter()
+            .chain(self.config.allowed_origin_patterns.iter())
+            .cloned()
+            .collect()
+    }
+
+    /// Reports whether this request may use `session`, fixing the session to its
+    /// first caller on the way.
+    ///
+    /// Session ids come from the client, so without a check here a request that
+    /// guesses or learns another client's id could read its messages and inject
+    /// into its handler. Checked even for a session this request just created —
+    /// where it trivially passes — so that there is one path to reason about.
+    ///
+    /// Two claims are available. An **identity**, when the service names an
+    /// attribute for it and the session carries a comparable value: that decides,
+    /// because it is the stronger claim and the only one that still means
+    /// anything behind a reverse proxy. Otherwise the **address** the session came
+    /// from, which costs nothing and helps when the deployment really does see
+    /// client addresses.
+    fn accepts_session(
+        &self,
+        session: &SockJsSession,
+        session_id: &str,
+        remote_addr: SocketAddr,
+        presented: &HashMap<String, AnyValue>,
+        created: bool,
+    ) -> bool {
+        /// Renders an identity to something two requests can be compared by.
+        ///
+        /// `AnyValue` cannot be compared — it documents that — and its
+        /// `BoxedValue` variant prints as a placeholder, so comparing rendered
+        /// values would make two different principals look equal. Only the
+        /// variants with an unambiguous textual form are accepted, and a session
+        /// whose identity is one of the others is refused rather than let through.
+        fn comparable(value: &AnyValue) -> Option<String> {
+            match value {
+                AnyValue::String(_) | AnyValue::Number(_) | AnyValue::Boolean(_) => {
+                    Some(value.to_string())
+                }
+                _ => None,
+            }
+        }
+
+        // The request that created the session is by definition its owner, and
+        // there is nothing yet to compare it against — including when the identity
+        // it supplied is one this check cannot read, which would otherwise refuse
+        // the very request that made the session. Its address is recorded either
+        // way, so the pin still applies if the identity does not.
+        if created {
+            session.bind_to(remote_addr.ip());
+            return true;
+        }
+
+        if let Some(name) = self.config.session_identity_attribute.as_deref()
+            && let Some(stored) = session.attributes().get(name)
+        {
+            let stored = comparable(stored);
+            let presented = presented.get(name).and_then(comparable);
+            if stored.is_some() && stored == presented {
+                // The identity decides; the address is not consulted, because it
+                // would add rejections for a client that legitimately changed
+                // address without adding any strength.
+                return true;
+            }
+
+            // Either a different identity, or one the check cannot read. Refusing
+            // is the honest answer: letting it through would make the control
+            // theatre, which is exactly what the address pin becomes behind a
+            // proxy.
+            warn!(
+                session = %session_id,
+                %remote_addr,
+                attribute = name,
+                readable = stored.is_some(),
+                "Refusing a SockJS request whose identity does not match its session"
+            );
+            return false;
+        }
+
+        session.bind_to(remote_addr.ip());
+
+        if !self.config.session_pinning || session.belongs_to(remote_addr.ip()) {
+            return true;
+        }
+
+        // 404 rather than 403: a SockJS client treats a missing session as "start a
+        // new one", which is the right recovery, and the answer does not confirm
+        // that the id exists.
+        warn!(
+            session = %session_id,
+            %remote_addr,
+            bound = ?session.bound_ip(),
+            "Refusing a SockJS request from an address the session does not belong to"
+        );
+        false
     }
 
     async fn authorize_request(
         &self,
         request: &mut Request,
         run_custom_interceptors: bool,
-    ) -> Result<Option<Response>, BoxError> {
+    ) -> Result<Authorization, BoxError> {
         let origin_interceptor = OriginHandshakeInterceptor::new(
             self.config.allowed_origins.clone(),
             self.config.allowed_origin_patterns.clone(),
@@ -126,25 +239,51 @@ impl TransportHandlingSockJsService {
         let mut response = Response::default();
         let mut attributes = HashMap::new();
 
-        if !origin_interceptor
+        // A refusal carries the response the interceptor built; a failure is
+        // treated as a refusal, because letting a broken check through would be
+        // the wrong default for a handshake. Setting the status here means an
+        // interceptor that failed before choosing one still produces a
+        // meaningful answer rather than `200 OK`.
+        fn refuse_on_failure(response: &mut Response, interceptor: &str, failure: BoxError) {
+            error!(
+                interceptor = %interceptor,
+                "SockJS handshake interceptor failed, refusing the connection: {failure}"
+            );
+            *response.status_mut() = StatusCode::FORBIDDEN;
+        }
+
+        match origin_interceptor
             .before_handshake(request, &mut response, &mut attributes)
-            .await?
+            .await
         {
-            return Ok(Some(response));
+            Ok(true) => {}
+            Ok(false) => return Ok(Authorization::refused(response)),
+            Err(failure) => {
+                refuse_on_failure(&mut response, "origin", failure);
+                return Ok(Authorization::refused(response));
+            }
         }
 
         if run_custom_interceptors {
             for interceptor in &self.interceptors {
-                if !interceptor
+                match interceptor
                     .before_handshake(request, &mut response, &mut attributes)
-                    .await?
+                    .await
                 {
-                    return Ok(Some(response));
+                    Ok(true) => {}
+                    Ok(false) => return Ok(Authorization::refused(response)),
+                    Err(failure) => {
+                        refuse_on_failure(&mut response, "custom", failure);
+                        return Ok(Authorization::refused(response));
+                    }
                 }
             }
         }
 
-        Ok(None)
+        // What the interceptors collected travels with the request so that the
+        // session it creates can hand it to the handler, which is what the
+        // `attributes` parameter of `before_handshake` promises.
+        Ok(Authorization::accepted(attributes))
     }
 
     fn add_cors_headers_for_origin(&self, origin: Option<&HeaderValue>, response: &mut Response) {
@@ -181,7 +320,7 @@ impl TransportHandlingSockJsService {
     }
 
     async fn handle_preflight(&self, request: &mut Request) -> Result<Response, BoxError> {
-        if let Some(response) = self.authorize_request(request, false).await? {
+        if let Some(response) = self.authorize_request(request, false).await?.refusal {
             return Ok(response);
         }
 
@@ -278,8 +417,13 @@ impl TransportHandlingSockJsService {
         }
 
         let sessions = Arc::downgrade(&self.sessions);
-        let disconnect_delay = self.config.disconnect_delay;
-        let interval = Duration::from_millis(disconnect_delay.clamp(1_000, 30_000));
+        // The sweep can only be as precise as how often it runs, so expiry uses
+        // the same clamped value as the interval. Comparing against the raw
+        // `disconnect_delay` let a small setting expire after a millisecond while
+        // being checked once a second, which reads as a session lifetime of a
+        // second and is not what the number says.
+        let disconnect_delay = self.config.disconnect_delay.clamp(1_000, 30_000);
+        let interval = Duration::from_millis(disconnect_delay);
         let Ok(runtime) = tokio::runtime::Handle::try_current() else {
             self.cleanup_task_started.store(false, Ordering::Release);
             return;
@@ -340,7 +484,7 @@ impl SockJsService for TransportHandlingSockJsService {
                     .header(header::ALLOW, "GET, OPTIONS")
                     .body(Body::empty())?);
             }
-            if let Some(response) = self.authorize_request(&mut req, false).await? {
+            if let Some(response) = self.authorize_request(&mut req, false).await?.refusal {
                 return Ok(response);
             }
             let mut response = self.handle_info();
@@ -360,7 +504,8 @@ impl SockJsService for TransportHandlingSockJsService {
             session_id, transport_type
         );
 
-        if let Some(response) = self.authorize_request(&mut req, true).await? {
+        let authorization = self.authorize_request(&mut req, true).await?;
+        if let Some(response) = authorization.refusal {
             return Ok(response);
         }
 
@@ -394,6 +539,16 @@ impl SockJsService for TransportHandlingSockJsService {
 
         let origin = req.headers().get(header::ORIGIN).cloned();
 
+        // The transport is looked up before anything is created. An unregistered
+        // one — `eventsource` is parsed out of the URL but no handler is ever
+        // registered for it — would otherwise create a session and then answer
+        // 404, leaving that session behind for the sweep to collect.
+        let Some(handler) = self.transport_handlers.get(&transport_type) else {
+            return Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::empty())?);
+        };
+
         // Get or create session
         let remote_addr = req
             .extensions()
@@ -401,28 +556,42 @@ impl SockJsService for TransportHandlingSockJsService {
             .map(|ci| ci.0)
             .unwrap_or_else(|| "0.0.0.0:0".parse().unwrap());
 
+        // Kept for the identity check below, which needs what this request
+        // presents alongside what the session was created with.
+        let presented = authorization.attributes.clone();
+
+        let mut created = false;
         let session = self
             .sessions
             .entry(session_id.clone())
             .or_insert_with(|| {
-                Arc::new(SockJsSession::new(
+                created = true;
+                let session = Arc::new(SockJsSession::with_attributes(
                     session_id.clone(),
                     self.codec.clone(),
                     remote_addr,
                     req.headers().clone(),
-                ))
+                    // The request that creates the session decides its
+                    // attributes; later polls of the same session do not, since
+                    // the session already exists by then.
+                    authorization.attributes,
+                ));
+                session.set_queue_capacity(self.config.http_message_cache_size);
+                session
             })
             .clone();
         if let Some(app_handler) = &self.websocket_handler {
             session.set_websocket_handler(app_handler.clone());
         }
 
-        // Get transport handler
-        let Some(handler) = self.transport_handlers.get(&transport_type) else {
+        if !self.accepts_session(&session, &session_id, remote_addr, &presented, created) {
             return Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .body(Body::empty())?);
-        };
+        }
+
+        // The transport was resolved above, before the session was created.
+        debug_assert!(self.transport_handlers.contains_key(&transport_type));
 
         // Delegate to transport handler
         let response = handler
@@ -438,7 +607,7 @@ impl SockJsService for TransportHandlingSockJsService {
     async fn authorize_websocket_request(
         &self,
         request: &mut Request,
-    ) -> Result<Option<Response>, BoxError> {
+    ) -> Result<Authorization, BoxError> {
         self.authorize_request(request, true).await
     }
 
@@ -452,6 +621,7 @@ impl SockJsService for TransportHandlingSockJsService {
         session_id: String,
         headers: HeaderMap,
         remote_addr: SocketAddr,
+        attributes: HashMap<String, AnyValue>,
     ) -> Result<Response, BoxError> {
         self.start_cleanup_task();
         if !self.config.websocket_enabled {
@@ -460,20 +630,35 @@ impl SockJsService for TransportHandlingSockJsService {
                 .body(Body::empty())?);
         }
 
+        // Kept for the identity check below, which needs what this request
+        // presents alongside what the session was created with.
+        let presented = attributes.clone();
+
+        let mut created = false;
         let session = self
             .sessions
             .entry(session_id.clone())
             .or_insert_with(|| {
-                Arc::new(SockJsSession::new(
-                    session_id,
+                created = true;
+                let session = Arc::new(SockJsSession::with_attributes(
+                    session_id.clone(),
                     self.codec.clone(),
                     remote_addr,
                     headers,
-                ))
+                    attributes,
+                ));
+                session.set_queue_capacity(self.config.http_message_cache_size);
+                session
             })
             .clone();
         if let Some(app_handler) = &self.websocket_handler {
             session.set_websocket_handler(app_handler.clone());
+        }
+
+        if !self.accepts_session(&session, &session_id, remote_addr, &presented, created) {
+            return Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::empty())?);
         }
 
         let transport_handler = self

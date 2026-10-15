@@ -12,7 +12,8 @@ keywords = ["resilience", "circuit-breaker", "rate-limiter", "bulkhead", "retry"
 
 [dependencies]
 next-web-core              = { workspace = true }
-next-web-resilience-macros = { workspace = true, optional = true }
+next-web-context           = { workspace = true, optional = true }
+next-web-macros            = { workspace = true, optional = true }
 
 tokio         = { workspace = true, features = ["sync", "time"] }
 tracing       = { workspace = true }
@@ -28,9 +29,15 @@ tokio = { workspace = true, features = ["sync", "time", "macros", "rt-multi-thre
 [features]
 default = ["macros"]
 # The attribute macros — `#[rate_limiter]`, `#[circuit_breaker]`, `#[bulkhead]`,
-# `#[time_limiter]`, `#[retry]` — re-exported from `next-web-resilience-macros`.
-# Turn them off with `default-features = false` for a runtime-only build.
-macros = ["dep:next-web-resilience-macros"]
+# `#[time_limiter]`, `#[retry]` — re-exported from the framework's macro crate.
+# Turn them off with `default-features = false` for a runtime-only build, which
+# then does not pull in a procedural macro crate at all.
+macros = ["dep:next-web-macros", "next-web-macros/resilience"]
+# Reading the configured instances out of the application's properties and
+# registering them, so `name = "..."` resolves to an instance whose settings come
+# from `application.yaml`. Needs the framework's dependency-injection crates, so
+# it is off by default: a runtime-only user does not pay for them.
+autoconfigure = ["dep:next-web-context", "dep:next-web-macros"]
 
 [lints]
 workspace = true

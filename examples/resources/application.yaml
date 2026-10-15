@@ -54,6 +54,56 @@ next:
   feature:
     enabled: true
 
+  # Resilience instances. Each one is built from its pattern's builder while the
+  # application starts, and registered under the name written here — so
+  # `name = "backendA"` on `#[rate_limiter]` resolves to this instance.
+  #
+  # Names are used exactly as written, and are matched exactly: a name this file
+  # does not declare is reported rather than quietly given a default instance,
+  # which is what `next.ratelimiter.instances` being present turns on.
+  #
+  # Keys are written the way the Rust side names them. The camelCase spelling of
+  # every key is accepted too, so a block copied from a Resilience4j example
+  # binds without editing; this application writes them the way the rest of this
+  # file is written. A key that matches no setting is an error rather than a
+  # setting that does nothing.
+  #
+  # Every setting is optional and keeps its documented default when left out, so
+  # an instance may declare only what it changes.
+  ratelimiter:
+    instances:
+      backendA:
+        limit_for_period: 5
+        limit_refresh_period: 1s
+        # No waiting at all: a call that finds no permission is refused at once.
+        timeout_duration: 0
+
+  circuitbreaker:
+    instances:
+      backendB:
+        sliding_window_size: 10
+        failure_rate_threshold: 50
+        wait_duration_in_open_state: 10s
+        permitted_number_of_calls_in_half_open_state: 3
+
+  bulkhead:
+    instances:
+      backendD:
+        max_concurrent_calls: 10
+        max_wait_duration: 10ms
+
+  timelimiter:
+    instances:
+      backendE:
+        timeout_duration: 2s
+        cancel_running_future: true
+
+  retry:
+    instances:
+      backendF:
+        max_attempts: 4
+        wait_duration: 500ms
+
   open_api:
     title: "Next Web Examples API"
     version: "0.1.0"

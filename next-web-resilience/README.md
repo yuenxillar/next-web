@@ -65,7 +65,9 @@ Or, when using the framework crate, enable the optional integration:
 next-web = { version = "0.2", features = ["enable-resilience"] }
 ```
 
-which re-exports the crate as `next_web::resilience`.
+which re-exports the crate as `next_web::resilience`. That also turns on the
+`autoconfigure` feature, which reads configured instances out of the
+application's properties.
 
 The attribute macros are on by default. For a runtime-only build — or one that
 must not pull in a procedural macro crate — turn them off:
@@ -156,9 +158,18 @@ async fn charge(&self) -> Result<Receipt, PaymentError> {
 }
 ```
 
-The `next-web-resilience-macros` crate documents the whole grammar, the stacking
-order and the one case that does not work — a method inside an `#[async_trait]`
-impl, which that attribute rewrites before the guard can see it.
+Two things decide whether a stack of attributes behaves the way it looks:
+
+- **The attribute written lowest ends up outermost.** To get the order
+  Resilience4j recommends — a retry that re-runs the whole chain, so the circuit
+  breaker sees every attempt — write the retry lowest.
+- **They do not work on a method inside an `#[async_trait]` impl.** That
+  attribute is applied to the whole impl block, so it rewrites each `async fn`
+  into a plain `fn` returning a boxed future before the guard can see it, and
+  guarding that future would record an instant success for something nobody has
+  polled. Drop `#[async_trait]` where the trait does not need to be a
+  `dyn Trait` — a native `async fn` in a trait works — or leave the attribute off
+  the method and drive the pattern from the body.
 
 ### Sharing one instance
 
@@ -286,6 +297,108 @@ a failure of the guarded operation is retried: a rejection from the circuit
 breaker, the rate limiter or the bulkhead ends the call at once, because those
 patterns refuse a call precisely when making it again cannot help.
 
+### Reading the instances from the application's properties
+
+An application can declare its instances in `resources/application.yaml` instead
+of building them in code. They are built while the application starts and
+registered under the name the file gives them, which is what `name = "..."`
+resolves:
+
+```yaml
+next:
+  ratelimiter:
+    instances:
+      backendA:
+        limit_for_period: 5
+        limit_refresh_period: 1s
+        timeout_duration: 0       # no waiting: refuse at once
+  circuitbreaker:
+    instances:
+      backendB:
+        sliding_window_size: 10
+        failure_rate_threshold: 50
+        wait_duration_in_open_state: 10s
+        permitted_number_of_calls_in_half_open_state: 3
+  bulkhead:
+    instances:
+      backendD:
+        max_concurrent_calls: 10
+        max_wait_duration: 10ms
+  timelimiter:
+    instances:
+      backendE:
+        timeout_duration: 2s
+        cancel_running_future: true
+  retry:
+    instances:
+      backendF:
+        max_attempts: 4
+        wait_duration: 500ms
+```
+
+```rust
+#[rate_limiter(name = "backendA")]  // the five-a-second instance above
+async fn login(&self) -> Result<u32, ApiError> {
+    // ...
+}
+```
+
+Nothing about the guarded code changes, and the module is the same one the rest
+of this README uses. What is different is where the settings come from, which is
+what makes per-environment limits possible: the file differs, the code does not.
+The example this repository ships declares exactly the instances above and serves
+what they were built as:
+
+```text
+cargo run -p next-web-examples --bin resilience_configured
+curl http://127.0.0.1:11000/app/resilience
+```
+
+This is part of the `autoconfigure` feature, which the framework crate turns on
+through `enable-resilience`. A direct dependency needs it explicitly:
+
+```toml
+[dependencies]
+next-web-resilience = { version = "0.1", features = ["autoconfigure"] }
+```
+
+#### How the settings are read
+
+- **Names are used exactly as written.** `backendA` in the file is reached as
+  `name = "backendA"`, and no spelling is rewritten on the way in.
+- **A name the file does not declare is reported, not silently defaulted.** Without
+  a configuration file, an unknown name resolves to an instance with the default
+  settings and nothing says so. With one, the mistake is reported as an error —
+  once per name, since this is the guarded call path — and the call is then served
+  on the defaults anyway. It is not refused: a resilience library that took an
+  endpoint down over a misspelling would be causing the outage it exists to
+  prevent. An application that wants the defaults silently can call
+  `global_registry().set_strict_names(false)`.
+- **Keys accept both spellings.** `limitForPeriod` and `limit_for_period` are the
+  same setting, so a block copied from a Resilience4j example binds unchanged
+  while the Rust side stays `snake_case`. A key that matches no setting is an
+  error rather than a setting that quietly does nothing.
+- **Durations are written as `250ms`, `2s`, `5m`, `1h`, or as a bare number of
+  milliseconds.** `timeout_duration: 0` therefore means "wait no time at all".
+- **Every setting is optional** and keeps its documented default when left out,
+  so an instance may declare only what it changes.
+- **A setting outside its range fails the application start**, not the first
+  call, and so does a duration that cannot be read — the report names the
+  instance and the setting.
+- **Each instance is registered twice, behind one `Arc`**: in the process-wide
+  registry that `name = "..."` looks in, and in the application context, so code
+  that resolves through the container finds the same instance rather than a
+  second one.
+
+#### What cannot be configured from a file
+
+The settings that take a trait object or a closure have no property form and keep
+their defaults: the `clock` of the rate limiter, the circuit breaker and the
+retry, the retry's `interval_function` and `retry_on_exception`, and the circuit
+breaker's `record_failure_predicate` and `record_slow_call_predicate`. An
+application that needs one of those builds that instance in code, as the rest of
+this README shows.
+
 ### See it run
 
 The crate ships a runnable demonstration that exercises all five patterns and
@@ -309,14 +422,16 @@ being enforced, and a bulkhead capping concurrency at its limit.
 | `retry` | `Retry`, `RetryConfig`, `IntervalFunction`, `ExponentialIntervalFunction`, `FixedIntervalFunction`, `RetryError`, `RetryEvent`, `RetrySnapshot` |
 | `timelimiter` | `TimeLimiter`, `TimeLimiterConfig`, `TimeLimiterError`, `TimeLimiterEvent`, `TimeLimiterSnapshot` |
 | `registry` | `ResilienceRegistry` |
+| `autoconfigure` | `ResilienceAutoConfiguration` and the `*Properties` structures a configuration file binds into. Present with the `autoconfigure` feature |
 | `decorator` | `Resilience`, `ResilienceBuilder` |
 | `clock` | `Clock`, `SystemClock`, `ManualClock` |
 | `error` | `ResilienceError` and the individual rejection errors |
 
-The attribute macros live in `next-web-resilience-macros`, a procedural macro
-crate the default `macros` feature re-exports from the root of this one. They
-share the macro namespace with the pattern modules, so `retry` names both the
-module and the attribute.
+The attribute macros are defined by the framework's `next-web-macros` crate, behind
+its `resilience` feature, and re-exported from the root of this one by the default
+`macros` feature — so this crate works on its own, without the rest of the
+framework. They share the macro namespace with the pattern modules, so `retry`
+names both the module and the attribute.
 
 ## Notes and limitations
 
@@ -343,6 +458,11 @@ module and the attribute.
 - **Events are best-effort.** The event channel drops events for a subscriber
   that falls behind, so that instrumentation can never slow down the calls it
   observes.
+- **A configured instance is registered once.** With `autoconfigure` on, a name
+  reaches the instance the properties built, whether it is asked for through the
+  registry or through the application context. Registering that name again by
+  hand does not replace it: the registry keeps the first instance and returns it,
+  so the settings stay the ones the file declared.
 
 ## License
 

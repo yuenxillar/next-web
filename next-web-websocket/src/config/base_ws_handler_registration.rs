@@ -8,6 +8,7 @@ use crate::{
 };
 
 /// That gathers all the configuration options
+#[derive(Default)]
 pub struct BaseWebSocketHandlerRegistration {
     handlers: Vec<(HashSet<String>, Arc<dyn WebSocketHandler>)>,
     interceptors: Vec<Arc<dyn HandshakeInterceptor>>,
@@ -82,12 +83,12 @@ impl WebSocketHandlerRegistration for BaseWebSocketHandlerRegistration {
         {
             Some((p, _)) => {
                 // Find an existing handler and extend its path
-                p.extend(paths.into_iter());
+                p.extend(paths);
             }
             None => {
                 //Not found, insert new handler
                 self.handlers
-                    .push((HashSet::from_iter(paths.into_iter()), handler));
+                    .push((HashSet::from_iter(paths), handler));
             }
         }
 
@@ -148,14 +149,3 @@ impl WebSocketHandlerRegistration for BaseWebSocketHandlerRegistration {
     }
 }
 
-impl Default for BaseWebSocketHandlerRegistration {
-    fn default() -> Self {
-        Self {
-            handlers: Default::default(),
-            interceptors: Default::default(),
-            allowed_origins: Default::default(),
-            allowed_origin_patterns: Default::default(),
-            sock_js_service_registration: Default::default(),
-        }
-    }
-}

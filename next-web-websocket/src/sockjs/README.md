@@ -32,7 +32,7 @@ compatibility is not guaranteed.
 sockjs/
 ├── codec/              # Message encoding/decoding
 │   ├── mod.rs         # SockJsMessageCodec trait
-│   └── jackson2.rs    # JSON codec implementation
+│   └── json_message_codec.rs  # JSON codec implementation
 ├── frame.rs           # SockJS frame protocol (o/h/a[]/c[])
 ├── heartbeat.rs       # Heartbeat mechanism
 ├── info.rs            # /info endpoint

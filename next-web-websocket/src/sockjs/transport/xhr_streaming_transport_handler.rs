@@ -63,22 +63,32 @@ impl XhrStreamingTransportHandler {
         prelude.push('\n');
         session.add_bytes_sent(prelude.len()).await;
 
+        // Claim the session's single receiver slot before the body starts
+        // streaming. A later request takes it over, which ends this stream.
+        let generation = session.begin_receive().await;
+
         let stream = stream::once(async move { Ok::<_, BoxError>(prelude) })
             .chain(stream::unfold(
-                (session.clone(), config.clone(), Instant::now()),
-                move |(session, config, last_heartbeat)| async move {
+                (session.clone(), config.clone(), Instant::now(), generation),
+                move |(session, config, last_heartbeat, generation)| async move {
                     // Drain queued close/message frames before checking the closed
                     // flag, so graceful close frames are observable by clients.
-                    let messages = session
-                        .poll_messages(config.http_message_cache_size.max(1))
-                        .await;
+                    let Some(messages) = session
+                        .poll_for_receiver(generation, config.http_message_cache_size.max(1))
+                        .await
+                    else {
+                        // Replaced by a newer receiver, whose client is the one
+                        // still listening, so end this stream without frames.
+                        debug!("XHR streaming receiver was replaced by a newer request");
+                        return None;
+                    };
                     if !messages.is_empty() {
                         session.touch().await;
                         let data = messages.join("\n") + "\n";
                         let len = data.len();
                         session.add_bytes_sent(len).await;
                         debug!("Streaming {} bytes ({} messages)", len, messages.len());
-                        return Some((Ok(data), (session, config, last_heartbeat)));
+                        return Some((Ok(data), (session, config, last_heartbeat, generation)));
                     }
 
                     if session.is_closed().await {
@@ -99,10 +109,10 @@ impl XhrStreamingTransportHandler {
                     if last_heartbeat.elapsed() >= Duration::from_millis(config.heartbeat_time) {
                         let data = "h\n".to_string();
                         session.add_bytes_sent(data.len()).await;
-                        return Some((Ok(data), (session, config, Instant::now())));
+                        return Some((Ok(data), (session, config, Instant::now(), generation)));
                     }
 
-                    Some((Ok(String::new()), (session, config, last_heartbeat)))
+                    Some((Ok(String::new()), (session, config, last_heartbeat, generation)))
                 },
             ))
             .filter(|result| {
@@ -144,9 +154,18 @@ impl TransportHandler for XhrStreamingTransportHandler {
     ) -> Result<Response, BoxError> {
         // Both GET and POST are used by SockJS XHR receivers depending on
         // transport implementation; application messages use `/xhr_send`.
-        match req.method().as_str() {
+        //
+        // The method is taken first so that the POST arm can consume the request.
+        let method = req.method().clone();
+        match method.as_str() {
             "GET" => Self::handle_stream(session, config).await,
-            "POST" => Self::handle_stream(session, config).await,
+            "POST" => {
+                // A streaming receiver's POST carries no payload, and the body was
+                // previously left unread on the connection. Reading it, bounded,
+                // leaves the request in a clean state.
+                let _ = axum::body::to_bytes(req.into_body(), 64 * 1024).await;
+                Self::handle_stream(session, config).await
+            }
             _ => {
                 let response = Response::builder()
                     .status(StatusCode::METHOD_NOT_ALLOWED)

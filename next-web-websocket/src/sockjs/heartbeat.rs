@@ -10,6 +10,12 @@ use tracing::{debug, warn};
 
 use crate::sockjs::session::SockJsSession;
 
+/// Smallest heartbeat interval honoured, in milliseconds.
+///
+/// SockJS clients ask for 25 seconds and the default matches. A floor exists so
+/// that a misconfiguration cannot produce a tick per millisecond.
+const MIN_INTERVAL_MS: u64 = 100;
+
 /// Handle for a running heartbeat task.
 ///
 /// Manages a background task that sends periodic heartbeat frames
@@ -30,7 +36,12 @@ impl HeartbeatHandle {
     ///
     /// A handle to the running heartbeat task.
     pub fn spawn(session: Arc<SockJsSession>, interval_ms: u64) -> Self {
-        let mut interval = time::interval(Duration::from_millis(interval_ms.max(1)));
+        // A floor, so that a configuration typo cannot turn this into a tick per
+        // millisecond that pushes an `h` frame just as often. The previous floor
+        // of one millisecond allowed exactly that.
+        let mut interval = time::interval(Duration::from_millis(
+            interval_ms.max(MIN_INTERVAL_MS),
+        ));
         interval.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
 
         let task = tokio::spawn(async move {
@@ -79,14 +90,14 @@ impl Drop for HeartbeatHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sockjs::{codec::Jackson2SockJsMessageCodec, session::SockJsSession};
+    use crate::sockjs::{codec::JsonSockJsMessageCodec, session::SockJsSession};
     use std::net::SocketAddr;
 
     #[tokio::test]
     async fn test_heartbeat_task() {
         let session = Arc::new(SockJsSession::new(
             "test-session".to_string(),
-            Arc::new(Jackson2SockJsMessageCodec),
+            Arc::new(JsonSockJsMessageCodec),
             "127.0.0.1:8080".parse::<SocketAddr>().unwrap(),
             axum::http::HeaderMap::new(),
         ));

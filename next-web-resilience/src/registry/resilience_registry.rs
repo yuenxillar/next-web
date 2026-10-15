@@ -5,7 +5,12 @@
 //! built per request would never reach its limit. The registry is where those
 //! shared instances live.
 
-use std::sync::{Arc, OnceLock};
+use std::sync::{
+    Arc, OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
+
+use tracing::error;
 
 use dashmap::DashMap;
 
@@ -49,6 +54,12 @@ pub struct ResilienceRegistry {
     bulkheads: DashMap<String, Arc<Bulkhead>>,
     time_limiters: DashMap<String, Arc<TimeLimiter>>,
     retries: DashMap<String, Arc<Retry>>,
+    /// Whether a name that is not registered is reported instead of being given
+    /// a default instance in silence.
+    strict_names: AtomicBool,
+    /// The names already reported by [`Self::report_undeclared`], so that a
+    /// repeated mistake is reported once rather than at request rate.
+    reported_undeclared: DashMap<String, ()>,
 }
 
 impl ResilienceRegistry {
@@ -62,6 +73,54 @@ impl ResilienceRegistry {
     /// Shorthand for [`global_registry`].
     pub fn global() -> &'static Self {
         global_registry()
+    }
+
+    /// Sets whether a name that is not registered is refused rather than given a
+    /// default instance.
+    ///
+    /// The `*_or_default` methods are what `name = "..."` on the attribute macros
+    /// resolves through. Defaulting a name nobody configured means running with
+    /// settings nobody chose — a limit of fifty a second where the file said five
+    /// — and nothing says so. The `autoconfigure` feature turns this on when a
+    /// configuration file declares instances, so a name the file does not declare
+    /// is reported instead.
+    ///
+    /// Turn it back off if an application deliberately mixes configured instances
+    /// with ad-hoc names.
+    pub fn set_strict_names(&self, strict: bool) {
+        self.strict_names.store(strict, Ordering::Release);
+    }
+
+    /// Returns whether an unregistered name is refused instead of defaulted.
+    pub fn is_strict_names(&self) -> bool {
+        self.strict_names.load(Ordering::Acquire)
+    }
+
+    /// Reports a name that had to be configured but is not.
+    ///
+    /// Reported **once per name**: this runs on the guarded call path, so
+    /// repeating it would log at request rate.
+    ///
+    /// The call is **not** refused. A resilience library that took an endpoint
+    /// down over a misspelled name would be causing the outage it exists to
+    /// prevent, so the caller gets the defaults — which is wrong, but wrong in a
+    /// way the log says out loud and the service survives. Refusing the call
+    /// instead is not expressible here: a factory has to return an instance.
+    fn report_undeclared(&self, pattern: &str, name: &str, registered: &[String]) {
+        if self
+            .reported_undeclared
+            .insert(name.to_owned(), ())
+            .is_some()
+        {
+            return;
+        }
+
+        error!(
+            "no {pattern} named {name:?} is registered, so the defaults are in use. A \
+             configuration file that declares instances does not have names defaulted: names in \
+             the file are used exactly as written, so check the spelling. Registered: \
+             {registered:?}"
+        );
     }
 
     // -- circuit breakers -------------------------------------------------
@@ -80,7 +139,35 @@ impl ResilienceRegistry {
     /// Returns the circuit breaker called `name`, creating it with the default
     /// configuration on first use.
     pub fn circuit_breaker_or_default(&self, name: &str) -> Arc<CircuitBreaker> {
+        if self.is_strict_names() {
+            return self.find_circuit_breaker(name).unwrap_or_else(|| {
+                self.report_undeclared(
+                    "circuit breaker",
+                    name,
+                    &self.circuit_breaker_names(),
+                );
+                self.circuit_breaker(name, CircuitBreakerConfig::default)
+            });
+        }
+
         self.circuit_breaker(name, CircuitBreakerConfig::default)
+    }
+
+    /// Registers a breaker that was built elsewhere, or returns the instance
+    /// already registered under `name`.
+    ///
+    /// Used when the configuration comes from the application's properties rather
+    /// than from a factory call, so that the instance the registry hands out is
+    /// the very one that was configured.
+    pub fn register_circuit_breaker(
+        &self,
+        name: &str,
+        breaker: Arc<CircuitBreaker>,
+    ) -> Arc<CircuitBreaker> {
+        self.circuit_breakers
+            .entry(name.to_owned())
+            .or_insert(breaker)
+            .clone()
     }
 
     /// Returns the circuit breaker called `name` if it is registered.
@@ -112,6 +199,13 @@ impl ResilienceRegistry {
     /// Returns the rate limiter called `name`, creating it with the default
     /// configuration on first use.
     pub fn rate_limiter_or_default(&self, name: &str) -> Arc<RateLimiter> {
+        if self.is_strict_names() {
+            return self.find_rate_limiter(name).unwrap_or_else(|| {
+                self.report_undeclared("rate limiter", name, &self.rate_limiter_names());
+                self.rate_limiter(name, RateLimiterConfig::default)
+            });
+        }
+
         self.rate_limiter(name, RateLimiterConfig::default)
     }
 
@@ -182,7 +276,23 @@ impl ResilienceRegistry {
     /// Returns the bulkhead called `name`, creating it with the default
     /// configuration on first use.
     pub fn bulkhead_or_default(&self, name: &str) -> Arc<Bulkhead> {
+        if self.is_strict_names() {
+            return self.find_bulkhead(name).unwrap_or_else(|| {
+                self.report_undeclared("bulkhead", name, &self.bulkhead_names());
+                self.bulkhead(name, BulkheadConfig::default)
+            });
+        }
+
         self.bulkhead(name, BulkheadConfig::default)
+    }
+
+    /// Registers a bulkhead that was built elsewhere, or returns the instance
+    /// already registered under `name`.
+    pub fn register_bulkhead(&self, name: &str, bulkhead: Arc<Bulkhead>) -> Arc<Bulkhead> {
+        self.bulkheads
+            .entry(name.to_owned())
+            .or_insert(bulkhead)
+            .clone()
     }
 
     /// Returns the bulkhead called `name` if it is registered.
@@ -216,7 +326,27 @@ impl ResilienceRegistry {
     /// Returns the time limiter called `name`, creating it with the default
     /// configuration on first use.
     pub fn time_limiter_or_default(&self, name: &str) -> Arc<TimeLimiter> {
+        if self.is_strict_names() {
+            return self.find_time_limiter(name).unwrap_or_else(|| {
+                self.report_undeclared("time limiter", name, &self.time_limiter_names());
+                self.time_limiter(name, TimeLimiterConfig::default)
+            });
+        }
+
         self.time_limiter(name, TimeLimiterConfig::default)
+    }
+
+    /// Registers a time limiter that was built elsewhere, or returns the instance
+    /// already registered under `name`.
+    pub fn register_time_limiter(
+        &self,
+        name: &str,
+        limiter: Arc<TimeLimiter>,
+    ) -> Arc<TimeLimiter> {
+        self.time_limiters
+            .entry(name.to_owned())
+            .or_insert(limiter)
+            .clone()
     }
 
     /// Returns the time limiter called `name` if it is registered.
@@ -248,7 +378,23 @@ impl ResilienceRegistry {
     /// Returns the retry called `name`, creating it with the default
     /// configuration on first use.
     pub fn retry_or_default(&self, name: &str) -> Arc<Retry> {
+        if self.is_strict_names() {
+            return self.find_retry(name).unwrap_or_else(|| {
+                self.report_undeclared("retry", name, &self.retry_names());
+                self.retry(name, RetryConfig::default)
+            });
+        }
+
         self.retry(name, RetryConfig::default)
+    }
+
+    /// Registers a retry that was built elsewhere, or returns the instance
+    /// already registered under `name`.
+    pub fn register_retry(&self, name: &str, retry: Arc<Retry>) -> Arc<Retry> {
+        self.retries
+            .entry(name.to_owned())
+            .or_insert(retry)
+            .clone()
     }
 
     /// Returns the retry called `name` if it is registered.

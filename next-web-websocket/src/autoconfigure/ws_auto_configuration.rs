@@ -105,7 +105,10 @@ impl WebsocketApplyRouter {
             .fold(Router::new(), |router, path| {
                 router.route(path.as_str(), any(websocket_handle))
             })
-            .with_state(Arc::new(std::mem::take(&mut self.ws_context)));
+            // Cloned rather than taken. Taking it consumed the context, so a
+            // router built a second time would have had no handlers, no
+            // interceptors and default properties.
+            .with_state(Arc::new(self.ws_context.clone()));
 
         self.sockjs_services
             .iter()
@@ -708,5 +711,362 @@ mod tests {
 
         client.close(None).await.unwrap();
         server.abort();
+    }
+
+    /// Reports the handshake attributes it was given, so a test can see them.
+    struct AttributeEcho;
+
+    #[async_trait]
+    impl WebSocketHandler for AttributeEcho {
+        async fn on_open(
+            &self,
+            session: &crate::server::support::ws_session::WebSocketSession,
+        ) -> WSResult<()> {
+            let value = session
+                .attribute("principal")
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "<missing>".to_owned());
+            // The payload only: the SockJS layer wraps it into an `a[...]` frame.
+            session
+                .send_message(Message::Text(format!("principal: {value}").into()))
+                .await
+                .map_err(|error| format!("failed to report the attribute: {error:?}"))?;
+            Ok(())
+        }
+
+        async fn on_message(
+            &self,
+            _session: &crate::server::support::ws_session::WebSocketSession,
+            _message: Message,
+        ) -> WSResult<()> {
+            Ok(())
+        }
+
+        async fn on_error(
+            &self,
+            _session: &crate::server::support::ws_session::WebSocketSession,
+            _error: Box<dyn Error + Send + Sync>,
+        ) -> WSResult<()> {
+            Ok(())
+        }
+
+        async fn on_close(
+            &self,
+            _session: &crate::server::support::ws_session::WebSocketSession,
+            _close: Option<CloseFrame>,
+        ) -> WSResult<()> {
+            Ok(())
+        }
+    }
+
+    struct AttributeSetter;
+
+    #[async_trait]
+    impl HandshakeInterceptor for AttributeSetter {
+        async fn before_handshake(
+            &self,
+            _request: &mut dyn next_web_core::traits::http::http_request::HttpRequest,
+            _response: &mut dyn HttpResponse,
+            attributes: &mut HashMap<String, AnyValue>,
+        ) -> Result<bool, BoxError> {
+            attributes.insert("principal".to_owned(), AnyValue::from("alice"));
+            Ok(true)
+        }
+    }
+
+    #[tokio::test]
+    async fn sockjs_hands_the_handshake_attributes_to_the_handler() {
+        let mut registry = DefaultWebSocketHandlerRegistry::default();
+        registry
+            .add_handler(Arc::new(AttributeEcho), vec!["/events".to_string()])
+            .with_sock_js()
+            .set_heartbeat_time(30);
+        let interceptors: Vec<Arc<dyn HandshakeInterceptor>> = vec![Arc::new(AttributeSetter)];
+        let sockjs_services = registry.sockjs_services(&interceptors);
+        let ws_context = WebSocketContext::new(
+            WebSocketProperties::default(),
+            registry.handler_mapping(),
+            Vec::<Arc<dyn HandshakeInterceptor>>::new(),
+        );
+        let mut apply_router = WebsocketApplyRouter {
+            ws_context,
+            sockjs_services,
+        };
+        let app = apply_router.build_router();
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        let url = format!("ws://{address}/events/000/session-attributes/websocket");
+        let (mut client, _) = tokio_tungstenite::connect_async(url).await.unwrap();
+
+        // Read past the open frame and any heartbeat that arrives first.
+        let mut reported = None;
+        for _ in 0..12 {
+            let frame = tokio::time::timeout(std::time::Duration::from_secs(3), client.next())
+                .await
+                .expect("a frame arrives")
+                .expect("the stream is open")
+                .expect("the frame is not an error");
+            let Ok(text) = frame.into_text() else {
+                continue;
+            };
+            if text.starts_with("a[") {
+                reported = Some(text);
+                break;
+            }
+        }
+
+        // Before the attributes were threaded through the SockJS service, the
+        // map the interceptor filled was dropped when the request ended and the
+        // handler saw nothing.
+        assert_eq!(reported.as_deref(), Some("a[\"principal: alice\"]"));
+
+        client.close(None).await.unwrap();
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn sockjs_a_new_receiver_replaces_the_one_that_was_waiting() {
+        let mut registry = DefaultWebSocketHandlerRegistry::default();
+        registry
+            .add_handler(Arc::new(TestHandler), vec!["/events".to_string()])
+            .with_sock_js()
+            .set_websocket_enabled(false)
+            // Far longer than the test waits, so a poll that ends early can only
+            // have ended because it was replaced.
+            .set_heartbeat_time(10_000);
+        let sockjs_services = registry.sockjs_services(&[]);
+        let ws_context = WebSocketContext::new(
+            WebSocketProperties::default(),
+            registry.handler_mapping(),
+            Vec::<Arc<dyn HandshakeInterceptor>>::new(),
+        );
+        let mut apply_router = WebsocketApplyRouter {
+            ws_context,
+            sockjs_services,
+        };
+        let app = apply_router.build_router();
+
+        let poll = |app: axum::Router| {
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/events/000/session-takeover/xhr")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+        };
+
+        // The first poll drains what `on_open` queued, so the next one really has
+        // to wait.
+        let initial = poll(app.clone()).await.unwrap();
+        assert_eq!(initial.status(), StatusCode::OK);
+        to_bytes(initial.into_body(), usize::MAX).await.unwrap();
+
+        // Reading the body is what starts the wait and claims the receiver slot.
+        let waiting = poll(app.clone()).await.unwrap();
+        assert_eq!(waiting.status(), StatusCode::OK);
+        let waiting_body =
+            tokio::spawn(async move { to_bytes(waiting.into_body(), usize::MAX).await.unwrap() });
+
+        // Let it claim the slot before the replacement arrives.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // A second receiver takes the session over. Its own body has to be driven
+        // for that to happen, so it is left waiting and dropped at the end.
+        let replacement = poll(app.clone()).await.unwrap();
+        assert_eq!(replacement.status(), StatusCode::OK);
+        let replacement_body =
+            tokio::spawn(async move { to_bytes(replacement.into_body(), usize::MAX).await });
+
+        let replaced = tokio::time::timeout(std::time::Duration::from_secs(1), waiting_body)
+            .await
+            .expect("the replaced receiver should end as soon as it is taken over")
+            .unwrap();
+
+        // And it sends nothing: the client that opened it has already moved on to
+        // the replacement, and the replacement will deliver the frames.
+        assert!(
+            replaced.is_empty(),
+            "the replaced receiver sent {replaced:?}"
+        );
+
+        replacement_body.abort();
+    }
+
+    #[tokio::test]
+    async fn sockjs_an_unregistered_transport_creates_no_session() {
+        let mut registry = DefaultWebSocketHandlerRegistry::default();
+        registry
+            .add_handler(Arc::new(TestHandler), vec!["/events".to_string()])
+            .with_sock_js()
+            .set_websocket_enabled(false);
+
+        let services = registry.sockjs_services(&[]);
+        let (_, service) = services.first().expect("a SockJS service was built");
+
+        // `eventsource` is parsed out of the URL but no handler is registered for
+        // it. Answering 404 is right; creating the session first and then
+        // answering 404 left one behind for the sweep on every such request.
+        let response = service
+            .handle_request(
+                Request::builder()
+                    .method("POST")
+                    .uri("/events/000/never-created/eventsource")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert!(
+            service.get_session("never-created").is_none(),
+            "an unregistered transport must not leave a session behind"
+        );
+    }
+
+    #[tokio::test]
+    async fn sockjs_reconnecting_a_session_replaces_the_socket_it_had() {
+        let mut registry = DefaultWebSocketHandlerRegistry::default();
+        registry
+            .add_handler(Arc::new(TestHandler), vec!["/events".to_string()])
+            .with_sock_js()
+            .set_heartbeat_time(30);
+        let sockjs_services = registry.sockjs_services(&[]);
+        let ws_context = WebSocketContext::new(
+            WebSocketProperties::default(),
+            registry.handler_mapping(),
+            Vec::<Arc<dyn HandshakeInterceptor>>::new(),
+        );
+        let mut apply_router = WebsocketApplyRouter {
+            ws_context,
+            sockjs_services,
+        };
+        let app = apply_router.build_router();
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        let url = format!("ws://{address}/events/000/session-reconnect/websocket");
+        let (mut first, _) = tokio_tungstenite::connect_async(url.clone())
+            .await
+            .expect("the first connection succeeds");
+        let open = tokio::time::timeout(std::time::Duration::from_secs(3), first.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(open.into_text().unwrap(), "o");
+
+        // The same id, as a client that reconnects or switches transport does. The
+        // second connection must be usable: it used to be closed without ever
+        // sending `o`, because the session counted as already opened.
+        let (mut second, _) = tokio_tungstenite::connect_async(url)
+            .await
+            .expect("the reconnect succeeds");
+
+        match tokio::time::timeout(std::time::Duration::from_millis(300), second.next()).await {
+            // A heartbeat or a queued frame: it is alive and being served.
+            Ok(Some(Ok(tokio_tungstenite::tungstenite::Message::Close(_)))) => {
+                panic!("the reconnected socket was closed")
+            }
+            Ok(Some(Ok(_))) | Err(_) => {}
+            Ok(Some(Err(error))) => panic!("the reconnected socket errored: {error}"),
+            Ok(None) => panic!("the reconnected socket ended"),
+        }
+
+        // And the socket it replaced is told, rather than left running with
+        // nobody writing to it.
+        let closed = tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            loop {
+                match first.next().await {
+                    Some(Ok(tokio_tungstenite::tungstenite::Message::Close(_))) | None => break,
+                    Some(Ok(_)) => continue,
+                    Some(Err(_)) => break,
+                }
+            }
+        })
+        .await;
+        assert!(
+            closed.is_ok(),
+            "the replaced socket was left open instead of being closed"
+        );
+
+        server.abort();
+    }
+
+    /// Takes the identity from a header, the way an application's authentication
+    /// interceptor would.
+    struct IdentityFromHeader;
+
+    #[async_trait]
+    impl HandshakeInterceptor for IdentityFromHeader {
+        async fn before_handshake(
+            &self,
+            request: &mut dyn next_web_core::traits::http::http_request::HttpRequest,
+            _response: &mut dyn HttpResponse,
+            attributes: &mut HashMap<String, AnyValue>,
+        ) -> Result<bool, BoxError> {
+            if let Some(user) = request.header("x-user") {
+                attributes.insert(
+                    crate::SESSION_IDENTITY_ATTRIBUTE.to_owned(),
+                    AnyValue::from(user),
+                );
+            }
+            Ok(true)
+        }
+    }
+
+    #[tokio::test]
+    async fn sockjs_a_session_is_used_only_by_the_identity_that_created_it() {
+        let mut registry = DefaultWebSocketHandlerRegistry::default();
+        registry
+            .add_handler(Arc::new(TestHandler), vec!["/events".to_string()])
+            // Before `with_sock_js()`, which copies the interceptors at the moment
+            // it is called.
+            .add_interceptors(vec![Arc::new(IdentityFromHeader)])
+            .with_sock_js()
+            .set_websocket_enabled(false)
+            .set_heartbeat_time(10_000)
+            .set_session_identity_attribute(crate::SESSION_IDENTITY_ATTRIBUTE);
+        let sockjs_services = registry.sockjs_services(&[]);
+        let (_, service) = sockjs_services.first().expect("a SockJS service was built");
+
+        let poll = |user: Option<&str>| {
+            let mut request = Request::builder()
+                .method("POST")
+                .uri("/events/000/session-identity/xhr");
+            if let Some(user) = user {
+                request = request.header("x-user", user);
+            }
+            request.body(Body::empty()).unwrap()
+        };
+
+        // The first request creates the session, and therefore owns it.
+        let created = service.handle_request(poll(Some("alice"))).await.unwrap();
+        assert_eq!(created.status(), StatusCode::OK);
+
+        // A different identity on the same session id is refused, and the session
+        // is left alone for its owner rather than handed over.
+        let other = service.handle_request(poll(Some("bob"))).await.unwrap();
+        assert_eq!(other.status(), StatusCode::NOT_FOUND);
+        assert!(service.get_session("session-identity").is_some());
+
+        // The owner still gets in.
+        let again = service.handle_request(poll(Some("alice"))).await.unwrap();
+        assert_eq!(again.status(), StatusCode::OK);
+
+        // So does a request presenting no identity at all? No: the session was
+        // identified, so an unidentified request is somebody else.
+        let anonymous = service.handle_request(poll(None)).await.unwrap();
+        assert_eq!(anonymous.status(), StatusCode::NOT_FOUND);
     }
 }

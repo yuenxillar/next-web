@@ -25,6 +25,9 @@ impl DefaultSockJsService {
     /// # Returns
     ///
     /// A configured `TransportHandlingSockJsService` with default handlers.
+    // The name is deliberate: this is a factory, not a service, and it returns the
+    // transport-handling service it builds.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(config: SockJsServiceConfig) -> TransportHandlingSockJsService {
         let mut transport_handlers: HashMap<TransportType, Arc<dyn TransportHandler>> =
             HashMap::new();

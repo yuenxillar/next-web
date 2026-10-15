@@ -68,9 +68,23 @@ impl CorsConfiguration {
             return true;
         }
 
+        // Then the same comparison in a normalised shape. Comparing raw strings
+        // rejects origins that name the same place, because the host is
+        // case-insensitive and the port is implied by the scheme: a configured
+        // `https://example.com` should accept a header of `https://EXAMPLE.com`
+        // or `https://example.com:443`.
+        if let Some(origin) = parse_origin(origin)
+            && self
+                .allowed_origins
+                .iter()
+                .any(|allowed| parse_origin(allowed).is_some_and(|allowed| allowed == origin))
+        {
+            return true;
+        }
+
         self.allowed_origin_patterns
             .iter()
-            .any(|pattern| wildcard_match(origin, pattern))
+            .any(|pattern| origin_pattern_matches(origin, pattern))
     }
 }
 
@@ -245,7 +259,59 @@ fn first_forwarded_value(value: Option<&str>) -> Option<&str> {
         .filter(|value| !value.is_empty())
 }
 
-fn wildcard_match(value: &str, pattern: &str) -> bool {
+/// Matches an `Origin` against a configured pattern such as
+/// `https://*.example.com` or `http://localhost:*`.
+///
+/// The wildcard is applied to the **host**, never to the whole origin. Matching
+/// the whole string, as this used to, let `https://*.example.com` be satisfied
+/// by `https://evil.com/api.example.com` — the `.example.com` appeared in the
+/// path, not in the host, so the pattern admitted an origin it was never meant
+/// to. The scheme and port are compared as whole components.
+///
+/// A pattern is `[scheme://]host[:port]`, where the scheme may be `*` or absent
+/// to accept any, the host may contain `*`, and the port may be `*` or absent to
+/// accept any. A bare `*` accepts everything.
+fn origin_pattern_matches(origin: &str, pattern: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+
+    // An origin that does not parse has no host to match on, so it can only be
+    // named literally.
+    let Some((origin_scheme, origin_host, origin_port)) = parse_origin(origin) else {
+        return origin == pattern;
+    };
+
+    let (pattern_scheme, pattern_authority) = match pattern.split_once("://") {
+        Some((scheme, authority)) => (scheme, authority),
+        None => ("*", pattern),
+    };
+    if pattern_scheme != "*" && canonical_scheme(pattern_scheme) != origin_scheme.as_str() {
+        return false;
+    }
+
+    let (pattern_host, pattern_port) = match pattern_authority.rsplit_once(':') {
+        Some((host, port)) => (host, Some(port)),
+        None => (pattern_authority, None),
+    };
+    if let Some(pattern_port) = pattern_port
+        && pattern_port != "*"
+    {
+        let Ok(pattern_port) = pattern_port.parse::<u16>() else {
+            return false;
+        };
+        if pattern_port != origin_port {
+            return false;
+        }
+    }
+
+    wildcard_host_match(&origin_host, pattern_host)
+}
+
+/// Matches a host against a pattern in which `*` stands for any run of
+/// characters. Only ever called with a bare host, and a pattern's `*:*` reaches
+/// here as the host `*` because the port is split off first.
+fn wildcard_host_match(value: &str, pattern: &str) -> bool {
     if pattern == "*" {
         return true;
     }
@@ -298,5 +364,57 @@ mod tests {
 
         assert!(config.check_origin(Some("https://api.example.com")));
         assert!(!config.check_origin(Some("https://api.example.org")));
+    }
+
+    #[test]
+    fn a_wildcard_pattern_matches_the_host_and_nothing_else() {
+        let config = CorsConfiguration::new()
+            .set_allowed_origin_patterns(vec!["https://*.example.com".to_string()]);
+
+        // The suffix appears in the path, not in the host, so this is not the
+        // subdomain the pattern was written for. Matching the whole origin string
+        // used to accept all three of these.
+        assert!(!config.check_origin(Some("https://evil.com/api.example.com")));
+        assert!(!config.check_origin(Some("https://evil.com?x=.example.com")));
+        assert!(!config.check_origin(Some("https://evil.com#.example.com")));
+
+        // A deeper subdomain is still allowed, and case does not matter.
+        assert!(config.check_origin(Some("https://a.b.example.com")));
+        assert!(config.check_origin(Some("https://API.example.com")));
+    }
+
+    #[test]
+    fn the_scheme_and_the_port_are_matched_as_whole_components() {
+        let config = CorsConfiguration::new()
+            .set_allowed_origin_patterns(vec!["https://*.example.com".to_string()]);
+
+        assert!(!config.check_origin(Some("http://api.example.com")));
+        // No port in the pattern accepts any port on an allowed host.
+        assert!(config.check_origin(Some("https://api.example.com:8443")));
+        assert!(!config.check_origin(Some("https://api.example.com.evil.com")));
+
+        let with_port = CorsConfiguration::new()
+            .set_allowed_origin_patterns(vec!["https://*.example.com:8443".to_string()]);
+        assert!(with_port.check_origin(Some("https://api.example.com:8443")));
+        assert!(!with_port.check_origin(Some("https://api.example.com:9443")));
+
+        let any_port = CorsConfiguration::new()
+            .set_allowed_origin_patterns(vec!["http://localhost:*".to_string()]);
+        assert!(any_port.check_origin(Some("http://localhost:3000")));
+        assert!(!any_port.check_origin(Some("http://localhost.evil.com:3000")));
+    }
+
+    #[test]
+    fn a_port_wildcard_does_not_widen_the_host() {
+        // `*:*` used to match any origin containing a colon, because the trailing
+        // wildcard was satisfied by an empty remainder. It is a deliberate
+        // allow-everything pattern, and a bare `*` says that more clearly.
+        let universal = CorsConfiguration::new().set_allowed_origin_patterns(vec!["*".to_string()]);
+        assert!(universal.check_origin(Some("https://evil.com:9999")));
+
+        let host_only = CorsConfiguration::new()
+            .set_allowed_origin_patterns(vec!["https://*".to_string()]);
+        assert!(host_only.check_origin(Some("https://anything.test")));
+        assert!(!host_only.check_origin(Some("http://anything.test")));
     }
 }

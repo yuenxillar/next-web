@@ -119,10 +119,10 @@ let close = SockJsFrame::Close {                           // ✅ c[3000,"reason
 ```rust
 use next_web_websocket::sockjs::codec::{
     SockJsMessageCodec,
-    Jackson2SockJsMessageCodec
+    JsonSockJsMessageCodec
 };
 
-let codec = Jackson2SockJsMessageCodec;
+let codec = JsonSockJsMessageCodec;
 
 // 编码
 let encoded = codec.encode(&SockJsFrame::Open)?;           // ✅ "o"

@@ -37,49 +37,13 @@ members = [
 exclude = ["next-web-code-generator"]
 resolver = "2"
 
-[workspace.package]
-rust-version = "1.98.1"
-edition = "2024"
-version = "0.1.0"
-authors = ["Listening <yuenxillar@163.com>"]
-keywords = ["http", "web", "framework"]
-license = "MIT OR Apache-2.0"
-readme = "README.md"
-homepage = "https://crates.io/crates/next-web"
-repository = "https://github.com/yuenxillar/next-web"
-include = ["**/*.rs", "Cargo.toml"]
-
-[workspace.lints.rust]
-unsafe_code = "forbid"
-
-rust_2018_idioms = { level = "warn", priority = -1 }
-missing_docs = "warn"
-unreachable_pub = "warn"
-
-
-[workspace.lints.clippy]
-await_holding_lock = "warn"
-if_let_mutex = "warn"
-mem_forget = "warn"
-enum_glob_use = "warn"
-macro_use_imports = "warn"
-match_same_arms = "warn"
-single_match_else = "warn"
-implicit_clone = "warn"
-redundant_clone = "warn"
-inefficient_to_string = "warn"
-str_to_string = "warn"
-uninlined_format_args = "warn"
-option_option = "warn"
-todo = "warn"
-
 [workspace.dependencies]
 # next dependencies
-next-web-core               = { path = "./next-web-core"            }
-next-web-context            = { path = "./next-web-context"         }
-next-web-singletons         = { path = "./next-web-singletons"      }
-next-web-util               = { path = "./next-web-util"            }
-next-web-macros             = { path = "./next-web-macros"          }
+next-web-core               = { path = "./next-web-core"   ,    version = "0.2.0"   }
+next-web-context            = { path = "./next-web-context",    version = "0.2.0"   }
+next-web-singletons         = { path = "./next-web-singletons", version = "0.2.0"   }
+next-web-util               = { path = "./next-web-util"    }
+next-web-macros             = { path = "./next-web-macros",     version =   "0.2.1" }
 next-web-resilience         = { path = "./next-web-resilience"      }
 next-web-retry              = { path = "./next-web-retry"           }
 next-web-security           = { path = "./next-web-security"        }
@@ -90,8 +54,10 @@ next-web-websocket          = { path = "./next-web-websocket"       }
 # main dependencies
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
 tokio-util = { version = "0.7.15" }
+tokio-tungstenite = {version = "0.30.0" }
 async-stream = { version = "0.3.6" }
 axum = { version = "0.8.4" }
+tower = { version = "0.5.2", default-features = false }
 tower-http = { version = "0.6.8" }
 axum-prometheus = { version = "0.7.0" }
 axum-core = { version = "0.5.2" }
@@ -228,6 +194,42 @@ tracing-subscriber = { version = "0.3.0", features = [
 ] }
 tera = { version = "2.4.0" }
 
+
+[workspace.package]
+rust-version = "1.98.1"
+edition = "2024"
+version = "0.2.0"
+authors = ["Listening <yuenxillar@163.com>"]
+keywords = ["http", "web", "framework"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+homepage = "https://crates.io/crates/next-web"
+repository = "https://github.com/yuenxillar/next-web"
+include = ["**/*.rs", "Cargo.toml"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+rust_2018_idioms = { level = "warn", priority = -1 }
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+
+[workspace.lints.clippy]
+await_holding_lock = "warn"
+if_let_mutex = "warn"
+mem_forget = "warn"
+enum_glob_use = "warn"
+macro_use_imports = "warn"
+match_same_arms = "warn"
+single_match_else = "warn"
+implicit_clone = "warn"
+redundant_clone = "warn"
+inefficient_to_string = "warn"
+str_to_string = "warn"
+uninlined_format_args = "warn"
+option_option = "warn"
+todo = "warn"
 
 [profile.release]
 codegen-units = 1

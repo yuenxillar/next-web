@@ -38,6 +38,7 @@ use reqwest::StatusCode;
 use tokio::sync::RwLock;
 use tracing::{Level, enabled};
 
+use crate::manager::background_service_manager::BackgroundServiceManager;
 use crate::{
     ApplicationArguments, ApplicationBannerPrinter, ApplicationContextFactory,
     ApplicationContextInitializer, ApplicationEnvironment, ApplicationEventHandler,
@@ -120,10 +121,12 @@ where
     /// Returns the background services the application contributes.
     ///
     /// A background service is a long-running task that runs next to the web
-    /// server, for example a scheduler, a message consumer, or a maintenance
-    /// job. The default implementation returns an empty collection, so an
-    /// application that contributes no service does not have to implement the
-    /// method.
+    /// server, for example a UDP listener, a message consumer, or a maintenance
+    /// worker. The framework registers and starts these services before it
+    /// binds the web server, checks their health periodically, restarts a
+    /// service whose task exits or reports unhealthy, and shuts them down
+    /// through [`APPLICATION_SHUTDOWN_HOOK`] when the application stops. The
+    /// default implementation returns an empty collection.
     ///
     /// # Arguments
     ///
@@ -369,15 +372,12 @@ where
         use futures::FutureExt;
 
         let future = async {
-            let mut startup = StandardStartup::default();
-            if self.properties.is_register_shutdown_hook() {
-                APPLICATION_SHUTDOWN_HOOK
-                    .set(ApplicationShutdownHook::default())
-                    .ok();
-            }
-            self.send_event(|handlers| handlers.starting(std::any::type_name::<T>()));
+            APPLICATION_SHUTDOWN_HOOK.get_or_init(|| Default::default());
 
             // Start
+            let mut startup = StandardStartup::default();
+            self.send_event(|handlers| handlers.starting(std::any::type_name::<T>()));
+
             let application_arguments = DefaultApplicationArguments::new(std::env::args());
             let environment = self.prepare_environment(&application_arguments);
             let _ = self.print_banner(environment.as_ref());
@@ -451,6 +451,10 @@ where
             self.preload_handler_singletons(ctx.as_mut()).await?;
         }
 
+        let background_services = self.application.background_services(ctx.as_mut());
+        self.start_background_services(ctx.as_mut(), background_services)
+            .await?;
+
         router = self.apply_routers(ctx.as_mut(), router)?;
         router = self.add_layers(ctx.as_mut(), router);
         router = self.add_state(ctx, router);
@@ -475,6 +479,67 @@ where
 
         let mut web_server = WebServer::new(socket_addr, router);
         web_server.run().await?;
+
+        Ok(())
+    }
+
+    /// Starts the given background services.
+    ///
+    /// This method merges the provided `services` with any additional
+    /// `BackgroundService` instances resolved from the application context,
+    /// registers them all with a newly created `BackgroundServiceManager`,
+    /// starts them together, and finally stores the manager as a singleton
+    /// in the context.
+    ///
+    /// If the combined service list is empty, it returns successfully
+    /// without doing anything.
+    ///
+    /// # Arguments
+    /// - `ctx`: The application context, used to resolve additional background
+    ///   services and to register the manager as a singleton.
+    /// - `services`: The list of background services to start, each passed as an
+    ///   `Arc<dyn BackgroundService>`. Additional services of the same type are
+    ///   appended from the context.
+    ///
+    /// # Returns
+    /// - `Ok(())`: All services were successfully registered, started, and the
+    ///   manager was stored in the context.
+    /// - `Err(_)`: An error occurred during registration or startup, and is
+    ///   returned early.
+    ///
+    /// # Errors
+    /// This function returns an error if `manager.register` fails for any service,
+    /// or if any result returned by `manager.start_all` contains an error. In both
+    /// cases, the error is propagated upward via the `?` operator.
+    ///
+    /// # Notes
+    /// - Services resolved from `ctx` are appended after the explicitly provided
+    ///   ones, so the final start order follows the combined list.
+    /// - The manager is only inserted into the context after all services have
+    ///   started successfully.
+    async fn start_background_services(
+        &self,
+        ctx: &mut dyn ConfigurableApplicationContext,
+        mut services: Vec<Arc<dyn BackgroundService>>,
+    ) -> ApplicationResult<()> {
+        // Register all background services
+        services.extend(ctx.resolve_by_type::<Arc<dyn BackgroundService>>());
+
+        if services.is_empty() {
+            return Ok(());
+        }
+
+        let background_service_manager = BackgroundServiceManager::new();
+
+        for service in services {
+            background_service_manager.register(service).await?;
+        }
+
+        for started_result in background_service_manager.start_all().await {
+            started_result.result?;
+        }
+
+        ctx.insert_singleton_with_default_name(background_service_manager);
 
         Ok(())
     }
@@ -1008,6 +1073,7 @@ where
 
         if let Some(shutdown_hook) = APPLICATION_SHUTDOWN_HOOK.get() {
             shutdown_hook.shutdown().await;
+            shutdown_hook.wait_for_completion().await;
         }
 
         // Exit the process with a non-zero status code to indicate failure.

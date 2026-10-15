@@ -218,6 +218,9 @@ async fn start_application() -> DefaultApplicationContext {
 
     let mut context = DefaultApplicationContext::default();
     context.set_environment(Arc::new(environment));
+    // The refresh reads this back, and `NextWebApplication` registers it while
+    // preparing the context, before refreshing it.
+    context.insert_singleton_with_name(false, "mainAllowOverride");
     context.refresh().expect("the context refreshes");
 
     // The condition of the configuration class of the test reads this

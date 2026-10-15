@@ -37,10 +37,26 @@ impl SockJsInfo {
     /// * `websocket_enabled` - Whether WebSocket transport is available
     /// * `cookie_needed` - Whether session cookies are required
     pub fn new(websocket_enabled: bool, cookie_needed: bool) -> Self {
+        Self::with_origins(websocket_enabled, cookie_needed, vec!["*:*".to_string()])
+    }
+
+    /// Creates a new SockJS info response that reports the origins the server
+    /// actually accepts.
+    ///
+    /// # Arguments
+    ///
+    /// * `websocket_enabled` - Whether WebSocket transport is available
+    /// * `cookie_needed` - Whether session cookies are required
+    /// * `origins` - The accepted origins; `["*:*"]` means "any"
+    pub fn with_origins(
+        websocket_enabled: bool,
+        cookie_needed: bool,
+        origins: Vec<String>,
+    ) -> Self {
         Self {
             websocket: websocket_enabled,
             cookie_needed,
-            origins: vec!["*:*".to_string()],
+            origins,
             entropy: rand::random(),
         }
     }

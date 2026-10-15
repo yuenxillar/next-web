@@ -33,6 +33,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use futures::FutureExt;
+use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
 /// A boxed, owned future produced by a shutdown hook.
@@ -50,6 +51,9 @@ struct ApplicationShutdownHookInner {
     next_id: AtomicUsize,
     /// Guards against running the callbacks more than once.
     triggered: AtomicBool,
+    /// Signals callers waiting for the first shutdown pass to finish.
+    completed: AtomicBool,
+    completion: Notify,
 }
 
 /// Coordinates application shutdown across multiple registered hooks.
@@ -232,7 +236,10 @@ impl ApplicationShutdownHook {
         };
 
         for (id, callback) in callbacks {
-            if let Err(payload) = AssertUnwindSafe(callback()).catch_unwind().await {
+            if let Err(payload) = AssertUnwindSafe(async { callback().await })
+                .catch_unwind()
+                .await
+            {
                 let message = payload
                     .downcast_ref::<&str>()
                     .map(|value| (*value).to_string())
@@ -244,6 +251,31 @@ impl ApplicationShutdownHook {
                     "application shutdown hook panicked: {message}"
                 );
             }
+        }
+
+        self.inner.completed.store(true, Ordering::SeqCst);
+        self.inner.completion.notify_waiters();
+    }
+
+    /// Waits until the callback pass started by [`Self::shutdown`] finishes.
+    ///
+    /// This is useful to coordinate other shutdown paths that only observed
+    /// the cancellation token.
+    pub async fn wait_for_completion(&self) {
+        if !self.inner.triggered.load(Ordering::SeqCst) {
+            return;
+        }
+
+        loop {
+            let notified = self.inner.completion.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+
+            if self.inner.completed.load(Ordering::SeqCst) {
+                return;
+            }
+
+            notified.await;
         }
     }
 
@@ -314,6 +346,45 @@ mod tests {
 
         assert_eq!(runs.load(Ordering::SeqCst), 1);
         assert_eq!(hook.hook_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn concurrent_shutdown_call_waits_for_callbacks_to_finish() {
+        let hook = ApplicationShutdownHook::new();
+        let callback_started = Arc::new(AtomicBool::new(false));
+        let callback_started_clone = Arc::clone(&callback_started);
+        let (release_callback, callback_released) = tokio::sync::oneshot::channel();
+        hook.add_hook(move || async move {
+            callback_started_clone.store(true, Ordering::SeqCst);
+            let _ = callback_released.await;
+        });
+
+        let first = {
+            let hook = hook.clone();
+            tokio::spawn(async move { hook.shutdown().await })
+        };
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while !callback_started.load(Ordering::SeqCst) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("the first shutdown should start its callback");
+
+        let second = {
+            let hook = hook.clone();
+            tokio::spawn(async move {
+                hook.shutdown().await;
+                hook.wait_for_completion().await;
+            })
+        };
+        tokio::task::yield_now().await;
+        assert!(!second.is_finished());
+
+        release_callback.send(()).unwrap();
+        first.await.unwrap();
+        second.await.unwrap();
     }
 
     #[tokio::test]

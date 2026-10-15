@@ -107,9 +107,8 @@ impl WebSocketHandlerMapping {
     pub fn insert(&mut self, path: &str, handler: Arc<dyn WebSocketHandler>) {
         self.handlers
             .insert(path, handler)
-            .and_then(|_| {
+            .map(|_| {
                 self.original_paths.push(path.to_string());
-                Ok(())
             })
             .unwrap_or_else(|e| panic!("Failed to add handler: {:?}", e));
     }

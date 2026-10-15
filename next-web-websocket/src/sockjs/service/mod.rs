@@ -2,14 +2,14 @@
 //!
 //! The service layer manages sessions and delegates to transport handlers.
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::{
     extract::{Request, ws::WebSocketUpgrade},
     http::HeaderMap,
     response::{IntoResponse, Response},
 };
-use next_web_core::error::BoxError;
+use next_web_core::{any::AnyValue, error::BoxError};
 
 use crate::{
     server::handshake_interceptor::HandshakeInterceptor,
@@ -23,6 +23,40 @@ pub mod transport_handling_sockjs_service;
 
 pub use default_sockjs_service::DefaultSockJsService;
 pub use transport_handling_sockjs_service::TransportHandlingSockJsService;
+
+/// The outcome of running a request through the handshake interceptors.
+///
+/// A SockJS request is authorized before the session it belongs to exists, and
+/// the attributes its interceptors collected have to reach that session, so the
+/// two travel together. On a refusal the attributes are dropped along with the
+/// request: no session is created for it.
+#[derive(Debug)]
+pub struct Authorization {
+    /// The response to answer with when an interceptor refused the request.
+    /// `None` means the request may continue.
+    pub refusal: Option<Response>,
+    /// What the interceptors collected, handed to the session the request
+    /// creates.
+    pub attributes: HashMap<String, AnyValue>,
+}
+
+impl Authorization {
+    /// Accepts the request, carrying `attributes` to the session it creates.
+    pub fn accepted(attributes: HashMap<String, AnyValue>) -> Self {
+        Self {
+            refusal: None,
+            attributes,
+        }
+    }
+
+    /// Refuses the request with `response`.
+    pub fn refused(response: Response) -> Self {
+        Self {
+            refusal: Some(response),
+            attributes: HashMap::new(),
+        }
+    }
+}
 
 /// Core trait for SockJS service implementations.
 ///
@@ -42,12 +76,15 @@ pub trait SockJsService: Send + Sync {
     /// handshake before Axum upgrades the connection.
     ///
     /// The default implementation accepts the request. Implementations that
-    /// support interceptors or origin restrictions should override this.
+    /// support interceptors or origin restrictions should override this. What
+    /// the interceptors put in the attribute map travels back in the
+    /// [`Authorization`] and is handed to
+    /// [`SockJsService::handle_websocket_upgrade`].
     async fn authorize_websocket_request(
         &self,
         _request: &mut Request,
-    ) -> Result<Option<Response>, BoxError> {
-        Ok(None)
+    ) -> Result<Authorization, BoxError> {
+        Ok(Authorization::accepted(HashMap::new()))
     }
 
     /// Adds CORS headers to a response for an already-authorized request.
@@ -59,12 +96,17 @@ pub trait SockJsService: Send + Sync {
     /// Handles the native WebSocket transport after Axum has validated the
     /// upgrade request. Implementations that do not support WebSocket can
     /// retain the default not-implemented response.
+    ///
+    /// `attributes` are what
+    /// [`SockJsService::authorize_websocket_request`] collected, and belong on
+    /// the session's application session so the handler can read them.
     async fn handle_websocket_upgrade(
         &self,
         _ws: WebSocketUpgrade,
         _session_id: String,
         _headers: HeaderMap,
         _remote_addr: SocketAddr,
+        _attributes: HashMap<String, AnyValue>,
     ) -> Result<Response, BoxError> {
         Ok(axum::http::StatusCode::NOT_IMPLEMENTED.into_response())
     }

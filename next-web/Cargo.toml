@@ -83,18 +83,23 @@ jemallocator    = { workspace = true }
 [dev-dependencies]
 # The tests drive a router without binding a socket.
 tower = { workspace = true }
+# The test of the resilience auto-configuration needs the crate under test to be
+# linked, so that its providers are discovered, and the feature that makes it read
+# the application's properties.
+next-web-resilience = { workspace = true, features = ["autoconfigure"] }
 
 [features]
 default = ["decrypt-properties"]
 full = [
     "enable-scheduling",
     "enable-web-security",
+    "enable-websocket",
     "enable-retry",
     "enable-i18n",
     "enable-thread-pool",
 
     "decrypt-properties",
-    # "enable-open-api",
+    "enable-open-api",
     "trace-log"
 ]
 
@@ -110,7 +115,7 @@ enable-websocket        = ["next-web-websocket"]
 enable-open-api         = ["next-web-open-api", "utoipa-swagger-ui", "next-web-macros/open-api"]
 enable-scheduling       = ["tokio-cron-scheduler"]
 enable-retry            = ["next-web-retry"]
-enable-resilience       = ["next-web-resilience"]
+enable-resilience       = ["next-web-resilience", "next-web-resilience/autoconfigure"]
 enable-prometheus       = ["axum-prometheus"]
 enable-i18n             = []
 enable-state-machine    = ["next-web-state-machine"]

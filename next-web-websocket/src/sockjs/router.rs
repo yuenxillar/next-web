@@ -60,13 +60,17 @@ async fn handle_websocket(
     ws: WebSocketUpgrade,
     mut request: Request,
 ) -> Response {
-    if let Some(response) = match service.authorize_websocket_request(&mut request).await {
-        Ok(response) => response,
+    // The interceptors' attributes have to reach the session this request
+    // creates, so they travel with the authorization rather than being dropped
+    // here.
+    let authorization = match service.authorize_websocket_request(&mut request).await {
+        Ok(authorization) => authorization,
         Err(error) => {
             tracing::error!("SockJS WebSocket authorization failed: {}", error);
             return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
-    } {
+    };
+    if let Some(response) = authorization.refusal {
         return response;
     }
 
@@ -78,7 +82,13 @@ async fn handle_websocket(
         .unwrap_or_else(|| SocketAddr::from(([0, 0, 0, 0], 0)));
 
     match service
-        .handle_websocket_upgrade(ws, session_id, headers, remote_addr)
+        .handle_websocket_upgrade(
+            ws,
+            session_id,
+            headers,
+            remote_addr,
+            authorization.attributes,
+        )
         .await
     {
         Ok(mut response) => {

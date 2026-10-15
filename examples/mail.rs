@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use axum::{Json, extract::Multipart, http::StatusCode};
-use next_web::{
-    Application, NextWebApplication, extract::find_singleton::FindSingleton,
-    macros::bind::post_mapping,
-};
+use next_web::{Application, NextWebApplication, macros::bind::post_mapping};
 use next_web_mail::{mail_service::MailService, mime_message_helper::MimeMessageHelper};
 
 #[derive(Default)]

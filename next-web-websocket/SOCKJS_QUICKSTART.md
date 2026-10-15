@@ -380,13 +380,13 @@ registration.set_interceptors(vec![Arc::new(interceptor)]);
 ```rust
 use next_web_websocket::sockjs::codec::{
     SockJsMessageCodec,
-    Jackson2SockJsMessageCodec,
+    JsonSockJsMessageCodec,
 };
 
 let mut registration = SockJsServiceRegistration::default();
 
 // 使用 JSON 编解码器（默认）
-let codec = Arc::new(Jackson2SockJsMessageCodec);
+let codec = Arc::new(JsonSockJsMessageCodec);
 registration.set_message_codec(codec);
 ```
 

@@ -26,3 +26,8 @@ data = []
 open-api = []
 embed-resources = []
 auto-register = []
+# The `#[rate_limiter]`, `#[circuit_breaker]`, `#[bulkhead]`, `#[time_limiter]`
+# and `#[retry]` attributes, which guard a function with the patterns of the
+# `next-web-resilience` crate. Off by default, so a build that does not use them
+# pays nothing for them.
+resilience = []

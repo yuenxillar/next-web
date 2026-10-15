@@ -9,9 +9,8 @@ use std::{error::Error, fmt, future::Future, io, net::SocketAddr, path::Path, ti
 use axum::Router;
 use axum_server::{Handle, tls_rustls::RustlsConfig};
 use next_web_core::env::ConfigurableEnvironment;
-use tracing::info;
 
-use crate::web::server::{Server, web_server::shutdown_signal};
+use crate::web::server::{Server, web_server::shutdown_application};
 
 /// Property that enables TLS for the web server.
 ///
@@ -241,8 +240,7 @@ impl Error for TlsWebServerError {
 /// * `handle` - The handle that shuts the connections of the server down.
 fn spawn_shutdown_listener(handle: Handle<SocketAddr>) {
     tokio::spawn(async move {
-        let reason = shutdown_signal().await;
-        info!("Graceful shutdown of application completed, reason: {reason}");
+        shutdown_application().await;
         handle.graceful_shutdown(Some(GRACEFUL_SHUTDOWN_TIMEOUT));
     });
 }

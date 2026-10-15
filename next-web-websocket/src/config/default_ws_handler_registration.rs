@@ -10,6 +10,7 @@ use crate::{
 };
 
 /// Default WebSocket Processor Registration
+#[derive(Default)]
 pub struct DefaultWebSocketHandlerRegistration {
     base: BaseWebSocketHandlerRegistration,
 }
@@ -46,14 +47,6 @@ impl WebSocketHandlerRegistration for DefaultWebSocketHandlerRegistration {
 
     fn with_sock_js(&mut self) -> &mut super::SockJsServiceRegistration {
         self.base.with_sock_js()
-    }
-}
-
-impl Default for DefaultWebSocketHandlerRegistration {
-    fn default() -> Self {
-        Self {
-            base: Default::default(),
-        }
     }
 }
 

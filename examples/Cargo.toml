@@ -6,7 +6,7 @@ publish = false
 license = "MIT"
 
 [dependencies]
-next-web                = { path = "../next-web", version = "*", features = ["full", "enable-open-api"]}
+next-web                = { path = "../next-web", version = "*", features = ["full", "enable-resilience"]}
 next-web-core           = { path = "../next-web-core", version = "*" }
 next-web-context        = { path = "../next-web-context", version = "*" }
 next-web-ai             = { path = "../next-web-ai", version = "*", features = ["deep-seek"]}
@@ -148,8 +148,8 @@ name = "resilience"
 path = "resilience.rs"
 
 [[bin]]
-name = "resilience_macros"
-path = "resilience_macros.rs"
+name = "resilience_configured"
+path = "resilience_configured.rs"
 
 [[bin]]
 name = "scheduled"

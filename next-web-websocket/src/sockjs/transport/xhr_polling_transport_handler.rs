@@ -23,6 +23,13 @@ use crate::sockjs::{
     transport::{SockJsServiceConfig, TransportHandler, TransportType},
 };
 
+/// Largest `xhr_send` body accepted, in bytes.
+///
+/// The SockJS client sends its messages as one small JSON array, so this is
+/// generous. It exists so that a request cannot make the server buffer an
+/// arbitrary amount of data before the body is even parsed.
+const MAX_SEND_BODY: usize = 64 * 1024;
+
 /// XHR polling transport handler.
 ///
 /// Implements HTTP long polling where `/xhr` receives queued messages using
@@ -53,12 +60,22 @@ impl XhrPollingTransportHandler {
         // long-poll body reads outside the framework's request timeout while
         // still making the XHR complete only when data or a heartbeat arrives.
         let body = Body::from_stream(stream::once(async move {
+            // Claim the session's single receiver slot. A later request takes it
+            // over, and that is what ends this response.
+            let generation = session.begin_receive().await;
+
             let heartbeat_deadline = Instant::now() + Duration::from_millis(config.heartbeat_time);
             let mut last_touch = Instant::now();
+            let mut taken_over = false;
             let messages = loop {
-                let messages = session
-                    .poll_messages(config.http_message_cache_size.max(1))
-                    .await;
+                let Some(messages) = session
+                    .poll_for_receiver(generation, config.http_message_cache_size.max(1))
+                    .await
+                else {
+                    taken_over = true;
+                    break Vec::new();
+                };
+
                 if !messages.is_empty() || session.is_closed().await {
                     break messages;
                 }
@@ -73,9 +90,22 @@ impl XhrPollingTransportHandler {
                 tokio::time::sleep(Duration::from_millis(25)).await;
             };
 
-            let body = if messages.is_empty() {
+            let body = if taken_over {
+                // A newer receiver has this session, and the client that opened
+                // this request has already moved on to it. End quietly rather than
+                // sending frames to a client that is no longer listening.
+                debug!("XHR polling receiver was replaced by a newer request");
+                String::new()
+            } else if messages.is_empty() {
                 if session.is_closed().await {
-                    String::new()
+                    // A close frame rather than an empty body. The queued copy is
+                    // delivered once; a poll arriving after that — or a session a
+                    // transport closed without going through `close` — would
+                    // otherwise leave the client to infer the end from an EOF.
+                    session
+                        .close_frame()
+                        .await
+                        .map_or_else(String::new, |frame| format!("{frame}\n"))
                 } else {
                     "h\n".to_string()
                 }
@@ -118,8 +148,17 @@ impl XhrPollingTransportHandler {
         }
         session.ensure_handler().await?;
 
-        // Read request body
-        let body_bytes = axum::body::to_bytes(req.into_body(), usize::MAX).await?;
+        // Read request body, bounded. Without a limit a client could make the
+        // server buffer an arbitrarily large POST before it was ever parsed;
+        // SockJS sends its messages as one small JSON array.
+        let body_bytes = match axum::body::to_bytes(req.into_body(), MAX_SEND_BODY).await {
+            Ok(body) => body,
+            Err(_) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::PAYLOAD_TOO_LARGE)
+                    .body(Body::empty())?);
+            }
+        };
         let body_str = String::from_utf8(body_bytes.to_vec())
             .map_err(|e| format!("Invalid UTF-8 in request body: {}", e))?;
 

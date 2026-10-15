@@ -30,6 +30,7 @@ use crate::{
 ///     .set_disconnect_delay(5000)
 ///     .set_websocket_enabled(true);
 /// ```
+#[derive(Default)]
 pub struct SockJsServiceRegistration {
     /// Optional scheduler handle retained for Spring-style configuration
     /// compatibility. Built-in heartbeats currently use the Tokio runtime.
@@ -39,6 +40,10 @@ pub struct SockJsServiceRegistration {
     ///
     /// Transports like "htmlfile" need to load SockJS from a trusted domain.
     /// Default: "https://cdn.jsdelivr.net/sockjs/1.0.0/sockjs.min.js"
+    ///
+    /// **Has no effect**: the iframe-based transports are not implemented, so
+    /// nothing serves this URL or reads this value. It is kept so that the
+    /// setting keeps its shape if they are added.
     client_library_url: Option<String>,
 
     /// Maximum bytes sent over a single HTTP streaming request.
@@ -95,6 +100,14 @@ pub struct SockJsServiceRegistration {
     /// Allowed origin patterns for CORS (supports wildcards)
     allowed_origin_patterns: Vec<String>,
 
+    /// Whether a session may only be used from the address that created it.
+    /// Default: true.
+    session_pinning: Option<bool>,
+
+    /// Attribute that identifies who a session belongs to. Default: unset, so the
+    /// identity is not checked.
+    session_identity_attribute: Option<String>,
+
     /// Suppress automatic CORS header addition
     /// Default: false
     suppress_cors: Option<bool>,
@@ -106,8 +119,9 @@ pub struct SockJsServiceRegistration {
 impl SockJsServiceRegistration {
     /// Set the task scheduler for heartbeat management.
     ///
-    /// Stored for configuration compatibility. Built-in heartbeat tasks are
-    /// spawned on the active Tokio runtime.
+    /// **Has no effect**: the value is stored and can be read back, but nothing
+    /// uses it, because heartbeat tasks are spawned on the active Tokio runtime.
+    /// It is kept for configuration compatibility.
     pub fn set_task_scheduler(&mut self, scheduler: Arc<dyn Send + Sync>) -> &mut Self {
         self.task_scheduler = Some(scheduler);
         self
@@ -235,6 +249,33 @@ impl SockJsServiceRegistration {
         self
     }
 
+    /// Set the attribute that identifies who a SockJS session belongs to.
+    ///
+    /// A handshake interceptor puts the identity in that attribute — use
+    /// [`crate::SESSION_IDENTITY_ATTRIBUTE`] or a name of your own — and from then
+    /// on only a request presenting the same value may use that session. This is
+    /// the check that still works behind a reverse proxy, where every client
+    /// shares the proxy's address and the IP pin cannot tell them apart.
+    ///
+    /// Off unless this is called. A session whose creating request set no such
+    /// attribute falls back to the IP pin rather than being refused, so an
+    /// anonymous session keeps working.
+    pub fn set_session_identity_attribute(&mut self, name: impl Into<String>) -> &mut Self {
+        self.session_identity_attribute = Some(name.into());
+        self
+    }
+
+    /// Set whether a session may only be used from the address that created it.
+    ///
+    /// On by default. The session id comes from the client, so with this off a
+    /// request that guesses or learns another client's id can read its messages
+    /// and inject into its handler. Turn it off only when clients legitimately
+    /// change address mid-session and the ids cannot be guessed.
+    pub fn set_session_pinning(&mut self, pinning: bool) -> &mut Self {
+        self.session_pinning = Some(pinning);
+        self
+    }
+
     /// Set allowed origin patterns for CORS.
     ///
     /// # Arguments
@@ -259,7 +300,7 @@ impl SockJsServiceRegistration {
     /// * `codec` - Custom codec implementation
     ///
     /// # Default
-    /// Uses JSON-based codec (similar to Jackson2SockJsMessageCodec)
+    /// Uses JSON-based codec (similar to JsonSockJsMessageCodec)
     pub fn set_message_codec(&mut self, codec: Arc<dyn SockJsMessageCodec>) -> &mut Self {
         self.message_codec = Some(codec);
         self
@@ -338,6 +379,12 @@ impl SockJsServiceRegistration {
 
         config.allowed_origins = self.allowed_origins.clone();
         config.allowed_origin_patterns = self.allowed_origin_patterns.clone();
+        if let Some(pinning) = self.session_pinning {
+            config.session_pinning = pinning;
+        }
+        if let Some(name) = self.session_identity_attribute.clone() {
+            config.session_identity_attribute = Some(name);
+        }
 
         // Create service with default or custom handlers
         let mut service = if !self.transport_handlers.is_empty() {
@@ -387,28 +434,6 @@ impl SockJsServiceRegistration {
     /// Get the configured task scheduler reference.
     pub fn get_task_scheduler(&self) -> Option<&Arc<dyn Send + Sync>> {
         self.task_scheduler.as_ref()
-    }
-}
-
-impl Default for SockJsServiceRegistration {
-    fn default() -> Self {
-        Self {
-            task_scheduler: None,
-            client_library_url: None,
-            stream_bytes_limit: None,
-            session_cookie_needed: None,
-            heartbeat_time: None,
-            disconnect_delay: None,
-            http_message_cache_size: None,
-            websocket_enabled: None,
-            transport_handlers: Vec::new(),
-            transport_handler_overrides: Vec::new(),
-            interceptors: Vec::new(),
-            allowed_origins: Vec::new(),
-            allowed_origin_patterns: Vec::new(),
-            suppress_cors: None,
-            message_codec: None,
-        }
     }
 }
 

@@ -10,7 +10,11 @@ pub struct WebSocketProperties {
     /// Maximum buffer capacity for writing.
     max_write_buffer_size: Option<usize>,
 
-    /// Maximum idle timeout for sessions.
+    /// How long a client may stay silent before the server closes its
+    /// connection, in seconds.
+    ///
+    /// Left unset, or set to `0`, the connection stays open until the client
+    /// closes it or the operating system gives up on it.
     max_session_idle_timeout: Option<u64>,
 
     /// WebSocket message channel capacity.

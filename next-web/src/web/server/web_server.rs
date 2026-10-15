@@ -68,7 +68,37 @@ pub(crate) async fn shutdown_signal() -> &'static str {
 
 /// Waits for a shutdown signal and reports it.
 async fn graceful_shutdown() {
-    let reason = shutdown_signal().await;
+    shutdown_application().await;
+}
 
-    tracing::info!("Graceful shutdown of application completed, reason: {reason}")
+/// Waits for either an operating-system signal or an explicit application
+/// shutdown request, then runs the registered application cleanup callbacks.
+pub(crate) async fn shutdown_application() {
+    let Some(shutdown_hook) = crate::next_web_application::APPLICATION_SHUTDOWN_HOOK
+        .get()
+        .cloned()
+    else {
+        let reason = shutdown_signal().await;
+        tracing::info!("Graceful shutdown of application completed, reason: {reason}");
+        return;
+    };
+
+    if shutdown_hook.is_shutdown() {
+        shutdown_hook.shutdown().await;
+        shutdown_hook.wait_for_completion().await;
+        return;
+    }
+
+    tokio::select! {
+        reason = shutdown_signal() => {
+            tracing::info!("Application shutdown requested, reason: {reason}");
+            shutdown_hook.shutdown().await;
+            shutdown_hook.wait_for_completion().await;
+        }
+        _ = shutdown_hook.cancelled() => {
+            tracing::info!("Application shutdown requested through its shutdown hook.");
+            shutdown_hook.shutdown().await;
+            shutdown_hook.wait_for_completion().await;
+        }
+    }
 }

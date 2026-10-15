@@ -72,6 +72,24 @@ pub struct SockJsServiceConfig {
     pub allowed_origins: Vec<String>,
     /// Allowed origin patterns for CORS
     pub allowed_origin_patterns: Vec<String>,
+    /// Whether a session may only be used from the address that created it.
+    ///
+    /// Session ids come from the client, so without this a request that guesses or
+    /// learns another client's id can read its messages and inject into its
+    /// handler. Comparing the IP rather than the full address, because every
+    /// request of one SockJS session arrives on a new TCP connection.
+    ///
+    /// Only worth anything when the application can see the client's address, so
+    /// it does nothing behind a reverse proxy, where every client arrives as the
+    /// proxy. [`SockJsServiceConfig::session_identity_attribute`] is the check
+    /// that survives that.
+    pub session_pinning: bool,
+    /// Attribute that identifies who a session belongs to, if any.
+    ///
+    /// When set, and the session carries a value for it, that value decides who
+    /// may use the session and the address is not consulted: identity is the
+    /// stronger claim, and it is the one that still works behind a proxy.
+    pub session_identity_attribute: Option<String>,
 }
 
 impl Default for SockJsServiceConfig {
@@ -87,6 +105,10 @@ impl Default for SockJsServiceConfig {
             suppress_cors: false,
             allowed_origins: vec![],
             allowed_origin_patterns: vec![],
+            session_pinning: true,
+            // Off unless asked for: a control that silently decides who may use a
+            // session is worth requiring one line of configuration.
+            session_identity_attribute: None,
         }
     }
 }

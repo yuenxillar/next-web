@@ -4,9 +4,9 @@ use std::error::Error;
 
 use crate::sockjs::SockJsFrame;
 
-pub mod jackson2_message_codec;
+pub mod json_message_codec;
 
-pub use jackson2_message_codec::Jackson2SockJsMessageCodec;
+pub use json_message_codec::JsonSockJsMessageCodec;
 
 /// Trait for encoding and decoding SockJS protocol frames.
 ///
@@ -17,10 +17,10 @@ pub use jackson2_message_codec::Jackson2SockJsMessageCodec;
 ///
 /// ```rust
 /// use next_web_websocket::sockjs::codec::SockJsMessageCodec;
-/// use next_web_websocket::sockjs::codec::Jackson2SockJsMessageCodec;
+/// use next_web_websocket::sockjs::codec::JsonSockJsMessageCodec;
 /// use next_web_websocket::sockjs::SockJsFrame;
 ///
-/// let codec = Jackson2SockJsMessageCodec;
+/// let codec = JsonSockJsMessageCodec;
 /// let frame = SockJsFrame::Open;
 /// let encoded = codec.encode(&frame).unwrap();
 /// assert_eq!(encoded, "o");

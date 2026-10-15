@@ -27,6 +27,15 @@ pub(crate) struct HttpSessionState {
     pub opened: bool,
     /// Whether the session has been closed.
     pub closed: bool,
+    /// The close frame the session was closed with, encoded and kept so that a
+    /// client still polling can be answered with `c[...]` instead of an empty
+    /// body once the queued copy has been delivered.
+    pub close_frame: Option<String>,
+    /// Which receive request currently owns the session.
+    ///
+    /// SockJS wants exactly one receiver at a time. Every receive request takes
+    /// this over, which is how the previous one learns that it has been replaced.
+    pub receiver_generation: u64,
 }
 
 impl Default for HttpSessionState {
@@ -38,6 +47,8 @@ impl Default for HttpSessionState {
             bytes_sent: 0,
             opened: false,
             closed: false,
+            close_frame: None,
+            receiver_generation: 0,
         }
     }
 }

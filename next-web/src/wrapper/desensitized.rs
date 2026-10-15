@@ -37,8 +37,8 @@ use next_web_core::traits::desensitize::Desensitize;
 ///
 /// ```ignore
 /// async fn get_user() -> Response {
-///     Desensitized::with(Json(fetch_user().await))
-///         .to_response(|json| json)
+///     Desensitized::with(fetch_user())
+///         .to_response(Json)
 /// }
 /// ```
 ///

@@ -15,9 +15,6 @@ const BANNER_MODE: &str = "next.main.banner_mode";
 /// Property key controlling whether startup information is logged.
 const LOG_STARTUP_INFO: &str = "next.main.log_startup_info";
 
-/// Property key controlling whether a shutdown hook is registered.
-const REGISTER_SHUTDOWN_HOOK: &str = "next.main.register_shutdown_hook";
-
 /// Property key listing the sources to include in the application context.
 const SOURCES: &str = "next.main.sources";
 
@@ -35,9 +32,6 @@ pub struct ApplicationProperties {
 
     /// Whether to log information about the application when it starts.
     log_startup_info: bool,
-
-    /// Whether the application should have a shutdown hook registered.
-    register_shutdown_hook: bool,
 
     /// Sources (type names or XML resource locations) to include in the
     /// ApplicationContext.
@@ -77,16 +71,6 @@ impl ApplicationProperties {
     /// Sets whether startup information is logged.
     pub fn set_log_startup_info(&mut self, log_startup_info: bool) {
         self.log_startup_info = log_startup_info;
-    }
-
-    /// Returns whether a shutdown hook is registered.
-    pub fn is_register_shutdown_hook(&self) -> bool {
-        self.register_shutdown_hook
-    }
-
-    /// Sets whether a shutdown hook is registered.
-    pub fn set_register_shutdown_hook(&mut self, register_shutdown_hook: bool) {
-        self.register_shutdown_hook = register_shutdown_hook;
     }
 
     /// Returns the sources to include in the ApplicationContext.
@@ -137,12 +121,6 @@ impl ApplicationProperties {
             }
         }
 
-        if let Some(value) = environment.get_property(REGISTER_SHUTDOWN_HOOK) {
-            if let Some(register_shutdown_hook) = parse_bool(&value) {
-                self.register_shutdown_hook = register_shutdown_hook;
-            }
-        }
-
         if let Some(value) = environment.get_property(SOURCES) {
             let sources = value
                 .split(',')
@@ -180,7 +158,6 @@ impl Default for ApplicationProperties {
             allow_override: false,
             banner_mode: BannerMode::default(),
             log_startup_info: true,
-            register_shutdown_hook: true,
             sources: HashSet::new(),
             lazy: false,
         }
@@ -295,7 +272,6 @@ mod tests {
         assert!(!properties.is_allow_override());
         assert_eq!(properties.get_banner_mode(), BannerMode::Console);
         assert!(properties.is_log_startup_info());
-        assert!(properties.is_register_shutdown_hook());
         assert!(properties.get_sources().is_empty());
     }
 
@@ -304,8 +280,7 @@ mod tests {
         let environment = MockEnvironment::default()
             .with_property(ALLOW_OVERRIDE, "true")
             .with_property(BANNER_MODE, "LOG")
-            .with_property(LOG_STARTUP_INFO, "false")
-            .with_property(REGISTER_SHUTDOWN_HOOK, "false");
+            .with_property(LOG_STARTUP_INFO, "false");
 
         let mut properties = ApplicationProperties::default();
         properties.bind(&environment);
@@ -313,7 +288,6 @@ mod tests {
         assert!(properties.is_allow_override());
         assert_eq!(properties.get_banner_mode(), BannerMode::Log);
         assert!(!properties.is_log_startup_info());
-        assert!(!properties.is_register_shutdown_hook());
     }
 
     #[test]

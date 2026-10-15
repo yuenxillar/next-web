@@ -1,11 +1,11 @@
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::{
     extract::ws::{CloseFrame, Message},
     http::HeaderMap,
 };
 use flume::Sender;
-use next_web_core::Uuid;
+use next_web_core::{Uuid, any::AnyValue};
 
 /// Represents a WebSocket session.
 ///
@@ -18,6 +18,8 @@ use next_web_core::Uuid;
 /// - `remote_address`: The client's remote socket address.
 /// - `header`: request header
 /// - `path`: request path
+/// - `attributes`: what the handshake interceptors collected, shared rather than
+///   copied so that cloning a session stays cheap
 ///
 #[derive(Clone)]
 pub struct WebSocketSession {
@@ -26,6 +28,7 @@ pub struct WebSocketSession {
     remote_address: SocketAddr,
     header: HeaderMap,
     path: String,
+    attributes: Arc<HashMap<String, AnyValue>>,
 }
 
 impl WebSocketSession {
@@ -46,6 +49,30 @@ impl WebSocketSession {
         header: HeaderMap,
         path: String,
     ) -> Self {
+        Self::with_attributes(msg_channel, remote_address, header, path, HashMap::new())
+    }
+
+    /// Creates a new WebSocket session that also carries the attributes the
+    /// handshake interceptors collected.
+    ///
+    /// # Arguments
+    /// - `msg_channel`: A sender channel used to send messages to the client.
+    /// - `remote_address`: The client’s remote socket address.
+    /// - `header`: request header
+    /// - `path`: request path
+    /// - `attributes`: what the handshake interceptors put in the map they were
+    ///   given
+    ///
+    /// # Returns
+    /// A new instance of `WebSocketSession`.
+    ///
+    pub fn with_attributes(
+        msg_channel: Sender<Message>,
+        remote_address: SocketAddr,
+        header: HeaderMap,
+        path: String,
+        attributes: HashMap<String, AnyValue>,
+    ) -> Self {
         let id = Uuid::new_v4();
         Self {
             id,
@@ -53,6 +80,7 @@ impl WebSocketSession {
             remote_address,
             header,
             path,
+            attributes: Arc::new(attributes),
         }
     }
 
@@ -133,5 +161,27 @@ impl WebSocketSession {
     ///
     pub fn path(&self) -> &str {
         self.path.as_str()
+    }
+
+    /// Gets everything the handshake interceptors put in the attribute map.
+    ///
+    /// # Returns
+    /// The attributes, keyed by the name the interceptor used.
+    ///
+    pub fn attributes(&self) -> &HashMap<String, AnyValue> {
+        &self.attributes
+    }
+
+    /// Gets one attribute by name, for the common case of a single value such as
+    /// the authenticated principal.
+    ///
+    /// # Arguments
+    /// - `name`: The key an interceptor used.
+    ///
+    /// # Returns
+    /// The value, or `None` when no interceptor set that name.
+    ///
+    pub fn attribute(&self, name: &str) -> Option<&AnyValue> {
+        self.attributes.get(name)
     }
 }

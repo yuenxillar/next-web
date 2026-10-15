@@ -23,6 +23,12 @@ mod di;
 mod util;
 mod web;
 
+#[cfg(feature = "resilience")]
+mod resilience;
+
+#[cfg(feature = "resilience")]
+use crate::resilience::{Pattern, apply};
+
 /// Automatically generate getter and setter methods for structures.
 ///
 /// This macro will generate corresponding 'get_ {field}' and 'set_ {field}' methods for each field of the structure,
@@ -949,3 +955,168 @@ pub fn singleowner(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 // ========================= Resilience =========================
+
+// The five resilience attributes are defined here rather than inside the module
+// above, because a procedural macro has to be defined in the crate root. What
+// each one means, the two forms it takes, the stacking order and the error
+// contract are documented on `resilience` itself and on each macro below.
+
+/// Caps how often the guarded function may be called.
+///
+/// Takes one permission from a [`RateLimiter`] before running the body. When the
+/// permission cannot be had within the limiter's configured `timeout_duration`,
+/// the call is rejected without running the body.
+///
+/// Asynchronous functions only: a limiter asks a permission store, and that store
+/// may live in another process, so the permission has to be awaited.
+///
+/// A rejection is a [`RateLimitExceededError`], converted into the function's
+/// error type unless a `fallback` is given.
+///
+/// ```ignore
+/// #[rate_limiter(self.limiters.login)]
+/// async fn login(&self, name: &str) -> Result<Token, LoginError> {
+///     self.authenticate(name).await
+/// }
+///
+/// // Degrade to a cached answer instead of failing.
+/// #[rate_limiter(name = "search", fallback = Ok(Vec::new()))]
+/// async fn search(&self, query: &str) -> Result<Vec<Hit>, SearchError> {
+///     self.query(query).await
+/// }
+/// ```
+///
+/// [`RateLimiter`]: https://docs.rs/next-web-resilience/latest/next_web_resilience/ratelimiter/struct.RateLimiter.html
+/// [`RateLimitExceededError`]: https://docs.rs/next-web-resilience/latest/next_web_resilience/error/struct.RateLimitExceededError.html
+#[cfg(feature = "resilience")]
+#[proc_macro_attribute]
+pub fn rate_limiter(attr: TokenStream, item: TokenStream) -> TokenStream {
+    apply(Pattern::RateLimiter, attr.into(), item.into()).into()
+}
+
+/// Refuses calls to a function whose dependency is known to be failing, and
+/// records the outcome of the ones it lets through.
+///
+/// The body runs only when the [`CircuitBreaker`] permits the call; its success
+/// or failure is then recorded, together with how long it took, which is what
+/// lets the breaker open, half-open and close again. Because the outcome is
+/// recorded, the body is wrapped so that a `?` inside it cannot leave the
+/// function before the recording happens.
+///
+/// Guards synchronous and asynchronous functions.
+///
+/// Needs the function's error type to implement `std::error::Error + 'static`,
+/// because that is what the breaker records; a rejection is a
+/// [`CallNotPermittedError`], converted into that error type unless a `fallback`
+/// is given.
+///
+/// ```ignore
+/// #[circuit_breaker(self.breakers.payments, fallback = Ok(Receipt::deferred()))]
+/// async fn charge(&self, amount: Money) -> Result<Receipt, PaymentError> {
+///     self.gateway.charge(amount).await
+/// }
+/// ```
+///
+/// [`CircuitBreaker`]: https://docs.rs/next-web-resilience/latest/next_web_resilience/circuitbreaker/struct.CircuitBreaker.html
+/// [`CallNotPermittedError`]: https://docs.rs/next-web-resilience/latest/next_web_resilience/error/struct.CallNotPermittedError.html
+#[cfg(feature = "resilience")]
+#[proc_macro_attribute]
+pub fn circuit_breaker(attr: TokenStream, item: TokenStream) -> TokenStream {
+    apply(Pattern::CircuitBreaker, attr.into(), item.into()).into()
+}
+
+/// Caps how many calls to the guarded function run at the same time.
+///
+/// Holds a [`Bulkhead`] permit for the whole call and releases it when the call
+/// ends, whether it succeeded, failed or returned early. Without a permit the
+/// call is rejected: the bulkhead waits for one for at most its configured
+/// `max_wait_duration`.
+///
+/// Asynchronous functions only, because the wait for a permit is a
+/// `tokio::sync::Semaphore` acquisition.
+///
+/// A rejection is a [`BulkheadFullError`], converted into the function's error
+/// type unless a `fallback` is given.
+///
+/// ```ignore
+/// #[bulkhead(self.bulkheads.reports)]
+/// async fn report(&self, id: ReportId) -> Result<Report, ReportError> {
+///     self.render(id).await
+/// }
+/// ```
+///
+/// [`Bulkhead`]: https://docs.rs/next-web-resilience/latest/next_web_resilience/bulkhead/struct.Bulkhead.html
+/// [`BulkheadFullError`]: https://docs.rs/next-web-resilience/latest/next_web_resilience/error/struct.BulkheadFullError.html
+#[cfg(feature = "resilience")]
+#[proc_macro_attribute]
+pub fn bulkhead(attr: TokenStream, item: TokenStream) -> TokenStream {
+    apply(Pattern::Bulkhead, attr.into(), item.into()).into()
+}
+
+/// Bounds how long the guarded function may take.
+///
+/// Runs the body under a [`TimeLimiter`]. When it outlives the limiter's
+/// configured `timeout_duration` the future is dropped, so the call really is
+/// abandoned rather than merely reported as late, and the limiter's timeout is
+/// recorded on its counters and event stream.
+///
+/// Asynchronous functions only: abandoning a synchronous call is not possible,
+/// so there would be nothing to enforce.
+///
+/// A timeout is a [`TimeoutError`] and a task that ended without a result is an
+/// [`AbortedError`]; both are converted into the function's error type unless a
+/// `fallback` is given.
+///
+/// ```ignore
+/// #[time_limiter(self.time_limits.search)]
+/// async fn search(&self, query: &str) -> Result<Vec<Hit>, SearchError> {
+///     self.index.query(query).await
+/// }
+/// ```
+///
+/// [`TimeLimiter`]: https://docs.rs/next-web-resilience/latest/next_web_resilience/timelimiter/struct.TimeLimiter.html
+/// [`TimeoutError`]: https://docs.rs/next-web-resilience/latest/next_web_resilience/error/struct.TimeoutError.html
+/// [`AbortedError`]: https://docs.rs/next-web-resilience/latest/next_web_resilience/error/struct.AbortedError.html
+#[cfg(feature = "resilience")]
+#[proc_macro_attribute]
+pub fn time_limiter(attr: TokenStream, item: TokenStream) -> TokenStream {
+    apply(Pattern::TimeLimiter, attr.into(), item.into()).into()
+}
+
+/// Repeats the guarded function while it fails.
+///
+/// Every attempt re-runs the body, so the function is called again with the same
+/// arguments: **only guard an operation that is safe to run twice.** A parameter
+/// taken by reference is borrowed again; any other parameter is cloned for the
+/// next attempt, so it has to implement `Clone` — the macro adds the bound to the
+/// signature when the parameter is one of the function's own type parameters.
+///
+/// The retry's configuration decides how many attempts are made, which failures
+/// are worth retrying and how long to wait between them, and its counters and
+/// event stream are updated exactly as `Retry::call` would update them.
+///
+/// Guards synchronous and asynchronous functions. The wait between attempts is
+/// `tokio::time::sleep` for the former kind and `std::thread::sleep` for the
+/// latter.
+///
+/// Only a spent attempt budget is a rejection: with a `fallback` the call
+/// degrades instead of failing, and without one the failure of the last attempt
+/// is returned unchanged, so no `From` implementation is needed. A failure the
+/// policy refuses to retry is never degraded — it goes to the caller.
+///
+/// ```ignore
+/// // Three attempts, exponential backoff, from the retry's own configuration.
+/// #[retry(self.retries.inventory)]
+/// async fn stock(&self, sku: Sku) -> Result<u32, InventoryError> {
+///     self.inventory.stock(sku).await
+/// }
+///
+/// // Degrade to a cached count once the budget is spent.
+/// #[retry(name = "inventory", fallback = Ok(self.cached_stock(sku)))]
+/// async fn stock_fallback(&self, sku: Sku) -> Result<u32, InventoryError> { .. }
+/// ```
+#[cfg(feature = "resilience")]
+#[proc_macro_attribute]
+pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {
+    apply(Pattern::Retry, attr.into(), item.into()).into()
+}

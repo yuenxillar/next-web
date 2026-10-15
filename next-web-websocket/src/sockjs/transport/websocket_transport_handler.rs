@@ -59,7 +59,12 @@ impl WebSocketTransportHandler {
         );
         session.attach_websocket(ws_session).await;
 
-        if let Err(e) = session.send_open().await {
+        // Only the first transport of a session sends the open frame. A client
+        // that reconnects, or switches transport, keeps its session id and has to
+        // be able to carry on instead of being closed without ever seeing `o`.
+        if !session.is_opened().await
+            && let Err(e) = session.send_open().await
+        {
             error!("Failed to send open frame: {}", e);
             let _ = ws_sender.close().await;
             session.detach_websocket().await;

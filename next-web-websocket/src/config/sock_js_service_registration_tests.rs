@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+mod behaviour {
     use crate::config::SockJsServiceRegistration;
     use crate::sockjs::transport::TransportHandler;
     use std::sync::Arc;
@@ -58,12 +58,12 @@ mod tests {
         // Check default values are applied through config
         let config = service.config();
         assert_eq!(config.stream_bytes_limit, 128 * 1024);
-        assert_eq!(config.session_cookie_needed, true);
+        assert!(config.session_cookie_needed);
         assert_eq!(config.heartbeat_time, 25_000);
         assert_eq!(config.disconnect_delay, 5_000);
         assert_eq!(config.http_message_cache_size, 100);
-        assert_eq!(config.websocket_enabled, true);
-        assert_eq!(config.suppress_cors, false);
+        assert!(config.websocket_enabled);
+        assert!(!config.suppress_cors);
     }
 
     #[test]
@@ -83,12 +83,12 @@ mod tests {
         let config = service.config();
 
         assert_eq!(config.stream_bytes_limit, 256 * 1024);
-        assert_eq!(config.session_cookie_needed, false);
+        assert!(!config.session_cookie_needed);
         assert_eq!(config.heartbeat_time, 30_000);
         assert_eq!(config.disconnect_delay, 10_000);
         assert_eq!(config.http_message_cache_size, 200);
-        assert_eq!(config.websocket_enabled, false);
-        assert_eq!(config.suppress_cors, true);
+        assert!(!config.websocket_enabled);
+        assert!(config.suppress_cors);
     }
 
     #[test]
@@ -119,7 +119,7 @@ mod tests {
         // Service should be created successfully with default transport handlers
         let config = service.config();
         assert_eq!(config.stream_bytes_limit, 128 * 1024);
-        assert_eq!(config.websocket_enabled, true);
+        assert!(config.websocket_enabled);
     }
 
     #[test]
