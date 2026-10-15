@@ -8,12 +8,11 @@ use std::sync::{
 use async_trait::async_trait;
 
 use crate::{
-    filter::FilterError,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        HttpRequest, HttpResponse,
+        filter::{FilterError, HttpFilter, HttpFilterChain},
     },
+    traits::named::Named,
 };
 
 /// A generic composite [`HttpFilter`] that delegates to a chain (list) of
@@ -31,7 +30,7 @@ use crate::{
 /// use std::sync::Arc;
 ///
 /// use next_web_core::filter::CompositeFilter;
-/// use next_web_core::traits::filter::HttpFilter;
+/// use next_web_core::http::filter::HttpFilter;
 ///
 /// let mut composite = CompositeFilter::default();
 /// composite.set_filters(Vec::<Arc<dyn HttpFilter>>::new());
@@ -154,12 +153,11 @@ mod tests {
 
     use super::CompositeFilter;
     use crate::{
-        filter::FilterError,
-        traits::{
-            filter::{HttpFilter, HttpFilterChain},
-            http::{http_request::HttpRequest, http_response::HttpResponse},
-            named::Named,
+        http::{
+            HttpRequest, HttpResponse,
+            filter::{FilterError, HttpFilter, HttpFilterChain},
         },
+        traits::named::Named,
     };
 
     /// A filter that records its name and then continues the chain.

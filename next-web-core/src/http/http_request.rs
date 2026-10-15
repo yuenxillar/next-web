@@ -30,13 +30,12 @@ use next_web_context::Locale;
 use crate::{
     any::AnyValue,
     http::{
-        Cookie, HttpMethod, HttpRequestShare, HttpVersion,
+        Cookie, HttpMethod, HttpRequestShare, HttpVersion, ResourceDispatcher,
         session::{
             HttpSession, SESSION_COOKIE_NAME, SessionManager, StandardSession,
             global_session_manager,
         },
     },
-    traits::http::resource_dispatcher::ResourceDispatcher,
     web::ViewModel,
 };
 
@@ -186,12 +185,13 @@ where
     /// Returns the server name, taken from the `Host` header.
     fn server_name(&self) -> Option<String>;
 
-    /// Returns the context path the application is nested under, if configured.
+    /// Returns the context path the application is nested under, if the request
+    /// carries one.
     ///
-    /// The web layer installs the context path with
-    /// [`install_global_context_path`](crate::http::install_global_context_path);
-    /// a request may also override it by storing a context path in its
-    /// extensions.
+    /// The context path is an application setting, `next.server.context_path`, and
+    /// the web layer strips it from the path before routing, so a request does not
+    /// normally hold it. A filter that has to report it may store one in the
+    /// request extensions, which is what this returns; it is `None` otherwise.
     fn context_path(&self) -> Option<&str>;
 
     // ------------------------------------------------------------------
@@ -707,7 +707,7 @@ fn parse_cookies(request: &Request) -> Vec<Cookie> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{borrow::Cow, sync::Arc};
 
     use axum::{
         body::Body,
@@ -718,7 +718,7 @@ mod tests {
     use crate::{
         error::BoxError,
         http::session::SESSION_COOKIE_NAME,
-        traits::http::{http_response::HttpResponse, resource_dispatcher::ResourceDispatcher},
+        http::{HttpResponse, ResourceDispatcher},
     };
 
     fn session_request(id: &str) -> Request {
@@ -855,5 +855,71 @@ mod tests {
         request.extensions_mut().insert(dispatcher);
 
         assert!(request.resource_dispatcher().is_some());
+    }
+
+    #[test]
+    fn the_request_line_is_reported_the_way_a_servlet_reads_it() {
+        let mut request = Request::builder()
+            .uri("https://api.example.com:8443/orders?page=2&tag=a&tag=b")
+            .header("host", "api.example.com")
+            .header("content-type", "application/json")
+            .body(Body::empty())
+            .unwrap();
+        request.ready();
+
+        assert_eq!(request.path(), "/orders");
+        assert_eq!(request.query(), Some("page=2&tag=a&tag=b"));
+        assert_eq!(request.host(), Some("api.example.com"));
+        assert_eq!(request.server_port(), Some(8443));
+        assert_eq!(request.server_name(), Some("api.example.com".to_owned()));
+        assert_eq!(request.content_type(), Some("application/json"));
+        assert!(request.is_secure());
+
+        assert_eq!(request.parameter("page"), Some("2"));
+        assert_eq!(
+            request.parameter_values("tag"),
+            Some(vec![Cow::from("a"), Cow::from("b")])
+        );
+        assert_eq!(
+            request.parameters().map(|pairs| pairs.len()),
+            Some(3),
+            "every query parameter is reported"
+        );
+    }
+
+    #[test]
+    fn an_empty_accept_language_falls_back_to_the_system_locale() {
+        let mut request = Request::builder()
+            .header("accept-language", "")
+            .body(Body::empty())
+            .unwrap();
+        request.ready();
+
+        // The header is present but empty, which is not the same as absent: the
+        // application still has to answer in some language.
+        let locales = request.locales().expect("an empty header still answers");
+        assert_eq!(locales.len(), 1);
+        assert_eq!(request.locale().is_some(), false);
+    }
+
+    #[test]
+    fn the_shared_snapshot_can_be_read_more_than_once() {
+        let mut request = Request::builder()
+            .uri("https://example.com/orders?page=2")
+            .body(Body::empty())
+            .unwrap();
+        request.ready();
+
+        {
+            let shared = request.shared();
+            assert_eq!(shared.path(), "/orders");
+            assert_eq!(shared.query(), Some("page=2"));
+        }
+
+        // The snapshot is cached on the request rather than rebuilt, and the
+        // borrow is what keeps a caller from holding it across a second call: the
+        // reference is tied to `&mut self`, so the two can never overlap.
+        let shared = request.shared();
+        assert_eq!(shared.path(), "/orders");
     }
 }

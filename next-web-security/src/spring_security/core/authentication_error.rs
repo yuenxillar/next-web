@@ -6,7 +6,7 @@ use std::{
 
 use next_web_core::{
     any::{AnyError, AnyValue},
-    filter::{FilterChainError, FilterError},
+    http::filter::{FilterChainError, FilterError},
 };
 
 use crate::core::Authentication;

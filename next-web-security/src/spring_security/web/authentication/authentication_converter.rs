@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use crate::core::{Authentication, AuthenticationError};
-use next_web_core::{clone_trait_object, traits::http::http_request::HttpRequest, DynClone};
+use next_web_core::{clone_trait_object, http::HttpRequest, DynClone};
 
 /// A strategy used to convert from an `HttpRequest` to an `Authentication`
 /// of a particular type. Used to authenticate with an appropriate

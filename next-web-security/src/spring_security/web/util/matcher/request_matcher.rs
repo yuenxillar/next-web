@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
-use next_web_core::{http::HttpMethod, traits::http::http_request::HttpRequest};
+use next_web_core::{http::HttpMethod, http::HttpRequest};
 
 use crate::web::util::matcher::ant_path_request_matcher::AntPathRequestMatcher;
 

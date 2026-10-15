@@ -62,6 +62,7 @@ use next_web_core::{
     error::BoxError,
     io::ResourceLoader,
     metrics::{ApplicationStartup, DefaultApplicationStartup},
+    util::time::current_time_millis,
 };
 use next_web_singletons::factory::{
     SingletonFactory,
@@ -1112,11 +1113,6 @@ impl Debug for DefaultApplicationContext {
             )
             .finish()
     }
-}
-
-/// Returns the current wall clock time in milliseconds since the Unix epoch.
-fn current_time_millis() -> i64 {
-    chrono::Utc::now().timestamp_millis()
 }
 
 /// The singleton container of an application context.

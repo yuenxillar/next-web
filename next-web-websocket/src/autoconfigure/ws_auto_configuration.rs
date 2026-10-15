@@ -132,7 +132,7 @@ mod tests {
         http::{Request, StatusCode},
     };
     use futures::{SinkExt, StreamExt};
-    use next_web_core::traits::http::http_response::HttpResponse;
+    use next_web_core::http::HttpResponse;
     use next_web_core::{any::AnyValue, async_trait, error::BoxError};
     use tokio::net::TcpListener;
     use tower::ServiceExt;
@@ -159,7 +159,7 @@ mod tests {
     impl HandshakeInterceptor for RejectSockJsRequest {
         async fn before_handshake(
             &self,
-            _request: &mut dyn next_web_core::traits::http::http_request::HttpRequest,
+            _request: &mut dyn next_web_core::http::HttpRequest,
             response: &mut dyn HttpResponse,
             _attributes: &mut HashMap<String, AnyValue>,
         ) -> Result<bool, BoxError> {
@@ -765,7 +765,7 @@ mod tests {
     impl HandshakeInterceptor for AttributeSetter {
         async fn before_handshake(
             &self,
-            _request: &mut dyn next_web_core::traits::http::http_request::HttpRequest,
+            _request: &mut dyn next_web_core::http::HttpRequest,
             _response: &mut dyn HttpResponse,
             attributes: &mut HashMap<String, AnyValue>,
         ) -> Result<bool, BoxError> {
@@ -1011,7 +1011,7 @@ mod tests {
     impl HandshakeInterceptor for IdentityFromHeader {
         async fn before_handshake(
             &self,
-            request: &mut dyn next_web_core::traits::http::http_request::HttpRequest,
+            request: &mut dyn next_web_core::http::HttpRequest,
             _response: &mut dyn HttpResponse,
             attributes: &mut HashMap<String, AnyValue>,
         ) -> Result<bool, BoxError> {

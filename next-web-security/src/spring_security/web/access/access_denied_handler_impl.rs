@@ -2,7 +2,7 @@ use next_web_core::{
     any::AnyValue,
     error::BoxError,
     http::StatusCode,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
     util::StringUtils,
 };
 use tracing::{debug, enabled, trace, Level};

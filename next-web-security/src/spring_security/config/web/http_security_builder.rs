@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use next_web_core::any::AnyClone;
-use next_web_core::traits::filter::HttpFilter;
+use next_web_core::http::filter::HttpFilter;
 
 use crate::{
     authentication::AuthenticationProvider,

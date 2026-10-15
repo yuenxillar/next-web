@@ -8,8 +8,8 @@ use axum::http::{StatusCode, Uri, uri::Authority};
 use next_web_core::any::AnyValue;
 use next_web_core::async_trait;
 use next_web_core::error::BoxError;
-use next_web_core::traits::http::http_request::HttpRequest;
-use next_web_core::traits::http::http_response::HttpResponse;
+use next_web_core::http::HttpRequest;
+use next_web_core::http::HttpResponse;
 use tracing::{debug, info};
 
 use crate::server::handshake_interceptor::HandshakeInterceptor;
@@ -412,8 +412,8 @@ mod tests {
         let universal = CorsConfiguration::new().set_allowed_origin_patterns(vec!["*".to_string()]);
         assert!(universal.check_origin(Some("https://evil.com:9999")));
 
-        let host_only = CorsConfiguration::new()
-            .set_allowed_origin_patterns(vec!["https://*".to_string()]);
+        let host_only =
+            CorsConfiguration::new().set_allowed_origin_patterns(vec!["https://*".to_string()]);
         assert!(host_only.check_origin(Some("https://anything.test")));
         assert!(!host_only.check_origin(Some("http://anything.test")));
     }

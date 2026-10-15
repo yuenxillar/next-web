@@ -1,8 +1,8 @@
 use std::{collections::HashSet, fmt::Debug, sync::Arc};
 
 use next_web_core::{
+    http::HttpRequest,
     http::MediaType,
-    traits::http::http_request::HttpRequest,
     web::accept::{ContentNegotiationStrategy, HeaderContentNegotiationStrategy},
 };
 

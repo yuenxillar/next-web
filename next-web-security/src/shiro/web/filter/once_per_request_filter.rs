@@ -4,7 +4,7 @@ use next_web_core::{
     error::BoxError,
     traits::{
         filter::{http_filter::HttpFilter, http_filter_chain::HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
+        http::{HttpRequest, HttpResponse},
         nameable::Nameable,
         named::Named,
         required::Required,

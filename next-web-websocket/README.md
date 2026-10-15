@@ -46,7 +46,7 @@ use std::{collections::HashMap, error::Error, sync::Arc};
 
 use next_web::core::any::AnyValue;
 use next_web::core::error::BoxError;
-use next_web::core::traits::http::http_request::HttpRequest;
+use next_web::core::http::HttpRequest;
 use next_web::core::traits::http::http_response::HttpResponse;
 use next_web::core::{ApplicationContext, async_trait};
 use next_web::macros::bind::singleton;

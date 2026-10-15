@@ -62,6 +62,6 @@ impl TimeUnit {
 pub fn current_time_millis() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }

@@ -56,8 +56,8 @@ impl HstsHeaderWriter {
 impl HeaderWriter for HstsHeaderWriter {
     fn write_headers(
         &self,
-        request: &dyn next_web_core::traits::http::http_request::HttpRequest,
-        response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
+        request: &dyn next_web_core::http::HttpRequest,
+        response: &mut dyn next_web_core::http::HttpResponse,
     ) {
         if !self.request_matcher.matches(request) {
             if enabled!(Level::TRACE) {
@@ -92,10 +92,7 @@ impl Default for HstsHeaderWriter {
 struct SecureRequestMatcher;
 
 impl RequestMatcher for SecureRequestMatcher {
-    fn matches(
-        &self,
-        request: &dyn next_web_core::traits::http::http_request::HttpRequest,
-    ) -> bool {
+    fn matches(&self, request: &dyn next_web_core::http::HttpRequest) -> bool {
         request.is_secure()
     }
 }

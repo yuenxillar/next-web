@@ -38,7 +38,7 @@ pub(crate) mod test_support {
         http::{buffer_request_body, form_parameters},
         traits::{
             filter::{HttpFilter, HttpFilterChain},
-            http::{http_request::HttpRequest, http_response::HttpResponse},
+            http::{HttpRequest, HttpResponse},
         },
     };
     use serde_json::Value;

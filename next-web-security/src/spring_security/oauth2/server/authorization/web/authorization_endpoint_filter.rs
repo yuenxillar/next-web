@@ -5,13 +5,11 @@ use std::{collections::HashMap, sync::Arc};
 use next_web_core::{
     any::AnyValue,
     async_trait,
-    filter::FilterError,
-    http::HttpMethod,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        filter::{FilterError, HttpFilter, HttpFilterChain},
+        HttpMethod, HttpRequest, HttpResponse,
     },
+    traits::named::Named,
 };
 
 use super::{
@@ -239,19 +237,14 @@ impl AuthorizationEndpointFilter {
             .pushed_authorization_requests()
             .consume(request_uri)
             .ok_or_else(|| {
-                OAuth2Error::invalid_request(
-                    "The request_uri is unknown or was used already",
-                )
+                OAuth2Error::invalid_request("The request_uri is unknown or was used already")
             })?;
         if pushed.is_expired(now()) {
-            return Err(OAuth2Error::invalid_request(
-                "The request_uri is expired",
-            ));
+            return Err(OAuth2Error::invalid_request("The request_uri is expired"));
         }
 
-        let client_id = form_parameter(request, "client_id").ok_or_else(|| {
-            OAuth2Error::invalid_request("The client_id parameter is required")
-        })?;
+        let client_id = form_parameter(request, "client_id")
+            .ok_or_else(|| OAuth2Error::invalid_request("The client_id parameter is required"))?;
         let registered_client = self
             .context
             .registered_clients()

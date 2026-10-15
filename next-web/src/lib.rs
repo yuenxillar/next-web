@@ -1,6 +1,5 @@
 pub mod autoconfigure;
 pub mod autoregister;
-pub mod configurer;
 pub mod context;
 pub mod diagnostics;
 pub mod env;

@@ -4,8 +4,7 @@ use std::{
 };
 
 use next_web_core::{
-    http::{HttpMethod, MediaType},
-    traits::filter::HttpFilter,
+    http::{filter::HttpFilter, HttpMethod, MediaType},
     web::accept::{ContentNegotiationStrategy, HeaderContentNegotiationStrategy},
 };
 

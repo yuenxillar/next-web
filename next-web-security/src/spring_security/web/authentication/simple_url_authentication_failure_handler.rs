@@ -4,7 +4,7 @@ use std::sync::Arc;
 use next_web_core::http::StatusCode;
 use next_web_core::{
     error::BoxError,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 use tracing::{debug, enabled, trace, Level};
 

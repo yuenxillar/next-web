@@ -427,11 +427,64 @@ fn every_instance_of_a_type_is_keyed_by_its_singleton_name() {
         context.contains(r#"cx . try_just_create_singletons_by_type :: < String > () ;"#),
         "{context}"
     );
-    // The instances are keyed by their singleton name, like the owned variant
-    // of the attribute.
+    // The key is the name the instance was registered under, which only the
+    // context knows: the instance itself is never asked for it, because requiring
+    // a `singleton_name()` method would mean every injectable type had to
+    // implement a trait it has no use for.
     assert!(
-        instances.contains(r#"instance . singleton_name ()"#),
+        instances.contains("get_singletons_by_type_with_names"),
         "{instances}"
     );
     assert_eq!(args, "ref_0");
+}
+
+#[test]
+fn a_map_of_instances_takes_whatever_map_was_declared() {
+    // The macro does not decide which map it is: it collects the pairs and lets
+    // the declared type of the argument decide. So `BTreeMap` works as well as
+    // `HashMap`, and the generated code names the type that was written.
+    let (context, instances, args) = resolve_of(
+        r#"fn test_name(
+            #[autowired(map, ref = String)] names: BTreeMap<String, &String>,
+        ) -> String"#,
+        Color::Sync,
+    );
+
+    assert!(
+        context.contains(r#"cx . try_just_create_singletons_by_type :: < String > () ;"#),
+        "{context}"
+    );
+    assert!(
+        instances.contains("BTreeMap"),
+        "the map should be the one that was declared: {instances}"
+    );
+    assert!(
+        instances.contains("get_singletons_by_type_with_names"),
+        "the key is the name the context registered the instance under: {instances}"
+    );
+    assert_eq!(args, "ref_0");
+}
+
+#[test]
+fn an_owned_map_of_instances_also_takes_the_declared_map() {
+    let (context, instances, args) = resolve_of(
+        r#"fn test_name(
+            #[autowired(map)] names: BTreeMap<String, String>,
+        ) -> String"#,
+        Color::Sync,
+    );
+
+    // The two halves of the generated code, without depending on which of them a
+    // statement lands in.
+    let generated = format!("{context}\n{instances}");
+
+    assert!(
+        generated.contains("BTreeMap"),
+        "the map should be the one that was declared: {generated}"
+    );
+    assert!(
+        generated.contains("resolve_by_type"),
+        "an owned map resolves the instances: {generated}"
+    );
+    assert!(!args.is_empty(), "the map is passed as an argument");
 }

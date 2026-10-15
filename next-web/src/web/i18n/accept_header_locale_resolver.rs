@@ -12,7 +12,7 @@
 use std::ops::{Deref, DerefMut};
 
 use next_web_context::Locale;
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::http::{HttpRequest, HttpResponse};
 
 use crate::i18n::{LocaleResolver, LocaleResolverError};
 use crate::web::i18n::base_locale_resolver::BaseLocaleResolver;

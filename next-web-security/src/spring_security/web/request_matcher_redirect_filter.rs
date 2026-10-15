@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
 use next_web_core::async_trait;
-use next_web_core::filter::FilterError;
-use next_web_core::traits::filter::{HttpFilter, HttpFilterChain};
-use next_web_core::traits::http::http_request::HttpRequest;
-use next_web_core::traits::http::http_response::HttpResponse;
+use next_web_core::http::filter::{FilterError, HttpFilter, HttpFilterChain};
+use next_web_core::http::HttpRequest;
+use next_web_core::http::HttpResponse;
 use next_web_core::traits::named::Named;
 
 use crate::web::util::matcher::RequestMatcher;

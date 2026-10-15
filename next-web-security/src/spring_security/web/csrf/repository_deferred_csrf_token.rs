@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
+    http::{HttpRequest, HttpResponse},
     http::{HttpRequestShare, HttpResponseShare},
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
 use crate::web::csrf::{CsrfToken, CsrfTokenRepository, DeferredCsrfToken};

@@ -23,7 +23,7 @@ pub mod server;
 ))]
 pub mod jose;
 
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::http::HttpRequest;
 
 #[cfg(feature = "oauth2-client")]
 pub use client::web::{
@@ -35,19 +35,18 @@ pub use client::web::{
 pub use client::{
     AuthorizationCodeOAuth2AuthorizedClientProvider, ClientAuthorizationRequiredError,
     ClientRegistration, ClientRegistrationRepository, DefaultOAuth2AuthorizedClientManager,
-    DefaultOAuth2UserService, DelegatingOAuth2AuthorizedClientProvider,
-    InMemoryClientRegistrationRepository, NullOAuth2AuthorizedClientService,
-    OAuth2AccessTokenResponseClient, OAuth2AuthorizationCodeAuthenticationProvider,
-    OAuth2AuthorizationCodeAuthenticationToken, OAuth2AuthorizationCodeAuthenticationTokenBuilder,
-    OAuth2AuthorizationCodeGrantRequest, OAuth2AuthorizationContext, OAuth2AuthorizeError,
-    OAuth2AuthorizeRequest, OAuth2AuthorizedClient, OAuth2AuthorizedClientManager,
-    OAuth2AuthorizedClientProvider, OAuth2AuthorizedClientService,
-    OAuth2LoginAuthenticationProvider, OAuth2LoginAuthenticationToken,
-    OAuth2LoginAuthenticationTokenBuilder, OAuth2UserRequest, OAuth2UserService,
-    OidcAuthenticationRequestChecker, OidcUser, OidcUserRequest, OidcUserService,
-    DefaultOidcIdTokenValidator, OidcIdToken, OidcIdTokenValidator,
-    OidcLoginAuthenticationProvider, RestClientAuthorizationCodeTokenResponseClient,
-    OidcUserAuthority, REQUEST_SCOPE_ATTRIBUTE_NAME,
+    DefaultOAuth2UserService, DefaultOidcIdTokenValidator,
+    DelegatingOAuth2AuthorizedClientProvider, InMemoryClientRegistrationRepository,
+    NullOAuth2AuthorizedClientService, OAuth2AccessTokenResponseClient,
+    OAuth2AuthorizationCodeAuthenticationProvider, OAuth2AuthorizationCodeAuthenticationToken,
+    OAuth2AuthorizationCodeAuthenticationTokenBuilder, OAuth2AuthorizationCodeGrantRequest,
+    OAuth2AuthorizationContext, OAuth2AuthorizeError, OAuth2AuthorizeRequest,
+    OAuth2AuthorizedClient, OAuth2AuthorizedClientManager, OAuth2AuthorizedClientProvider,
+    OAuth2AuthorizedClientService, OAuth2LoginAuthenticationProvider,
+    OAuth2LoginAuthenticationToken, OAuth2LoginAuthenticationTokenBuilder, OAuth2UserRequest,
+    OAuth2UserService, OidcAuthenticationRequestChecker, OidcIdToken, OidcIdTokenValidator,
+    OidcLoginAuthenticationProvider, OidcUser, OidcUserAuthority, OidcUserRequest, OidcUserService,
+    RestClientAuthorizationCodeTokenResponseClient, REQUEST_SCOPE_ATTRIBUTE_NAME,
 };
 pub use core::{
     endpoint::{
@@ -81,7 +80,7 @@ fn decode(value: &str) -> String {
 mod tests {
     use axum::{body::Body, extract::Request as AxumRequest};
 
-    use next_web_core::traits::http::http_request::HttpRequest;
+    use next_web_core::http::HttpRequest;
 
     use std::sync::Arc;
 

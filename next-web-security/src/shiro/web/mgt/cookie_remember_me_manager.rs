@@ -3,7 +3,7 @@ use std::{ops::Deref, sync::Arc};
 use base64::{prelude::BASE64_STANDARD, Engine};
 use next_web_core::{
     error::BoxError,
-    traits::http::{
+   http::{
         http_request::{HttpRequest, IDENTITY_REMOVED_KEY},
         http_response::HttpResponse,
     },

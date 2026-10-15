@@ -6,7 +6,7 @@ use std::{
 use next_web_core::{
     any::AnyValue,
     async_trait,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
 };
 use tracing::{debug, error, trace};
 

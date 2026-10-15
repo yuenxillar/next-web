@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::{
     error::BoxError,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
     util::StringUtils,
 };
 use tracing::{debug, warn};

@@ -1,7 +1,6 @@
 use next_web::{Application, NextWebApplication};
 use next_web_data_database::transactional::transactionl_executor::TransactionalExecutor;
 
-use next_web::extract::find_singleton::FindSingleton;
 use next_web::macros::bind::{get_mapping, post_mapping};
 use next_web_data_database::service::database_service::DatabaseService;
 

@@ -3,7 +3,7 @@ use std::{fmt::Debug, sync::Arc};
 use next_web_context::{support::MessageSourceAccessor, MessageSource};
 use next_web_core::{
     async_trait,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 
 use crate::{

@@ -1,7 +1,7 @@
 use tracing::trace;
 
 use crate::web::csrf::CsrfToken;
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::http::HttpRequest;
 
 /// Implementations of this interface are capable of resolving the token value of a CsrfToken from the
 /// provided HttpRequest. Used by the CsrfFilter.

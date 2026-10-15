@@ -5,7 +5,7 @@ use next_web_core::{
     async_trait,
     error::BoxError,
     http::CookieBuilder,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{HttpRequest, HttpResponse},
     util::WebUtils,
     Uuid,
 };

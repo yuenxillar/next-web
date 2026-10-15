@@ -4,7 +4,7 @@ use next_web_context::ApplicationEventPublisher;
 use next_web_core::{
     async_trait,
     http::session::HttpSession,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 use tracing::{debug, enabled, warn, Level};
 

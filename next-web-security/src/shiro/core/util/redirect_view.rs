@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
-use next_web_core::traits::http::http_request::HttpRequest;
-use next_web_core::traits::http::http_response::HttpResponse;
+use next_web_core::http::HttpRequest;
+use next_web_core::http::HttpResponse;
 use std::collections::HashMap;
 use std::fmt;
 use urlencoding::encode;

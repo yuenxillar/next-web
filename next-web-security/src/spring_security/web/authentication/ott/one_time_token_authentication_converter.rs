@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use next_web_core::{traits::http::http_request::HttpRequest, util::StringUtils};
+use next_web_core::{http::HttpRequest, util::StringUtils};
 use tracing::debug;
 
 use crate::{

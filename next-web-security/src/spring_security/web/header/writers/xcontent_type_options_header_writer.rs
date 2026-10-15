@@ -15,8 +15,8 @@ impl Default for XContentTypeOptionsHeaderWriter {
 impl HeaderWriter for XContentTypeOptionsHeaderWriter {
     fn write_headers(
         &self,
-        request: &dyn next_web_core::traits::http::http_request::HttpRequest,
-        response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
+        request: &dyn next_web_core::http::HttpRequest,
+        response: &mut dyn next_web_core::http::HttpResponse,
     ) {
         self.0.write_headers(request, response);
     }

@@ -19,7 +19,7 @@ use crate::{
 };
 use next_web_core::error::BoxError;
 #[cfg(feature = "web")]
-use next_web_core::traits::http::http_response::HttpResponse;
+use next_web_core::http::HttpResponse;
 
 #[derive(Clone)]
 pub struct DefaultRememberMeManager<C = AesCipherService> {

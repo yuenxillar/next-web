@@ -47,22 +47,22 @@ use std::sync::Arc;
 
 use axum::routing::get;
 use next_web::{
-    core::{traits::apply_router::ApplyRouter, ApplicationContext, Ordered},
-    macros::{autoconfigure::configuration, bind::singleton},
     Application, NextWebApplication,
+    core::{ApplicationContext, Ordered, traits::apply_router::ApplyRouter},
+    macros::{autoconfigure::configuration, bind::singleton},
 };
 use next_web_context::{ApplicationEvent, ApplicationEventPublisher};
 use next_web_core::error::BoxError;
 use next_web_security::{
     authentication::dao::DaoAuthenticationProvider,
-    config::web::{builders::HttpSecurity, HttpSecurityBuilder, WebSecurityConfigurer},
+    config::web::{HttpSecurityBuilder, WebSecurityConfigurer, builders::HttpSecurity},
     core::userdetails::User,
     crypto::bcrypt::BCryptPasswordEncoder,
     crypto::password::PasswordEncoder,
     oauth2::{
         client::{
-            registration::ClientAuthenticationMethod as ClientAuthMethod, ClientRegistration,
-            InMemoryClientRegistrationRepository,
+            ClientRegistration, InMemoryClientRegistrationRepository,
+            registration::ClientAuthenticationMethod as ClientAuthMethod,
         },
         server::{
             authorization::{
@@ -388,8 +388,8 @@ pub fn demo_login_client() -> ClientRegistration {
 ///
 /// The user details service of the example, whose user is `user` with the
 /// password `password`.
-pub fn demo_user_details_service(
-) -> Arc<dyn next_web_security::core::userdetails::UserDetailsService> {
+pub fn demo_user_details_service()
+-> Arc<dyn next_web_security::core::userdetails::UserDetailsService> {
     let password = BCryptPasswordEncoder::default()
         .encode(Some("password"))
         .expect("the password of the demo user is encoded")
@@ -515,7 +515,7 @@ mod tests {
     use axum::{
         body::Body,
         extract::Request,
-        http::{header, StatusCode},
+        http::{StatusCode, header},
         response::Response,
     };
     use next_web_core::{
@@ -523,7 +523,7 @@ mod tests {
         http::buffer_request_body,
         traits::{
             filter::{HttpFilter, HttpFilterChain},
-            http::{http_request::HttpRequest, http_response::HttpResponse},
+            http::{HttpRequest, HttpResponse},
         },
     };
     use next_web_security::{
@@ -532,20 +532,19 @@ mod tests {
             authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
             security_builder::SecurityBuilder, web::builders::HttpSecurity,
         },
-        core::{context::SecurityContextHolder, Authentication, Principal},
+        core::{Authentication, Principal, context::SecurityContextHolder},
         oauth2::server::resource::{
-            jwt::{JwtDecoder, NimbusJwtDecoder},
             OpaqueTokenIntrospector,
+            jwt::{JwtDecoder, NimbusJwtDecoder},
         },
         web::security_filter_chain::SecurityFilterChain,
     };
 
     use super::{
-        configure_oauth2_authorization_server,
-        configure_oauth2_authorization_server_with_settings, ASSERTION_CLIENT_ID,
-        ASSERTION_CLIENT_SECRET, CONSENT_CLIENT_ID, CONSENT_CLIENT_SECRET, DEMO_CLIENT_ID,
-        DEMO_CLIENT_SECRET, DEMO_INITIAL_ACCESS_TOKEN, DEMO_ISSUER, DEMO_LOGIN_REDIRECT_URI,
-        DEMO_REDIRECT_URI, LOGIN_CLIENT_ID, LOGIN_CLIENT_SECRET,
+        ASSERTION_CLIENT_ID, ASSERTION_CLIENT_SECRET, CONSENT_CLIENT_ID, CONSENT_CLIENT_SECRET,
+        DEMO_CLIENT_ID, DEMO_CLIENT_SECRET, DEMO_INITIAL_ACCESS_TOKEN, DEMO_ISSUER,
+        DEMO_LOGIN_REDIRECT_URI, DEMO_REDIRECT_URI, LOGIN_CLIENT_ID, LOGIN_CLIENT_SECRET,
+        configure_oauth2_authorization_server, configure_oauth2_authorization_server_with_settings,
     };
 
     /// Reads the claims of an identifier token.
@@ -631,7 +630,7 @@ mod tests {
             .uri(path)
             .header("Content-Type", "application/x-www-form-urlencoded");
         if let Some((client_id, client_secret)) = client {
-            use base64::{engine::general_purpose::STANDARD, Engine};
+            use base64::{Engine, engine::general_purpose::STANDARD};
 
             let credentials = STANDARD.encode(format!("{client_id}:{client_secret}"));
             builder = builder.header("Authorization", format!("Basic {credentials}"));
@@ -1097,9 +1096,11 @@ mod tests {
         let token = json_body(response).await;
         assert_eq!(token["token_type"], "Bearer");
         assert_eq!(token["scope"], "read");
-        assert!(token["access_token"]
-            .as_str()
-            .is_some_and(|value| value.starts_with("ey")));
+        assert!(
+            token["access_token"]
+                .as_str()
+                .is_some_and(|value| value.starts_with("ey"))
+        );
         assert!(
             token["refresh_token"].as_str().is_some(),
             "a refresh token is issued"
@@ -1573,12 +1574,7 @@ mod tests {
             .set_issuer_uri(super::DEMO_ISSUER);
         let validator = DefaultOidcIdTokenValidator::default();
         let validated = validator
-            .validate(
-                &registration,
-                &id_token,
-                None,
-                Some(access_token.as_str()),
-            )
+            .validate(&registration, &id_token, None, Some(access_token.as_str()))
             .await
             .expect("the identifier token of the server is verified");
 
@@ -1597,10 +1593,12 @@ mod tests {
         parts[1] = &payload;
         let tampered = parts.join(".");
 
-        assert!(validator
-            .validate(&registration, &tampered, None, Some(access_token.as_str()))
-            .await
-            .is_err());
+        assert!(
+            validator
+                .validate(&registration, &tampered, None, Some(access_token.as_str()))
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -1730,7 +1728,7 @@ mod tests {
             next_web_core::http::buffer_request_body(&mut request, bytes);
 
             let chain = ApplicationFilterChain::new(filters);
-            next_web_core::traits::http::http_request::HttpRequest::ready(&mut request);
+            next_web_core::http::HttpRequest::ready(&mut request);
             let mut response = Response::new(Body::empty());
 
             chain
@@ -1802,10 +1800,12 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::CREATED);
         let body = json_body(response).await;
-        assert!(body["request_uri"]
-            .as_str()
-            .expect("the response carries the request URI")
-            .starts_with("urn:ietf:params:oauth:request_uri:"));
+        assert!(
+            body["request_uri"]
+                .as_str()
+                .expect("the response carries the request URI")
+                .starts_with("urn:ietf:params:oauth:request_uri:")
+        );
         assert_eq!(body["expires_in"], 90);
     }
 
@@ -2015,20 +2015,19 @@ mod tests {
             .expect("the response carries the user code")
             .to_string();
         assert_eq!(body["interval"], 5);
-        assert!(body["verification_uri"]
-            .as_str()
-            .expect("the response carries the verification URI")
-            .ends_with("/oauth2/device_verification"));
+        assert!(
+            body["verification_uri"]
+                .as_str()
+                .expect("the response carries the verification URI")
+                .ends_with("/oauth2/device_verification")
+        );
 
         // The device polls before the resource owner answered.
         let poll = |device_code: &str| {
             token_request(
                 "/oauth2/token",
                 &[
-                    (
-                        "grant_type",
-                        "urn:ietf:params:oauth:grant-type:device_code",
-                    ),
+                    ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
                     ("device_code", device_code),
                 ],
                 Some((DEMO_CLIENT_ID, DEMO_CLIENT_SECRET)),
@@ -2036,17 +2035,18 @@ mod tests {
         };
         let response = run(&filters, poll(&device_code)).await;
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(
-            json_body(response).await["error"],
-            "authorization_pending"
-        );
+        assert_eq!(json_body(response).await["error"], "authorization_pending");
 
         // The resource owner enters the user code and approves the request.
         {
             let _resource_owner = SignedInResourceOwner::new();
             let response = run(
                 &filters,
-                token_request("/oauth2/device_verification", &[("user_code", &user_code)], None),
+                token_request(
+                    "/oauth2/device_verification",
+                    &[("user_code", &user_code)],
+                    None,
+                ),
             )
             .await;
             assert_eq!(response.status(), StatusCode::OK);
@@ -2096,10 +2096,7 @@ mod tests {
             token_request(
                 "/oauth2/token",
                 &[
-                    (
-                        "grant_type",
-                        "urn:ietf:params:oauth:grant-type:device_code",
-                    ),
+                    ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
                     ("device_code", &device_code),
                 ],
                 Some((DEMO_CLIENT_ID, DEMO_CLIENT_SECRET)),
@@ -2119,7 +2116,10 @@ mod tests {
             .method("POST")
             .uri("/connect/register")
             .header("Content-Type", "application/json")
-            .header("Authorization", format!("Bearer {DEMO_INITIAL_ACCESS_TOKEN}"))
+            .header(
+                "Authorization",
+                format!("Bearer {DEMO_INITIAL_ACCESS_TOKEN}"),
+            )
             .body(Body::empty())
             .expect("the request is built");
         buffer_request_body(
@@ -2135,7 +2135,10 @@ mod tests {
         let response = run(&filters, request).await;
         assert_eq!(response.status(), StatusCode::CREATED);
         let body = json_body(response).await;
-        let client_id = body["client_id"].as_str().expect("the client id").to_string();
+        let client_id = body["client_id"]
+            .as_str()
+            .expect("the client id")
+            .to_string();
         let client_secret = body["client_secret"]
             .as_str()
             .expect("the client secret")
@@ -2360,6 +2363,9 @@ mod tests {
             .expect("the token is active");
 
         assert_eq!(principal.name().as_ref(), DEMO_CLIENT_ID);
-        assert_eq!(principal.attributes().get("active").map(String::as_str), Some("true"));
+        assert_eq!(
+            principal.attributes().get("active").map(String::as_str),
+            Some("true")
+        );
     }
 }

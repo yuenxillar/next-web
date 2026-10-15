@@ -5,8 +5,8 @@ use next_web_core::{
     error::BoxError,
     filter::FilterError,
     http::StatusCode,
+    http::{HttpRequest, HttpResponse},
     traits::filter::{HttpFilter, HttpFilterChain},
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
     traits::named::Named,
     traits::required::Required,
 };

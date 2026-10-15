@@ -6,9 +6,9 @@
 //! bytes, and the committed flag. It implements [`HttpResponse`] as well, so a
 //! snapshot can be treated like any other response.
 
-use axum::http::{header::LOCATION, HeaderMap, HeaderName, HeaderValue, StatusCode, Version};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Version, header::LOCATION};
 
-use crate::{http::Cookie, traits::http::http_response::HttpResponse};
+use crate::{http::Cookie, http::HttpResponse};
 
 /// A cloneable, transport-independent snapshot of an HTTP response.
 ///
@@ -21,7 +21,7 @@ use crate::{http::Cookie, traits::http::http_response::HttpResponse};
 /// ```
 /// use axum::{body::Body, http::StatusCode, response::Response};
 /// use next_web_core::http::HttpResponseShare;
-/// use next_web_core::traits::http::http_response::HttpResponse;
+/// use next_web_core::http::HttpResponse;
 ///
 /// let response = Response::builder()
 ///     .status(StatusCode::CREATED)
@@ -195,6 +195,10 @@ impl HttpResponse for HttpResponseShare {
 
     fn set_body(&mut self, body: Vec<u8>) {
         self.body = body;
+        // The trait promises that writing a body commits the response, and the
+        // implementation on an axum `Response` does commit. A snapshot that did
+        // not would report a different state for the same write.
+        self.committed = true;
     }
 
     fn body(&self) -> &[u8] {
@@ -255,7 +259,7 @@ mod tests {
     };
 
     use super::HttpResponseShare;
-    use crate::{http::Cookie, traits::http::http_response::HttpResponse};
+    use crate::{http::Cookie, http::HttpResponse};
 
     #[test]
     fn a_new_snapshot_defaults_to_ok() {
@@ -331,5 +335,20 @@ mod tests {
         snapshot.set_body(b"hello".to_vec());
 
         assert_eq!(snapshot.body(), b"hello");
+    }
+
+    #[test]
+    fn setting_a_body_commits_the_snapshot_too() {
+        let mut snapshot = HttpResponseShare::new();
+        assert!(!snapshot.is_committed());
+
+        snapshot.set_body(b"hello".to_vec());
+
+        assert!(
+            snapshot.is_committed(),
+            "the trait promises that writing a body commits the response, and an \
+             axum response does commit — a snapshot must not report a different state \
+             for the same write"
+        );
     }
 }

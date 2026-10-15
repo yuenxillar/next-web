@@ -365,7 +365,7 @@ mod tests {
     use futures::{SinkExt, StreamExt};
     use next_web_core::{
         any::AnyValue, async_trait, error::BoxError,
-        traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+       http::{HttpRequest, HttpResponse},
     };
     use tokio::net::TcpListener;
     use tokio_tungstenite::tungstenite;

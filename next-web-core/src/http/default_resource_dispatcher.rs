@@ -36,11 +36,8 @@ use std::{
 
 use crate::{
     error::BoxError,
+    http::{HttpRequest, HttpResponse, ResourceDispatcher},
     io::{ResourceLoader, web_resource_loader},
-    traits::http::{
-        http_request::HttpRequest, http_response::HttpResponse,
-        resource_dispatcher::ResourceDispatcher,
-    },
     web::TemplateEngine,
 };
 
@@ -364,12 +361,9 @@ mod tests {
 
     use super::{DefaultResourceDispatcher, content_type, percent_decode, resource_location};
     use crate::{
+        http::{HttpRequest, HttpResponse, ResourceDispatcher},
         http::{HttpResponseShare, StatusCode},
         io::{DefaultResourceLoader, ResourceLoader},
-        traits::http::{
-            http_request::HttpRequest, http_response::HttpResponse,
-            resource_dispatcher::ResourceDispatcher,
-        },
         web::ViewModel,
     };
 

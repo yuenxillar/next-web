@@ -1,4 +1,4 @@
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::http::HttpRequest;
 
 /// Maps HTTP ports to HTTPS ports and vice versa for redirects.
 /// Used by `HttpsRedirectFilter` to determine the correct port when redirecting.

@@ -194,8 +194,8 @@ mod behaviour {
         use next_web_core::any::AnyValue;
         use next_web_core::async_trait;
         use next_web_core::error::BoxError;
-        use next_web_core::traits::http::http_request::HttpRequest;
-        use next_web_core::traits::http::http_response::HttpResponse;
+        use next_web_core::http::HttpRequest;
+        use next_web_core::http::HttpResponse;
         use std::collections::HashMap;
 
         struct TestInterceptor;

@@ -8,12 +8,11 @@ use next_web_context::{ApplicationEventPublisher, MessageSource};
 use next_web_core::{
     async_trait,
     error::BoxError,
-    filter::FilterError,
-    traits::{
-        filter::HttpFilterChain,
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        filter::{FilterError, HttpFilterChain},
+        HttpRequest, HttpResponse,
     },
+    traits::named::Named,
 };
 use tracing::{debug, enabled, trace, Level};
 

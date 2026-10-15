@@ -1,4 +1,4 @@
-use crate::{error::BoxError, http::MediaType, traits::http::http_request::HttpRequest};
+use crate::{error::BoxError, http::HttpRequest, http::MediaType};
 
 /// A strategy for resolving the requested media types for a request.
 pub trait ContentNegotiationStrategy

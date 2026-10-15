@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
 };
 
 use crate::core::session::{Session, SessionError};

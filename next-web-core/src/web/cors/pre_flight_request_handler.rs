@@ -1,6 +1,6 @@
 use crate::{
     error::BoxError,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 
 /// Handler for CORS pre-flight requests.

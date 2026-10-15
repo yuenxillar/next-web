@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use next_web_core::{filter::CorsFilter, traits::filter::HttpFilter};
+use next_web_core::http::filter::{CorsFilter, HttpFilter};
 
 use crate::web::{
     access::{intercept::AuthorizationFilter, ErrorTranslationFilter},

@@ -7,12 +7,11 @@ use tracing::debug;
 
 use next_web_core::{
     async_trait,
-    filter::FilterError,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        filter::{FilterError, HttpFilter, HttpFilterChain},
+        HttpRequest, HttpResponse,
     },
+    traits::named::Named,
 };
 
 use crate::{

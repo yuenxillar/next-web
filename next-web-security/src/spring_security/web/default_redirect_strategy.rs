@@ -1,7 +1,7 @@
 use next_web_core::{
     error::BoxError,
     http::{header::LOCATION, StatusCode},
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
 };
 use tracing::{debug, enabled, Level};
 

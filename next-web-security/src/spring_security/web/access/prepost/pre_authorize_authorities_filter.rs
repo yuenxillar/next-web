@@ -5,13 +5,12 @@ use std::sync::Arc;
 use next_web_core::{
     any::AnyValue,
     async_trait,
-    filter::FilterError,
-    security::{PreAuthorizeDenialHandler, AUTHORITIES_ATTRIBUTE, DENIAL_HANDLER_ATTRIBUTE},
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        filter::{FilterError, HttpFilter, HttpFilterChain},
+        HttpRequest, HttpResponse,
     },
+    security::{PreAuthorizeDenialHandler, AUTHORITIES_ATTRIBUTE, DENIAL_HANDLER_ATTRIBUTE},
+    traits::named::Named,
 };
 
 use crate::{

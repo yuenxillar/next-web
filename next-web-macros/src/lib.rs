@@ -43,6 +43,7 @@ use crate::resilience::{Pattern, apply};
 /// # Example
 ///
 /// ```rust
+/// # use next_web_macros::GetSet;
 /// #[derive(GetSet)]
 /// struct MyStruct {
 ///     #[get_set(skip)]
@@ -66,7 +67,8 @@ pub fn get_set(input: TokenStream) -> TokenStream {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```ignore
+/// # use next_web_macros::FieldName;
 /// #[derive(FieldName)]
 /// struct Person {
 ///     name: String,
@@ -96,7 +98,8 @@ pub fn field_name(input: TokenStream) -> TokenStream {
 /// Finally, the 'build()' method is used to construct the original structure instance
 ///
 /// ## Attention
-///     1. By default, even if the field is Option, the user still needs to assign a value to this field before the build method, unless the default auxiliary parameter is used
+///
+/// 1. By default, even if the field is Option, the user still needs to assign a value to this field before the build method, unless the default auxiliary parameter is used
 ///
 /// Support customizing field behavior through the '# [builder (...)]' attribute<br>
 /// Auxiliary parameters:<br>
@@ -106,7 +109,8 @@ pub fn field_name(input: TokenStream) -> TokenStream {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```ignore
+/// # use next_web_macros::Builder;
 /// #[derive(Builder)]
 /// struct User {
 ///     #[builder(into)]
@@ -115,7 +119,7 @@ pub fn field_name(input: TokenStream) -> TokenStream {
 /// }
 ///
 /// // Generate UserBuilder structure
-///  sturct UserBuilder {
+/// struct UserBuilder {
 ///     name: Option<String>,
 ///     age: Option<u32>,
 /// }
@@ -150,7 +154,7 @@ pub fn builder(input: TokenStream) -> TokenStream {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```ignore
 /// #[derive(RequiredArgsConstructor)]
 /// struct Person {
 ///     #[constructor(into)]
@@ -230,7 +234,7 @@ pub fn desensitize(input: TokenStream) -> TokenStream {
 /// - If `resources` attribute is provided, enables resource embedding from the specified folder
 ///
 /// # Example
-/// ```
+/// ```ignore
 /// use next_web::macros::application::next_application;
 ///
 /// /// Basic application without embedded resources
@@ -660,7 +664,7 @@ pub fn scheduled(args: TokenStream, input: TokenStream) -> TokenStream {
 /// You should use PostMapping or RequestMapping (method="POST")`
 ///
 /// # Example
-/// ```rust
+/// ```ignore
 /// #[idempotency(name = "myIdempotencyStore", key = "Idempotency-key", cache_key_prefix = "test", ttl = 6)]
 /// #[PostMapping(path = "/createOrder")]
 /// async fn create_order(order: String) -> impl IntoResponse {
@@ -804,7 +808,7 @@ pub fn order(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// The current function should return std:: result:: Result<T, E>type, where T is the normal return value type and E is the error type that needs to be retried
 ///
 /// # Example
-/// ```rust
+/// ```ignore
 ///
 /// #[derive(Debug)]
 /// enum TestMatch {
@@ -904,8 +908,12 @@ pub fn event_listener(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///   given expression instead.
 /// - `#[autowired(vec)]`: the field is a `Vec<T>` collecting every provider of
 ///   `T`.
-/// - `#[autowired(map)]`: the field is a `HashMap<String, T>` naming every
-///   provider of `T`; `T` has to implement `Singleton`.
+/// - `#[autowired(map)]`: the field is a `HashMap<String, T>` or a
+///   `BTreeMap<String, T>` naming every provider of `T`. Which map it is comes
+///   from the type the field is declared as. Each key is the name the context
+///   registered the instance under, so `T` does not have to implement
+///   `Singleton` — a type that knows nothing of this framework can be collected
+///   by name.
 /// - `#[autowired(ref)]`: the field takes a reference to the provider, which is
 ///   required when a type alias hides the reference of the field type.
 /// - A field or an argument declared as a reference, e.g. `&MyService` or
@@ -914,8 +922,19 @@ pub fn event_listener(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///   context first when it does not exist yet. The context lends any number of
 ///   immutable references, or a single mutable one, so a `&mut` field or
 ///   argument cannot be combined with another reference.
-/// - `#[value(key = "...")]`: the field takes the value of the given
-///   application property.
+/// - `#[value(key = "...")]`: the field is *configured* rather than injected —
+///   it takes the value of the application property the key names, and no
+///   provider is resolved for it. The value is parsed with `FromStr`, so a type
+///   that needs a unit, a `Duration` or a byte size, has to be wrapped in a type
+///   that parses itself.
+///
+///   A property that is not configured is not an error: the field takes the value
+///   of `default = <expression>` when the attribute names one, and
+///   `Default::default()` otherwise. A property that is configured but cannot be
+///   parsed is reported as a panic, because that is a mistake rather than an
+///   absence. Declare the field as an `Option<T>` when the property may be
+///   absent, which is how "not configured" is told apart from a value that is
+///   there.
 /// - `#[resource(path = ...)]`: path of the crate used by the generated code,
 ///   `::next_web_context` by default.
 ///

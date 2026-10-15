@@ -11,7 +11,7 @@ use axum::{extract::Request, response::Response};
 
 use crate::{
     http::{Cookie, session::SESSION_COOKIE_NAME},
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 
 /// The lifecycle of a request.
@@ -108,8 +108,8 @@ mod tests {
     use super::{RequestLifecycle, SESSION_COOKIE_NAME};
     use crate::{
         any::AnyValue,
+        http::HttpRequest,
         http::session::{generate_session_id, global_session_manager},
-        traits::http::http_request::HttpRequest,
     };
 
     /// Returns the session cookie of a response, if the response carries one.

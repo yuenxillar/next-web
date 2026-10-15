@@ -377,7 +377,7 @@ mod tests {
         use next_web_core::{
             error::BoxError,
             security::PreAuthorizeDenialHandler,
-            traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+           http::{HttpRequest, HttpResponse},
         };
 
         struct JsonRefusal;

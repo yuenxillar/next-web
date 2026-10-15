@@ -12,7 +12,7 @@ use std::{collections::HashMap, fmt, sync::Arc};
 
 use next_web_core::{
     any::AnyValue,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
 };
 
 use crate::{
@@ -551,7 +551,7 @@ mod tests {
             &self,
             authorized_client: OAuth2AuthorizedClient,
             _principal: &dyn Authentication,
-            _request: &dyn next_web_core::traits::http::http_request::HttpRequest,
+            _request: &dyn next_web_core::http::HttpRequest,
             _response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
         ) {
             self.authorized_clients.lock().unwrap().insert(
@@ -567,7 +567,7 @@ mod tests {
             &self,
             client_registration_id: &str,
             _principal: &dyn Authentication,
-            _request: &dyn next_web_core::traits::http::http_request::HttpRequest,
+            _request: &dyn next_web_core::http::HttpRequest,
         ) -> Option<OAuth2AuthorizedClient> {
             self.authorized_clients
                 .lock()

@@ -5,12 +5,11 @@ use next_web_context::{support::MessageSourceAccessor, MessageSource};
 use next_web_core::{
     async_trait,
     error::BoxError,
-    filter::{FilterChainError, FilterError},
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        filter::{FilterChainError, FilterError, HttpFilter, HttpFilterChain},
+        HttpRequest, HttpResponse,
     },
+    traits::named::Named,
 };
 
 use crate::{

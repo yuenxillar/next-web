@@ -5,9 +5,7 @@ use std::{
 };
 
 use next_web_context::ApplicationContextExt;
-use next_web_core::{
-    http::HttpMethod, traits::http::http_request::HttpRequest, ApplicationContext,
-};
+use next_web_core::{http::HttpMethod, http::HttpRequest, ApplicationContext};
 
 use crate::{
     authentication::{

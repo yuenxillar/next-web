@@ -2,7 +2,7 @@ use next_web_core::{
     any::AnyValue,
     async_trait,
     http::session::HttpSession,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 use std::sync::Arc;
 use tracing::{debug, enabled, trace, warn, Level};

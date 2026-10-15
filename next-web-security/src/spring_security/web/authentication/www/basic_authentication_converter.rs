@@ -7,7 +7,7 @@ use crate::{
     web::authentication::{AuthenticationConverter, WebAuthenticationDetailsSource},
 };
 use base64::Engine;
-use next_web_core::{traits::http::http_request::HttpRequest, util::StringUtils};
+use next_web_core::{http::HttpRequest, util::StringUtils};
 use std::sync::Arc;
 
 /// Converts from a `HttpServletRequest` to `UsernamePasswordAuthenticationToken` that

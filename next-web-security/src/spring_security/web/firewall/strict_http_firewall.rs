@@ -38,7 +38,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::http::{HttpRequest, HttpResponse};
 use next_web_core::Regex;
 
 use crate::web::firewall::request_rejected_error::RequestRejectedError;

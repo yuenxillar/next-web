@@ -5,7 +5,7 @@ use next_web_context::{support::MessageSourceAccessor, MessageSource};
 use next_web_core::{
     async_trait,
     http::Cookie,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
 };
 use tracing::debug;
 

@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, sync::OnceLock};
 
 use crate::web::util::matcher::{AnyRequestMatcher, MatchResult, RequestMatcher};
 use next_web_core::http::HttpMethod;
-use next_web_core::{traits::http::http_request::HttpRequest, util::pattern::PathPatternParser};
+use next_web_core::{http::HttpRequest, util::pattern::PathPatternParser};
 
 /// A request matcher that uses path patterns to match against each request.
 ///

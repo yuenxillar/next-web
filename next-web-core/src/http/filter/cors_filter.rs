@@ -3,12 +3,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::{
-    filter::FilterError,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        HttpRequest, HttpResponse,
+        filter::{FilterError, HttpFilter, HttpFilterChain},
     },
+    traits::named::Named,
     web::cors::{CorsConfigurationSource, CorsProcessor, CorsUtils, DefaultCorsProcessor},
 };
 

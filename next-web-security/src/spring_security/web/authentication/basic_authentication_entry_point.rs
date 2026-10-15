@@ -1,7 +1,7 @@
+use next_web_core::http::HttpResponse;
 use next_web_core::http::StatusCode;
-use next_web_core::traits::http::http_response::HttpResponse;
 use next_web_core::util::StringUtils;
-use next_web_core::{error::BoxError, traits::http::http_request::HttpRequest};
+use next_web_core::{error::BoxError, http::HttpRequest};
 
 use crate::{core::AuthenticationError, web::authentication_entry_point::AuthenticationEntryPoint};
 

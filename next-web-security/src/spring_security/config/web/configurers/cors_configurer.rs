@@ -5,7 +5,7 @@ use std::{
 
 use next_web_context::ApplicationContextExt;
 use next_web_core::{
-    filter::{CorsFilter, PreFlightRequestFilter},
+    http::filter::{CorsFilter, PreFlightRequestFilter},
     traits::required::Required,
     web::cors::{CorsConfigurationSource, PreFlightRequestHandler},
     ApplicationContext,

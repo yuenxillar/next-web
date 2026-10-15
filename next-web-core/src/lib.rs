@@ -4,7 +4,6 @@ pub mod context;
 pub mod convert;
 pub mod env;
 pub mod error;
-pub mod filter;
 pub mod http;
 pub mod io;
 pub mod macros;
@@ -39,9 +38,32 @@ pub use uuid::Uuid;
 #[cfg(feature = "http-request")]
 pub extern crate headers;
 
+/// A thread-safe, shared, type-erased value.
+///
+/// Equivalent to `Arc<dyn Any + Send + Sync>`. Useful for storing values
+/// of arbitrary types in shared containers (e.g., dependency injection
+/// registries, plugin systems, or event buses) that need to be accessed
+/// from multiple threads.
 pub type AnyObject = std::sync::Arc<dyn std::any::Any + Send + Sync>;
+
+/// A thread-safe, uniquely-owned, type-erased value.
+///
+/// Equivalent to `Box<dyn Any + Send + Sync>`. Useful when a value of an
+/// arbitrary type needs to be boxed and transferred by ownership, such as
+/// storing it in a collection and later downcasting it back to its
+/// concrete type.
 pub type BoxAny = std::boxed::Box<dyn std::any::Any + Send + Sync>;
-pub type BoxFuture<'a, T> = core::pin::Pin<std::boxed::Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// A boxed, pinned, thread-safe future with lifetime `'a`.
+///
+/// Equivalent to `Pin<Box<dyn Future<Output = T> + Send + 'a>>`. Commonly
+/// used as the return type of trait methods that need to be `async`,
+/// since `async fn` in traits is not directly supported in all cases.
+///
+/// The `Send` bound allows the future to be moved across threads. Remove
+/// it if the future does not need to be `Send`.
+pub type BoxFuture<'a, T> =
+    core::pin::Pin<std::boxed::Box<dyn core::future::Future<Output = T> + Send + 'a>>;
 
 mod next_version;
 mod ordered;

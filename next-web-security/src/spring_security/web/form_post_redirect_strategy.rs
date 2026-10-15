@@ -4,8 +4,8 @@ use std::borrow::Cow;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
-use next_web_core::traits::http::http_request::HttpRequest;
-use next_web_core::traits::http::http_response::HttpResponse;
+use next_web_core::http::HttpRequest;
+use next_web_core::http::HttpResponse;
 use next_web_core::{error::BoxError, util::HtmlUtils};
 use rand::RngCore;
 use std::fmt::Write;

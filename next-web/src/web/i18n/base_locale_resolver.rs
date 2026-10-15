@@ -9,7 +9,7 @@ use std::fmt;
 
 use next_web_context::Locale;
 use next_web_core::http::CookieError;
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::http::HttpRequest;
 
 /// The kind of a [`LocaleResolverError`].
 ///

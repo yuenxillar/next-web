@@ -1,8 +1,8 @@
 use std::{borrow::Cow, collections::HashMap, fmt};
 
 use next_web_core::{
+    http::HttpRequest,
     http::{Cookie, HttpMethod},
-    traits::http::http_request::HttpRequest,
 };
 
 use crate::web::{savedrequest::SavedRequest, util::UrlUtils};

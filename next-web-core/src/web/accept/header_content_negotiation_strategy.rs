@@ -1,5 +1,5 @@
 use crate::{
-    error::BoxError, http::MediaType, traits::http::http_request::HttpRequest, util::MimeTypeUtils,
+    error::BoxError, http::HttpRequest, http::MediaType, util::MimeTypeUtils,
     web::accept::ContentNegotiationStrategy,
 };
 

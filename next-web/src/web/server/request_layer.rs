@@ -8,7 +8,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::http::HttpRequest;
 
 #[cfg(feature = "enable-i18n")]
 use crate::web::i18n::LocaleResolver;
@@ -103,7 +103,7 @@ mod tests {
     use crate::web::i18n::RequestLocaleHolder;
     use axum::{Router, body::Body, routing::get};
     use next_web_context::Locale;
-    use next_web_core::traits::http::http_response::HttpResponse;
+    use next_web_core::http::HttpResponse;
     use tower::ServiceExt;
 
     /// A resolver that answers the locale of the test.

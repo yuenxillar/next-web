@@ -8,11 +8,8 @@ use std::sync::{
 use async_trait::async_trait;
 
 use crate::{
-    filter::FilterError,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-    },
+    http::filter::{FilterError, HttpFilter, HttpFilterChain},
+    http::{HttpRequest, HttpResponse},
 };
 
 /// Runs a fixed list of [`HttpFilter`]s in order.
@@ -39,7 +36,7 @@ use crate::{
 /// use std::sync::Arc;
 ///
 /// use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
-/// use next_web_core::traits::filter::HttpFilter;
+/// use next_web_core::http::filter::HttpFilter;
 ///
 /// let filters: Arc<[Arc<dyn HttpFilter>]> = Arc::from(Vec::new());
 /// let chain = ApplicationFilterChain::new(filters);
@@ -116,12 +113,11 @@ mod tests {
 
     use super::ApplicationFilterChain;
     use crate::{
-        filter::FilterError,
-        traits::{
-            filter::{HttpFilter, HttpFilterChain},
-            http::{http_request::HttpRequest, http_response::HttpResponse},
-            named::Named,
+        http::{
+            HttpRequest, HttpResponse,
+            filter::{FilterError, HttpFilter, HttpFilterChain},
         },
+        traits::named::Named,
     };
 
     #[derive(Clone)]

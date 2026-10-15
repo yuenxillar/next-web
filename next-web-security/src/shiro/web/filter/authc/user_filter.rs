@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use next_web_core::{
     async_trait,
     traits::{
-        http::{http_request::HttpRequest, http_response::HttpResponse},
+        http::{HttpRequest, HttpResponse},
         named::Named,
         required::Required,
     },

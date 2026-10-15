@@ -1,15 +1,12 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::idempotency_error::IdempotencyError, traits::to_error_response::ToErrorResponse,
-};
+use crate::error::idempotency_error::IdempotencyError;
 
 #[async_trait]
 pub trait IdempotencyStore
 where
     Self: Send + Sync,
-    Self: ToErrorResponse,
 {
     /// 存储值的类型
     type Value: Send + Sync + Clone + for<'de> Deserialize<'de> + Serialize;

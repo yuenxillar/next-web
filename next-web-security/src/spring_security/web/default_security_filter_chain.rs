@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::traits::{filter::HttpFilter, http::http_request::HttpRequest};
+use next_web_core::http::{filter::HttpFilter, HttpRequest};
 use tracing::debug;
 
 use crate::{web::security_filter_chain::SecurityFilterChain, web::util::matcher::RequestMatcher};

@@ -6,7 +6,7 @@ use tracing::{debug, trace};
 use crate::{
     error::BoxError,
     http::HttpMethod,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{HttpRequest, HttpResponse},
     web::cors::{CorsConfiguration, CorsProcessor, CorsUtils},
 };
 

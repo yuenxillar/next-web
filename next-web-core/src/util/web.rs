@@ -1,4 +1,4 @@
-use crate::{http::Cookie, traits::http::http_request::HttpRequest};
+use crate::{http::Cookie, http::HttpRequest};
 
 pub struct WebUtils;
 

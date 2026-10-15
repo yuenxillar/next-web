@@ -7,13 +7,11 @@ use std::{
 use next_web_core::{
     any::AnyValue,
     async_trait,
-    filter::FilterError,
-    http::HttpMethod,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        filter::{FilterError, HttpFilter, HttpFilterChain},
+        HttpMethod, HttpRequest, HttpResponse,
     },
+    traits::named::Named,
 };
 use tracing::{debug, trace};
 use tracing::{enabled, Level};

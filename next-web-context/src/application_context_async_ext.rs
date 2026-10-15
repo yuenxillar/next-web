@@ -179,6 +179,33 @@ pub trait ApplicationContextAsyncExt: ApplicationContext {
             .collect()
     }
 
+    /// Resolves every instance of the given type, with the names they are
+    /// registered under.
+    ///
+    /// The named counterpart of [`Self::resolve_by_type_async`], and the async
+    /// counterpart of
+    /// [`ApplicationContextExt::resolve_by_type_with_names`](crate::ApplicationContextExt::resolve_by_type_with_names).
+    ///
+    /// The names are taken from the keys of the type and paired with the instances
+    /// [`Self::resolve_by_type_async`] returns, which its own documentation
+    /// promises to hand back in the order of their keys. Both walk the same set of
+    /// keys for the same `TypeId`, so the two orders are the same order.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instances to resolve.
+    async fn resolve_by_type_with_names_async<T>(&mut self) -> Vec<(String, T)>
+    where
+        T: Send + Sync + 'static,
+    {
+        let names = self
+            .keys_of_type(std::any::TypeId::of::<T>())
+            .into_iter()
+            .map(|key| key.name.to_string());
+
+        names.zip(self.resolve_by_type_async::<T>().await).collect()
+    }
+
     /// Creates the instance registered under the given name, when it does not
     /// exist yet.
     ///

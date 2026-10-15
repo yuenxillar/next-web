@@ -1,6 +1,5 @@
 use next_web_core::{
-    constants::application_constants::APPLICATION_DEFAULT_PORT,
-    traits::http::http_request::HttpRequest, Regex,
+    constants::application_constants::APPLICATION_DEFAULT_PORT, http::HttpRequest, Regex,
 };
 use std::sync::LazyLock;
 

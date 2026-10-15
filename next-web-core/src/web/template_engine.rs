@@ -21,8 +21,8 @@ use tera::{Context, Tera};
 
 use crate::{
     error::BoxError,
+    http::HttpRequest,
     io::{ResourceLoader, web_resource_loader},
-    traits::http::http_request::HttpRequest,
 };
 
 /// The extensions that mark a resource as a template.
@@ -199,8 +199,8 @@ mod tests {
     use super::TemplateEngine;
     use crate::{
         any::AnyValue,
+        http::HttpRequest,
         io::{DefaultResourceLoader, ResourceLoader},
-        traits::http::http_request::HttpRequest,
         web::ViewModel,
     };
 

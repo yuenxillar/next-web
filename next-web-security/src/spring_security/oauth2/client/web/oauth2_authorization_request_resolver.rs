@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use next_web_core::{traits::http::http_request::HttpRequest, Uuid};
+use next_web_core::{http::HttpRequest, Uuid};
 
 use crate::{
     core::{AuthenticationError, AuthenticationErrorKind},

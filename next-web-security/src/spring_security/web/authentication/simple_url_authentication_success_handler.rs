@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::http::{HttpRequest, HttpResponse};
 
 use crate::{
     core::Authentication,

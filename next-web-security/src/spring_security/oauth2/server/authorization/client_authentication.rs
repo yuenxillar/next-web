@@ -4,7 +4,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 use next_web_core::any::AnyValue;
 use next_web_core::http::form_parameters;
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::http::HttpRequest;
 use serde_json::Value;
 
 use super::{
@@ -511,7 +511,7 @@ mod tests {
     use axum::{body::Body, extract::Request};
     use base64::{engine::general_purpose::STANDARD, Engine};
     use next_web_core::http::buffer_request_body;
-    use next_web_core::traits::http::http_request::HttpRequest;
+    use next_web_core::http::HttpRequest;
 
     use super::{authenticate_client, form_parameter, form_parameter_map};
     use crate::oauth2::server::authorization::{

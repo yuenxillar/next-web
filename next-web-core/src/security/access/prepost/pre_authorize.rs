@@ -27,11 +27,8 @@ use axum::{
 use crate::{
     any::AnyValue,
     error::BoxError,
+    http::{HttpRequest, HttpResponse, ResourceDispatcher},
     security::current_authorities,
-    traits::http::{
-        http_request::HttpRequest, http_response::HttpResponse,
-        resource_dispatcher::ResourceDispatcher,
-    },
     web::ViewModel,
 };
 
@@ -508,9 +505,7 @@ mod tests {
     async fn the_guard_reads_the_authorities_of_the_request() {
         use axum::extract::FromRequestParts;
 
-        use crate::{
-            any::AnyValue, security::AUTHORITIES_ATTRIBUTE, traits::http::http_request::HttpRequest,
-        };
+        use crate::{any::AnyValue, http::HttpRequest, security::AUTHORITIES_ATTRIBUTE};
 
         let mut request = axum::extract::Request::new(axum::body::Body::empty());
         HttpRequest::ready(&mut request);
@@ -533,7 +528,7 @@ mod tests {
     async fn a_refused_request_is_rendered_by_the_handler_of_the_application() {
         use std::sync::Arc;
 
-        use crate::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+        use crate::http::{HttpRequest, HttpResponse};
 
         struct JsonRefusal;
 
@@ -588,8 +583,8 @@ mod tests {
 
         use crate::{
             any::AnyValue,
+            http::{HttpRequest, HttpResponse},
             security::{AUTHORITIES_ATTRIBUTE, DENIAL_HANDLER_ATTRIBUTE},
-            traits::http::{http_request::HttpRequest, http_response::HttpResponse},
         };
 
         /// A refusal that answers with an attribute of the request.

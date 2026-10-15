@@ -4,7 +4,7 @@
 
 use next_web_core::{
     any::AnyValue,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
 };
 
 use crate::oauth2::OAuth2AuthorizationRequest;

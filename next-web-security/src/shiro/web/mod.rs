@@ -2,7 +2,7 @@ pub mod proxied_filter_chain;
 use std::fmt::Write;
 
 use chrono::Utc;
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::http::{HttpRequest, HttpResponse};
 use tracing::{debug, warn};
 
 pub mod mgt;

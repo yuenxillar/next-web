@@ -15,7 +15,7 @@
 
 use axum::http::header;
 use axum::{
-    body::Body,
+    body::{Body, Bytes},
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Version},
     response::Response,
 };
@@ -28,6 +28,22 @@ use crate::http::{Cookie, HttpResponseShare};
 /// back by [`HttpResponse::is_committed`].
 #[derive(Clone, Copy)]
 struct Committed;
+
+/// The body bytes a response was given through [`HttpResponse::set_body`].
+///
+/// An axum [`Response`] holds a streaming body, which cannot be borrowed, so the
+/// bytes are kept beside it: a filter, or the snapshot an event carries, can then
+/// read what was written instead of finding an empty body. The bytes are shared
+/// rather than copied, so keeping them costs a reference count.
+#[derive(Clone)]
+struct WrittenBody(Bytes);
+
+impl WrittenBody {
+    /// Returns the bytes that were written.
+    fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 /// The servlet-style view of an HTTP response.
 ///
@@ -205,8 +221,23 @@ impl HttpResponse for Response {
     }
 
     fn set_body(&mut self, body: Vec<u8>) {
-        *self.body_mut() = Body::from(body);
+        let bytes = Bytes::from(body);
+        *self.body_mut() = Body::from(bytes.clone());
+        self.extensions_mut().insert(WrittenBody(bytes));
         self.commit();
+    }
+
+    /// Returns the body this framework wrote, when it wrote one.
+    ///
+    /// A body a handler handed to axum directly is a stream that cannot be
+    /// borrowed, so it is not readable here. The bytes [`HttpResponse::set_body`]
+    /// wrote are kept in the response extensions, and those are what this returns;
+    /// without them a snapshot of the response could never carry a body.
+    fn body(&self) -> &[u8] {
+        self.extensions()
+            .get::<WrittenBody>()
+            .map(WrittenBody::as_bytes)
+            .unwrap_or_default()
     }
 
     fn set_redirect(&mut self, url: &str) {
@@ -298,15 +329,61 @@ mod tests {
     }
 
     #[test]
-    fn setting_a_body_commits_the_response() {
+    fn an_invalid_value_leaves_the_existing_header_alone() {
+        let mut response = empty_response();
+        assert!(response.append_header("x-tag", "a"));
+
+        // A value that cannot be a header value is refused and the header keeps
+        // what it had: `insert_header` reports the refusal with `None`, and
+        // `append_header` with `false`.
+        assert!(response.insert_header("x-tag", "bad\nvalue").is_none());
+        assert!(!response.append_header("x-tag", "bad\nvalue"));
+        assert_eq!(response.header("x-tag"), Some("a"));
+        assert_eq!(HttpResponse::headers(&response, "x-tag"), Some(vec!["a"]));
+
+        // A name that is not a header name is refused the same way.
+        assert!(response.insert_header("bad name", "value").is_none());
+        assert!(!response.append_header("bad name", "value"));
+        assert!(response.remove_header("bad name").is_none());
+        assert_eq!(response.header("x-tag"), Some("a"));
+    }
+
+    #[test]
+    fn a_header_that_is_absent_is_reported_as_absent() {
+        let response = empty_response();
+
+        assert_eq!(response.header("x-missing"), None);
+        assert_eq!(HttpResponse::headers(&response, "x-missing"), None);
+        assert!(!response.contains_header("x-missing"));
+        assert!(response.header_map().is_empty());
+    }
+
+    #[test]
+    fn setting_a_body_commits_the_response_and_keeps_the_bytes_readable() {
         let mut response = empty_response();
 
         assert!(!response.is_committed());
         response.set_body(b"hello".to_vec());
         assert!(response.is_committed());
 
-        // A streaming body cannot be borrowed, so the default accessor is empty.
-        assert!(HttpResponse::body(&response).is_empty());
+        // The body is a stream that cannot be borrowed, so the bytes written
+        // through this trait are kept beside it — otherwise a filter, or the
+        // snapshot an event carries, could never read what was written.
+        assert_eq!(HttpResponse::body(&response), b"hello");
+    }
+
+    #[test]
+    fn a_snapshot_of_a_response_carries_the_body_that_was_written() {
+        let mut response = empty_response();
+        response.set_body(b"hello".to_vec());
+
+        let snapshot = HttpResponseShare::from(&response as &dyn HttpResponse);
+
+        assert_eq!(
+            snapshot.body(),
+            b"hello",
+            "the body written through the trait reaches the snapshot"
+        );
     }
 
     #[test]

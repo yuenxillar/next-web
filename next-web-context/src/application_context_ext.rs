@@ -680,6 +680,37 @@ pub trait ApplicationContextExt: ApplicationContext {
             .collect()
     }
 
+    /// Returns every instance of the given type, with the names they are
+    /// registered under.
+    ///
+    /// This is what lets a field or an argument be a `HashMap<String, &T>`: the
+    /// key is the name the instance was registered with, so the caller can pick
+    /// one by name at run time instead of being handed every instance of the type
+    /// in an order it cannot identify.
+    ///
+    /// The names are owned because the keys the context iterates are, so a name
+    /// has to be copied out of the key it came from. The instances are borrowed
+    /// from the context, as in [`Self::get_singletons_by_type`].
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instances.
+    fn get_singletons_by_type_with_names<T>(&self) -> Vec<(String, &T)>
+    where
+        T: 'static,
+    {
+        self.keys_of_type(TypeId::of::<T>())
+            .into_iter()
+            .filter_map(|key| {
+                let name = key.name.to_string();
+
+                self.get_singleton_boxed(&key)
+                    .and_then(|instance| instance.downcast_ref::<T>())
+                    .map(|instance| (name, instance))
+            })
+            .collect()
+    }
+
     /// Resolves the instance registered under the empty name `""`.
     ///
     /// The context returns a stored instance when it has one, and constructs the
@@ -790,6 +821,33 @@ pub trait ApplicationContextExt: ApplicationContext {
         self.resolve_all_of_type(TypeId::of::<T>())
             .into_iter()
             .filter_map(|instance| instance.downcast::<T>().ok().map(|instance| *instance))
+            .collect()
+    }
+
+    /// Resolves every instance of the given type, with the names they are
+    /// registered under.
+    ///
+    /// The owned counterpart of [`Self::get_singletons_by_type_with_names`], and
+    /// the named counterpart of [`Self::resolve_by_type`]: it creates the missing
+    /// instances the same way, and hands each one out together with the name it
+    /// answers to.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` - The type of the instances to resolve.
+    fn resolve_by_type_with_names<T>(&mut self) -> Vec<(String, T)>
+    where
+        T: Send + Sync + 'static,
+    {
+        self.keys_of_type(TypeId::of::<T>())
+            .into_iter()
+            .filter_map(|key| {
+                let name = key.name.to_string();
+
+                self.resolve_boxed(&key)
+                    .and_then(|instance| instance.downcast::<T>().ok())
+                    .map(|instance| (name, *instance))
+            })
             .collect()
     }
 

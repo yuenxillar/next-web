@@ -7,7 +7,7 @@ use std::{
 use base64::{engine::general_purpose::STANDARD, Engine};
 use next_web_core::{
     async_trait,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
     util::time::current_time_millis,
 };
 use rand::{rngs::OsRng, RngCore};

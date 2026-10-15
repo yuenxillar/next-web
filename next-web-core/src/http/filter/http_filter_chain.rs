@@ -5,10 +5,7 @@ use std::any::Any;
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 
-use crate::{
-    filter::FilterError,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
-};
+use crate::http::{filter::FilterError, http_request::HttpRequest, http_response::HttpResponse};
 
 /// Continues the processing of a filter chain.
 ///

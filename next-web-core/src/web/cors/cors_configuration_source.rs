@@ -1,4 +1,4 @@
-use crate::{traits::http::http_request::HttpRequest, web::cors::CorsConfiguration};
+use crate::{http::HttpRequest, web::cors::CorsConfiguration};
 
 /// Interface to be implemented by classes (usually HTTP request handlers) that provides a
 /// CorsConfiguration instance based on the provided request.

@@ -4,10 +4,9 @@ use next_web_context::ApplicationEventPublisher;
 use next_web_core::{
     any::AnyValue,
     error::BoxError,
-    filter::FilterError,
-    traits::{
-        filter::HttpFilterChain,
-        http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{
+        filter::{FilterError, HttpFilterChain},
+        HttpRequest, HttpResponse,
     },
 };
 use tracing::{debug, trace};

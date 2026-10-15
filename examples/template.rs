@@ -34,7 +34,7 @@ use next_web::{
     core::{ApplicationContext, traits::apply_router::ApplyRouter},
     macros::{bind::get_mapping, bind::singleton, order},
 };
-use next_web_core::{tera::Value, traits::http::http_request::HttpRequest, web::ModelAndView};
+use next_web_core::{http::HttpRequest, tera::Value, web::ModelAndView};
 use serde::Deserialize;
 
 #[derive(Default)]

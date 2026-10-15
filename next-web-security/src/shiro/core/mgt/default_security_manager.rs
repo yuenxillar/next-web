@@ -3,7 +3,7 @@ use std::{fmt::Display, sync::Arc};
 use next_web_core::{
     async_trait, clone_box,
     traits::{
-        http::{http_request::HttpRequest, http_response::HttpResponse},
+        http::{HttpRequest, HttpResponse},
         required::Required,
     },
 };

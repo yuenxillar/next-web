@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use next_web_core::any::AnyValue;
-use next_web_core::traits::http::http_request::HttpRequest;
-use next_web_core::traits::http::http_response::HttpResponse;
+use next_web_core::http::HttpRequest;
+use next_web_core::http::HttpResponse;
 use next_web_core::util::HttpMethod;
 
 use crate::core::mgt::security_manager::SecurityManager;

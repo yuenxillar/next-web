@@ -11,13 +11,9 @@ use axum::{
     response::Response,
 };
 use next_web_context::ApplicationContextExt;
-use next_web_core::{
-    filter::application_filter_chain::ApplicationFilterChain,
-    http::{BodyBufferPolicy, RequestLifecycle, buffer_request_body_for},
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::http_response::HttpResponse,
-    },
+use next_web_core::http::{
+    BodyBufferPolicy, HttpResponse, RequestLifecycle, buffer_request_body_for,
+    filter::{ApplicationFilterChain, HttpFilter, HttpFilterChain},
 };
 
 use crate::{Application, ConfigurableApplicationContext};

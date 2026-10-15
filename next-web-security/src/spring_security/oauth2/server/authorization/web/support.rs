@@ -4,7 +4,7 @@ use next_web_core::{
     error::BoxError,
     filter::FilterError,
     http::StatusCode,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
 };
 use serde_json::Value;
 

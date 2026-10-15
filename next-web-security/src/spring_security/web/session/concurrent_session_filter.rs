@@ -3,13 +3,11 @@ use std::sync::Arc;
 use next_web_core::{
     async_trait,
     error::BoxError,
-    filter::FilterError,
-    http::HttpFilterChainShare,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        filter::{FilterError, HttpFilter, HttpFilterChain},
+        HttpFilterChainShare, HttpRequest, HttpResponse,
     },
+    traits::named::Named,
 };
 use tracing::debug;
 

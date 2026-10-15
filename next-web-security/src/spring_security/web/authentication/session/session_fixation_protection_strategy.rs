@@ -4,9 +4,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use next_web_core::{
-    any::AnyValue, http::session::HttpSession, traits::http::http_request::HttpRequest,
-};
+use next_web_core::{any::AnyValue, http::session::HttpSession, http::HttpRequest};
 use tracing::debug;
 
 use crate::web::authentication::session::{

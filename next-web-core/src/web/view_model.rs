@@ -14,7 +14,7 @@ use crate::error::BoxError;
 /// renders and is therefore a separate store on the request.
 ///
 /// The model is reached through
-/// [`HttpRequest::view_model_mut`](crate::traits::http::http_request::HttpRequest::view_model_mut),
+/// [`HttpRequest::view_model_mut`](crate::http::HttpRequest::view_model_mut),
 /// which is how a filter hands the variables of an error page to a dispatch:
 ///
 /// ```ignore

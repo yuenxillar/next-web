@@ -23,12 +23,11 @@ use next_web_core::{
         DEFAULT_NON_OPTION_ARGS_PROPERTY_NAME, MutablePropertySources, PropertySource,
         SimpleCommandLinePropertySource,
     },
-    http::DefaultResourceDispatcher,
+    http::{DefaultResourceDispatcher, ResourceDispatcher},
     io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup, StartupStep},
     traits::{
         apply_router::ApplyRouter, config::auto_configuration::AutoConfiguration,
-        http::resource_dispatcher::ResourceDispatcher,
         service::background_service::BackgroundService,
     },
     util::indexmap::IndexMap,
@@ -671,7 +670,7 @@ where
     /// the state of the application being built for it.
     ///
     /// [`HttpRequest::resource_dispatcher`]:
-    ///     next_web_core::traits::http::http_request::HttpRequest::resource_dispatcher
+    ///     next_web_core::http::HttpRequest::resource_dispatcher
     fn add_state(
         &self,
         mut ctx: Box<dyn ConfigurableApplicationContext>,
@@ -1772,7 +1771,7 @@ mod tests {
     #[tokio::test]
     async fn the_state_and_the_resource_dispatcher_are_installed_on_the_routes() {
         use axum::{body::Body, routing::get};
-        use next_web_core::traits::http::http_request::HttpRequest;
+        use next_web_core::http::HttpRequest;
         use tower::ServiceExt;
 
         /// Answers after checking what the request carries.

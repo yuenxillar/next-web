@@ -1,9 +1,7 @@
-use std::{
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::sync::Arc;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
+use next_web_core::util::time::current_time_millis;
 use rand::{rngs::OsRng, RngCore};
 
 use super::{DefaultToken, Sha512DigestUtils, Token, TokenService};
@@ -149,11 +147,4 @@ impl TokenService for KeyBasedPersistenceTokenService {
             extended_information,
         )))
     }
-}
-
-fn current_time_millis() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before Unix epoch")
-        .as_millis() as i64
 }

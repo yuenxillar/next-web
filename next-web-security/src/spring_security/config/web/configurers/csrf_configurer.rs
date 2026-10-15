@@ -6,10 +6,8 @@ use std::{
 
 use next_web_core::{
     async_trait,
-    traits::{
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        required::Required,
-    },
+    http::{HttpRequest, HttpResponse},
+    traits::required::Required,
     util::StringUtils,
 };
 

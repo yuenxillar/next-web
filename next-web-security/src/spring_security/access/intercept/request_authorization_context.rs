@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use next_web_core::{http::HttpRequestShare, traits::http::http_request::HttpRequest};
+use next_web_core::{http::HttpRequest, http::HttpRequestShare};
 
 /// An HttpServletRequest authorization context.
 #[derive(Clone)]

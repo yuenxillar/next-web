@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use next_web_core::{
     error::BoxError,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
 };
 
 /// Strategy for handling an invalid (expired or otherwise invalid) session ID

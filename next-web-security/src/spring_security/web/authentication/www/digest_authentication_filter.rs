@@ -1,15 +1,14 @@
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use next_web_core::http::StatusCode;
+use next_web_core::util::time::current_time_millis;
 use next_web_core::{
     async_trait,
-    filter::FilterError,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        filter::{FilterError, HttpFilter, HttpFilterChain},
+        HttpRequest, HttpResponse,
     },
+    traits::named::Named,
 };
 use tracing::debug;
 
@@ -198,17 +197,9 @@ impl DigestAuthenticationFilter {
 
     // --- Internal methods ---
 
-    /// Returns the current time in milliseconds since UNIX epoch.
-    fn current_time_millis() -> i64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as i64
-    }
-
     /// Generates a nonce value. Format: `base64(expirationTime + ":" + md5Hex(expirationTime + ":" + key))`.
     fn generate_nonce_value(&self) -> String {
-        let expiry_time = Self::current_time_millis() + (self.nonce_validity_seconds as i64 * 1000);
+        let expiry_time = current_time_millis() + (self.nonce_validity_seconds as i64 * 1000);
         let signature_value = digest_auth_utils::md5_hex(&format!("{}:{}", expiry_time, self.key));
         let nonce_value = format!("{}:{}", expiry_time, signature_value);
 
@@ -408,7 +399,7 @@ impl HttpFilter for DigestAuthenticationFilter {
 
         // Check if the nonce has expired. We do this last so we can direct
         // the user agent that its nonce is stale.
-        if digest_auth.is_nonce_expired(Self::current_time_millis()) {
+        if digest_auth.is_nonce_expired(current_time_millis()) {
             let ex = NonceExpiredException::new("Nonce has expired/timed out");
             let auth_error = AuthenticationError::from(ex);
             return self.fail(request, response, &auth_error);

@@ -8,15 +8,28 @@ use next_web_context::Locale;
 use crate::{
     any::AnyValue,
     http::{Cookie, HttpMethod, HttpVersion, session::HttpSession},
-    traits::http::{http_request::HttpRequest, resource_dispatcher::ResourceDispatcher},
+    http::{HttpRequest, ResourceDispatcher},
     web::ViewModel,
 };
 
+/// An owned, transport-independent snapshot of an HTTP request.
+///
+/// A snapshot is taken from a live request with [`HttpRequest::shared`] or
+/// `HttpRequestShare::from`, and mirrors the parts a filter, a background task or
+/// an application event needs after the request scope has ended: the request line,
+/// the headers, the cookies, the buffered body, the attributes, the view model and
+/// the peer address.
+///
+/// The session is **not** part of a snapshot, and neither is the resource
+/// dispatcher: both outlive a single request and are reached through the context
+/// instead. The context path a filter stored on the request is not carried
+/// either. Those methods answer `None`, which is what the request would answer
+/// when it had none.
 pub struct HttpRequestShare {
     version: HttpVersion,
     method: HttpMethod,
     uri: Uri,
-    body: (),
+    body: Option<Vec<u8>>,
     headers: Arc<HeaderMap<HeaderValue>>,
     cookies: Vec<Cookie>,
     attributes: HashMap<String, AnyValue>,
@@ -160,10 +173,11 @@ impl HttpRequest for HttpRequestShare {
             .map(|host| host.hostname().to_string())
     }
 
+    /// Returns `None`.
+    ///
+    /// A context path a filter stored on the request is not part of what a
+    /// snapshot carries, so a snapshot never reports one.
     fn context_path(&self) -> Option<&str> {
-        // GLOBAL_SERVER_PROPERTIES
-        //     .get()
-        //     .and_then(|var| var.context_path())
         None
     }
 
@@ -216,6 +230,16 @@ impl HttpRequest for HttpRequestShare {
     fn content_type(&self) -> Option<&str> {
         self.headers.get(CONTENT_TYPE).and_then(|v| v.to_str().ok())
     }
+
+    /// Returns the body the request had when the snapshot was taken.
+    ///
+    /// The body is only there when the request exposed it — a layer buffers the
+    /// body for the requests whose filters read it — which is the same condition
+    /// the live request reports, so a snapshot answers exactly as the request it
+    /// came from did.
+    fn body_bytes(&self) -> Option<&[u8]> {
+        self.body.as_deref()
+    }
 }
 
 impl From<&dyn HttpRequest> for HttpRequestShare {
@@ -224,10 +248,10 @@ impl From<&dyn HttpRequest> for HttpRequestShare {
             version: req.version(),
             method: req.method(),
             uri: req.uri().clone(),
-            body: (),
+            body: req.body_bytes().map(<[u8]>::to_vec),
             headers: Arc::new(req.headers().to_owned()),
             cookies: parse_cookies(req.headers()),
-            attributes: HashMap::new(),
+            attributes: req.attributes().cloned().unwrap_or_default(),
             view_model: req.view_model().cloned(),
             remote_addr: req.remote_addr().copied(),
         }
@@ -240,7 +264,7 @@ impl Clone for HttpRequestShare {
             version: self.version,
             method: self.method.to_owned(),
             uri: self.uri.to_owned(),
-            body: self.body,
+            body: self.body.clone(),
             headers: Arc::clone(&self.headers),
             cookies: self.cookies.clone(),
             attributes: self.attributes.clone(),
@@ -258,4 +282,59 @@ fn parse_cookies(headers: &HeaderMap<HeaderValue>) -> Vec<Cookie> {
         .iter()
         .map(|(name, value)| Cookie::new(name, Some(value.to_string())))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{body::Body, extract::Request};
+
+    use super::HttpRequestShare;
+    use crate::{http::HttpRequest, http::RequestBody};
+
+    #[test]
+    fn a_snapshot_carries_the_attributes_of_the_request() {
+        let mut request = Request::builder().body(Body::empty()).unwrap();
+        request.set_attribute("user", "alice".into());
+
+        let snapshot = HttpRequestShare::from(&request as &dyn HttpRequest);
+
+        assert_eq!(
+            snapshot
+                .get_attribute("user")
+                .and_then(|value| value.as_str()),
+            Some("alice"),
+            "an attribute a filter set stays readable once the request is snapshotted"
+        );
+    }
+
+    #[test]
+    fn a_snapshot_carries_the_body_the_request_exposed() {
+        let mut request = Request::builder().body(Body::empty()).unwrap();
+        request
+            .extensions_mut()
+            .insert(RequestBody::new(b"hello".to_vec()));
+
+        assert_eq!(
+            request.body_bytes(),
+            Some(&b"hello"[..]),
+            "the request exposes the buffered body"
+        );
+
+        let snapshot = HttpRequestShare::from(&request as &dyn HttpRequest);
+
+        assert_eq!(
+            snapshot.body_bytes(),
+            Some(&b"hello"[..]),
+            "the body the layer buffered travels with the snapshot"
+        );
+    }
+
+    #[test]
+    fn a_snapshot_of_a_request_without_a_body_reports_none() {
+        let request = Request::builder().body(Body::empty()).unwrap();
+
+        let snapshot = HttpRequestShare::from(&request as &dyn HttpRequest);
+
+        assert!(snapshot.body_bytes().is_none());
+    }
 }

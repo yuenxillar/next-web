@@ -18,8 +18,8 @@ impl HeaderWriter for XFrameOptionsHeaderWriter {
     /// Writes the X-Frame-Options header value, overwritting any previous value.
     fn write_headers(
         &self,
-        _request: &dyn next_web_core::traits::http::http_request::HttpRequest,
-        response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
+        _request: &dyn next_web_core::http::HttpRequest,
+        response: &mut dyn next_web_core::http::HttpResponse,
     ) {
         response.insert_header(XFRAME_OPTIONS_HEADER, self.frame_options_mode.get_mode());
     }

@@ -9,12 +9,11 @@ use std::{
 use next_web_core::{
     any::AnyClone,
     async_trait,
-    filter::FilterError,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
+    http::{
+        filter::{FilterError, HttpFilter, HttpFilterChain},
+        HttpRequest, HttpResponse,
     },
+    traits::named::Named,
     ApplicationContext, BoxAny, Ordered,
 };
 

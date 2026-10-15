@@ -21,7 +21,7 @@ use std::time::Duration;
 use next_web_context::Locale;
 use next_web_core::headers::{Cookie as HeaderCookie, HeaderMapExt};
 use next_web_core::http::{Cookie, SameSite};
-use next_web_core::traits::http::{http_request::HttpRequest, http_response::HttpResponse};
+use next_web_core::http::{HttpRequest, HttpResponse};
 use tracing::{debug, trace};
 
 use crate::i18n::{LocaleResolver, LocaleResolverError};

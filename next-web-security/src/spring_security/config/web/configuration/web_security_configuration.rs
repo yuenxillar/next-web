@@ -5,8 +5,7 @@ use std::{error::Error, sync::Arc};
 
 use next_web_context::{ApplicationContextExt, SECURITY_FILTERS_SINGLETON_NAME};
 use next_web_core::{
-    async_trait,
-    traits::{config::auto_configuration::AutoConfiguration, filter::HttpFilter},
+    async_trait, http::filter::HttpFilter, traits::config::auto_configuration::AutoConfiguration,
     ApplicationContext, Ordered,
 };
 use next_web_macros::singleton;

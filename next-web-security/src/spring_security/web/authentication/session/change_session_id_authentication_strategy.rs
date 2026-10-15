@@ -4,7 +4,7 @@ use std::{
 };
 
 use next_web_core::http::session::HttpSession;
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::http::HttpRequest;
 
 use crate::web::authentication::session::{
     BaseSessionFixationProtectionStrategy, BaseSessionFixationProtectionStrategyExt,

@@ -1,6 +1,6 @@
 use next_web_core::{
     error::BoxError,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+   http::{HttpRequest, HttpResponse},
 };
 
 /// Encapsulates the redirection logic for all classes in the framework which perform redirects.

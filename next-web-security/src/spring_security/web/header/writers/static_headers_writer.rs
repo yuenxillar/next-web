@@ -18,8 +18,8 @@ impl StaticHeadersWriter {
 impl HeaderWriter for StaticHeadersWriter {
     fn write_headers(
         &self,
-        _request: &dyn next_web_core::traits::http::http_request::HttpRequest,
-        response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
+        _request: &dyn next_web_core::http::HttpRequest,
+        response: &mut dyn next_web_core::http::HttpResponse,
     ) {
         self.headers.iter().for_each(|header| {
             let header_name = header.header_name();

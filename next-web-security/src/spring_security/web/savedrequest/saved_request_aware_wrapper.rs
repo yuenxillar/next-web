@@ -5,11 +5,10 @@ use std::sync::Arc;
 
 use next_web_core::any::AnyValue;
 use next_web_core::http::session::HttpSession;
-use next_web_core::http::{HeaderMap, HeaderValue, HttpRequestShare, Uri};
-use next_web_core::traits::http::resource_dispatcher::ResourceDispatcher;
+use next_web_core::http::{HeaderMap, HeaderValue, HttpRequestShare, ResourceDispatcher, Uri};
 use next_web_core::{
-    http::{Cookie, HttpMethod, header::CONTENT_TYPE},
-    traits::http::http_request::HttpRequest,
+    http::HttpRequest,
+    http::{header::CONTENT_TYPE, Cookie, HttpMethod},
     web::ViewModel,
 };
 
@@ -92,19 +91,41 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
         self.request.headers()
     }
 
+    /// Returns the first value of `name`, preferring the saved request.
+    ///
+    /// The saved request describes what the client originally asked for, so its
+    /// value wins; the request being served answers when the saved one has none,
+    /// so a header that only the current request carries is not lost.
     fn header(&self, name: &str) -> Option<&str> {
         self.saved_request
             .get_header_values(name)
             .first()
-            .map(|s| *s)
+            .copied()
+            .or_else(|| self.request.header(name))
     }
 
+    /// Returns every value of `name` from both requests, without duplicates.
     fn header_values(&self, name: &str) -> Vec<&str> {
-        self.saved_request.get_header_values(name)
+        let mut values = self.saved_request.get_header_values(name);
+        for value in self.request.header_values(name) {
+            if !values.contains(&value) {
+                values.push(value);
+            }
+        }
+
+        values
     }
 
+    /// Returns the name of every header of both requests, without duplicates.
     fn header_names(&self) -> Vec<&str> {
-        self.saved_request.get_header_names()
+        let mut names = self.saved_request.get_header_names();
+        for name in self.request.header_names() {
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+
+        names
     }
 
     fn uri(&self) -> &Uri {
@@ -119,35 +140,65 @@ impl HttpRequest for SavedRequestAwareWrapper<'_> {
         self.request.parameter(name).or_else(|| {
             self.saved_request
                 .get_parameter_values(name)
-                .and_then(|v| v.first().map(|s| *s))
+                .and_then(|v| v.first().copied())
         })
     }
 
+    /// Returns the parameters of both requests, without duplicates.
+    ///
+    /// The ones the request being served carries come first, then the ones that
+    /// only the saved request has.
     fn parameters(&self) -> Option<Vec<(Cow<'_, str>, Cow<'_, str>)>> {
-        self.request.parameters()
+        let mut parameters = self.request.parameters().unwrap_or_default();
+
+        for name in self.saved_request.get_parameter_map().keys() {
+            let Some(values) = self.saved_request.get_parameter_values(name) else {
+                continue;
+            };
+
+            for value in values {
+                let pair = (Cow::Owned(name.clone()), Cow::Borrowed(value));
+                if !parameters.contains(&pair) {
+                    parameters.push(pair);
+                }
+            }
+        }
+
+        Some(parameters)
     }
 
+    /// Returns the values of `name` from both requests, without duplicates.
+    ///
+    /// Both groups are kept. Keeping only the saved request's values, minus the
+    /// duplicates of the ones the request being served carries, would answer with
+    /// nothing at all when the two requests share every value.
     fn parameter_values(&self, name: &str) -> Option<Vec<Cow<'_, str>>> {
-        let saved_request_params = self.saved_request.get_parameter_values(name);
-        let wrapped_request_params = self.request.parameter_values(name);
-        let saved_request_params = match saved_request_params {
-            Some(params) => params.into_iter().map(|s| Cow::Borrowed(s)).collect(),
-            None => return wrapped_request_params,
-        };
+        let mut values = self.request.parameter_values(name).unwrap_or_default();
 
-        let wrapped_request_params = match wrapped_request_params {
-            Some(params) => params,
-            None => return Some(saved_request_params),
-        };
+        if let Some(saved) = self.saved_request.get_parameter_values(name) {
+            for value in saved {
+                if !values.iter().any(|existing| existing.as_ref() == value) {
+                    values.push(Cow::Borrowed(value));
+                }
+            }
+        }
 
-        // We want to add all parameters of the saved request *apart from* duplicates of
-        // those already added
-        Some(
-            saved_request_params
-                .into_iter()
-                .filter(|s| !wrapped_request_params.contains(&s))
-                .collect(),
-        )
+        if values.is_empty() {
+            None
+        } else {
+            Some(values)
+        }
+    }
+
+    /// Returns the body the wrapped request exposes.
+    ///
+    /// The saved request records the method, the headers, the cookies and the
+    /// parameters, but not a body, so a replay reads the body of the request being
+    /// served. This has to be forwarded explicitly: the trait's own default
+    /// answers `None`, so a wrapper that leaves it out silently loses the body of
+    /// the request it wraps.
+    fn body_bytes(&self) -> Option<&[u8]> {
+        self.request.body_bytes()
     }
 
     fn content_type(&self) -> Option<&str> {

@@ -1,6 +1,6 @@
 use std::{fmt, sync::Arc};
 
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::http::HttpRequest;
 
 use crate::web::util::matcher::{MatchResult, RequestMatcher};
 

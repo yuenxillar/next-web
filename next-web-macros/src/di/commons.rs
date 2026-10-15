@@ -273,7 +273,7 @@ fn extract_path_type_with_owned_type(ty: &Type, ty_name: &str) -> syn::Result<Ty
     };
 
     if args.len() > 1 {
-        if ty_name == "HashMap" {
+        if ty_name == "HashMap" || ty_name == "BTreeMap" {
             let last_args = args.last().unwrap();
             if let GenericArgument::Type(last_ty) = last_args {
                 let Type::Path(TypePath {
@@ -319,8 +319,14 @@ fn extract_vec_type(ty: &Type) -> syn::Result<&Type> {
     extract_path_type(ty, "Vec")
 }
 
+/// The value type of a map of instances.
+///
+/// Which map a field or an argument is declared as is the caller's choice, so
+/// both `HashMap` and `BTreeMap` are accepted: the macro only resolves the values
+/// and lets the declared type collect them.
 fn extract_hashmap_type(ty: &Type) -> syn::Result<Type> {
     extract_path_type_with_owned_type(ty, "HashMap")
+        .or_else(|_| extract_path_type_with_owned_type(ty, "BTreeMap"))
 }
 
 /// The statement that resolves one field or argument of an item, which is
@@ -438,7 +444,10 @@ fn generate_only_one_field_or_argument_resolve_stmt(
     };
 
     // macro processing for properties
-    let ValueAttr { key } = match ValueAttr::remove_attributes(attrs) {
+    let ValueAttr {
+        key,
+        default: value_default,
+    } = match ValueAttr::remove_attributes(attrs) {
         Ok(Some(AttrsValue { value: attr, .. })) => attr,
         Ok(None) => ValueAttr::default(),
         Err(AttrsValue { value, .. }) => return Err(value),
@@ -627,12 +636,31 @@ fn generate_only_one_field_or_argument_resolve_stmt(
         };
     }
 
-    // if map
+    // A map of the instances of a type, keyed by the name each one was registered
+    // under.
+    //
+    // The name comes from the context, which is the only place that knows it: an
+    // instance is not asked for its own name, because a type that is registered
+    // under one has no reason to carry it — requiring `singleton_name()` would
+    // mean every injectable type had to implement a trait it never uses.
+    //
+    // Which map it becomes is not the macro's business either: the declared type
+    // of the field or the argument decides, so all that is generated is the
+    // collection of `(String, T)` pairs, and `HashMap` and `BTreeMap` both take
+    // it.
     if map {
         let ty = match ref_ {
             FlagOrValue::None => None,
             FlagOrValue::Flag { .. } => {
+                // The declared type carries the reference the instance is lent
+                // as, which the resolver is not asked for: it hands out
+                // `(String, &T)` itself.
                 let ty = extract_hashmap_type(field_or_argument_ty)?;
+                let ty = match ty {
+                    Type::Reference(reference) => *reference.elem,
+                    other => other,
+                };
+
                 Some(quote!(#ty))
             }
             FlagOrValue::Value { value: ty, .. } => Some(quote!(#ty)),
@@ -650,12 +678,8 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                 };
 
                 let get_singleton = parse_quote! {
-                    let #ident: ::std::collections::HashMap<String, _> =
-                        ::std::collections::HashMap::from_iter(
-                            cx.get_singletons_by_type()
-                                .into_iter()
-                                .map(|instance| (instance.singleton_name(), instance)),
-                        );
+                    let #ident: #field_or_argument_ty =
+                        cx.get_singletons_by_type_with_names::<#ty>().into_iter().collect();
                 };
 
                 Ok(ResolveOne {
@@ -667,15 +691,15 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                 })
             }
             None => {
-                let ty = extract_hashmap_type(field_or_argument_ty)
-                    .unwrap()
-                    .into_token_stream();
+                let ty = extract_hashmap_type(field_or_argument_ty)?;
                 let resolve = match color {
                     Color::Async => parse_quote! {
-                        let #ident: ::std::collections::HashMap<String, #ty>  = ::std::collections::HashMap::from_iter(cx.resolve_by_type_async::<#ty>().await.into_iter().map(|v| (v.singleton_name(), v)));
+                        let #ident: #field_or_argument_ty =
+                            cx.resolve_by_type_with_names_async::<#ty>().await.into_iter().collect();
                     },
                     Color::Sync => parse_quote! {
-                        let #ident: ::std::collections::HashMap<String, #ty>  = ::std::collections::HashMap::from_iter(cx.resolve_by_type::<#ty>().into_iter().map(|v| (v.singleton_name(), v)));
+                        let #ident: #field_or_argument_ty =
+                            cx.resolve_by_type_with_names::<#ty>().into_iter().collect();
                     },
                 };
 
@@ -753,30 +777,95 @@ fn generate_only_one_field_or_argument_resolve_stmt(
             })
         }
         None => {
+            // `#[value("key")]` reads the value the application's environment
+            // holds, instead of resolving a singleton: the instance is configured,
+            // not injected.
+            //
+            // It is read here, in the statement both colours share, because there
+            // is nothing to await — the environment is in place before any
+            // provider is built. Handling it only in the synchronous arm would
+            // make an asynchronous constructor silently resolve a singleton named
+            // after the key instead of reading it.
+            if is_value {
+                // The framework registers its environment under this name. The
+                // constant for it lives in `next-web-context`, which the generated
+                // code cannot name from every crate that uses these macros, so the
+                // name is spelled out.
+                let environment_singleton_name =
+                    syn::LitStr::new("applicationEnvironment", Span::call_site());
+
+                // An `Option<T>` field means the property may be absent; any other
+                // type means the application cannot start without it.
+                // What a property that is not configured at all becomes. The
+                // attribute may name it, and otherwise the type's own default is
+                // used, so a missing property is never an error.
+                let fallback = match &value_default {
+                    Some(expr) => quote!(#expr),
+                    None => quote!(::core::default::Default::default()),
+                };
+
+                // Reading the inner type is what tells an `Option<T>` field from a
+                // plain one. Neither of the other two helpers can do it:
+                // `extract_path_type_with_owned_type` only unwraps the two
+                // arguments of a map and reports an error for a single one, and
+                // `extract_option_type` strips a reference from what it found,
+                // which an `Option<T>` field does not have.
+                let read =
+                    match crate::util::extract_type::extract_option_inner_type(field_or_argument_ty)
+                    {
+                        Some(inner) => parse_quote! {
+                        let #ident: #field_or_argument_ty = match cx
+                            .get_singleton_with_name::<::std::sync::Arc<dyn ::next_web::core::env::ConfigurableEnvironment>>(
+                                #environment_singleton_name,
+                            )
+                            .get_property(#key)
+                        {
+                            ::core::option::Option::Some(__value) => ::core::option::Option::Some(
+                                match __value.parse::<#inner>() {
+                                    ::core::result::Result::Ok(__parsed) => __parsed,
+                                    ::core::result::Result::Err(_) => ::core::panic!(
+                                        "the property `{}` is not a valid value: {:?}",
+                                        #key,
+                                        __value,
+                                    ),
+                                },
+                            ),
+                            ::core::option::Option::None => #fallback,
+                        };
+                    },
+                    None => parse_quote! {
+                        let #ident: #field_or_argument_ty = match cx
+                            .get_singleton_with_name::<::std::sync::Arc<dyn ::next_web::core::env::ConfigurableEnvironment>>(
+                                #environment_singleton_name,
+                            )
+                            .get_property(#key)
+                        {
+                            ::core::option::Option::Some(__value) => match __value.parse() {
+                                ::core::result::Result::Ok(__parsed) => __parsed,
+                                ::core::result::Result::Err(_) => ::core::panic!(
+                                    "the property `{}` is not a valid value: {:?}",
+                                    #key,
+                                    __value,
+                                ),
+                            },
+                            ::core::option::Option::None => #fallback,
+                        };
+                    },
+                };
+
+                return Ok(ResolveOne {
+                    stmt: ResolveOneValue::Owned { resolve: read },
+                    variable: ident,
+                });
+            }
+
             let resolve = match color {
                 Color::Async => parse_quote! {
                     let #ident = cx.resolve_with_name_async(#name).await;
                 },
-                Color::Sync => {
-                    if is_value {
-                        // 如果为空就 panic
-                        let value_type = extract_vec_inner_type(field_or_argument_ty);
-                        if value_type.is_none() {
-                            return Err(syn::Error::new(
-                                Span::call_site(),
-                                "value only support `Option<T>` type with one generic argument",
-                            ));
-                        }
-
-                        parse_quote! {
-                            let #ident = cx.get_singleton::<::next_web_core::context::properties::ApplicationProperties>().one_value::<#value_type>(#key);
-                        }
-                    } else {
-                        parse_quote! {
-                            let #ident = cx.resolve_with_name(#name);
-                        }
-                    }
-                }
+                Color::Sync => parse_quote! {
+                    let #ident = cx.resolve_with_name(#name);
+                },
             };
 
             Ok(ResolveOne {

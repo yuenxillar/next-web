@@ -3,7 +3,7 @@ use axum::http::{
     header::{ACCESS_CONTROL_REQUEST_METHOD, ORIGIN},
 };
 
-use crate::{http::HttpMethod, traits::http::http_request::HttpRequest};
+use crate::{http::HttpMethod, http::HttpRequest};
 
 pub struct CorsUtils;
 

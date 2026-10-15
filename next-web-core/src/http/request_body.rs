@@ -4,7 +4,7 @@
 //! read synchronously. The body is buffered by the web layer for the requests
 //! whose filters have to read it, and it is then available to every filter
 //! through
-//! [`HttpRequest::body_bytes`](crate::traits::http::http_request::HttpRequest::body_bytes).
+//! [`HttpRequest::body_bytes`](crate::http::HttpRequest::body_bytes).
 
 use std::{borrow::Cow, fmt};
 
@@ -232,10 +232,10 @@ mod tests {
     use axum::{body::Body, extract::Request};
 
     use super::{
-        buffer_request_body, buffer_request_body_for, form_parameters, BodyBufferPolicy,
-        RequestBody, APPLICATION_JSON, FORM_URLENCODED,
+        APPLICATION_JSON, BodyBufferPolicy, FORM_URLENCODED, RequestBody, buffer_request_body,
+        buffer_request_body_for, form_parameters,
     };
-    use crate::traits::http::http_request::HttpRequest;
+    use crate::http::http_request::HttpRequest;
 
     #[test]
     fn buffers_the_body_of_a_request() {

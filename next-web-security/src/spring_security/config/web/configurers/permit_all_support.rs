@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use next_web_core::traits::http::http_request::HttpRequest;
+use next_web_core::http::HttpRequest;
 
 use crate::authorization::SingleResultAuthorizationManager;
 use crate::config::web::configurers::AuthorizeHttpRequestsConfigurer;

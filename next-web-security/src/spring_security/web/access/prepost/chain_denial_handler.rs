@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use next_web_core::{
     error::BoxError,
+    http::{HttpRequest, HttpResponse},
     security::PreAuthorizeDenialHandler,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
 };
 
 use crate::{

@@ -1,15 +1,11 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-use next_web_core::filter::FilterError;
-use next_web_core::traits::filter::{HttpFilter, HttpFilterChain};
+use next_web_core::http::filter::{HttpFilter, HttpFilterChain};
 use next_web_core::{
     async_trait,
-    http::HttpMethod,
-    traits::{
-        http::{http_request::HttpRequest, http_response::HttpResponse},
-        named::Named,
-    },
+    http::{filter::FilterError, HttpMethod, HttpRequest, HttpResponse},
+    traits::named::Named,
 };
 
 use crate::authentication::{UsernamePasswordAuthenticationToken, EMPTY_STRING};

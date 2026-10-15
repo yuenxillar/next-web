@@ -1,6 +1,6 @@
 use crate::{
     error::BoxError,
-    traits::http::{http_request::HttpRequest, http_response::HttpResponse},
+    http::{HttpRequest, HttpResponse},
     web::cors::CorsConfiguration,
 };
 
