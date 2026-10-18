@@ -21,8 +21,8 @@ use next_web::{
     autoconfigure::web_auto_configuration::WebAutoConfiguration,
     context::{ApplicationContextExt, DefaultApplicationContext},
     core::{
+        config::AutoConfiguration,
         env::{ConfigurableEnvironment, MapPropertySource, StandardEnvironment},
-        traits::config::auto_configuration::AutoConfiguration,
     },
 };
 use next_web_core::util::indexmap::IndexMap;
@@ -96,14 +96,16 @@ async fn the_instances_a_properties_file_describes_are_registered_and_configured
     ])
     .await;
 
-    let limiter = global_registry().find_rate_limiter(INSTANCE).unwrap_or_else(|| {
-        panic!(
-            "the configured limiter never reached the registry. Either the auto-configuration \
+    let limiter = global_registry()
+        .find_rate_limiter(INSTANCE)
+        .unwrap_or_else(|| {
+            panic!(
+                "the configured limiter never reached the registry. Either the auto-configuration \
              was not discovered, or the name it resolves its properties under does not match the \
              one the properties struct was given. Registered: {:?}",
-            global_registry().rate_limiter_names()
-        )
-    });
+                global_registry().rate_limiter_names()
+            )
+        });
 
     // What the properties said, not the defaults.
     assert_eq!(

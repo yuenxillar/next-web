@@ -3,7 +3,7 @@ use crate::{
     support::state_machine_interceptor::StateMachineInterceptor,
     transition::StateMachineTransition,
 };
-use next_web_core::{async_trait, traits::message::Message};
+use next_web_core::{async_trait, messaging::Message};
 use std::sync::Arc;
 
 /// Interface for a StateMachine event executor.

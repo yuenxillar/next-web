@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use next_web_core::traits::{service::Service, singleton::Singleton};
 use rbatis::{Error, RBatis};
 use rbdc::pool::Pool;
 
@@ -11,9 +10,6 @@ pub struct DatabaseService {
     properties: DataSourceProperties,
     pub(crate) rbs: RBatis,
 }
-
-impl Singleton for DatabaseService {}
-impl Service for DatabaseService {}
 
 impl DatabaseService {
     pub fn new(properties: DataSourceProperties) -> Result<Self, Error> {

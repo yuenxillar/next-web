@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::traits::message::Message;
+use next_web_core::messaging::Message;
 use tracing::debug;
 
 use crate::StateMachine;

@@ -5,7 +5,7 @@ use std::{
     rc::Rc,
 };
 
-use next_web_core::{error::BoxError, traits::required::Required};
+use next_web_core::{Required, error::BoxError};
 
 use crate::config::{
     builders::state_machine_state_configurer::StateMachineStateConfigurer,

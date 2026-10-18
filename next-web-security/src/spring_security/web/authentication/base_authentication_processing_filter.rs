@@ -12,7 +12,7 @@ use next_web_core::{
         filter::{FilterError, HttpFilterChain},
         HttpRequest, HttpResponse,
     },
-    traits::named::Named,
+    Named,
 };
 use tracing::{debug, enabled, trace, Level};
 

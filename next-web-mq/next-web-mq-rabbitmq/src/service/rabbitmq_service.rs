@@ -9,10 +9,7 @@ use amqprs::{
     },
     connection::{Connection, OpenConnectionArguments},
 };
-use next_web_core::{
-    error::BoxError,
-    traits::{service::Service, singleton::Singleton},
-};
+use next_web_core::error::BoxError;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -28,9 +25,6 @@ pub struct RabbitmqService {
     connection: Connection,
     channel: Channel,
 }
-
-impl Singleton for RabbitmqService {}
-impl Service for RabbitmqService {}
 
 impl RabbitmqService {
     pub async fn new(

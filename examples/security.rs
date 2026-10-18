@@ -5,12 +5,12 @@ use axum::{
     routing::{get, post},
 };
 use next_web::{
-    core::{traits::apply_router::ApplyRouter, ApplicationContext},
+    Application, NextWebApplication,
+    core::{ApplicationContext, ApplyRouter},
     macros::autoconfigure::configuration,
     macros::bind::singleton,
     macros::order,
     macros::security::pre_authorize,
-    Application, NextWebApplication,
 };
 use next_web_context::{ApplicationEvent, ApplicationEventPublisher};
 use next_web_core::error::BoxError;
@@ -130,7 +130,7 @@ mod t2 {
         authentication::dao::DaoAuthenticationProvider,
         config::{
             http::SessionCreationPolicy,
-            web::{builders::HttpSecurity, HttpSecurityBuilder, WebSecurityConfigurer},
+            web::{HttpSecurityBuilder, WebSecurityConfigurer, builders::HttpSecurity},
         },
         core::userdetails::User,
         crypto::{bcrypt::BCryptPasswordEncoder, password::PasswordEncoder},
@@ -376,8 +376,8 @@ mod tests {
     async fn a_refused_request_is_rendered_by_the_handler_of_the_application() {
         use next_web_core::{
             error::BoxError,
+            http::{HttpRequest, HttpResponse},
             security::PreAuthorizeDenialHandler,
-           http::{HttpRequest, HttpResponse},
         };
 
         struct JsonRefusal;

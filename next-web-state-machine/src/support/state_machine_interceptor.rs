@@ -1,4 +1,4 @@
-use next_web_core::{error::BoxError, traits::message::Message};
+use next_web_core::{error::BoxError, messaging::Message};
 
 use crate::{
     StateMachine, state::StateMachineState, state_context::StateContext,

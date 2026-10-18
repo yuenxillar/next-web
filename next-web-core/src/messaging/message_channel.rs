@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::traits::message::Message;
+use super::Message;
 
 pub trait MessageChannel<T>
 where

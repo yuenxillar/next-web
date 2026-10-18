@@ -113,11 +113,11 @@ mod tests {
 
     use super::ApplicationFilterChain;
     use crate::{
+        Named,
         http::{
             HttpRequest, HttpResponse,
             filter::{FilterError, HttpFilter, HttpFilterChain},
         },
-        traits::named::Named,
     };
 
     #[derive(Clone)]

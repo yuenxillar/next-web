@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
 };
 
-use next_web_core::{async_trait, error::BoxError, traits::message::Message};
+use next_web_core::{async_trait, error::BoxError, messaging::Message};
 use tokio::sync::broadcast::Sender;
 
 use crate::{

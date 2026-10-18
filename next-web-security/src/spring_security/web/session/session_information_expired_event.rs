@@ -1,7 +1,10 @@
 use next_web_context::EventAttributes;
 use next_web_core::{
-    http::{filter::HttpFilterChain, HttpRequest, HttpResponse},
-    http::{HttpFilterChainShare, HttpRequestShare, HttpResponseShare},
+    http::{
+        filter::{HttpFilterChain, HttpFilterChainShare},
+        HttpRequest, HttpResponse,
+    },
+    http::{HttpRequestShare, HttpResponseShare},
 };
 
 use crate::core::session::SessionInformation;

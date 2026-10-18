@@ -13,8 +13,7 @@ use next_web_core::{
         filter::{FilterError, HttpFilter, HttpFilterChain},
         HttpRequest, HttpResponse,
     },
-    traits::named::Named,
-    ApplicationContext, BoxAny, Ordered,
+    ApplicationContext, BoxAny, Named, Ordered,
 };
 
 use next_web_context::ApplicationEventPublisher;

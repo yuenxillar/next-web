@@ -5,7 +5,7 @@ use next_web_core::http::filter::{HttpFilter, HttpFilterChain};
 use next_web_core::{
     async_trait,
     http::{filter::FilterError, HttpMethod, HttpRequest, HttpResponse},
-    traits::named::Named,
+    Named,
 };
 
 use crate::authentication::{UsernamePasswordAuthenticationToken, EMPTY_STRING};

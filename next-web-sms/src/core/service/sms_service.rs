@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use next_web_core::{async_trait, error::BoxError, traits::service::Service};
+use next_web_core::{async_trait, error::BoxError};
 use serde_json::Value;
 
 #[async_trait]
-pub trait SmsService: Service {
+pub trait SmsService {
     type Response: serde::de::DeserializeOwned;
 
     /// Send a single SMS message to one phone number.

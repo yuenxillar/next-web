@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use next_web_core::{
     async_trait,
-    traits::service::background_service::{BackgroundService, HealthStatus, ServiceError},
+    service::{BackgroundService, HealthStatus, ServiceError},
 };
 use next_web_macros::singleton;
 
@@ -36,7 +36,7 @@ impl BackgroundService for XxlWebServer {
         "XxlJobWebServer"
     }
 
-    async fn run(&self) -> Result<(), ServiceError> {
+    async fn run(self: Arc<Self>) -> Result<(), ServiceError> {
         let addr = self.app_state.client_config.get_http_addr();
 
         let listener = tokio::net::TcpListener::bind(addr.to_owned())

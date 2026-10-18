@@ -3,7 +3,7 @@ use next_web_core::http::{HttpRequest, HttpResponse};
 use next_web_core::{
     async_trait,
     error::{illegal_state_error::IllegalStateError, BoxError},
-    traits::required::Required,
+    Required,
 };
 use tracing::debug;
 

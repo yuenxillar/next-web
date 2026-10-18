@@ -1,4 +1,4 @@
-use next_web_core::{any::AnyValue, traits::message::Message};
+use next_web_core::{any::AnyValue, messaging::Message};
 
 use crate::{
     StateMachine, state::StateMachineState, state_context::StateContext,

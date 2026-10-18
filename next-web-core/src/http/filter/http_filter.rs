@@ -4,11 +4,11 @@ use async_trait::async_trait;
 use dyn_clone::{DynClone, clone_trait_object};
 
 use crate::{
+    Named,
     http::{
         HttpRequest, HttpResponse,
         filter::{FilterError, HttpFilterChain},
     },
-    traits::named::Named,
 };
 
 #[async_trait]

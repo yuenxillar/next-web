@@ -31,14 +31,14 @@ use std::sync::Arc;
 
 use axum::routing::get;
 use next_web::{
-    core::{traits::apply_router::ApplyRouter, ApplicationContext, Ordered},
-    macros::{autoconfigure::configuration, bind::singleton},
     Application, NextWebApplication,
+    core::{ApplicationContext, ApplyRouter, Ordered},
+    macros::{autoconfigure::configuration, bind::singleton},
 };
 use next_web_context::{ApplicationEvent, ApplicationEventPublisher};
 use next_web_core::error::BoxError;
 use next_web_security::{
-    config::web::{builders::HttpSecurity, WebSecurityConfigurer},
+    config::web::{WebSecurityConfigurer, builders::HttpSecurity},
     oauth2::{
         jose::{JwkSource, JwtSigner, SecretJwtSigner},
         server::resource::jwt::NimbusJwtDecoder,
@@ -217,7 +217,7 @@ mod tests {
     use axum::{
         body::Body,
         extract::Request,
-        http::{header, StatusCode},
+        http::{StatusCode, header},
         response::Response,
     };
     use next_web_core::{
@@ -238,8 +238,8 @@ mod tests {
     };
 
     use super::{
-        configure_oauth2_resource_server, demo_admin_token, demo_jwt_signer, demo_read_token,
-        demo_write_token, DEMO_ISSUER,
+        DEMO_ISSUER, configure_oauth2_resource_server, demo_admin_token, demo_jwt_signer,
+        demo_read_token, demo_write_token,
     };
 
     /// The opaque token the example introspection accepts.

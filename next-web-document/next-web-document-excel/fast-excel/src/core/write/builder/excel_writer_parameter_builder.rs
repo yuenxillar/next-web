@@ -4,7 +4,7 @@ use crate::core::{
         handler::write_handler::WriteHandler, metadata::write_basic_parameter::WriteBasicParameter,
     },
 };
-use next_web_core::traits::required::Required;
+use next_web_core::Required;
 
 pub trait ExcelWriterParameterBuilder<T, C>
 where

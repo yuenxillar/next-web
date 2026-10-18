@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use next_web::macros::data::Desensitize;
-use next_web_core::traits::desensitize::Desensitize;
+use next_web_core::util::Desensitize;
 
 /// Masks every character of a plate but the first two.
 fn de_plate(value: &str) -> String {

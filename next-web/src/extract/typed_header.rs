@@ -8,8 +8,7 @@ use axum::{
     http::request::Parts,
     response::{IntoResponse, IntoResponseParts, Response, ResponseParts},
 };
-use headers::{Header, HeaderMapExt};
-use next_web_core::headers;
+use next_web_core::http::headers::{Header, HeaderMapExt};
 
 /// Extractor and response that works with typed header values from [`headers`].
 ///
@@ -165,7 +164,7 @@ pub enum TypedHeaderRejectionReason {
     /// The header was missing from the HTTP request
     Missing,
     /// An error occurred when parsing the header from the HTTP request
-    Error(headers::Error),
+    Error(next_web_core::http::headers::Error),
 }
 
 impl TypedHeaderRejectionReason {

@@ -13,8 +13,7 @@ use next_web::{
 };
 use next_web_context::ApplicationContextExt;
 use next_web_core::{
-    ApplicationContext, Ordered, async_trait, headers::Host,
-    traits::config::auto_configuration::AutoConfiguration,
+    ApplicationContext, Ordered, async_trait, config::AutoConfiguration, http::headers::Host,
 };
 use next_web_pay_alipay::{
     config::AlipayConfig,

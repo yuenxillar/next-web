@@ -3,11 +3,11 @@ use std::fmt::Debug;
 
 use crate::any::AnyClone;
 use crate::any::AnyValue;
+use crate::messaging::Message;
 use crate::messaging::generic_message::GenericMessage;
 use crate::messaging::message_channel::MessageChannel;
 use crate::messaging::message_headers::MessageHeaders;
 use crate::messaging::support::message_header_accessor::MessageHeaderAccessor;
-use crate::traits::message::Message;
 
 /// A builder for creating messages.
 pub struct MessageBuilder<T> {

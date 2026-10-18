@@ -6,7 +6,7 @@ mod response_stream;
 pub use bytes_stream::BytesStream;
 pub use local_file_stream::LocalFileStream;
 pub use network_file_stream::NetworkFileStream;
-pub use response_stream::ResponseStream;
+pub use response_stream::{ResponseStream, ResponseStreamWrapper};
 
 /// 4kb
 pub const DEFAULT_CHUNK_SIZE: usize = 4096;

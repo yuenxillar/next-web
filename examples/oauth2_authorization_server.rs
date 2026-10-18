@@ -48,7 +48,7 @@ use std::sync::Arc;
 use axum::routing::get;
 use next_web::{
     Application, NextWebApplication,
-    core::{ApplicationContext, Ordered, traits::apply_router::ApplyRouter},
+    core::{ApplicationContext, ApplyRouter, Ordered},
     macros::{autoconfigure::configuration, bind::singleton},
 };
 use next_web_context::{ApplicationEvent, ApplicationEventPublisher};

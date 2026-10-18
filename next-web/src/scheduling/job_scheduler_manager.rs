@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::util::Uuid;
-use next_web_core::{error::BoxError, traits::singleton::Singleton, util::time::TimeUnit};
+use next_web_core::{error::BoxError, util::time::TimeUnit};
 use tokio::sync::RwLock;
 use tokio_cron_scheduler::{Job, JobScheduler, JobSchedulerError};
 use tracing::{error, warn};
@@ -34,8 +34,6 @@ pub struct JobSchedulerManager {
     store: Arc<dyn ScheduledJobStore>,
     registry: ScheduledJobRegistry,
 }
-
-impl Singleton for JobSchedulerManager {}
 
 #[derive(Clone)]
 struct RepositoryReaderAdapter {

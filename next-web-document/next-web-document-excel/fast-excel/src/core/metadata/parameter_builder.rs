@@ -1,4 +1,4 @@
-use next_web_core::{traits::required::Required, util::locale::Locale};
+use next_web_core::{util::locale::Locale, Required};
 
 use crate::core::{converters::converter::Converter, metadata::basic_parameter::BasicParameter};
 

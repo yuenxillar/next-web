@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use next_web_core::Id;
 use next_web_core::async_trait;
-use next_web_core::traits::id::Id;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio::time;

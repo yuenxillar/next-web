@@ -1,7 +1,7 @@
 use next_web_core::async_trait;
 use next_web_core::error::BoxError;
+use next_web_core::messaging::Message;
 use next_web_core::messaging::message_headers::MessageHeaders;
-use next_web_core::traits::message::Message;
 use std::fmt::{self, Debug};
 use std::hash::Hash;
 use std::marker::PhantomData;

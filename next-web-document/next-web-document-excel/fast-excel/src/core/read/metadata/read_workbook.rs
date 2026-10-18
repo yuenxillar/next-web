@@ -7,7 +7,7 @@ use crate::core::{
     read::metadata::read_basic_parameter::ReadBasicParameter,
     support::excel_type::ExcelType,
 };
-use next_web_core::traits::required::Required;
+use next_web_core::Required;
 #[cfg(feature = "async")]
 use tokio::fs::File;
 #[cfg(feature = "async")]

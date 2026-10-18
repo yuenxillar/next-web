@@ -2,15 +2,15 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
 
+use super::ResponseStream;
 use axum::BoxError;
 use axum::body::Bytes;
 use axum::http::{HeaderMap, HeaderName};
-use axum::{body::Body, response::Response};
+use axum::response::Response;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt, stream};
-use next_web_core::traits::stream::into_response_stream::IntoRespnoseStream;
+use reqwest::Method;
 use reqwest::{Client, header};
-use reqwest::{Method, StatusCode};
 use tracing::error;
 
 use crate::util::{local_date_time::LocalDateTime, stream_throttle::throttle_byte_stream};
@@ -43,10 +43,40 @@ impl NetworkFileStream {
     }
 }
 
-impl IntoRespnoseStream for NetworkFileStream {
-    fn into_response_stream(self, target_rate: usize) -> Response {
-        let url = self.url.clone();
+impl ResponseStream for NetworkFileStream {
+    type Stream = BoxStream<'static, Result<Bytes, BoxError>>;
 
+    /// Describes the remote file: it is an octet stream, offered under the name of
+    /// the last segment of the URL.
+    fn response_headers(&self) -> axum::http::HeaderMap {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            axum::http::HeaderValue::from_static("application/octet-stream"),
+        );
+
+        let file_name = self
+            .url
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .next_back()
+            .map(str::to_owned)
+            .unwrap_or_else(LocalDateTime::now);
+        if let Ok(value) =
+            axum::http::HeaderValue::from_str(&format!("attachment; filename=\"{file_name}\""))
+        {
+            headers.insert(header::CONTENT_DISPOSITION, value);
+        }
+
+        headers
+    }
+
+    /// Requests the file and streams the response.
+    ///
+    /// The request is made inside the stream, because producing the stream cannot
+    /// await — a request that fails is therefore reported as the stream's error
+    /// item rather than as a response of its own.
+    fn stream(self, target_rate: usize) -> Result<Self::Stream, Response> {
         let mut headers = HeaderMap::new();
         if let Some(header_map) = self.headers {
             header_map.into_iter().for_each(|(key, value)| {
@@ -92,26 +122,10 @@ impl IntoRespnoseStream for NetworkFileStream {
         .try_flatten()
         .boxed();
 
-        let header_name = format!(
-            "attachment; filename=\"{}\"",
-            url.split('/')
-                .filter(|s| !s.is_empty())
-                .last()
-                .unwrap_or(LocalDateTime::now().as_str())
-        );
-
-        let body = if target_rate == 0 {
-            Body::from_stream(source)
-        } else {
-            Body::from_stream(throttle_byte_stream(source, target_rate))
-        };
-
-        Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "application/octet-stream")
-            .header(header::CONTENT_DISPOSITION, header_name)
-            .body(body)
-            .unwrap()
+        match target_rate {
+            0 => Ok(source),
+            rate => Ok(throttle_byte_stream(source, rate).boxed()),
+        }
     }
 }
 

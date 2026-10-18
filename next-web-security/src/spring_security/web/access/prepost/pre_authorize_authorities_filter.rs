@@ -10,7 +10,7 @@ use next_web_core::{
         HttpRequest, HttpResponse,
     },
     security::{PreAuthorizeDenialHandler, AUTHORITIES_ATTRIBUTE, DENIAL_HANDLER_ATTRIBUTE},
-    traits::named::Named,
+    Named,
 };
 
 use crate::{

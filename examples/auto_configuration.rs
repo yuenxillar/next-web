@@ -17,9 +17,7 @@ use std::sync::Arc;
 
 use next_web::{
     Application, NextWebApplication,
-    core::{
-        ApplicationContext, async_trait, traits::config::auto_configuration::AutoConfiguration,
-    },
+    core::{ApplicationContext, async_trait, config::AutoConfiguration},
     macros::{
         autoconfigure::{auto_configuration, configuration_properties},
         bind::{get_mapping, singleton},

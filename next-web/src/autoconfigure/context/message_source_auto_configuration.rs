@@ -13,9 +13,9 @@ use next_web_context::{
 use next_web_core::env::ConfigurableEnvironment;
 use next_web_core::{
     Ordered, async_trait,
+    config::AutoConfiguration,
     io::support::PropertiesLoaderUtils,
     io::{BytesResource, Resource, ResourceLoader},
-    traits::config::auto_configuration::AutoConfiguration,
 };
 
 use next_web_macros::singleton;

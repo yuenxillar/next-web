@@ -6,7 +6,7 @@ use next_web_core::http::filter::{FilterError, HttpFilter, HttpFilterChain};
 use next_web_core::http::HttpMethod;
 use next_web_core::http::HttpRequest;
 use next_web_core::http::HttpResponse;
-use next_web_core::traits::named::Named;
+use next_web_core::Named;
 
 use crate::core::context::SecurityContextHolder;
 use crate::core::context::SecurityContextHolderStrategy;

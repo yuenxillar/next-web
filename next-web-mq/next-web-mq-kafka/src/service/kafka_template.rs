@@ -1,9 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use next_web_core::{
-    error::BoxError,
-    traits::{service::Service, singleton::Singleton},
-};
+use next_web_core::error::BoxError;
 
 use crate::{
     autoconfigure::kafka_properties::KafkaProperties,
@@ -17,9 +14,6 @@ pub struct KafkaTemplate {
     properties: KafkaProperties,
     registrations: Vec<DefaultKafkaListenerRegistration>,
 }
-
-impl Singleton for KafkaTemplate {}
-impl Service for KafkaTemplate {}
 
 impl KafkaTemplate {
     pub fn new(

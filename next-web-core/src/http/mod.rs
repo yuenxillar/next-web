@@ -4,7 +4,6 @@ pub mod session;
 
 mod cookie;
 mod default_resource_dispatcher;
-mod http_filter_chain_share;
 mod http_request;
 mod http_request_share;
 mod http_response;
@@ -22,7 +21,6 @@ pub use cookie::{
     Cookie, CookieBuilder, CookieError, CookieValidationError, Rfc6265Utils, SameSite,
 };
 pub use default_resource_dispatcher::DefaultResourceDispatcher;
-pub use http_filter_chain_share::HttpFilterChainShare;
 pub use http_request::HttpRequest;
 pub use http_request_share::HttpRequestShare;
 pub use http_response::HttpResponse;
@@ -34,3 +32,5 @@ pub use request_body::{
 };
 pub use request_lifecycle::RequestLifecycle;
 pub use resource_dispatcher::ResourceDispatcher;
+
+pub extern crate headers;

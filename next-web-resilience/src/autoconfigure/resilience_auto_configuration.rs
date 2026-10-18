@@ -12,10 +12,7 @@
 use std::{error::Error, sync::Arc, time::Duration};
 
 use next_web_context::ApplicationContextExt;
-use next_web_core::{
-    ApplicationContext, Ordered, async_trait,
-    traits::config::auto_configuration::AutoConfiguration,
-};
+use next_web_core::{ApplicationContext, Ordered, async_trait, config::AutoConfiguration};
 use next_web_macros::singleton;
 
 use crate::{
@@ -74,10 +71,7 @@ impl ResilienceAutoConfiguration {
         let mut registered = RegisteredInstances::default();
 
         for (name, instance) in &self.rate_limiter_properties.instances {
-            let limiter = Arc::new(RateLimiter::new(
-                name,
-                rate_limiter_config(name, instance),
-            ));
+            let limiter = Arc::new(RateLimiter::new(name, rate_limiter_config(name, instance)));
             registry.register_rate_limiter(name, Arc::clone(&limiter));
             registered.rate_limiters.push(Registered {
                 instance: limiter,
@@ -107,10 +101,7 @@ impl ResilienceAutoConfiguration {
         }
 
         for (name, instance) in &self.time_limiter_properties.instances {
-            let limiter = Arc::new(TimeLimiter::new(
-                name,
-                time_limiter_config(name, instance),
-            ));
+            let limiter = Arc::new(TimeLimiter::new(name, time_limiter_config(name, instance)));
             registry.register_time_limiter(name, Arc::clone(&limiter));
             registered.time_limiters.push(Registered {
                 instance: limiter,
@@ -220,12 +211,15 @@ fn insert<T: Send + Sync + 'static>(ctx: &mut dyn ApplicationContext, entry: &Re
 
 /// Reads a duration setting, failing the configuration rather than a call.
 fn duration(value: &DurationValue, pattern: &str, instance: &str, setting: &str) -> Duration {
-    value.to_duration().unwrap_or_else(|error| {
-        panic!("next.{pattern}.instances.{instance}: {setting} {error}")
-    })
+    value
+        .to_duration()
+        .unwrap_or_else(|error| panic!("next.{pattern}.instances.{instance}: {setting} {error}"))
 }
 
-fn rate_limiter_config(instance_name: &str, instance: &RateLimiterInstanceProperties) -> RateLimiterConfig {
+fn rate_limiter_config(
+    instance_name: &str,
+    instance: &RateLimiterInstanceProperties,
+) -> RateLimiterConfig {
     let mut builder = RateLimiterConfig::builder();
 
     if let Some(value) = instance.limit_for_period {
@@ -286,8 +280,8 @@ fn circuit_breaker_config(
         builder = builder.permitted_number_of_calls_in_half_open_state(value);
     }
     if let Some(value) = &instance.max_wait_duration_in_half_open_state {
-        builder =
-            builder.max_wait_duration_in_half_open_state(read(value, "maxWaitDurationInHalfOpenState"));
+        builder = builder
+            .max_wait_duration_in_half_open_state(read(value, "maxWaitDurationInHalfOpenState"));
     }
 
     builder.build()
@@ -360,15 +354,15 @@ mod tests {
         let mut environment = next_web_core::env::BaseEnvironment::new();
         {
             use next_web_core::env::ConfigurableEnvironment;
-            environment
-                .property_sources()
-                .add_last(Box::new(next_web_core::env::MapPropertySource::new(
+            environment.property_sources().add_last(Box::new(
+                next_web_core::env::MapPropertySource::new(
                     "test".to_owned(),
                     entries
                         .iter()
                         .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
                         .collect::<IndexMap<_, _>>(),
-                )));
+                ),
+            ));
         }
 
         next_web_core::env::Binder::new(&environment, prefix)
@@ -381,18 +375,12 @@ mod tests {
         ResilienceAutoConfiguration {
             rate_limiter_properties: properties(
                 &[
-                    (
-                        "next.ratelimiter.instances.backendA.limitForPeriod",
-                        "5",
-                    ),
+                    ("next.ratelimiter.instances.backendA.limitForPeriod", "5"),
                     (
                         "next.ratelimiter.instances.backendA.limitRefreshPeriod",
                         "1s",
                     ),
-                    (
-                        "next.ratelimiter.instances.backendA.timeoutDuration",
-                        "0",
-                    ),
+                    ("next.ratelimiter.instances.backendA.timeoutDuration", "0"),
                 ],
                 "next.ratelimiter",
             ),
@@ -419,20 +407,14 @@ mod tests {
             ),
             bulkhead_properties: properties(
                 &[
-                    (
-                        "next.bulkhead.instances.backendD.maxConcurrentCalls",
-                        "10",
-                    ),
+                    ("next.bulkhead.instances.backendD.maxConcurrentCalls", "10"),
                     ("next.bulkhead.instances.backendD.maxWaitDuration", "10ms"),
                 ],
                 "next.bulkhead",
             ),
             time_limiter_properties: properties(
                 &[
-                    (
-                        "next.timelimiter.instances.backendE.timeoutDuration",
-                        "2s",
-                    ),
+                    ("next.timelimiter.instances.backendE.timeoutDuration", "2s"),
                     (
                         "next.timelimiter.instances.backendE.cancelRunningFuture",
                         "true",
@@ -459,7 +441,10 @@ mod tests {
             .find_rate_limiter("backendA")
             .expect("the limiter is registered");
         assert_eq!(limiter.config().limit_for_period(), 5);
-        assert_eq!(limiter.config().limit_refresh_period(), Duration::from_secs(1));
+        assert_eq!(
+            limiter.config().limit_refresh_period(),
+            Duration::from_secs(1)
+        );
         assert_eq!(limiter.config().timeout_duration(), Duration::ZERO);
 
         let breaker = registry
@@ -472,7 +457,9 @@ mod tests {
             Duration::from_secs(10)
         );
         assert_eq!(
-            breaker.config().permitted_number_of_calls_in_half_open_state(),
+            breaker
+                .config()
+                .permitted_number_of_calls_in_half_open_state(),
             3
         );
 
@@ -488,13 +475,12 @@ mod tests {
         let limiter = registry
             .find_time_limiter("backendE")
             .expect("the time limiter is registered");
-        assert_eq!(
-            limiter.config().timeout_duration(),
-            Duration::from_secs(2)
-        );
+        assert_eq!(limiter.config().timeout_duration(), Duration::from_secs(2));
         assert!(limiter.config().cancel_running_future());
 
-        let retry = registry.find_retry("backendF").expect("the retry is registered");
+        let retry = registry
+            .find_retry("backendF")
+            .expect("the retry is registered");
         assert_eq!(retry.config().max_attempts(), 4);
         assert_eq!(retry.config().wait_duration(), Duration::from_millis(500));
     }

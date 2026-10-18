@@ -9,7 +9,7 @@ use std::{
 };
 
 use jsonwebtoken::{Algorithm, DecodingKey, Header, Validation};
-use next_web_core::{async_trait, traits::required::Required};
+use next_web_core::{async_trait, Required};
 use serde_json::Value;
 
 use crate::{
@@ -998,7 +998,10 @@ mod tests {
         let signer = SecretJwtSigner::new("secret");
         let decoder = decoder(Arc::new(FixedJwkSet(signer.jwk_set())));
 
-        assert!(decoder.decode(&token).await.is_err(), "the token is rejected");
+        assert!(
+            decoder.decode(&token).await.is_err(),
+            "the token is rejected"
+        );
     }
 
     #[tokio::test]
@@ -1014,7 +1017,10 @@ mod tests {
         symmetric.set_kid(kid);
         let decoder = decoder(Arc::new(FixedJwkSet(JwkSet::new(vec![symmetric]))));
 
-        assert!(decoder.decode(&token).await.is_err(), "the token is rejected");
+        assert!(
+            decoder.decode(&token).await.is_err(),
+            "the token is rejected"
+        );
     }
 
     #[tokio::test]

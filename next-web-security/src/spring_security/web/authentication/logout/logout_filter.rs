@@ -19,8 +19,8 @@ use next_web_core::{
         filter::{FilterError, HttpFilter, HttpFilterChain},
         HttpRequest, HttpResponse,
     },
-    traits::named::Named,
     util::StringUtils,
+    Named,
 };
 use tracing::debug;
 use tracing::Level;

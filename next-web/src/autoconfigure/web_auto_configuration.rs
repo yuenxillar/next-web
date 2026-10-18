@@ -5,11 +5,9 @@ use next_web_context::{
 };
 use next_web_core::context::ConfigurationProperties;
 use next_web_core::{
-    ApplicationContext, Ordered, async_trait, env::ConfigurableEnvironment,
-    traits::config::auto_configuration::AutoConfiguration,
-    traits::config::auto_configuration_sorter::AutoConfigurationSorter,
-    traits::config::auto_configuration_sorter::ConfigurationSorter,
-    traits::config::configuration::Configuration,
+    ApplicationContext, Ordered, async_trait,
+    config::{AutoConfiguration, AutoConfigurationSorter, Configuration, ConfigurationSorter},
+    env::ConfigurableEnvironment,
 };
 use std::{error::Error, sync::Arc};
 

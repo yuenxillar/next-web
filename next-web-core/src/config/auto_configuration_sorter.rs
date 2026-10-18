@@ -20,8 +20,8 @@ use std::fmt;
 use tracing::trace;
 
 use crate::Ordered;
-use crate::traits::config::auto_configuration::AutoConfiguration;
-use crate::traits::config::configuration::Configuration;
+use crate::config::AutoConfiguration;
+use crate::config::Configuration;
 
 /// The metadata the sorter of the configurations of an application reads.
 ///

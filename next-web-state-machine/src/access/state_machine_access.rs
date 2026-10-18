@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use next_web_core::traits::message::Message;
+use next_web_core::messaging::Message;
 
 use crate::{
     StateMachine, access::reactive_state_machine_access::ReactiveStateMachineAccess,

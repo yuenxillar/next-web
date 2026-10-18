@@ -7,8 +7,8 @@
 use next_web::context::DefaultApplicationContext;
 use next_web::macros::autoconfigure::configuration;
 use next_web_context::ApplicationContextExt;
-use next_web_core::traits::config::auto_configuration_sorter::AutoConfigurationSorter;
-use next_web_core::traits::config::configuration::Configuration;
+use next_web_core::config::AutoConfigurationSorter;
+use next_web_core::config::Configuration;
 
 /// The registry the initializer of the configuration fills.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

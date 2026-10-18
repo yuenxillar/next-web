@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-use next_web_core::traits::required::Required;
+use next_web_core::Required;
 
 use crate::{
     authorization::AuthenticationManager,

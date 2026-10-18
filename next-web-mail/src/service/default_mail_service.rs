@@ -14,8 +14,7 @@ use lettre::{
     transport::smtp::authentication::Credentials,
 };
 use next_web_core::{
-    async_trait, impl_service,
-    mime_type::configurable_mime_file_type_map::ConfigurableMimeFileTypeMap,
+    async_trait, mime_type::configurable_mime_file_type_map::ConfigurableMimeFileTypeMap,
 };
 
 use crate::{
@@ -526,8 +525,6 @@ impl Deref for DefaultMailService {
         &self.smtp_transport
     }
 }
-
-impl_service!(DefaultMailService);
 
 #[cfg(test)]
 mod tests {

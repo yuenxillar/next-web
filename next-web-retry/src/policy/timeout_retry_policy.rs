@@ -1,9 +1,9 @@
 use std::{any::Any, sync::Arc};
 
 use next_web_core::{
+    Named,
     any::{AnyError, AnyValue},
     async_trait,
-    traits::named::Named,
 };
 
 use crate::{

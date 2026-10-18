@@ -8,11 +8,11 @@ use std::sync::{
 use async_trait::async_trait;
 
 use crate::{
+    Named,
     http::{
         HttpRequest, HttpResponse,
         filter::{FilterError, HttpFilter, HttpFilterChain},
     },
-    traits::named::Named,
 };
 
 /// A generic composite [`HttpFilter`] that delegates to a chain (list) of
@@ -153,11 +153,11 @@ mod tests {
 
     use super::CompositeFilter;
     use crate::{
+        Named,
         http::{
             HttpRequest, HttpResponse,
             filter::{FilterError, HttpFilter, HttpFilterChain},
         },
-        traits::named::Named,
     };
 
     /// A filter that records its name and then continues the chain.

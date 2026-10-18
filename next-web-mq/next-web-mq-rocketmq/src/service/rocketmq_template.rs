@@ -1,9 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use next_web_core::{
-    error::BoxError,
-    traits::{service::Service, singleton::Singleton},
-};
+use next_web_core::error::BoxError;
 
 use crate::{
     autoconfigure::rocketmq_properties::RocketmqProperties,
@@ -23,9 +20,6 @@ pub struct RocketmqTemplate {
     properties: RocketmqProperties,
     registrations: Vec<DefaultRocketmqListenerRegistration>,
 }
-
-impl Singleton for RocketmqTemplate {}
-impl Service for RocketmqTemplate {}
 
 impl RocketmqTemplate {
     /// Creates a new template from resolved properties and listener

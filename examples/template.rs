@@ -31,7 +31,7 @@ use axum::{
 };
 use next_web::{
     Application, NextWebApplication,
-    core::{ApplicationContext, traits::apply_router::ApplyRouter},
+    core::{ApplicationContext, ApplyRouter},
     macros::{bind::get_mapping, bind::singleton, order},
 };
 use next_web_core::{http::HttpRequest, tera::Value, web::ModelAndView};

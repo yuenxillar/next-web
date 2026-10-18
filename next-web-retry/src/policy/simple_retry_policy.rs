@@ -8,9 +8,9 @@ use std::{
 };
 
 use next_web_core::{
+    Named,
     any::{AnyError, AnyValue},
     async_trait,
-    traits::named::Named,
 };
 use tokio::sync::Mutex;
 

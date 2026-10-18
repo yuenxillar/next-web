@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use next_web_core::any::AnyValue;
 use next_web_core::error::BoxError;
+use next_web_core::messaging::Message;
 use next_web_core::messaging::message_headers::MessageHeaders;
-use next_web_core::traits::message::Message;
 
 use crate::StateMachine;
 use crate::extended_state::ExtendedState;

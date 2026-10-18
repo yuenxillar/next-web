@@ -1,5 +1,5 @@
 use axum::response::IntoResponse;
-use next_web_core::traits::desensitize::Desensitize;
+use next_web_core::util::Desensitize;
 
 /// A response wrapper that automatically redacts its payload before it is
 /// sent to the client.

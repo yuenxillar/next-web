@@ -1,4 +1,4 @@
-use next_web_core::{error::BoxError, traits::required::Required};
+use next_web_core::{Required, error::BoxError};
 
 use std::{
     any::Any,

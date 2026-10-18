@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
-use syn::{Data, DeriveInput, Field, Ident, Path, spanned::Spanned};
+use syn::{spanned::Spanned, Data, DeriveInput, Field, Ident, Path};
 
 use crate::util::field_type::FieldType;
 
@@ -61,7 +61,7 @@ pub(crate) fn impl_macro_desensitize(input: &DeriveInput) -> TokenStream {
     };
 
     quote! {
-        impl ::next_web_core::traits::desensitize::Desensitize for #name {
+        impl ::next_web_core::util::Desensitize for #name {
             fn desensitize(&mut self) {
                 #built_in_use
 

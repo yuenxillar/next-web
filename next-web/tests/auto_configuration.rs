@@ -15,8 +15,8 @@ use next_web::{
     context::{ApplicationContextExt, DefaultApplicationContext},
     core::{
         ApplicationContext, async_trait,
+        config::AutoConfiguration,
         env::{ConfigurableEnvironment, MapPropertySource, StandardEnvironment},
-        traits::config::auto_configuration::AutoConfiguration,
     },
     macros::{autoconfigure::auto_configuration, bind::singleton},
 };

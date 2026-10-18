@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-use next_web_core::{error::BoxError, traits::required::Required};
+use next_web_core::{Required, error::BoxError};
 
 use crate::config::{
     builders::state_machine_model_configurer::StateMachineModelConfigurer,

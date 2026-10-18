@@ -1,18 +1,17 @@
 pub mod any;
+pub mod config;
 pub mod constants;
 pub mod context;
-pub mod convert;
 pub mod env;
 pub mod error;
 pub mod http;
 pub mod io;
-pub mod macros;
 pub mod messaging;
 pub mod metrics;
 pub mod mime_type;
 pub mod security;
 pub mod server;
-pub mod traits;
+pub mod service;
 pub mod util;
 pub mod web;
 
@@ -34,9 +33,6 @@ pub use regex::{Regex, RegexBuilder};
 // without depending on the version of the crate the framework uses.
 pub use tera;
 pub use uuid::Uuid;
-
-#[cfg(feature = "http-request")]
-pub extern crate headers;
 
 /// A thread-safe, shared, type-erased value.
 ///
@@ -65,8 +61,16 @@ pub type BoxAny = std::boxed::Box<dyn std::any::Any + Send + Sync>;
 pub type BoxFuture<'a, T> =
     core::pin::Pin<std::boxed::Box<dyn core::future::Future<Output = T> + Send + 'a>>;
 
+mod apply_router;
+mod id;
+mod named;
 mod next_version;
 mod ordered;
+mod required;
 
+pub use apply_router::ApplyRouter;
+pub use id::Id;
+pub use named::Named;
 pub use next_version::NextVersion;
 pub use ordered::Ordered;
+pub use required::Required;

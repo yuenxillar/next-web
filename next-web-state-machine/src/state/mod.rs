@@ -13,7 +13,7 @@ pub mod state_listener;
 use std::{any::Any, collections::HashSet, sync::Arc};
 
 use futures::future::BoxFuture;
-use next_web_core::{async_trait, traits::message::Message};
+use next_web_core::{async_trait, messaging::Message};
 
 use crate::{
     state::{

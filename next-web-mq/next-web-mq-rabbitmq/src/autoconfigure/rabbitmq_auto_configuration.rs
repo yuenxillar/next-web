@@ -1,9 +1,7 @@
 use next_web_context::ApplicationContextExt;
 use std::error::Error;
 
-use next_web_core::{
-    ApplicationContext, Ordered, async_trait, traits::config::auto_configuration::AutoConfiguration,
-};
+use next_web_core::{ApplicationContext, Ordered, async_trait, config::AutoConfiguration};
 use next_web_macros::singleton;
 
 use crate::{

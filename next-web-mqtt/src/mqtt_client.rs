@@ -10,7 +10,6 @@ use crate::{
     topic_router::TopicRouter,
 };
 
-use next_web_core::impl_service;
 use rumqttc::{
     AsyncClient, ClientError, ConnectReturnCode, ConnectionError, Event, EventLoop, MqttOptions,
     NetworkOptions, Packet, QoS, SubscribeFilter,
@@ -503,8 +502,6 @@ fn invalid_broker_url(url: &str, reason: &str) -> Box<dyn Error> {
 fn ws_feature_required(scheme: &str) -> Box<dyn Error> {
     format!("the '{scheme}://' broker URL requires the `ws` feature of next-web-mqtt").into()
 }
-
-impl_service!(MqttClient);
 
 #[cfg(test)]
 mod tests {

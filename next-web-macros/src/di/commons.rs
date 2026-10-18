@@ -810,10 +810,10 @@ fn generate_only_one_field_or_argument_resolve_stmt(
                 // arguments of a map and reports an error for a single one, and
                 // `extract_option_type` strips a reference from what it found,
                 // which an `Option<T>` field does not have.
-                let read =
-                    match crate::util::extract_type::extract_option_inner_type(field_or_argument_ty)
-                    {
-                        Some(inner) => parse_quote! {
+                let read = match crate::util::extract_type::extract_option_inner_type(
+                    field_or_argument_ty,
+                ) {
+                    Some(inner) => parse_quote! {
                         let #ident: #field_or_argument_ty = match cx
                             .get_singleton_with_name::<::std::sync::Arc<dyn ::next_web::core::env::ConfigurableEnvironment>>(
                                 #environment_singleton_name,
@@ -1165,22 +1165,4 @@ pub(crate) fn generate_field_resolve_stmts(
             })
         }
     }
-}
-
-fn extract_vec_inner_type(ty: &Type) -> Option<&Type> {
-    if let Type::Path(type_path) = ty {
-        let last_segment = type_path.path.segments.last()?;
-
-        // 检查是否是 Option
-        if last_segment.ident == "Option" {
-            // 获取泛型参数
-            if let PathArguments::AngleBracketed(args) = &last_segment.arguments {
-                // 获取第一个泛型参数
-                if let Some(GenericArgument::Type(inner_ty)) = args.args.first() {
-                    return Some(inner_ty);
-                }
-            }
-        }
-    }
-    None
 }

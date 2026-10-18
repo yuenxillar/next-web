@@ -1,5 +1,5 @@
 use next_web_core::any::AnyValue;
-use next_web_core::traits::message::Message;
+use next_web_core::messaging::Message;
 use std::sync::{Arc, RwLock};
 
 use crate::StateMachine;

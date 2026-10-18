@@ -5,8 +5,8 @@ use std::{
 
 use next_web_core::{
     http::{HttpMethod, MediaType},
-    traits::required::Required,
     web::accept::{ContentNegotiationStrategy, HeaderContentNegotiationStrategy},
+    Required,
 };
 
 use crate::{

@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use futures::future::BoxFuture;
 use next_web_core::any::AnyValue;
-use next_web_core::traits::message::Message;
+use next_web_core::messaging::Message;
 use tracing::error;
 
 use crate::StateMachine;

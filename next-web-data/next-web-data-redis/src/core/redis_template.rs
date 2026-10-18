@@ -1,6 +1,5 @@
 use std::{error::Error, ops::Deref, sync::Arc, time::Duration};
 
-use next_web_core::impl_service;
 use redis::{AsyncConnectionConfig, Client, RedisResult, aio::MultiplexedConnection};
 
 use crate::autoconfigure::redis_properties::RedisProperties;
@@ -84,5 +83,3 @@ impl Deref for RedisTemplate {
         &self.client
     }
 }
-
-impl_service!(RedisTemplate);

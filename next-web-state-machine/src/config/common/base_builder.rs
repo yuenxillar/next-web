@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use next_web_core::Required;
 use next_web_core::error::BoxError;
-use next_web_core::traits::required::Required;
 
 use crate::config::common::builder::Builder;
 

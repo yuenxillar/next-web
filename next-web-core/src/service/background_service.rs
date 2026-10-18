@@ -1,4 +1,8 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
+
+use crate::service::{HealthStatus, ServiceError};
 
 /// A long-lived application component managed alongside the web server.
 ///
@@ -15,10 +19,8 @@ where
     /// Returns a stable, unique name within one manager.
     fn name(&self) -> &'static str;
 
-    /// Runs the service until its internal shutdown mechanism is signalled.
-    ///
-    /// Unexpected completion or an error causes the manager to restart it.
-    async fn run(&self) -> Result<(), ServiceError>;
+    /// Runs the service.
+    async fn run(self: Arc<Self>) -> Result<(), ServiceError>;
 
     /// Signals `run` to stop and releases resources owned by the service.
     ///
@@ -29,37 +31,4 @@ where
     /// Reports service health. The manager calls this periodically as a
     /// heartbeat and restarts the service when it returns `Unhealthy`.
     async fn health_check(&self) -> HealthStatus;
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ServiceError {
-    #[error("Service initialization failed: {0}")]
-    InitFailed(String),
-
-    #[error("Service runtime error: {0}")]
-    RuntimeError(String),
-
-    #[error("Service already running")]
-    AlreadyRunning,
-
-    #[error("Service not found")]
-    NotFound,
-
-    #[error("Shutdown timeout")]
-    ShutdownTimeout,
-
-    #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
-
-    #[error("Other error: {0}")]
-    Other(String),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum HealthStatus {
-    Healthy,
-    Unhealthy(String),
-    Starting,
-    Stopping,
-    Unknown,
 }

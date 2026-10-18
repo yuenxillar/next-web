@@ -5,7 +5,7 @@ use std::{error::Error, sync::Arc};
 #[cfg(feature = "distributed-lock")]
 use next_web_core::traits::singleton::Singleton;
 use next_web_core::{
-    async_trait, traits::config::auto_configuration::AutoConfiguration, ApplicationContext,
+    ApplicationContext, async_trait, config::auto_configuration::AutoConfiguration,
 };
 use next_web_macros::auto_configuration;
 use next_web_macros::singleton;
@@ -16,7 +16,7 @@ use crate::{
     core::redis_template::RedisTemplate,
     listener::{
         key_expiration_event_message_listener::{
-            KeyExpirationEventMessageListener, KEYEVENT_EXPIRED_TOPIC,
+            KEYEVENT_EXPIRED_TOPIC, KeyExpirationEventMessageListener,
         },
         redis_message_listener_container::RedisMessageListenerContainer,
     },

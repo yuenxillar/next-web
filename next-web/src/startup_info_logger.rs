@@ -65,7 +65,7 @@ impl<'a> StartupInfoLogger<'a> {
 
     /// Prints the runtime message to the log.
     fn print_runtime_message(&self) {
-        info!("Starting Async Runtime: [Tokio/1.44.1]");
+        info!("Starting Async Runtime: [Tokio/1.52.3]");
         info!("Starting HTTP  Server:  [Axum/0.8.4]");
     }
 

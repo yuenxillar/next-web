@@ -1,5 +1,5 @@
 use next_web_core::async_trait;
-use next_web_core::traits::required::Required;
+use next_web_core::Required;
 use std::any::Any;
 use std::sync::Arc;
 use tracing::debug;

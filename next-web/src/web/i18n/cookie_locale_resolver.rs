@@ -19,9 +19,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use next_web_context::Locale;
-use next_web_core::headers::{Cookie as HeaderCookie, HeaderMapExt};
 use next_web_core::http::{Cookie, SameSite};
-use next_web_core::http::{HttpRequest, HttpResponse};
+use next_web_core::http::{
+    HttpRequest, HttpResponse,
+    headers::{Cookie as HeaderCookie, HeaderMapExt},
+};
 use tracing::{debug, trace};
 
 use crate::i18n::{LocaleResolver, LocaleResolverError};

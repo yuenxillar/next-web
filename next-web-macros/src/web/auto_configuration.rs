@@ -8,13 +8,13 @@
 //! The two attributes differ in where the class is applied:
 //!
 //! - `#[configuration]` declares the configuration of an application. The class
-//!   implements [`Configuration`](::next_web_core::traits::config::configuration::Configuration)
+//!   implements [`Configuration`](::next_web_core::config::Configuration)
 //!   and is applied before every auto-configuration. Its methods may also
 //!   declare an `#[init]` initializer, which runs without registering the value
 //!   it computes.
 //! - `#[auto_configuration]` declares the auto-configuration of a starter. The
 //!   class implements
-//!   [`AutoConfiguration`](::next_web_core::traits::config::auto_configuration::AutoConfiguration)
+//!   [`AutoConfiguration`](::next_web_core::config::auto_configuration::AutoConfiguration)
 //!   and is applied together with the auto-configurations of the application.
 //!
 //! The configurations a configuration has to be applied before or after are
@@ -60,10 +60,10 @@ impl ConfigurationKind {
     fn trait_path(self) -> TokenStream2 {
         match self {
             Self::Configuration => {
-                quote!(::next_web_core::traits::config::configuration::Configuration)
+                quote!(::next_web_core::config::Configuration)
             }
             Self::AutoConfiguration => {
-                quote!(::next_web_core::traits::config::auto_configuration::AutoConfiguration)
+                quote!(::next_web_core::config::AutoConfiguration)
             }
         }
     }

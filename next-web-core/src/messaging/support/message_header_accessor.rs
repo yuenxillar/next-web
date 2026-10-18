@@ -8,11 +8,11 @@ use uuid::Uuid;
 
 use crate::any::AnyClone;
 use crate::any::AnyValue;
+use crate::messaging::Message;
 use crate::messaging::message_channel::MessageChannel;
 use crate::messaging::message_headers::MessageHeaders;
-use crate::traits::message::Message;
 use crate::util::MimeType;
-use crate::util::pattern_match::PatternMatchUtils;
+use crate::util::PatternMatchUtils;
 
 /// A class representing message header accessor.
 pub struct MessageHeaderAccessor {

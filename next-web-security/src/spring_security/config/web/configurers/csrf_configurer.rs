@@ -7,8 +7,8 @@ use std::{
 use next_web_core::{
     async_trait,
     http::{HttpRequest, HttpResponse},
-    traits::required::Required,
     util::StringUtils,
+    Required,
 };
 
 use crate::{

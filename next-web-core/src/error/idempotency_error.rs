@@ -1,17 +1,40 @@
-use thiserror::Error;
+use std::error::Error;
+use std::fmt;
 
-/// 幂等性错误类型
-#[derive(Error, Debug)]
+/// Errors that can occur while performing idempotent operations.
+///
+/// All variants are self-contained: none wrap an underlying error, so
+/// [`Error::source`] always returns `None` and the error chain has depth one.
+#[derive(Debug)]
 pub enum IdempotencyError {
-    #[error("Storage error: {0}")]
+    /// The backing storage failed to read or write.
     StorageError(String),
 
-    #[error("Serialization error: {0}")]
+    /// A value could not be serialized before being stored.
     SerializationError(String),
 
-    #[error("Deserialization error: {0}")]
+    /// A stored value could not be deserialized on retrieval.
     DeserializationError(String),
 
-    #[error("Key already exists")]
+    /// The idempotency key already exists, so the operation was rejected.
     KeyExists,
 }
+
+impl fmt::Display for IdempotencyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IdempotencyError::StorageError(msg) => {
+                write!(f, "Storage error: {msg}")
+            }
+            IdempotencyError::SerializationError(msg) => {
+                write!(f, "Serialization error: {msg}")
+            }
+            IdempotencyError::DeserializationError(msg) => {
+                write!(f, "Deserialization error: {msg}")
+            }
+            IdempotencyError::KeyExists => f.write_str("Key already exists"),
+        }
+    }
+}
+
+impl Error for IdempotencyError {}

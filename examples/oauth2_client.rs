@@ -22,17 +22,17 @@ use std::sync::{Arc, Mutex};
 
 use axum::routing::get;
 use next_web::{
-    core::{traits::apply_router::ApplyRouter, ApplicationContext, Ordered},
-    macros::{autoconfigure::configuration, bind::singleton},
     Application, NextWebApplication,
+    core::{ApplicationContext, ApplyRouter, Ordered},
+    macros::{autoconfigure::configuration, bind::singleton},
 };
 use next_web_context::{ApplicationEvent, ApplicationEventPublisher};
 use next_web_core::{
     error::BoxError,
-   http::{HttpRequest, HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 use next_web_security::{
-    config::web::{builders::HttpSecurity, WebSecurityConfigurer},
+    config::web::{WebSecurityConfigurer, builders::HttpSecurity},
     oauth2::{
         AuthorizationRequestRepository, ClientRegistration, InMemoryClientRegistrationRepository,
         OAuth2AuthorizationRequest,
@@ -236,7 +236,7 @@ mod tests {
     use axum::{
         body::Body,
         extract::Request,
-        http::{header, StatusCode},
+        http::{StatusCode, header},
         response::Response,
     };
     use next_web_core::{
@@ -260,8 +260,8 @@ mod tests {
     };
 
     use super::{
-        configure_oauth2_client, InMemoryAuthorizationRequestRepository, DEMO_CLIENT_ID,
-        DEMO_REGISTRATION_ID,
+        DEMO_CLIENT_ID, DEMO_REGISTRATION_ID, InMemoryAuthorizationRequestRepository,
+        configure_oauth2_client,
     };
 
     /// Exchanges an authorization code for a token without a provider.

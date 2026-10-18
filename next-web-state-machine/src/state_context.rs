@@ -1,8 +1,7 @@
 use std::any::Any;
 
 use next_web_core::{
-    any::AnyValue, error::BoxError, messaging::message_headers::MessageHeaders,
-    traits::message::Message,
+    any::AnyValue, error::BoxError, messaging::Message, messaging::message_headers::MessageHeaders,
 };
 
 use crate::{

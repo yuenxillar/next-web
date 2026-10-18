@@ -1,4 +1,4 @@
-use next_web_core::traits::required::Required;
+use next_web_core::Required;
 
 use crate::web::filter::path_matching_filter::PathMatchingFilter;
 

@@ -10,7 +10,7 @@ use std::io::Write;
 
 use std::ops::{Deref, DerefMut};
 
-use next_web_core::traits::required::Required;
+use next_web_core::Required;
 
 use crate::core::{
     metadata::basic_parameter::BasicParameter, support::excel_type::ExcelType,

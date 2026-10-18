@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use next_web_core::{http::HttpMethod, traits::required::Required};
+use next_web_core::{http::HttpMethod, Required};
 
 use crate::{
     config::{

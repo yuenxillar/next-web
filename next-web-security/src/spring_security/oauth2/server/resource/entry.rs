@@ -7,8 +7,7 @@ use next_web_core::{
     http::StatusCode,
     http::{HttpRequest, HttpResponse},
     traits::filter::{HttpFilter, HttpFilterChain},
-    traits::named::Named,
-    traits::required::Required,
+    Named, Required,
 };
 
 use crate::{

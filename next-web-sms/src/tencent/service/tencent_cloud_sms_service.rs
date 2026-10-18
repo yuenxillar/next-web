@@ -4,11 +4,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use next_web_core::{
-    async_trait,
-    error::BoxError,
-    traits::{service::Service, singleton::Singleton},
-};
+use next_web_core::{async_trait, error::BoxError};
 use reqwest::{
     Method,
     header::{HeaderMap, HeaderName},
@@ -112,9 +108,6 @@ impl TencentCloudSmsService {
         Ok(resp.json::<R>().await?)
     }
 }
-
-impl Singleton for TencentCloudSmsService {}
-impl Service for TencentCloudSmsService {}
 
 #[async_trait]
 impl SmsService for TencentCloudSmsService {

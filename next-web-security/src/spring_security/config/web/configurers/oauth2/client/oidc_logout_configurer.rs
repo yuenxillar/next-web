@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use next_web_core::{traits::required::Required, ApplicationContext};
+use next_web_core::{ApplicationContext, Required};
 
 use crate::{
     authentication::AuthenticationProvider,

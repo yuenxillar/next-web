@@ -312,20 +312,6 @@ struct RequestContextPath(String);
 #[derive(Clone, Copy, Debug)]
 struct Prepared;
 
-/// Returns whether the per-request state of the request was prepared.
-///
-/// The outermost layer of an application prepares every request with
-/// [`HttpRequest::ready`], and a layer inside it that has to prepare a request
-/// it owns can ask whether the preparation already ran instead of paying for it
-/// twice.
-///
-/// # Arguments
-///
-/// * `request` - The request to look at.
-pub fn is_request_prepared(request: &Request) -> bool {
-    request.extensions().get::<Prepared>().is_some()
-}
-
 impl HttpRequest for Request {
     fn session(&self) -> Option<&dyn HttpSession> {
         self.extensions()

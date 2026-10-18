@@ -2,7 +2,7 @@ pub mod region_execution_policy;
 
 use std::sync::Arc;
 
-use next_web_core::{async_trait, error::BoxError, traits::message::Message};
+use next_web_core::{async_trait, error::BoxError, messaging::Message};
 
 use crate::{
     listener::state_machine_listener::StateMachineListener, state::StateMachineState,

@@ -4,10 +4,10 @@ use next_web_core::{
     async_trait,
     error::BoxError,
     http::{
-        filter::{FilterError, HttpFilter, HttpFilterChain},
-        HttpFilterChainShare, HttpRequest, HttpResponse,
+        filter::{FilterError, HttpFilter, HttpFilterChain, HttpFilterChainShare},
+        HttpRequest, HttpResponse,
     },
-    traits::named::Named,
+    Named,
 };
 use tracing::debug;
 

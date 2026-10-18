@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use next_web_core::{traits::required::Required, util::StringUtils};
+use next_web_core::{util::StringUtils, Required};
 
 use crate::{
     config::{

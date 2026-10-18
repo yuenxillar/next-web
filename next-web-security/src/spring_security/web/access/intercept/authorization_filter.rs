@@ -6,7 +6,7 @@ use next_web_core::{
         filter::{FilterChainError, FilterError, HttpFilter, HttpFilterChain},
         HttpRequest, HttpResponse,
     },
-    traits::named::Named,
+    Named,
 };
 
 use crate::{

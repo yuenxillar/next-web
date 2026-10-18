@@ -11,7 +11,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use next_web::{
     ConfigurableApplicationContext,
     context::{ApplicationContextAsyncExt, ApplicationContextExt, DefaultApplicationContext},
-    core::traits::singleton::Singleton,
     macros::bind::singleton,
 };
 
@@ -70,8 +69,6 @@ async fn eager_service(#[autowired(name = "baseName")] base: String) -> EagerSer
 /// A value the fields of the struct below collect every instance of.
 #[derive(Clone, Debug)]
 pub struct NamedValue(pub String);
-
-impl Singleton for NamedValue {}
 
 /// The provider of the value the collected fields resolve.
 #[singleton]

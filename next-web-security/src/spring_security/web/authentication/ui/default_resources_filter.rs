@@ -6,7 +6,7 @@ use next_web_core::{
         filter::{FilterError, HttpFilter, HttpFilterChain},
         HttpMethod, HttpRequest, HttpResponse,
     },
-    traits::named::Named,
+    Named,
 };
 
 use crate::web::util::matcher::{PathPatternRequestMatcher, RequestMatcher};

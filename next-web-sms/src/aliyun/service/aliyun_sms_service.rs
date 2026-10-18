@@ -6,11 +6,7 @@ use std::{
 };
 
 use chrono::DateTime;
-use next_web_core::{
-    async_trait,
-    error::BoxError,
-    traits::{service::Service, singleton::Singleton},
-};
+use next_web_core::{async_trait, error::BoxError};
 
 use reqwest::{
     Method,
@@ -93,9 +89,6 @@ impl AliyunCloudSmsService {
         Ok(resp.json::<T>().await?)
     }
 }
-
-impl Singleton for AliyunCloudSmsService {}
-impl Service for AliyunCloudSmsService {}
 
 #[async_trait]
 impl SmsService for AliyunCloudSmsService {

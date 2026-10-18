@@ -16,7 +16,9 @@ use axum::{
 
 use next_web_context::{APPLICATION_ARGUMENTS_SINGLETON_NAME, ApplicationContextExt};
 use next_web_core::{
+    ApplyRouter,
     any::AnyValue,
+    config::auto_configuration::AutoConfiguration,
     constants::application_constants::APPLICATION_DEFAULT_PORT,
     env::{
         COMMAND_LINE_PROPERTY_SOURCE_NAME, CompositePropertySource, ConfigurableEnvironment,
@@ -26,10 +28,7 @@ use next_web_core::{
     http::{DefaultResourceDispatcher, ResourceDispatcher},
     io::{DefaultResourceLoader, ResourceLoader},
     metrics::{ApplicationStartup, DefaultApplicationStartup, StartupStep},
-    traits::{
-        apply_router::ApplyRouter, config::auto_configuration::AutoConfiguration,
-        service::background_service::BackgroundService,
-    },
+    service::BackgroundService,
     util::indexmap::IndexMap,
 };
 use next_web_singletons::factory::{SingletonFactory, config::SingletonRegistry, support::Key};
@@ -172,6 +171,7 @@ where
         #[cfg(not(feature = "enable-open-api"))]
         let mut context = RouterContext::new();
 
+        #[allow(unused_variables)]
         let mut router = InventoryHelper::iter::<&dyn HttpHandlerAutoRegister>()
             .into_iter()
             .fold(Router::new(), |router, handler| {

@@ -7,7 +7,7 @@ use std::{
     sync::Arc,
 };
 
-use next_web_core::{async_trait, traits::required::Required};
+use next_web_core::{async_trait, Required};
 
 use crate::{
     authentication::AuthenticationProvider,
@@ -139,8 +139,10 @@ pub trait OpaqueTokenIntrospector: Send + Sync {
     /// # Arguments
     ///
     /// * `token` - The opaque token of the request.
-    async fn introspect(&self, token: &str)
-        -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError>;
+    async fn introspect(
+        &self,
+        token: &str,
+    ) -> Result<OAuth2AuthenticatedPrincipal, AuthenticationError>;
 }
 
 /// The introspector of an opaque token, backed by the introspection endpoint of
@@ -247,12 +249,15 @@ impl OpaqueTokenIntrospector for SpringOpaqueTokenIntrospector {
             ));
         }
 
-        let introspection = response.json::<serde_json::Value>().await.map_err(|error| {
-            AuthenticationError::with_kind(
-                format!("The introspection response is not a valid document: {error}"),
-                AuthenticationErrorKind::BadCredentials,
-            )
-        })?;
+        let introspection = response
+            .json::<serde_json::Value>()
+            .await
+            .map_err(|error| {
+                AuthenticationError::with_kind(
+                    format!("The introspection response is not a valid document: {error}"),
+                    AuthenticationErrorKind::BadCredentials,
+                )
+            })?;
 
         principal_of(&introspection)
     }
@@ -298,8 +303,9 @@ fn principal_of(
             } else {
                 format!("SCOPE_{scope}")
             };
-            Arc::new(crate::core::authority::SimpleGrantedAuthority::new(authority))
-                as Arc<dyn GrantedAuthority>
+            Arc::new(crate::core::authority::SimpleGrantedAuthority::new(
+                authority,
+            )) as Arc<dyn GrantedAuthority>
         })
         .collect();
 
@@ -613,7 +619,9 @@ mod tests {
         headers: HeaderMap,
         Form(form): Form<HashMap<String, String>>,
     ) -> Json<serde_json::Value> {
-        let mut captured = captured.lock().expect("the captured request is not poisoned");
+        let mut captured = captured
+            .lock()
+            .expect("the captured request is not poisoned");
         captured.authorization = headers
             .get("authorization")
             .and_then(|value| value.to_str().ok())
@@ -655,8 +663,7 @@ mod tests {
             "client_id": "demo-client",
         });
 
-        let principal =
-            super::principal_of(&introspection).expect("the token is active");
+        let principal = super::principal_of(&introspection).expect("the token is active");
 
         assert_eq!(principal.name().as_ref(), "user");
         assert_eq!(principal.authorities().len(), 2);
@@ -686,7 +693,9 @@ mod tests {
             .expect("the token is active");
 
         assert_eq!(principal.name().as_ref(), "user");
-        let captured = captured.lock().expect("the captured request is not poisoned");
+        let captured = captured
+            .lock()
+            .expect("the captured request is not poisoned");
         assert_eq!(
             captured.authorization.as_deref(),
             Some("Basic cmVzb3VyY2Utc2VydmVyOnJlc291cmNlLXNlY3JldA=="),

@@ -10,11 +10,12 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use axum::Router;
 use next_web::{
     Application, NextWebApplication,
-    core::{ApplicationContext, BoxFuture, Ordered, traits::apply_router::ApplyRouter},
+    core::{ApplicationContext, ApplyRouter, BoxFuture, Ordered},
     macros::bind::singleton,
 };
 use next_web_context::{
-    ApplicationContextExt, ApplicationEvent, ApplicationListener, event::ApplicationEventMulticaster,
+    ApplicationContextExt, ApplicationEvent, ApplicationListener,
+    event::ApplicationEventMulticaster,
 };
 
 /// Test application

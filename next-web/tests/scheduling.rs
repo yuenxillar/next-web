@@ -13,7 +13,7 @@ use next_web::{
     ConfigurableApplicationContext,
     autoconfigure::web_auto_configuration::WebAutoConfiguration,
     context::{ApplicationContextExt, DefaultApplicationContext},
-    core::traits::config::auto_configuration::AutoConfiguration,
+    core::config::AutoConfiguration,
     macros::{bind::singleton, scheduled},
     scheduling::{
         InMemoryScheduledJobRepository, JOB_SCHEDULER_MANAGER_SINGLETON_NAME, JobExecutionContext,

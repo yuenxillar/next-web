@@ -1,10 +1,7 @@
 use next_web_context::ApplicationContextExt;
 use std::{error::Error, sync::Arc};
 
-use next_web_core::{
-    ApplicationContext, Ordered,
-    traits::{config::auto_configuration::AutoConfiguration, singleton::Singleton},
-};
+use next_web_core::{ApplicationContext, Ordered, config::auto_configuration::AutoConfiguration};
 use next_web_macros::singleton;
 use rbatis::{Intercept, async_trait};
 
@@ -56,18 +53,13 @@ impl AutoConfiguration for DataSourceAutoConfiguration {
             .await?;
 
         // Insert the  service into the context and name it with the singleton name
-        let name = database_service.singleton_name();
-        ctx.insert_singleton_with_name(database_service, name);
+        ctx.insert_singleton_with_default_name(database_service);
 
         Ok(())
     }
 }
 
-impl Ordered for DataSourceAutoConfiguration {
-    fn order(&self) -> i32 {
-        100
-    }
-}
+impl Ordered for DataSourceAutoConfiguration {}
 
 #[allow(unused)]
 fn generate_datasource_id(id: &str) -> String {

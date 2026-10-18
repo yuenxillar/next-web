@@ -172,13 +172,6 @@ pub(crate) fn generate(
     let expand = quote! {
         #item_struct
 
-        impl ::next_web_core::traits::singleton::Singleton   for #struct_ident {
-            fn singleton_name(&self) -> String
-            {
-                stringify!(#default_name).to_string()
-            }
-        }
-
         impl #impl_generics #path::DefaultProvider for #struct_ident #ty_generics #where_clause {
             type Type = Self;
 

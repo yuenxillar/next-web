@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use next_web_core::traits::required::Required;
+use next_web_core::Required;
 
 use crate::core::{session::SessionId, util::map_context::MapContext, util::object::Object};
 

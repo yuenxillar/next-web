@@ -6,10 +6,10 @@ use std::sync::Arc;
 
 use futures::executor::block_on;
 use futures::future::BoxFuture;
+use next_web_core::Id;
 use next_web_core::async_trait;
 use next_web_core::error::BoxError;
-use next_web_core::traits::id::Id;
-use next_web_core::traits::message::Message;
+use next_web_core::messaging::Message;
 use uuid::Uuid;
 
 use crate::config::action::StateMachineAction;

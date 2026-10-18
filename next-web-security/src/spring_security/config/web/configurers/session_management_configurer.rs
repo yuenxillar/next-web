@@ -8,7 +8,7 @@ use next_web_context::ApplicationContextExt;
 use next_web_context::{
     event::GenericApplicationListenerAdapter, ApplicationEvent, ApplicationListener,
 };
-use next_web_core::{traits::required::Required, ApplicationContext};
+use next_web_core::{ApplicationContext, Required};
 
 use crate::{
     authorization::AuthenticationTrustResolver,

@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use next_web_core::{any::AnyError, async_trait, traits::named::Named};
+use next_web_core::{Named, any::AnyError, async_trait};
 
 use crate::{context::retry_context_support::RetryContextSupport, retry_policy::RetryPolicy};
 

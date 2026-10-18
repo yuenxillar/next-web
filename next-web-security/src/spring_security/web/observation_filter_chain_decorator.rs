@@ -10,7 +10,7 @@ use next_web_core::{
         filter::{FilterError, HttpFilter, HttpFilterChain},
         HttpRequest, HttpResponse,
     },
-    traits::named::Named,
+    Named,
 };
 use tracing::{event, field, span, Instrument, Level, Span};
 

@@ -6,8 +6,8 @@ use next_web_context::{ApplicationContextExt, ApplicationEventPublisher};
 use next_web_core::{
     any::AnyClone,
     async_trait,
+    config::AutoConfiguration,
     error::BoxError,
-    traits::config::auto_configuration::AutoConfiguration,
     web::{
         accept::{ContentNegotiationStrategy, HeaderContentNegotiationStrategy},
         cors::UrlBasedCorsConfigurationSource,

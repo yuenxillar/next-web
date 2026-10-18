@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use next_web_core::http::{HttpRequest, HttpResponse};
-use next_web_core::{
-    async_trait, error::illegal_state_error::IllegalStateError, traits::required::Required,
-};
+use next_web_core::{async_trait, error::illegal_state_error::IllegalStateError, Required};
 
 use crate::{
     core::{

@@ -1,25 +1,15 @@
 use axum::http::StatusCode;
-use next_web::core::traits::data_decoder::DataDecoder;
 use next_web::extract::ValidatedJson;
 use next_web::validator::Validate;
 use next_web::{
-    Application, NextWebApplication,
-    extract::{data::Data, validated::ValidatedForm},
-    macros::bind::{get_mapping, post_mapping, singleton},
+    Application, NextWebApplication, extract::validated::ValidatedForm, macros::bind::post_mapping,
 };
-use serde::{Deserialize, Serialize};
-
-use std::sync::Arc;
+use serde::Deserialize;
 
 #[derive(Default)]
 struct TestApplication;
 
 impl Application for TestApplication {}
-
-#[get_mapping(path = "/")]
-async fn index() -> &'static str {
-    "Ok"
-}
 
 #[derive(Clone, Debug, Deserialize, Validate)]
 #[validate(crate = "next_web::validator")]
@@ -44,38 +34,6 @@ async fn json_valid(ValidatedJson(data): ValidatedJson<TestValidator>) -> impl I
     assert!(data.name.len() > 4);
     assert!(data.weight > 20);
     (StatusCode::OK, "Ok")
-}
-
-#[post_mapping(path = "/decode")]
-async fn test_decode(Data(data): Data<TestData>) -> String {
-    serde_json::to_string(&data).unwrap()
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-struct TestData {
-    pub name: String,
-    pub age: i32,
-}
-
-#[singleton(name = "defaultDataDecoder", binds=[Self::into_decoder])]
-#[derive(Clone)]
-pub struct TestDecoder;
-
-impl TestDecoder {
-    fn into_decoder(self) -> Arc<dyn DataDecoder> {
-        Arc::new(self)
-    }
-}
-
-impl DataDecoder for TestDecoder {
-    fn decode(&self, data: &[u8]) -> Result<String, &'static str> {
-        let d = data
-            .iter()
-            .filter(|&&s| s != b'\\')
-            .copied()
-            .collect::<Vec<_>>();
-        Ok(String::from_utf8_lossy(&d).to_string())
-    }
 }
 
 #[tokio::main]

@@ -1,6 +1,6 @@
 use next_web_core::any::AnyValue;
 use next_web_core::async_trait;
-use next_web_core::traits::message::Message;
+use next_web_core::messaging::Message;
 use std::any::Any;
 
 use crate::StateMachine;

@@ -1,9 +1,7 @@
 use std::{collections::HashMap, panic::AssertUnwindSafe, sync::Arc, time::Duration};
 
 use futures::{FutureExt, future::join_all};
-use next_web_core::traits::service::background_service::{
-    BackgroundService, HealthStatus, ServiceError,
-};
+use next_web_core::service::{BackgroundService, HealthStatus, ServiceError};
 use tokio::{
     sync::{Mutex, oneshot},
     task::{AbortHandle, JoinHandle},
@@ -407,7 +405,11 @@ async fn supervise_service(
             break;
         }
 
-        let mut run = Box::pin(AssertUnwindSafe(service.run()).catch_unwind());
+        // `run` takes ownership of the instance, and a service that is restarted
+        // runs it again — so every iteration hands the future a clone of the
+        // handle. Cloning an `Arc` is a reference count, and the health check
+        // below keeps using the handle the loop owns.
+        let mut run = Box::pin(AssertUnwindSafe(Arc::clone(&service).run()).catch_unwind());
         let mut heartbeat = interval(heartbeat_interval);
         heartbeat.set_missed_tick_behavior(MissedTickBehavior::Delay);
         // The first Tokio interval tick is immediate; wait one full period
@@ -614,9 +616,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use next_web_core::async_trait;
-    use next_web_core::traits::service::background_service::{
-        BackgroundService, HealthStatus, ServiceError,
-    };
+    use next_web_core::service::{BackgroundService, HealthStatus, ServiceError};
     use tokio::sync::Mutex as AsyncMutex;
     use tokio::time::{Duration, sleep, timeout};
     use tokio_util::sync::CancellationToken;
@@ -690,7 +690,7 @@ mod tests {
             self.name
         }
 
-        async fn run(&self) -> Result<(), ServiceError> {
+        async fn run(self: Arc<Self>) -> Result<(), ServiceError> {
             let run_number = self.starts.fetch_add(1, Ordering::SeqCst);
             let stop = {
                 let mut current = self.stop.lock().await;
@@ -810,7 +810,10 @@ mod tests {
         wait_for(&service.heartbeats, 1).await;
 
         let stopped = timeout(Duration::from_millis(200), manager.shutdown_all()).await;
-        assert!(stopped.is_ok(), "shutdown should not wait for heartbeat timeout");
+        assert!(
+            stopped.is_ok(),
+            "shutdown should not wait for heartbeat timeout"
+        );
         assert_eq!(service.shutdowns.load(Ordering::SeqCst), 1);
     }
 

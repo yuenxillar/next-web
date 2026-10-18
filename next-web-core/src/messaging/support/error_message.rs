@@ -4,9 +4,9 @@ use dyn_clone::clone_box;
 
 use crate::any::AnyError;
 use crate::any::AnyValue;
+use crate::messaging::Message;
 use crate::messaging::generic_message::GenericMessage;
 use crate::messaging::message_headers::MessageHeaders;
-use crate::traits::message::Message;
 
 /// A message that carries an error payload.
 ///

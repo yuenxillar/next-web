@@ -7,7 +7,7 @@ use std::{
 };
 
 use dashmap::DashMap;
-use next_web_core::{async_trait, traits::required::Required};
+use next_web_core::{async_trait, Required};
 use tracing::{debug, trace};
 
 use crate::core::{

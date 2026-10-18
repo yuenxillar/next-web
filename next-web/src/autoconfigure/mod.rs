@@ -5,4 +5,4 @@ pub mod security;
 
 pub mod web_auto_configuration;
 
-pub use next_web_core::traits::config::configuration::Configuration;
+pub use next_web_core::config::Configuration;

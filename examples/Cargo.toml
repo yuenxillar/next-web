@@ -92,10 +92,6 @@ name = "application_event"
 path = "application_event.rs"
 
 [[bin]]
-name = "application_lifecycle"
-path = "application_lifecycle.rs"
-
-[[bin]]
 name = "auto_configuration"
 path = "auto_configuration.rs"
 
@@ -108,8 +104,8 @@ name = "database"
 path = "database.rs"
 
 [[bin]]
-name = "decoder_and_vaild"
-path = "decoder_and_vaild.rs"
+name = "vaild"
+path = "vaild.rs"
 
 [[bin]]
 name = "desensitize"

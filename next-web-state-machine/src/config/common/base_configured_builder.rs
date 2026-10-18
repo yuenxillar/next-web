@@ -1,7 +1,7 @@
+use next_web_core::Required;
 use next_web_core::any::AnyValue;
 use next_web_core::clone_box;
 use next_web_core::error::BoxError;
-use next_web_core::traits::required::Required;
 use std::any::{Any, TypeId};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};

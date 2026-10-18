@@ -54,7 +54,6 @@ tracing-appender    = { workspace = true }
 tracing-subscriber  = { workspace = true }
 flume               = { workspace = true }
 validator           = { workspace = true }
-# thiserror           = { workspace = true }
 inventory           = { workspace = true }
 
 utoipa-swagger-ui   = { workspace = true, optional = true }
@@ -69,10 +68,6 @@ aes-gcm             = { workspace = true, optional = true }
 scrypt              = { workspace = true, optional = true }
 rand                = { workspace = true, optional = true }
 quick-xml           = { workspace = true }
-
-serde_path_to_error = { workspace = true }
-mime                = { workspace = true }
-
 
 [target.'cfg(windows)'.dependencies]
 mimalloc        = { workspace = true }

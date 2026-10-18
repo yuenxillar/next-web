@@ -3,8 +3,8 @@ use std::{error::Error, sync::Arc};
 
 use axum::{Router, routing::any};
 use next_web_core::{
-    ApplicationContext, Ordered, async_trait,
-    traits::{apply_router::ApplyRouter, config::auto_configuration::AutoConfiguration},
+    ApplicationContext, ApplyRouter, Ordered, async_trait,
+    config::auto_configuration::AutoConfiguration,
 };
 use next_web_macros::singleton;
 

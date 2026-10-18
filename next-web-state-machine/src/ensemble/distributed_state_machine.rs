@@ -2,7 +2,7 @@
 // use next_web_core::async_trait;
 // use next_web_core::error::BoxError;
 // use next_web_core::messaging::support::message_builder::MessageBuilder;
-// use next_web_core::traits::message::Message;
+// use next_web_core::messaging::Message;
 // use std::sync::Arc;
 // use std::{fmt, marker::PhantomData};
 // use tracing::{debug, error, info, trace};

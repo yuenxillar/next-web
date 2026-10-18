@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use next_web_core::{error::BoxError, traits::required::Required};
+use next_web_core::{Required, error::BoxError};
 
 use crate::config::{
     builders::{

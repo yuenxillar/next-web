@@ -4,7 +4,7 @@ use next_web_core::async_trait;
 use next_web_core::http::filter::{FilterError, HttpFilter, HttpFilterChain};
 use next_web_core::http::HttpRequest;
 use next_web_core::http::HttpResponse;
-use next_web_core::traits::named::Named;
+use next_web_core::Named;
 
 use crate::web::util::matcher::RequestMatcher;
 use crate::web::{DefaultRedirectStrategy, RedirectStrategy};

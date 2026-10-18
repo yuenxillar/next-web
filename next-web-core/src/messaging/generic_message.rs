@@ -1,4 +1,5 @@
-use crate::{messaging::message_headers::MessageHeaders, traits::message::Message};
+use super::Message;
+use crate::messaging::message_headers::MessageHeaders;
 
 #[derive(Clone)]
 pub struct GenericMessage<T> {
