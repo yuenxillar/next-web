@@ -680,7 +680,7 @@ impl HttpSecurity {
         self
     }
 
-    /// Pending
+    /// Ok
     ///
     /// Configures login through an OAuth 2.0 or OpenID Connect 1.0 provider.
     ///
@@ -689,6 +689,17 @@ impl HttpSecurity {
     /// exchanged for tokens, and the user information those tokens carry becomes
     /// the authentication. The client registrations have to be shared with this
     /// builder.
+    ///
+    /// `/oauth2/authorization/{registrationId}` starts the login of a registration
+    /// and remembers the authorization request it issued, the callback the
+    /// provider sends the user back to answers it, and the login is stored as the
+    /// user the profile names, with the authorities the configured mapper decides.
+    /// A profile that cannot be loaded signs nobody in, and a callback that answers
+    /// a request the application never issued is refused. The login page of the
+    /// default configuration links every registration by name. OpenID Connect
+    /// adds an `id_token` to the exchange: the validator and the provider of the
+    /// module are tested on their own, the end-to-end tests of the configuration
+    /// cover the OAuth 2.0 login.
     #[cfg(feature = "oauth2-client")]
     pub fn oauth2_login<F>(&mut self, oauth2_login: F) -> &mut Self
     where

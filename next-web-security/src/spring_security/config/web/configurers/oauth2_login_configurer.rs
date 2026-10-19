@@ -591,3 +591,672 @@ impl UserInfoEndpointConfig {
         self
     }
 }
+
+#[cfg(all(test, feature = "oauth2-client"))]
+mod tests {
+    use std::{any::TypeId, collections::HashMap, sync::Arc};
+
+    use axum::{body::Body, extract::Request, response::Response};
+
+    use super::*;
+    use crate::{
+        authentication::dao::DaoAuthenticationProvider,
+        config::authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
+        config::security_builder::SecurityBuilder,
+        config::web::builders::HttpSecurity,
+        config::web::http_security_builder::HttpSecurityBuilder,
+        core::userdetails::{User, UserDetailsService},
+        crypto::{bcrypt::BCryptPasswordEncoder, password::PasswordEncoder},
+        oauth2::client::registration::{ClientRegistration, InMemoryClientRegistrationRepository},
+        provisioning::InMemoryUserDetailsManager,
+        web::security_filter_chain::SecurityFilterChain,
+        web::test_support::Chain,
+        web::util::matcher::PathPatternRequestMatcherBuilder,
+    };
+
+    /// Returns the registration the flow is performed for.
+    fn registration() -> ClientRegistration {
+        ClientRegistration::new(
+            "okta",
+            "Okta",
+            "https://idp.example.org/oauth2/authorize",
+        )
+        .set_client_id("client")
+    }
+
+    /// Returns a chain whose OAuth 2.0 login is configured for one registration.
+    fn http_security() -> HttpSecurity {
+        // The configurer takes its matchers from a shared builder, the way the
+        // configuration of an application provides one.
+        let mut shared_objects: HashMap<TypeId, Box<dyn next_web_core::any::AnyClone>> =
+            HashMap::new();
+        shared_objects.insert(
+            TypeId::of::<PathPatternRequestMatcherBuilder>(),
+            Box::new(PathPatternRequestMatcherBuilder::default()),
+        );
+
+        let mut http = HttpSecurity::new(AuthenticationManagerBuilder::default(), shared_objects);
+        http.oauth2_login(|login| {
+            login.client_registration_repository(Arc::new(
+                InMemoryClientRegistrationRepository::new(vec![registration()]),
+            ));
+        });
+
+        // A chain has to be able to authenticate something at all; the redirect
+        // does not use it, but the chain is assembled around it.
+        let encoder = BCryptPasswordEncoder::new(4);
+        let hash = encoder
+            .encode(Some("password"))
+            .expect("the password is encoded")
+            .expect("the encoder returns a hash");
+        let user_details_service: Arc<dyn UserDetailsService> =
+            Arc::new(InMemoryUserDetailsManager::with_users(vec![Arc::new(
+                User::with_username("user")
+                    .password(Some(hash))
+                    .build(),
+            )]));
+        let mut provider = DaoAuthenticationProvider::new(user_details_service);
+        provider.set_password_encoder(Arc::new(encoder));
+        http.authentication_provider(Arc::new(provider));
+
+        http
+    }
+
+    /// Returns the `Location` header of a response.
+    fn redirect_of(response: &Response) -> Option<String> {
+        response
+            .headers()
+            .get("location")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned)
+    }
+
+    #[tokio::test]
+    async fn the_authorization_endpoint_redirects_to_the_provider() {
+        let mut http = http_security();
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        let mut request = Request::builder()
+            .uri("https://sp.example.org/oauth2/authorization/okta")
+            .body(Body::empty())
+            .expect("a valid request");
+        let mut response = Response::default();
+        Chain::new(filters)
+            .run(&mut request, &mut response)
+            .await
+            .expect("the chain runs");
+
+        assert!(
+            response.status().is_redirection(),
+            "the authorization endpoint redirects, status was {}",
+            response.status()
+        );
+        let location = redirect_of(&response).expect("the redirect names a location");
+        assert!(
+            location.starts_with("https://idp.example.org/oauth2/authorize?"),
+            "the redirect goes to the authorization uri, was: {location}"
+        );
+        assert!(
+            location.contains("response_type=code"),
+            "the request asks for a code, was: {location}"
+        );
+        assert!(
+            location.contains("client_id=client"),
+            "the request names the client, was: {location}"
+        );
+        assert!(
+            location.contains("state="),
+            "the request carries a state, was: {location}"
+        );
+    }
+}
+
+/// The tests of the callback: the request the redirect stores, and the response
+/// the callback exchanges for it.
+#[cfg(all(test, feature = "oauth2-client"))]
+mod callback_tests {
+    use std::{any::TypeId, collections::HashMap, sync::Arc};
+
+    use axum::{body::Body, extract::Request, response::Response};
+
+    use super::*;
+    use crate::{
+        config::authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
+        config::security_builder::SecurityBuilder,
+        config::web::builders::HttpSecurity,
+        config::web::http_security_builder::HttpSecurityBuilder,
+        oauth2::client::registration::{ClientRegistration, InMemoryClientRegistrationRepository},
+        oauth2::client::web::AuthorizationRequestRepository,
+        oauth2::core::endpoint::OAuth2AuthorizationRequest,
+        web::security_filter_chain::SecurityFilterChain,
+        web::test_support::Chain,
+        web::util::matcher::PathPatternRequestMatcherBuilder,
+    };
+    use next_web_core::http::{HttpRequest, HttpResponse};
+
+    /// A repository that keeps the authorization request in memory.
+    ///
+    /// The default repository writes to the session of the request, and a test has
+    /// no session: without this double, the redirect cannot be shown to remember
+    /// anything at all.
+    #[derive(Default, Clone)]
+    struct InMemoryAuthorizationRequestRepository {
+        request: Arc<std::sync::RwLock<Option<OAuth2AuthorizationRequest>>>,
+    }
+
+    impl AuthorizationRequestRepository for InMemoryAuthorizationRequestRepository {
+        fn load_authorization_request(
+            &self,
+            _request: &dyn HttpRequest,
+        ) -> Option<OAuth2AuthorizationRequest> {
+            // The callback looks the request up by the state it answers, so the
+            // double hands out a copy, the way the session repository does.
+            let stored = self.request.read().expect("the repository is not poisoned");
+
+            (*stored).clone()
+        }
+
+        fn save_authorization_request(
+            &self,
+            authorization_request: Option<OAuth2AuthorizationRequest>,
+            _request: &mut dyn HttpRequest,
+            _response: &mut dyn HttpResponse,
+        ) {
+            *self
+                .request
+                .write()
+                .expect("the repository is not poisoned") = authorization_request;
+        }
+
+        fn remove_authorization_request(
+            &self,
+            _request: &mut dyn HttpRequest,
+        ) -> Option<OAuth2AuthorizationRequest> {
+            self.request
+                .write()
+                .expect("the repository is not poisoned")
+                .take()
+        }
+    }
+
+    /// Returns the registration the flow is performed for.
+    fn registration() -> ClientRegistration {
+        ClientRegistration::new(
+            "okta",
+            "Okta",
+            "https://idp.example.org/oauth2/authorize",
+        )
+        .set_client_id("client")
+    }
+
+    /// Answers the token exchange with a fixed token.
+    struct FakeTokenClient;
+
+    #[next_web_core::async_trait]
+    impl crate::oauth2::OAuth2AccessTokenResponseClient<
+        crate::oauth2::OAuth2AuthorizationCodeGrantRequest,
+    > for FakeTokenClient
+    {
+        async fn get_token_response(
+            &self,
+            _request: &crate::oauth2::OAuth2AuthorizationCodeGrantRequest,
+        ) -> Result<
+            crate::oauth2::core::endpoint::OAuth2AccessTokenResponse,
+            crate::core::AuthenticationError,
+        > {
+            Ok(crate::oauth2::core::endpoint::OAuth2AccessTokenResponse::new(
+                "an-access-token",
+            ))
+        }
+    }
+
+    /// Answers the profile of the user without asking the provider.
+    struct FakeUserService;
+
+    #[next_web_core::async_trait]
+    impl crate::oauth2::OAuth2UserService<crate::oauth2::OAuth2UserRequest, crate::oauth2::OAuth2User>
+        for FakeUserService
+    {
+        async fn load_user(
+            &self,
+            _request: &crate::oauth2::OAuth2UserRequest,
+        ) -> Result<crate::oauth2::OAuth2User, crate::core::AuthenticationError> {
+            Ok(crate::oauth2::OAuth2User::new(
+                "Max",
+                std::collections::HashMap::new(),
+            ))
+        }
+    }
+
+    /// Returns the `Location` header of a response.
+    fn redirect_of(response: &Response) -> Option<String> {
+        response
+            .headers()
+            .get("location")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned)
+    }
+
+    /// Returns a chain that remembers authorization requests in memory.
+    fn http_security(repository: Arc<InMemoryAuthorizationRequestRepository>) -> HttpSecurity {
+        let mut shared_objects: HashMap<TypeId, Box<dyn next_web_core::any::AnyClone>> =
+            HashMap::new();
+        shared_objects.insert(
+            TypeId::of::<PathPatternRequestMatcherBuilder>(),
+            Box::new(PathPatternRequestMatcherBuilder::default()),
+        );
+
+        let mut http = HttpSecurity::new(AuthenticationManagerBuilder::default(), shared_objects);
+        http.oauth2_login(|login| {
+            login
+                .client_registration_repository(Arc::new(
+                    InMemoryClientRegistrationRepository::new(vec![registration()]),
+                ))
+                .authorization_endpoint(|endpoint| {
+                    endpoint.authorization_request_repository(repository.clone());
+                })
+                .token_endpoint(|endpoint| {
+                    endpoint.access_token_response_client(Arc::new(FakeTokenClient));
+                })
+                .user_info_endpoint(|endpoint| {
+                    endpoint.user_service(Arc::new(FakeUserService));
+                });
+        });
+
+        http
+    }
+
+    #[tokio::test]
+    async fn the_redirect_remembers_the_authorization_request() {
+        let repository = Arc::new(InMemoryAuthorizationRequestRepository::default());
+        let mut http = http_security(repository.clone());
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        let mut request = Request::builder()
+            .uri("https://sp.example.org/oauth2/authorization/okta")
+            .body(Body::empty())
+            .expect("a valid request");
+        let mut response = Response::default();
+        Chain::new(filters)
+            .run(&mut request, &mut response)
+            .await
+            .expect("the chain runs");
+
+        assert!(
+            response.status().is_redirection(),
+            "the authorization endpoint redirects, status was {}",
+            response.status()
+        );
+
+        let stored = repository
+            .load_authorization_request(&request)
+            .expect("the redirect stores the authorization request the callback answers");
+        assert_eq!(
+            stored.registration_id(),
+            "okta",
+            "the stored request belongs to the registration of the endpoint"
+        );
+        assert!(
+            !stored.state().is_empty(),
+            "the stored request carries the state the callback is answered with"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_callback_with_an_unknown_state_is_refused() {
+        let repository = Arc::new(InMemoryAuthorizationRequestRepository::default());
+        let mut http = http_security(repository);
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        let body = "code=the-code&state=not-a-state-we-issued";
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("https://sp.example.org/login/oauth2/code/okta")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::empty())
+            .expect("a valid request");
+        request
+            .extensions_mut()
+            .insert(next_web_core::http::RequestBody::new(
+                body.as_bytes().to_vec(),
+            ));
+
+        let mut response = Response::default();
+        let outcome = Chain::new(filters).run(&mut request, &mut response).await;
+
+        // A callback answers the request the redirect stored; one it never issued
+        // must not be accepted, whether the filter reports a failure or answers
+        // with a redirect to the login page.
+        assert!(
+            !(outcome.is_ok() && response.status().is_success()),
+            "the callback accepted a state this application never issued, status was {}",
+            response.status()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_callback_that_answers_the_issued_request_logs_the_user_in() {
+        let repository = Arc::new(InMemoryAuthorizationRequestRepository::default());
+        let mut http = http_security(repository.clone());
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        // The redirect starts the flow and remembers the request it issued.
+        let mut request = Request::builder()
+            .uri("https://sp.example.org/oauth2/authorization/okta")
+            .body(Body::empty())
+            .expect("a valid request");
+        let mut response = Response::default();
+        Chain::new(filters.clone())
+            .run(&mut request, &mut response)
+            .await
+            .expect("the chain runs");
+        let state = repository
+            .load_authorization_request(&request)
+            .expect("the redirect stores the request")
+            .state()
+            .to_owned();
+
+        // The callback answers it, and the grant is exchanged for the profile.
+        let body = format!("code=the-code&state={state}");
+        let mut callback = Request::builder()
+            .method("POST")
+            .uri("https://sp.example.org/login/oauth2/code/okta")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::empty())
+            .expect("a valid request");
+        callback
+            .extensions_mut()
+            .insert(next_web_core::http::RequestBody::new(body.into_bytes()));
+        let mut callback_response = Response::default();
+        Chain::new(filters)
+            .run(&mut callback, &mut callback_response)
+            .await
+            .expect("the chain runs");
+
+        assert!(
+            callback_response.status().is_redirection(),
+            "the login redirects, status was {}",
+            callback_response.status()
+        );
+        assert_eq!(
+            redirect_of(&callback_response),
+            Some("/".to_owned()),
+            "the login succeeds and sends the user to the application"
+        );
+    }
+
+    /// Returns the authentication a chain stored on the request, if any.
+    fn stored_authentication(
+        request: &dyn next_web_core::http::HttpRequest,
+    ) -> Option<Arc<dyn crate::core::Authentication>> {
+        use next_web_core::any::AnyValue;
+
+        let AnyValue::BoxedValue(value) = request.get_attribute(
+            crate::web::context::RequestAttributeSecurityContextRepository::DEFAULT_REQUEST_ATTR_NAME,
+        )?
+        else {
+            return None;
+        };
+        let context = (**value)
+            .as_any()
+            .downcast_ref::<Arc<dyn crate::core::context::SecurityContext>>()?;
+
+        context.get_authentication()
+    }
+
+    /// A user service that cannot load the profile of the user.
+    struct RefusingUserService;
+
+    #[next_web_core::async_trait]
+    impl crate::oauth2::OAuth2UserService<crate::oauth2::OAuth2UserRequest, crate::oauth2::OAuth2User>
+        for RefusingUserService
+    {
+        async fn load_user(
+            &self,
+            _request: &crate::oauth2::OAuth2UserRequest,
+        ) -> Result<crate::oauth2::OAuth2User, crate::core::AuthenticationError> {
+            Err(crate::core::AuthenticationError::new(
+                "the profile of the user is not available",
+            ))
+        }
+    }
+
+    /// Maps the profile of every login to `ROLE_USER`.
+    struct RoleUserMapper;
+
+    impl crate::core::authority::mapping::GrantedAuthoritiesMapper for RoleUserMapper {
+        fn map_authorities(
+            &self,
+            _authorities: &[Arc<dyn crate::core::GrantedAuthority>],
+        ) -> Vec<Arc<dyn crate::core::GrantedAuthority>> {
+            vec![Arc::new(crate::core::authority::SimpleGrantedAuthority::new(
+                "ROLE_USER",
+            ))]
+        }
+    }
+
+    /// Returns a chain that answers the profile with the given service and maps
+    /// the authorities of the login with the given mapper.
+    fn http_security_with(
+        repository: Arc<InMemoryAuthorizationRequestRepository>,
+        user_service: Arc<
+            dyn crate::oauth2::OAuth2UserService<
+                crate::oauth2::OAuth2UserRequest,
+                crate::oauth2::OAuth2User,
+            >,
+        >,
+        user_authorities_mapper: Option<
+            Arc<dyn crate::core::authority::mapping::GrantedAuthoritiesMapper>,
+        >,
+    ) -> HttpSecurity {
+        let mut shared_objects: HashMap<TypeId, Box<dyn next_web_core::any::AnyClone>> =
+            HashMap::new();
+        shared_objects.insert(
+            TypeId::of::<PathPatternRequestMatcherBuilder>(),
+            Box::new(PathPatternRequestMatcherBuilder::default()),
+        );
+
+        let mut http = HttpSecurity::new(AuthenticationManagerBuilder::default(), shared_objects);
+        http.oauth2_login(|login| {
+            login
+                .client_registration_repository(Arc::new(
+                    InMemoryClientRegistrationRepository::new(vec![registration()]),
+                ))
+                .authorization_endpoint(|endpoint| {
+                    endpoint.authorization_request_repository(repository.clone());
+                })
+                .token_endpoint(|endpoint| {
+                    endpoint.access_token_response_client(Arc::new(FakeTokenClient));
+                })
+                .user_info_endpoint(|endpoint| {
+                    endpoint.user_service(user_service.clone());
+                    if let Some(mapper) = user_authorities_mapper.clone() {
+                        endpoint.user_authorities_mapper(mapper);
+                    }
+                });
+        });
+
+        http
+    }
+
+    /// Runs the redirect that starts the flow, and returns the authorization
+    /// request the callback has to answer.
+    async fn start_the_flow(filters: Arc<Vec<Arc<dyn next_web_core::http::filter::HttpFilter>>>) -> String {
+        let mut request = Request::builder()
+            .uri("https://sp.example.org/oauth2/authorization/okta")
+            .body(Body::empty())
+            .expect("a valid request");
+        let mut response = Response::default();
+        Chain::new(filters)
+            .run(&mut request, &mut response)
+            .await
+            .expect("the chain runs");
+
+        assert!(
+            response.status().is_redirection(),
+            "the authorization endpoint redirects, status was {}",
+            response.status()
+        );
+
+        redirect_of(&response)
+            .expect("the redirect carries the location")
+            .split(['?', '&'])
+            .find_map(|parameter| parameter.strip_prefix("state="))
+            .expect("the redirect carries the state")
+            .to_string()
+    }
+
+    /// Answers the redirect with the given code and state.
+    async fn answer_the_flow(
+        filters: Arc<Vec<Arc<dyn next_web_core::http::filter::HttpFilter>>>,
+        state: &str,
+    ) -> (Response, Request) {
+        let body = format!("code=the-code&state={state}");
+        let mut callback = Request::builder()
+            .method("POST")
+            .uri("https://sp.example.org/login/oauth2/code/okta")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::empty())
+            .expect("a valid request");
+        callback
+            .extensions_mut()
+            .insert(next_web_core::http::RequestBody::new(body.into_bytes()));
+        let mut response = Response::default();
+        let _ = Chain::new(filters)
+            .run(&mut callback, &mut response)
+            .await;
+
+        (response, callback)
+    }
+
+    #[tokio::test]
+    async fn the_callback_signs_in_as_the_user_the_profile_names() {
+        let repository = Arc::new(InMemoryAuthorizationRequestRepository::default());
+        let mut http = http_security(repository.clone());
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        let state = start_the_flow(filters.clone()).await;
+        let (response, callback) = answer_the_flow(filters, &state).await;
+
+        let authentication =
+            stored_authentication(&callback).expect("the callback signs the user in");
+        assert_eq!(
+            authentication.name(),
+            "Max",
+            "the profile of the user names the user"
+        );
+        assert!(
+            authentication.is_authenticated(),
+            "the login authenticates the user"
+        );
+        assert_eq!(
+            authentication.of(),
+            TypeId::of::<crate::oauth2::OAuth2LoginAuthenticationToken>(),
+            "the stored authentication is the OAuth 2.0 login one"
+        );
+        assert!(
+            response.status().is_redirection(),
+            "the login redirects the user to the application, status was {}",
+            response.status()
+        );
+    }
+
+    #[tokio::test]
+    async fn the_authorities_of_the_login_are_mapped_by_the_configuration() {
+        let repository = Arc::new(InMemoryAuthorizationRequestRepository::default());
+        let mut http = http_security_with(
+            repository.clone(),
+            Arc::new(FakeUserService),
+            Some(Arc::new(RoleUserMapper)),
+        );
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        let state = start_the_flow(filters.clone()).await;
+        let (_, callback) = answer_the_flow(filters, &state).await;
+
+        let authentication =
+            stored_authentication(&callback).expect("the callback signs the user in");
+        let authorities = authentication
+            .authorities()
+            .iter()
+            .filter_map(|authority| authority.authority())
+            .map(|authority| authority.to_string())
+            .collect::<Vec<_>>();
+        assert!(
+            authorities.iter().any(|authority| authority == "ROLE_USER"),
+            "the mapper of the configuration decides the authorities, they were: {authorities:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_profile_that_cannot_be_loaded_does_not_sign_the_user_in() {
+        let repository = Arc::new(InMemoryAuthorizationRequestRepository::default());
+        let mut http = http_security_with(
+            repository.clone(),
+            Arc::new(RefusingUserService),
+            None,
+        );
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        let state = start_the_flow(filters.clone()).await;
+        let (response, callback) = answer_the_flow(filters, &state).await;
+
+        assert!(
+            stored_authentication(&callback).is_none(),
+            "a login whose profile cannot be loaded authenticates nobody"
+        );
+        assert!(
+            !response.status().is_success(),
+            "the login reports the failure instead of answering the application, status was {}",
+            response.status()
+        );
+    }
+
+    #[test]
+    fn the_login_page_links_the_login_of_the_registration() {
+        use crate::config::web::configurers::DefaultLoginPageConfigurer;
+
+        let repository = Arc::new(InMemoryAuthorizationRequestRepository::default());
+        let mut shared_objects: HashMap<TypeId, Box<dyn next_web_core::any::AnyClone>> =
+            HashMap::new();
+        shared_objects.insert(
+            TypeId::of::<PathPatternRequestMatcherBuilder>(),
+            Box::new(PathPatternRequestMatcherBuilder::default()),
+        );
+        let mut http = HttpSecurity::new(AuthenticationManagerBuilder::default(), shared_objects);
+        // The page has to be shared before the login configuration initializes,
+        // which is the order an application configures its chain in.
+        http.with(DefaultLoginPageConfigurer::default(), |_| {});
+        http.oauth2_login(|login| {
+            login
+                .client_registration_repository(Arc::new(
+                    InMemoryClientRegistrationRepository::new(vec![registration()]),
+                ))
+                .user_info_endpoint(|endpoint| {
+                    endpoint.user_service(Arc::new(FakeUserService));
+                });
+        });
+        let _chain = http.build();
+        let page = http
+            .shared_object::<DefaultLoginPageGeneratingFilter>()
+            .expect("the login page is shared");
+
+        assert!(
+            page.is_enabled(),
+            "the page is rendered for an application that only offers the OAuth 2.0 login"
+        );
+        let links = page.oauth2_authentication_url_to_client_name();
+        assert_eq!(
+            links.get("/oauth2/authorization/okta").map(String::as_str),
+            Some("Okta"),
+            "the page links the login of the registration by its name, the links were: {links:?}"
+        );
+    }
+}

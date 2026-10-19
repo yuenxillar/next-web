@@ -203,6 +203,11 @@ impl DefaultLoginPageGeneratingFilter {
         self.oauth2_authentication_url_to_client_name = url_to_client_name;
     }
 
+    /// Returns the login URL of every OAuth 2.0 registration the page offers.
+    pub fn oauth2_authentication_url_to_client_name(&self) -> &HashMap<String, String> {
+        &self.oauth2_authentication_url_to_client_name
+    }
+
     pub fn set_saml2_authentication_url_to_provider_name(
         &mut self,
         url_to_provider_name: HashMap<String, String>,
