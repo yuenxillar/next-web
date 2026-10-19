@@ -790,7 +790,13 @@ impl HttpFilter for OidcBackChannelLogoutFilter {
         self.logout_handler
             .logout(request, response, Some(&authenticated))
             .await;
-        filter_chain.do_filter(request, response).await
+
+        // The logout is the answer: the request came from the provider, not from
+        // the application, so it is not passed on. A filter behind this one — the
+        // CSRF filter, which runs after it, for instance — has nothing to say
+        // about a request the provider signed.
+        Ok(())
+
     }
 
     fn supports(&self, name: &str) -> bool {

@@ -710,14 +710,23 @@ impl HttpSecurity {
         self
     }
 
-    /// Pending
+    /// Ok
     ///
-    /// Configures OpenID Connect logout.
+    /// Configures OpenID Connect back-channel logout.
     ///
-    /// The endpoint ends the session at the provider as well as in the
-    /// application, so a user who logged out is not silently authenticated again
-    /// by the provider on the next request. The closure configures the endpoint
-    /// and the redirect that follows it.
+    /// The provider ends the sessions it holds for a user and tells the
+    /// application: the chain serves the endpoint of the registration, verifies
+    /// the logout token the provider posts there, and hands the sessions the token
+    /// ends to the configured `LogoutHandler`. A request that carries no logout
+    /// token is left to the application, and a token that cannot be verified is
+    /// answered with 400.
+    ///
+    /// The logout token is a JWT signed by the provider, so the configuration
+    /// takes the decoder that verifies it — `back_channel(|back| back.jwt_decoder(…))`
+    /// — and without one every logout token is refused, because there is no key to
+    /// verify one with. The redirect of a user who logs out at the application is
+    /// the end-session endpoint of the provider, which this configuration does not
+    /// serve: it contributes the half where the provider tells the application.
     #[cfg(all(feature = "oauth2-client", feature = "oauth2-resource-server"))]
     pub fn oidc_logout<F>(&mut self, oidc_logout: F) -> &mut Self
     where
