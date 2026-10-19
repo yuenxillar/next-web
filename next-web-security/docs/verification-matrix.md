@@ -15,7 +15,7 @@ cargo test -p next-web-security --features oauth2-client
 
 cargo test -p next-web-security \
   --features oauth2-client,oauth2-resource-server,oauth2-authorization-server
-    549 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored
+    554 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored
 ```
 
 The five end-to-end tests are `tests/end_to_end_flow.rs` (a real socket, HTTP)
@@ -71,6 +71,7 @@ filters in order, the way the chain proxy runs them.
 | oauth2 authorization redirect | `the_authorization_endpoint_redirects_to_the_provider`, `the_redirect_remembers_the_authorization_request` | `oauth2_login_configurer.rs` |
 | oauth2 callback (refusal) | `a_callback_with_an_unknown_state_is_refused` | same |
 | oauth2 callback (success) | `a_callback_that_answers_the_issued_request_logs_the_user_in` | same |
+| oauth2 authorization server | `an_authorization_request_is_answered_with_a_code`, `the_code_is_exchanged_for_a_token`, `the_metadata_of_the_server_is_published`, `a_request_without_a_registered_client_is_refused` | `config/web/configurers/oauth2_authorization_server_configurer.rs` |
 | saml2 metadata | the filter and configurer tests, `Saml2MetadataFilter` | `web/saml2/metadata/`, `config/web/configurers/saml2_metadata_configurer.rs` |
 | saml2 login | `a_response_signed_by_the_asserting_party_logs_the_user_in`, `a_believed_response_authenticates_through_the_chain`, `a_rejected_response_redirects_back_to_the_login_page` | `config/web/configurers/saml2_login_configurer.rs` |
 | saml2 signature | the six tests of `XmlSignatureVerifier` — the signature of a response verifies, a changed assertion is refused, another key is refused, no signature is refused, a registration without a key is refused, SHA-1 is refused | `saml2/login/xml_signature_verifier.rs` |
@@ -97,6 +98,7 @@ container writes is read, the user is looked up, the authentication carries
 | Configuration | What holds, what does not |
 |---|---|
 | oauth2 client | The authorization code flow is verified from the redirect to the authenticated callback. The authorize-server side of the subsystem has filter-level tests but no chain test. |
+| oauth2 authorization server | The authorization code grant is verified end to end: the authorization endpoint issues a code to a registered client and the token endpoint exchanges it for an access token. The consent page, the device flow, the pushed authorization request, the introspection and revocation endpoints and the user info endpoint are part of the chain but are not walked end to end. |
 
 The SAML 2.0 login is no longer here: it verifies the signature of a response and
 completes, and the tests above hold that from the endpoint to the stored

@@ -798,7 +798,7 @@ impl HttpSecurity {
         self
     }
 
-    /// Pending
+    /// Ok
     ///
     /// Adds OAuth 2.1 authorization server support.
     ///
@@ -806,6 +806,19 @@ impl HttpSecurity {
     /// endpoints of an authorization server, and the configurer is where the
     /// registered clients, the stored authorizations and the token generator are
     /// configured.
+    ///
+    /// The authorization code grant is verified from one end to the other: the
+    /// authorization endpoint issues a code to a registered client and redirects
+    /// to its redirect URI with the state of the request, and the token endpoint
+    /// authenticates the client with its credentials and exchanges that code for
+    /// an access token, which the login that follows reads back. The metadata
+    /// document, the JWK set, the introspection and revocation endpoints, the
+    /// pushed authorization request, the device flow, the user info and the
+    /// logout endpoint of the server are part of the chain but are not walked end
+    /// to end here; the consent of the resource owner is served by the application
+    /// as [`OAuth2AuthorizationServerConfigurer::consent_page`] decides.
+    ///
+    /// [`OAuth2AuthorizationServerConfigurer::consent_page`]: crate::config::web::configurers::oauth2::OAuth2AuthorizationServerConfigurer
     #[cfg(feature = "oauth2-authorization-server")]
     pub fn oauth2_authorization_server<F>(&mut self, oauth2_authorization_server: F) -> &mut Self
     where
