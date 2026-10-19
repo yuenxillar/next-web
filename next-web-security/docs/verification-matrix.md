@@ -11,11 +11,11 @@ cargo test -p next-web-security
     398 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
 
 cargo test -p next-web-security --features oauth2-client
-    436 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
+    444 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
 
 cargo test -p next-web-security \
   --features oauth2-client,oauth2-resource-server,oauth2-authorization-server
-    511 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored```
+    519 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored```
 
 The five end-to-end tests are `tests/end_to_end_flow.rs` (a real socket, HTTP)
 and `tests/x509_over_tls.rs` (a real TLS listener that asks for a client
