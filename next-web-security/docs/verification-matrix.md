@@ -8,14 +8,15 @@ Last verified with:
 
 ```
 cargo test -p next-web-security
-    398 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
+    411 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
 
 cargo test -p next-web-security --features oauth2-client
-    444 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
+    465 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
 
 cargo test -p next-web-security \
   --features oauth2-client,oauth2-resource-server,oauth2-authorization-server
-    519 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored```
+    549 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored
+```
 
 The five end-to-end tests are `tests/end_to_end_flow.rs` (a real socket, HTTP)
 and `tests/x509_over_tls.rs` (a real TLS listener that asks for a client
@@ -71,7 +72,8 @@ filters in order, the way the chain proxy runs them.
 | oauth2 callback (refusal) | `a_callback_with_an_unknown_state_is_refused` | same |
 | oauth2 callback (success) | `a_callback_that_answers_the_issued_request_logs_the_user_in` | same |
 | saml2 metadata | the filter and configurer tests, `Saml2MetadataFilter` | `web/saml2/metadata/`, `config/web/configurers/saml2_metadata_configurer.rs` |
-| saml2 login | `a_believed_response_authenticates_through_the_chain`, `a_rejected_response_redirects_back_to_the_login_page` | `config/web/configurers/saml2_login_configurer.rs` |
+| saml2 login | `a_response_signed_by_the_asserting_party_logs_the_user_in`, `a_believed_response_authenticates_through_the_chain`, `a_rejected_response_redirects_back_to_the_login_page` | `config/web/configurers/saml2_login_configurer.rs` |
+| saml2 signature | the six tests of `XmlSignatureVerifier` — the signature of a response verifies, a changed assertion is refused, another key is refused, no signature is refused, a registration without a key is refused, SHA-1 is refused | `saml2/login/xml_signature_verifier.rs` |
 | one-time token submit | `the_token_is_read_from_the_form_body`, `a_form_without_a_token_converts_to_nothing` | `web/authentication/ott/one_time_token_authentication_converter.rs` |
 | csrf token resolution | `the_token_is_resolved_from_a_form_body`, `a_submission_without_the_token_resolves_to_nothing` | `web/csrf/csrf_token_request_resolver.rs` |
 | web authn | `a_passkey_registers_and_then_logs_the_user_in_through_the_chain` | `config/web/configurers/web_authn_configurer.rs` |
@@ -93,14 +95,17 @@ container writes is read, the user is looked up, the authentication carries
 
 | Configuration | What holds, what does not |
 |---|---|
-| saml2 login | The chain is complete — start, parse, strict validation, replay defence, authentication — but no signature implementation ships, so the default verifier refuses every assertion. A login can be started and can never be completed without a `SignatureVerifier` from the application. |
 | oauth2 client | The authorization code flow is verified from the redirect to the authenticated callback. The authorize-server side of the subsystem has filter-level tests but no chain test. |
+
+The SAML 2.0 login is no longer here: it verifies the signature of a response and
+completes, and the tests above hold that from the endpoint to the stored
+authentication.
 
 ## Not implemented
 
 | Configuration | Blocker |
 |---|---|
-| saml2 logout | A logout request and its response carry the signature of the asserting party, and the port has no XML signature implementation. The same `SignatureVerifier` that the login needs would unblock it. |
+| saml2 logout | The logout profile is not wired: a logout request and its response carry the signature of the asserting party, and the filters that would serve them do not exist yet. The XML signature verifier the login uses is the piece they would be built on. |
 
 It is marked `Pending` in the documentation of `HttpSecurity`, and the
 documentation says what is missing rather than only that it is missing.
