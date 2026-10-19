@@ -615,7 +615,7 @@ impl HttpSecurity {
         self
     }
 
-    /// Pending
+    /// Ok
     ///
     /// Adds SAML 2.0 relying party authentication.
     ///
@@ -623,12 +623,19 @@ impl HttpSecurity {
     /// shared with this builder, and the closure is where the registrations, the
     /// user details service and the assertion verifier are configured.
     ///
-    /// The chain is complete — a login can be started, the posted response is
-    /// parsed, verified, and turned into an authentication — but no assertion
-    /// verifier ships with the port: the default one refuses every response, and
-    /// an application has to supply one that checks the signature. Until it does,
-    /// the endpoint starts logins that can never complete. See
-    /// [`Saml2LoginConfigurer`] for what the configurer contributes.
+    /// A login is started on the endpoint of a registration, and the response the
+    /// asserting party posts to the assertion consumer endpoint is believed only
+    /// when its signature verifies against the key of the registration
+    /// ([`RelyingPartyRegistration::verification_public_key`]) and the conditions
+    /// of the profile hold: success status, the two identities, the audience and
+    /// the recipient, the window of the assertion, the request it answers, and
+    /// that it was not used before. The signature is checked as an XML signature —
+    /// exclusive canonicalization, RSA-SHA256, a SHA-256 digest — and a document
+    /// that names another algorithm, carries no signature, or changed after it was
+    /// signed is refused. See [`Saml2LoginConfigurer`] for what the configurer
+    /// contributes.
+    ///
+    /// [`RelyingPartyRegistration::verification_public_key`]: crate::saml2::registration::RelyingPartyRegistration::verification_public_key
     pub fn saml2_login<F>(&mut self, saml2_login: F) -> &mut Self
     where
         F: FnMut(&mut Saml2LoginConfigurer<Self>),

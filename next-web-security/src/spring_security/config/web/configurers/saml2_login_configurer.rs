@@ -15,9 +15,9 @@ use crate::{
     saml2::{
         login::{
             AssertionReplayCache, AssertionVerifier, InMemoryAssertionReplayCache,
-            InMemorySaml2AuthenticationRequestRepository, RejectingAssertionVerifier,
+            InMemorySaml2AuthenticationRequestRepository,
             Saml2AuthenticationProvider, Saml2AuthenticationRequestRepository, SignatureVerifier,
-            StrictAssertionVerifier,
+            StrictAssertionVerifier, XmlSignatureVerifier,
         },
         registration::RelyingPartyRegistrationRepository,
     },
@@ -32,9 +32,11 @@ use crate::{
 ///
 /// The configurer registers the two endpoints a login needs — the one a login is
 /// started on, and the assertion consumer one the asserting party posts to — and
-/// the provider that authenticates the posted response. A response is only
-/// believed when an [`AssertionVerifier`] says so; without one the shipped
-/// [`RejectingAssertionVerifier`] refuses every response.
+/// the provider that authenticates the posted response. A response is believed
+/// when its signature verifies against the key of the registration and the
+/// conditions of the profile hold; the signature verifier can be replaced, and an
+/// application that wants to believe nothing supplies
+/// [`RejectingAssertionVerifier`].
 #[derive(Clone)]
 pub struct Saml2LoginConfigurer<H>
 where
@@ -134,16 +136,14 @@ where
             return verifier;
         }
 
-        let Some(signature) = self.signature_verifier.clone() else {
-            // Silence here would mean a login endpoint that starts logins it
-            // can never finish, with nothing to explain why.
-            tracing::warn!(
-                "saml2Login() is configured without a SignatureVerifier, so every assertion is \
-                 refused and no login can complete; supply one that verifies the signature of a \
-                 response"
-            );
-            return Arc::new(RejectingAssertionVerifier);
-        };
+        // Without a verifier of its own the application gets the one that checks
+        // the signature against the key of the registration, so a login completes
+        // for a response its asserting party signed. A registration without a key
+        // still refuses every response, which is what the verifier reports.
+        let signature = self
+            .signature_verifier
+            .clone()
+            .unwrap_or_else(|| Arc::new(XmlSignatureVerifier));
 
         Arc::new(
             StrictAssertionVerifier::new(
@@ -416,17 +416,17 @@ mod tests {
     }
 
     #[test]
-    fn without_a_signature_verifier_every_response_is_refused() {
+    fn without_a_signature_verifier_a_response_without_a_signature_is_refused() {
         let configurer = Saml2LoginConfigurer::<HttpSecurity>::new(context());
 
         let error = configurer
             .build_verifier()
             .verify(&registration(), &minimal_response())
-            .expect_err("no verifier is configured");
+            .expect_err("the response carries no signature");
 
         assert!(
-            error.message().contains("no assertion verifier"),
-            "the error names the missing verifier, was: {}",
+            error.message().contains("no signature"),
+            "the error names the missing signature, was: {}",
             error.message()
         );
     }
@@ -693,6 +693,146 @@ mod tests {
             redirect_of(&response),
             Some("/login?error".to_owned()),
             "a refused login sends the user back"
+        );
+    }
+
+    /// Returns a key the signed response of the tests is signed with.
+    fn signing_key() -> rsa::RsaPrivateKey {
+        rsa::RsaPrivateKey::new(&mut rsa::rand_core::OsRng, 2048).expect("a key is generated")
+    }
+
+    /// Returns the public key of a private key, in PEM form.
+    fn public_key_pem(key: &rsa::RsaPrivateKey) -> String {
+        use rsa::pkcs8::{EncodePublicKey, LineEnding};
+
+        rsa::RsaPublicKey::from(key)
+            .to_public_key_pem(LineEnding::LF)
+            .expect("the key is written")
+    }
+
+    /// Returns the registration the signed response of the tests is verified
+    /// against.
+    fn signed_registration(key: &rsa::RsaPrivateKey) -> RelyingPartyRegistration {
+        RelyingPartyRegistration::with_registration_id("okta")
+            .entity_id("sp-entity-id")
+            .assertion_consumer_service_location("https://sp.example.org/login/saml2/sso/okta")
+            .asserting_party_entity_id("idp-entity-id")
+            .single_sign_on_service_location("https://idp.example.org/sso")
+            .verification_public_key(public_key_pem(key))
+            .build()
+    }
+
+    /// Returns the instant a SAML 2.0 message names, at the given offset from now.
+    fn instant(minutes: i64) -> String {
+        (chrono::Utc::now() + chrono::Duration::minutes(minutes))
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string()
+    }
+
+    /// Returns the assertion the signed response carries, without a signature.
+    ///
+    /// The assertion is written in the canonical form itself, so the digest the
+    /// signature carries is the digest of the bytes written here.
+    fn assertion_without_signature() -> String {
+        format!(
+            r##"<saml2:Assertion xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion" ID="the-assertion" IssueInstant="{issue}" Version="2.0"><saml2:Issuer>idp-entity-id</saml2:Issuer><saml2:Subject><saml2:NameID>Max</saml2:NameID><saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml2:SubjectConfirmationData InResponseTo="the-request" NotOnOrAfter="{not_after}" Recipient="https://sp.example.org/login/saml2/sso/okta"></saml2:SubjectConfirmationData></saml2:SubjectConfirmation></saml2:Subject><saml2:Conditions NotBefore="{not_before}" NotOnOrAfter="{not_after}"><saml2:AudienceRestriction><saml2:Audience>sp-entity-id</saml2:Audience></saml2:AudienceRestriction></saml2:Conditions></saml2:Assertion>"##,
+            issue = instant(0),
+            not_before = instant(-1),
+            not_after = instant(5),
+        )
+    }
+
+    /// Returns the signature element of the assertion of the tests.
+    fn signature_of(assertion: &str, key: &rsa::RsaPrivateKey) -> String {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        use rsa::{
+            pkcs1v15::SigningKey,
+            signature::{SignatureEncoding, Signer},
+        };
+        use sha2::{Digest, Sha256};
+
+        let digest = STANDARD.encode(Sha256::digest(assertion.as_bytes()));
+        let signature_element_of = |digest: &str, signature: &str| {
+            format!(
+                r##"<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"></ds:CanonicalizationMethod><ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"></ds:SignatureMethod><ds:Reference URI="#the-assertion"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></ds:Transform><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"></ds:Transform></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"></ds:DigestMethod><ds:DigestValue>{digest}</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>{signature}</ds:SignatureValue></ds:Signature>"##
+            )
+        };
+        let signed_info = signature_element_of(&digest, "")
+            .replacen(
+                "<ds:SignedInfo>",
+                r##"<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">"##,
+                1,
+            );
+        let start = signed_info
+            .find("<ds:SignedInfo")
+            .expect("the signature holds a SignedInfo");
+        let end = signed_info
+            .find("</ds:SignedInfo>")
+            .expect("the signature holds a SignedInfo")
+            + "</ds:SignedInfo>".len();
+        let signature = SigningKey::<Sha256>::new(key.clone())
+            .sign(signed_info[start..end].as_bytes());
+
+        signature_element_of(&digest, &STANDARD.encode(signature.to_bytes()))
+    }
+
+    /// Returns a response whose assertion is signed with the given key.
+    fn signed_response(key: &rsa::RsaPrivateKey) -> String {
+        let assertion = assertion_without_signature();
+        let signature = signature_of(&assertion, key);
+
+        format!(
+            r##"<saml2p:Response xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol" ID="the-response" InResponseTo="the-request" IssueInstant="{issue}" Version="2.0"><saml2:Issuer>idp-entity-id</saml2:Issuer><saml2p:Status><saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"></saml2p:StatusCode></saml2p:Status>{assertion_with_signature}</saml2p:Response>"##,
+            issue = instant(0),
+            assertion_with_signature = assertion.replace("</saml2:Assertion>", &format!("{signature}</saml2:Assertion>")),
+        )
+    }
+
+    #[tokio::test]
+    async fn a_response_signed_by_the_asserting_party_logs_the_user_in() {
+        use crate::saml2::login::InMemorySaml2AuthenticationRequestRepository;
+
+        let key = signing_key();
+        let requests = Arc::new(InMemorySaml2AuthenticationRequestRepository::default());
+        requests.save(
+            "okta",
+            "the-request",
+            chrono::Utc::now() + chrono::Duration::minutes(5),
+        );
+        let mut configurer = Saml2LoginConfigurer::<HttpSecurity>::new(context());
+        configurer.relying_party_registration_repository(Arc::new(
+            InMemoryRelyingPartyRegistrationRepository::new(vec![signed_registration(&key)]),
+        ));
+        configurer.user_details_service(user_details_service());
+        configurer.authentication_request_repository(requests);
+        // The verifier is the one the configuration ships with: the signature is
+        // checked against the key of the registration.
+        let mut http = http_security();
+        http.with(configurer, |_| {});
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        let mut request = acs_request("okta", &signed_response(&key));
+        let mut response = axum::response::Response::default();
+        Chain::new(filters)
+            .run(&mut request, &mut response)
+            .await
+            .expect("the chain runs");
+
+        assert!(
+            response.status().is_redirection(),
+            "the login redirects, status was {}",
+            response.status()
+        );
+        assert_eq!(
+            redirect_of(&response),
+            Some("/".to_owned()),
+            "a signed response signs the user in"
+        );
+        assert_eq!(
+            authenticated_username(&request).as_deref(),
+            Some("Max"),
+            "the response names the user"
         );
     }
 }
