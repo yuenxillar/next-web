@@ -89,9 +89,16 @@ pub enum FilterChainError {
     /// ```
     /// use next_web_core::filter::FilterChainError;
     ///
-    /// #[derive(Debug, thiserror::Error)]
-    /// #[error("custom error")]
+    /// #[derive(Debug)]
     /// struct CustomError;
+    ///
+    /// impl std::fmt::Display for CustomError {
+    ///     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    ///         write!(f, "custom error")
+    ///     }
+    /// }
+    ///
+    /// impl std::error::Error for CustomError {}
     ///
     /// let err = FilterChainError::AnyError(Box::new(CustomError));
     /// if err.is::<CustomError>() {

@@ -28,7 +28,6 @@ next-web-state-machine  = { workspace = true, optional = true }
 tokio                   = { workspace = true, features = ["sync", "signal","net", "fs"] }
 axum                    = { workspace = true, features = ["http2"] }
 axum-core               = { workspace = true }
-axum-server             = { version = "0.8.0",optional = true }
 rustls                  = { workspace = true, optional = true }
 tokio-rustls            = { workspace = true, optional = true }
 rustls-pemfile          = { workspace = true, optional = true }
@@ -101,7 +100,6 @@ full = [
     "trace-log"
 ]
 
-# tls-openssl = ["axum-server/tls-openssl"]
 tls-rustls  = ["dep:rustls", "dep:tokio-rustls", "dep:rustls-pemfile"]
 
 # web

@@ -35,8 +35,7 @@ use crate::{
 /// ```
 /// use std::sync::Arc;
 ///
-/// use next_web_core::filter::application_filter_chain::ApplicationFilterChain;
-/// use next_web_core::http::filter::HttpFilter;
+/// use next_web_core::filter::{ApplicationFilterChain, HttpFilter};
 ///
 /// let filters: Arc<[Arc<dyn HttpFilter>]> = Arc::from(Vec::new());
 /// let chain = ApplicationFilterChain::new(filters);

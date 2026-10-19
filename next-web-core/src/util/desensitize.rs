@@ -36,7 +36,7 @@
 /// # Examples
 ///
 /// ```
-/// use next_web_core::traits::desensitize::Desensitize;
+/// use next_web_core::util::Desensitize;
 ///
 /// struct Token(String);
 ///
