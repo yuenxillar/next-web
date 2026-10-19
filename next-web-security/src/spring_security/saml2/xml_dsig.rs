@@ -11,11 +11,6 @@
 //! the algorithms of a SAML 2.0 profile are accepted — RSA-SHA256, SHA-256 and the
 //! enveloped-signature transform — and anything else is refused rather than
 //! guessed at.
-//!
-//! A document whose form differs from its canonical form cannot be verified this
-//! way and is refused: rewriting it would produce a digest that is not the digest
-//! the asserting party signed. A SAML 2.0 profile requires the signature to be over
-//! the canonical form, which is what makes this check the right one.
 
 use std::collections::BTreeMap;
 
@@ -72,11 +67,7 @@ fn failed(reason: impl Into<String>) -> Saml2Error {
 }
 
 /// Verifies one signature of a document.
-fn verify_one(
-    signature: &Element,
-    root: &Element,
-    public_key_pem: &str,
-) -> Result<(), Saml2Error> {
+fn verify_one(signature: &Element, root: &Element, public_key_pem: &str) -> Result<(), Saml2Error> {
     let signed_info = signature
         .child("SignedInfo")
         .ok_or_else(|| failed("the signature carries no SignedInfo"))?;
@@ -103,7 +94,7 @@ fn verify_one(
 
     let signature_value = signature
         .child("SignatureValue")
-        .map(|value| value.text.trim().to_string())
+        .map(|value| value.text().trim().to_string())
         .filter(|value| !value.is_empty())
         .ok_or_else(|| failed("the signature carries no value"))?;
 
@@ -157,7 +148,7 @@ fn verify_reference(reference: &Element, root: &Element) -> Result<(), Saml2Erro
     }
     let digest_value = reference
         .child("DigestValue")
-        .map(|value| value.text.trim().to_string())
+        .map(|value| value.text().trim().to_string())
         .filter(|value| !value.is_empty())
         .ok_or_else(|| failed("a reference of the signature carries no digest"))?;
 
@@ -200,7 +191,9 @@ fn verify_reference(reference: &Element, root: &Element) -> Result<(), Saml2Erro
 /// Returns the signature of an element, which the enveloped-signature transform
 /// leaves out of the canonical form.
 fn enclosing_signature(element: &Element) -> Option<&Element> {
-    element.children.iter().find(|child| child.is("Signature"))
+    element
+        .elements()
+        .find(|child| child.is("Signature"))
 }
 
 /// Parses a public key in PEM form.
@@ -209,6 +202,15 @@ fn parse_public_key(pem: &str) -> Result<RsaPublicKey, Saml2Error> {
     RsaPublicKey::from_public_key_pem(pem)
         .or_else(|_| RsaPublicKey::from_pkcs1_pem(pem))
         .map_err(|error| failed(format!("the key of the asserting party is not RSA PEM: {error}")))
+}
+
+/// What an element holds, in document order.
+#[derive(Clone, Debug)]
+enum Content {
+    /// A run of text.
+    Text(String),
+    /// An element.
+    Element(Element),
 }
 
 /// An element of the parsed document.
@@ -223,10 +225,8 @@ struct Element {
     /// The attributes of the element that are not namespace declarations, as
     /// `(prefix, local name, value)`.
     attributes: Vec<(String, String, String)>,
-    /// The text the element holds.
-    text: String,
-    /// The elements the element holds.
-    children: Vec<Element>,
+    /// What the element holds, in document order.
+    content: Vec<Content>,
 }
 
 impl Element {
@@ -244,17 +244,35 @@ impl Element {
             .map(|(_, uri)| uri.clone())
     }
 
-    /// Returns the first child with the given local name.
-    fn child(&self, local: &str) -> Option<&Element> {
-        self.children.iter().find(|child| child.local == local)
+    /// Returns the elements the element holds.
+    fn elements(&self) -> impl Iterator<Item = &Element> {
+        self.content.iter().filter_map(|content| match content {
+            Content::Element(element) => Some(element),
+            Content::Text(_) => None,
+        })
     }
 
-    /// Returns the children with the given local name.
+    /// Returns the first element with the given local name.
+    fn child(&self, local: &str) -> Option<&Element> {
+        self.elements().find(|child| child.local == local)
+    }
+
+    /// Returns the elements with the given local name.
     fn children_named(&self, local: &str) -> Vec<&Element> {
-        self.children
-            .iter()
-            .filter(|child| child.local == local)
-            .collect()
+        self.elements().filter(|child| child.local == local).collect()
+    }
+
+    /// Returns the text the element holds, with the text of its children joined.
+    fn text(&self) -> String {
+        let mut text = String::new();
+        for content in &self.content {
+            match content {
+                Content::Text(run) => text.push_str(run),
+                Content::Element(element) => text.push_str(&element.text()),
+            }
+        }
+
+        text
     }
 
     /// Returns the value of the attribute with the given local name, whatever
@@ -271,7 +289,7 @@ impl Element {
         if self.attribute("ID").as_deref() == Some(id) {
             return Some(self);
         }
-        self.children.iter().find_map(|child| child.find_by_id(id))
+        self.elements().find_map(|child| child.find_by_id(id))
     }
 
     /// Returns the qualified name of the element.
@@ -289,26 +307,21 @@ fn collect_signatures<'a>(element: &'a Element, found: &mut Vec<&'a Element>) {
     if element.is("Signature") {
         found.push(element);
     }
-    for child in &element.children {
+    for child in element.elements() {
         collect_signatures(child, found);
     }
 }
 
 /// Returns the namespaces in scope where the given element sits.
 fn in_scope_of(root: &Element, target: &Element) -> Option<BTreeMap<String, String>> {
-    fn descend(
-        element: &Element,
-        target: &Element,
-        scope: &mut BTreeMap<String, String>,
-    ) -> bool {
+    fn descend(element: &Element, target: &Element, scope: &mut BTreeMap<String, String>) -> bool {
         let before = scope.clone();
         for (prefix, uri) in &element.namespaces {
             scope.insert(prefix.clone(), uri.clone());
         }
         let found = std::ptr::eq(element, target)
             || element
-                .children
-                .iter()
+                .elements()
                 .any(|child| descend(child, target, scope));
         if !found {
             *scope = before;
@@ -333,20 +346,21 @@ fn parse_document(document: &str) -> Result<Element, Saml2Error> {
             Ok(Event::Empty(element)) => {
                 let parsed = parse_element(&element);
                 match stack.last_mut() {
-                    Some(parent) => parent.children.push(parsed),
+                    Some(parent) => parent.content.push(Content::Element(parsed)),
                     None => root = Some(parsed),
                 }
             }
             Ok(Event::Text(text)) => {
+                let text = text.unescape().unwrap_or_default().to_string();
                 if let Some(current) = stack.last_mut() {
-                    current.text.push_str(&text.unescape().unwrap_or_default());
+                    current.content.push(Content::Text(text));
                 }
             }
             Ok(Event::CData(data)) => {
                 if let Some(current) = stack.last_mut() {
                     current
-                        .text
-                        .push_str(&String::from_utf8_lossy(data.as_ref()));
+                        .content
+                        .push(Content::Text(String::from_utf8_lossy(data.as_ref()).to_string()));
                 }
             }
             Ok(Event::End(_)) => {
@@ -354,7 +368,7 @@ fn parse_document(document: &str) -> Result<Element, Saml2Error> {
                     .pop()
                     .ok_or_else(|| failed("the document ends an element it never started"))?;
                 match stack.last_mut() {
-                    Some(parent) => parent.children.push(element),
+                    Some(parent) => parent.content.push(Content::Element(element)),
                     None => root = Some(element),
                 }
             }
@@ -410,8 +424,7 @@ fn parse_element(element: &BytesStart) -> Element {
         local,
         namespaces,
         attributes,
-        text: String::new(),
-        children: Vec::new(),
+        content: Vec::new(),
     }
 }
 
@@ -426,13 +439,7 @@ fn canonicalize(
 ) -> String {
     let mut output = String::new();
     let mut rendered = BTreeMap::new();
-    write_element(
-        element,
-        without,
-        in_scope,
-        &mut rendered,
-        &mut output,
-    );
+    write_element(element, without, in_scope, &mut rendered, &mut output);
 
     output
 }
@@ -486,7 +493,9 @@ fn write_element(
     attributes.sort_by(|(prefix_a, local_a, _), (prefix_b, local_b, _)| {
         let namespace_a = element.namespace_of(prefix_a).unwrap_or_default();
         let namespace_b = element.namespace_of(prefix_b).unwrap_or_default();
-        namespace_a.cmp(&namespace_b).then_with(|| local_a.cmp(local_b))
+        namespace_a
+            .cmp(&namespace_b)
+            .then_with(|| local_a.cmp(local_b))
     });
     for (prefix, local, value) in attributes {
         let name = if prefix.is_empty() {
@@ -497,14 +506,18 @@ fn write_element(
         output.push_str(&format!(" {name}=\"{}\"", escape_attribute(&value)));
     }
     output.push('>');
-    output.push_str(&escape_text(&element.text));
-    for child in &element.children {
-        if let Some(without) = without {
-            if std::ptr::eq(child, without) {
-                continue;
+    for content in &element.content {
+        match content {
+            Content::Text(text) => output.push_str(&escape_text(text)),
+            Content::Element(child) => {
+                if let Some(without) = without {
+                    if std::ptr::eq(child, without) {
+                        continue;
+                    }
+                }
+                write_element(child, without, &scope, rendered, output);
             }
         }
-        write_element(child, without, &scope, rendered, output);
     }
     output.push_str(&format!("</{}>", element.qualified_name()));
 }

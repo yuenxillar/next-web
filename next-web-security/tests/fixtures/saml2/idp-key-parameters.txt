@@ -1,0 +1,6 @@
+# The key the asserting party of the fixture signs with: the modulus and the
+# exponent of its RSA public key, in base64. It is kept as the two numbers rather
+# than as a PEM document because the fixture carries no certificate, and the test
+# builds the key from them.
+modulus=ygrklmNn2ZmUjvv6csqfdYDRFsQ1J6c/63FJ57OyBlUyVH9fW1sboe1902WhSzIHXsDqcE9+svvQz+9x0UOQbB5sZ168HUz5g8hKSUxGm/CcGy+pZFlMdh12mdf7ur1U/BPVORMcgeElfj09Qg5EHDl7RTOZ9I81LdL+rdhRgSJlJO5kl1F4gX/FcN6Ej77dd/PHe2PH9eBsWbmxHD6aOsVOFTwDjKAIHJFYiqhXF1IJKYcRjX74ebZin6Fm19Z6gMkG/s8837CXcLyEmjgI0vdwevSbIWy5iZkOEvV++oquOIqE0nfJckx0BysCkWGWh8Jd8EKjI3izV2qc+IkXIQ==
+exponent=AQAB
