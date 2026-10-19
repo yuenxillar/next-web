@@ -139,6 +139,21 @@ impl HttpFilter for RequestHeaderAuthenticationFilter {
     }
 }
 
+impl Default for RequestHeaderAuthenticationFilter {
+    /// Creates the filter with the header of CA Siteminder and no manager.
+    ///
+    /// The manager is set before the filter is put into a chain; a filter without
+    /// one cannot authenticate and refuses the request with an error.
+    fn default() -> Self {
+        Self {
+            principal_request_header: String::from("SM_USER"),
+            credentials_request_header: None,
+            error_if_header_missing: true,
+            base: BasePreAuthenticatedProcessingFilter::default(),
+        }
+    }
+}
+
 impl Named for RequestHeaderAuthenticationFilter {
     fn name(&self) -> &str {
         "RequestHeaderAuthenticationFilter"
