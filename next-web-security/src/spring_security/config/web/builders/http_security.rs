@@ -645,19 +645,28 @@ impl HttpSecurity {
         self
     }
 
-    /// Pending
+    /// Ok
     ///
     /// Adds SAML 2.0 single logout.
     ///
     /// The relying party registrations have to be shared with this builder, and
-    /// the closure configures the relying party initiated logout and the handling
-    /// of the logout responses an asserting party sends back.
+    /// the closure configures the endpoint, the handlers that end a session and
+    /// the URL a completed logout sends the user to.
     ///
-    /// The endpoints are not wired yet, and the reason is the same one that
-    /// keeps [`Self::saml2_login`] from completing a login: a logout request and
-    /// its response carry a signature of the asserting party, and the port has no
-    /// XML signature implementation to check it. The configurer holds its
-    /// settings but contributes no filter to the chain.
+    /// The chain serves the single logout endpoint of the registrations. A
+    /// `LogoutRequest` the asserting party sends there is believed only when its
+    /// signature verifies against the key of the registration: the session ends
+    /// through the handlers of the application, and the asserting party is
+    /// answered with a `LogoutResponse` in the location its registration names. A
+    /// `LogoutResponse` completes a logout of the application the same way. A
+    /// message that carries no signature, names another algorithm, or changed
+    /// after it was signed is answered with 400 and ends nothing.
+    ///
+    /// A logout started at the application is not redirected to the asserting
+    /// party by this configuration: the port's registration carries no signing key
+    /// of the service provider, so the message that would start it cannot be
+    /// signed. What it does serve is the half where the asserting party is the one
+    /// that starts the logout, and the answer to it.
     pub fn saml2_logout<F>(&mut self, saml2_logout: F) -> &mut Self
     where
         F: FnMut(&mut Saml2LogoutConfigurer<Self>),

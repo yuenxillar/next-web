@@ -8,14 +8,14 @@ Last verified with:
 
 ```
 cargo test -p next-web-security
-    411 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
+    420 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
 
 cargo test -p next-web-security --features oauth2-client
-    465 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
+    474 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
 
 cargo test -p next-web-security \
   --features oauth2-client,oauth2-resource-server,oauth2-authorization-server
-    554 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored
+    563 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored
 ```
 
 The five end-to-end tests are `tests/end_to_end_flow.rs` (a real socket, HTTP)
@@ -74,6 +74,7 @@ filters in order, the way the chain proxy runs them.
 | oauth2 authorization server | `an_authorization_request_is_answered_with_a_code`, `the_code_is_exchanged_for_a_token`, `the_metadata_of_the_server_is_published`, `a_request_without_a_registered_client_is_refused` | `config/web/configurers/oauth2_authorization_server_configurer.rs` |
 | saml2 metadata | the filter and configurer tests, `Saml2MetadataFilter` | `web/saml2/metadata/`, `config/web/configurers/saml2_metadata_configurer.rs` |
 | saml2 login | `a_response_signed_by_the_asserting_party_logs_the_user_in`, `a_believed_response_authenticates_through_the_chain`, `a_rejected_response_redirects_back_to_the_login_page` | `config/web/configurers/saml2_login_configurer.rs` |
+| saml2 logout | `a_signed_logout_request_ends_the_session_and_is_answered`, `a_logout_request_without_a_signature_is_refused`, `a_signed_logout_response_completes_the_logout`, `the_configuration_installs_the_logout_filters` | `config/web/configurers/saml2_logout_configurer.rs` |
 | saml2 signature | the six tests of `XmlSignatureVerifier` — the signature of a response verifies, a changed assertion is refused, another key is refused, no signature is refused, a registration without a key is refused, SHA-1 is refused | `saml2/login/xml_signature_verifier.rs` |
 | saml2 signature (another implementation) | `the_signature_of_a_response_signed_by_another_implementation_is_verified`, `a_response_of_the_other_implementation_that_changed_is_refused`, `a_response_of_the_other_implementation_is_refused_for_another_key` — the fixture in `tests/fixtures/saml2/` is signed by the `SignedXml` of .NET, so the canonicalization of this crate is held against another XML signature implementation | `tests/saml2_signature_interop.rs` |
 | one-time token submit | `the_token_is_read_from_the_form_body`, `a_form_without_a_token_converts_to_nothing` | `web/authentication/ott/one_time_token_authentication_converter.rs` |
@@ -104,14 +105,14 @@ The SAML 2.0 login is no longer here: it verifies the signature of a response an
 completes, and the tests above hold that from the endpoint to the stored
 authentication.
 
-## Not implemented
+## The half a configuration does not cover
 
-| Configuration | Blocker |
+| Configuration | What is missing |
 |---|---|
-| saml2 logout | The logout profile is not wired: a logout request and its response carry the signature of the asserting party, and the filters that would serve them do not exist yet. The XML signature verifier the login uses is the piece they would be built on. |
+| saml2 logout | A logout started at the application is not redirected to the asserting party: the registration of this port carries no signing key of the service provider, so the `LogoutRequest` that would start it cannot be signed. The half where the asserting party starts the logout, and the answer to it, are served and verified (`Saml2LogoutRequestFilter`, `Saml2LogoutResponseFilter`). |
 
-It is marked `Pending` in the documentation of `HttpSecurity`, and the
-documentation says what is missing rather than only that it is missing.
+It is marked `Ok` in the documentation of `HttpSecurity`, and the documentation
+says which half of the profile is served rather than only that it is served.
 
 ## The one defect class this round found
 

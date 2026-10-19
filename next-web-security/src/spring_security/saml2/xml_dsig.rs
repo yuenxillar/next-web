@@ -449,13 +449,18 @@ fn write_element(
     element: &Element,
     without: Option<&Element>,
     in_scope: &BTreeMap<String, String>,
-    rendered: &mut BTreeMap<String, String>,
+    rendered: &BTreeMap<String, String>,
     output: &mut String,
 ) {
     let mut scope = in_scope.clone();
     for (prefix, uri) in &element.namespaces {
         scope.insert(prefix.clone(), uri.clone());
     }
+    // The declarations an ancestor rendered are in scope for this element, but a
+    // declaration a sibling rendered is not: every element starts from what its
+    // ancestors declared, which is what makes a namespace of a sibling be written
+    // again on the next one.
+    let mut rendered = rendered.clone();
 
     // Exclusive canonicalization writes only the namespaces the element or one of
     // its attributes visibly utilizes, and writes each of them once.
@@ -515,7 +520,7 @@ fn write_element(
                         continue;
                     }
                 }
-                write_element(child, without, &scope, rendered, output);
+                write_element(child, without, &scope, &rendered, output);
             }
         }
     }
