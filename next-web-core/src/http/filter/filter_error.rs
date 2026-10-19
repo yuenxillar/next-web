@@ -69,7 +69,7 @@ pub enum FilterChainError {
     ///
     /// # Examples
     /// ```
-    /// use next_web_core::filter::FilterChainError;
+    /// use next_web_core::http::filter::FilterChainError;
     /// use std::io;
     ///
     /// let err = FilterChainError::Boxed(Box::new(io::Error::new(
@@ -87,7 +87,7 @@ pub enum FilterChainError {
     ///
     /// # Examples
     /// ```
-    /// use next_web_core::filter::FilterChainError;
+    /// use next_web_core::http::filter::FilterChainError;
     ///
     /// #[derive(Debug)]
     /// struct CustomError;
@@ -138,7 +138,7 @@ impl FilterChainError {
     /// # Examples
     /// ```
     /// use std::io;
-    /// use next_web_core::filter::FilterChainError;
+    /// use next_web_core::http::filter::FilterChainError;
     ///
     /// let error = io::Error::new(io::ErrorKind::NotFound, "test");
     /// let err = FilterChainError::AnyError(Box::new(error));
@@ -163,7 +163,7 @@ impl FilterChainError {
     /// # Examples
     /// ```
     /// use std::io;
-    /// use next_web_core::filter::FilterChainError;
+    /// use next_web_core::http::filter::FilterChainError;
     ///
     /// let error = io::Error::new(io::ErrorKind::NotFound, "test");
     /// let err = FilterChainError::AnyError(Box::new(error));

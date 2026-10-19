@@ -1,4 +1,4 @@
-use next_web_core::traits::{filter::http_filter::HttpFilter, named::Named, required::Required};
+use next_web_core::{http::filter::HttpFilter, Named, Required};
 
 use crate::web::filter::{
     advice_filter::AdviceFilterExt,

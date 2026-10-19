@@ -82,7 +82,7 @@ mod tests {
 
     use crate::{
         core::userdetails::{User, UserDetailsService},
-        provisioning::{InMemoryUserDetailsManager, UserDetailsManager},
+        provisioning::InMemoryUserDetailsManager,
     };
 
     #[tokio::test]

@@ -13,9 +13,10 @@ use crate::core::GrantedAuthority;
 ///
 /// # Example
 /// ```
-/// use your_crate::core::authority::mapping::SimpleAttributes2GrantedAuthoritiesMapper;
+/// use next_web_security::core::authority::mapping::SimpleAttributes2GrantedAuthoritiesMapper;
+/// # use next_web_security::core::authority::mapping::Attributes2GrantedAuthoritiesMapper;
 ///
-/// let mut mapper = SimpleAttributes2GrantedAuthoritiesMapper::new();
+/// let mut mapper = SimpleAttributes2GrantedAuthoritiesMapper::default();
 /// mapper.set_attribute_prefix("PERM_");
 /// mapper.set_convert_attribute_to_upper_case(true);
 /// mapper.after_properties_set().unwrap();
@@ -93,9 +94,10 @@ impl SimpleAttributes2GrantedAuthoritiesMapper {
     ///
     /// # Example
     /// ```
-    /// # use your_crate::core::authority::mapping::SimpleAttributes2GrantedAuthoritiesMapper;
+    /// # use next_web_security::core::authority::mapping::SimpleAttributes2GrantedAuthoritiesMapper;
+    /// # use next_web_security::core::authority::mapping::Attributes2GrantedAuthoritiesMapper;
     ///
-    /// let mut mapper = SimpleAttributes2GrantedAuthoritiesMapper::new();
+    /// let mut mapper = SimpleAttributes2GrantedAuthoritiesMapper::default();
     /// mapper.set_add_prefix_if_already_existing(true);
     ///
     /// let authorities = mapper.get_granted_authorities(&[

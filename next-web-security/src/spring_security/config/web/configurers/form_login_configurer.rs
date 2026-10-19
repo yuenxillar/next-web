@@ -34,6 +34,10 @@ pub struct FormLoginConfigurer<H>
 where
     H: HttpSecurityBuilder<H>,
 {
+    /// The login page given through the DSL, installed when the configurer is
+    /// initialized because the entry point needs the builder.
+    custom_login_page: Option<Box<str>>,
+
     base: BaseAuthenticationFilterConfigurer<H, Self, UsernamePasswordAuthenticationFilter>,
 }
 
@@ -42,6 +46,27 @@ where
     H: HttpSecurityBuilder<H>,
     H: 'static,
 {
+    /// Specifies the URL to send users to if login is required.
+    ///
+    /// The page replaces the generated login page, and the entry point of the
+    /// chain redirects to it. It is installed when the configurer is initialized,
+    /// because updating the entry point needs the builder, which a DSL closure
+    /// does not have.
+    pub fn login_page(&mut self, login_page: &str) -> &mut Self {
+        self.custom_login_page = Some(login_page.into());
+        self
+    }
+
+    /// Specifies the URL the login form is submitted to. Default is
+    /// `"/login"`.
+    pub fn login_processing_url(&mut self, login_processing_url: &str) -> &mut Self {
+        <Self as BaseAuthenticationFilterConfigurerExt<H>>::login_processing_url(
+            self,
+            login_processing_url,
+        );
+        self
+    }
+
     /// The HTTP parameter to look for the username when performing authentication. Default
     /// is `"username"`.
     ///
@@ -166,6 +191,16 @@ where
     H: 'static,
 {
     fn init(&mut self, http: &mut H) {
+        // A login page given through the DSL replaces the generated one, so it is
+        // installed before the defaults are updated around it.
+        if let Some(login_page) = self.custom_login_page.clone() {
+            <Self as BaseAuthenticationFilterConfigurerExt<H>>::login_page(
+                self,
+                login_page.as_ref(),
+                http,
+            );
+        }
+
         self.base.init(http);
         self.init_default_login_filter(http);
 
@@ -272,6 +307,7 @@ where
 {
     fn default() -> Self {
         let mut configurer = Self {
+            custom_login_page: None,
             base: BaseAuthenticationFilterConfigurer::new(
                 UsernamePasswordAuthenticationFilter::default(),
                 None,
@@ -302,5 +338,325 @@ where
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+    use crate::config::{
+        authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
+        web::builders::HttpSecurity,
+    };
+
+    /// Returns an HTTP security a configurer can be applied to.
+    fn http_security() -> HttpSecurity {
+        HttpSecurity::new(AuthenticationManagerBuilder::default(), HashMap::new())
+    }
+
+    #[test]
+    fn a_custom_login_page_is_installed_as_the_entry_point() {
+        let mut http = http_security();
+        let mut configurer = FormLoginConfigurer::<HttpSecurity>::default();
+        configurer.login_page("/custom-login");
+
+        configurer.init(&mut http);
+
+        assert!(configurer.is_custom_login_page());
+        assert_eq!(
+            configurer
+                .get_authentication_entry_point()
+                .map(|point| point.get_login_form_url().to_owned()),
+            Some("/custom-login".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_custom_login_processing_url_is_kept() {
+        let mut configurer = FormLoginConfigurer::<HttpSecurity>::default();
+
+        configurer.login_processing_url("/do-login");
+
+        assert_eq!(
+            configurer.get_login_processing_url(),
+            Some("/do-login")
+        );
+    }
+
+    mod flow {
+        use std::sync::Arc;
+
+        use axum::{body::Body, extract::Request, response::Response};
+        use next_web_core::http::{HttpRequest, RequestBody};
+
+        use super::*;
+        use crate::{
+            authentication::dao::DaoAuthenticationProvider,
+            config::security_builder::SecurityBuilder,
+            config::web::http_security_builder::HttpSecurityBuilder,
+            core::userdetails::{User, UserDetailsService},
+            crypto::{bcrypt::BCryptPasswordEncoder, password::PasswordEncoder},
+            provisioning::InMemoryUserDetailsManager,
+            web::security_filter_chain::SecurityFilterChain,
+            web::test_support::Chain,
+        };
+
+        /// Returns a `POST` of the login form.
+        fn login_request(username: &str, password: &str) -> Request {
+            let body = format!("username={username}&password={password}");
+            let mut request = Request::builder()
+                .method("POST")
+                .uri("https://sp.example.org/login")
+                .body(Body::empty())
+                .expect("a valid request");
+            request
+                .extensions_mut()
+                .insert(RequestBody::new(body.into_bytes()));
+
+            request
+        }
+
+        /// Returns a `POST` of the given path, with no body.
+        fn post_request(path: &str) -> Request {
+            Request::builder()
+                .method("POST")
+                .uri(format!("https://sp.example.org{path}"))
+                .body(Body::empty())
+                .expect("a valid request")
+        }
+
+        /// Returns the `Location` header of a response.
+        fn redirect_of(response: &Response) -> Option<String> {
+            response
+                .headers()
+                .get("location")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned)
+        }
+
+        /// Returns the name of the authenticated principal, if one was stored.
+        fn authenticated_username(request: &dyn HttpRequest) -> Option<String> {
+            use next_web_core::any::AnyValue;
+
+            let AnyValue::BoxedValue(value) = request.get_attribute(
+                crate::web::context::RequestAttributeSecurityContextRepository::
+                    DEFAULT_REQUEST_ATTR_NAME,
+            )?
+            else {
+                return None;
+            };
+            let context = (**value)
+                .as_any()
+                .downcast_ref::<Arc<dyn crate::core::context::SecurityContext>>()?;
+
+            context
+                .get_authentication()
+                .and_then(|authentication| authentication.principal().map(|p| p.to_string()))
+        }
+
+        /// Returns an HTTP security whose form login authenticates `user`.
+        fn http_security(password_hash: &str) -> HttpSecurity {
+            // The logout configurer takes its matcher from a shared builder, the
+            // way the configuration of an application provides one.
+            let mut shared_objects: HashMap<
+                std::any::TypeId,
+                Box<dyn next_web_core::any::AnyClone>,
+            > = HashMap::new();
+            shared_objects.insert(
+                std::any::TypeId::of::<crate::web::util::matcher::PathPatternRequestMatcherBuilder>(
+                ),
+                Box::new(crate::web::util::matcher::PathPatternRequestMatcherBuilder::default()),
+            );
+
+            let mut http =
+                HttpSecurity::new(AuthenticationManagerBuilder::default(), shared_objects);
+            http.form_login(|_| {});
+
+            let user_details_service: Arc<dyn UserDetailsService> =
+                Arc::new(InMemoryUserDetailsManager::with_users(vec![Arc::new(
+                    User::with_username("user")
+                        .password(Some(password_hash.to_string()))
+                        .build(),
+                )]));
+            let mut provider = DaoAuthenticationProvider::new(user_details_service);
+            provider.set_password_encoder(Arc::new(BCryptPasswordEncoder::new(4)));
+            http.authentication_provider(Arc::new(provider));
+
+            http
+        }
+
+        #[tokio::test]
+        async fn a_form_login_authenticates_through_the_chain() {
+            let encoder = BCryptPasswordEncoder::new(4);
+            let hash = encoder
+                .encode(Some("password"))
+                .expect("the password is encoded")
+                .expect("the encoder returns a hash");
+            let mut http = http_security(&hash);
+            let chain = http.build();
+            let filters = Arc::new(chain.get_filters().to_vec());
+
+            let mut request = login_request("user", "password");
+            let mut response = Response::default();
+            Chain::new(filters)
+                .run(&mut request, &mut response)
+                .await
+                .expect("the chain runs");
+
+            assert!(
+                response.status().is_redirection(),
+                "the login redirects, status was {}",
+                response.status()
+            );
+            assert_eq!(redirect_of(&response), Some("/".to_owned()));
+            assert_eq!(authenticated_username(&request).as_deref(), Some("user"));
+        }
+
+        #[tokio::test]
+        async fn a_wrong_password_does_not_authenticate() {
+            let encoder = BCryptPasswordEncoder::new(4);
+            let hash = encoder
+                .encode(Some("password"))
+                .expect("the password is encoded")
+                .expect("the encoder returns a hash");
+            let mut http = http_security(&hash);
+            let chain = http.build();
+            let filters = Arc::new(chain.get_filters().to_vec());
+
+            let mut request = login_request("user", "wrong");
+            let mut response = Response::default();
+            Chain::new(filters)
+                .run(&mut request, &mut response)
+                .await
+                .expect("the chain runs");
+
+            assert_eq!(
+                redirect_of(&response),
+                Some("/login?error".to_owned()),
+                "a failed login sends the user back to the login page"
+            );
+            assert_eq!(authenticated_username(&request), None);
+        }
+
+        /// Returns an HTTP security whose form login authenticates `user` and
+        /// whose chain can log the user out again.
+        fn http_security_with_logout(password_hash: &str) -> HttpSecurity {
+            let mut http = http_security(password_hash);
+            http.logout(|_| {});
+
+            http
+        }
+
+        /// Returns a request with an HTTP Basic authorization header.
+        fn basic_request(username: &str, password: &str) -> Request {
+            use base64::Engine;
+
+            let credentials = base64::engine::general_purpose::STANDARD
+                .encode(format!("{username}:{password}"));
+
+            Request::builder()
+                .method("GET")
+                .uri("https://sp.example.org/api/users")
+                .header("authorization", format!("Basic {credentials}"))
+                .body(Body::empty())
+                .expect("a valid request")
+        }
+
+        #[tokio::test]
+        async fn http_basic_authenticates_through_the_chain() {
+            let encoder = BCryptPasswordEncoder::new(4);
+            let hash = encoder
+                .encode(Some("password"))
+                .expect("the password is encoded")
+                .expect("the encoder returns a hash");
+            let mut http = http_security(&hash);
+            http.http_basic(|_| {});
+            let chain = http.build();
+            let filters = Arc::new(chain.get_filters().to_vec());
+
+            let mut request = basic_request("user", "password");
+            let mut response = Response::default();
+            Chain::new(filters)
+                .run(&mut request, &mut response)
+                .await
+                .expect("the chain runs");
+
+            assert_eq!(
+                authenticated_username(&request).as_deref(),
+                Some("user"),
+                "the credentials of the header authenticate the user"
+            );
+        }
+
+        #[tokio::test]
+        async fn http_basic_without_credentials_does_not_authenticate() {
+            let encoder = BCryptPasswordEncoder::new(4);
+            let hash = encoder
+                .encode(Some("password"))
+                .expect("the password is encoded")
+                .expect("the encoder returns a hash");
+            let mut http = http_security(&hash);
+            http.http_basic(|_| {});
+            let chain = http.build();
+            let filters = Arc::new(chain.get_filters().to_vec());
+
+            let mut request = post_request("/api/users");
+            let mut response = Response::default();
+            Chain::new(filters)
+                .run(&mut request, &mut response)
+                .await
+                .expect("the chain runs");
+
+            assert_eq!(
+                authenticated_username(&request),
+                None,
+                "without a header nothing is authenticated"
+            );
+        }
+
+        #[tokio::test]
+        async fn a_logged_in_user_can_be_logged_out() {
+            let encoder = BCryptPasswordEncoder::new(4);
+            let hash = encoder
+                .encode(Some("password"))
+                .expect("the password is encoded")
+                .expect("the encoder returns a hash");
+            let mut http = http_security_with_logout(&hash);
+            let chain = http.build();
+            let filters = Arc::new(chain.get_filters().to_vec());
+
+            let mut login = login_request("user", "password");
+            let mut login_response = Response::default();
+            Chain::new(filters.clone())
+                .run(&mut login, &mut login_response)
+                .await
+                .expect("the chain runs");
+            assert_eq!(authenticated_username(&login).as_deref(), Some("user"));
+
+            let mut logout = post_request("/logout");
+            let mut logout_response = Response::default();
+            Chain::new(filters)
+                .run(&mut logout, &mut logout_response)
+                .await
+                .expect("the chain runs");
+
+            assert!(
+                logout_response.status().is_redirection(),
+                "the logout redirects, status was {}",
+                logout_response.status()
+            );
+            assert_eq!(
+                redirect_of(&logout_response),
+                Some("/login?logout".to_owned()),
+                "the user is sent back to the login page"
+            );
+            assert_eq!(
+                authenticated_username(&logout),
+                None,
+                "the logout leaves no authentication behind"
+            );
+        }
     }
 }

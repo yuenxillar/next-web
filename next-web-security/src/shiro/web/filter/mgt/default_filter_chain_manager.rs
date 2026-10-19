@@ -1,7 +1,7 @@
 use std::vec;
 
 use indexmap::{map::Entry, IndexMap};
-use next_web_core::traits::filter::{http_filter::HttpFilter, http_filter_chain::HttpFilterChain};
+use next_web_core::http::filter::{HttpFilter, HttpFilterChain};
 use tracing::debug;
 
 use crate::web::filter::mgt::{

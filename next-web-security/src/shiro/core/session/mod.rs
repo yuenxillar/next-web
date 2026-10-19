@@ -3,7 +3,7 @@ pub mod proxied_session;
 pub mod session_listener;
 
 use next_web_core::async_trait;
-use next_web_core::traits::any_clone::AnyClone;
+use next_web_core::any::AnyClone;
 use std::any::Any;
 use std::error::Error;
 use std::fmt::Display;

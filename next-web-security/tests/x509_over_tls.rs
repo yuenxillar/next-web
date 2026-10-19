@@ -232,9 +232,9 @@ async fn serve_one(
         .extensions_mut()
         .insert(RequestBody::new(Vec::new()));
     // The container's part: it validated the certificate and hands it on, and the
-    // filter that reads the attribute of a servlet-style request is what turns it
-    // into the principal. The test inserts what the transport of an application
-    // inserts — the certificate itself, not a subject it would have to trust.
+    // filter that reads the attribute of a request is what turns it into the
+    // principal. The test inserts what the transport of an application inserts —
+    // the certificate itself, not a subject it would have to trust.
     if with_certificate {
         if let Some(certificate) = peer_certificate.clone() {
             request

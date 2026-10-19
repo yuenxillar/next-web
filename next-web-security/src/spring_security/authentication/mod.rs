@@ -8,9 +8,6 @@ pub mod event;
 pub mod ott;
 pub mod password;
 pub mod provider_manager;
-// pub mod reactive_authentication_manager;
-// pub mod reactive_authentication_manager_adapter;
-// pub mod reactive_authentication_manager_resolver;
 pub mod remember_me_authentication_provider;
 pub mod testing_authentication_provider;
 pub mod testing_authentication_token;
@@ -19,7 +16,6 @@ mod account_status_user_details_checker;
 mod anonymous_authentication_token;
 mod authentication_event_publisher;
 mod authentication_events;
-mod authentication_manager_resolver;
 mod authentication_provider;
 mod authentication_trust_resolver_impl;
 mod base_authentication_token;
@@ -33,7 +29,6 @@ pub use authentication_event_publisher::{
     AuthenticationEventPublisher, NullAuthenticationEventPublisher,
 };
 pub use authentication_events::*;
-pub use authentication_manager_resolver::AuthenticationManagerResolver;
 pub use authentication_provider::AuthenticationProvider;
 pub use authentication_trust_resolver_impl::AuthenticationTrustResolverImpl;
 pub use base_authentication_token::{BaseAuthenticationBuilder, BaseAuthenticationToken};

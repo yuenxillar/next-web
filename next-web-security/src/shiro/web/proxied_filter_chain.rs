@@ -6,8 +6,7 @@ use std::sync::{
 use next_web_core::{
     async_trait,
     error::BoxError,
-    traits::{
-        filter::{http_filter::HttpFilter, http_filter_chain::HttpFilterChain},
+    http::filter::{http_http::filter::HttpFilter, http_filter_chain::HttpFilterChain
         http::{HttpRequest, HttpResponse},
     },
 };

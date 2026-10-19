@@ -81,8 +81,19 @@ impl DefaultOneTimeTokenSubmitPageGeneratingFilter {
 
     /// Specifies the URL that the submit form should POST to. Defaults to
     /// `/login/ott`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the URL is empty or whitespace, because a form that posts
+    /// nowhere cannot authenticate anything.
     pub fn set_login_processing_url(&mut self, login_processing_url: impl Into<Box<str>>) {
-        self.login_processing_url = login_processing_url.into();
+        let login_processing_url = login_processing_url.into();
+        assert!(
+            !login_processing_url.trim().is_empty(),
+            "loginProcessingUrl cannot be null or empty"
+        );
+
+        self.login_processing_url = login_processing_url;
     }
 
     /// Sets the function used to resolve a Map of the hidden inputs where the
@@ -103,7 +114,7 @@ impl DefaultOneTimeTokenSubmitPageGeneratingFilter {
 
         ONE_TIME_TOKEN_SUBMIT_PAGE_TEMPLATE
             .replace("{{contextPath}}", context_path)
-            .replace("{{tokenValue}}", token_value)
+            .replace("{{tokenValue}}", &escape_html(token_value))
             .replace(
                 "{{loginProcessingUrl}}",
                 &format!("{}{}", context_path, self.login_processing_url.as_ref()),
@@ -117,12 +128,33 @@ impl DefaultOneTimeTokenSubmitPageGeneratingFilter {
         let mut sb = String::new();
         for (name, value) in &inputs {
             let input_element = HIDDEN_HTML_INPUT_TEMPLATE
-                .replace("{{name}}", name)
-                .replace("{{value}}", value);
+                .replace("{{name}}", &escape_html(name))
+                .replace("{{value}}", &escape_html(value));
             sb.push_str(&input_element);
         }
         sb
     }
+}
+
+/// Escapes the characters that would otherwise be read as HTML markup.
+///
+/// The page echoes a token and the hidden inputs of the form back into the
+/// document, so a value that carries markup must not be able to change the page.
+fn escape_html(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+
+    for character in value.chars() {
+        match character {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#39;"),
+            other => escaped.push(other),
+        }
+    }
+
+    escaped
 }
 
 impl Default for DefaultOneTimeTokenSubmitPageGeneratingFilter {
@@ -154,5 +186,75 @@ impl HttpFilter for DefaultOneTimeTokenSubmitPageGeneratingFilter {
 impl Named for DefaultOneTimeTokenSubmitPageGeneratingFilter {
     fn name(&self) -> &str {
         "DefaultOneTimeTokenSubmitPageGeneratingFilter"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{body::Body, extract::Request};
+
+    use super::*;
+
+    /// Returns a submit page filter with the default settings.
+    fn filter() -> DefaultOneTimeTokenSubmitPageGeneratingFilter {
+        DefaultOneTimeTokenSubmitPageGeneratingFilter::new()
+    }
+
+    /// Returns a `GET` request for the given path.
+    fn request(path: &str) -> Request {
+        Request::builder()
+            .method(HttpMethod::GET)
+            .uri(path)
+            .body(Body::empty())
+            .expect("a valid request")
+    }
+
+    #[test]
+    fn html_special_characters_are_escaped() {
+        assert_eq!(escape_html(r#"this<>!@#""#), "this&lt;&gt;!@#&quot;");
+    }
+
+    #[test]
+    fn the_hidden_input_value_is_html_escaped() {
+        let mut filter = filter();
+        filter.set_resolve_hidden_inputs(Arc::new(|_| {
+            HashMap::from([("_csrf".to_owned(), "<b>".to_owned())])
+        }));
+
+        let html = filter.generate_html(&request("/login/ott"));
+
+        assert!(
+            html.contains(r#"<input name="_csrf" type="hidden" value="&lt;b&gt;" />"#),
+            "the hidden input is escaped, page was: {html}"
+        );
+    }
+
+    #[test]
+    fn the_form_posts_to_the_login_processing_url() {
+        let mut filter = filter();
+        filter.set_login_processing_url("/login/another");
+
+        let html = filter.generate_html(&request("/login/ott"));
+
+        assert!(
+            html.contains(r#"action="/login/another""#),
+            "the form action is the processing url, page was: {html}"
+        );
+    }
+
+    #[test]
+    fn the_token_from_the_query_is_prefilled() {
+        let html = filter().generate_html(&request("/login/ott?token=1234"));
+
+        assert!(
+            html.contains(r#"value="1234""#),
+            "the token is prefilled, page was: {html}"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "loginProcessingUrl cannot be null or empty")]
+    fn an_empty_login_processing_url_is_rejected() {
+        filter().set_login_processing_url("");
     }
 }

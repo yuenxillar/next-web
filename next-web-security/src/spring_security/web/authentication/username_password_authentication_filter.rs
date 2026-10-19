@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -51,13 +52,13 @@ impl UsernamePasswordAuthenticationFilter {
     /// This might be used for example if a postcode/zipcode was required in addition to the password. A delimiter such as a pipe (|)
     /// should be used to separate the password and extended value(s). The AuthenticationDao will
     /// need to generate the expected password in a corresponding manner.
-    pub fn obtain_password<'a>(&self, request: &'a dyn HttpRequest) -> Option<&'a str> {
-        request.parameter(self.password_parameter.as_ref())
+    pub fn obtain_password<'a>(&self, request: &'a dyn HttpRequest) -> Option<Cow<'a, str>> {
+        request.form_parameter(self.password_parameter.as_ref())
     }
 
     /// Enables subclasses to override the composition of the username, such as by including additional values and a separator.
-    pub fn obtain_username<'a>(&self, request: &'a dyn HttpRequest) -> Option<&'a str> {
-        request.parameter(self.username_parameter.as_ref())
+    pub fn obtain_username<'a>(&self, request: &'a dyn HttpRequest) -> Option<Cow<'a, str>> {
+        request.form_parameter(self.username_parameter.as_ref())
     }
 
     /// Provided so that subclasses may configure what is put into the authentication request's details property.
@@ -147,13 +148,12 @@ impl BaseAuthenticationProcessingFilterExt for UsernamePasswordAuthenticationFil
 
         let username = self
             .obtain_username(request)
-            .map(str::trim)
-            .map(ToString::to_string)
+            .map(|value| value.trim().to_string())
             .map(|s| Arc::new(s) as AuthPrincipal)
             .unwrap_or_else(|| EMPTY_STRING.to_owned());
         let password = self
             .obtain_password(request)
-            .map(ToString::to_string)
+            .map(|value| value.to_string())
             .map(|s| Arc::new(s) as AuthPrincipal)
             .unwrap_or_else(|| EMPTY_STRING.to_owned());
 
@@ -202,5 +202,52 @@ impl Default for UsernamePasswordAuthenticationFilter {
                 Self::default_path_request_matcher(),
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{body::Body, extract::Request};
+    use next_web_core::http::RequestBody;
+
+    use super::*;
+
+    /// Returns a `POST` of a url-encoded login form.
+    fn login_form(body: &str) -> Request {
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/login")
+            .body(Body::empty())
+            .expect("a valid request");
+        request
+            .extensions_mut()
+            .insert(RequestBody::new(body.as_bytes().to_vec()));
+
+        request
+    }
+
+    #[test]
+    fn the_credentials_are_read_from_a_form_body() {
+        let filter = UsernamePasswordAuthenticationFilter::default();
+        let request = login_form("username=user&password=p%40ss%2Bword");
+
+        assert_eq!(filter.obtain_username(&request).as_deref(), Some("user"));
+        assert_eq!(
+            filter.obtain_password(&request).as_deref(),
+            Some("p@ss+word"),
+            "the form body is percent-decoded"
+        );
+    }
+
+    #[test]
+    fn a_parameter_of_the_query_string_is_still_found() {
+        let filter = UsernamePasswordAuthenticationFilter::default();
+        let request = Request::builder()
+            .method("POST")
+            .uri("/login?username=user")
+            .body(Body::empty())
+            .expect("a valid request");
+
+        assert_eq!(filter.obtain_username(&request).as_deref(), Some("user"));
     }
 }

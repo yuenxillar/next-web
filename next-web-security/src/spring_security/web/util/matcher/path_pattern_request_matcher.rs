@@ -25,7 +25,7 @@ use next_web_core::{http::HttpRequest, util::pattern::PathPatternParser};
 /// # Examples
 ///
 /// ```
-/// use PathPatternRequestMatcher;
+/// use next_web_security::web::util::matcher::PathPatternRequestMatcher;
 ///
 /// let matcher = PathPatternRequestMatcher::path_pattern(None, "/api/users/**");
 /// ```
@@ -66,6 +66,8 @@ impl PathPatternRequestMatcher {
     /// # Examples
     ///
     /// ```
+    /// # use next_web_security::web::util::matcher::PathPatternRequestMatcher;
+    /// # use axum::http::Method as HttpMethod;
     /// let matcher = PathPatternRequestMatcher::path_pattern(None, "/api/**");
     /// let matcher = PathPatternRequestMatcher::path_pattern(
     ///     Some(HttpMethod::GET),
@@ -286,6 +288,7 @@ pub static DEFAULT_BUILDER: OnceLock<PathPatternRequestMatcherBuilder> = OnceLoc
 /// is the context path, you can do:
 ///
 /// ```
+/// # use next_web_security::web::util::matcher::PathPatternRequestMatcher;
 /// let matcher = PathPatternRequestMatcher::path_pattern(
 ///     None,
 ///     "/servlet/my/resource/**"
@@ -296,6 +299,7 @@ pub static DEFAULT_BUILDER: OnceLock<PathPatternRequestMatcherBuilder> = OnceLoc
 /// `base_path` to reduce repetition like so:
 ///
 /// ```
+/// # use next_web_security::web::util::matcher::PathPatternRequestMatcher;
 /// let mvc = PathPatternRequestMatcher::with_defaults()
 ///     .base_path("/mvc");
 ///

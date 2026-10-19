@@ -1,6 +1,5 @@
-use next_web_core::traits::{
-    filter::http_filter_chain::HttpFilterChain,
-    http::{HttpRequest, HttpResponse},
+use next_web_core::http::{
+    filter::HttpFilterChain, HttpRequest, HttpResponse,
 };
 use tracing::debug;
 

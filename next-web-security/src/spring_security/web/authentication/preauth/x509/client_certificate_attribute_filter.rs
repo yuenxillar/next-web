@@ -2,10 +2,10 @@
 //!
 //! A certificate is not part of an HTTP request: the transport that made the
 //! connection validated it and inserted it, and it is the X.509 filter that
-//! reads the *attribute* a servlet-style container would have written. This
-//! filter is the step in between, on every request: when the connection carries
-//! a certificate, its subject is written into the attribute the filter reads, so
-//! that a login over TLS works without the application wiring anything.
+//! reads the *attribute* the container writes. This filter is the step in
+//! between, on every request: when the connection carries a certificate, its
+//! subject is written into the attribute the filter reads, so that a login over
+//! TLS works without the application wiring anything.
 
 use std::sync::Arc;
 

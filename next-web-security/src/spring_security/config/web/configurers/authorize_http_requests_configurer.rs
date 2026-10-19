@@ -591,8 +591,11 @@ impl AuthorizedUrlVariable {
     /// for further customization.
     ///
     /// # Example
-    /// ```rust
-    /// # use authorize_http_requests_configurer::*;
+    ///
+    /// The registry is created by `HttpSecurity::authorize_http_requests`; a
+    /// registry is configured like this:
+    ///
+    /// ```ignore
     /// registry
     ///     .request_matchers(&["/user/{username}"])
     ///     .has_variable("username")

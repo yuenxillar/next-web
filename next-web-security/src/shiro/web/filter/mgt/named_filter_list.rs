@@ -1,6 +1,6 @@
-use next_web_core::traits::{
-    filter::{http_filter::HttpFilter, http_filter_chain::HttpFilterChain},
-    required::Required,
+use next_web_core::{
+    http::filter::{HttpFilter, HttpFilterChain},
+    Required,
 };
 
 pub trait NamedFilterList

@@ -264,7 +264,11 @@ where
                     .collect::<Vec<_>>();
                 Arc::new(OrRequestMatcher::new(matchers))
             })
-            .expect("Builder not found in shared objects")
+            .expect(
+                "the logout endpoint builds its matcher from the shared \
+                 PathPatternRequestMatcherBuilder, which the HTTP security configuration of an \
+                 application provides; a chain assembled by hand has to share one",
+            )
     }
 }
 

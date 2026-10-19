@@ -1,7 +1,7 @@
 use std::{any::Any, collections::HashMap};
 
 use indexmap::IndexMap;
-use next_web_core::traits::filter::http_filter::HttpFilter;
+use next_web_core::http::filter::HttpFilter;
 
 use crate::web::filter::{
     access_control_filter::AccessControlFilter,

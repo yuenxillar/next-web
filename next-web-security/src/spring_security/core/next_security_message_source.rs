@@ -5,10 +5,10 @@ use std::{
 };
 
 use next_web_context::{
-    Locale, MessageSource, MessageSourceResolvable, NoSuchMessageError,
     support::{BundleLoader, MessageSourceAccessor, ResourceBundleMessageSource},
+    Locale, MessageSource, MessageSourceResolvable, NoSuchMessageError,
 };
-use next_web_core::io::{Resource, web_resource_loader};
+use next_web_core::io::web_resource_loader;
 
 /// The default MessageSource used by Next Security.
 /// All Next Security classes requiring message localization will by default use this class. However, all such

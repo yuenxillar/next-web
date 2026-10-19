@@ -14,7 +14,7 @@ use next_web_core::{
 };
 
 use crate::{
-    core::{context::SecurityContextHolder, GrantedAuthority},
+    core::context::SecurityContextHolder,
     web::access::{prepost::chain_denial_handler::ChainDenialHandler, AccessDeniedHandler},
 };
 

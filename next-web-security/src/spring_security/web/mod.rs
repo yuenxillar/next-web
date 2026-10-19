@@ -6,10 +6,15 @@ pub mod default_security_filter_chain;
 pub mod firewall;
 pub mod header;
 pub mod savedrequest;
+pub mod saml2;
 pub mod security_filter_chain;
 pub mod session;
 pub mod transport;
 pub mod util;
+pub mod webauthn;
+
+#[cfg(test)]
+pub(crate) mod test_support;
 
 mod authentication_entry_point;
 mod default_redirect_strategy;

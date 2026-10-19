@@ -23,7 +23,7 @@ use next_web_core::http::headers::{Header, HeaderMapExt};
 ///     Router,
 /// };
 /// use next_web::extract::typed_header::TypedHeader;
-/// use next_web_core::headers::UserAgent;
+/// use next_web_core::http::headers::UserAgent;
 ///
 /// async fn users_teams_show(
 ///     TypedHeader(user_agent): TypedHeader<UserAgent>,
@@ -42,7 +42,7 @@ use next_web_core::http::headers::{Header, HeaderMapExt};
 ///     response::IntoResponse,
 /// };
 /// use next_web::extract::typed_header::TypedHeader;
-/// use next_web_core::headers::ContentType;
+/// use next_web_core::http::headers::ContentType;
 ///
 /// async fn handler() -> (TypedHeader<ContentType>, &'static str) {
 ///     (

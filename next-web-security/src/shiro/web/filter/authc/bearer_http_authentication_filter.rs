@@ -5,8 +5,7 @@ use std::{
 
 use next_web_core::{
     async_trait,
-    traits::{
-        http::{HttpRequest, HttpResponse},
+    http::{HttpRequest, HttpResponse
         named::Named,
         required::Required,
     },

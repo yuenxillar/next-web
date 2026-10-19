@@ -40,7 +40,7 @@ use crate::{
 /// A configuration of the application creates an instance of this type, adds
 /// the builders of the security filter chains, optionally ignores a few static
 /// requests, and builds the [`FilterChainProxy`] from it. The proxy is then
-/// registered as an [`HttpFilter`](next_web_core::traits::filter::HttpFilter),
+/// registered as an [`HttpFilter`](next_web_core::http::filter::HttpFilter),
 /// so that the filter layer of the application runs it in front of the routes.
 ///
 /// # Examples

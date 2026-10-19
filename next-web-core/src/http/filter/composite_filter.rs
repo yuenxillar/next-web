@@ -29,7 +29,7 @@ use crate::{
 /// ```
 /// use std::sync::Arc;
 ///
-/// use next_web_core::filter::CompositeFilter;
+/// use next_web_core::http::filter::CompositeFilter;
 /// use next_web_core::http::filter::HttpFilter;
 ///
 /// let mut composite = CompositeFilter::default();

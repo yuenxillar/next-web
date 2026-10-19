@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use next_web_core::security::{install_current_authorities, CurrentAuthorities};
 
-use crate::core::{context::SecurityContextHolder, GrantedAuthority};
+use crate::core::context::SecurityContextHolder;
 
 /// The authorities of the authentication the security context holds.
 ///
