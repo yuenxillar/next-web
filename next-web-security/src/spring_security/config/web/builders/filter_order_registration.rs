@@ -21,7 +21,7 @@ use crate::web::{
     csrf::CsrfFilter,
     header::HeaderWriterFilter,
     savedrequest::RequestCacheAwareFilter,
-    session::{ConcurrentSessionFilter, SessionManagementFilter},
+    session::{ConcurrentSessionFilter, ForceEagerSessionCreationFilter, SessionManagementFilter},
     transport::HttpsRedirectFilter,
 };
 
@@ -61,6 +61,10 @@ impl Default for FilterOrderRegistration {
             filter_to_order: HashMap::with_capacity(30),
         };
 
+        // A session that is created before anything else runs is created before
+        // the transport of the request is decided, so the filter that does it is
+        // the first one of the chain.
+        filter_order.put::<ForceEagerSessionCreationFilter>(order.next());
         filter_order.put::<HttpsRedirectFilter>(order.next());
         order.next(); // gh-8105
         filter_order.put::<SecurityContextHolderFilter>(order.next());
@@ -98,36 +102,34 @@ impl Default for FilterOrderRegistration {
             order.next(),
         );
 
-        // The endpoints that are used by a client run before the filters that
-        // authenticate a resource owner, so that the credentials a client
-        // presents are not read as the credentials of a resource owner. The
-        // authorization endpoint runs after the error translation filter, so
-        // that a resource owner that is not logged in is sent to the login
-        // page, and before the authorization filter, so that the endpoint
-        // handles its own request.
+        // The endpoints that are used by a client run after the logout endpoint and
+        // before the filters that authenticate a resource owner, so that the
+        // credentials a client presents are not read as the credentials of a
+        // resource owner. Their positions are relative to the filters above, so
+        // that a filter added to the registry later cannot move them past each
+        // other.
         #[cfg(feature = "oauth2-authorization-server")]
         {
             use crate::oauth2::server::authorization::{
-                AuthorizationEndpointFilter, AuthorizationServerMetadataEndpointFilter,
-                JwkSetEndpointFilter, LogoutEndpointFilter, OAuth2ClientRegistrationEndpointFilter,
-                OAuth2DeviceAuthorizationEndpointFilter, OAuth2DeviceVerificationEndpointFilter,
+                AuthorizationServerMetadataEndpointFilter, JwkSetEndpointFilter,
+                OAuth2ClientRegistrationEndpointFilter, OAuth2DeviceAuthorizationEndpointFilter,
                 OAuth2PushedAuthorizationRequestEndpointFilter, TokenEndpointFilter,
                 TokenIntrospectionEndpointFilter, TokenRevocationEndpointFilter,
                 UserInfoEndpointFilter,
             };
 
-            filter_order.put::<OAuth2ClientRegistrationEndpointFilter>(705);
-            filter_order.put::<AuthorizationServerMetadataEndpointFilter>(710);
-            filter_order.put::<JwkSetEndpointFilter>(720);
-            filter_order.put::<TokenIntrospectionEndpointFilter>(730);
-            filter_order.put::<TokenRevocationEndpointFilter>(740);
-            filter_order.put::<OAuth2PushedAuthorizationRequestEndpointFilter>(745);
-            filter_order.put::<OAuth2DeviceAuthorizationEndpointFilter>(746);
-            filter_order.put::<TokenEndpointFilter>(750);
-            filter_order.put::<UserInfoEndpointFilter>(760);
-            filter_order.put::<OAuth2DeviceVerificationEndpointFilter>(2805);
-            filter_order.put::<AuthorizationEndpointFilter>(2810);
-            filter_order.put::<LogoutEndpointFilter>(2820);
+            let logout_order = filter_order
+                .get_order::<LogoutFilter>()
+                .expect("the logout filter is registered above");
+            filter_order.put::<OAuth2ClientRegistrationEndpointFilter>(logout_order + 10);
+            filter_order.put::<AuthorizationServerMetadataEndpointFilter>(logout_order + 20);
+            filter_order.put::<JwkSetEndpointFilter>(logout_order + 30);
+            filter_order.put::<TokenIntrospectionEndpointFilter>(logout_order + 40);
+            filter_order.put::<TokenRevocationEndpointFilter>(logout_order + 50);
+            filter_order.put::<OAuth2PushedAuthorizationRequestEndpointFilter>(logout_order + 55);
+            filter_order.put::<OAuth2DeviceAuthorizationEndpointFilter>(logout_order + 56);
+            filter_order.put::<TokenEndpointFilter>(logout_order + 60);
+            filter_order.put::<UserInfoEndpointFilter>(logout_order + 70);
         }
 
         filter_order.put::<BasicAuthenticationFilter>(order.next());
@@ -141,6 +143,26 @@ impl Default for FilterOrderRegistration {
         // authorizes it.
         filter_order.put::<crate::web::access::prepost::PreAuthorizeAuthoritiesFilter>(2750);
         filter_order.put::<ErrorTranslationFilter>(order.next());
+
+        // The endpoints a resource owner is sent to run after the error translation
+        // filter, so that a resource owner who is not logged in is sent to the login
+        // page, and before the filter that authorizes the request, so that the
+        // endpoint answers its own request.
+        #[cfg(feature = "oauth2-authorization-server")]
+        {
+            use crate::oauth2::server::authorization::{
+                AuthorizationEndpointFilter, LogoutEndpointFilter,
+                OAuth2DeviceVerificationEndpointFilter,
+            };
+
+            let error_order = filter_order
+                .get_order::<ErrorTranslationFilter>()
+                .expect("the error translation filter is registered above");
+            filter_order.put::<OAuth2DeviceVerificationEndpointFilter>(error_order + 10);
+            filter_order.put::<AuthorizationEndpointFilter>(error_order + 20);
+            filter_order.put::<LogoutEndpointFilter>(error_order + 30);
+        }
+
         filter_order.put::<AuthorizationFilter>(order.next());
         filter_order.put::<SwitchUserFilter>(order.next());
 

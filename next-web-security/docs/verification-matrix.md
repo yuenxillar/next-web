@@ -8,7 +8,8 @@ Last verified with:
 
 ```
 cargo test -p next-web-security
-    420 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
+    420 passed, 0 failed, 3 over HTTP, 4 over the chain, 2 over TLS
+    8 doctests passed, 9 ignored
 
 cargo test -p next-web-security --features oauth2-client
     474 passed, 0 failed
@@ -21,7 +22,8 @@ cargo test -p next-web-security --features oauth2-authorization-server
 
 cargo test -p next-web-security \
   --features oauth2-client,oauth2-resource-server,oauth2-authorization-server
-    563 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored
+    563 passed, 0 failed, 3 over HTTP, 4 over the chain, 2 over TLS
+    8 doctests passed, 10 ignored
 ```
 
 The eight end-to-end tests are `tests/end_to_end_flow.rs` (a real socket, HTTP),
@@ -146,6 +148,38 @@ authentication.
 
 It is marked `Ok` in the documentation of `HttpSecurity`, and the documentation
 says which half of the profile is served rather than only that it is served.
+
+## The order of the chain
+
+A filter is only reached when the chain holds it in the right place, so one test
+builds a chain with the filters of **every** configuration the builder has — the
+login methods, the session and the context, the two logouts of an asserting party,
+the X.509 certificate attribute, the Web Authentication ceremonies, the one-time
+token, the remember-me, the CORS and the CSRF, the OAuth 2.0 client, login,
+resource server and authorization server — and holds the order of the whole chain
+against the order of the reference implementation.
+
+| Test | What it proves |
+|---|---|
+| `every_configuration_composes_into_one_ordered_chain` | the chain builds without a filter that has no position, every expected filter is in it, and the filters that have to run before another do: the eager session creation, the context, the header writer, the CORS, the CSRF, the logout, the two SAML 2.0 logouts before the CSRF token is demanded, the certificate attribute before the X.509 filter, the resources before the Web Authentication filters, the Web Authentication filters and the SAML 2.0 assertion consumer before basic authentication, the anonymous authentication before the session management, the session management before the error translation, and the error translation before the authorization |
+| `the_session_creation_policy_of_always_has_a_filter_of_its_own` | `SessionCreationPolicy::Always` puts the eager session creation first, which is the position the reference implementation gives it |
+| `a_request_the_application_permits_reaches_it` | a permitted request runs through every filter of the chain and reaches the application |
+| `a_request_the_application_does_not_permit_is_stopped` | a request that is not permitted is stopped by the filter that authorizes it, and never reaches the application |
+
+The test runs in the default build and in the build with all three OAuth 2.0
+features, so the endpoints of the authorization server are held in their place in
+both.
+
+## The defects verifying the chain found
+
+| Defect | What it was | Fix |
+|---|---|---|
+| the eager session creation had no position | `sessionManagement().sessionCreationPolicy(Always)` panicked while the chain was built, with `ForceEagerSessionCreationFilter has no registered order` — the configuration could not be used at all | the filter is registered first, which is where the reference implementation puts it |
+| the OAuth 2.0 authorization server endpoints had absolute positions | the endpoints were registered at fixed numbers (`705`–`760`, `2805`–`2820`) while every other filter was registered by steps from `100`; the authorization endpoint therefore ran **before** the error translation filter although the comment above it says it runs after, so a resource owner who is not logged in was not sent to the login page by the filter the design relies on | the positions are anchored to the filters they have to follow: the client endpoints after the logout filter, and the device verification, authorization and logout endpoints after the error translation filter and before the authorization filter |
+
+Both are held by the tests above, and both were found by building the chain rather
+than by reading it: the panic is the first one, and the second one is the ordering
+assertion that failed against the numbers.
 
 ## The one defect class this round found
 
