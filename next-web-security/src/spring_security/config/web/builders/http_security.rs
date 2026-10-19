@@ -900,7 +900,7 @@ impl HttpSecurity {
         self
     }
 
-    /// Unverified
+    /// Ok
     ///
     /// Adds matchers for the requests this builder applies to.
     ///
@@ -908,6 +908,12 @@ impl HttpSecurity {
     /// and the builder applies to a request that matches any of them. A closure
     /// that declares several matchers therefore widens the set, whereas
     /// [`Self::security_matcher`] replaces it.
+    ///
+    /// The matcher the calls leave behind is the one the chain matches requests
+    /// with, so a chain built this way serves the requests its matchers declare
+    /// and lets the chains after it serve the rest. A closure that declares no
+    /// matcher leaves the matcher of the builder as it was, neither widening nor
+    /// narrowing it.
     pub fn security_matchers<F>(&mut self, mut security_matchers: F) -> &mut Self
     where
         F: FnMut(&mut RequestMatcherConfigurer),
@@ -1336,6 +1342,97 @@ mod tests {
         assert!(
             !http.request_matcher.matches(&request("/admin/users")),
             "the unprefixed path is not the one the chain applies to"
+        );
+    }
+
+    #[test]
+    fn the_matchers_of_several_calls_are_added() {
+        let builder = PathPatternRequestMatcherBuilder::default();
+        let mut http = http_with_matcher_builder(builder);
+
+        http.security_matchers(|configurer| {
+            configurer.request_matchers(vec!["/admin/**"]);
+        });
+        http.security_matchers(|configurer| {
+            configurer.request_matchers(vec!["/api/**"]);
+        });
+
+        assert!(
+            http.request_matcher.matches(&request("/admin/users")),
+            "the matcher of the first call still applies"
+        );
+        assert!(
+            http.request_matcher.matches(&request("/api/users")),
+            "the matcher of the second call applies as well"
+        );
+        assert!(
+            !http.request_matcher.matches(&request("/login")),
+            "a request that matches neither matcher is out of scope"
+        );
+    }
+
+    #[test]
+    fn an_empty_closure_keeps_the_matcher_of_the_builder() {
+        let builder = PathPatternRequestMatcherBuilder::default();
+        let mut http = http_with_matcher_builder(builder);
+        http.security_matchers(|configurer| {
+            configurer.request_matchers(vec!["/admin/**"]);
+        });
+
+        http.security_matchers(|_configurer| {});
+
+        assert!(
+            http.request_matcher.matches(&request("/admin/users")),
+            "a closure that declares no matcher does not widen the scope of the chain"
+        );
+        assert!(
+            !http.request_matcher.matches(&request("/login")),
+            "a closure that declares no matcher does not narrow the scope either"
+        );
+    }
+
+    #[test]
+    fn the_built_chain_only_serves_the_requests_the_matchers_declare() {
+        use crate::{config::security_builder::SecurityBuilder, web::security_filter_chain::SecurityFilterChain};
+
+        let builder = PathPatternRequestMatcherBuilder::default();
+        let mut http = http_with_matcher_builder(builder);
+        http.security_matchers(|configurer| {
+            configurer.request_matchers(vec!["/admin/**"]);
+        });
+
+        let chain = http.build();
+
+        assert!(
+            chain.matches(&mut request("/admin/users")),
+            "the chain serves a request its matchers declare"
+        );
+        assert!(
+            !chain.matches(&mut request("/login")),
+            "the chain leaves every other request to the chains after it"
+        );
+    }
+
+    #[test]
+    fn a_single_matcher_replaces_the_matchers_declared_before_it() {
+        let builder = PathPatternRequestMatcherBuilder::default();
+        let mut http = http_with_matcher_builder(builder);
+        http.security_matchers(|configurer| {
+            configurer.request_matchers(vec!["/admin/**"]);
+        });
+
+        http.security_matcher(Arc::new(PathPatternRequestMatcherBuilder::default().matcher(
+            None,
+            "/api/**",
+        )));
+
+        assert!(
+            http.request_matcher.matches(&request("/api/users")),
+            "the replacing matcher applies"
+        );
+        assert!(
+            !http.request_matcher.matches(&request("/admin/users")),
+            "the matchers declared before it are gone"
         );
     }
 }
