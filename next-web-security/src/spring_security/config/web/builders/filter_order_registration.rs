@@ -73,6 +73,9 @@ impl Default for FilterOrderRegistration {
         filter_order.put::<crate::oauth2::client::web::OAuth2AuthorizationRequestRedirectFilter>(
             order.next(),
         );
+        #[cfg(feature = "oauth2-client")]
+        filter_order
+            .put::<crate::oauth2::client::web::OAuth2AuthorizationCodeGrantFilter>(order.next());
         filter_order.put::<GenerateOneTimeTokenFilter>(order.next());
         filter_order.put::<X509AuthenticationFilter>(order.next());
 

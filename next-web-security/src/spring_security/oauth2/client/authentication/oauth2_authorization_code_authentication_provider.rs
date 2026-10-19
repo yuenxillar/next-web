@@ -11,7 +11,7 @@ use crate::{
     oauth2::{
         OAuth2AccessToken, OAuth2AccessTokenResponseClient,
         OAuth2AuthorizationCodeAuthenticationToken, OAuth2AuthorizationCodeGrantRequest,
-        OAuth2AuthorizedClient,
+        OAuth2AuthorizedClient, OAuth2RefreshToken,
     },
 };
 
@@ -92,11 +92,18 @@ impl AuthenticationProvider for OAuth2AuthorizationCodeAuthenticationProvider {
             .await?;
         let access_token = OAuth2AccessToken::from_response(&response);
         let principal_name = client_registration.registration_id().to_string();
-        let authorized_client = OAuth2AuthorizedClient::new(
+        let mut authorized_client = OAuth2AuthorizedClient::new(
             client_registration.clone(),
             principal_name.clone(),
             access_token.clone(),
         );
+        // A provider that issues a refresh token is asked for a new access token
+        // with it, so the token of the response has to be kept: an access token
+        // alone ends the authorization when it expires.
+        if let Some(refresh_token) = response.refresh_token() {
+            authorized_client =
+                authorized_client.with_refresh_token(OAuth2RefreshToken::new(refresh_token));
+        }
 
         let authorities: Vec<Arc<dyn GrantedAuthority>> = self
             .authorities_mapper

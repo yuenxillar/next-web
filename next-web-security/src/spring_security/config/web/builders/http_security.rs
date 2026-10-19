@@ -717,14 +717,22 @@ impl HttpSecurity {
         self
     }
 
-    /// Pending
+    /// Ok
     ///
     /// Adds OAuth 2.0 client support.
     ///
-    /// The chain drives the authorization code, refresh token and client
-    /// credentials grants for the registered clients, and stores the
-    /// authorizations it obtained between requests. The closure configures the
-    /// repository those authorizations are stored in.
+    /// The chain drives the authorization code grant for the registered clients,
+    /// and stores the authorization it obtained so a later request of the same
+    /// user can use it. The closure configures the repository those authorizations
+    /// are stored in.
+    ///
+    /// A request for `/oauth2/authorization/{registrationId}` is answered with a
+    /// redirect to the authorization endpoint of that client, and the callback the
+    /// provider sends the user back to is exchanged for a token: the application
+    /// then holds the authorized client, with the refresh token the provider
+    /// issued. The registrations and the authorized clients are shared objects, so
+    /// the rest of the chain reads the same ones. See [`OAuth2ClientConfigurer`]
+    /// for the filters the configuration contributes.
     #[cfg(feature = "oauth2-client")]
     pub fn oauth2_client<F>(&mut self, oauth2_client: F) -> &mut Self
     where

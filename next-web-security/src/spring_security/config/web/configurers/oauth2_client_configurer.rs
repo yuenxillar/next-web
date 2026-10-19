@@ -399,3 +399,7 @@ impl AuthorizationCodeGrantConfigurer {
             })
     }
 }
+
+#[cfg(test)]
+#[path = "oauth2_client_configurer_tests.rs"]
+mod tests;
