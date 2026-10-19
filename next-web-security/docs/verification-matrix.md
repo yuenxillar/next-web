@@ -11,16 +11,49 @@ cargo test -p next-web-security
     420 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
 
 cargo test -p next-web-security --features oauth2-client
-    474 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
+    474 passed, 0 failed
+
+cargo test -p next-web-security --features oauth2-resource-server
+    430 passed, 0 failed
+
+cargo test -p next-web-security --features oauth2-authorization-server
+    478 passed, 0 failed
 
 cargo test -p next-web-security \
   --features oauth2-client,oauth2-resource-server,oauth2-authorization-server
     563 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 10 ignored
 ```
 
-The five end-to-end tests are `tests/end_to_end_flow.rs` (a real socket, HTTP)
-and `tests/x509_over_tls.rs` (a real TLS listener that asks for a client
-certificate).
+The eight end-to-end tests are `tests/end_to_end_flow.rs` (a real socket, HTTP),
+`tests/x509_over_tls.rs` (a real TLS listener that asks for a client certificate)
+and `tests/saml2_signature_interop.rs` (a response signed by the `SignedXml` of
+.NET, so the canonicalization of this crate is held against another XML signature
+implementation).
+
+## The configurations of the builder, and the tests behind each `Ok`
+
+Every configuration `HttpSecurity` exposes is `Ok`: the ones that were `Pending`
+or `Unverified` when this round started are now held by a chain-level test that
+runs the real filters of a built chain.
+
+| Configuration | Test that holds it |
+|---|---|
+| `security_matchers` | `the_matchers_of_several_calls_are_added`, `the_built_chain_only_serves_the_requests_the_matchers_declare`, `a_single_matcher_replaces_the_matchers_declared_before_it`, `an_empty_closure_keeps_the_matcher_of_the_builder`, `the_shared_request_matcher_builder_is_used` |
+| `get_authentication_registry` | `the_registry_builds_the_manager_the_chain_authenticates_with`, `a_manager_of_its_own_replaces_the_one_the_registry_builds` |
+| `oauth2_resource_server` | `the_configuration_installs_the_filter`, `a_bearer_token_authenticates_the_request`, `a_request_without_a_bearer_token_is_not_authenticated`, `a_token_that_is_refused_is_answered_with_unauthorized` |
+| `oauth2_client` | `the_configuration_shares_the_repositories`, `a_request_for_the_authorization_endpoint_is_redirected_to_the_provider`, `the_callback_exchanges_the_code_and_stores_the_authorized_client`, `a_callback_without_a_code_is_not_matched_by_the_grant` |
+| `oauth2_login` | `the_callback_signs_in_as_the_user_the_profile_names`, `the_authorities_of_the_login_are_mapped_by_the_configuration`, `a_profile_that_cannot_be_loaded_does_not_sign_the_user_in`, `the_login_page_links_the_login_of_the_registration` |
+| `oidc_logout` | `the_configuration_installs_the_filter_before_the_csrf_filter`, `the_configuration_shares_the_repositories`, `a_logout_token_ends_the_sessions_of_the_provider`, `a_request_that_is_not_a_logout_is_left_alone`, `a_logout_token_that_cannot_be_verified_is_refused` |
+| `saml2_login` | `a_response_signed_by_the_asserting_party_logs_the_user_in`, `a_believed_response_authenticates_through_the_chain`, `a_rejected_response_redirects_back_to_the_login_page`, and the six tests of `XmlSignatureVerifier` |
+| `saml2_logout` | `a_signed_logout_request_ends_the_session_and_is_answered`, `a_logout_request_without_a_signature_is_refused`, `a_signed_logout_response_completes_the_logout`, `the_configuration_installs_the_logout_filters` |
+| `oauth2_authorization_server` | `an_authorization_request_is_answered_with_a_code`, `the_code_is_exchanged_for_a_token`, `the_metadata_of_the_server_is_published`, `a_request_without_a_registered_client_is_refused` |
+
+The runtime code of this round is two things the port did not have: an XML
+signature verifier (`saml2/xml_dsig.rs`, exclusive canonicalization over a parsed
+tree, RSA-SHA256 and SHA-256, fail-closed on every other algorithm) and the two
+filters of the logout profile (`web/saml2/logout/`). Everything else that was
+`Pending` was a configuration whose filters existed but whose behaviour no test
+ran.
 
 ## Verified over HTTP and TLS
 
