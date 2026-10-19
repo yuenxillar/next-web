@@ -12,7 +12,7 @@ pub trait CsrfTokenRequestResolver {
         request: &mut dyn HttpRequest,
         csrf_token: &dyn CsrfToken,
     ) -> Option<String> {
-        let mut actual_token = request.header(csrf_token.header_name());
+        let actual_token = request.header(csrf_token.header_name());
 
         match actual_token {
             Some(token) => return Some(token.to_string()),
@@ -83,6 +83,9 @@ mod tests {
         let token = DefaultCsrfToken::new("X-CSRF-TOKEN", "_csrf", "the-token");
         let mut request = form_post("other=value");
 
-        assert_eq!(Resolver.resolve_csrf_token_value(&mut request, &token), None);
+        assert_eq!(
+            Resolver.resolve_csrf_token_value(&mut request, &token),
+            None
+        );
     }
 }

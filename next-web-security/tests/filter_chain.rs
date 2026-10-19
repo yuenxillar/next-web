@@ -18,8 +18,8 @@ use next_web_core::{
     any::AnyClone,
     async_trait,
     http::{
-        HttpRequest, HttpResponse,
         filter::{FilterError, HttpFilter, HttpFilterChain},
+        HttpRequest, HttpResponse,
     },
     web::cors::{CorsConfiguration, CorsConfigurationSource},
     Named,
@@ -29,9 +29,7 @@ use next_web_security::{
         authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
         http::SessionCreationPolicy,
         security_builder::SecurityBuilder,
-        web::{
-            HttpSecurityBuilder, builders::HttpSecurity, configurers::DefaultLoginPageConfigurer,
-        },
+        web::{builders::HttpSecurity, configurers::DefaultLoginPageConfigurer},
     },
     core::userdetails::{User, UserDetailsService},
     provisioning::InMemoryUserDetailsManager,
@@ -347,7 +345,11 @@ fn every_configuration_composes_into_one_ordered_chain() {
     // The session the application creates eagerly is created before anything reads
     // the request, and the context of the request is read before anything
     // authenticates it.
-    assert_before(&names, "ForceEagerSessionCreationFilter", "SecurityContextHolderFilter");
+    assert_before(
+        &names,
+        "ForceEagerSessionCreationFilter",
+        "SecurityContextHolderFilter",
+    );
     assert_before(&names, "SecurityContextHolderFilter", "HeaderWriterFilter");
     assert_before(&names, "HeaderWriterFilter", "CorsFilter");
     assert_before(&names, "CorsFilter", "CsrfFilter");
@@ -361,7 +363,11 @@ fn every_configuration_composes_into_one_ordered_chain() {
     // the credentials of a user.
     #[cfg(feature = "oauth2-client")]
     {
-        assert_before(&names, "LogoutFilter", "OAuth2AuthorizationRequestRedirectFilter");
+        assert_before(
+            &names,
+            "LogoutFilter",
+            "OAuth2AuthorizationRequestRedirectFilter",
+        );
         assert_before(
             &names,
             "OAuth2AuthorizationRequestRedirectFilter",
@@ -380,17 +386,61 @@ fn every_configuration_composes_into_one_ordered_chain() {
     }
     // The certificate of the connection is written into the request before the
     // filter that authenticates with it reads it.
-    assert_before(&names, "ClientCertificateAttributeFilter", "X509AuthenticationFilter");
-    assert_before(&names, "X509AuthenticationFilter", "UsernamePasswordAuthenticationFilter");
-    assert_before(&names, "UsernamePasswordAuthenticationFilter", "DefaultResourcesFilter");
-    assert_before(&names, "DefaultResourcesFilter", "WebAuthnRegistrationFilter");
-    assert_before(&names, "WebAuthnRegistrationFilter", "WebAuthnAuthenticationFilter");
-    assert_before(&names, "WebAuthnAuthenticationFilter", "Saml2AuthenticationFilter");
-    assert_before(&names, "Saml2AuthenticationFilter", "BasicAuthenticationFilter");
-    assert_before(&names, "BasicAuthenticationFilter", "RequestCacheAwareFilter");
-    assert_before(&names, "RequestCacheAwareFilter", "RememberMeAuthenticationFilter");
-    assert_before(&names, "RememberMeAuthenticationFilter", "AnonymousAuthenticationFilter");
-    assert_before(&names, "AnonymousAuthenticationFilter", "SessionManagementFilter");
+    assert_before(
+        &names,
+        "ClientCertificateAttributeFilter",
+        "X509AuthenticationFilter",
+    );
+    assert_before(
+        &names,
+        "X509AuthenticationFilter",
+        "UsernamePasswordAuthenticationFilter",
+    );
+    assert_before(
+        &names,
+        "UsernamePasswordAuthenticationFilter",
+        "DefaultResourcesFilter",
+    );
+    assert_before(
+        &names,
+        "DefaultResourcesFilter",
+        "WebAuthnRegistrationFilter",
+    );
+    assert_before(
+        &names,
+        "WebAuthnRegistrationFilter",
+        "WebAuthnAuthenticationFilter",
+    );
+    assert_before(
+        &names,
+        "WebAuthnAuthenticationFilter",
+        "Saml2AuthenticationFilter",
+    );
+    assert_before(
+        &names,
+        "Saml2AuthenticationFilter",
+        "BasicAuthenticationFilter",
+    );
+    assert_before(
+        &names,
+        "BasicAuthenticationFilter",
+        "RequestCacheAwareFilter",
+    );
+    assert_before(
+        &names,
+        "RequestCacheAwareFilter",
+        "RememberMeAuthenticationFilter",
+    );
+    assert_before(
+        &names,
+        "RememberMeAuthenticationFilter",
+        "AnonymousAuthenticationFilter",
+    );
+    assert_before(
+        &names,
+        "AnonymousAuthenticationFilter",
+        "SessionManagementFilter",
+    );
     // The authorization endpoint of the server runs after the error translation so
     // that a resource owner who is not logged in is sent to the login page, and
     // before the filter that authorizes the request so that it serves its own.
@@ -406,11 +456,16 @@ fn every_configuration_composes_into_one_ordered_chain() {
         assert_before(&names, "TokenEndpointFilter", "GenerateOneTimeTokenFilter");
         // A resource owner who is not logged in is sent to the login page by the
         // error translation filter, so the authorization endpoint runs after it.
-        assert_before(&names, "ErrorTranslationFilter", "AuthorizationEndpointFilter");
+        assert_before(
+            &names,
+            "ErrorTranslationFilter",
+            "AuthorizationEndpointFilter",
+        );
         assert_before(&names, "AuthorizationEndpointFilter", "AuthorizationFilter");
     }
 
     // Every filter an application can expect is part of the chain.
+    #[allow(unused)]
     let mut expected_filters = vec![
         "ForceEagerSessionCreationFilter",
         "SecurityContextHolderFilter",

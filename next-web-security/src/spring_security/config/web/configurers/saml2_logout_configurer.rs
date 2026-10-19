@@ -93,8 +93,8 @@ where
         if let Some(logout_handlers) = &self.logout_handlers {
             return logout_handlers.clone();
         }
-        if let Some(logout) = http
-            .configurer::<crate::config::web::configurers::LogoutConfigurer<H>>()
+        if let Some(logout) =
+            http.configurer::<crate::config::web::configurers::LogoutConfigurer<H>>()
         {
             let handlers = logout.get_logout_handlers().to_vec();
             if !handlers.is_empty() {
@@ -125,7 +125,9 @@ where
 
     /// Returns the URL the user is sent to once a logout is complete.
     fn logout_success_url_of(&self) -> &str {
-        self.logout_success_url.as_deref().unwrap_or("/login?logout")
+        self.logout_success_url
+            .as_deref()
+            .unwrap_or("/login?logout")
     }
 }
 
@@ -214,14 +216,12 @@ mod tests {
     use std::{collections::HashMap, sync::Arc};
 
     use axum::{body::Body, extract::Request, response::Response};
-    use base64::{Engine, engine::general_purpose::STANDARD};
+    use base64::{engine::general_purpose::STANDARD, Engine};
 
-    use super::*;
     use crate::{
         config::{
             authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
-            security_builder::SecurityBuilder,
-            web::builders::HttpSecurity,
+            security_builder::SecurityBuilder, web::builders::HttpSecurity,
         },
         core::context::SecurityContextHolder,
         saml2::registration::{
@@ -276,12 +276,11 @@ mod tests {
                 r##"<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"></ds:CanonicalizationMethod><ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"></ds:SignatureMethod><ds:Reference URI="#{id}"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></ds:Transform><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"></ds:Transform></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"></ds:DigestMethod><ds:DigestValue>{digest}</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>{signature}</ds:SignatureValue></ds:Signature>"##
             )
         };
-        let signed_info = signature_element_of(&digest, "")
-            .replacen(
-                "<ds:SignedInfo>",
-                r##"<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">"##,
-                1,
-            );
+        let signed_info = signature_element_of(&digest, "").replacen(
+            "<ds:SignedInfo>",
+            r##"<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">"##,
+            1,
+        );
         let start = signed_info
             .find("<ds:SignedInfo")
             .expect("the signature holds a SignedInfo");
@@ -289,8 +288,8 @@ mod tests {
             .find("</ds:SignedInfo>")
             .expect("the signature holds a SignedInfo")
             + "</ds:SignedInfo>".len();
-        let signature = SigningKey::<Sha256>::new(key.clone())
-            .sign(signed_info[start..end].as_bytes());
+        let signature =
+            SigningKey::<Sha256>::new(key.clone()).sign(signed_info[start..end].as_bytes());
 
         signature_element_of(&digest, &STANDARD.encode(signature.to_bytes()))
     }
@@ -440,7 +439,10 @@ mod tests {
         });
 
         assert_eq!(status, 302, "it was: {location}");
-        assert!(location.starts_with(IDP_LOGOUT_LOCATION), "it was: {location}");
+        assert!(
+            location.starts_with(IDP_LOGOUT_LOCATION),
+            "it was: {location}"
+        );
         assert!(
             location.contains("SAMLResponse="),
             "the asserting party is answered with a logout response, it was: {location}"

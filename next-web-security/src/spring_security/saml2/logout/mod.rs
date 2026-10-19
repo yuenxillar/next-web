@@ -8,11 +8,8 @@
 
 use std::io::Read;
 
-use base64::{Engine, engine::general_purpose::STANDARD};
-use quick_xml::{
-    Reader,
-    events::Event,
-};
+use base64::{engine::general_purpose::STANDARD, Engine};
+use quick_xml::{events::Event, Reader};
 
 use crate::saml2::{
     error::{Saml2Error, Saml2ErrorKind},
@@ -316,11 +313,16 @@ fn local_name(name: &[u8]) -> String {
 }
 
 /// Returns the value of an attribute of an element.
-fn attribute(element: &quick_xml::events::BytesStart, name: &str) -> Result<Option<String>, Saml2Error> {
+fn attribute(
+    element: &quick_xml::events::BytesStart,
+    name: &str,
+) -> Result<Option<String>, Saml2Error> {
     for attribute in element.attributes().flatten() {
         let key = String::from_utf8_lossy(attribute.key.as_ref()).to_string();
         if key == name {
-            return Ok(Some(attribute.unescape_value().unwrap_or_default().to_string()));
+            return Ok(Some(
+                attribute.unescape_value().unwrap_or_default().to_string(),
+            ));
         }
     }
 
@@ -328,6 +330,7 @@ fn attribute(element: &quick_xml::events::BytesStart, name: &str) -> Result<Opti
 }
 
 /// Returns the error of a message the profile refuses.
+#[allow(unused)]
 pub(crate) fn refused(reason: impl Into<String>) -> Saml2Error {
     not_believed(reason)
 }
@@ -371,7 +374,8 @@ mod tests {
 
     #[test]
     fn a_document_that_is_not_a_logout_message_is_refused() {
-        let error = Saml2LogoutRequest::parse("<Something />").expect_err("the document is not one");
+        let error =
+            Saml2LogoutRequest::parse("<Something />").expect_err("the document is not one");
 
         assert_eq!(error.kind(), Saml2ErrorKind::InvalidResponse);
     }

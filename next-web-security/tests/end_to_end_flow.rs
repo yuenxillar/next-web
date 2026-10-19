@@ -115,8 +115,9 @@ fn shared_objects() -> HashMap<std::any::TypeId, Box<dyn next_web_core::any::Any
     let mut shared_objects: HashMap<std::any::TypeId, Box<dyn next_web_core::any::AnyClone>> =
         HashMap::new();
     shared_objects.insert(
-        std::any::TypeId::of::<next_web_security::web::util::matcher::PathPatternRequestMatcherBuilder>(
-        ),
+        std::any::TypeId::of::<
+            next_web_security::web::util::matcher::PathPatternRequestMatcherBuilder,
+        >(),
         Box::new(
             next_web_security::web::util::matcher::PathPatternRequestMatcherBuilder::default(),
         ),
@@ -217,9 +218,7 @@ fn csrf_parameter(html: &str) -> String {
         .expect("the login page carries a csrf token");
     let rest = &html[start..];
     let value_start = rest.find("value=\"").expect("the input carries a value") + 7;
-    let value_end = rest[value_start..]
-        .find('"')
-        .expect("the value is quoted");
+    let value_end = rest[value_start..].find('"').expect("the value is quoted");
 
     rest[value_start..value_start + value_end].to_string()
 }
@@ -230,9 +229,7 @@ fn csrf_parameter(html: &str) -> String {
 /// the colon, so the pieces between the quotes are read rather than the exact
 /// spacing of the object.
 fn csrf_header(page: &str) -> (String, String) {
-    let start = page
-        .find("{\"")
-        .expect("the page renders the csrf header");
+    let start = page.find("{\"").expect("the page renders the csrf header");
     let quotes: Vec<&str> = page[start..]
         .split('"')
         .skip(1)
@@ -255,6 +252,7 @@ fn base64_url(bytes: &[u8]) -> String {
 }
 
 /// Decodes a base64url string without padding.
+#[allow(dead_code)]
 fn decode_base64_url(value: &str) -> Vec<u8> {
     base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(value)
@@ -277,7 +275,10 @@ fn cose_key(key: &SigningKey) -> Vec<u8> {
         (integer(1), integer(2)),
         (integer(3), integer(-7)),
         (integer(-1), integer(1)),
-        (integer(-2), ciborium::value::Value::Bytes(bytes[1..33].to_vec())),
+        (
+            integer(-2),
+            ciborium::value::Value::Bytes(bytes[1..33].to_vec()),
+        ),
         (
             integer(-3),
             ciborium::value::Value::Bytes(bytes[33..65].to_vec()),
@@ -373,9 +374,8 @@ async fn sign_in_with_password(client: &reqwest::Client, base: &str) -> String {
     let status = page.status();
     let page_cookie = session_cookie(&page);
     let page = page.text().await.expect("the page is text");
-    let page_cookie = page_cookie.unwrap_or_else(|| {
-        panic!("the page starts a session, status {status}, page: {page}")
-    });
+    let page_cookie = page_cookie
+        .unwrap_or_else(|| panic!("the page starts a session, status {status}, page: {page}"));
     let csrf = csrf_parameter(&page);
 
     let response = client
@@ -596,7 +596,8 @@ async fn a_passkey_is_registered_and_then_signs_the_user_in() {
         .unwrap_or_default()
         .to_string();
     assert_eq!(
-        location, "/",
+        location,
+        "/",
         "the passkey login redirects to the application, status was {}",
         response.status()
     );
