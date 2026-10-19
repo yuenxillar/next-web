@@ -27,13 +27,10 @@ use axum::http::StatusCode;
 use next_web::{
     Application, NextWebApplication,
     macros::{
-        autoconfigure::configuration,
         bind::{get_mapping, singleton},
         security::pre_authorize,
     },
 };
-use next_web_context::{ApplicationEvent, ApplicationEventPublisher};
-use next_web_core::error::BoxError;
 use next_web_security::{
     authentication::provider_manager::ProviderManager,
     config::{
@@ -176,33 +173,6 @@ impl WebSecurityConfigurer for PreAuthenticatedRequests {
             ));
         });
     }
-}
-
-#[derive(Clone)]
-struct SecurityAutoConfig {}
-
-#[configuration]
-impl SecurityAutoConfig {
-    /// Publishes the events of the application.
-    ///
-    /// The security configuration publishes the events of an authentication
-    /// through the publisher of the application, so an application that runs
-    /// without a publisher of its own provides the default one here.
-    #[provider(name = "applicationEventPublisher")]
-    fn application_event_publisher() -> Arc<dyn ApplicationEventPublisher> {
-        #[derive(Clone)]
-        struct DefaultApplicationEventPublisher;
-
-        impl ApplicationEventPublisher for DefaultApplicationEventPublisher {
-            fn publish_event(&self, _event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
-                Ok(())
-            }
-        }
-
-        Arc::new(DefaultApplicationEventPublisher)
-    }
-
-
 }
 
 #[tokio::main]

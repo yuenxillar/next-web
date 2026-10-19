@@ -50,6 +50,7 @@ use std::{
 
 use next_web_context::{
     APPLICATION_ENVIRONMENT_SINGLETON_NAME, APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
+    APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME,
     ApplicationContext, ApplicationContextExt, ApplicationEvent, ApplicationEventPublisher,
     ApplicationListener, Definition, DynProvider, EagerCreateFunction, InstanceClone, Locale,
     MESSAGE_SOURCE_SINGLETON_NAME, MessageSource, MessageSourceResolvable, NoSuchMessageError,
@@ -373,6 +374,10 @@ impl DefaultApplicationContext {
         // Initialize event multicaster for this context.
         self.init_application_event_multicaster()?;
 
+        // The publisher an application publishes its events with is the context
+        // itself, so the default one is installed before anything resolves it.
+        self.init_application_event_publisher()?;
+
         // Initialize other special instances
         self.on_refresh();
 
@@ -577,6 +582,43 @@ impl DefaultApplicationContext {
         }
 
         event_multicaster
+    }
+
+    /// Installs the default publisher of the events of the application.
+    ///
+    /// The publisher of an application is its context: what a component publishes
+    /// reaches the listeners of the multicaster of the context, and then the
+    /// listeners of its parent context. The publisher is installed under
+    /// [`APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME`] so that a component either
+    /// injects the context and publishes what it has to publish, or resolves the
+    /// publisher and publishes through it — the two are the same.
+    ///
+    /// A publisher the application installed itself wins and is left alone.
+    fn init_application_event_publisher(&mut self) -> Result<(), ContextError> {
+        if self.contains_singleton_with_name::<Arc<dyn ApplicationEventPublisher>>(
+            APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME,
+        ) {
+            tracing::trace!(
+                "the application installed its own ApplicationEventPublisher, so the one of the \
+                 context is not installed"
+            );
+
+            return Ok(());
+        }
+
+        if let Some(multicaster) = self.application_event_multicaster.as_ref() {
+            let publisher: Arc<dyn ApplicationEventPublisher> =
+                Arc::new(ContextApplicationEventPublisher {
+                    event_multicaster: Arc::clone(multicaster),
+                    parent: self.parent.clone(),
+                });
+            self.insert_singleton_with_name(
+                publisher,
+                APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME,
+            );
+        }
+
+        Ok(())
     }
 
     /// Called when the application context is refreshed.
@@ -1337,6 +1379,35 @@ impl Context {
     }
 }
 
+/// Publishes the events of an application the way its context does.
+///
+/// An application publishes an event by handing it to its context; the context
+/// multicasts it to the listeners of the application and then hands it to its
+/// parent context, which multicasts it to the listeners of that one. This type is
+/// what the context installs under
+/// [`APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME`], so a component that resolves
+/// the publisher behaves exactly like one that publishes through the context
+/// itself.
+#[derive(Debug, Clone)]
+struct ContextApplicationEventPublisher {
+    /// The multicaster that reaches the listeners of the context.
+    event_multicaster: Arc<dyn ApplicationEventMulticaster>,
+    /// The parent context, whose listeners are reached after this one's.
+    parent: Option<Arc<dyn ApplicationContext>>,
+}
+
+impl ApplicationEventPublisher for ContextApplicationEventPublisher {
+    fn publish_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
+        self.event_multicaster.multicast_event(event.clone())?;
+
+        if let Some(parent) = self.parent.as_deref() {
+            parent.publish_event(event)?;
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::any::Any;
@@ -1452,6 +1523,65 @@ mod tests {
             .publish_event(Box::new(TestEvent))
             .expect("publishing succeeds");
         assert_eq!(received.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn installs_the_context_as_the_publisher_of_the_application() {
+        let received = Arc::new(AtomicUsize::new(0));
+        let mut context = DefaultApplicationContext::default();
+        context.add_application_listener(Arc::new(CountingListener {
+            received: Arc::clone(&received),
+        }));
+        context.refresh().expect("refreshing succeeds");
+
+        // A component publishes an event through the publisher, and the listener
+        // of the context receives it: the publisher is the context, so the two
+        // ways of publishing an event are the same one.
+        let publisher = context
+            .get_singleton_option_with_name::<Arc<dyn ApplicationEventPublisher>>(
+                APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME,
+            )
+            .cloned()
+            .expect("the context installs the publisher of the application");
+        publisher
+            .publish_event(Box::new(TestEvent))
+            .expect("publishing succeeds");
+
+        assert_eq!(received.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn keeps_the_publisher_the_application_installed() {
+        #[derive(Debug, Clone)]
+        struct ApplicationPublisher;
+
+        impl ApplicationEventPublisher for ApplicationPublisher {
+            fn publish_event(&self, _event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
+                Ok(())
+            }
+        }
+
+        let installed: Arc<dyn ApplicationEventPublisher> = Arc::new(ApplicationPublisher);
+        let mut context = DefaultApplicationContext::default();
+        context.insert_singleton_with_name::<Arc<dyn ApplicationEventPublisher>>(
+            Arc::clone(&installed),
+            APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME,
+        );
+        context.refresh().expect("refreshing succeeds");
+
+        // The publisher of the application is still the one the application
+        // installed: the context does not replace it with its own.
+        let publisher = context
+            .get_singleton_option_with_name::<Arc<dyn ApplicationEventPublisher>>(
+                APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME,
+            )
+            .cloned()
+            .expect("the application installed a publisher");
+
+        assert!(
+            Arc::ptr_eq(&publisher, &installed),
+            "the installed publisher is the one the application declared"
+        );
     }
 
     #[test]
