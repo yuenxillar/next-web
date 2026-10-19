@@ -22,6 +22,12 @@ the transport and the filter that authenticates:
   RFC 4514 order, escaped values — and uses the subject a terminator rendered
   when the transport carries one.
 
+The TLS server of `next-web` is the transport that inserts it: `TlsWebServer`
+terminates the connection with rustls, reads the certificate the handshake
+settled on, and inserts it into every request it serves, so an application that
+serves over TLS and configures `x509()` needs nothing else.
+`next-web/tests/tls_client_certificate.rs` holds that path.
+
 ## Where it stands
 
 `HttpSecurity::x509` is marked `Unverified`. Everything it installs exists and

@@ -46,11 +46,14 @@ the test therefore walks the same path a TLS server or a terminator takes, and
 what it holds is the subject parsing, the attribute, the user lookup,
 `FACTOR_X509` and the session.
 
-A transport of an application inserts `PeerCertificate` itself: `axum-server`
-hands the certificate of its TLS connection to the service it serves, and the
-layer that reads it inserts the type into the request extensions before the
-security chain runs. A terminator that reports a subject as text can use
-`PeerCertificate::with_subject`, and the filter uses that subject as it is.
+A transport of an application inserts `PeerCertificate` itself, and the TLS
+server of `next-web` does: `TlsWebServer` terminates the connection with rustls,
+reads the certificate the handshake settled on, and inserts it into every request
+it serves (`next-web/tests/tls_client_certificate.rs`, which serves a
+client-auth-only listener and checks the request carries the certificate, and
+that a client without one is refused). A terminator that reports a subject as
+text can use `PeerCertificate::with_subject` instead, and the filter uses that
+subject as it is.
 
 ## Verified end to end
 

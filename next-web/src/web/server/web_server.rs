@@ -67,7 +67,7 @@ pub(crate) async fn shutdown_signal() -> &'static str {
 }
 
 /// Waits for a shutdown signal and reports it.
-async fn graceful_shutdown() {
+pub(crate) async fn graceful_shutdown() {
     shutdown_application().await;
 }
 

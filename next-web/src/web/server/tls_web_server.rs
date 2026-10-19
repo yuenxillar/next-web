@@ -4,13 +4,27 @@
 //! feature, which enables the TLS support of the server, and is not compiled
 //! without it.
 
-use std::{error::Error, fmt, future::Future, io, net::SocketAddr, path::Path, time::Duration};
+use std::{
+    error::Error,
+    fmt, future::Future,
+    io,
+    net::SocketAddr,
+    path::Path,
+    sync::Arc,
+};
 
-use axum::Router;
-use axum_server::{Handle, tls_rustls::RustlsConfig};
-use next_web_core::env::ConfigurableEnvironment;
+use axum::{
+    Router,
+    extract::{ConnectInfo, Request, connect_info::Connected},
+    middleware::{self, Next},
+    response::Response,
+    serve::{IncomingStream, Listener},
+};
+use next_web_core::{env::ConfigurableEnvironment, http::PeerCertificate};
+use tokio_rustls::{TlsAcceptor, server::TlsStream};
+use tokio::net::{TcpListener, TcpStream};
 
-use crate::web::server::{Server, web_server::shutdown_application};
+use crate::web::server::{Server, web_server::graceful_shutdown};
 
 /// Property that enables TLS for the web server.
 ///
@@ -27,10 +41,6 @@ pub const SSL_CERTIFICATE_PROPERTY: &str = "next.server.ssl.certificate";
 /// the server, in PEM format.
 pub const SSL_CERTIFICATE_PRIVATE_KEY_PROPERTY: &str = "next.server.ssl.certificate_private_key";
 
-/// The time that the connections of a server are given to complete when it shuts
-/// down.
-const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
-
 /// A web server that serves a router over HTTPS.
 ///
 /// The certificate chain and the private key of the server are read from PEM
@@ -38,10 +48,15 @@ const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 /// the [`SSL_CERTIFICATE_PROPERTY`] and
 /// [`SSL_CERTIFICATE_PRIVATE_KEY_PROPERTY`] properties, while the other
 /// constructors take the certificate and the key directly.
+///
+/// The connection of a client is settled before the router sees a request, and
+/// the certificate the client presented is part of that connection. The server
+/// inserts it into every request as [`PeerCertificate`], and the certificate of
+/// a client is what the X.509 support authenticates.
 pub struct TlsWebServer {
     socket_addr: SocketAddr,
     router: Option<Router>,
-    tls_config: RustlsConfig,
+    server_config: Arc<rustls::ServerConfig>,
 }
 
 impl TlsWebServer {
@@ -85,11 +100,28 @@ impl TlsWebServer {
         certificate: impl Into<Vec<u8>>,
         private_key: impl Into<Vec<u8>>,
     ) -> Result<Self, TlsWebServerError> {
-        let tls_config = RustlsConfig::from_pem(certificate.into(), private_key.into())
-            .await
-            .map_err(TlsWebServerError::Load)?;
+        let server_config = server_config_from_pem(certificate.into(), private_key.into())?;
 
-        Ok(Self::new(socket_addr.into(), router, tls_config))
+        Ok(Self::new(socket_addr.into(), router, server_config))
+    }
+
+    /// Creates a server that serves the given router over the given TLS
+    /// configuration.
+    ///
+    /// The configuration is the place an application asks for a client
+    /// certificate, since a verifier of client certificates is part of it.
+    ///
+    /// # Arguments
+    ///
+    /// * `socket_addr` - The address the server binds to.
+    /// * `router` - The router to serve.
+    /// * `server_config` - The TLS configuration of the server.
+    pub fn from_config(
+        socket_addr: impl Into<SocketAddr>,
+        router: Router,
+        server_config: Arc<rustls::ServerConfig>,
+    ) -> Self {
+        Self::new(socket_addr.into(), router, server_config)
     }
 
     /// Creates a server that serves the given router over HTTPS, using the
@@ -113,11 +145,11 @@ impl TlsWebServer {
         certificate: impl AsRef<Path>,
         private_key: impl AsRef<Path>,
     ) -> Result<Self, TlsWebServerError> {
-        let tls_config = RustlsConfig::from_pem_file(certificate, private_key)
-            .await
-            .map_err(TlsWebServerError::Load)?;
+        let certificate = tokio::fs::read(certificate).await.map_err(TlsWebServerError::Load)?;
+        let private_key = tokio::fs::read(private_key).await.map_err(TlsWebServerError::Load)?;
+        let server_config = server_config_from_pem(certificate, private_key)?;
 
-        Ok(Self::new(socket_addr.into(), router, tls_config))
+        Ok(Self::new(socket_addr.into(), router, server_config))
     }
 
     /// Creates a server that serves the given router over HTTPS, using the TLS
@@ -150,11 +182,11 @@ impl TlsWebServer {
     }
 
     /// Creates a server for a configuration that has already been loaded.
-    fn new(socket_addr: SocketAddr, router: Router, tls_config: RustlsConfig) -> Self {
+    fn new(socket_addr: SocketAddr, router: Router, server_config: Arc<rustls::ServerConfig>) -> Self {
         Self {
             socket_addr,
             router: Some(router),
-            tls_config,
+            server_config,
         }
     }
 
@@ -162,20 +194,21 @@ impl TlsWebServer {
     async fn serve(&mut self) -> Result<(), Box<dyn Error>> {
         let app = self.router.take().unwrap_or_else(Router::new);
 
-        // The connections that are still open are given a moment to complete
-        // once the application receives a shutdown signal.
-        let handle = Handle::new();
-        spawn_shutdown_listener(handle.clone());
+        let listener = TcpListener::bind(self.socket_addr).await?;
+        let acceptor = TlsAcceptor::from(self.server_config.clone());
 
-        let mut server =
-            axum_server::bind_rustls(self.socket_addr, self.tls_config.clone()).handle(handle);
-        // Advertise the support for HTTP/2 websockets to the client, which
-        // `axum::serve` does by default.
-        server.http_builder().http2().enable_connect_protocol();
+        // The certificate of a connection is handed to the request it carries,
+        // after the handshake that settled it and before the router sees it: no
+        // layer behind the server can reach a certificate, and an application
+        // that authenticates one would never see it.
+        let app = app.layer(middleware::from_fn(hand_over_certificate));
 
-        server
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await?;
+        axum::serve(
+            TlsListener { listener, acceptor },
+            app.into_make_service_with_connect_info::<TlsPeer>(),
+        )
+        .with_graceful_shutdown(graceful_shutdown())
+        .await?;
 
         Ok(())
     }
@@ -232,17 +265,124 @@ impl Error for TlsWebServerError {
     }
 }
 
-/// Spawns the task that shuts the server down gracefully once the application
-/// receives a shutdown signal.
+/// What the TLS connection of a request carried.
 ///
-/// # Arguments
+/// The address is the one of the client, and the certificate is the one the
+/// handshake settled on, encoded the way it arrived.
+#[derive(Clone, Debug)]
+pub struct TlsPeer {
+    addr: SocketAddr,
+    certificate: Option<Vec<u8>>,
+}
+
+impl Connected<IncomingStream<'_, TlsListener>> for TlsPeer {
+    fn connect_info(stream: IncomingStream<'_, TlsListener>) -> Self {
+        stream.remote_addr().clone()
+    }
+}
+
+/// A listener that settles the TLS connection of every client before the
+/// router sees the request it carries.
+struct TlsListener {
+    listener: TcpListener,
+    acceptor: TlsAcceptor,
+}
+
+impl Listener for TlsListener {
+    type Io = TlsStream<TcpStream>;
+    type Addr = TlsPeer;
+
+    async fn accept(&mut self) -> (Self::Io, Self::Addr) {
+        loop {
+            let (stream, addr) = match self.listener.accept().await {
+                Ok(accepted) => accepted,
+                Err(error) => {
+                    tracing::warn!("the connection of a client failed: {error}");
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    continue;
+                }
+            };
+
+            match self.acceptor.accept(stream).await {
+                Ok(stream) => {
+                    let certificate = stream
+                        .get_ref()
+                        .1
+                        .peer_certificates()
+                        .and_then(|certificates| certificates.first())
+                        .map(|certificate| certificate.as_ref().to_vec());
+
+                    return (stream, TlsPeer { addr, certificate });
+                }
+                Err(error) => {
+                    tracing::debug!("the TLS connection of {addr} failed: {error}");
+                }
+            }
+        }
+    }
+
+    fn local_addr(&self) -> io::Result<Self::Addr> {
+        let addr = self.listener.local_addr()?;
+
+        Ok(TlsPeer {
+            addr,
+            certificate: None,
+        })
+    }
+}
+
+/// Hands the certificate of the connection to the request it carries.
 ///
-/// * `handle` - The handle that shuts the connections of the server down.
-fn spawn_shutdown_listener(handle: Handle<SocketAddr>) {
-    tokio::spawn(async move {
-        shutdown_application().await;
-        handle.graceful_shutdown(Some(GRACEFUL_SHUTDOWN_TIMEOUT));
-    });
+/// The request gets the address of the client, and the certificate when the
+/// handshake settled on one. Nothing in the request itself proves a certificate,
+/// so only this server — which made the connection and verified the certificate
+/// against the configuration it was given — inserts one.
+async fn hand_over_certificate(mut request: Request, next: Next) -> Response {
+    let peer = request
+        .extensions()
+        .get::<ConnectInfo<TlsPeer>>()
+        .map(|info| info.0.clone());
+
+    if let Some(peer) = peer {
+        request.extensions_mut().insert(peer.addr);
+        if let Some(certificate) = peer.certificate {
+            request
+                .extensions_mut()
+                .insert(PeerCertificate::new(certificate));
+        }
+    }
+
+    next.run(request).await
+}
+
+/// Returns the TLS configuration of a server from a certificate chain and the
+/// private key of its certificate, both in PEM format.
+///
+/// # Errors
+///
+/// Returns [`TlsWebServerError::Load`] when either document is not a PEM
+/// document, or when they do not belong together.
+fn server_config_from_pem(
+    certificate: Vec<u8>,
+    private_key: Vec<u8>,
+) -> Result<Arc<rustls::ServerConfig>, TlsWebServerError> {
+    let certificates = rustls_pemfile::certs(&mut certificate.as_slice())
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(TlsWebServerError::Load)?;
+    let private_key = rustls_pemfile::private_key(&mut private_key.as_slice())
+        .map_err(TlsWebServerError::Load)?
+        .ok_or_else(|| {
+            TlsWebServerError::Load(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "the private key of the server is missing",
+            ))
+        })?;
+    let config = rustls::ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(certificates, private_key)
+        .map_err(|error| TlsWebServerError::Load(io::Error::new(io::ErrorKind::InvalidData, error)))?;
+
+    Ok(Arc::new(config))
 }
 
 /// Parses a boolean property value, accepting `true` and `false` in any case.
