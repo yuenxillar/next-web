@@ -130,7 +130,7 @@ impl HttpFilter for CsrfFilter {
         filter_chain: &dyn HttpFilterChain,
     ) -> Result<(), FilterError> {
         let mut deferred_csrf_token =
-            load_deferred_token(self.token_repository.clone(), request, response);
+            load_deferred_token(self.token_repository.clone(), request, response).await;
         request.set_attribute(
             type_name::<&dyn DeferredCsrfToken>(),
             AnyValue::BoxedValue(Box::new(deferred_csrf_token.clone())),
@@ -210,5 +210,111 @@ impl RequestMatcher for DefaultRequiresCsrfMatcher {
 impl Display for DefaultRequiresCsrfMatcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "IsNotHttpMethod [GET, HEAD, TRACE, OPTIONS]",)
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use std::sync::Arc;
+
+    use axum::{body::Body, extract::Request, response::Response};
+    use next_web_core::{
+        async_trait,
+        http::{
+            filter::{FilterError, HttpFilterChain},
+            HttpRequest, HttpResponse, RequestBody,
+        },
+    };
+
+    use super::*;
+    use crate::web::csrf::{CsrfToken, HttpSessionCsrfTokenRepository};
+
+    /// A chain that continues the request.
+    #[derive(Clone)]
+    struct Continuing;
+
+    #[async_trait]
+    impl HttpFilterChain for Continuing {
+        async fn do_filter(
+            &self,
+            _request: &mut dyn HttpRequest,
+            _response: &mut dyn HttpResponse,
+        ) -> Result<(), FilterError> {
+            Ok(())
+        }
+    }
+
+    /// Returns a request of the given method, with the given cookie and body.
+    fn request(method: &str, cookie: Option<&str>, body: Option<&str>) -> Request {
+        let mut builder = Request::builder()
+            .method(method)
+            .uri("http://localhost/login");
+        if let Some(cookie) = cookie {
+            builder = builder.header("cookie", cookie);
+        }
+        let mut request = builder.body(Body::empty()).expect("a valid request");
+        request.ready();
+        if let Some(body) = body {
+            request
+                .extensions_mut()
+                .insert(RequestBody::new(body.as_bytes().to_vec()));
+        }
+
+        request
+    }
+
+    /// Returns the token the filter wrote into the request attributes.
+    fn rendered_token(request: &dyn HttpRequest) -> Arc<dyn CsrfToken> {
+        request
+            .get_attribute(std::any::type_name::<&dyn CsrfToken>())
+            .and_then(|value| value.as_ref_value::<Arc<dyn CsrfToken>>())
+            .cloned()
+            .expect("the filter wrote the token of the request")
+    }
+
+    #[tokio::test]
+    async fn the_token_of_a_page_is_stored_in_the_session_of_the_client() {
+        let repository = Arc::new(HttpSessionCsrfTokenRepository::default());
+        let filter = CsrfFilter::new(repository);
+        let mut get = request("GET", None, None);
+        let mut response = Response::default();
+
+        filter
+            .do_filter(&mut get, &mut response, &Continuing)
+            .await
+            .expect("the page is served");
+
+        assert!(
+            get.session().is_some(),
+            "the token is stored in the session the client is told about"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_submission_that_carries_the_rendered_token_is_accepted() {
+        let repository = Arc::new(HttpSessionCsrfTokenRepository::default());
+        let filter = CsrfFilter::new(repository);
+        let mut get = request("GET", None, None);
+        let mut response = Response::default();
+        filter
+            .do_filter(&mut get, &mut response, &Continuing)
+            .await
+            .expect("the page is served");
+        let rendered = rendered_token(&get).token().to_string();
+        let session_id = get
+            .session()
+            .expect("the page starts a session")
+            .id()
+            .to_string();
+
+        let body = format!("_csrf={}", urlencoding::encode(&rendered));
+        let cookie = format!("NEXT_SESSION={session_id}");
+        let mut post = request("POST", Some(&cookie), Some(&body));
+        let mut response = Response::default();
+
+        filter
+            .do_filter(&mut post, &mut response, &Continuing)
+            .await
+            .expect("the token the page rendered is accepted");
     }
 }

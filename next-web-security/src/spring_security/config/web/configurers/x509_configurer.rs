@@ -153,8 +153,9 @@ where
     }
 
     /// Specifies the regex to extract the principal from the certificate. If not
-    /// specified, the default expression from [`SubjectDnX509PrincipalExtractor`] is
-    /// used.
+    /// specified, the default expression from
+    /// [`SubjectDnX509PrincipalExtractor`](crate::web::authentication::preauth::x509::SubjectDnX509PrincipalExtractor)
+    /// is used.
     ///
     /// # Arguments
     ///
@@ -309,5 +310,202 @@ where
             authentication_details_source: None,
             base: Default::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, sync::Arc};
+
+    use axum::{body::Body, extract::Request};
+    use next_web_core::http::HttpRequest as _;
+
+    use super::*;
+    use crate::{
+        config::{
+            authentication::builders::authentication_manager_builder::AuthenticationManagerBuilder,
+            security_builder::SecurityBuilder,
+            web::builders::HttpSecurity,
+        },
+        core::{
+            userdetails::User,
+            AuthenticationError,
+        },
+        provisioning::InMemoryUserDetailsManager,
+        web::{
+            authentication::preauth::x509::DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE,
+            context::RequestAttributeSecurityContextRepository,
+            security_filter_chain::SecurityFilterChain,
+            test_support::Chain,
+        },
+    };
+
+    /// Returns an HTTP security a configurer can be applied to.
+    fn http_security() -> HttpSecurity {
+        HttpSecurity::new(AuthenticationManagerBuilder::default(), HashMap::new())
+    }
+
+    /// Returns a user details service that holds `Alice`.
+    fn user_details_service() -> InMemoryUserDetailsManager {
+        InMemoryUserDetailsManager::with_users(vec![Arc::new(
+            User::with_username("Alice")
+                .password(Some("password".to_string()))
+                .build(),
+        )])
+    }
+
+    /// Returns a `GET` of the application root.
+    fn request() -> Request {
+        Request::builder()
+            .uri("https://sp.example.org/")
+            .body(Body::empty())
+            .expect("a valid request")
+    }
+
+    /// Returns the names of the filters of a chain.
+    fn filter_names(mut http: HttpSecurity) -> Vec<String> {
+        http.build()
+            .get_filters()
+            .iter()
+            .map(|filter| filter.name().to_owned())
+            .collect()
+    }
+
+    /// Returns the authentication a chain stored on the request, if any.
+    fn stored_authentication(
+        request: &dyn next_web_core::http::HttpRequest,
+    ) -> Option<Arc<dyn crate::core::Authentication>> {
+        use next_web_core::any::AnyValue;
+
+        let AnyValue::BoxedValue(value) = request.get_attribute(
+            RequestAttributeSecurityContextRepository::DEFAULT_REQUEST_ATTR_NAME,
+        )?
+        else {
+            return None;
+        };
+        let context = (**value)
+            .as_any()
+            .downcast_ref::<Arc<dyn crate::core::context::SecurityContext>>()?;
+
+        context.get_authentication()
+    }
+
+    #[test]
+    fn the_configuration_installs_the_filter() {
+        let mut http = http_security();
+        http.x509(|x509| {
+            x509.user_details_service(user_details_service());
+        });
+
+        let names = filter_names(http);
+
+        assert!(
+            names.iter().any(|name| name == "X509AuthenticationFilter"),
+            "the endpoints were: {names:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_configuration_installs_a_forbidden_entry_point() {
+        let mut http = http_security();
+        http.x509(|x509| {
+            x509.user_details_service(user_details_service());
+        });
+
+        let _chain = http.build();
+        let entry_point = http
+            .shared_object::<Arc<dyn AuthenticationEntryPoint>>()
+            .expect("the chain of x509() answers an unauthenticated request")
+            .clone();
+        let mut request = request();
+        let mut response = axum::response::Response::default();
+
+        entry_point
+            .commence(
+                &mut request,
+                &mut response,
+                &AuthenticationError::with_kind(
+                    "no certificate",
+                    crate::core::AuthenticationErrorKind::BadCredentials,
+                ),
+            )
+            .expect("the entry point answers");
+
+        assert_eq!(
+            response.status(),
+            403,
+            "there is nothing a client certificate could be retried with, so the answer is 403"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "A UserDetailsService is required to enable x509()")]
+    fn a_missing_user_details_service_is_reported() {
+        let mut http = http_security();
+        http.x509(|_| {});
+
+        let _ = http.build();
+    }
+
+    #[tokio::test]
+    async fn a_request_with_a_certificate_authenticates_through_the_chain() {
+        let mut http = http_security();
+        http.x509(|x509| {
+            x509.user_details_service(user_details_service());
+        });
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        let mut request = request();
+        request.set_attribute(
+            DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE,
+            next_web_core::any::AnyValue::from("CN=Alice,O=Example"),
+        );
+        let mut response = axum::response::Response::default();
+        Chain::new(filters)
+            .run(&mut request, &mut response)
+            .await
+            .expect("the chain runs");
+
+        let authentication =
+            stored_authentication(&request).expect("the certificate authenticates the user");
+        assert_eq!(authentication.name(), "Alice");
+        assert!(
+            authentication
+                .authorities()
+                .iter()
+                .filter_map(|authority| authority.authority())
+                .any(|authority| authority == "FACTOR_X509"),
+            "the authentication says how the user was authenticated"
+        );
+        assert_eq!(
+            authentication.of(),
+            std::any::TypeId::of::<
+                crate::web::authentication::preauth::PreAuthenticatedAuthenticationToken,
+            >(),
+            "the stored authentication is the pre-authenticated one"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_request_without_a_certificate_does_not_authenticate() {
+        let mut http = http_security();
+        http.x509(|x509| {
+            x509.user_details_service(user_details_service());
+        });
+        let chain = http.build();
+        let filters = Arc::new(chain.get_filters().to_vec());
+
+        let mut request = request();
+        let mut response = axum::response::Response::default();
+        Chain::new(filters)
+            .run(&mut request, &mut response)
+            .await
+            .expect("the chain runs");
+
+        assert!(
+            stored_authentication(&request).is_none(),
+            "a request without a certificate is not authenticated"
+        );
     }
 }

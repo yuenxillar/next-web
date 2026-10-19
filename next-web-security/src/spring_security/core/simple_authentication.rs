@@ -70,7 +70,7 @@ impl Principal for SimpleAuthentication {
     fn name(&self) -> Cow<'_, str> {
         self.principal
             .as_deref()
-            .map(|p| Cow::Owned(p.to_string()))
+            .map(crate::web::authentication::principal_name)
             .unwrap_or_default()
     }
 }

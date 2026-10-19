@@ -147,12 +147,25 @@ impl DefaultLoginPageGeneratingFilter {
         self.one_time_token_enabled = one_time_token_enabled;
     }
 
+    /// Returns whether the generated page contains a one-time token request form.
+    pub fn is_one_time_token_enabled(&self) -> bool {
+        self.one_time_token_enabled
+    }
+
     pub fn set_saml2_login_enabled(&mut self, saml2_login_enabled: bool) {
         self.saml2_login_enabled = saml2_login_enabled;
     }
 
     pub fn set_passkeys_enabled(&mut self, passkeys_enabled: bool) {
         self.passkeys_enabled = passkeys_enabled;
+    }
+
+    /// Returns whether the login page offers a passkey sign-in.
+    ///
+    /// The page renders the passkey form, and the script that runs the ceremony,
+    /// only when a relying party configured Web Authentication.
+    pub fn passkeys_enabled(&self) -> bool {
+        self.passkeys_enabled
     }
 
     pub fn set_authentication_url(&mut self, authentication_url: impl Into<String>) {
@@ -164,6 +177,11 @@ impl DefaultLoginPageGeneratingFilter {
         generate_one_time_token_url: impl Into<String>,
     ) {
         self.generate_one_time_token_url = Some(generate_one_time_token_url.into());
+    }
+
+    /// Returns the URL the generated one-time token form posts to, if one is set.
+    pub fn get_one_time_token_generation_url(&self) -> Option<&str> {
+        self.generate_one_time_token_url.as_deref()
     }
 
     pub fn set_username_parameter(&mut self, username_parameter: impl Into<String>) {
@@ -309,6 +327,11 @@ impl DefaultLoginPageGeneratingFilter {
             return HtmlTemplates::from_template(PASSKEY_SCRIPT_TEMPLATE)
                 .with_value("loginPageUrl", self.login_page_url.as_deref().unwrap_or(""))
                 .with_value("contextPath", context_path)
+                .with_value(
+                    "usernameParameter",
+                    self.username_parameter.as_deref().unwrap_or("username"),
+                )
+                .with_value("registerUrl", &format!("{context_path}/webauthn/register"))
                 .with_raw_html("csrfHeaders", &self.render_headers(request))
                 .render();
         }
@@ -650,7 +673,7 @@ const PASSKEY_SCRIPT_TEMPLATE: &str = r#"
 <script type="text/javascript" src="{{contextPath}}/login/webauthn.js"></script>
 <script type="text/javascript">
 <!--
-    document.addEventListener("DOMContentLoaded",() => setupLogin({{csrfHeaders}}, "{{contextPath}}", document.getElementById('passkey-signin')));
+    document.addEventListener("DOMContentLoaded",() => setupLogin({{csrfHeaders}}, "{{contextPath}}", "{{usernameParameter}}", "{{registerUrl}}", document.getElementById('passkey-signin')));
 
 //-->
 </script>
@@ -752,3 +775,48 @@ const ONE_TIME_READONLY_USERNAME_INPUT: &str = r#"
 const ONE_TIME_USERNAME_INPUT: &str = r#"
 <input type="text" id="ott-username" name="username" placeholder="Username" required>
 "#;
+
+#[cfg(test)]
+mod tests {
+    use axum::{body::Body, extract::Request};
+
+    use super::*;
+
+    /// Returns a `GET` of the login page.
+    fn request() -> Request {
+        Request::builder()
+            .method("GET")
+            .uri("https://sp.example.org/login")
+            .body(Body::empty())
+            .expect("a valid request")
+    }
+
+    #[test]
+    fn the_passkey_script_is_rendered_with_the_username_parameter() {
+        let mut filter = DefaultLoginPageGeneratingFilter::default();
+        filter.set_passkeys_enabled(true);
+        filter.set_username_parameter("user");
+
+        let html = filter.render_java_script(&request(), "");
+
+        assert!(
+            html.contains("setupLogin("),
+            "the page calls the script of the login page, was: {html}"
+        );
+        assert!(
+            html.contains(r#""user""#),
+            "the script is told which field holds the user name, was: {html}"
+        );
+        assert!(
+            html.contains(r#""/webauthn/register""#),
+            "the script is told where a passkey is registered, was: {html}"
+        );
+    }
+
+    #[test]
+    fn no_passkey_script_is_rendered_without_a_relying_party() {
+        let filter = DefaultLoginPageGeneratingFilter::default();
+
+        assert_eq!(filter.render_java_script(&request(), ""), "");
+    }
+}

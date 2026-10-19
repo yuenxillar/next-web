@@ -56,7 +56,7 @@ impl SessionAuthenticationStrategy for CsrfAuthenticationStrategy {
                 })?;
 
             let mut deferred_csrf_token =
-                load_deferred_token(self.token_repository.clone(), req, resp);
+                load_deferred_token(self.token_repository.clone(), req, resp).await;
             self.request_handler
                 .handle(req, resp, &mut deferred_csrf_token)
                 .await;

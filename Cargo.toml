@@ -74,6 +74,7 @@ serde_repr = { version = "0.1.20" }
 serde_with = { version = "3.17.0" }
 serde_path_to_error = { version = "0.1.17" }
 quick-xml = { version = "0.37.4", features = ["serialize"] }
+flate2 = { version = "1.1.5" }
 strum = { version = "0.27", features = ["derive"] }
 
 utoipa = { version = "6.0.0", default-features = false }
@@ -152,6 +153,14 @@ aes-gcm = { version = "0.10.3" }
 aes = { version = "0.8.4" }
 scrypt  = { version = "0.11.0" }
 rsa     = { version = "0.9.10" }
+p256    = { version = "0.14.0" }
+# TLS, for the end-to-end tests that present a client certificate
+rustls = { version = "0.23.35" }
+tokio-rustls = { version = "0.26.4" }
+rustls-pemfile = { version = "2.2.0" }
+# CBOR and COSE, the encodings a Web Authentication ceremony carries
+ciborium = { version = "0.2.2" }
+coset    = { version = "0.4.2" }
 
 # data
 rbs = { version = "4.6.2" }

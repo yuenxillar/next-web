@@ -104,7 +104,7 @@ impl Authentication for PreAuthenticatedAuthenticationToken {
 
 impl Principal for PreAuthenticatedAuthenticationToken {
     fn name(&self) -> Cow<'_, str> {
-        Cow::Owned(self.principal.to_string())
+        crate::web::authentication::principal_name(self.principal.as_ref())
     }
 }
 
@@ -195,5 +195,46 @@ impl AuthenticationBuilder for PreAuthenticatedAuthenticationTokenBuilder {
 
     fn build(&mut self) -> Arc<dyn Authentication> {
         Arc::new(PreAuthenticatedAuthenticationToken::from_builder(self))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::userdetails::User;
+
+    /// Returns the token a pre-authenticated provider builds for a user details.
+    fn token_of(user: User) -> PreAuthenticatedAuthenticationToken {
+        PreAuthenticatedAuthenticationToken::with_authorities(
+            Arc::new(user) as AuthPrincipal,
+            None,
+            Vec::new(),
+        )
+    }
+
+    #[test]
+    fn the_name_of_a_user_details_principal_is_the_user_name() {
+        let token = token_of(
+            User::with_username("Alice")
+                .password(Some("secret".to_string()))
+                .build(),
+        );
+
+        assert_eq!(
+            token.name(),
+            "Alice",
+            "the name of an authentication is the user name, not the display of the user"
+        );
+    }
+
+    #[test]
+    fn the_name_of_another_principal_is_its_display_form() {
+        let token = PreAuthenticatedAuthenticationToken::with_authorities(
+            Arc::new("Alice".to_string()) as AuthPrincipal,
+            None,
+            Vec::new(),
+        );
+
+        assert_eq!(token.name(), "Alice");
     }
 }

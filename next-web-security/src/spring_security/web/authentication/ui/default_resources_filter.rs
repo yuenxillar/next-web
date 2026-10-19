@@ -12,7 +12,56 @@ use next_web_core::{
 use crate::web::util::matcher::{PathPatternRequestMatcher, RequestMatcher};
 
 const DEFAULT_CSS: &str = include_str!("resources/default-ui.css");
-const DEFAULT_WEBAUTHN_JS: &str = include_str!("resources/spring-security-webauthn.js");
+const DEFAULT_WEBAUTHN_JS: &str = include_str!("resources/security-webauthn.js");
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_served_script_runs_the_login_ceremony() {
+        assert!(
+            DEFAULT_WEBAUTHN_JS.contains(r#""/webauthn/authenticate/options""#),
+            "the script asks for the options of the ceremony"
+        );
+        assert!(
+            DEFAULT_WEBAUTHN_JS.contains(r#""/webauthn/authenticate""#),
+            "the script answers them"
+        );
+        assert!(
+            DEFAULT_WEBAUTHN_JS.contains("navigator.credentials.get"),
+            "the script asks the authenticator"
+        );
+        assert!(
+            DEFAULT_WEBAUTHN_JS.contains("setupLogin"),
+            "the login page calls this"
+        );
+        assert!(
+            DEFAULT_WEBAUTHN_JS.contains("PublicKeyCredential"),
+            "the script hides itself where passkeys are absent"
+        );
+    }
+
+    #[test]
+    fn the_served_script_runs_the_registration_ceremony() {
+        assert!(
+            DEFAULT_WEBAUTHN_JS.contains(r#""/webauthn/register/options""#),
+            "the script asks for the options of a registration"
+        );
+        assert!(
+            DEFAULT_WEBAUTHN_JS.contains(r#""/webauthn/register""#),
+            "the script answers them"
+        );
+        assert!(
+            DEFAULT_WEBAUTHN_JS.contains("navigator.credentials.create"),
+            "the script creates the credential"
+        );
+        assert!(
+            DEFAULT_WEBAUTHN_JS.contains("setupRegistration"),
+            "the registration page calls this"
+        );
+    }
+}
 
 /// Serve common static assets used in default UIs, such as CSS or Javascript
 /// files. For internal use only.

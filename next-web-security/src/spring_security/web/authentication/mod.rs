@@ -69,10 +69,33 @@ where
     Self: Send + Sync,
 {
     fn as_any(&self) -> &dyn std::any::Any;
+
+    /// Returns the name this principal is known by, when it is a user of the
+    /// application.
+    ///
+    /// The name of an authentication is the user name of a user details
+    /// principal, not the display form of the object; every other principal
+    /// answers with nothing, and its display form is the name.
+    fn principal_name(&self) -> Option<&str> {
+        None
+    }
 }
 
 impl Identity for String {
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn principal_name(&self) -> Option<&str> {
+        Some(self)
+    }
+}
+
+/// Returns the name of a principal, the way the name of an authentication is
+/// defined.
+pub fn principal_name(principal: &dyn Identity) -> std::borrow::Cow<'_, str> {
+    match principal.principal_name() {
+        Some(name) => std::borrow::Cow::Owned(name.to_string()),
+        None => std::borrow::Cow::Owned(principal.to_string()),
     }
 }

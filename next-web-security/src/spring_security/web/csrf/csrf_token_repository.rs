@@ -47,20 +47,23 @@ where
     async fn load_token(&self, request: &mut dyn HttpRequest) -> Option<Arc<dyn CsrfToken>>;
 }
 
-/// Lazily loads a CSRF Token.
+/// Loads the CSRF token of a request.
 ///
-/// Returns a `DeferredCsrfToken` that caches the token to avoid repeated loading.
+/// The token is loaded with the request and the response in hand, because a
+/// request without a token has one generated and stored, and the store is what
+/// tells the client about the session it answers with.
 ///
 /// # Parameters
+/// * `this` - The repository the token is loaded from.
 /// * `request` - The HTTP request object.
 /// * `response` - The HTTP response object.
 ///
 /// # Returns
 /// A `DeferredCsrfToken` instance.
-pub fn load_deferred_token(
+pub async fn load_deferred_token(
     this: Arc<dyn CsrfTokenRepository>,
     request: &mut dyn HttpRequest,
     response: &mut dyn HttpResponse,
 ) -> RepositoryDeferredCsrfToken {
-    RepositoryDeferredCsrfToken::new(this, request, response)
+    RepositoryDeferredCsrfToken::load(this, request, response).await
 }

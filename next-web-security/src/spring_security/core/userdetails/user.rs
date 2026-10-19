@@ -144,6 +144,10 @@ impl Identity for User {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn principal_name(&self) -> Option<&str> {
+        Some(&self.username)
+    }
 }
 
 impl CredentialsContainer for User {
@@ -266,11 +270,11 @@ impl UserBuilder {
     /// "ROLE_".
     ///
     /// # Example
-    /// ```
+    /// ```text
     /// builder.roles(&["USER", "ADMIN"]);
     /// ```
     /// is equivalent to
-    /// ```
+    /// ```text
     /// builder.authorities(&["ROLE_USER", "ROLE_ADMIN"]);
     /// ```
     ///
