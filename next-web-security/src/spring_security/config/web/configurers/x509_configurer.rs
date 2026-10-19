@@ -25,7 +25,7 @@ use crate::{
     web::{
         authentication::{
             preauth::{
-                x509::{X509AuthenticationFilter, X509PrincipalExtractor},
+                x509::{ClientCertificateAttributeFilter, X509AuthenticationFilter, X509PrincipalExtractor},
                 PreAuthenticatedAuthenticationProvider, PreAuthenticatedAuthenticationToken,
             },
             Http403ForbiddenEntryPoint,
@@ -273,6 +273,14 @@ where
     }
 
     fn configure(&mut self, http: &mut H) {
+        // The certificate of the connection is not part of the request: the
+        // transport that validated it inserted it, and the filter that
+        // authenticates it reads an attribute. This filter is the step between
+        // them, and it runs before the one that authenticates.
+        http.add_filter_before::<ClientCertificateAttributeFilter, X509AuthenticationFilter>(
+            ClientCertificateAttributeFilter::new(),
+        );
+
         let filter = self.get_filter(http);
         http.add_filter(filter);
     }

@@ -8,7 +8,7 @@ Last verified with:
 
 ```
 cargo test -p next-web-security
-    390 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
+    398 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
 
 cargo test -p next-web-security --features oauth2-client
     436 passed, 0 failed, 3 over HTTP, 2 over TLS; 8 doctests passed, 9 ignored
@@ -36,12 +36,21 @@ handshake. This is the strongest evidence in this file.
 | web authn | `a_passkey_is_registered_and_then_signs_the_user_in` | a passkey is registered for the signed-in user through the two registration endpoints, and a **new client with no password** signs in through the two authentication endpoints and reaches the application as that user |
 | x509 client certificates | `a_client_certificate_authenticates_over_tls`, `a_client_without_a_certificate_is_refused_by_the_handshake` | a TLS handshake that requires a client certificate reaches the chain, and the application sees the user the certificate names; a client that presents none never reaches the chain |
 
-What the x509 test does **not** prove is the certificate's own validation and the
-extraction of its subject: rustls validates the certificate in the test, as a
-container would in production, and writes the subject its certificate carries
-after checking that the handshake agreed on that certificate. The port's half —
-the attribute, the user lookup, `FACTOR_X509`, the session — is what the test
-holds.
+What the x509 test does **not** prove is the certificate's own validation: rustls
+validates it in the test, as a container would in production, and the request
+carries the certificate itself — `next_web_core::http::PeerCertificate`, which
+only a transport that validated it may insert. `ClientCertificateAttributeFilter`,
+which `x509()` installs before the filter that authenticates, reads the subject
+out of the DER encoding and writes it into the attribute the X.509 filter reads;
+the test therefore walks the same path a TLS server or a terminator takes, and
+what it holds is the subject parsing, the attribute, the user lookup,
+`FACTOR_X509` and the session.
+
+A transport of an application inserts `PeerCertificate` itself: `axum-server`
+hands the certificate of its TLS connection to the service it serves, and the
+layer that reads it inserts the type into the request extensions before the
+security chain runs. A terminator that reports a subject as text can use
+`PeerCertificate::with_subject`, and the filter uses that subject as it is.
 
 ## Verified end to end
 

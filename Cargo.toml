@@ -158,6 +158,8 @@ p256    = { version = "0.14.0" }
 rustls = { version = "0.23.35" }
 tokio-rustls = { version = "0.26.4" }
 rustls-pemfile = { version = "2.2.0" }
+# DER parsing, for the subject of a client certificate
+simple_asn1 = { version = "0.6.4" }
 # CBOR and COSE, the encodings a Web Authentication ceremony carries
 ciborium = { version = "0.2.2" }
 coset    = { version = "0.4.2" }

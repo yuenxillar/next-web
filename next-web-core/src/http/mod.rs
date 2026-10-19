@@ -9,6 +9,7 @@ mod http_request_share;
 mod http_response;
 mod http_response_share;
 mod media_type;
+mod peer_certificate;
 mod request_body;
 mod request_lifecycle;
 mod resource_dispatcher;
@@ -26,6 +27,7 @@ pub use http_request_share::HttpRequestShare;
 pub use http_response::HttpResponse;
 pub use http_response_share::HttpResponseShare;
 pub use media_type::MediaType;
+pub use peer_certificate::PeerCertificate;
 pub use request_body::{
     APPLICATION_JSON, BodyBufferError, BodyBufferPolicy, DEFAULT_MAX_BUFFERED_BODY_BYTES,
     FORM_URLENCODED, RequestBody, buffer_request_body, buffer_request_body_for, form_parameters,

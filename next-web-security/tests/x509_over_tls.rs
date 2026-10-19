@@ -21,7 +21,6 @@ use axum::{
     response::Response,
 };
 use next_web_core::{
-    any::AnyValue,
     async_trait,
     http::{
         filter::{FilterError, HttpFilter, HttpFilterChain},
@@ -36,7 +35,7 @@ use next_web_security::{
     },
     core::userdetails::User,
     provisioning::InMemoryUserDetailsManager,
-    web::{authentication::preauth::x509::DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE, FilterChainProxy},
+    web::FilterChainProxy,
 };
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
 use tokio::{
@@ -55,8 +54,6 @@ const SERVER_KEY: &str = include_str!("fixtures/tls/server-key.pem");
 const CLIENT_CERT: &str = include_str!("fixtures/tls/client-cert.pem");
 /// The private key the client presents.
 const CLIENT_KEY: &str = include_str!("fixtures/tls/client-key.pem");
-/// The subject the client certificate carries, as the container would report it.
-const CLIENT_SUBJECT: &str = "CN=Alice, O=Example";
 /// The name of the user the client certificate is mapped to.
 const USER: &str = "Alice";
 
@@ -234,14 +231,18 @@ async fn serve_one(
     request
         .extensions_mut()
         .insert(RequestBody::new(Vec::new()));
-    // The container's part: it validated the certificate, and it hands the
-    // subject on. The test writes the subject its certificate carries, after
-    // checking that the handshake agreed on that certificate.
-    if with_certificate && peer_certificate.is_some() {
-        request.set_attribute(
-            DEFAULT_CLIENT_CERTIFICATE_ATTRIBUTE,
-            AnyValue::from(CLIENT_SUBJECT),
-        );
+    // The container's part: it validated the certificate and hands it on, and the
+    // filter that reads the attribute of a servlet-style request is what turns it
+    // into the principal. The test inserts what the transport of an application
+    // inserts — the certificate itself, not a subject it would have to trust.
+    if with_certificate {
+        if let Some(certificate) = peer_certificate.clone() {
+            request
+                .extensions_mut()
+                .insert(next_web_core::http::PeerCertificate::new(
+                    certificate.as_ref().to_vec(),
+                ));
+        }
     }
 
     let lifecycle = next_web_core::http::RequestLifecycle::begin(&mut request);

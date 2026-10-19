@@ -2,10 +2,25 @@
 
 Date: 2026-10-21
 Status: done — 7 tests of the configuration and the name of a pre-authenticated
-token, and 2 end-to-end tests over TLS (`tests/x509_over_tls.rs`): a TLS
-listener that requires a client certificate, a client that presents the one the
-fixtures carry, and the chain behind it. The defect the chain test found is in
-`docs/verification-matrix.md`.
+token, 5 of the bridge that turns the certificate of the connection into the
+attribute the filter reads, and 2 end-to-end tests over TLS
+(`tests/x509_over_tls.rs`): a TLS listener that requires a client certificate, a
+client that presents the one the fixtures carry, and the chain behind it. The
+defect the chain test found is in `docs/verification-matrix.md`.
+
+## The certificate of the connection
+
+A certificate is not part of an HTTP request, so the port needs a step between
+the transport and the filter that authenticates:
+
+- `next_web_core::http::PeerCertificate` is what the transport inserts into the
+  request extensions once it has validated the certificate; `HttpRequest::
+  peer_certificate` reads it. A request of any other transport has none.
+- `ClientCertificateAttributeFilter`, installed by `x509()` ahead of the filter
+  that authenticates, writes the subject of that certificate into the attribute
+  the X.509 filter already reads. It parses the subject out of the DER encoding —
+  RFC 4514 order, escaped values — and uses the subject a terminator rendered
+  when the transport carries one.
 
 ## Where it stands
 

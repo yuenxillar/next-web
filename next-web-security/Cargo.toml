@@ -34,6 +34,7 @@ tracing.workspace       = true
 ciborium.workspace      = true
 coset.workspace         = true
 p256.workspace          = true
+simple_asn1.workspace   = true
 
 
 [features]

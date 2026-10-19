@@ -30,12 +30,11 @@ use next_web_context::Locale;
 use crate::{
     any::AnyValue,
     http::{
-        Cookie, HttpMethod, HttpRequestShare, HttpVersion, ResourceDispatcher,
+        Cookie, HttpMethod, HttpRequestShare, HttpVersion, PeerCertificate, ResourceDispatcher,
         session::{
             HttpSession, SESSION_COOKIE_NAME, SessionManager, StandardSession,
             global_session_manager,
-        },
-    },
+        },    },
     web::ViewModel,
 };
 
@@ -160,6 +159,23 @@ where
 
     /// Returns every value of the named query parameter.
     fn parameter_values(&self, name: &str) -> Option<Vec<Cow<'_, str>>>;
+
+    /// Returns the value of a submitted parameter, from the query string or from
+    /// a url-encoded form body.
+    ///
+    /// A form post carries its parameters in the body rather than in the query,
+    /// so a filter that authenticates a form submission has to read both — which
+    /// is what a servlet request's parameter lookup does. The query string wins
+    /// when both carry the name.
+    fn form_parameter(&self, name: &str) -> Option<Cow<'_, str>> {
+        if let Some(value) = self.parameter(name) {
+            return Some(Cow::Borrowed(value));
+        }
+
+        let body = self.body_bytes()?;
+
+        form_urlencoded::parse(body).find_map(|(key, value)| (key == name).then_some(value))
+    }
 
     /// Returns the bytes of the request body when the transport buffered them.
     ///
@@ -287,6 +303,16 @@ where
 
     /// Returns the address of the peer that sent the request, if known.
     fn remote_addr(&self) -> Option<&SocketAddr>;
+
+    /// Returns the certificate the client presented over the connection of the
+    /// request, if the transport of the application handed one on.
+    ///
+    /// The certificate is not part of the request: the transport that made the
+    /// connection validated it and inserted it, and a request of any other
+    /// transport has none.
+    fn peer_certificate(&self) -> Option<&PeerCertificate> {
+        None
+    }
 
     /// Returns the shared, transport-independent snapshot of the request.
     ///
@@ -589,6 +615,10 @@ impl HttpRequest for Request {
 
     fn remote_addr(&self) -> Option<&SocketAddr> {
         self.extensions().get::<SocketAddr>()
+    }
+
+    fn peer_certificate(&self) -> Option<&PeerCertificate> {
+        self.extensions().get::<PeerCertificate>()
     }
 
     fn shared(&mut self) -> &HttpRequestShare {
