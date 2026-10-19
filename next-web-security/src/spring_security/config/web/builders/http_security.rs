@@ -1001,13 +1001,16 @@ impl HttpSecurity {
         self.add_filter_at_offset::<F, F1>(filter, 0);
     }
 
-    /// Unverified
+    /// Ok
     ///
     /// Returns the authentication builder the chain builds its authentication
     /// manager from.
     ///
     /// The builder is the one this instance was created with, and it is the place a
-    /// provider or a user details service is registered on.
+    /// provider or a user details service is registered on: a provider registered
+    /// through it is the one the manager the build shares authenticates with.
+    /// [`Self::authentication_manager`] replaces that build, and then the manager
+    /// it was given is the one the chain authenticates with.
     pub fn get_authentication_registry(&mut self) -> Option<&mut AuthenticationManagerBuilder> {
         self.shared_object_mut::<AuthenticationManagerBuilder>()
     }
@@ -1433,6 +1436,103 @@ mod tests {
         assert!(
             !http.request_matcher.matches(&request("/admin/users")),
             "the matchers declared before it are gone"
+        );
+    }
+
+    /// A provider that accepts every token it supports, so that the manager of a
+    /// chain can be told apart from one that was built another way.
+    #[derive(Clone)]
+    struct AcceptingProvider;
+
+    #[next_web_core::async_trait]
+    impl crate::authentication::AuthenticationProvider for AcceptingProvider {
+        async fn authenticate(
+            &self,
+            authentication: &Arc<dyn crate::core::Authentication>,
+        ) -> Result<Option<Arc<dyn crate::core::Authentication>>, crate::core::AuthenticationError>
+        {
+            Ok(Some(authentication.clone()))
+        }
+
+        fn supports(&self, _authentication: std::any::TypeId) -> bool {
+            true
+        }
+    }
+
+    /// A manager that authenticates nobody, so that a chain configured with it
+    /// can be told apart from the one its registry builds.
+    struct DenyingManager;
+
+    #[next_web_core::async_trait]
+    impl crate::authorization::AuthenticationManager for DenyingManager {
+        async fn authenticate(
+            &self,
+            _authentication: &dyn crate::core::Authentication,
+        ) -> Result<Arc<dyn crate::core::Authentication>, crate::core::AuthenticationError> {
+            Err(crate::core::AuthenticationError::new(
+                "no provider of this manager accepts the token",
+            ))
+        }
+    }
+
+    /// Returns a token of the user the tests name.
+    fn token() -> Arc<dyn crate::core::Authentication> {
+        Arc::new(
+            crate::web::authentication::preauth::PreAuthenticatedAuthenticationToken::new(
+                Arc::new("Alice".to_string()),
+                None,
+            ),
+        )
+    }
+
+    #[tokio::test]
+    async fn the_registry_builds_the_manager_the_chain_authenticates_with() {
+        use crate::authorization::AuthenticationManager;
+        use crate::config::authentication::provider_manager_builder::ProviderManagerBuilder;
+        use crate::config::security_builder::SecurityBuilder;
+
+        let mut http = http_with_matcher_builder(PathPatternRequestMatcherBuilder::default());
+        http.get_authentication_registry()
+            .expect("a builder this instance created holds a registry")
+            .authentication_provider(Arc::new(AcceptingProvider));
+        let _chain = http.build();
+        let manager = http
+            .shared_object::<Arc<dyn AuthenticationManager>>()
+            .expect("the build shares the manager it built");
+
+        let authenticated = manager
+            .authenticate(&*token())
+            .await
+            .expect("the provider of the registry accepts the token");
+
+        assert_eq!(
+            authenticated.name(),
+            "Alice",
+            "the manager authenticates with the provider that was registered on the registry"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_manager_of_its_own_replaces_the_one_the_registry_builds() {
+        use crate::authorization::AuthenticationManager;
+        use crate::config::authentication::provider_manager_builder::ProviderManagerBuilder;
+        use crate::config::security_builder::SecurityBuilder;
+
+        let mut http = http_with_matcher_builder(PathPatternRequestMatcherBuilder::default());
+        http.get_authentication_registry()
+            .expect("a builder this instance created holds a registry")
+            .authentication_provider(Arc::new(AcceptingProvider));
+        http.authentication_manager(Arc::new(DenyingManager));
+        let _chain = http.build();
+        let manager = http
+            .shared_object::<Arc<dyn AuthenticationManager>>()
+            .expect("the build shares the manager it was given");
+
+        let outcome = manager.authenticate(&*token()).await;
+
+        assert!(
+            outcome.is_err(),
+            "the manager of the builder is the one the chain authenticates with, not the one of the registry"
         );
     }
 }
