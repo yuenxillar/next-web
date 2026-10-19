@@ -34,12 +34,8 @@ pub(crate) mod test_support {
 
     use axum::{body::Body, extract::Request, http::StatusCode, response::Response};
     use next_web_core::{
-        filter::application_filter_chain::ApplicationFilterChain,
-        http::{buffer_request_body, form_parameters},
-        traits::{
-            filter::{HttpFilter, HttpFilterChain},
-            http::{HttpRequest, HttpResponse},
-        },
+        http::filter::{ApplicationFilterChain, HttpFilter, HttpFilterChain},
+        http::{HttpRequest, HttpResponse, buffer_request_body, form_parameters},
     };
     use serde_json::Value;
 

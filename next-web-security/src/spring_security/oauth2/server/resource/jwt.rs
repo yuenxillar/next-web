@@ -845,7 +845,9 @@ where
     }
 }
 
-#[cfg(test)]
+/// The tests sign the tokens they decode, and only a build that supports the
+/// authorization server carries a signer.
+#[cfg(all(test, feature = "oauth2-authorization-server"))]
 mod tests {
     use std::sync::{
         atomic::{AtomicUsize, Ordering},

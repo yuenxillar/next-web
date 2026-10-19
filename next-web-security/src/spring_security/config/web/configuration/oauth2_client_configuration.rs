@@ -9,7 +9,7 @@ use std::{error::Error, sync::Arc};
 
 use next_web_context::ApplicationContextExt;
 use next_web_core::{
-    async_trait, traits::config::auto_configuration::AutoConfiguration, ApplicationContext, Ordered,
+    async_trait, config::auto_configuration::AutoConfiguration, ApplicationContext, Ordered,
 };
 use next_web_macros::singleton;
 

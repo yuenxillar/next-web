@@ -3,10 +3,10 @@ use std::{fmt, ops::Deref, ops::DerefMut, sync::Arc};
 use next_web_core::{
     async_trait,
     error::BoxError,
-    filter::FilterError,
-    http::StatusCode,
-    http::{HttpRequest, HttpResponse},
-    traits::filter::{HttpFilter, HttpFilterChain},
+    http::{
+        HttpRequest, HttpResponse, StatusCode,
+        filter::{FilterError, HttpFilter, HttpFilterChain},
+    },
     Named, Required,
 };
 

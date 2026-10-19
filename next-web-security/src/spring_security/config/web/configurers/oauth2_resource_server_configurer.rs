@@ -313,3 +313,7 @@ where
             .finish()
     }
 }
+
+#[cfg(test)]
+#[path = "oauth2_resource_server_configurer_tests.rs"]
+mod tests;

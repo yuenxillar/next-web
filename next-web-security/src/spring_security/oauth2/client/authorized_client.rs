@@ -12,7 +12,7 @@ use std::{collections::HashMap, fmt, sync::Arc};
 
 use next_web_core::{
     any::AnyValue,
-   http::{HttpRequest, HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 
 use crate::{
@@ -460,15 +460,17 @@ impl OAuth2AuthorizedClientManager for DefaultOAuth2AuthorizedClientManager {
         }
 
         // The scopes a request asks for are read from its `scope` parameter,
-        // which is the parameter the attribute is mapped from.
+        // which is the parameter the attribute is mapped from. The consent of
+        // the resource owner arrives as a form post, so the body is consulted as
+        // well as the query.
         if authorization_context
             .attribute(REQUEST_SCOPE_ATTRIBUTE_NAME)
             .is_none()
         {
-            if let Some(scope) = request.parameter("scope") {
+            if let Some(scope) = request.form_parameter("scope") {
                 authorization_context.set_attribute(
                     REQUEST_SCOPE_ATTRIBUTE_NAME,
-                    AnyValue::String(scope.to_string()),
+                    AnyValue::String(scope.into_owned()),
                 );
             }
         }
@@ -552,7 +554,7 @@ mod tests {
             authorized_client: OAuth2AuthorizedClient,
             _principal: &dyn Authentication,
             _request: &dyn next_web_core::http::HttpRequest,
-            _response: &mut dyn next_web_core::traits::http::http_response::HttpResponse,
+            _response: &mut dyn next_web_core::http::HttpResponse,
         ) {
             self.authorized_clients.lock().unwrap().insert(
                 authorized_client

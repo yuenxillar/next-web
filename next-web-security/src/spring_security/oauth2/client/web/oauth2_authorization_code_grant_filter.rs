@@ -2,13 +2,11 @@ use std::{fmt, sync::Arc};
 
 use next_web_core::{
     async_trait,
-    filter::FilterError,
-    http::{HttpMethod, StatusCode},
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{HttpRequest, HttpResponse},
-        named::Named,
+    http::{
+        HttpRequest, HttpResponse, StatusCode,
+        filter::{FilterError, HttpFilter, HttpFilterChain},
     },
+    Named,
 };
 
 use crate::{
@@ -167,8 +165,13 @@ impl OAuth2AuthorizationCodeGrantFilter {
     /// be any URI of the application.
     fn matches(&self, request: &dyn HttpRequest) -> bool {
         // An authorization response carries the code, or the error the
-        // authorization endpoint reported.
-        if request.parameter("code").is_none() && request.parameter("error").is_none() {
+        // authorization endpoint reported. The response is a form post when it
+        // answers a code grant, so both the query and the body are consulted.
+        if request
+            .form_parameter("code")
+            .or_else(|| request.form_parameter("error"))
+            .is_none()
+        {
             return false;
         }
 
@@ -407,11 +410,9 @@ mod tests {
     use axum::{body::Body, extract::Request, response::Response};
     use next_web_core::{
         async_trait,
-        filter::FilterError,
-        http::StatusCode,
-        traits::{
-            filter::{HttpFilter, HttpFilterChain},
-            http::{HttpRequest, HttpResponse},
+        http::{
+            HttpRequest, HttpResponse, StatusCode,
+            filter::{FilterError, HttpFilter, HttpFilterChain},
         },
     };
 

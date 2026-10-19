@@ -735,7 +735,7 @@ impl HttpSecurity {
         self
     }
 
-    /// Pending
+    /// Ok
     ///
     /// Adds OAuth 2.0 resource server support.
     ///
@@ -743,6 +743,13 @@ impl HttpSecurity {
     /// the claims of the token into the authentication, so a rule can require an
     /// authority or a scope the token was issued with. The closure decides how a
     /// token is decoded and validated.
+    ///
+    /// A request that carries a token the decoder accepts continues down the
+    /// chain as the user the token names, with the scopes of the token as
+    /// authorities; a request without a token is left to the application, and a
+    /// token the decoder refuses is answered with 401. See
+    /// [`OAuth2ResourceServerConfigurer`] for the entry point and the handler the
+    /// configuration installs.
     #[cfg(feature = "oauth2-resource-server")]
     pub fn oauth2_resource_server<F>(&mut self, oauth2_resource_server: F) -> &mut Self
     where

@@ -2,9 +2,9 @@
 
 use next_web_core::{
     error::BoxError,
-    filter::FilterError,
+    http::filter::FilterError,
     http::StatusCode,
-   http::{HttpRequest, HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 use serde_json::Value;
 
@@ -56,7 +56,7 @@ pub(crate) fn error_response(response: &mut dyn HttpResponse, error: &OAuth2Erro
 /// the resource owner to the login page and lets the request continue after the
 /// login.
 pub(crate) fn resource_owner_required() -> FilterError {
-    FilterError::Chain(next_web_core::filter::FilterChainError::AnyError(Box::new(
+    FilterError::Chain(next_web_core::http::filter::FilterChainError::AnyError(Box::new(
         AuthenticationError::with_kind(
             "Full authentication is required to access the authorization endpoint",
             AuthenticationErrorKind::InsufficientAuthentication,
@@ -103,7 +103,7 @@ pub(crate) fn send_redirect(
     strategy
         .send_redirect(request, response, &redirect_url(redirect_uri, parameters))
         .map_err(|error: BoxError| {
-            FilterError::Chain(next_web_core::filter::FilterChainError::Boxed(error))
+            FilterError::Chain(next_web_core::http::filter::FilterChainError::Boxed(error))
         })
 }
 

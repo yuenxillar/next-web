@@ -413,7 +413,10 @@ fn invalid_id_token(message: impl Into<String>) -> AuthenticationError {
     AuthenticationError::with_kind(message, AuthenticationErrorKind::BadCredentials)
 }
 
-#[cfg(test)]
+// The tests sign an id token, and the signer of the crate belongs to the
+// authorization server side: enabling only the client feature leaves the tests of
+// the validator out, rather than refusing to build the crate at all.
+#[cfg(all(test, feature = "oauth2-authorization-server"))]
 mod tests {
     use serde_json::json;
 

@@ -3,11 +3,9 @@
 use next_web_core::{
     async_trait,
     http::StatusCode,
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{HttpRequest, HttpResponse},
-        named::Named,
-    },
+    http::filter::{HttpFilter, HttpFilterChain},
+    http::{HttpRequest, HttpResponse},
+    Named,
 };
 
 use super::{super::context::AuthorizationServerContext, support::json_response};
@@ -42,7 +40,7 @@ impl HttpFilter for AuthorizationServerMetadataEndpointFilter {
         request: &mut dyn HttpRequest,
         response: &mut dyn HttpResponse,
         filter_chain: &dyn HttpFilterChain,
-    ) -> Result<(), next_web_core::filter::FilterError> {
+    ) -> Result<(), next_web_core::http::filter::FilterError> {
         let settings = self.context.settings();
         let metadata = if request.path() == settings.authorization_server_metadata_endpoint() {
             Some(settings.metadata())

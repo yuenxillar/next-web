@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use next_web_core::filter::{FilterChainError, FilterError};
+use next_web_core::http::filter::{FilterChainError, FilterError};
 
 /// Indicates that an OAuth 2.0 Client is required to obtain authorization
 /// from the Resource Owner.

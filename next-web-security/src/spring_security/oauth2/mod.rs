@@ -58,22 +58,13 @@ pub use core::{
     AuthorizationGrantType,
 };
 
-/// Reads a query parameter from the request, returning a decoded owned value.
+/// Reads a parameter of the submitted request, from its query or its
+/// url-encoded body, returning a decoded owned value.
 pub fn request_parameter(request: &dyn HttpRequest, name: &str) -> Option<String> {
-    request.query()?.split('&').find_map(|pair| {
-        let mut parts = pair.splitn(2, '=');
-        let key = decode(parts.next().unwrap_or_default());
-        if key != name {
-            return None;
-        }
-        Some(decode(parts.next().unwrap_or_default()))
-    })
-}
-
-fn decode(value: &str) -> String {
-    urlencoding::decode(value)
-        .map(|value| value.into_owned())
-        .unwrap_or_else(|_| value.to_string())
+    // The callback of an authorization code grant is a form post: the code and
+    // the state are in the body, not in the query. The query wins when both
+    // carry the name, which is what a servlet parameter lookup does.
+    request.form_parameter(name).map(|value| value.into_owned())
 }
 
 #[cfg(all(test, feature = "oauth2-client"))]

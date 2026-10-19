@@ -10,13 +10,11 @@ use next_web_core::{
     any::AnyValue,
     async_trait,
     error::BoxError,
-    filter::FilterError,
-    http::{HttpMethod, StatusCode},
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{HttpRequest, HttpResponse},
-        named::Named,
+    http::{
+        HttpMethod, HttpRequest, HttpResponse, StatusCode,
+        filter::{FilterError, HttpFilter, HttpFilterChain},
     },
+    Named,
 };
 use tracing::{error, warn};
 
@@ -317,11 +315,9 @@ mod tests {
     use axum::{body::Body, extract::Request, response::Response};
     use next_web_core::{
         async_trait,
-        filter::FilterError,
-        http::StatusCode,
-        traits::{
-            filter::{HttpFilter, HttpFilterChain},
-            http::{HttpRequest, HttpResponse},
+        http::{
+            HttpRequest, HttpResponse, StatusCode,
+            filter::{FilterError, HttpFilter, HttpFilterChain},
         },
     };
 

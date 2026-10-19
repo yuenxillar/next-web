@@ -2,13 +2,11 @@
 
 use next_web_core::{
     async_trait,
-    filter::FilterError,
+    http::filter::FilterError,
     http::{HttpMethod, StatusCode},
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{HttpRequest, HttpResponse},
-        named::Named,
-    },
+    http::filter::{HttpFilter, HttpFilterChain},
+    http::{HttpRequest, HttpResponse},
+    Named,
 };
 
 use super::{super::context::AuthorizationServerContext, support::json_response};
@@ -68,7 +66,7 @@ impl Named for JwkSetEndpointFilter {
 mod tests {
     use std::sync::Arc;
 
-    use next_web_core::{http::StatusCode, traits::filter::HttpFilter};
+    use next_web_core::{http::StatusCode, http::filter::HttpFilter};
 
     use super::{super::test_support, JwkSetEndpointFilter};
     use crate::oauth2::{

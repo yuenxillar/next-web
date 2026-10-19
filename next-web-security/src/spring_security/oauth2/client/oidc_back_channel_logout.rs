@@ -9,13 +9,11 @@ use std::{
 
 use next_web_core::{
     async_trait,
-    filter::FilterError,
+    http::filter::FilterError,
     http::{HttpMethod, StatusCode},
-    traits::{
-        filter::{HttpFilter, HttpFilterChain},
-        http::{HttpRequest, HttpResponse},
-        named::Named,
-    },
+    http::filter::{HttpFilter, HttpFilterChain},
+    http::{HttpRequest, HttpResponse},
+    Named,
 };
 
 use crate::{
