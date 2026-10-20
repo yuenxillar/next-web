@@ -53,6 +53,7 @@ mod default_application_event_multicaster;
 mod execution;
 mod listener_dispatch;
 mod typed_application_listener;
+mod typed_listener_fn;
 
 #[cfg(test)]
 mod channel_dispatch_tests;
@@ -75,3 +76,4 @@ pub use listener_dispatch::{
 pub use typed_application_listener::{
     TypedApplicationListener, downcast_event, typed_listener,
 };
+pub use typed_listener_fn::{TypedListenerFn, typed_listener_fn};

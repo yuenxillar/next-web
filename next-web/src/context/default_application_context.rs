@@ -1485,7 +1485,7 @@ mod tests {
     impl ApplicationListener<Arc<dyn ApplicationEvent>> for CountingListener {
         fn on_application_event<'a>(
             &'a self,
-            _event: Arc<dyn ApplicationEvent>,
+            _event: &'a Arc<dyn ApplicationEvent>,
         ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
             self.received.fetch_add(1, Ordering::SeqCst);
             Box::pin(async {})

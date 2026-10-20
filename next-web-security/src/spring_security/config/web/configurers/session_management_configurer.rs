@@ -999,7 +999,7 @@ mod tests {
     impl ApplicationListener<Arc<dyn ApplicationEvent>> for Counter {
         fn on_application_event<'a>(
             &'a self,
-            _event: Arc<dyn ApplicationEvent>,
+            _event: &'a Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 self.received.fetch_add(1, Ordering::SeqCst);

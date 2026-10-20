@@ -58,15 +58,18 @@ where
 impl<L, E> ApplicationListener<Arc<dyn ApplicationEvent>> for TypedApplicationListener<L, E>
 where
     L: ApplicationListener<E> + 'static,
-    E: ApplicationEvent + Clone + 'static,
+    E: ApplicationEvent + 'static,
 {
-    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+    fn on_application_event<'a>(
+        &'a self,
+        event: &'a Arc<dyn ApplicationEvent>,
+    ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
-            match downcast_event::<E>(event) {
-                // The event is shared by every listener of the application, so the
-                // listener that handles it by value is given a copy of it. This is
-                // the only place a clone of an event happens.
-                Ok(event) => self.listener.on_application_event((*event).clone()).await,
+            // The downcast happens here and nowhere else: the listener of the type
+            // is handed the event it declared, borrowed from the value the
+            // application published.
+            match downcast_event::<E>(Arc::clone(event)) {
+                Ok(event) => self.listener.on_application_event(event.as_ref()).await,
                 Err(event) => {
                     tracing::debug!(
                         expected = ?TypeId::of::<E>(),
@@ -98,7 +101,7 @@ where
 pub fn typed_listener<L, E>(listener: L) -> Arc<TypedApplicationListener<L, E>>
 where
     L: ApplicationListener<E> + 'static,
-    E: ApplicationEvent + Clone + 'static,
+    E: ApplicationEvent + 'static,
 {
     Arc::new(TypedApplicationListener::new(listener))
 }
@@ -128,4 +131,116 @@ where
     Ok(event
         .downcast::<E>()
         .unwrap_or_else(|_| unreachable!("the event is an instance of the type it was checked against")))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        any::Any,
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
+
+    use crate::{
+        ApplicationEvent, ApplicationListener, BoxFuture,
+        event::{
+            ApplicationEventMulticaster, ApplicationListenerRegistration,
+            DefaultApplicationEventMulticaster,
+        },
+    };
+
+    /// The event of the tests, which is not cloneable: the listener of it is handed
+    /// the value that was published.
+    struct Ping {
+        /// The identifier of the event of the test.
+        id: u32,
+    }
+
+    impl ApplicationEvent for Ping {
+        fn source(&self) -> &dyn Any {
+            self
+        }
+    }
+
+    /// Another event, so that the listener of `Ping` has an event it is never
+    /// called for.
+    struct Pong;
+
+    impl ApplicationEvent for Pong {
+        fn source(&self) -> &dyn Any {
+            self
+        }
+    }
+
+    /// The listener of one event type, written as a type of its own.
+    struct PingListener {
+        received: Arc<Mutex<Vec<u32>>>,
+    }
+
+    impl ApplicationListener<Ping> for PingListener {
+        fn on_application_event<'a>(&'a self, ping: &'a Ping) -> BoxFuture<'a, ()> {
+            Box::pin(async move {
+                self.received
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .push(ping.id);
+            })
+        }
+    }
+
+    /// A listener of the shared event that counts what it receives.
+    #[derive(Default)]
+    struct Counter {
+        received: AtomicUsize,
+    }
+
+    impl ApplicationListener<Arc<dyn ApplicationEvent>> for Counter {
+        fn on_application_event<'a>(
+            &'a self,
+            _event: &'a Arc<dyn ApplicationEvent>,
+        ) -> BoxFuture<'a, ()> {
+            Box::pin(async move {
+                self.received.fetch_add(1, Ordering::SeqCst);
+            })
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn the_listener_of_one_event_type_reads_the_event_it_was_registered_for() {
+        let multicaster = Arc::new(DefaultApplicationEventMulticaster::new_boxed());
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let listener = PingListener {
+            received: Arc::clone(&received),
+        };
+
+        multicaster.register(ApplicationListenerRegistration::typed("ping", listener));
+        multicaster
+            .multicast_event(Arc::new(Ping { id: 4 }))
+            .expect("the ping is published");
+        multicaster
+            .multicast_event(Arc::new(Pong))
+            .expect("the pong is published");
+
+        assert_eq!(
+            *received.lock().unwrap_or_else(|poisoned| poisoned.into_inner()),
+            vec![4],
+            "the listener was called for its event only, and the event was not copied for it"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_listener_of_the_shared_event_reads_the_one_value_published() {
+        let multicaster = Arc::new(DefaultApplicationEventMulticaster::new_boxed());
+        let counter = Arc::new(Counter::default());
+        let listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>> = counter.clone();
+
+        multicaster.add_application_listener(String::from("counter"), listener);
+        multicaster
+            .multicast_event(Arc::new(Ping { id: 5 }))
+            .expect("the ping is published");
+
+        assert_eq!(counter.received.load(Ordering::SeqCst), 1);
+    }
 }

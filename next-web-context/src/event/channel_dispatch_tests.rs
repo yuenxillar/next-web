@@ -73,7 +73,7 @@ impl NumberedListener {
 }
 
 impl ApplicationListener<Arc<dyn ApplicationEvent>> for NumberedListener {
-    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+    fn on_application_event<'a>(&'a self, event: &'a Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             if let Some(event) = (event.as_ref() as &dyn Any).downcast_ref::<NumberedEvent>() {
                 self.received
@@ -98,7 +98,7 @@ struct GatedListener {
 }
 
 impl ApplicationListener<Arc<dyn ApplicationEvent>> for GatedListener {
-    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+    fn on_application_event<'a>(&'a self, event: &'a Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             self.started.notify_one();
             let _permit = self.gate.acquire().await;
@@ -116,7 +116,7 @@ impl ApplicationListener<Arc<dyn ApplicationEvent>> for GatedListener {
 struct PanickingListener;
 
 impl ApplicationListener<Arc<dyn ApplicationEvent>> for PanickingListener {
-    fn on_application_event<'a>(&'a self, _event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+    fn on_application_event<'a>(&'a self, _event: &'a Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             panic!("the listener of the tests failed on purpose");
         })

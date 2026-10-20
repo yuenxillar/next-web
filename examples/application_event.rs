@@ -4,11 +4,14 @@
 //! The routes publish an event through the publisher of the application, and the
 //! multicaster of the context hands it to the listeners that support it:
 //!
-//! - `AuditListener` is dispatched **inline**: it runs as part of the call that
-//!   publishes the event, so what it writes is there when the call returns;
-//! - `NotifierListener` is dispatched over a **channel**: the publishing call only
-//!   queues the event, and the listener runs on a worker of its own, one event
+//! - the listener of the audit is dispatched **inline**: it runs as part of the call
+//!   that publishes the event, so what it writes is there when the call returns;
+//! - the listener that notifies is dispatched over a **channel**: the publishing call
+//!   only queues the event, and the listener runs on a worker of its own, one event
 //!   after the other. It waits 50 milliseconds, like a mail or a webhook would.
+//!
+//! Both listeners are functions of the one event of the example, so neither of them
+//! downcasts an event nor has a case for the events it does not handle.
 //!
 //! Try it with:
 //!
@@ -19,7 +22,6 @@
 //! ```
 
 use std::{
-    any::{Any, TypeId},
     sync::{
         Arc, Mutex, OnceLock,
         atomic::{AtomicUsize, Ordering},
@@ -37,7 +39,7 @@ use next_web_context::{
     ApplicationEvent, ApplicationEventPublisher, ApplicationEventPublisherExt, ApplicationListener,
     event::{
         ApplicationEventMulticaster, ApplicationListenerRegistration, ChannelDispatch,
-        DefaultApplicationEventMulticaster, ListenerDispatch,
+        DefaultApplicationEventMulticaster, ListenerDispatch, typed_listener_fn,
     },
 };
 
@@ -102,52 +104,30 @@ impl Received {
 }
 
 /// Writes the order into the audit, as part of the publishing call.
+///
+/// The listener names the event type it handles, so the event it is handed is the
+/// order itself: no downcast, and no case for the events of another type.
 struct AuditListener {
     received: Arc<Received>,
 }
 
-impl ApplicationListener<Arc<dyn ApplicationEvent>> for AuditListener {
-    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+impl ApplicationListener<OrderPlaced> for AuditListener {
+    fn on_application_event<'a>(&'a self, order: &'a OrderPlaced) -> BoxFuture<'a, ()> {
         Box::pin(async move {
-            if let Some(order) = (event.as_ref() as &dyn Any).downcast_ref::<OrderPlaced>() {
-                self.received
-                    .inline
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .push(format!("audited {}", order.id));
-            }
-        })
-    }
-}
-
-/// Notifies the order, slowly, on the worker of its queue.
-struct NotifierListener {
-    received: Arc<Received>,
-}
-
-impl ApplicationListener<Arc<dyn ApplicationEvent>> for NotifierListener {
-    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
-        Box::pin(async move {
-            let Some(order) = (event.as_ref() as &dyn Any).downcast_ref::<OrderPlaced>() else {
-                return;
-            };
-            let id = order.id.clone();
-
-            self.received.in_flight.fetch_add(1, Ordering::SeqCst);
-            // A mail, a webhook or a call to another service would be here.
-            tokio::time::sleep(Duration::from_millis(50)).await;
-
             self.received
-                .channel
+                .inline
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push(format!("notified {id}"));
-            self.received.in_flight.fetch_sub(1, Ordering::SeqCst);
+                .push(format!("audited {}", order.id));
         })
     }
 }
 
 /// Registers the two listeners on the multicaster.
+///
+/// The two listeners are written in the two ways a listener of one event type is
+/// written: a type that declares the event it handles, and a function of it. Neither
+/// of them downcasts an event nor has a case for the events it does not handle.
 ///
 /// This is the whole difference between the two kinds: the registration says how
 /// the event reaches the listener.
@@ -158,21 +138,35 @@ impl ApplicationListener<Arc<dyn ApplicationEvent>> for NotifierListener {
 /// * `received` - The state the listeners write.
 fn register_listeners(multicaster: &DefaultApplicationEventMulticaster, received: &Arc<Received>) {
     // Inline: runs as part of the publishing call.
-    multicaster.register(ApplicationListenerRegistration::new(
+    multicaster.register(ApplicationListenerRegistration::typed(
         "audit",
-        Arc::new(AuditListener {
+        AuditListener {
             received: Arc::clone(received),
-        }),
+        },
     ));
 
     // Channel: the event is queued, and the worker delivers one at a time.
     multicaster.register(
-        ApplicationListenerRegistration::new(
-            "notifier",
-            Arc::new(NotifierListener {
-                received: Arc::clone(received),
-            }),
-        )
+        ApplicationListenerRegistration::new("notifier", {
+            let received = Arc::clone(received);
+
+            typed_listener_fn::<OrderPlaced, _, _>(move |order| {
+                let received = Arc::clone(&received);
+
+                async move {
+                    received.in_flight.fetch_add(1, Ordering::SeqCst);
+                    // A mail, a webhook or a call to another service would be here.
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+
+                    received
+                        .channel
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .push(format!("notified {}", order.id));
+                    received.in_flight.fetch_sub(1, Ordering::SeqCst);
+                }
+            })
+        })
         .with_dispatch(ListenerDispatch::Channel(ChannelDispatch::with_capacity(
             16,
         ))),

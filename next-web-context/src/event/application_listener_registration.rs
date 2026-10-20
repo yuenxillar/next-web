@@ -71,7 +71,7 @@ impl ApplicationListenerRegistration {
     pub fn typed<L, E>(id: impl Into<String>, listener: L) -> Self
     where
         L: ApplicationListener<E> + 'static,
-        E: ApplicationEvent + Clone + 'static,
+        E: ApplicationEvent + 'static,
     {
         let listener = TypedApplicationListener::<L, E>::new(listener);
         Self::new(id, std::sync::Arc::new(listener)).with_event_type::<E>()

@@ -61,13 +61,13 @@ impl std::fmt::Debug for DelegatingApplicationListener {
 }
 
 impl ApplicationListener<Arc<dyn ApplicationEvent>> for DelegatingApplicationListener {
-    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+    fn on_application_event<'a>(&'a self, event: &'a Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             // Every listener receives the event: the listeners of this module are
             // the ones that know which events they handle, and they read the event
             // they were given.
             for listener in self.listeners.iter() {
-                listener.on_application_event(event.clone()).await;
+                listener.on_application_event(event).await;
             }
         })
     }
@@ -104,7 +104,7 @@ mod tests {
     impl ApplicationListener<Arc<dyn ApplicationEvent>> for Counter {
         fn on_application_event<'a>(
             &'a self,
-            _event: Arc<dyn ApplicationEvent>,
+            _event: &'a Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 self.received.fetch_add(1, Ordering::SeqCst);
@@ -126,7 +126,8 @@ mod tests {
         // Adding a listener twice does not hand it the event twice.
         delegating.add_listener(first_listener);
 
-        delegating.on_application_event(Arc::new(Ping)).await;
+        let event: Arc<dyn ApplicationEvent> = Arc::new(Ping);
+        delegating.on_application_event(&event).await;
 
         assert_eq!(first.received.load(Ordering::SeqCst), 1);
         assert_eq!(second.received.load(Ordering::SeqCst), 1);
@@ -137,7 +138,8 @@ mod tests {
     async fn a_listener_that_was_not_added_receives_nothing() {
         let delegating = DelegatingApplicationListener::default();
 
-        delegating.on_application_event(Arc::new(Ping)).await;
+        let event: Arc<dyn ApplicationEvent> = Arc::new(Ping);
+        delegating.on_application_event(&event).await;
 
         assert!(delegating.listeners().is_empty());
     }

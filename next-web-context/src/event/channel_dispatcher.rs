@@ -308,7 +308,7 @@ async fn run_worker(
     while let Some(message) = receiver.recv().await {
         match message {
             ChannelMessage::Event(event) => {
-                match CatchUnwind::new(listener.on_application_event(event)).await {
+                match CatchUnwind::new(listener.on_application_event(&event)).await {
                     Ok(()) => statistics.record_delivered(),
                     Err(payload) => {
                         statistics.record_failed();

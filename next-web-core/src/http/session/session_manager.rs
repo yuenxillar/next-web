@@ -24,6 +24,33 @@ use super::{HttpSession, StandardSession};
 /// methods that still mutate sessions.
 pub type SessionHandle = Arc<Mutex<StandardSession>>;
 
+/// Notified when a session of the container is created, replaced or destroyed.
+///
+/// The manager of the sessions is the only place that knows when a session comes
+/// into being and when it ends, so the parts of the application that have to react
+/// to that (the registry of the sessions of an application, the audit of the
+/// sessions, a cache that is keyed by a session) are told by the manager through
+/// this seam. A listener does not decide anything: the session is created or
+/// destroyed and the manager hands it the session that was.
+pub trait SessionLifecycleListener
+where
+    Self: Send + Sync,
+{
+    /// A session was created under an identifier the store did not hold.
+    ///
+    /// # Arguments
+    ///
+    /// * `session` - The session that was created.
+    fn session_created(&self, session: Arc<dyn HttpSession>);
+
+    /// A session was destroyed.
+    ///
+    /// # Arguments
+    ///
+    /// * `session` - The session that was destroyed.
+    fn session_destroyed(&self, session: Arc<dyn HttpSession>);
+}
+
 /// Owns and manages the lifetime of [`HttpSession`]s.
 ///
 /// Implementations must be `Send + Sync + Debug` so the manager can be shared

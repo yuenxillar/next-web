@@ -54,9 +54,12 @@ impl Recorder {
 }
 
 impl ApplicationListener<Arc<dyn ApplicationEvent>> for Recorder {
-    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+    fn on_application_event<'a>(&'a self, event: &'a Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
-            let name = if (event.as_ref() as &dyn Any).downcast_ref::<Ping>().is_some() {
+            let name = if (event.as_ref() as &dyn Any)
+                .downcast_ref::<Ping>()
+                .is_some()
+            {
                 "ping"
             } else if (event.as_ref() as &dyn Any)
                 .downcast_ref::<Pong>()
@@ -81,7 +84,7 @@ struct PingRecorder {
 }
 
 impl ApplicationListener<Ping> for PingRecorder {
-    fn on_application_event<'a>(&'a self, _event: Ping) -> BoxFuture<'a, ()> {
+    fn on_application_event<'a>(&'a self, _event: &'a Ping) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             self.recorder
                 .received
@@ -114,7 +117,7 @@ fn the_type_an_event_reports_is_the_type_it_is_downcast_to() {
     // ignored by the listener.
     let event: Arc<dyn ApplicationEvent> = Arc::new(Ping);
 
-    assert_eq!(event.event_type(), (*event).type_id());
+    assert_eq!(event.event_type(), Any::type_id(event.as_ref()));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -195,7 +198,11 @@ async fn a_channel_listener_without_an_identifier_gets_a_queue_of_its_own() {
     }
 
     let ids = multicaster.channel_listener_ids();
-    assert_eq!(ids.len(), 2, "every listener has a queue of its own: {ids:?}");
+    assert_eq!(
+        ids.len(),
+        2,
+        "every listener has a queue of its own: {ids:?}"
+    );
     assert!(
         ids.iter().all(|id| !id.is_empty()),
         "the identifiers an anonymous listener is given are not empty: {ids:?}"
@@ -207,6 +214,7 @@ async fn a_channel_listener_without_an_identifier_gets_a_queue_of_its_own() {
 
 /// An event that is not cloneable, which is what the shared dispatch makes
 /// possible: the event of a listener is the one value the application published.
+#[allow(unused)]
 struct NotClone {
     /// The identifier of the event of the test.
     id: u32,
@@ -226,8 +234,14 @@ async fn an_event_that_is_not_cloneable_reaches_every_listener_as_one_value() {
     let first_listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>> = first.clone();
     let second_listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>> = second.clone();
 
-    multicaster.register(ApplicationListenerRegistration::new("first", first_listener));
-    multicaster.register(ApplicationListenerRegistration::new("second", second_listener));
+    multicaster.register(ApplicationListenerRegistration::new(
+        "first",
+        first_listener,
+    ));
+    multicaster.register(ApplicationListenerRegistration::new(
+        "second",
+        second_listener,
+    ));
     multicaster
         .multicast_event(Arc::new(NotClone { id: 7 }))
         .expect("the event is published");

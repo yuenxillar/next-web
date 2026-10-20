@@ -319,7 +319,7 @@ impl DefaultApplicationEventMulticaster {
     pub fn register_typed<L, E>(&self, id: impl Into<String>, listener: L)
     where
         L: ApplicationListener<E> + 'static,
-        E: ApplicationEvent + Clone + 'static,
+        E: ApplicationEvent + 'static,
     {
         self.register(ApplicationListenerRegistration::typed(id, listener));
     }
@@ -370,7 +370,7 @@ impl DefaultApplicationEventMulticaster {
         event: Arc<dyn ApplicationEvent>,
     ) -> Result<(), MulticastError> {
         let registrations = self.matching_listeners(&*event);
-        let (queued_failures, inline_listeners) = self.queue_channel_listeners(&event, registrations);
+        let (queued_failures, inline_listeners) = self.queue_channel_listeners(event.clone(), registrations);
         let inline = dispatch_listeners(
             inline_listeners,
             event,
@@ -458,7 +458,7 @@ impl DefaultApplicationEventMulticaster {
     ///   they run in.
     fn queue_channel_listeners(
         &self,
-        event: &Arc<dyn ApplicationEvent>,
+        event: Arc<dyn ApplicationEvent>,
         registrations: Vec<ApplicationListenerRegistration>,
     ) -> (Vec<ListenerFailure>, Vec<ApplicationListenerRegistration>) {
         let channels = self
@@ -645,7 +645,7 @@ impl DefaultApplicationEventMulticaster {
     fn run_listeners(
         &self,
         registrations: &[ApplicationListenerRegistration],
-        event: &Arc<dyn ApplicationEvent>,
+        event: Arc<dyn ApplicationEvent>,
     ) -> Result<(), MulticastError> {
         block_on(dispatch_listeners(
             registrations.to_vec(),
@@ -714,7 +714,7 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
         // than waiting for room, so this cannot make the publishing call wait,
         // and a queue that is full is reported together with the failures of the
         // inline listeners below.
-        let (channel_listeners, inline_listeners) = self.queue_channel_listeners(&event, registrations);
+        let (channel_listeners, inline_listeners) = self.queue_channel_listeners(event.clone(), registrations);
         let queued_failures = channel_listeners;
 
         match self.dispatch_mode {
@@ -732,14 +732,14 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
                     Ok(handle) if handle.runtime_flavor() == RuntimeFlavor::MultiThread => {
                         let blocked = std::panic::catch_unwind(AssertUnwindSafe(|| {
                             tokio::task::block_in_place(|| {
-                                self.run_listeners(&inline_listeners, &event)
+                                self.run_listeners(&inline_listeners, event.clone())
                             })
                         }));
 
                         // A `LocalSet` does not allow blocking either. The event is
                         // dispatched on the calling thread in that case, which is
                         // what a listener that does not await expects as well.
-                        blocked.unwrap_or_else(|_| self.run_listeners(&inline_listeners, &event))
+                        blocked.unwrap_or_else(|_| self.run_listeners(&inline_listeners, event.clone()))
                     }
                     // The single thread of a current thread runtime drives the
                     // reactor of the runtime, so waiting for a listener on it
@@ -747,7 +747,7 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
                     // progress. The listeners run on the runtime instead, and
                     // publishing does not wait for them.
                     Ok(_) => self.spawn_listeners(inline_listeners, event),
-                    Err(_) => self.run_listeners(&inline_listeners, &event),
+                    Err(_) => self.run_listeners(&inline_listeners, event.clone()),
                 };
 
                 let channel = self.finish_channel_dispatch(&queued_failures);
@@ -831,7 +831,7 @@ async fn dispatch_listeners(
 
     for registration in &registrations {
         let listener = registration.listener();
-        let outcome = CatchUnwind::new(listener.on_application_event(event.clone())).await;
+        let outcome = CatchUnwind::new(listener.on_application_event(&event)).await;
 
         if let Err(payload) = outcome {
             let message = panic_message(&payload);
@@ -912,10 +912,10 @@ mod tests {
     impl ApplicationListener<Arc<dyn ApplicationEvent>> for RecordingListener {
         fn on_application_event<'a>(
             &'a self,
-            event: Arc<dyn ApplicationEvent>,
+            event: &'a Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
-                let name = if (*event).type_id() == TypeId::of::<TestEvent>() {
+                let name = if event.event_type() == TypeId::of::<TestEvent>() {
                     "test"
                 } else {
                     "other"
@@ -932,7 +932,7 @@ mod tests {
     impl ApplicationListener<Arc<dyn ApplicationEvent>> for PanickingListener {
         fn on_application_event<'a>(
             &'a self,
-            _event: Arc<dyn ApplicationEvent>,
+            _event: &'a Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 panic!("the listener of the test failed");
@@ -949,7 +949,7 @@ mod tests {
     impl ApplicationListener<Arc<dyn ApplicationEvent>> for OrderListener {
         fn on_application_event<'a>(
             &'a self,
-            _event: Arc<dyn ApplicationEvent>,
+            _event: &'a Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 self.ran.lock().unwrap().push(self.name);
@@ -963,7 +963,7 @@ mod tests {
     }
 
     impl ApplicationListener<TestEvent> for CountingListener {
-        fn on_application_event<'a>(&'a self, _event: TestEvent) -> BoxFuture<'a, ()> {
+        fn on_application_event<'a>(&'a self, _event: &'a TestEvent) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 self.received.fetch_add(1, Ordering::SeqCst);
             })
@@ -979,7 +979,7 @@ mod tests {
     impl ApplicationListener<Arc<dyn ApplicationEvent>> for SlowListener {
         fn on_application_event<'a>(
             &'a self,
-            _event: Arc<dyn ApplicationEvent>,
+            _event: &'a Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 tokio::time::sleep(self.delay).await;

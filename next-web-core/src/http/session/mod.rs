@@ -18,7 +18,9 @@ mod standard_session;
 
 pub use default_session_manager::DefaultSessionManager;
 pub use http_session::{HttpSession, HttpSessionAccessor};
-pub use session_manager::{generate_session_id, SessionHandle, SessionManager};
+pub use session_manager::{
+    generate_session_id, SessionHandle, SessionLifecycleListener, SessionManager,
+};
 pub use standard_session::{StandardSession, StandardSessionAccessor};
 
 /// The name of the cookie that carries the session identifier.

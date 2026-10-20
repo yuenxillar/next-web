@@ -30,7 +30,7 @@ pub use application_context::{
 pub use application_context_async_ext::ApplicationContextAsyncExt;
 pub use application_context_ext::{ApplicationContextExt, DynSingleton};
 pub use application_event::{ApplicationEvent, EventAttributes};
-pub use application_event_publisher::ApplicationEventPublisher;
+pub use application_event_publisher::{ApplicationEventPublisher, BoxError};
 pub use application_event_publisher_ext::ApplicationEventPublisherExt;
 pub use application_listener::ApplicationListener;
 pub use autoregister::{AutoRegisterModule, ProviderRegister, auto_registered_providers, submit};

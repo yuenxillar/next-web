@@ -4,13 +4,13 @@ use std::{
     fmt,
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, Mutex, OnceLock, Weak,
+        Arc, Mutex, OnceLock, RwLock, Weak,
     },
 };
 
 use dashmap::DashMap;
 
-use super::{HttpSession, SessionHandle, SessionManager, StandardSession};
+use super::{HttpSession, SessionHandle, SessionLifecycleListener, SessionManager, StandardSession};
 
 /// An in-memory [`SessionManager`] backed by a sharded concurrent map.
 ///
@@ -47,6 +47,8 @@ pub struct DefaultSessionManager {
     /// Weak self-reference used to attach itself to created sessions so they
     /// can build accessors. Set by [`DefaultSessionManager::init`].
     manager: OnceLock<Weak<dyn SessionManager>>,
+    /// The listeners that are told when a session is created or destroyed.
+    lifecycle_listeners: RwLock<Vec<Arc<dyn SessionLifecycleListener>>>,
 }
 
 impl DefaultSessionManager {
@@ -74,6 +76,60 @@ impl DefaultSessionManager {
             sessions: DashMap::new(),
             default_max_inactive_interval: AtomicU64::new(seconds),
             manager: OnceLock::new(),
+            lifecycle_listeners: RwLock::new(Vec::new()),
+        }
+    }
+
+    /// Adds a listener that is told when a session is created or destroyed.
+    ///
+    /// The listener is told for the sessions the manager creates from now on, and
+    /// for the ones it destroys, which is what lets the parts of the application
+    /// that follow the sessions of the container react to them.
+    ///
+    /// # Arguments
+    ///
+    /// * `listener` - The listener of the life of a session.
+    pub fn add_lifecycle_listener(&self, listener: Arc<dyn SessionLifecycleListener>) {
+        self.lifecycle_listeners
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(listener);
+    }
+
+    /// Returns the listeners of the life of a session.
+    pub fn lifecycle_listeners(&self) -> Vec<Arc<dyn SessionLifecycleListener>> {
+        self.lifecycle_listeners
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    /// Tells the listeners of the creation of the session, when it is new.
+    ///
+    /// # Arguments
+    ///
+    /// * `session` - The session that was stored.
+    /// * `created` - Whether the store held no session with that identifier.
+    fn notify_created(&self, session: &StandardSession, created: bool) {
+        if !created {
+            return;
+        }
+
+        let session: Arc<dyn HttpSession> = Arc::new(session.clone());
+        for listener in self.lifecycle_listeners() {
+            listener.session_created(Arc::clone(&session));
+        }
+    }
+
+    /// Tells the listeners of the destruction of the session.
+    ///
+    /// # Arguments
+    ///
+    /// * `session` - The session that was removed.
+    fn notify_destroyed(&self, session: &StandardSession) {
+        let session: Arc<dyn HttpSession> = Arc::new(session.clone());
+        for listener in self.lifecycle_listeners() {
+            listener.session_destroyed(Arc::clone(&session));
         }
     }
 
@@ -108,8 +164,11 @@ impl SessionManager for DefaultSessionManager {
         }
 
         let session_id = session.id().to_string();
-        let handle = Arc::new(Mutex::new(session));
+        let created = !self.sessions.contains_key(&session_id);
+        let handle = Arc::new(Mutex::new(session.clone()));
         self.sessions.insert(session_id, Arc::clone(&handle));
+        self.notify_created(&session, created);
+
         handle
     }
 
@@ -118,7 +177,19 @@ impl SessionManager for DefaultSessionManager {
     }
 
     fn remove_session(&self, id: &str) -> bool {
-        self.sessions.remove(id).is_some()
+        let Some((_, handle)) = self.sessions.remove(id) else {
+            return false;
+        };
+
+        // The listeners are told with the session that ended, which is the one the
+        // store held when it was removed.
+        let session = handle
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        self.notify_destroyed(&session);
+
+        true
     }
 
     fn session_ids(&self) -> Vec<String> {
@@ -167,6 +238,51 @@ mod tests {
     use super::DefaultSessionManager;
     use crate::http::session::{HttpSession, SessionManager};
 
+    /// A listener of the life of a session that records what it is told.
+    #[derive(Default)]
+    struct RecordingLifecycleListener {
+        /// The identifiers of the sessions that were created.
+        created: Mutex<Vec<String>>,
+        /// The identifiers of the sessions that were destroyed.
+        destroyed: Mutex<Vec<String>>,
+    }
+
+    impl crate::http::session::SessionLifecycleListener for RecordingLifecycleListener {
+        fn session_created(&self, session: Arc<dyn HttpSession>) {
+            self.created
+                .lock()
+                .unwrap()
+                .push(session.id().to_string());
+        }
+
+        fn session_destroyed(&self, session: Arc<dyn HttpSession>) {
+            self.destroyed
+                .lock()
+                .unwrap()
+                .push(session.id().to_string());
+        }
+    }
+
+    #[test]
+    fn the_listeners_are_told_when_a_session_is_created_and_destroyed() {
+        let manager = DefaultSessionManager::new();
+        let listener = Arc::new(RecordingLifecycleListener::default());
+        manager.add_lifecycle_listener(listener.clone());
+
+        manager.create_session_with_id("s1".to_string());
+        manager.create_session_with_id("s2".to_string());
+        // Saving a session that is already stored is not a creation.
+        manager.create_session_with_id("s1".to_string());
+        manager.remove_session(&"s1".to_string());
+        // Removing a session that is not stored tells the listeners nothing.
+        manager.remove_session(&"gone".to_string());
+
+        assert_eq!(
+            *listener.created.lock().unwrap(),
+            vec!["s1".to_string(), "s2".to_string()]
+        );
+        assert_eq!(*listener.destroyed.lock().unwrap(), vec!["s1".to_string()]);
+    }
     #[test]
     fn sessions_can_be_created_listed_and_removed() {
         let manager = DefaultSessionManager::new();
