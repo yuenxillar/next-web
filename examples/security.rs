@@ -23,9 +23,10 @@
 
 use std::sync::Arc;
 
-use axum::http::StatusCode;
 use next_web::{
     Application, NextWebApplication,
+    extract::Json,
+    http::{HeaderMap, StatusCode},
     macros::{
         bind::{get_mapping, singleton},
         security::{post_authorize, pre_authorize},
@@ -104,14 +105,13 @@ async fn audit() -> &'static str {
 /// `authentication`, so a `String` result is compared with the name directly.
 #[post_authorize("result == authentication.name and authentication.has_role('USER')")]
 #[get_mapping(path = "/auth/me")]
-async fn me(headers: axum::http::HeaderMap) -> String {
+async fn me(headers: HeaderMap) -> String {
     headers
         .get(PRINCIPAL_HEADER)
         .and_then(|value| value.to_str().ok())
         .unwrap_or_default()
         .to_string()
 }
-
 
 /// The account the handler answers with.
 #[derive(Clone, Debug, serde::Serialize)]
@@ -129,14 +129,14 @@ struct Account {
 /// not the wrapper that writes it.
 #[post_authorize("result.owner == authentication.name or result.public")]
 #[get_mapping(path = "/auth/account")]
-async fn account(headers: axum::http::HeaderMap) -> axum::Json<Account> {
+async fn account(headers: HeaderMap) -> Json<Account> {
     let name = headers
         .get(PRINCIPAL_HEADER)
         .and_then(|value| value.to_str().ok())
         .unwrap_or_default()
         .to_string();
 
-    axum::Json(Account {
+    Json(Account {
         owner: name,
         public: false,
     })
@@ -223,26 +223,24 @@ impl WebSecurityConfigurer for PreAuthenticatedRequests {
 
 #[tokio::main]
 async fn main() {
-    NextWebApplication::<SecurityApplication>::default().run().await
+    NextWebApplication::<SecurityApplication>::default()
+        .run()
+        .await
 }
 
 #[cfg(test)]
 mod tests {
     use std::{any::TypeId, collections::HashMap, sync::Arc};
 
-    use axum::{
-        body::Body,
-        http::Request,
-        response::Response,
-    };
+    use axum::{body::Body, http::Request, response::Response};
     use next_web_core::{
+        Named,
         any::AnyClone,
         async_trait,
         http::{
             HttpRequest, HttpResponse,
             filter::{ApplicationFilterChain, FilterError, HttpFilter, HttpFilterChain},
         },
-        Named,
     };
     use next_web_security::{
         config::{
@@ -257,7 +255,7 @@ mod tests {
         },
     };
 
-    use super::{PRINCIPAL_HEADER, PreAuthenticatedRequests, account, me};
+    use super::PreAuthenticatedRequests;
 
     /// The terminal of the chains of the tests: it records who the request was
     /// made for, which is what the filter of the example established.
@@ -278,9 +276,7 @@ mod tests {
                     let authorities = authentication
                         .authorities()
                         .iter()
-                        .map(|authority| {
-                            authority.authority().unwrap_or_default().to_string()
-                        })
+                        .map(|authority| authority.authority().unwrap_or_default().to_string())
                         .collect::<Vec<_>>()
                         .join(",");
                     format!("{} [{authorities}]", authentication.name())
@@ -434,8 +430,10 @@ mod tests {
         let names = filter_names();
 
         assert!(
-            !names.iter().any(|name| name == "UsernamePasswordAuthenticationFilter"
-                || name == "BasicAuthenticationFilter"),
+            !names
+                .iter()
+                .any(|name| name == "UsernamePasswordAuthenticationFilter"
+                    || name == "BasicAuthenticationFilter"),
             "a pre-authenticated example asks for no password: {names:?}"
         );
     }
@@ -462,8 +460,17 @@ mod tests {
         let mine = String::from("user");
         let other = String::from("alex");
 
-        assert!(mine == authentication.name, "the name of the request is the result");
-        assert!(!(other == authentication.name), "another name is not the name of the request");
-        assert!(authentication.has_role("USER"), "the user of the example carries the role");
+        assert!(
+            mine == authentication.name,
+            "the name of the request is the result"
+        );
+        assert!(
+            !(other == authentication.name),
+            "another name is not the name of the request"
+        );
+        assert!(
+            authentication.has_role("USER"),
+            "the user of the example carries the role"
+        );
     }
 }

@@ -378,6 +378,12 @@ where
         crate::diagnostics::startup_panic::install_hook();
 
         let future = async {
+            // The guard is what keeps the hook of the framework in charge of the
+            // panics of this startup: it holds the flag while it is alive and
+            // releases it when the startup ends, whether it ends well or unwinds.
+            // The binding therefore has to live for the whole startup — `let _ =`
+            // would drop it at the end of this statement, and the hook of the
+            // standard library would report the panic again.
             let _startup = crate::diagnostics::startup_panic::StartupPanicGuard::new();
             APPLICATION_SHUTDOWN_HOOK.get_or_init(|| Default::default());
 
@@ -916,23 +922,19 @@ where
         )
     }
 
-    #[cfg(feature = "embed-resources")]
     fn embedded_resource_loader() -> Option<Arc<dyn ResourceLoader>> {
-        crate::resources::embedded_resource_loader()
-    }
-
-    #[cfg(not(feature = "embed-resources"))]
-    fn embedded_resource_loader() -> Option<Arc<dyn ResourceLoader>> {
+        #[cfg(feature = "embed-resources")]
+        {
+            return crate::resources::embedded_resource_loader();
+        }
         None
     }
 
-    #[cfg(feature = "embed-resources")]
     fn embedded_resource_loader_ref() -> Option<&'static dyn ResourceLoader> {
-        crate::resources::embedded_resource_loader_ref()
-    }
-
-    #[cfg(not(feature = "embed-resources"))]
-    fn embedded_resource_loader_ref() -> Option<&'static dyn ResourceLoader> {
+        #[cfg(feature = "embed-resources")]
+        {
+            return crate::resources::embedded_resource_loader_ref();
+        }
         None
     }
 

@@ -90,7 +90,7 @@ impl StartupPanic {
     /// and the line an application has to look at.
     pub fn description(&self) -> String {
         match self.location() {
-            Some(location) => format!("{}\n\n    at {location}", self.message),
+            Some(location) => format!("{}\n\nLocation:\n\n{location}", self.message),
             None => self.message.clone(),
         }
     }
@@ -116,6 +116,13 @@ pub struct StartupPanicGuard {
 impl StartupPanicGuard {
     /// Marks the start of a startup, so that the hook of the framework reports
     /// the panics of it.
+    ///
+    /// The guard is what holds the flag, so it has to be **bound for as long as
+    /// the startup runs**: `let _guard = StartupPanicGuard::new();` keeps it
+    /// alive until the end of the enclosing scope, while `let _ = ...` drops it at
+    /// the end of the statement and hands the panics back to the hook of the
+    /// standard library immediately.
+    #[must_use = "the guard holds the flag only while it is alive: bind it for the whole startup"]
     pub fn new() -> Self {
         STARTING.store(true, Ordering::SeqCst);
 
@@ -187,8 +194,14 @@ fn record(info: &PanicHookInfo<'_>) {
 
     *recorded = Some(StartupPanic::new(
         payload_message(info.payload()),
-        info.location()
-            .map(|location| format!("{}:{}:{}", location.file(), location.line(), location.column())),
+        info.location().map(|location| {
+            format!(
+                "{}:{}:{}",
+                location.file(),
+                location.line(),
+                location.column()
+            )
+        }),
     ));
 }
 
@@ -198,6 +211,7 @@ fn record(info: &PanicHookInfo<'_>) {
 ///
 /// * `panic` - The panic to record.
 #[cfg(test)]
+#[allow(unused)]
 fn record_without_hook(panic: StartupPanic) {
     let mut recorded = RECORDED
         .lock()
@@ -237,11 +251,14 @@ pub fn payload_message(payload: &(dyn Any + Send)) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{StartupPanic, StartupPanicGuard, is_starting, payload_message, take_recorded};
+    use super::{StartupPanic, StartupPanicGuard, is_starting, take_recorded};
 
     #[test]
     fn a_description_names_the_location_of_the_panic() {
-        let panic = StartupPanic::new("is panic1", Some(String::from("examples/application.rs:20:9")));
+        let panic = StartupPanic::new(
+            "is panic1",
+            Some(String::from("examples/application.rs:20:9")),
+        );
 
         assert_eq!(
             panic.description(),
@@ -260,47 +277,47 @@ mod tests {
     }
 
     #[test]
-    fn a_recorded_panic_is_taken_once() {
-        // The test records a panic the way the hook does, so that taking it does
-        // not depend on a panic of the test itself.
-        super::record_without_hook(StartupPanic::new("is panic1", None));
-
-        assert!(take_recorded().is_some());
-        assert!(take_recorded().is_none());
+    fn the_message_of_a_panic_of_a_str_or_a_string_is_read() {
+        assert_eq!(super::payload_message(&"is panic1"), "is panic1");
+        assert_eq!(
+            super::payload_message(&String::from("is panic2")),
+            "is panic2"
+        );
     }
 
-    #[test]
-    fn the_hook_records_the_message_and_the_location_of_a_panic() {
+    #[tokio::test]
+    async fn the_guard_keeps_the_hook_in_charge_for_the_whole_startup() {
+        // The flag, the recorded panic and the hook are state of the process, so
+        // the whole life of a startup is walked through in one test.
         super::install_hook();
+        let _ = take_recorded();
+        assert!(!is_starting());
+
         let mut guard = StartupPanicGuard::new();
+        assert!(is_starting());
+
+        // The guard is held across an await point, which is why the binding of
+        // the startup has to live for the whole future.
+        tokio::task::yield_now().await;
+        assert!(is_starting());
 
         let _ = std::panic::catch_unwind(|| panic!("is panic1"));
         guard.release();
+        assert!(!is_starting());
 
-        let panic = take_recorded().expect("the hook recorded the panic");
+        let panic = take_recorded().expect("the hook recorded the panic of the startup");
         assert_eq!(panic.message(), "is panic1");
         assert!(
             panic.location().is_some(),
             "the hook keeps the location of the panic"
         );
-    }
-
-    #[test]
-    fn the_flag_of_the_startup_is_held_by_the_guard_it_returns() {
-        let mut guard = StartupPanicGuard::new();
-        assert!(is_starting());
-
-        guard.release();
-        assert!(!is_starting());
+        assert!(
+            take_recorded().is_none(),
+            "the panic of a startup is reported once"
+        );
 
         // Dropping a released guard leaves the flag alone.
         drop(guard);
         assert!(!is_starting());
-    }
-
-    #[test]
-    fn the_message_of_a_panic_of_a_str_or_a_string_is_read() {
-        assert_eq!(payload_message(&"is panic1"), "is panic1");
-        assert_eq!(payload_message(&String::from("is panic2")), "is panic2");
     }
 }
