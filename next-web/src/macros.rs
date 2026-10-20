@@ -24,6 +24,7 @@ pub mod data {
 }
 
 pub mod event {
+    pub use next_web_macros::ApplicationEvent;
     pub use next_web_macros::event_listener;
 }
 

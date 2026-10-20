@@ -5,9 +5,7 @@ use std::{
 };
 
 use next_web_context::ApplicationContextExt;
-use next_web_context::{
-    event::GenericApplicationListenerAdapter, ApplicationEvent, ApplicationListener,
-};
+use next_web_context::{ApplicationEvent, ApplicationListener};
 use next_web_core::{ApplicationContext, Required};
 
 use crate::{
@@ -607,8 +605,10 @@ where
             if let Some(delegating) =
                 context.get_singleton_option_mut::<DelegatingApplicationListener>()
             {
-                let smart_listener = GenericApplicationListenerAdapter::new(delegate);
-                delegating.add_listener(Arc::new(smart_listener));
+                // The delegation hands the event to the listener, which reads the
+                // events it is interested in; a listener that is filtered by the
+                // multicaster is registered on it instead.
+                delegating.add_listener(delegate);
             }
         }
     }

@@ -2,22 +2,26 @@ use std::any::{Any, TypeId};
 
 use dyn_clone::{DynClone, clone_trait_object};
 
-/// Trait for application events that can be dispatched through the event system.
+/// The event of an application.
 ///
-/// This trait provides common functionality for all events, including
-/// timestamping and source identification. It is designed to be used with
-/// trait objects (`dyn ApplicationEvent`), hence the Send + Sync and Any requirements.
+/// An event is a value the event system clones, publishes and hands to the
+/// listeners that support it. The trait asks for the type of the event and for the
+/// source of it so that a listener is called only for the events it handles; both
+/// have a default that is right for the usual event, which is a value that is its
+/// own source.
 ///
 /// # Requirements
 ///
-/// - `Send + Sync`: Events must be safe to send and share across threads
-/// - `Any`: Enables downcasting to concrete event types
-/// - `DynClone`: Allows cloning of trait objects (requires the `dyn-clone` crate)
+/// - `Send + Sync`: an event is shared by the listeners of the threads that
+///   dispatch it;
+/// - `Any`: an event is downcast to its type by a listener that is adapted to one
+///   type of event;
+/// - `DynClone`: the event system hands a copy of the event to each listener.
 ///
 /// # Example
 ///
 /// ```rust
-/// use std::any::{Any, TypeId};
+/// use std::any::Any;
 ///
 /// use next_web_context::ApplicationEvent;
 ///
@@ -30,36 +34,62 @@ use dyn_clone::{DynClone, clone_trait_object};
 ///     fn source(&self) -> &dyn Any {
 ///         self
 ///     }
-///
-///     fn event_type(&self) -> TypeId {
-///         TypeId::of::<Self>()
-///     }
-///
-///     fn source_type(&self) -> TypeId {
-///         TypeId::of::<Self>()
-///     }
 /// }
 /// ```
+///
+/// The three other methods are the defaults of the trait: the event reports its
+/// own type, the source of the event is the event itself, and the event carries no
+/// timestamp. An event that wraps the object that published it overrides
+/// [`ApplicationEvent::source`] and [`ApplicationEvent::source_type`], and an event
+/// that is stamped overrides [`ApplicationEvent::timestamp`].
+///
+/// The implementation is what `#[derive(ApplicationEvent)]` of `next-web-macros`
+/// writes.
 pub trait ApplicationEvent
 where
     Self: Send + Sync,
     Self: Any,
     Self: DynClone,
 {
-    /// Returns the timestamp when this event occurred.
+    /// Returns the timestamp when this event occurred, in seconds since the Unix
+    /// epoch.
     ///
-    /// Default implementation returns 0, indicating no specific timestamp.
-    /// Override this method to provide actual timing information.
+    /// The default is `0`, which means that the event carries no timestamp; an
+    /// event that is stamped overrides it. The value is the one
+    /// [`EventAttributes`] stamps, and an application that needs the age of an
+    /// event reads it from there.
     fn timestamp(&self) -> u64 {
         0
     }
 
     /// Returns the source of the event as a `dyn Any` reference.
+    ///
+    /// The source is the object that published the event, and it is type erased,
+    /// so a listener that reads it downcasts it. An event that is its own source
+    /// (the common case, and what `#[derive(ApplicationEvent)]` generates) answers
+    /// `self`.
     fn source(&self) -> &dyn Any;
 
-    fn event_type(&self) -> TypeId;
+    /// Returns the type of the event.
+    ///
+    /// The default is the type of the value the call is made on, which is what
+    /// listeners are filtered by and what the downcast of an adapted listener
+    /// checks. An implementation must not override it: a type the method reports
+    /// that is not the type of the event makes the two disagree, and an event
+    /// that passes the filter of a listener is then ignored by it.
+    fn event_type(&self) -> TypeId {
+        Any::type_id(self)
+    }
 
-    fn source_type(&self) -> TypeId;
+    /// Returns the type of the source of the event.
+    ///
+    /// The default is the type of the event, which is what an event that is its
+    /// own source answers. An event that wraps the object that published it
+    /// reports the type of that object, so a listener that filters by source type
+    /// reads it.
+    fn source_type(&self) -> TypeId {
+        Any::type_id(self)
+    }
 }
 
 clone_trait_object!(ApplicationEvent);
@@ -77,10 +107,13 @@ where
     S: Any,
 {
     pub fn new(source: S) -> Self {
+        // A clock set before the Unix epoch is rare, and it is not a reason to
+        // fail the construction of an event: the timestamp of the event is then
+        // the epoch itself.
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+            .map(|elapsed| elapsed.as_secs())
+            .unwrap_or_default();
         Self {
             timestamp,
             source,

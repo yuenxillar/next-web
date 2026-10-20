@@ -2,7 +2,10 @@ use std::{
     collections::HashMap,
     fmt::{self, Debug},
     panic::AssertUnwindSafe,
-    sync::{Arc, Mutex, RwLock},
+    sync::{
+        Arc, Mutex, RwLock,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use tokio::runtime::{Handle, RuntimeFlavor};
@@ -16,6 +19,10 @@ use crate::{
         execution::{CatchUnwind, block_on, panic_message},
     },
 };
+
+/// The source of the identifiers of the listeners that are registered without
+/// one.
+static NEXT_ANONYMOUS_ID: AtomicUsize = AtomicUsize::new(0);
 
 /// Decides when the listeners of an event run relative to the call that
 /// publishes the event.
@@ -207,10 +214,30 @@ impl DefaultApplicationEventMulticaster {
     /// Registers the listener, replacing the listener registered under the same
     /// identifier.
     ///
+    /// A registration without an identifier is given one, because the identifier
+    /// is what a channel dispatched listener is keyed by: two listeners registered
+    /// without one would otherwise share the queue and the worker of each other,
+    /// and the second would replace the first.
+    ///
     /// # Arguments
     ///
     /// * `registration` - The listener and the metadata it is dispatched with.
     pub fn register(&self, registration: ApplicationListenerRegistration) {
+        let registration = if registration.id().is_empty() {
+            let id = format!(
+                "listener@{}",
+                NEXT_ANONYMOUS_ID.fetch_add(1, Ordering::Relaxed)
+            );
+            tracing::debug!(
+                id,
+                "a listener without an identifier is registered under one"
+            );
+
+            registration.with_id(id)
+        } else {
+            registration
+        };
+
         // A listener that is dispatched over a channel gets a queue of its own,
         // and the queue replaces the one of a listener registered under the same
         // identifier before, so that the events of the replaced listener are not
@@ -389,6 +416,10 @@ impl DefaultApplicationEventMulticaster {
 
     /// Returns the listeners that support the event, in the order they run in.
     ///
+    /// A listener supports the event when the registration of the listener names
+    /// no event type or the type of the event, and no source type or the type of
+    /// the source of the event.
+    ///
     /// # Arguments
     ///
     /// * `event` - The event that is published.
@@ -397,10 +428,11 @@ impl DefaultApplicationEventMulticaster {
         event: &dyn ApplicationEvent,
     ) -> Vec<ApplicationListenerRegistration> {
         let event_type = event.event_type();
+        let source_type = event.source_type();
 
         self.ordered_listeners()
             .into_iter()
-            .filter(|registration| registration.supports(event_type))
+            .filter(|registration| registration.supports(event_type, source_type))
             .collect()
     }
 

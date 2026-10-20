@@ -1,6 +1,8 @@
 extern crate proc_macro;
 
+use crate::data::application_event::impl_macro_application_event;
 use crate::data::builder::impl_macro_builder;
+use crate::util::logic::Logic;
 use crate::data::constructor::impl_macro_required_args_constructor;
 use crate::data::field_name::impl_macro_field_name;
 use crate::data::get_set::impl_macro_get_set;
@@ -91,6 +93,42 @@ pub fn get_set(input: TokenStream) -> TokenStream {
 pub fn field_name(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     impl_macro_field_name(&input)
+}
+
+/// Implements `ApplicationEvent` for the annotated value.
+///
+/// Every event of the application implements the trait, and the three methods of
+/// it that are the same for every event are boilerplate that the derive writes:
+/// the type of the event and the type of its source are the type of the value, and
+/// the source of the event is the value itself. A listener that reads the source
+/// downcasts the event, and the filter of the event system matches the value with
+/// the type it reports, so the two cannot disagree.
+///
+/// The annotated value has to be `Clone` and `'static`: every event of the system
+/// is cloneable, and the type of an event is a `TypeId`.
+///
+/// The derive does not implement `timestamp`, because a generated method would
+/// report the time it is called rather than the time the event happened. An event
+/// that carries the time it happened keeps it in a field.
+///
+/// # Example
+///
+/// ```ignore
+/// use next_web_context::ApplicationEvent;
+///
+/// #[derive(Clone, ApplicationEvent)]
+/// struct OrderPlaced {
+///     id: String,
+/// }
+/// ```
+///
+/// The trait is named as `::next_web_context::ApplicationEvent`, so the crate that
+/// annotates a value depends on `next-web-context`.
+#[proc_macro_derive(ApplicationEvent)]
+pub fn application_event(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    Logic::generate(|| impl_macro_application_event(&input))
 }
 
 /// Implement the Builder pattern for structures

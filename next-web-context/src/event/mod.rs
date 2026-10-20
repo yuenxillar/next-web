@@ -51,14 +51,14 @@ mod application_listener_registration;
 mod channel_dispatcher;
 mod default_application_event_multicaster;
 mod execution;
-mod generic_application_listener;
-mod generic_application_listener_adapter;
 mod listener_dispatch;
-mod smart_application_listener;
 mod typed_application_listener;
 
 #[cfg(test)]
 mod channel_dispatch_tests;
+
+#[cfg(test)]
+mod event_metadata_tests;
 
 pub use application_event_multicaster::{
     ApplicationEventMulticaster, ErasedApplicationListener, ListenerFailure, MulticastError,
@@ -69,12 +69,9 @@ pub use default_application_event_multicaster::{
     DefaultApplicationEventMulticaster, DispatchMode, ListenerFailurePolicy,
     LoggingMulticastErrorHandler, MulticastErrorHandler,
 };
-pub use generic_application_listener::GenericApplicationListener;
-pub use generic_application_listener_adapter::GenericApplicationListenerAdapter;
 pub use listener_dispatch::{
     ChannelDispatch, ChannelStatistics, ChannelStatisticsSnapshot, ListenerDispatch, WhenFull,
 };
-pub use smart_application_listener::SmartApplicationListener;
 pub use typed_application_listener::{
     TypedApplicationListener, downcast_event, typed_listener,
 };

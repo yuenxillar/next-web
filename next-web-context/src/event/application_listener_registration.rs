@@ -1,5 +1,5 @@
 use std::{
-    any::TypeId,
+    any::{Any, TypeId},
     fmt::{self, Debug},
 };
 
@@ -16,16 +16,20 @@ use crate::{
 /// - the `order` decides when a listener runs relative to the others,
 /// - the [`TypeId`] of the event type, when there is one, filters the events
 ///   the listener is called for,
+/// - the [`TypeId`] of the source type, when there is one, filters the events by
+///   the object that published them,
 /// - the [`ListenerDispatch`] decides whether the listener runs as part of the
 ///   publishing call or on a worker of its own.
 ///
 /// A registration without an event type receives every event, which is what a
-/// listener of `Box<dyn ApplicationEvent>` asks for.
+/// listener of `Box<dyn ApplicationEvent>` asks for. A registration without a
+/// source type receives the events of every source.
 #[derive(Clone)]
 pub struct ApplicationListenerRegistration {
     id: String,
     order: i32,
     event_type: Option<TypeId>,
+    source_type: Option<TypeId>,
     dispatch: ListenerDispatch,
     listener: ErasedApplicationListener,
 }
@@ -47,6 +51,7 @@ impl ApplicationListenerRegistration {
             id: id.into(),
             order: 0,
             event_type: None,
+            source_type: None,
             dispatch: ListenerDispatch::default(),
             listener,
         }
@@ -70,6 +75,19 @@ impl ApplicationListenerRegistration {
     {
         let listener = TypedApplicationListener::<L, E>::new(listener);
         Self::new(id, std::sync::Arc::new(listener)).with_event_type::<E>()
+    }
+
+    /// Sets the identifier the listener is registered under.
+    ///
+    /// The multicaster uses it when a listener is registered without one, so that
+    /// every channel dispatched listener has a queue of its own.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The identifier the listener is registered under.
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = id.into();
+        self
     }
 
     /// Sets the order the listener runs in.
@@ -105,6 +123,34 @@ impl ApplicationListenerRegistration {
     /// * `event_type` - The [`TypeId`] of the event type the listener handles.
     pub fn with_event_type_id(mut self, event_type: TypeId) -> Self {
         self.event_type = Some(event_type);
+        self
+    }
+
+    /// Restricts the listener to the events of a source of type `S`.
+    ///
+    /// The source of an event is the object that published it, and the type of it
+    /// is what [`ApplicationEvent::source_type`] reports. A listener of the events
+    /// of one source (the security context, a scheduler, a repository) filters
+    /// with it instead of inspecting the event.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `S` - The type of the source the listener handles.
+    pub fn with_source_type<S>(mut self) -> Self
+    where
+        S: Any,
+    {
+        self.source_type = Some(TypeId::of::<S>());
+        self
+    }
+
+    /// Restricts the listener to the events of a source of the given type.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_type` - The [`TypeId`] of the source type the listener handles.
+    pub fn with_source_type_id(mut self, source_type: TypeId) -> Self {
+        self.source_type = Some(source_type);
         self
     }
 
@@ -144,15 +190,33 @@ impl ApplicationListenerRegistration {
         self.event_type
     }
 
-    /// Returns whether the listener is called for an event of `event_type`.
+    /// Returns the source type the listener is restricted to, when it is.
+    pub fn source_type(&self) -> Option<TypeId> {
+        self.source_type
+    }
+
+    /// Returns whether the listener is called for an event of `event_type` from a
+    /// source of `source_type`.
+    ///
+    /// A listener that names no event type is called for the event of any type,
+    /// and a listener that names no source type is called for the event of any
+    /// source.
     ///
     /// # Arguments
     ///
     /// * `event_type` - The type of the event that is published.
-    pub fn supports(&self, event_type: TypeId) -> bool {
-        self.event_type
+    /// * `source_type` - The type of the source of the event that is published.
+    pub fn supports(&self, event_type: TypeId, source_type: TypeId) -> bool {
+        let supported_event = self
+            .event_type
             .map(|supported| supported == event_type)
-            .unwrap_or(true)
+            .unwrap_or(true);
+        let supported_source = self
+            .source_type
+            .map(|supported| supported == source_type)
+            .unwrap_or(true);
+
+        supported_event && supported_source
     }
 
     /// Returns the type erased listener.

@@ -27,10 +27,10 @@ use std::{
     time::Duration,
 };
 
-use axum::extract::Path;
 use next_web::{
     Application, NextWebApplication,
     core::BoxFuture,
+    extract::Path,
     macros::bind::{get_mapping, post_mapping, singleton},
 };
 use next_web_context::{
@@ -47,24 +47,14 @@ pub struct EventsApplication;
 impl Application for EventsApplication {}
 
 /// The event of the example.
-#[derive(Clone, Debug)]
+///
+/// The derive writes the four methods the event system asks for: the type of the
+/// event and the type of its source are the type of the value, and the source of
+/// the event is the value itself.
+#[derive(Clone, Debug, next_web::macros::event::ApplicationEvent)]
 pub struct OrderPlaced {
     /// The identifier of the order.
     pub id: String,
-}
-
-impl ApplicationEvent for OrderPlaced {
-    fn source(&self) -> &dyn Any {
-        self
-    }
-
-    fn event_type(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
-
-    fn source_type(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
 }
 
 /// What the listeners of the example received.
@@ -247,7 +237,9 @@ async fn list(received: FindSingleton<Arc<Received>>) -> String {
 
 #[tokio::main]
 async fn main() {
-    NextWebApplication::<EventsApplication>::default().run().await
+    NextWebApplication::<EventsApplication>::default()
+        .run()
+        .await
 }
 
 #[cfg(test)]
@@ -255,7 +247,9 @@ mod tests {
     use std::sync::Arc;
 
     use next_web::ConfigurableApplicationContext;
-    use next_web_context::event::{ApplicationEventMulticaster, DefaultApplicationEventMulticaster};
+    use next_web_context::event::{
+        ApplicationEventMulticaster, DefaultApplicationEventMulticaster,
+    };
 
     use super::{OrderPlaced, Received, register_listeners};
 
@@ -272,9 +266,7 @@ mod tests {
     /// Publishes an order the way the route does.
     fn publish(multicaster: &DefaultApplicationEventMulticaster, id: &str) {
         multicaster
-            .multicast_event(Box::new(OrderPlaced {
-                id: id.to_owned(),
-            }))
+            .multicast_event(Box::new(OrderPlaced { id: id.to_owned() }))
             .expect("the order is published");
     }
 
