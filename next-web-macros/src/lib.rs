@@ -272,11 +272,11 @@ pub fn next_application(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Arguments
 ///
-/// - `order` - The order the configuration is applied in. A
-///   `#[auto_configuration]` defaults to `100`, so that it runs before the
-///   configurations of the application; a `#[configuration]` defaults to
-///   `i32::MAX - 100` (`2147483547`), so that it runs after them and can
-///   replace what they contributed.
+/// - `order` - The order the configuration is applied in. It defaults to `100`,
+///   the default of [`Ordered`](next_web_core::Ordered), and it places the
+///   configuration among the configurations of its own phase: the
+///   configurations of an application are applied before the
+///   auto-configurations of the starters, whatever order the two declare.
 /// - `conditional = [path, ...]` - The conditions the configuration is applied
 ///   under. Each names a function that takes `&dyn ApplicationContext` and
 ///   returns a `bool`, and the configuration is skipped when one of them
@@ -363,11 +363,11 @@ pub fn auto_configuration(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Arguments
 ///
-/// - `order` - The order the configuration is applied in. A
-///   `#[auto_configuration]` defaults to `100`, so that it runs before the
-///   configurations of the application; a `#[configuration]` defaults to
-///   `i32::MAX - 100` (`2147483547`), so that it runs after them and can
-///   replace what they contributed.
+/// - `order` - The order the configuration is applied in. It defaults to `100`,
+///   the default of [`Ordered`](next_web_core::Ordered), and it places the
+///   configuration among the configurations of its own phase: the
+///   configurations of an application are applied before the
+///   auto-configurations of the starters, whatever order the two declare.
 /// - `conditional = [path, ...]` - The conditions the configuration is applied
 ///   under. Each names a function that takes `&dyn ApplicationContext` and
 ///   returns a `bool`, and the configuration is skipped when one of them

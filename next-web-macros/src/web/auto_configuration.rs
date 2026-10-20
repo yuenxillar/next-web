@@ -183,7 +183,7 @@ fn generate_configuration_class(
 
     let order: Expr = match configuration.order {
         Some(order) => order,
-        None => default_order(&kind)?,
+        None => default_order()?,
     };
 
     let conditions = configuration
@@ -195,7 +195,7 @@ fn generate_configuration_class(
         })
         .collect::<Vec<_>>();
 
-    let (steps, condition_names) = collect_steps(&mut item_impl.items, kind.clone(), &annotated)?;
+    let (steps, condition_names) = collect_steps(&mut item_impl.items, kind, &annotated)?;
 
     // The functions a step names as its condition. A condition that is named
     // without a path, `conditional = [enabled]`, is a function of the module of
@@ -433,7 +433,6 @@ fn collect_steps(
                 autowired,
                 provider_attr,
                 conditional_on_property,
-                kind.clone(),
             )?);
 
             continue;
@@ -463,7 +462,7 @@ fn collect_steps(
             let autowired = read_autowired(&mut item_fn.sig)?;
             item_fn.attrs.push(parse_quote! { #[allow(dead_code)] });
 
-            steps.push(expand_init(index, item_fn, autowired, init_attr, kind.clone())?);
+            steps.push(expand_init(index, item_fn, autowired, init_attr)?);
         }
     }
 
@@ -559,7 +558,6 @@ fn expand_provider(
     autowired_attrs: Vec<Option<AutowiredAttr>>,
     mut provider_attr: Option<ProviderAttr>,
     conditional_on_property_attr: Option<ConditionalOnPropertyAttr>,
-    kind: ConfigurationKind,
 ) -> Result<Step, Error> {
     let ident = item_fn.sig.ident.clone();
     let is_async = if item_fn.sig.asyncness.is_some() {
@@ -568,7 +566,7 @@ fn expand_provider(
         quote! {}
     };
 
-    let order = provider_order(&provider_attr, &kind)?;
+    let order = provider_order(&provider_attr)?;
 
     let conditional = expand_conditional(
         provider_attr
@@ -656,7 +654,6 @@ fn expand_init(
     item_fn: &ImplItemFn,
     autowired_attrs: Vec<Option<AutowiredAttr>>,
     init_attr: InitAttr,
-    kind: ConfigurationKind,
 ) -> Result<Step, Error> {
     let ident = item_fn.sig.ident.clone();
     let is_async = if item_fn.sig.asyncness.is_some() {
@@ -667,7 +664,7 @@ fn expand_init(
 
     let order = match &init_attr.order {
         Some(order) => order.clone(),
-        None => default_order(&kind)?,
+        None => default_order()?,
     };
 
     let conditional = expand_conditional(&init_attr.conditional);
@@ -881,22 +878,15 @@ fn gen_code(steps: Vec<Step>) -> TokenStream2 {
     }
 }
 
-/// The order an auto-configuration runs in when it does not declare one.
+/// The order a step runs in when the configuration does not declare one.
 ///
-/// An auto-configuration fills in what an application does not declare, so it
-/// runs before the configurations of the application, which can then replace
-/// what it contributed.
-const AUTO_CONFIGURATION_ORDER: &str = "100";
-
-/// The order a configuration of an application runs in when it does not declare
-/// one.
-///
-/// The configurations of an application run after the auto-configurations, so
-/// that an application replaces an instance an auto-configuration contributed
-/// instead of being replaced by it. This is the counterpart of the user beans of
-/// the reference implementation, which are registered before the
-/// auto-configurations fill in the gaps.
-const CONFIGURATION_ORDER: &str = "2147483547";
+/// The order is the default of [`Ordered`](::next_web_core::Ordered), and it
+/// places a step among the steps of its own configuration class. It does not
+/// place a configuration among the configurations of the application: the
+/// configurations of an application are applied before the auto-configurations
+/// of the starters, whatever order they declare, because the two are applied in
+/// separate phases.
+const DEFAULT_ORDER: &str = "100";
 
 /// Returns the default order of a step, which is the default of
 /// [`Ordered`](::next_web_core::Ordered) for the kind of the class.
@@ -904,13 +894,8 @@ const CONFIGURATION_ORDER: &str = "2147483547";
 /// # Arguments
 ///
 /// * `kind` - The kind of configuration class the step belongs to.
-fn default_order(kind: &ConfigurationKind) -> Result<Expr, Error> {
-    let order = match kind {
-        ConfigurationKind::AutoConfiguration => AUTO_CONFIGURATION_ORDER,
-        ConfigurationKind::Configuration => CONFIGURATION_ORDER,
-    };
-
-    syn::parse_str(order).map_err(|_| {
+fn default_order() -> Result<Expr, Error> {
+    syn::parse_str(DEFAULT_ORDER).map_err(|_| {
         Error::new(
             Span::call_site(),
             "the default order of a configuration is a whole number",
@@ -923,14 +908,10 @@ fn default_order(kind: &ConfigurationKind) -> Result<Expr, Error> {
 /// # Arguments
 ///
 /// * `provider_attr` - The `#[provider]` attribute of the method.
-/// * `kind` - The kind of configuration class the provider belongs to.
-fn provider_order(
-    provider_attr: &Option<ProviderAttr>,
-    kind: &ConfigurationKind,
-) -> Result<Expr, Error> {
+fn provider_order(provider_attr: &Option<ProviderAttr>) -> Result<Expr, Error> {
     match provider_attr.as_ref().and_then(|attr| attr.order.as_ref()) {
         Some(order) => Ok(order.clone()),
-        None => default_order(kind),
+        None => default_order(),
     }
 }
 
