@@ -28,7 +28,7 @@ use next_web::{
     Application, NextWebApplication,
     macros::{
         bind::{get_mapping, singleton},
-        security::pre_authorize,
+        security::{post_authorize, pre_authorize},
     },
 };
 use next_web_security::{
@@ -94,6 +94,52 @@ async fn order_reads() -> &'static str {
 #[get_mapping(path = "/auth/audit")]
 async fn audit() -> &'static str {
     "the audit"
+}
+
+/// Answers the name of the user the request was made for.
+///
+/// The handler is guarded after it ran: it computes the name it answers with, and
+/// the rule of the handler holds only when that name is the name of the
+/// authentication of the request. The rule is a Rust expression over `result` and
+/// `authentication`, so a `String` result is compared with the name directly.
+#[post_authorize("result == authentication.name and authentication.has_role('USER')")]
+#[get_mapping(path = "/auth/me")]
+async fn me(headers: axum::http::HeaderMap) -> String {
+    headers
+        .get(PRINCIPAL_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_string()
+}
+
+
+/// The account the handler answers with.
+#[derive(Clone, Debug, serde::Serialize)]
+struct Account {
+    /// The owner of the account.
+    owner: String,
+    /// Whether the account is public.
+    public: bool,
+}
+
+/// Answers an account that belongs to the user the request was made for.
+///
+/// The handler answers with `Json<Account>`, so the rule of the handler reads the
+/// account the handler serializes: `result.owner` is the field of the account and
+/// not the wrapper that writes it.
+#[post_authorize("result.owner == authentication.name or result.public")]
+#[get_mapping(path = "/auth/account")]
+async fn account(headers: axum::http::HeaderMap) -> axum::Json<Account> {
+    let name = headers
+        .get(PRINCIPAL_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+
+    axum::Json(Account {
+        owner: name,
+        public: false,
+    })
 }
 
 /// Configures the requests of the example as pre-authenticated requests.
@@ -211,7 +257,7 @@ mod tests {
         },
     };
 
-    use super::PreAuthenticatedRequests;
+    use super::{PRINCIPAL_HEADER, PreAuthenticatedRequests, account, me};
 
     /// The terminal of the chains of the tests: it records who the request was
     /// made for, which is what the filter of the example established.
@@ -392,5 +438,32 @@ mod tests {
                 || name == "BasicAuthenticationFilter"),
             "a pre-authenticated example asks for no password: {names:?}"
         );
+    }
+
+    /// Returns the guard of a request signed in as the user of the example.
+    ///
+    /// The guard is the first argument of a handler that is guarded after it ran.
+    /// # Arguments
+    ///
+    /// * `name` - The name the request is authenticated as.
+    fn guard(name: &str) -> next_web::security::PostAuthorizeContext {
+        next_web::security::PostAuthorizeContext::for_authentication(
+            ["ROLE_USER", "order:read"],
+            name,
+        )
+    }
+
+    #[test]
+    fn the_rule_of_a_handler_guarded_after_it_ran_holds_only_for_the_name_of_the_request() {
+        // The rule of the route is a Rust expression, so this is what
+        // `#[post_authorize("result == authentication.name ...")]` compares.
+        let guard = guard("user");
+        let authentication = guard.authentication();
+        let mine = String::from("user");
+        let other = String::from("alex");
+
+        assert!(mine == authentication.name, "the name of the request is the result");
+        assert!(!(other == authentication.name), "another name is not the name of the request");
+        assert!(authentication.has_role("USER"), "the user of the example carries the role");
     }
 }

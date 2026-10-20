@@ -9,7 +9,10 @@ use next_web_core::{
         filter::{FilterError, HttpFilter, HttpFilterChain},
         HttpRequest, HttpResponse,
     },
-    security::{PreAuthorizeDenialHandler, AUTHORITIES_ATTRIBUTE, DENIAL_HANDLER_ATTRIBUTE},
+    security::{
+        PreAuthorizeDenialHandler, AUTHORITIES_ATTRIBUTE, DENIAL_HANDLER_ATTRIBUTE,
+        PRINCIPAL_NAME_ATTRIBUTE,
+    },
     Named,
 };
 
@@ -50,6 +53,13 @@ impl PreAuthorizeAuthoritiesFilter {
     ///
     /// A request without an authentication answers with no authority, so a rule
     /// that asks for a role or an authority of it does not hold.
+    fn principal_name() -> AnyValue {
+        SecurityContextHolder::get_context()
+            .get_authentication()
+            .map(|authentication| AnyValue::String(authentication.name().into_owned()))
+            .unwrap_or(AnyValue::Null)
+    }
+
     fn authorities() -> Vec<AnyValue> {
         SecurityContextHolder::get_context()
             .get_authentication()
@@ -78,6 +88,7 @@ impl HttpFilter for PreAuthorizeAuthoritiesFilter {
         let result = filter_chain.do_filter(request, response).await;
 
         request.set_attribute(AUTHORITIES_ATTRIBUTE, AnyValue::Vec(Self::authorities()));
+        request.set_attribute(PRINCIPAL_NAME_ATTRIBUTE, Self::principal_name());
         request.set_attribute(
             DENIAL_HANDLER_ATTRIBUTE,
             AnyValue::BoxedValue(Box::new(self.denial_handler.clone())),

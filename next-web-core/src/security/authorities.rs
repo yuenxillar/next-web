@@ -20,6 +20,17 @@ pub trait CurrentAuthorities: Send + Sync {
     /// A request without an authentication answers with no authority, so a rule
     /// that asks for a role or an authority of it does not hold.
     fn authorities(&self) -> Vec<String>;
+
+    /// Returns the name the current request was authenticated as.
+    ///
+    /// The name is what a rule written against the result of a handler compares
+    /// with (`result.owner == authentication.name`), so a crate that
+    /// authenticates the requests reports it as well. A source that does not
+    /// report a name answers with `None`, and a rule that compares with the name
+    /// of the authentication does not hold.
+    fn principal_name(&self) -> Option<String> {
+        None
+    }
 }
 
 /// The authorities source the rules read.
@@ -50,6 +61,16 @@ pub fn current_authorities() -> Vec<String> {
         .get()
         .map(|authorities| authorities.authorities())
         .unwrap_or_default()
+}
+
+/// Returns the name the current request was authenticated as.
+///
+/// The name is the one the installed [`CurrentAuthorities`] reports, and it is
+/// `None` when no source was installed or when the source reports no name.
+pub fn current_principal_name() -> Option<String> {
+    AUTHORITIES
+        .get()
+        .and_then(|authorities| authorities.principal_name())
 }
 
 #[cfg(test)]

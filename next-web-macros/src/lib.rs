@@ -7,6 +7,7 @@ use crate::data::get_set::impl_macro_get_set;
 use crate::web::configuration_properties::impl_macro_configuration_properties;
 use crate::web::idempotency::impl_macro_idempotency;
 use crate::web::order::generate_order;
+use crate::web::post_authorize::impl_macro_post_authorize;
 use crate::web::pre_authorize::impl_macro_pre_authorize;
 
 use proc_macro::TokenStream;
@@ -768,6 +769,56 @@ pub fn idempotency(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn pre_authorize(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
     impl_macro_pre_authorize(attr, item_fn)
+}
+
+/// Declares the rule a handler is guarded with after it ran.
+///
+/// The rule is a Rust expression over two bindings: `result`, the value the
+/// handler returned, and `authentication`, the authentication of the request
+/// (`authentication.name` and `authentication.authorities`, and the methods
+/// `has_role`, `has_any_role`, `has_authority` and `has_any_authority`).
+///
+/// The rule is compiled into the handler instead of being interpreted while a
+/// request is handled, so the compiler type-checks it together with the handler:
+/// a rule reads a field of the result, calls a method of it, indexes a
+/// collection, and compares it with anything Rust compares with. A rule that
+/// names something the result does not have does not compile, which is the trade
+/// this attribute makes on purpose.
+///
+/// The Spring Security spelling of a rule is understood as well, so
+/// `has_role('ADMIN')`, `has_any_role('ADMIN', 'AUDITOR')`,
+/// `has_authority('order:read')`, `and`, `or` and `not` mean what they mean
+/// there.
+///
+/// The attribute has to be placed above the `#[get_mapping]`/`#[post_mapping]`/
+/// ... of the handler, exactly like [`pre_authorize`], because the routing macros
+/// only re-emit the attributes they receive.
+///
+/// The body of the handler already ran when the rule is evaluated, so a handler
+/// that changes the state of the application is guarded with [`pre_authorize`]
+/// instead: what a refused request did is not undone.
+///
+/// # Example
+///
+/// ```ignore
+/// use next_web::macros::{get_mapping, post_authorize};
+///
+/// #[post_authorize("result == authentication.name")]
+/// #[get_mapping(path = "/me")]
+/// async fn me() -> String {
+///     String::from("max")
+/// }
+///
+/// #[post_authorize("result.owner == authentication.name and result.public")]
+/// #[get_mapping(path = "/accounts/{id}")]
+/// async fn account() -> Json<Account> {
+///     // ...
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn post_authorize(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item_fn = parse_macro_input!(item as ItemFn);
+    impl_macro_post_authorize(attr, item_fn)
 }
 
 /// Implements `Ordered` for the annotated item with the order it is given.

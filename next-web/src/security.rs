@@ -14,5 +14,6 @@
 
 pub use next_web_core::security::access;
 pub use next_web_core::security::{
-    CurrentAuthorities, current_authorities, install_current_authorities,
+    Authentication, CurrentAuthorities, PostAuthorizeContext, current_authorities,
+    current_principal_name, install_current_authorities,
 };

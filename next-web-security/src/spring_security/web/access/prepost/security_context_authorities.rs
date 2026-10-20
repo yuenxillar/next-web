@@ -28,6 +28,12 @@ impl CurrentAuthorities for SecurityContextAuthorities {
             })
             .unwrap_or_default()
     }
+
+    fn principal_name(&self) -> Option<String> {
+        SecurityContextHolder::get_context()
+            .get_authentication()
+            .map(|authentication| authentication.name().into_owned())
+    }
 }
 
 /// Installs the authorities of the security context for the rules to read.

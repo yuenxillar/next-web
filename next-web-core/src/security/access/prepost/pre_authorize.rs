@@ -28,7 +28,7 @@ use crate::{
     any::AnyValue,
     error::BoxError,
     http::{HttpRequest, HttpResponse, ResourceDispatcher},
-    security::current_authorities,
+    security::{current_authorities, current_principal_name},
     web::ViewModel,
 };
 
@@ -52,6 +52,14 @@ pub const AUTHORITIES_ATTRIBUTE: &str = "next.security.pre_authorize.authorities
 /// The handler renders the refusal of a rule the way the refusals of the filter
 /// chain of the application are rendered.
 pub const DENIAL_HANDLER_ATTRIBUTE: &str = "next.security.pre_authorize.denial_handler";
+
+/// The name of the request attribute that carries the name the request was
+/// authenticated as.
+///
+/// It is what a rule compares the result of a handler with, so the crate that
+/// authenticates the requests writes the name of the authentication it
+/// established into the request.
+pub const PRINCIPAL_NAME_ATTRIBUTE: &str = "next.security.pre_authorize.principal_name";
 
 /// Renders the response of a request a rule refused.
 pub trait PreAuthorizeDenialHandler: Send + Sync {
@@ -78,6 +86,8 @@ pub trait PreAuthorizeDenialHandler: Send + Sync {
 #[derive(Clone)]
 pub struct PreAuthorizeContext {
     authorities: Vec<String>,
+    /// The name the request was authenticated as, when the request carries it.
+    principal_name: Option<String>,
     denial_handler: Option<Arc<dyn PreAuthorizeDenialHandler>>,
     // The parts of the request the refusal is rendered with. The request of the
     // handler was consumed by its extractors, and a refusal does not carry a
@@ -112,6 +122,7 @@ impl PreAuthorizeContext {
     {
         Self {
             authorities: authorities.into_iter().map(Into::into).collect(),
+            principal_name: None,
             denial_handler: None,
             method: Method::GET,
             uri: Uri::default(),
@@ -121,6 +132,16 @@ impl PreAuthorizeContext {
             view_model: None,
             resource_dispatcher: None,
         }
+    }
+
+    /// Sets the name the request was authenticated as.
+    ///
+    /// # Arguments
+    ///
+    /// * `principal_name` - The name of the authentication of the request.
+    pub fn with_principal_name(mut self, principal_name: impl Into<String>) -> Self {
+        self.principal_name = Some(principal_name.into());
+        self
     }
 
     /// Sets the handler of a refusal.
@@ -139,6 +160,11 @@ impl PreAuthorizeContext {
     /// Returns the authorities of the request.
     pub fn authorities(&self) -> &[String] {
         &self.authorities
+    }
+
+    /// Returns the name the request was authenticated as, when it carries one.
+    pub fn principal_name(&self) -> Option<&str> {
+        self.principal_name.as_deref()
     }
 
     /// Evaluates a rule against the authorities of the request.
@@ -207,6 +233,7 @@ where
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self {
             authorities: authorities_of(parts).unwrap_or_else(current_authorities),
+            principal_name: principal_name_of(parts).or_else(current_principal_name),
             denial_handler: denial_handler_of(parts),
             method: parts.method.clone(),
             uri: parts.uri.clone(),
@@ -251,6 +278,16 @@ fn authorities_of(parts: &Parts) -> Option<Vec<String>> {
                 .map(ToString::to_string)
                 .collect()
         })
+}
+
+/// Returns the name the request was authenticated as, if the crate that
+/// authenticates the requests wrote it.
+///
+/// # Arguments
+///
+/// * parts - The parts of the request.
+fn principal_name_of(parts: &Parts) -> Option<String> {
+    attribute(parts, PRINCIPAL_NAME_ATTRIBUTE).and_then(AnyValue::as_str).map(ToString::to_string)
 }
 
 /// Returns the handler the request carries for a refusal, if the crate that

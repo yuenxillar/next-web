@@ -39,7 +39,7 @@ pub mod application {
 
 #[cfg(feature = "enable-web-security")]
 pub mod security {
-    pub use next_web_macros::pre_authorize;
+    pub use next_web_macros::{post_authorize, pre_authorize};
 }
 
 #[cfg(feature = "enable-retry")]

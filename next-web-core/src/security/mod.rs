@@ -10,7 +10,13 @@
 pub mod access;
 pub mod authorities;
 
+pub use access::prepost::post_authorize::{
+    Authentication, PostAuthorizeContext, refuse,
+};
 pub use access::prepost::pre_authorize::{
     PreAuthorizeContext, PreAuthorizeDenialHandler, AUTHORITIES_ATTRIBUTE, DENIAL_HANDLER_ATTRIBUTE,
+    PRINCIPAL_NAME_ATTRIBUTE,
 };
-pub use authorities::{current_authorities, install_current_authorities, CurrentAuthorities};
+pub use authorities::{
+    current_authorities, current_principal_name, install_current_authorities, CurrentAuthorities,
+};
