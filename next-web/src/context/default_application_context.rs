@@ -371,6 +371,16 @@ impl DefaultApplicationContext {
         // Initialize message source for this context.
         self.init_message_source()?;
 
+        // The providers the attribute macros submitted, such as the singleton
+        // providers of `#[singleton]`, are loaded first, so that the singletons
+        // of the application are known to the context, and so that the
+        // multicaster and the publisher below can be contributed by the
+        // application.
+        self.context.register_auto_providers();
+        // A provider that declares a condition is only registered when its
+        // condition holds.
+        self.evaluate_conditional_providers();
+
         // Initialize event multicaster for this context.
         self.init_application_event_multicaster()?;
 
@@ -380,14 +390,6 @@ impl DefaultApplicationContext {
 
         // Initialize other special instances
         self.on_refresh();
-
-        // The providers the attribute macros submitted, such as the singleton
-        // providers of `#[singleton]`, are loaded first, so that the singletons
-        // of the application are known to the context.
-        self.context.register_auto_providers();
-        // A provider that declares a condition is only registered when its
-        // condition holds.
-        self.evaluate_conditional_providers();
 
         Ok(())
     }
@@ -506,13 +508,14 @@ impl DefaultApplicationContext {
     ///    [`ConfigurableApplicationContext::add_application_listener`], which
     ///    win over the listeners of a provider of the same concrete type.
     fn init_application_event_multicaster(&mut self) -> Result<(), ContextError> {
+        // A multicaster the application declares is resolved, not only read: a
+        // provider of the application contributes the multicaster of the
+        // application, and the context creates it here so that the events of the
+        // refresh itself reach it.
         let installed = self
-            .singleton_factory()?
-            .registry_mut()
-            .get_singleton::<Arc<dyn ApplicationEventMulticaster>, &'static str>(
+            .resolve_option_with_name::<Arc<dyn ApplicationEventMulticaster>>(
                 APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
-            )
-            .map(Clone::clone);
+            );
 
         let event_multicaster = match installed {
             Some(event_multicaster) => {
@@ -1666,6 +1669,23 @@ mod tests {
             context.message_or_default("missing", &[], Some("fallback"), None),
             Some("fallback".to_owned())
         );
+    }
+
+    #[test]
+    fn resolves_an_arc_of_a_provider_after_the_refresh() {
+        let mut context = DefaultApplicationContext::default();
+        let dependency: Provider<Arc<u32>> = singleton(|_| Arc::new(7_u32)).name("state").into();
+        let dependent: Provider<String> = singleton(|cx: &mut dyn ApplicationContext| {
+            format!("{}", cx.resolve_with_name::<Arc<u32>>("state"))
+        })
+        .name("dependent")
+        .into();
+        context.register_provider(dependent.into());
+        context.register_provider(dependency.into());
+        context.refresh().expect("refreshing succeeds");
+
+        assert_eq!(context.resolve_with_name::<String>("dependent"), "7");
+        assert_eq!(*context.resolve_with_name::<Arc<u32>>("state"), 7);
     }
 
     #[test]

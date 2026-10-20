@@ -53,10 +53,7 @@ use axum::extract::Path;
 use next_web::{
     Application, NextWebApplication,
     core::BoxFuture,
-    macros::{
-        autoconfigure::configuration,
-        bind::{get_mapping, post_mapping},
-    },
+    macros::bind::{get_mapping, post_mapping, singleton},
 };
 use next_web_context::{
     ApplicationEvent, ApplicationListener,
@@ -282,32 +279,35 @@ fn register_listeners(
     );
 }
 
-/// The configuration of the example.
-#[derive(Clone)]
-pub struct EventsConfiguration;
+/// Contributes the state the listeners of the example write.
+///
+/// A singleton provider is registered before the context refreshes, and the
+/// instance is created when it is first resolved. That is what lets the
+/// multicaster below depend on it: the context creates the multicaster while it
+/// refreshes, and the multicaster resolves the state it needs.
+#[singleton(name = "eventsState")]
+fn events_state() -> Arc<EventsState> {
+    Arc::new(EventsState::default())
+}
 
-#[configuration]
-impl EventsConfiguration {
-    /// Contributes the state the listeners of the example write.
-    #[provider(name = "eventsState", order = 0)]
-    fn events_state() -> Arc<EventsState> {
-        Arc::new(EventsState::default())
-    }
+/// Contributes the multicaster of the application and registers the listeners of
+/// the example on it.
+///
+/// The context resolves a multicaster the application declares while it
+/// refreshes, so every event of the application goes through this one — the
+/// publisher of the context hands the events to it — and the routes of the
+/// example read the statistics of its queues.
+///
+/// The argument is resolved when the multicaster is created, not when it is
+/// declared: a provider is created on demand, so the order the providers are
+/// declared in does not matter.
+#[singleton(name = "applicationEventMulticaster")]
+fn multicaster(events_state: Arc<EventsState>) -> Arc<dyn ApplicationEventMulticaster> {
+    let multicaster = Arc::new(DefaultApplicationEventMulticaster::new_boxed());
+    register_listeners(&multicaster, &events_state);
+    let _ = events_state.multicaster.set(Arc::clone(&multicaster));
 
-    /// Contributes the multicaster of the application and registers the
-    /// listeners of the example on it.
-    ///
-    /// The context uses a multicaster the application installed, so this is the
-    /// multicaster that every event of the application goes through, and the one
-    /// the routes of the example read the statistics from.
-    #[provider(name = "applicationEventMulticaster", order = 1)]
-    fn multicaster(events_state: Arc<EventsState>) -> Arc<dyn ApplicationEventMulticaster> {
-        let multicaster = Arc::new(DefaultApplicationEventMulticaster::new_boxed());
-        register_listeners(&multicaster, &events_state);
-        let _ = events_state.multicaster.set(Arc::clone(&multicaster));
-
-        multicaster
-    }
+    multicaster
 }
 
 /// Publishes an order and reports what each kind of listener did with it.
