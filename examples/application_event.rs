@@ -34,7 +34,7 @@ use next_web::{
     macros::bind::{get_mapping, post_mapping, singleton},
 };
 use next_web_context::{
-    ApplicationEvent, ApplicationEventPublisher, ApplicationListener,
+    ApplicationEvent, ApplicationEventPublisher, ApplicationEventPublisherExt, ApplicationListener,
     event::{
         ApplicationEventMulticaster, ApplicationListenerRegistration, ChannelDispatch,
         DefaultApplicationEventMulticaster, ListenerDispatch,
@@ -207,7 +207,7 @@ async fn place_order(
     publisher: FindSingleton<Arc<dyn ApplicationEventPublisher>>,
 ) -> String {
     publisher
-        .publish_event(Arc::new(OrderPlaced { id }))
+        .publish(OrderPlaced { id })
         .expect("the event is published");
 
     format!(
