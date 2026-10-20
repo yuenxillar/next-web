@@ -5,8 +5,14 @@ use std::{
 };
 
 use next_web_context::ApplicationContextExt;
-use next_web_context::{ApplicationEvent, ApplicationListener};
+use next_web_context::{
+    APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME, ApplicationEvent, ApplicationListener,
+    event::ApplicationEventMulticaster,
+};
 use next_web_core::{ApplicationContext, Required};
+
+/// The identifier the registry of the sessions is registered under.
+pub const SESSION_REGISTRY_LISTENER_ID: &str = "sessionRegistry";
 
 use crate::{
     authorization::AuthenticationTrustResolver,
@@ -20,7 +26,6 @@ use crate::{
             http_security_builder::HttpSecurityBuilder,
         },
     },
-    context::DelegatingApplicationListener,
     core::session::{SessionRegistry, SessionRegistryImpl},
     web::{
         authentication::{
@@ -590,26 +595,37 @@ where
         registry
     }
 
-    /// Registers a delegate application listener.
+    /// Registers the listener that receives the events of the sessions.
+    ///
+    /// The listener is registered on the multicaster of the context, which is
+    /// where the events of the application are published. A context that has no
+    /// multicaster (a context built by hand, or one that is not refreshed) has no
+    /// events to deliver, and the listener is left out.
     fn register_delegate_application_listener(
         &self,
         http: &mut H,
         delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
     ) {
-        let context = http.shared_object_mut::<Arc<RwLock<Box<dyn ApplicationContext>>>>();
-        if let Some(context) = context {
-            let mut context = context
-                .write()
-                .expect("the application context lock is poisoned");
+        let Some(context) = http.shared_object_mut::<Arc<RwLock<Box<dyn ApplicationContext>>>>()
+        else {
+            return;
+        };
+        let context = context
+            .write()
+            .expect("the application context lock is poisoned");
 
-            if let Some(delegating) =
-                context.get_singleton_option_mut::<DelegatingApplicationListener>()
-            {
-                // The delegation hands the event to the listener, which reads the
-                // events it is interested in; a listener that is filtered by the
-                // multicaster is registered on it instead.
-                delegating.add_listener(delegate);
-            }
+        if !register_session_events(
+            context
+                .get_singleton_option_with_name::<Arc<dyn ApplicationEventMulticaster>>(
+                    APPLICATION_EVENT_MULTICASTER_SINGLETON_NAME,
+                )
+                .cloned(),
+            delegate,
+        ) {
+            tracing::warn!(
+                "the context holds no event multicaster: the events of the sessions are not \
+                 delivered to the registry of the sessions"
+            );
         }
     }
 
@@ -917,5 +933,112 @@ where
     /// Returns the parent `SessionManagementConfigurer` for further customization.
     pub fn and(self) -> &'a mut SessionManagementConfigurer<H> {
         self.parent
+    }
+}
+
+/// Registers the listener that receives the events of the sessions on the
+/// multicaster of the context.
+///
+/// Returns whether the multicaster was there, which is what tells the caller
+/// whether the events reach the registry of the sessions.
+///
+/// # Arguments
+///
+/// * `multicaster` - The multicaster of the context, when it has one.
+/// * `delegate` - The listener that receives the events of the sessions.
+fn register_session_events(
+    multicaster: Option<Arc<dyn ApplicationEventMulticaster>>,
+    delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+) -> bool {
+    let Some(multicaster) = multicaster else {
+        return false;
+    };
+
+    // The registry of the sessions is called for every event of the application
+    // and reads the events of the sessions, which is where it knows what to do:
+    // the events of another kind are ignored by it.
+    multicaster.add_application_listener(String::from(SESSION_REGISTRY_LISTENER_ID), delegate);
+
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        any::Any,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
+
+    use next_web_context::{
+        ApplicationEvent, ApplicationListener,
+        event::{ApplicationEventMulticaster, DefaultApplicationEventMulticaster},
+    };
+    use next_web_core::BoxFuture;
+
+    use super::{SESSION_REGISTRY_LISTENER_ID, register_session_events};
+
+    /// An event of the test.
+    #[derive(Clone)]
+    struct Ping;
+
+    impl ApplicationEvent for Ping {
+        fn source(&self) -> &dyn Any {
+            self
+        }
+    }
+
+    /// The listener of the test: it counts the events it receives.
+    #[derive(Default)]
+    struct Counter {
+        received: AtomicUsize,
+    }
+
+    impl ApplicationListener<Box<dyn ApplicationEvent>> for Counter {
+        fn on_application_event<'a>(
+            &'a self,
+            _event: Box<dyn ApplicationEvent>,
+        ) -> BoxFuture<'a, ()> {
+            Box::pin(async move {
+                self.received.fetch_add(1, Ordering::SeqCst);
+            })
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn the_events_of_the_application_reach_the_listener_of_the_sessions() {
+        let multicaster = Arc::new(DefaultApplicationEventMulticaster::new_boxed());
+        let counter = Arc::new(Counter::default());
+        let delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>> = counter.clone();
+
+        let registered = register_session_events(
+            Some(Arc::clone(&multicaster) as Arc<dyn ApplicationEventMulticaster>),
+            delegate,
+        );
+        multicaster
+            .multicast_event(Box::new(Ping))
+            .expect("the event is published");
+
+        assert!(registered, "the multicaster was there");
+        assert_eq!(
+            counter.received.load(Ordering::SeqCst),
+            1,
+            "the event reached the listener of the sessions"
+        );
+        let statistics = multicaster.channel_statistics(SESSION_REGISTRY_LISTENER_ID);
+        assert!(
+            statistics.is_none(),
+            "the listener of the sessions is dispatched inline, so it has no queue"
+        );
+    }
+
+    #[test]
+    fn a_context_without_a_multicaster_reports_that_the_listener_was_left_out() {
+        let counter = Arc::new(Counter::default());
+        let delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>> = counter;
+
+        assert!(!register_session_events(None, delegate));
     }
 }
