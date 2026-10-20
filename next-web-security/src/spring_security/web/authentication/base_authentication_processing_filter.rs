@@ -291,7 +291,7 @@ impl BaseAuthenticationProcessingFilter {
 
         if let Some(publisher) = self.event_publisher.as_ref() {
             publisher
-                .publish_event(Box::new(InteractiveAuthenticationSuccessEvent::new(
+                .publish_event(Arc::new(InteractiveAuthenticationSuccessEvent::new(
                     auth_result.clone(),
                     TypeId::of::<Self>(),
                 )))

@@ -55,20 +55,20 @@ impl DefaultAuthenticationEventPublisher {
     fn failure_event(
         error: AuthenticationError,
         authentication: Arc<dyn Authentication>,
-    ) -> Box<dyn ApplicationEvent> {
+    ) -> Arc<dyn ApplicationEvent> {
         match error.kind() {
             AuthenticationErrorKind::BadCredentials
             | AuthenticationErrorKind::UsernameNotFound
-            | AuthenticationErrorKind::CredentialsNotFound => Box::new(
+            | AuthenticationErrorKind::CredentialsNotFound => Arc::new(
                 AuthenticationFailureBadCredentialsEvent::new(authentication, error),
             ),
-            AuthenticationErrorKind::AccountStatus => Box::new(
+            AuthenticationErrorKind::AccountStatus => Arc::new(
                 AuthenticationFailureExpiredEvent::new(authentication, error),
             ),
-            AuthenticationErrorKind::ProviderNotFound => Box::new(
+            AuthenticationErrorKind::ProviderNotFound => Arc::new(
                 AuthenticationFailureProviderNotFoundEvent::new(authentication, error),
             ),
-            _ => Box::new(AuthenticationFailureServiceErrorEvent::new(
+            _ => Arc::new(AuthenticationFailureServiceErrorEvent::new(
                 authentication,
                 error,
             )),
@@ -87,8 +87,8 @@ impl Default for DefaultAuthenticationEventPublisher {
 impl AuthenticationEventPublisher for DefaultAuthenticationEventPublisher {
     fn publish_authentication_success(&self, authentication: Arc<dyn Authentication>) {
         if let Some(ref publisher) = self.application_event_publisher {
-            let event: Box<dyn ApplicationEvent> =
-                Box::new(AuthenticationSuccessEvent::new(authentication));
+            let event: Arc<dyn ApplicationEvent> =
+                Arc::new(AuthenticationSuccessEvent::new(authentication));
             let _ = publisher.publish_event(event);
         }
     }
@@ -128,7 +128,7 @@ mod tests {
     impl ApplicationEventPublisher for RecordingPublisher {
         fn publish_event(
             &self,
-            event: Box<dyn ApplicationEvent>,
+            event: Arc<dyn ApplicationEvent>,
         ) -> Result<(), Box<dyn Error + Send + Sync>> {
             self.events.lock().unwrap().push(event.event_type());
             Ok(())

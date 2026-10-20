@@ -173,7 +173,7 @@ impl HttpFilter for RememberMeAuthenticationFilter {
                     .save_context(&ctx, request, response)
                     .await;
                 if let Some(event_publisher) = self.event_publisher.as_ref() {
-                    event_publisher.publish_event(Box::new(
+                    event_publisher.publish_event(Arc::new(
                         InteractiveAuthenticationSuccessEvent::new(
                             remember_me_auth.clone(),
                             TypeId::of::<Self>(),

@@ -2,6 +2,7 @@
 
 use std::{
     any::{Any, TypeId},
+    sync::Arc,
     collections::HashMap,
     fmt::{self},
 };
@@ -122,7 +123,7 @@ impl ApplicationContext for StandaloneApplicationContext {
 impl ApplicationEventPublisher for StandaloneApplicationContext {
     fn publish_event(
         &self,
-        _event: Box<dyn ApplicationEvent>,
+        _event: Arc<dyn ApplicationEvent>,
     ) -> Result<(), next_web_core::error::BoxError> {
         Ok(())
     }

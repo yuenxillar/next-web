@@ -106,8 +106,8 @@ struct AuditListener {
     received: Arc<Received>,
 }
 
-impl ApplicationListener<Box<dyn ApplicationEvent>> for AuditListener {
-    fn on_application_event<'a>(&'a self, event: Box<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+impl ApplicationListener<Arc<dyn ApplicationEvent>> for AuditListener {
+    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             if let Some(order) = (event.as_ref() as &dyn Any).downcast_ref::<OrderPlaced>() {
                 self.received
@@ -125,8 +125,8 @@ struct NotifierListener {
     received: Arc<Received>,
 }
 
-impl ApplicationListener<Box<dyn ApplicationEvent>> for NotifierListener {
-    fn on_application_event<'a>(&'a self, event: Box<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+impl ApplicationListener<Arc<dyn ApplicationEvent>> for NotifierListener {
+    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             let Some(order) = (event.as_ref() as &dyn Any).downcast_ref::<OrderPlaced>() else {
                 return;
@@ -207,7 +207,7 @@ async fn place_order(
     publisher: FindSingleton<Arc<dyn ApplicationEventPublisher>>,
 ) -> String {
     publisher
-        .publish_event(Box::new(OrderPlaced { id }))
+        .publish_event(Arc::new(OrderPlaced { id }))
         .expect("the event is published");
 
     format!(
@@ -266,7 +266,7 @@ mod tests {
     /// Publishes an order the way the route does.
     fn publish(multicaster: &DefaultApplicationEventMulticaster, id: &str) {
         multicaster
-            .multicast_event(Box::new(OrderPlaced { id: id.to_owned() }))
+            .multicast_event(Arc::new(OrderPlaced { id: id.to_owned() }))
             .expect("the order is published");
     }
 
@@ -334,7 +334,7 @@ mod tests {
             .cloned()
             .expect("the context installs the publisher of the application");
         publisher
-            .publish_event(Box::new(OrderPlaced {
+            .publish_event(Arc::new(OrderPlaced {
                 id: String::from("order-1"),
             }))
             .expect("the order is published");

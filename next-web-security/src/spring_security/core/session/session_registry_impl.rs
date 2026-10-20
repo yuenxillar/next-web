@@ -45,8 +45,8 @@ impl SessionRegistryImpl {
     }
 }
 
-impl ApplicationListener<Box<dyn ApplicationEvent>> for SessionRegistryImpl {
-    fn on_application_event<'a>(&'a self, event: Box<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+impl ApplicationListener<Arc<dyn ApplicationEvent>> for SessionRegistryImpl {
+    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             let session_event = match (event.as_ref() as &dyn Any).downcast_ref::<SessionEvent>() {
                 Some(event) => event,

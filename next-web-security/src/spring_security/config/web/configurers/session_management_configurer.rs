@@ -604,7 +604,7 @@ where
     fn register_delegate_application_listener(
         &self,
         http: &mut H,
-        delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        delegate: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>,
     ) {
         let Some(context) = http.shared_object_mut::<Arc<RwLock<Box<dyn ApplicationContext>>>>()
         else {
@@ -948,7 +948,7 @@ where
 /// * `delegate` - The listener that receives the events of the sessions.
 fn register_session_events(
     multicaster: Option<Arc<dyn ApplicationEventMulticaster>>,
-    delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+    delegate: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>,
 ) -> bool {
     let Some(multicaster) = multicaster else {
         return false;
@@ -996,10 +996,10 @@ mod tests {
         received: AtomicUsize,
     }
 
-    impl ApplicationListener<Box<dyn ApplicationEvent>> for Counter {
+    impl ApplicationListener<Arc<dyn ApplicationEvent>> for Counter {
         fn on_application_event<'a>(
             &'a self,
-            _event: Box<dyn ApplicationEvent>,
+            _event: Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 self.received.fetch_add(1, Ordering::SeqCst);
@@ -1011,14 +1011,14 @@ mod tests {
     async fn the_events_of_the_application_reach_the_listener_of_the_sessions() {
         let multicaster = Arc::new(DefaultApplicationEventMulticaster::new_boxed());
         let counter = Arc::new(Counter::default());
-        let delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>> = counter.clone();
+        let delegate: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>> = counter.clone();
 
         let registered = register_session_events(
             Some(Arc::clone(&multicaster) as Arc<dyn ApplicationEventMulticaster>),
             delegate,
         );
         multicaster
-            .multicast_event(Box::new(Ping))
+            .multicast_event(Arc::new(Ping))
             .expect("the event is published");
 
         assert!(registered, "the multicaster was there");
@@ -1037,7 +1037,7 @@ mod tests {
     #[test]
     fn a_context_without_a_multicaster_reports_that_the_listener_was_left_out() {
         let counter = Arc::new(Counter::default());
-        let delegate: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>> = counter;
+        let delegate: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>> = counter;
 
         assert!(!register_session_events(None, delegate));
     }

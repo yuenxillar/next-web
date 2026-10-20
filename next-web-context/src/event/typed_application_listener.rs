@@ -10,7 +10,7 @@ use crate::{ApplicationEvent, ApplicationListener, BoxFuture};
 /// multicaster stores.
 ///
 /// Every listener is registered as an
-/// [`ApplicationListener<Box<dyn ApplicationEvent>>`](ApplicationListener),
+/// [`ApplicationListener<Arc<dyn ApplicationEvent>>`](ApplicationListener),
 /// because a multicaster publishes the events of an application without knowing
 /// their types. A listener of a concrete event type therefore needs an adapter
 /// that turns the erased event back into the event the listener handles. The
@@ -55,15 +55,18 @@ where
     }
 }
 
-impl<L, E> ApplicationListener<Box<dyn ApplicationEvent>> for TypedApplicationListener<L, E>
+impl<L, E> ApplicationListener<Arc<dyn ApplicationEvent>> for TypedApplicationListener<L, E>
 where
     L: ApplicationListener<E> + 'static,
-    E: ApplicationEvent + 'static,
+    E: ApplicationEvent + Clone + 'static,
 {
-    fn on_application_event<'a>(&'a self, event: Box<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             match downcast_event::<E>(event) {
-                Ok(event) => self.listener.on_application_event(*event).await,
+                // The event is shared by every listener of the application, so the
+                // listener that handles it by value is given a copy of it. This is
+                // the only place a clone of an event happens.
+                Ok(event) => self.listener.on_application_event((*event).clone()).await,
                 Err(event) => {
                     tracing::debug!(
                         expected = ?TypeId::of::<E>(),
@@ -95,20 +98,20 @@ where
 pub fn typed_listener<L, E>(listener: L) -> Arc<TypedApplicationListener<L, E>>
 where
     L: ApplicationListener<E> + 'static,
-    E: ApplicationEvent + 'static,
+    E: ApplicationEvent + Clone + 'static,
 {
     Arc::new(TypedApplicationListener::new(listener))
 }
 
-/// Turns an erased event back into the event of type `E`.
+/// Turns a shared event back into the event of type `E`.
 ///
 /// The event is handed back unchanged when it is of another type, so that the
 /// caller can report the mismatch without losing the event.
 ///
 /// # Arguments
 ///
-/// * `event` - The erased event to downcast.
-pub fn downcast_event<E>(event: Box<dyn ApplicationEvent>) -> Result<Box<E>, Box<dyn ApplicationEvent>>
+/// * `event` - The shared event to downcast.
+pub fn downcast_event<E>(event: Arc<dyn ApplicationEvent>) -> Result<Arc<E>, Arc<dyn ApplicationEvent>>
 where
     E: ApplicationEvent + 'static,
 {
@@ -118,9 +121,9 @@ where
         return Err(event);
     }
 
-    // The event is an `E`, so the conversion goes through `Any`; a trait object
+    // The event is an `E`, so the conversion goes through `Any`: a shared event
     // cannot be downcast to a type that is only known at runtime otherwise.
-    let event: Box<dyn Any + Send + Sync> = event;
+    let event: Arc<dyn Any + Send + Sync> = event;
 
     Ok(event
         .downcast::<E>()

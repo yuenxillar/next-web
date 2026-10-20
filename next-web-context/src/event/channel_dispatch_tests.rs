@@ -72,8 +72,8 @@ impl NumberedListener {
     }
 }
 
-impl ApplicationListener<Box<dyn ApplicationEvent>> for NumberedListener {
-    fn on_application_event<'a>(&'a self, event: Box<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+impl ApplicationListener<Arc<dyn ApplicationEvent>> for NumberedListener {
+    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             if let Some(event) = (event.as_ref() as &dyn Any).downcast_ref::<NumberedEvent>() {
                 self.received
@@ -97,8 +97,8 @@ struct GatedListener {
     started: Arc<Notify>,
 }
 
-impl ApplicationListener<Box<dyn ApplicationEvent>> for GatedListener {
-    fn on_application_event<'a>(&'a self, event: Box<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+impl ApplicationListener<Arc<dyn ApplicationEvent>> for GatedListener {
+    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             self.started.notify_one();
             let _permit = self.gate.acquire().await;
@@ -115,8 +115,8 @@ impl ApplicationListener<Box<dyn ApplicationEvent>> for GatedListener {
 /// A listener that panics for every event.
 struct PanickingListener;
 
-impl ApplicationListener<Box<dyn ApplicationEvent>> for PanickingListener {
-    fn on_application_event<'a>(&'a self, _event: Box<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+impl ApplicationListener<Arc<dyn ApplicationEvent>> for PanickingListener {
+    fn on_application_event<'a>(&'a self, _event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             panic!("the listener of the tests failed on purpose");
         })
@@ -161,7 +161,7 @@ fn register_channel(
 
 /// Publishes an event with the given number.
 fn publish(multicaster: &DefaultApplicationEventMulticaster, number: u8) -> Result<(), MulticastError> {
-    multicaster.multicast_event(Box::new(NumberedEvent(number)))
+    multicaster.multicast_event(Arc::new(NumberedEvent(number)))
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

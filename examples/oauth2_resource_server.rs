@@ -112,7 +112,7 @@ impl OAuth2ResourceServerAutoConfig {
         struct NoopApplicationEventPublisher;
 
         impl ApplicationEventPublisher for NoopApplicationEventPublisher {
-            fn publish_event(&self, _event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
+            fn publish_event(&self, _event: Arc<dyn ApplicationEvent>) -> Result<(), BoxError> {
                 Ok(())
             }
         }

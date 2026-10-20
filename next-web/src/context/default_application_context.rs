@@ -115,7 +115,7 @@ pub struct DefaultApplicationContext {
     /// Registered listeners, in registration order, paired with their identifier.
     listeners: Vec<(
         String,
-        Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>,
     )>,
     /// Message source used to resolve localized messages, when one is installed.
     message_source: Option<Arc<dyn MessageSource>>,
@@ -255,7 +255,7 @@ impl DefaultApplicationContext {
     /// ```
     pub fn listener_id_of<L>() -> String
     where
-        L: ApplicationListener<Box<dyn ApplicationEvent>> + 'static,
+        L: ApplicationListener<Arc<dyn ApplicationEvent>> + 'static,
     {
         Self::listener_id(TypeId::of::<L>())
     }
@@ -557,7 +557,7 @@ impl DefaultApplicationContext {
 
         // Listeners contributed by the providers of the application.
         let listeners =
-            self.resolve_by_type::<Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>>();
+            self.resolve_by_type::<Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>>();
         for listener in listeners {
             let id = Self::listener_id(listener.as_ref().type_id());
             event_multicaster.add_application_listener(id, listener);
@@ -699,7 +699,7 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
 
     fn add_application_listener(
         &mut self,
-        listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>,
     ) {
         let id = Self::listener_id(listener.as_ref().type_id());
 
@@ -728,7 +728,7 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
 
     fn add_application_listener_with_dispatch(
         &mut self,
-        listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>,
         dispatch: next_web_context::event::ListenerDispatch,
     ) {
         if dispatch.is_inline() {
@@ -1103,7 +1103,7 @@ impl ApplicationContext for DefaultApplicationContext {
 }
 
 impl ApplicationEventPublisher for DefaultApplicationContext {
-    fn publish_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
+    fn publish_event(&self, event: Arc<dyn ApplicationEvent>) -> Result<(), BoxError> {
         // Multicast the event to the application event multicaster, if one is configured.
         if let Some(multicaster) = self.application_event_multicaster.as_ref() {
             multicaster.multicast_event(event.clone())?;
@@ -1436,7 +1436,7 @@ struct ContextApplicationEventPublisher {
 }
 
 impl ApplicationEventPublisher for ContextApplicationEventPublisher {
-    fn publish_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
+    fn publish_event(&self, event: Arc<dyn ApplicationEvent>) -> Result<(), BoxError> {
         self.event_multicaster.multicast_event(event.clone())?;
 
         if let Some(parent) = self.parent.as_deref() {
@@ -1482,10 +1482,10 @@ mod tests {
         received: Arc<AtomicUsize>,
     }
 
-    impl ApplicationListener<Box<dyn ApplicationEvent>> for CountingListener {
+    impl ApplicationListener<Arc<dyn ApplicationEvent>> for CountingListener {
         fn on_application_event<'a>(
             &'a self,
-            _event: Box<dyn ApplicationEvent>,
+            _event: Arc<dyn ApplicationEvent>,
         ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
             self.received.fetch_add(1, Ordering::SeqCst);
             Box::pin(async {})
@@ -1551,7 +1551,7 @@ mod tests {
         }));
 
         context
-            .publish_event(Box::new(TestEvent))
+            .publish_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
         assert_eq!(received.load(Ordering::SeqCst), 1);
 
@@ -1559,7 +1559,7 @@ mod tests {
             CountingListener,
         >());
         context
-            .publish_event(Box::new(TestEvent))
+            .publish_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
         assert_eq!(received.load(Ordering::SeqCst), 1);
     }
@@ -1583,7 +1583,7 @@ mod tests {
             .cloned()
             .expect("the context installs the publisher of the application");
         publisher
-            .publish_event(Box::new(TestEvent))
+            .publish_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
 
         assert_eq!(received.load(Ordering::SeqCst), 1);
@@ -1595,7 +1595,7 @@ mod tests {
         struct ApplicationPublisher;
 
         impl ApplicationEventPublisher for ApplicationPublisher {
-            fn publish_event(&self, _event: Box<dyn ApplicationEvent>) -> Result<(), BoxError> {
+            fn publish_event(&self, _event: Arc<dyn ApplicationEvent>) -> Result<(), BoxError> {
                 Ok(())
             }
         }
@@ -1647,7 +1647,7 @@ mod tests {
             .expect("the context installs the publisher of the application");
         for _ in 0..10 {
             publisher
-                .publish_event(Box::new(TestEvent))
+                .publish_event(Arc::new(TestEvent))
                 .expect("publishing succeeds");
         }
         context.close().expect("closing succeeds");

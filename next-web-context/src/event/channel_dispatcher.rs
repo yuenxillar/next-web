@@ -44,7 +44,7 @@ pub const DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 /// The message the worker of a listener reads.
 enum ChannelMessage {
     /// An event the listener has to run for.
-    Event(Box<dyn ApplicationEvent>),
+    Event(Arc<dyn ApplicationEvent>),
     /// Reaches the worker after the events sent before it, so the sender knows
     /// those events were delivered.
     Barrier(oneshot::Sender<()>),
@@ -148,7 +148,7 @@ impl ChannelDispatcher {
     /// # Arguments
     ///
     /// * `event` - The event the listener has to run for.
-    pub(crate) fn send(&self, event: Box<dyn ApplicationEvent>) -> SendOutcome {
+    pub(crate) fn send(&self, event: Arc<dyn ApplicationEvent>) -> SendOutcome {
         if let Err(outcome) = self.ensure_started() {
             return outcome;
         }

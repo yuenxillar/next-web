@@ -319,7 +319,7 @@ impl DefaultApplicationEventMulticaster {
     pub fn register_typed<L, E>(&self, id: impl Into<String>, listener: L)
     where
         L: ApplicationListener<E> + 'static,
-        E: ApplicationEvent + 'static,
+        E: ApplicationEvent + Clone + 'static,
     {
         self.register(ApplicationListenerRegistration::typed(id, listener));
     }
@@ -367,7 +367,7 @@ impl DefaultApplicationEventMulticaster {
     /// * `event` - The event to publish.
     pub async fn multicast_event_async(
         &self,
-        event: Box<dyn ApplicationEvent>,
+        event: Arc<dyn ApplicationEvent>,
     ) -> Result<(), MulticastError> {
         let registrations = self.matching_listeners(&*event);
         let (queued_failures, inline_listeners) = self.queue_channel_listeners(&event, registrations);
@@ -458,7 +458,7 @@ impl DefaultApplicationEventMulticaster {
     ///   they run in.
     fn queue_channel_listeners(
         &self,
-        event: &Box<dyn ApplicationEvent>,
+        event: &Arc<dyn ApplicationEvent>,
         registrations: Vec<ApplicationListenerRegistration>,
     ) -> (Vec<ListenerFailure>, Vec<ApplicationListenerRegistration>) {
         let channels = self
@@ -604,7 +604,7 @@ impl DefaultApplicationEventMulticaster {
     fn spawn_listeners(
         &self,
         registrations: Vec<ApplicationListenerRegistration>,
-        event: Box<dyn ApplicationEvent>,
+        event: Arc<dyn ApplicationEvent>,
     ) -> Result<(), MulticastError> {
         if Handle::try_current().is_err() {
             tracing::warn!(
@@ -645,7 +645,7 @@ impl DefaultApplicationEventMulticaster {
     fn run_listeners(
         &self,
         registrations: &[ApplicationListenerRegistration],
-        event: &Box<dyn ApplicationEvent>,
+        event: &Arc<dyn ApplicationEvent>,
     ) -> Result<(), MulticastError> {
         block_on(dispatch_listeners(
             registrations.to_vec(),
@@ -702,7 +702,7 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
             .clear();
     }
 
-    fn multicast_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), MulticastError> {
+    fn multicast_event(&self, event: Arc<dyn ApplicationEvent>) -> Result<(), MulticastError> {
         let registrations = self.matching_listeners(&*event);
 
         if registrations.is_empty() {
@@ -823,7 +823,7 @@ impl Debug for DefaultApplicationEventMulticaster {
 /// * `failure_policy` - What to return when a listener failed.
 async fn dispatch_listeners(
     registrations: Vec<ApplicationListenerRegistration>,
-    event: Box<dyn ApplicationEvent>,
+    event: Arc<dyn ApplicationEvent>,
     error_handler: Arc<dyn MulticastErrorHandler>,
     failure_policy: ListenerFailurePolicy,
 ) -> Result<(), MulticastError> {
@@ -909,10 +909,10 @@ mod tests {
         events: Arc<Mutex<Vec<&'static str>>>,
     }
 
-    impl ApplicationListener<Box<dyn ApplicationEvent>> for RecordingListener {
+    impl ApplicationListener<Arc<dyn ApplicationEvent>> for RecordingListener {
         fn on_application_event<'a>(
             &'a self,
-            event: Box<dyn ApplicationEvent>,
+            event: Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 let name = if (*event).type_id() == TypeId::of::<TestEvent>() {
@@ -929,10 +929,10 @@ mod tests {
     /// A listener that panics.
     struct PanickingListener;
 
-    impl ApplicationListener<Box<dyn ApplicationEvent>> for PanickingListener {
+    impl ApplicationListener<Arc<dyn ApplicationEvent>> for PanickingListener {
         fn on_application_event<'a>(
             &'a self,
-            _event: Box<dyn ApplicationEvent>,
+            _event: Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 panic!("the listener of the test failed");
@@ -946,10 +946,10 @@ mod tests {
         ran: Arc<Mutex<Vec<&'static str>>>,
     }
 
-    impl ApplicationListener<Box<dyn ApplicationEvent>> for OrderListener {
+    impl ApplicationListener<Arc<dyn ApplicationEvent>> for OrderListener {
         fn on_application_event<'a>(
             &'a self,
-            _event: Box<dyn ApplicationEvent>,
+            _event: Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 self.ran.lock().unwrap().push(self.name);
@@ -976,10 +976,10 @@ mod tests {
         delay: Duration,
     }
 
-    impl ApplicationListener<Box<dyn ApplicationEvent>> for SlowListener {
+    impl ApplicationListener<Arc<dyn ApplicationEvent>> for SlowListener {
         fn on_application_event<'a>(
             &'a self,
-            _event: Box<dyn ApplicationEvent>,
+            _event: Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 tokio::time::sleep(self.delay).await;
@@ -1029,7 +1029,7 @@ mod tests {
         let (multicaster, _) = recording_multicaster(&events);
 
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
 
         assert_eq!(*events.lock().unwrap(), vec!["test"]);
@@ -1048,7 +1048,7 @@ mod tests {
         assert_eq!(multicaster.listener_count(), 1);
 
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
 
         assert_eq!(*events.lock().unwrap(), vec!["test"]);
@@ -1061,7 +1061,7 @@ mod tests {
 
         multicaster.remove_application_listener(String::from("recording"));
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
 
         assert!(multicaster.is_empty());
@@ -1075,7 +1075,7 @@ mod tests {
 
         multicaster.remove_all_listeners();
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
 
         assert!(events.lock().unwrap().is_empty());
@@ -1086,7 +1086,7 @@ mod tests {
         let multicaster = DefaultApplicationEventMulticaster::default();
 
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
     }
 
@@ -1102,12 +1102,12 @@ mod tests {
         );
 
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
         assert_eq!(received.load(Ordering::SeqCst), 1);
 
         multicaster
-            .multicast_event(Box::new(OtherEvent))
+            .multicast_event(Arc::new(OtherEvent))
             .expect("publishing succeeds");
         assert_eq!(received.load(Ordering::SeqCst), 1);
 
@@ -1132,7 +1132,7 @@ mod tests {
         );
 
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("the failure is reported, not returned");
 
         assert_eq!(*events.lock().unwrap(), vec!["test"]);
@@ -1148,7 +1148,7 @@ mod tests {
             .add_application_listener(String::from("panicking"), Arc::new(PanickingListener));
 
         let error = multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect_err("the failure is returned");
 
         match error {
@@ -1179,7 +1179,7 @@ mod tests {
         }
 
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
 
         assert_eq!(*ran.lock().unwrap(), vec!["first", "middle", "last"]);
@@ -1193,7 +1193,7 @@ mod tests {
 
         clone.remove_all_listeners();
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
 
         assert!(events.lock().unwrap().is_empty());
@@ -1212,7 +1212,7 @@ mod tests {
         );
 
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
 
         assert_eq!(ran.load(Ordering::SeqCst), 1);
@@ -1231,7 +1231,7 @@ mod tests {
         );
 
         multicaster
-            .multicast_event_async(Box::new(TestEvent))
+            .multicast_event_async(Arc::new(TestEvent))
             .await?;
 
         assert_eq!(received.load(Ordering::SeqCst), 1);
@@ -1252,7 +1252,7 @@ mod tests {
         );
 
         multicaster
-            .multicast_event(Box::new(TestEvent))
+            .multicast_event(Arc::new(TestEvent))
             .expect("publishing succeeds");
 
         assert_eq!(ran.load(Ordering::SeqCst), 0);

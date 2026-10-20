@@ -15,7 +15,7 @@ use crate::{ApplicationEvent, ApplicationListener, event::ListenerDispatch};
 /// Such a listener is responsible for ignoring the events it does not
 /// understand. [`TypedApplicationListener`](crate::event::TypedApplicationListener)
 /// is the adapter that does it for a listener of one concrete event type.
-pub type ErasedApplicationListener = Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>;
+pub type ErasedApplicationListener = Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>;
 
 /// Multicasts application events to the registered listeners.
 ///
@@ -82,7 +82,7 @@ where
     /// which is what a caller that publishes an event and then reads the state
     /// the listener writes relies on. The listeners that are dispatched over a
     /// channel have had the event queued when the call returns.
-    fn multicast_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), MulticastError>;
+    fn multicast_event(&self, event: Arc<dyn ApplicationEvent>) -> Result<(), MulticastError>;
 
     /// Waits until the events published before the call have been delivered to
     /// the listeners that are dispatched over a channel.

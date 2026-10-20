@@ -1,22 +1,29 @@
-use std::any::{Any, TypeId};
-
-use dyn_clone::{DynClone, clone_trait_object};
+use std::{
+    any::{Any, TypeId},
+    sync::Arc,
+};
 
 /// The event of an application.
 ///
-/// An event is a value the event system clones, publishes and hands to the
-/// listeners that support it. The trait asks for the type of the event and for the
-/// source of it so that a listener is called only for the events it handles; both
-/// have a default that is right for the usual event, which is a value that is its
-/// own source.
+/// An event is a value the event system publishes and hands to the listeners that
+/// support it. It is published once and shared by every listener as an
+/// `Arc<dyn ApplicationEvent>`, so an event does not have to be cloneable and a
+/// large event is not copied for each listener. The trait asks for the type of the
+/// event and for the source of it so that a listener is called only for the events
+/// it handles; both have a default that is right for the usual event, which is a
+/// value that is its own source.
 ///
 /// # Requirements
 ///
 /// - `Send + Sync`: an event is shared by the listeners of the threads that
 ///   dispatch it;
 /// - `Any`: an event is downcast to its type by a listener that is adapted to one
-///   type of event;
-/// - `DynClone`: the event system hands a copy of the event to each listener.
+///   type of event.
+///
+/// An event does not have to be `Clone`: the event system publishes one value and
+/// hands the same `Arc` to every listener. A listener that is adapted to one type
+/// of event does clone the event it handles, because the trait of a listener takes
+/// the event it handles by value, and such an event has to be `Clone`.
 ///
 /// # Example
 ///
@@ -49,7 +56,6 @@ pub trait ApplicationEvent
 where
     Self: Send + Sync,
     Self: Any,
-    Self: DynClone,
 {
     /// Returns the timestamp when this event occurred, in seconds since the Unix
     /// epoch.
@@ -91,8 +97,6 @@ where
         Any::type_id(self)
     }
 }
-
-clone_trait_object!(ApplicationEvent);
 
 #[derive(Debug, Clone)]
 pub struct EventAttributes<S> {
@@ -138,7 +142,7 @@ where
     }
 }
 
-impl ApplicationEvent for Box<dyn ApplicationEvent> {
+impl ApplicationEvent for Arc<dyn ApplicationEvent> {
     fn timestamp(&self) -> u64 {
         self.as_ref().timestamp()
     }

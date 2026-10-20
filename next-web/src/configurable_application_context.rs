@@ -151,7 +151,7 @@ where
     /// * `listener` - The listener to register.
     fn add_application_listener(
         &mut self,
-        listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>,
     );
 
     /// Adds a listener that is dispatched the way the caller chooses.
@@ -169,7 +169,7 @@ where
     /// * `dispatch` - How the events of the listener reach it.
     fn add_application_listener_with_dispatch(
         &mut self,
-        listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>,
         dispatch: ListenerDispatch,
     ) {
         let _ = dispatch;

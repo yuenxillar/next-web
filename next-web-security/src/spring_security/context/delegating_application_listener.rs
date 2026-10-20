@@ -20,7 +20,7 @@ use next_web_core::BoxFuture;
 /// is for.
 #[derive(Clone, Default)]
 pub struct DelegatingApplicationListener {
-    listeners: Vec<Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>>,
+    listeners: Vec<Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>>,
 }
 
 impl DelegatingApplicationListener {
@@ -33,7 +33,7 @@ impl DelegatingApplicationListener {
     /// * `listener` - The listener that receives the events of the application.
     pub fn add_listener(
         &mut self,
-        listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>,
     ) {
         if self
             .listeners
@@ -47,7 +47,7 @@ impl DelegatingApplicationListener {
     }
 
     /// Returns the listeners the events are handed to.
-    pub fn listeners(&self) -> &[Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>] {
+    pub fn listeners(&self) -> &[Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>>] {
         &self.listeners
     }
 }
@@ -60,8 +60,8 @@ impl std::fmt::Debug for DelegatingApplicationListener {
     }
 }
 
-impl ApplicationListener<Box<dyn ApplicationEvent>> for DelegatingApplicationListener {
-    fn on_application_event<'a>(&'a self, event: Box<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
+impl ApplicationListener<Arc<dyn ApplicationEvent>> for DelegatingApplicationListener {
+    fn on_application_event<'a>(&'a self, event: Arc<dyn ApplicationEvent>) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             // Every listener receives the event: the listeners of this module are
             // the ones that know which events they handle, and they read the event
@@ -101,10 +101,10 @@ mod tests {
         received: AtomicUsize,
     }
 
-    impl ApplicationListener<Box<dyn ApplicationEvent>> for Counter {
+    impl ApplicationListener<Arc<dyn ApplicationEvent>> for Counter {
         fn on_application_event<'a>(
             &'a self,
-            _event: Box<dyn ApplicationEvent>,
+            _event: Arc<dyn ApplicationEvent>,
         ) -> BoxFuture<'a, ()> {
             Box::pin(async move {
                 self.received.fetch_add(1, Ordering::SeqCst);
@@ -116,8 +116,8 @@ mod tests {
     async fn every_event_reaches_every_listener_once() {
         let first = Arc::new(Counter::default());
         let second = Arc::new(Counter::default());
-        let first_listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>> = first.clone();
-        let second_listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>> =
+        let first_listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>> = first.clone();
+        let second_listener: Arc<dyn ApplicationListener<Arc<dyn ApplicationEvent>>> =
             second.clone();
         let mut delegating = DelegatingApplicationListener::default();
 
@@ -126,7 +126,7 @@ mod tests {
         // Adding a listener twice does not hand it the event twice.
         delegating.add_listener(first_listener);
 
-        delegating.on_application_event(Box::new(Ping)).await;
+        delegating.on_application_event(Arc::new(Ping)).await;
 
         assert_eq!(first.received.load(Ordering::SeqCst), 1);
         assert_eq!(second.received.load(Ordering::SeqCst), 1);
@@ -137,7 +137,7 @@ mod tests {
     async fn a_listener_that_was_not_added_receives_nothing() {
         let delegating = DelegatingApplicationListener::default();
 
-        delegating.on_application_event(Box::new(Ping)).await;
+        delegating.on_application_event(Arc::new(Ping)).await;
 
         assert!(delegating.listeners().is_empty());
     }

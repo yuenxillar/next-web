@@ -22,7 +22,7 @@ use crate::{
 ///   publishing call or on a worker of its own.
 ///
 /// A registration without an event type receives every event, which is what a
-/// listener of `Box<dyn ApplicationEvent>` asks for. A registration without a
+/// listener of `Arc<dyn ApplicationEvent>` asks for. A registration without a
 /// source type receives the events of every source.
 #[derive(Clone)]
 pub struct ApplicationListenerRegistration {
@@ -71,7 +71,7 @@ impl ApplicationListenerRegistration {
     pub fn typed<L, E>(id: impl Into<String>, listener: L) -> Self
     where
         L: ApplicationListener<E> + 'static,
-        E: ApplicationEvent + 'static,
+        E: ApplicationEvent + Clone + 'static,
     {
         let listener = TypedApplicationListener::<L, E>::new(listener);
         Self::new(id, std::sync::Arc::new(listener)).with_event_type::<E>()

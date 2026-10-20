@@ -48,7 +48,7 @@ impl BaseSessionFixationProtectionStrategy {
                 new_session.map(|s| s.id()).unwrap_or_default(),
             );
             application_event_publisher
-                .publish_event(Box::new(event))
+                .publish_event(Arc::new(event))
                 .inspect_err(|err| {
                     tracing::error!(
                         "Failed to publish session fixation protection event: {}",

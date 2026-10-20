@@ -5,7 +5,7 @@
 //! and resolves a key by copying the instance the key holds. It has no
 //! providers, so a key it does not hold cannot be resolved.
 
-use std::any::{Any, TypeId};
+use std::{any::{Any, TypeId}, sync::Arc};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
@@ -105,7 +105,7 @@ impl ApplicationContext for FakeContext {
 impl ApplicationEventPublisher for FakeContext {
     fn publish_event(
         &self,
-        _event: Box<dyn ApplicationEvent>,
+        _event: Arc<dyn ApplicationEvent>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Ok(())
     }

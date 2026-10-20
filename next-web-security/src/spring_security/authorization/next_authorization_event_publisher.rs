@@ -61,7 +61,7 @@ impl AuthorizationEventPublisher for NextAuthorizationEventPublisher {
 
         let failure = AuthorizationDeniedEvent::new(authentication, object, result);
         self.event_publisher
-            .publish_event(Box::new(failure))
+            .publish_event(Arc::new(failure))
             .inspect_err(|err| {
                 tracing::error!("Failed to publish authorization event: {}", err);
             })
