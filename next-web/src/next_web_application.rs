@@ -367,10 +367,18 @@ where
     }
 
     /// Run the application.
+    ///
+    /// A panic that stops the startup is reported once, by the framework: the hook
+    /// of the framework keeps the message and the location of the panic while the
+    /// startup runs, and the analysis of the failure names both. See
+    /// [startup_panic](crate::diagnostics::startup_panic).
     pub async fn run(mut self) {
         use futures::FutureExt;
 
+        crate::diagnostics::startup_panic::install_hook();
+
         let future = async {
+            let _startup = crate::diagnostics::startup_panic::StartupPanicGuard::new();
             APPLICATION_SHUTDOWN_HOOK.get_or_init(|| Default::default());
 
             // Start
@@ -1051,8 +1059,16 @@ where
 
     /// Converts a caught panic payload into a referenceable error and delegates
     /// to [`Self::handle_run_error`].
+    ///
+    /// The panic the hook of the startup kept is the one that is reported, so that
+    /// the description of the failure names the file and the line the panic was
+    /// raised at. A panic the hook did not see, because it was raised before the
+    /// startup installed it, is reported from the payload alone.
     async fn handle_run_panic(self, payload: &(dyn Any + Send)) {
-        let error = PanicError::from_payload(payload);
+        let error = match crate::diagnostics::startup_panic::take_recorded() {
+            Some(panic) => PanicError::from_startup_panic(panic),
+            None => PanicError::from_payload(payload),
+        };
         self.handle_run_error(&error).await;
     }
 
@@ -1403,6 +1419,9 @@ impl Default for StandardStartup {
 #[derive(Debug)]
 struct PanicError {
     message: String,
+    /// The file, the line and the column the panic was raised at, when the hook
+    /// of the startup saw it.
+    location: Option<String>,
 }
 
 impl PanicError {
@@ -1414,13 +1433,39 @@ impl PanicError {
             .or_else(|| payload.downcast_ref::<String>().cloned())
             .unwrap_or_else(|| "Unknown panic".to_string());
 
-        Self { message }
+        Self {
+            message,
+            location: None,
+        }
+    }
+
+    /// Builds a [PanicError] from the panic the hook of the startup kept.
+    ///
+    /// # Arguments
+    ///
+    /// * panic - The panic an application stopped on while it started.
+    fn from_startup_panic(panic: crate::diagnostics::startup_panic::StartupPanic) -> Self {
+        Self {
+            message: panic.message().to_owned(),
+            location: panic.location().map(ToOwned::to_owned),
+        }
     }
 }
 
 impl std::fmt::Display for PanicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.message)
+        f.write_str(&self.message)?;
+
+        // The location of the panic is the part an application needs to find it,
+        // so the description names it as well.
+        if let Some(location) = self.location.as_deref() {
+            write!(f, "\n\n")?;
+            write!(f, "Location:")?;
+            write!(f, "\n\n")?;
+            write!(f, "{location}")?;
+        }
+
+        Ok(())
     }
 }
 
