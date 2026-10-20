@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{ApplicationEvent, ApplicationListener};
+use crate::{ApplicationEvent, ApplicationListener, event::ListenerDispatch};
 
 /// A listener that receives every event the multicaster publishes.
 ///
@@ -32,8 +32,35 @@ where
 {
     /// Adds the listener, replacing the listener registered under `id`.
     ///
-    /// The listener receives every event the multicaster publishes.
+    /// The listener receives every event the multicaster publishes, and it runs
+    /// as part of the call that publishes the event.
     fn add_application_listener(&self, id: String, listener: ErasedApplicationListener);
+
+    /// Adds the listener with the given dispatch.
+    ///
+    /// A listener added with [`ListenerDispatch::Channel`] does not run as part
+    /// of the publishing call: the event is queued for a worker of the listener,
+    /// which delivers the events one after the other. See [`ListenerDispatch`]
+    /// for what each kind guarantees.
+    ///
+    /// An implementation that has no worker of its own falls back to adding the
+    /// listener inline, which is what the default implementation of this method
+    /// does.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The identifier the listener is registered under.
+    /// * `listener` - The type erased listener.
+    /// * `dispatch` - How the events of the listener reach it.
+    fn add_application_listener_with_dispatch(
+        &self,
+        id: String,
+        listener: ErasedApplicationListener,
+        dispatch: ListenerDispatch,
+    ) {
+        let _ = dispatch;
+        self.add_application_listener(id, listener);
+    }
 
     /// Removes the listener registered under `id`, when there is one.
     fn remove_application_listener(&self, id: String);
@@ -50,7 +77,29 @@ where
     /// hands it to its error handler and, unless its failure policy is
     /// [`Propagate`](crate::event::ListenerFailurePolicy::Propagate), still
     /// reports success.
+    ///
+    /// The listeners that are dispatched inline have run when the call returns,
+    /// which is what a caller that publishes an event and then reads the state
+    /// the listener writes relies on. The listeners that are dispatched over a
+    /// channel have had the event queued when the call returns.
     fn multicast_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), MulticastError>;
+
+    /// Waits until the events published before the call have been delivered to
+    /// the listeners that are dispatched over a channel.
+    ///
+    /// This is what an application calls before it reads state that a channel
+    /// dispatched listener writes, or before a test ends.
+    fn flush(&self) -> Result<(), MulticastError> {
+        Ok(())
+    }
+
+    /// Stops delivering the events that are queued for a channel dispatched
+    /// listener, after the ones in the queue have been delivered.
+    ///
+    /// The context calls this when it closes, so an application that shuts down
+    /// does not lose the events it already published. Implementations that have
+    /// nothing to drain do nothing.
+    fn close(&self) {}
 }
 
 /// A listener that failed while it handled an event.

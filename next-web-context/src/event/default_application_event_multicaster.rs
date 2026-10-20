@@ -1,7 +1,8 @@
 use std::{
+    collections::HashMap,
     fmt::{self, Debug},
     panic::AssertUnwindSafe,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use tokio::runtime::{Handle, RuntimeFlavor};
@@ -9,8 +10,9 @@ use tokio::runtime::{Handle, RuntimeFlavor};
 use crate::{
     ApplicationEvent, ApplicationListener,
     event::{
-        ApplicationEventMulticaster, ApplicationListenerRegistration, ErasedApplicationListener,
-        ListenerFailure, MulticastError,
+        ApplicationEventMulticaster, ApplicationListenerRegistration, ChannelStatisticsSnapshot,
+        ErasedApplicationListener, ListenerDispatch, ListenerFailure, MulticastError,
+        channel_dispatcher::{ChannelDispatcher, DRAIN_TIMEOUT, SendOutcome},
         execution::{CatchUnwind, block_on, panic_message},
     },
 };
@@ -105,6 +107,9 @@ impl MulticastErrorHandler for LoggingMulticastErrorHandler {
 #[derive(Clone)]
 pub struct DefaultApplicationEventMulticaster {
     listeners: Arc<RwLock<Vec<ApplicationListenerRegistration>>>,
+    /// The queues of the listeners that are dispatched over a channel, by the
+    /// identifier the listener is registered under.
+    channels: Arc<Mutex<HashMap<String, Arc<ChannelDispatcher>>>>,
     error_handler: Arc<dyn MulticastErrorHandler>,
     dispatch_mode: DispatchMode,
     failure_policy: ListenerFailurePolicy,
@@ -118,6 +123,7 @@ impl DefaultApplicationEventMulticaster {
     pub fn new_boxed() -> Self {
         Self {
             listeners: Arc::default(),
+            channels: Arc::default(),
             error_handler: Arc::new(LoggingMulticastErrorHandler),
             dispatch_mode: DispatchMode::default(),
             failure_policy: ListenerFailurePolicy::default(),
@@ -205,6 +211,31 @@ impl DefaultApplicationEventMulticaster {
     ///
     /// * `registration` - The listener and the metadata it is dispatched with.
     pub fn register(&self, registration: ApplicationListenerRegistration) {
+        // A listener that is dispatched over a channel gets a queue of its own,
+        // and the queue replaces the one of a listener registered under the same
+        // identifier before, so that the events of the replaced listener are not
+        // delivered to the new one.
+        match registration.dispatch() {
+            ListenerDispatch::Inline => {
+                self.channels
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .remove(registration.id());
+            }
+            ListenerDispatch::Channel(settings) => {
+                let dispatcher = Arc::new(ChannelDispatcher::new(
+                    registration.id().to_owned(),
+                    Arc::clone(registration.listener()),
+                    settings,
+                    Arc::clone(&self.error_handler),
+                ));
+                self.channels
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .insert(registration.id().to_owned(), dispatcher);
+            }
+        }
+
         let mut listeners = self.write_listeners();
 
         match listeners
@@ -214,6 +245,39 @@ impl DefaultApplicationEventMulticaster {
             Some(registered) => *registered = registration,
             None => listeners.push(registration),
         }
+    }
+
+    /// Returns the counters of the listener registered under `id`, when it is
+    /// dispatched over a channel.
+    ///
+    /// The counters are the ones of the queue of the listener: what it accepted,
+    /// what it refused, and what the listener delivered or failed to deliver.
+    /// They are what an application reports to tell a listener that is behind
+    /// from one that is not receiving anything.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The identifier the listener is registered under.
+    pub fn channel_statistics(&self, id: &str) -> Option<ChannelStatisticsSnapshot> {
+        self.channels
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(id)
+            .map(|dispatcher| dispatcher.statistics().snapshot())
+    }
+
+    /// Returns the identifiers of the listeners that are dispatched over a
+    /// channel, in the order they were registered in.
+    pub fn channel_listener_ids(&self) -> Vec<String> {
+        let channels = self
+            .channels
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        self.listener_ids()
+            .into_iter()
+            .filter(|id| channels.contains_key(id))
+            .collect()
     }
 
     /// Registers a listener of one concrete event type.
@@ -279,14 +343,48 @@ impl DefaultApplicationEventMulticaster {
         event: Box<dyn ApplicationEvent>,
     ) -> Result<(), MulticastError> {
         let registrations = self.matching_listeners(&*event);
-
-        dispatch_listeners(
-            registrations,
+        let (queued_failures, inline_listeners) = self.queue_channel_listeners(&event, registrations);
+        let inline = dispatch_listeners(
+            inline_listeners,
             event,
             Arc::clone(&self.error_handler),
             self.failure_policy,
         )
-        .await
+        .await;
+        let channel = self.finish_channel_dispatch(&queued_failures);
+
+        self.combine_outcomes(inline, channel)
+    }
+
+    /// Waits until the events published before the call have been delivered to
+    /// the listeners that are dispatched over a channel.
+    ///
+    /// This is the deterministic counterpart of
+    /// [`flush`](ApplicationEventMulticaster::flush): it waits on any runtime,
+    /// including the single threaded one, so an application that publishes an
+    /// event from an asynchronous function and then reads the state the listener
+    /// writes uses it.
+    pub async fn flush_async(&self) {
+        for dispatcher in self.dispatchers() {
+            dispatcher.flush().await;
+        }
+    }
+
+    /// Stops the workers of the listeners that are dispatched over a channel,
+    /// after the events in their queues have been delivered.
+    ///
+    /// This is the deterministic counterpart of
+    /// [`close`](ApplicationEventMulticaster::close), and it is what an
+    /// application awaits when it has to know that the events it published have
+    /// been delivered before the process ends.
+    pub async fn close_async(&self) {
+        for dispatcher in self.dispatchers() {
+            dispatcher.shutdown().await;
+        }
+        self.channels
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
     }
 
     /// Returns the listeners that support the event, in the order they run in.
@@ -314,6 +412,155 @@ impl DefaultApplicationEventMulticaster {
         let mut listeners = self.read_listeners().clone();
         listeners.sort_by_key(ApplicationListenerRegistration::order);
         listeners
+    }
+
+    /// Queues the event for the listeners that are dispatched over a channel.
+    ///
+    /// Returns the listeners whose queue refused the event, and the listeners
+    /// that are dispatched inline, in the order they run in.
+    ///
+    /// # Arguments
+    ///
+    /// * `event` - The event that is published.
+    /// * `registrations` - The listeners that support the event, in the order
+    ///   they run in.
+    fn queue_channel_listeners(
+        &self,
+        event: &Box<dyn ApplicationEvent>,
+        registrations: Vec<ApplicationListenerRegistration>,
+    ) -> (Vec<ListenerFailure>, Vec<ApplicationListenerRegistration>) {
+        let channels = self
+            .channels
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        let mut failures = Vec::new();
+        let mut inline = Vec::new();
+
+        for registration in registrations {
+            let dispatch = registration.dispatch();
+            let Some(dispatcher) = channels.get(registration.id()) else {
+                inline.push(registration);
+                continue;
+            };
+            let _ = dispatch;
+
+            match dispatcher.send(event.clone()) {
+                SendOutcome::Queued => {}
+                SendOutcome::NoRuntime => {
+                    // No runtime is available to run the worker, so the listener
+                    // runs where the event was published. Losing the event of a
+                    // listener that is only slow, and not broken, would be worse
+                    // than delivering it late.
+                    tracing::debug!(
+                        listener = registration.id(),
+                        "no runtime is available to start the worker of a channel dispatched \
+                         listener, so the listener runs inline"
+                    );
+                    inline.push(registration);
+                }
+                SendOutcome::Rejected => failures.push(ListenerFailure::new(
+                    registration.id(),
+                    "the queue of the listener is full, so the event was refused",
+                )),
+                SendOutcome::Closed => failures.push(ListenerFailure::new(
+                    registration.id(),
+                    "the worker of the listener is closed, so the event was refused",
+                )),
+            }
+        }
+
+        (failures, inline)
+    }
+
+    /// Applies the failure policy to the listeners whose queue refused an event.
+    ///
+    /// # Arguments
+    ///
+    /// * `failures` - The listeners that refused the event.
+    fn finish_channel_dispatch(
+        &self,
+        failures: &[ListenerFailure],
+    ) -> Result<(), MulticastError> {
+        if failures.is_empty() {
+            return Ok(());
+        }
+
+        match self.failure_policy {
+            ListenerFailurePolicy::Report => Ok(()),
+            ListenerFailurePolicy::Propagate => {
+                Err(MulticastError::ListenerFailures(failures.to_vec()))
+            }
+        }
+    }
+
+    /// Returns the outcome of a dispatch that both kinds of listeners took part
+    /// in.
+    ///
+    /// # Arguments
+    ///
+    /// * `inline` - The outcome of the inline dispatch.
+    /// * `channel` - The outcome of the channel dispatch.
+    fn combine_outcomes(
+        &self,
+        inline: Result<(), MulticastError>,
+        channel: Result<(), MulticastError>,
+    ) -> Result<(), MulticastError> {
+        match (inline, channel) {
+            (Ok(()), Ok(())) => Ok(()),
+            (
+                Err(MulticastError::ListenerFailures(mut inline)),
+                Err(MulticastError::ListenerFailures(channel)),
+            ) => {
+                inline.extend(channel);
+
+                Err(MulticastError::ListenerFailures(inline))
+            }
+            (Err(error), _) | (_, Err(error)) => Err(error),
+        }
+    }
+
+    /// Returns the queues of the listeners that are dispatched over a channel.
+    fn dispatchers(&self) -> Vec<Arc<ChannelDispatcher>> {
+        self.channels
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .values()
+            .cloned()
+            .collect()
+    }
+
+    /// Waits for a future on the current thread, when the thread can wait.
+    ///
+    /// The threads that cannot wait are the ones of a current thread runtime,
+    /// whose reactor the future would need to complete, and the threads that have
+    /// no runtime at all. The future is started on the runtime in the first
+    /// case, and dropped in the second.
+    ///
+    /// # Arguments
+    ///
+    /// * `future` - The future to wait for.
+    fn await_on_thread<F>(&self, future: F) -> Option<F::Output>
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        match Handle::try_current() {
+            Ok(handle) if handle.runtime_flavor() == RuntimeFlavor::MultiThread => {
+                Some(tokio::task::block_in_place(|| block_on(future)))
+            }
+            Ok(_) => {
+                // The thread drives the reactor the worker needs, so waiting on
+                // it would keep the worker from ever finishing. The wait is
+                // started on the runtime instead, and the caller continues:
+                // `flush_async` and `close_async` are what an asynchronous
+                // application uses when it has to know when the queue is empty.
+                tokio::spawn(future);
+
+                None
+            }
+            Err(_) => None,
+        }
     }
 
     /// Runs the listeners of the event on a task of the runtime.
@@ -407,10 +654,20 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
     fn remove_application_listener(&self, id: String) {
         self.write_listeners()
             .retain(|registered| registered.id() != id);
+        // Dropping the queue of the listener ends its worker once the events in
+        // the queue have been delivered.
+        self.channels
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(&id);
     }
 
     fn remove_all_listeners(&self) {
         self.write_listeners().clear();
+        self.channels
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
     }
 
     fn multicast_event(&self, event: Box<dyn ApplicationEvent>) -> Result<(), MulticastError> {
@@ -420,31 +677,97 @@ impl ApplicationEventMulticaster for DefaultApplicationEventMulticaster {
             return Ok(());
         }
 
-        match self.dispatch_mode {
-            DispatchMode::Spawned => self.spawn_listeners(registrations, event),
-            DispatchMode::Inline => match Handle::try_current() {
-                // The runtime keeps making progress while this thread waits for
-                // the listeners, and `block_in_place` tells it to move the
-                // tasks of this thread to another one meanwhile.
-                Ok(handle) if handle.runtime_flavor() == RuntimeFlavor::MultiThread => {
-                    let blocked = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                        tokio::task::block_in_place(|| self.run_listeners(&registrations, &event))
-                    }));
+        // The listeners that are dispatched over a channel have the event
+        // queued before the inline ones run: a queue refuses an event rather
+        // than waiting for room, so this cannot make the publishing call wait,
+        // and a queue that is full is reported together with the failures of the
+        // inline listeners below.
+        let (channel_listeners, inline_listeners) = self.queue_channel_listeners(&event, registrations);
+        let queued_failures = channel_listeners;
 
-                    // A `LocalSet` does not allow blocking either. The event is
-                    // dispatched on the calling thread in that case, which is
-                    // what a listener that does not await expects as well.
-                    blocked.unwrap_or_else(|_| self.run_listeners(&registrations, &event))
-                }
-                // The single thread of a current thread runtime drives the
-                // reactor of the runtime, so waiting for a listener on it would
-                // keep a listener that awaits from ever making progress. The
-                // listeners run on the runtime instead, and publishing does not
-                // wait for them.
-                Ok(_) => self.spawn_listeners(registrations, event),
-                Err(_) => self.run_listeners(&registrations, &event),
-            },
+        match self.dispatch_mode {
+            DispatchMode::Spawned => {
+                let spawned = self.spawn_listeners(inline_listeners, event)?;
+                self.finish_channel_dispatch(&queued_failures)?;
+
+                Ok(spawned)
+            }
+            DispatchMode::Inline => {
+                let inline = match Handle::try_current() {
+                    // The runtime keeps making progress while this thread waits
+                    // for the listeners, and `block_in_place` tells it to move the
+                    // tasks of this thread to another one meanwhile.
+                    Ok(handle) if handle.runtime_flavor() == RuntimeFlavor::MultiThread => {
+                        let blocked = std::panic::catch_unwind(AssertUnwindSafe(|| {
+                            tokio::task::block_in_place(|| {
+                                self.run_listeners(&inline_listeners, &event)
+                            })
+                        }));
+
+                        // A `LocalSet` does not allow blocking either. The event is
+                        // dispatched on the calling thread in that case, which is
+                        // what a listener that does not await expects as well.
+                        blocked.unwrap_or_else(|_| self.run_listeners(&inline_listeners, &event))
+                    }
+                    // The single thread of a current thread runtime drives the
+                    // reactor of the runtime, so waiting for a listener on it
+                    // would keep a listener that awaits from ever making
+                    // progress. The listeners run on the runtime instead, and
+                    // publishing does not wait for them.
+                    Ok(_) => self.spawn_listeners(inline_listeners, event),
+                    Err(_) => self.run_listeners(&inline_listeners, &event),
+                };
+
+                let channel = self.finish_channel_dispatch(&queued_failures);
+
+                self.combine_outcomes(inline, channel)
+            }
         }
+    }
+
+    fn add_application_listener_with_dispatch(
+        &self,
+        id: String,
+        listener: ErasedApplicationListener,
+        dispatch: ListenerDispatch,
+    ) {
+        self.register(ApplicationListenerRegistration::new(id, listener).with_dispatch(dispatch));
+    }
+
+    fn flush(&self) -> Result<(), MulticastError> {
+        let dispatchers = self.dispatchers();
+        let mut failures = Vec::new();
+
+        for dispatcher in dispatchers {
+            let waiting = Arc::clone(&dispatcher);
+            let Some(flushed) = self.await_on_thread(async move { waiting.flush().await }) else {
+                // Nothing to wait for: the worker was never started, or the
+                // current thread cannot wait for it. The events in the queue are
+                // delivered anyway.
+                continue;
+            };
+            if !flushed {
+                failures.push(dispatcher.id().to_owned());
+            }
+        }
+
+        if failures.is_empty() {
+            return Ok(());
+        }
+
+        Err(MulticastError::Timeout(DRAIN_TIMEOUT))
+    }
+
+    fn close(&self) {
+        let dispatchers = self.dispatchers();
+        for dispatcher in dispatchers {
+            let stopping = Arc::clone(&dispatcher);
+            let _drained = self.await_on_thread(async move { stopping.shutdown().await });
+        }
+        self.channels
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
     }
 }
 

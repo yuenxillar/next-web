@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     ApplicationEvent, ApplicationListener,
-    event::{ErasedApplicationListener, TypedApplicationListener},
+    event::{ErasedApplicationListener, ListenerDispatch, TypedApplicationListener},
 };
 
 /// A listener together with the metadata the multicaster dispatches with.
@@ -15,7 +15,9 @@ use crate::{
 ///
 /// - the `order` decides when a listener runs relative to the others,
 /// - the [`TypeId`] of the event type, when there is one, filters the events
-///   the listener is called for.
+///   the listener is called for,
+/// - the [`ListenerDispatch`] decides whether the listener runs as part of the
+///   publishing call or on a worker of its own.
 ///
 /// A registration without an event type receives every event, which is what a
 /// listener of `Box<dyn ApplicationEvent>` asks for.
@@ -24,6 +26,7 @@ pub struct ApplicationListenerRegistration {
     id: String,
     order: i32,
     event_type: Option<TypeId>,
+    dispatch: ListenerDispatch,
     listener: ErasedApplicationListener,
 }
 
@@ -31,7 +34,8 @@ impl ApplicationListenerRegistration {
     /// Creates a registration of `listener` under `id`.
     ///
     /// The listener receives every event, and it runs in the order of its
-    /// registration until [`Self::with_order`] is used.
+    /// registration until [`Self::with_order`] is used. It is dispatched inline
+    /// until [`Self::with_dispatch`] is used.
     ///
     /// # Arguments
     ///
@@ -43,6 +47,7 @@ impl ApplicationListenerRegistration {
             id: id.into(),
             order: 0,
             event_type: None,
+            dispatch: ListenerDispatch::default(),
             listener,
         }
     }
@@ -103,6 +108,27 @@ impl ApplicationListenerRegistration {
         self
     }
 
+    /// Sets how the events of the listener reach it.
+    ///
+    /// A listener is dispatched inline by default: it runs as part of the call
+    /// that publishes the event. [`ListenerDispatch::Channel`] queues the event
+    /// for a worker of the listener instead, which keeps a slow listener from
+    /// slowing down the request that published the event. See
+    /// [`ListenerDispatch`] for what each kind guarantees.
+    ///
+    /// # Arguments
+    ///
+    /// * `dispatch` - How the listener is dispatched.
+    pub fn with_dispatch(mut self, dispatch: ListenerDispatch) -> Self {
+        self.dispatch = dispatch;
+        self
+    }
+
+    /// Returns how the events of the listener reach it.
+    pub fn dispatch(&self) -> ListenerDispatch {
+        self.dispatch
+    }
+
     /// Returns the identifier the listener is registered under.
     pub fn id(&self) -> &str {
         &self.id
@@ -141,6 +167,7 @@ impl Debug for ApplicationListenerRegistration {
             .field("id", &self.id)
             .field("order", &self.order)
             .field("event_type", &self.event_type)
+            .field("dispatch", &self.dispatch)
             .finish_non_exhaustive()
     }
 }

@@ -723,6 +723,35 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
         }
     }
 
+    fn add_application_listener_with_dispatch(
+        &mut self,
+        listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        dispatch: next_web_context::event::ListenerDispatch,
+    ) {
+        if dispatch.is_inline() {
+            self.add_application_listener(listener);
+
+            return;
+        }
+
+        let id = Self::listener_id(listener.as_ref().type_id());
+        match self.listeners.iter_mut().find(|(key, _)| *key == id) {
+            Some((_, registered)) => *registered = Arc::clone(&listener),
+            None => self.listeners.push((id.clone(), Arc::clone(&listener))),
+        }
+
+        match self.application_event_multicaster.as_ref() {
+            Some(multicaster) => {
+                multicaster.add_application_listener_with_dispatch(id, listener, dispatch)
+            }
+            None => {
+                let multicaster = self.create_application_event_multicaster();
+                multicaster.add_application_listener_with_dispatch(id, listener, dispatch);
+                self.application_event_multicaster = Some(multicaster);
+            }
+        }
+    }
+
     fn remove_application_listener(&mut self, id: &str) {
         self.listeners.retain(|(listener_id, _)| listener_id != id);
 
@@ -814,6 +843,13 @@ impl ConfigurableApplicationContext for DefaultApplicationContext {
         if self.is_closed() {
             // Closing is idempotent.
             return Ok(());
+        }
+
+        // The events that were published before the close are delivered to the
+        // listeners that are dispatched over a channel before the workers stop,
+        // so that a shutdown does not lose them.
+        if let Some(event_multicaster) = self.application_event_multicaster.as_ref() {
+            event_multicaster.close();
         }
 
         // Release the singletons held by this context. The parent context is
@@ -1581,6 +1617,43 @@ mod tests {
         assert!(
             Arc::ptr_eq(&publisher, &installed),
             "the installed publisher is the one the application declared"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn delivers_the_events_of_a_channel_listener_and_drains_them_on_close() {
+        let received = Arc::new(AtomicUsize::new(0));
+        let mut context = DefaultApplicationContext::default();
+        context.add_application_listener_with_dispatch(
+            Arc::new(CountingListener {
+                received: Arc::clone(&received),
+            }),
+            next_web_context::event::ListenerDispatch::Channel(
+                next_web_context::event::ChannelDispatch::new(),
+            ),
+        );
+        context.refresh().expect("refreshing succeeds");
+
+        // The event is published through the publisher of the application, which
+        // is the context: what a component publishes reaches the listener.
+        let publisher = context
+            .get_singleton_option_with_name::<Arc<dyn ApplicationEventPublisher>>(
+                APPLICATION_EVENT_PUBLISHER_SINGLETON_NAME,
+            )
+            .cloned()
+            .expect("the context installs the publisher of the application");
+        for _ in 0..10 {
+            publisher
+                .publish_event(Box::new(TestEvent))
+                .expect("publishing succeeds");
+        }
+        context.close().expect("closing succeeds");
+
+        assert_eq!(
+            received.load(Ordering::SeqCst),
+            10,
+            "the events that were published before the close were delivered to the channel \
+             dispatched listener before its worker stopped"
         );
     }
 

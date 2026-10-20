@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use next_web_context::{ApplicationContext, ApplicationEvent, ApplicationListener};
+use next_web_context::event::ListenerDispatch;
 use next_web_core::{
     async_trait, env::ConfigurableEnvironment, io::ResourceLoader, metrics::ApplicationStartup,
 };
@@ -152,6 +153,28 @@ where
         &mut self,
         listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
     );
+
+    /// Adds a listener that is dispatched the way the caller chooses.
+    ///
+    /// A listener added with [`ListenerDispatch::Channel`] does not run as part
+    /// of the call that publishes the event: the event is queued for a worker of
+    /// the listener, which delivers the events one after the other. This is what
+    /// a listener that is slow, and whose effect the request does not depend on,
+    /// is registered with. A listener that the request depends on is added with
+    /// [`Self::add_application_listener`], which dispatches it inline.
+    ///
+    /// # Arguments
+    ///
+    /// * `listener` - The listener to register.
+    /// * `dispatch` - How the events of the listener reach it.
+    fn add_application_listener_with_dispatch(
+        &mut self,
+        listener: Arc<dyn ApplicationListener<Box<dyn ApplicationEvent>>>,
+        dispatch: ListenerDispatch,
+    ) {
+        let _ = dispatch;
+        self.add_application_listener(listener);
+    }
 
     /// Removes the given [`ApplicationListener`] from this context's set of
     /// listeners.

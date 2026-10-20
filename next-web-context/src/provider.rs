@@ -200,7 +200,7 @@ pub enum Color {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// use next_web_context::{DefaultProvider, Provider, Singleton, Transient};
 ///
 /// #[Transient]

@@ -78,6 +78,7 @@ mimalloc        = { workspace = true }
 jemallocator    = { workspace = true }
 
 [dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "time", "sync"] }
 # The tests drive a router without binding a socket.
 tower = { workspace = true }
 # The test of the resilience auto-configuration needs the crate under test to be

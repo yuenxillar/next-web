@@ -17,10 +17,28 @@ use dyn_clone::{DynClone, clone_trait_object};
 /// # Example
 ///
 /// ```rust
-/// #[derive(Clone)]
-/// struct UserLoggedIn { user_id: u64 }
+/// use std::any::{Any, TypeId};
 ///
-/// impl ApplicationEvent for UserLoggedIn {}
+/// use next_web_context::ApplicationEvent;
+///
+/// #[derive(Clone)]
+/// struct UserLoggedIn {
+///     user_id: u64,
+/// }
+///
+/// impl ApplicationEvent for UserLoggedIn {
+///     fn source(&self) -> &dyn Any {
+///         self
+///     }
+///
+///     fn event_type(&self) -> TypeId {
+///         TypeId::of::<Self>()
+///     }
+///
+///     fn source_type(&self) -> TypeId {
+///         TypeId::of::<Self>()
+///     }
+/// }
 /// ```
 pub trait ApplicationEvent
 where

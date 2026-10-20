@@ -12,7 +12,7 @@ repository.workspace = true
 
 [dependencies]
 next-web-singletons     = { workspace = true }
-tokio                   = { workspace = true, features = ["time"] }
+tokio                   = { workspace = true, features = ["time", "sync"] }
 
 arc-swap.workspace      = true
 async-trait.workspace   = true
@@ -22,6 +22,9 @@ inventory.workspace     = true
 serde_json.workspace    = true
 serde_yaml.workspace    = true
 tracing.workspace       = true
+
+[dev-dependencies]
+tokio                   = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "time", "sync"] }
 
 [lints]
 workspace = true
