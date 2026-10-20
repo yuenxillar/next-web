@@ -220,3 +220,156 @@ impl Ordered for WebAutoConfiguration {
         i32::MIN + 10
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        error::Error,
+        sync::{Arc, Mutex},
+    };
+
+    use next_web_context::{Provider, singleton};
+
+    use crate::{ConfigurableApplicationContext, context::DefaultApplicationContext};
+    use next_web_core::{
+        ApplicationContext, Ordered, async_trait,
+        config::{AutoConfiguration, Configuration},
+    };
+
+    use super::WebAutoConfiguration;
+
+    /// The configurations that were applied, in the order they ran.
+    type Applied = Arc<Mutex<Vec<String>>>;
+
+    /// A configuration of an application that records that it ran.
+    #[derive(Clone)]
+    struct ApplicationConfiguration {
+        order: i32,
+        applied: Applied,
+    }
+
+    #[async_trait]
+    impl Configuration for ApplicationConfiguration {
+        async fn configure(
+            &mut self,
+            _ctx: &mut dyn ApplicationContext,
+        ) -> Result<(), Box<dyn Error>> {
+            self.applied
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(String::from("application"));
+
+            Ok(())
+        }
+    }
+
+    impl Ordered for ApplicationConfiguration {
+        fn order(&self) -> i32 {
+            self.order
+        }
+    }
+
+    /// An auto-configuration of a starter that records that it ran.
+    #[derive(Clone)]
+    struct StarterAutoConfiguration {
+        order: i32,
+        applied: Applied,
+    }
+
+    #[async_trait]
+    impl AutoConfiguration for StarterAutoConfiguration {
+        async fn configure(
+            &mut self,
+            _ctx: &mut dyn ApplicationContext,
+        ) -> Result<(), Box<dyn Error>> {
+            self.applied
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(String::from("auto"));
+
+            Ok(())
+        }
+    }
+
+    impl Ordered for StarterAutoConfiguration {
+        fn order(&self) -> i32 {
+            self.order
+        }
+    }
+
+    /// Applies the configurations of the two kinds through the framework, and
+    /// returns the order they ran in.
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration_order` - The order the configuration of the application
+    ///   declares.
+    /// * `auto_configuration_order` - The order the auto-configuration declares.
+    async fn applied_through_the_framework(
+        configuration_order: i32,
+        auto_configuration_order: i32,
+    ) -> Vec<String> {
+        let applied: Applied = Arc::default();
+        let mut context = DefaultApplicationContext::default();
+
+        let configuration: Provider<Box<dyn Configuration>> = singleton({
+            let applied = Arc::clone(&applied);
+
+            move |_| {
+                Box::new(ApplicationConfiguration {
+                    order: configuration_order,
+                    applied: Arc::clone(&applied),
+                }) as Box<dyn Configuration>
+            }
+        })
+        .into();
+        let auto_configuration: Provider<Box<dyn AutoConfiguration>> = singleton({
+            let applied = Arc::clone(&applied);
+
+            move |_| {
+                Box::new(StarterAutoConfiguration {
+                    order: auto_configuration_order,
+                    applied: Arc::clone(&applied),
+                }) as Box<dyn AutoConfiguration>
+            }
+        })
+        .into();
+        context.register_provider(configuration.into());
+        context.register_provider(auto_configuration.into());
+        context.refresh().expect("the context refreshes");
+
+        // The framework applies the configurations of the two kinds, which is
+        // where the order of the phases is decided.
+        AutoConfiguration::configure(&mut WebAutoConfiguration, &mut context)
+            .await
+            .expect("the configurations are applied");
+
+        applied
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    #[tokio::test]
+    async fn the_configurations_of_an_application_are_applied_before_the_auto_configurations() {
+        // The configuration of the application declares the last possible order
+        // and the auto-configuration declares the first one, and the two still
+        // run in the order of the phases: the order of a configuration places it
+        // among the configurations of its own phase only.
+        let applied = applied_through_the_framework(i32::MAX, i32::MIN).await;
+
+        assert_eq!(
+            applied,
+            vec![String::from("application"), String::from("auto")],
+            "the configuration of the application ran before the auto-configuration"
+        );
+    }
+
+    #[test]
+    fn the_web_auto_configuration_runs_before_every_other_auto_configuration() {
+        // The configuration that applies the two phases is an auto-configuration
+        // itself, so it has to run before the auto-configurations it orders.
+        assert_eq!(Ordered::order(&WebAutoConfiguration), i32::MIN + 10);
+    }
+}
+
