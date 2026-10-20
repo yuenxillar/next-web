@@ -16,14 +16,17 @@
 //! # What a report holds
 //!
 //! The description of the failure is the message of the panic, followed by the
-//! location of it:
+//! location of it, which is the file, the line and the column the panic was raised
+//! at:
 //!
 //! ```text
 //! Description:
 //!
 //! is panic1
 //!
-//!     at examples/application.rs:20:9
+//! Location:
+//!
+//! examples/application.rs:20:9
 //! ```
 
 use std::{
@@ -262,7 +265,7 @@ mod tests {
 
         assert_eq!(
             panic.description(),
-            "is panic1\n\n    at examples/application.rs:20:9"
+            "is panic1\n\nLocation:\n\nexamples/application.rs:20:9"
         );
         assert_eq!(panic.message(), "is panic1");
         assert_eq!(panic.location(), Some("examples/application.rs:20:9"));
