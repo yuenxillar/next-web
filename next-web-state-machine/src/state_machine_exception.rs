@@ -129,10 +129,7 @@ impl std::error::Error for StateMachineException {
 /// # Arguments
 /// * `kind` - the kind of the error
 /// * `message` - a human readable description
-pub fn state_machine_error(
-    kind: StateMachineErrorKind,
-    message: impl Into<String>,
-) -> BoxError {
+pub fn state_machine_error(kind: StateMachineErrorKind, message: impl Into<String>) -> BoxError {
     Box::new(StateMachineException::new(kind, message))
 }
 

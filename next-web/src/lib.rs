@@ -86,8 +86,9 @@ pub use next_web_state_machine as state_machine;
 
 /// Marks a function as the handler of a state machine transition.
 ///
-/// Pass `crate = next_web::state_machine` so the generated code refers to the
-/// re-export of this crate instead of the state machine crate itself.
+/// The generated code targets [`state_machine`](crate::state_machine), so an
+/// application needs no extra dependency. A project which depends on the state
+/// machine crate directly passes `crate = next_web_state_machine`.
 #[cfg(feature = "enable-state-machine")]
 pub use next_web_macros::on_transition;
 
