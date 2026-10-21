@@ -6,7 +6,7 @@ publish = false
 license = "MIT"
 
 [dependencies]
-next-web                = { path = "../next-web", version = "*", features = ["full", "enable-resilience"]}
+next-web                = { path = "../next-web", version = "*", features = ["full", "enable-resilience", "enable-state-machine"]}
 next-web-core           = { path = "../next-web-core", version = "*" }
 next-web-context        = { path = "../next-web-context", version = "*" }
 next-web-ai             = { path = "../next-web-ai", version = "*", features = ["deep-seek"]}
@@ -166,6 +166,10 @@ path = "singleton.rs"
 [[bin]]
 name = "state_machine"
 path = "state_machine.rs"
+
+[[bin]]
+name = "state_machine_basic"
+path = "state_machine_basic.rs"
 
 [[bin]]
 name = "stream"
