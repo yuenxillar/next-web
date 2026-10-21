@@ -410,15 +410,28 @@ where
         E: Eq + Hash,
     {
         let parent_state_id = self.group_parent_id(state_datas)?;
+        let belongs_to_group = |state: &S| state_datas.iter().any(|data| data.state() == state);
         let mut transitions = Vec::new();
 
         for transition in all_transitions {
-            match (parent_state_id.as_ref(), transition.state()) {
-                (Some(parent), Some(state)) if state == parent => {
-                    transitions.push(transition.clone())
+            // A scoped transition belongs to the group of the state which scopes
+            // it, which is what a region uses to reach into its own states. An
+            // unscoped transition belongs to the group which owns its endpoints,
+            // and the top level group is the fallback for the ones which cross a
+            // boundary.
+            let belongs = match (parent_state_id.as_ref(), transition.state()) {
+                (Some(parent), Some(scope)) => scope == parent,
+                (None, Some(_)) => false,
+                (Some(_), None) => {
+                    belongs_to_group(transition.source()) && belongs_to_group(transition.target())
                 }
-                (None, None) => transitions.push(transition.clone()),
-                _ => {}
+                (None, None) => {
+                    belongs_to_group(transition.source()) || belongs_to_group(transition.target())
+                }
+            };
+
+            if belongs {
+                transitions.push(transition.clone());
             }
         }
 
@@ -1842,6 +1855,94 @@ mod tests {
             interceptor.events.load(Ordering::SeqCst),
             2,
             "the submachine runs the configured interceptor too"
+        );
+    }
+
+    #[test]
+    fn the_machine_offers_an_event_to_its_submachine() {
+        use crate::monitor::state_machine_monitor::StateMachineMonitor;
+        use crate::transition::StateMachineTransition;
+        use std::any::Any;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Duration;
+
+        #[derive(Default)]
+        struct NestedMonitor {
+            transitions: AtomicUsize,
+        }
+
+        impl StateMachineMonitor<i32, i32> for NestedMonitor {
+            fn transition(
+                &self,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _transition: &dyn StateMachineTransition<i32, i32>,
+                _duration: Duration,
+            ) {
+                self.transitions.fetch_add(1, Ordering::SeqCst);
+            }
+
+            fn action(
+                &self,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _action: &crate::BoxedStateAction<i32, i32>,
+                _duration: Duration,
+            ) {
+            }
+        }
+
+        let monitor = Arc::new(NestedMonitor::default());
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+        configuration.state_machine_monitor = Some(monitor.clone());
+
+        let parent = Arc::new(2) as Arc<dyn Any + Send + Sync>;
+        let states = vec![
+            StateData::<i32, i32>::with_initial(1, true),
+            StateData::<i32, i32>::new(2),
+            StateData::<i32, i32>::with_hierarchy(Some(parent.clone()), None, 21, true),
+            StateData::<i32, i32>::with_hierarchy(Some(parent), None, 22, false),
+        ];
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(states.into()),
+            Some(TransitionsData::new(vec![
+                TransitionData::new(1, 2, 100),
+                // The transition of the nested machine is declared without a
+                // scope, so it belongs to the group which owns both endpoints.
+                TransitionData::new(21, 22, 200),
+            ])),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory.get_state_machine().expect("the machine builds");
+
+        block_on(machine.start()).unwrap();
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(100)))).unwrap();
+        assert_eq!(monitor.transitions.load(Ordering::SeqCst), 1);
+
+        // The top level machine has no transition for 200, so it offers the
+        // event to the machine behind state 2.
+        let result =
+            block_on(machine.send_event(Arc::new(GenericMessage::with_payload(200)))).unwrap();
+
+        assert_eq!(
+            result.result_type(),
+            crate::state_machine_event_result::ResultType::Accepted,
+            "the nested machine accepted the event"
+        );
+        assert!(
+            machine
+                .state()
+                .expect("the machine has a current state")
+                .contains_id(&22),
+            "the nested machine ran its transition"
+        );
+        assert_eq!(
+            monitor.transitions.load(Ordering::SeqCst),
+            2,
+            "the transition of the nested machine reached the monitor"
         );
     }
 

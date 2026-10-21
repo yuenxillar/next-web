@@ -251,7 +251,9 @@ where
         candidates.sort_by(|left, right| self.comparator.compare(left.as_ref(), right.as_ref()));
 
         if candidates.is_empty() {
-            return Ok(false);
+            // No transition of this machine reacts, so the state gets the event
+            // and offers it to the nested machine or to its regions.
+            return Ok(self.forward_to_state(&current, message).await);
         }
 
         let Some(transit) = self.transit_handler() else {
@@ -278,7 +280,29 @@ where
             }
         }
 
-        Ok(false)
+        // Every transition of this machine refused the event, so the nested
+        // machine still gets a chance to handle it.
+        Ok(self.forward_to_state(&current, message).await)
+    }
+
+    /// Offers the message to the machine or the regions behind a state.
+    ///
+    /// # Arguments
+    /// * `current` - the state which is active
+    /// * `message` - the message to offer
+    ///
+    /// # Returns
+    /// `true` when the nested machine accepted the message
+    async fn forward_to_state(
+        &self,
+        current: &Arc<dyn StateMachineState<S, E>>,
+        message: Arc<dyn Message<E>>,
+    ) -> bool {
+        current
+            .send_event(message)
+            .await
+            .iter()
+            .any(|result| result.result_type().is_accepted())
     }
 
     /// Collects the transitions which may react to the event.
