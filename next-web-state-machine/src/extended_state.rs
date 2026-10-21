@@ -33,15 +33,29 @@ where
     /// Gets all extended state variables.
     ///
     /// # Returns
-    /// A reference to the map containing all variables
-    fn get_variables(&self) -> &HashMap<K, AnyValue>;
+    /// A copy of the variables, because the machine shares the extended state
+    /// and cannot hand out a reference into it
+    fn get_variables(&self) -> HashMap<K, AnyValue>;
 
-    /// Gets a variable with automatic type casting.
-    fn get(&self, key: &K) -> Option<&AnyValue>;
+    /// Gets a variable.
+    ///
+    /// # Arguments
+    /// * `key` - the key of the variable
+    fn get(&self, key: &K) -> Option<AnyValue>;
+
+    /// Sets a variable, replacing the value it had before.
+    ///
+    /// # Arguments
+    /// * `key` - the key of the variable
+    /// * `value` - the new value of the variable
+    fn set(&self, key: K, value: AnyValue);
 
     /// Sets the extended state change listener.
+    ///
+    /// # Arguments
+    /// * `listener` - the listener which is notified on every change
     fn set_extended_state_change_listener(
-        &mut self,
+        &self,
         listener: Arc<dyn ExtendedStateChangeListener>,
     );
 }

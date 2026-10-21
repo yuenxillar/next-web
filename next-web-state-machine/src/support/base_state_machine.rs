@@ -1254,7 +1254,7 @@ where
 
         let extended_state: Arc<dyn ExtendedState> = Arc::new(
             crate::support::default_extended_state::DefaultExtendedState::with_variables(
-                self.extended_state.get_variables().clone(),
+                self.extended_state.get_variables(),
             ),
         );
 

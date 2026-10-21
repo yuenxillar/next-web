@@ -98,6 +98,26 @@ where
     /// # Arguments
     /// * `state` - the identifier of the state to restore to
     fn reset_to(&self, state: &S) -> Result<(), BoxError>;
+
+    /// Restores the state and the extended state variables of a context.
+    ///
+    /// The extended state variables which the context carries replace the ones
+    /// of a machine which is restored from a store.
+    ///
+    /// # Arguments
+    /// * `context` - the context to restore
+    fn restore_context(
+        &self,
+        context: &dyn crate::state_machine_context::StateMachineContext<S, E>,
+    ) -> Result<(), BoxError> {
+        self.reset_to(context.state())?;
+
+        for (key, value) in context.extended_state().get_variables() {
+            self.extended_state().set(key, value);
+        }
+
+        Ok(())
+    }
 }
 
 /// A trait bound alias for the identifier type of a state machine.
