@@ -115,7 +115,6 @@ mod tests {
     use next_web_core::error::BoxError;
     use next_web_core::messaging::generic_message::GenericMessage;
 
-    use crate::StateMachine as _;
     use crate::config::base_state_machine_factory::BaseStateMachineFactory;
     use crate::config::model::configuration_data::ConfigurationData;
     use crate::config::model::default_state_machine_model::DefaultStateMachineModel;
@@ -124,7 +123,6 @@ mod tests {
     use crate::config::model::transitions_data::TransitionsData;
     use crate::config::state_machine_factory::StateMachineFactory;
     use crate::persist::persisting_state_machine_interceptor::PersistingStateMachineInterceptor;
-    use crate::region::Region;
     use crate::state_machine_context::StateMachineContext;
     use crate::state_machine_persist::StateMachinePersist;
 
@@ -153,6 +151,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::field_reassign_with_default)]
     async fn every_state_change_is_persisted() {
         let mut configuration = ConfigurationData::default();
         configuration.verifier_enabled = false;

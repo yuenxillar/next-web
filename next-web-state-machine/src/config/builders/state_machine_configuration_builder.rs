@@ -599,7 +599,7 @@ where
 mod tests {
     use crate::config::{
         builders::state_machine_configuration_configurer::StateMachineConfigurationConfigurer,
-        common::builder::Builder, configurers::configuration_configurer::ConfigurationConfigurer,
+        common::builder::Builder,
     };
 
     use super::StateMachineConfigurationBuilder;

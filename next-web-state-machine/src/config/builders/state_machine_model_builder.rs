@@ -245,11 +245,11 @@ mod tests {
 
     use crate::config::{
         builders::state_machine_model_configurer::StateMachineModelConfigurer,
-        common::builder::Builder, configurer_builder::ConfigurerBuilder,
-        model::state_machine_model::StateMachineModel,
-        model::state_machine_model_factory::StateMachineModelFactory,
+        common::builder::Builder,
         model::configuration_data::ConfigurationData,
         model::default_state_machine_model::DefaultStateMachineModel,
+        model::state_machine_model::StateMachineModel,
+        model::state_machine_model_factory::StateMachineModelFactory,
     };
 
     use super::StateMachineModelBuilder;

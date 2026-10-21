@@ -1232,6 +1232,9 @@ where
 }
 
 #[cfg(test)]
+// The tests build a configuration field by field, which reads clearer than one
+// long struct literal.
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use std::{any::Any, sync::Arc};
 
@@ -1477,7 +1480,6 @@ mod tests {
     #[test]
     fn choice_pseudo_state_is_wired_from_the_model() {
         use crate::config::model::choice_data::ChoiceData;
-        use crate::region::Region;
         use crate::state::pseudo_state_kind::PseudoStateKind;
         use std::collections::HashMap;
 
@@ -1525,7 +1527,6 @@ mod tests {
 
     #[test]
     fn orthogonal_regions_are_assembled_from_region_keys() {
-        use crate::region::Region;
         use std::any::Any;
 
         let mut configuration = ConfigurationData::default();
@@ -1716,7 +1717,6 @@ mod tests {
 
     #[test]
     fn fork_pseudo_state_is_wired_from_the_model() {
-        use crate::region::Region;
         use crate::state::pseudo_state_kind::PseudoStateKind;
         use std::collections::HashMap;
 
@@ -1761,7 +1761,6 @@ mod tests {
 
     #[test]
     fn event_security_rule_vetoes_events_without_authority() {
-        use crate::region::Region;
         use crate::security::security_rule::SecurityRule;
         use crate::security::state_machine_security_interceptor::HEADER_AUTHENTICATION;
         use crate::state_machine_event_result::ResultType;
@@ -1810,7 +1809,6 @@ mod tests {
 
     #[tokio::test]
     async fn timer_transition_fires_from_the_model() {
-        use crate::region::Region;
         use crate::transition::transition_kind::TransitionKind;
         use std::time::Duration;
 
@@ -2032,7 +2030,6 @@ mod tests {
 
     #[tokio::test]
     async fn custom_decision_manager_vetoes_the_event() {
-        use crate::region::Region;
         use crate::security::security_rule::SecurityRule;
         use crate::security::state_machine_security_interceptor::HEADER_AUTHENTICATION;
         use crate::state_machine_event_result::ResultType;
@@ -2082,7 +2079,6 @@ mod tests {
 
     #[tokio::test]
     async fn expression_rule_denies_without_an_evaluator() {
-        use crate::region::Region;
         use crate::security::security_rule::SecurityRule;
         use crate::security::state_machine_security_interceptor::HEADER_AUTHENTICATION;
         use crate::state_machine_event_result::ResultType;

@@ -83,7 +83,6 @@ mod tests {
     use crate::config::state_machine_factory::StateMachineFactory;
     use crate::persist::default_state_machine_persister::DefaultStateMachinePersister;
     use crate::persist::state_machine_persister::StateMachinePersister;
-    use crate::region::Region;
     use crate::state_machine_context::StateMachineContext;
     use crate::state_machine_persist::StateMachinePersist;
     use crate::support::default_state_machine_context::DefaultStateMachineContext;
@@ -117,6 +116,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::field_reassign_with_default)]
     async fn a_machine_state_is_persisted_and_restored() {
         let mut configuration = ConfigurationData::default();
         configuration.verifier_enabled = false;

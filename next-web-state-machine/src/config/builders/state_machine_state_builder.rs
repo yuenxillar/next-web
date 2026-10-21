@@ -187,11 +187,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{
-        builders::state_machine_state_configurer::StateMachineStateConfigurer,
-        common::builder::Builder, configurer_builder::ConfigurerBuilder,
-        configurers::state_configurer::StateConfigurer,
-    };
+    use crate::config::{builders::state_machine_state_configurer::StateMachineStateConfigurer, common::builder::Builder};
 
     use super::StateMachineStateBuilder;
 
