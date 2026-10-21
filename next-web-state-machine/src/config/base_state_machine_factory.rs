@@ -366,9 +366,8 @@ where
                 )?;
 
                 if let Some(machine) = built {
-                    // The region machines get the configured listeners, monitors
-                    // and interceptors too, not only the top level machine.
-                    self.apply_machine_features(&machine, state_machine_model)?;
+                    // The features are attached by `build_machine`, which every
+                    // machine of the group passes through.
                     machines.push(machine);
                 }
             }
@@ -895,9 +894,19 @@ where
         executor.set_self_arc();
         machine.attach(executor);
 
-        Ok(machine)
+        // Every machine this factory builds gets the configured features, no
+        // matter whether it is the top level machine, a region or a machine which
+        // is used as the submachine of a state.
+        self.apply_machine_features(&handle, _state_machine_model)?;
+
+        Ok(handle)
     }
 
+    /// Applies the startup part of the post build features to the top level
+    /// machine.
+    ///
+    /// The listeners, interceptors and monitors are attached by
+    /// [`Self::apply_machine_features`] when a machine is built.
     fn apply_post_build_features(
         &self,
         machine: Arc<dyn StateMachine<S, E>>,
@@ -915,14 +924,15 @@ where
                 });
             }
 
-        self.apply_machine_features(&machine, state_machine_model)
+        Ok(())
     }
 
     /// Attaches the configured listeners, interceptors, monitors and the security
     /// interceptor to one machine.
     ///
-    /// It is applied to the machines of the orthogonal regions as well, so a
-    /// monitor sees the transitions a region runs.
+    /// [`Self::build_machine`] calls it for every machine it builds, so the
+    /// machines of the orthogonal regions and the machines used as submachines
+    /// get them too.
     fn apply_machine_features(
         &self,
         machine: &Arc<dyn StateMachine<S, E>>,
@@ -1712,6 +1722,126 @@ mod tests {
             monitor.transitions.load(Ordering::SeqCst),
             3,
             "the second region transition must reach the monitor"
+        );
+    }
+
+    #[test]
+    fn configured_interceptor_also_observes_the_submachine() {
+        use crate::state::StateMachineState;
+        use crate::state_context::StateContext;
+        use crate::support::state_machine_interceptor::StateMachineInterceptor;
+        use crate::transition::StateMachineTransition;
+        use next_web_core::error::BoxError;
+        use std::any::Any;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        #[derive(Default)]
+        struct SubmachineInterceptor {
+            events: AtomicUsize,
+        }
+
+        impl StateMachineInterceptor<i32, i32> for SubmachineInterceptor {
+            fn pre_event(
+                &self,
+                message: Arc<dyn next_web_core::messaging::Message<i32>>,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+            ) -> Result<Arc<dyn next_web_core::messaging::Message<i32>>, BoxError> {
+                self.events.fetch_add(1, Ordering::SeqCst);
+
+                Ok(message)
+            }
+
+            fn pre_state_change(
+                &self,
+                _state: &dyn StateMachineState<i32, i32>,
+                _message: Option<&dyn next_web_core::messaging::Message<i32>>,
+                _transition: Option<&dyn StateMachineTransition<i32, i32>>,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _root_state_machine: &dyn crate::StateMachine<i32, i32>,
+            ) -> Result<(), BoxError> {
+                Ok(())
+            }
+
+            fn post_state_change(
+                &self,
+                _state: &dyn StateMachineState<i32, i32>,
+                _message: Option<&dyn next_web_core::messaging::Message<i32>>,
+                _transition: Option<&dyn StateMachineTransition<i32, i32>>,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _root_state_machine: &dyn crate::StateMachine<i32, i32>,
+            ) {
+            }
+
+            fn pre_transition(
+                &self,
+                _state_context: &dyn StateContext<i32, i32>,
+            ) -> Result<(), BoxError> {
+                Ok(())
+            }
+
+            fn post_transition(
+                &self,
+                _state_context: &dyn StateContext<i32, i32>,
+            ) -> Result<(), BoxError> {
+                Ok(())
+            }
+
+            fn state_machine_error(
+                &self,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                error: BoxError,
+            ) -> Option<BoxError> {
+                Some(error)
+            }
+        }
+
+        let interceptor = Arc::new(SubmachineInterceptor::default());
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+        configuration.interceptors = vec![interceptor.clone()];
+
+        let parent = Arc::new(2) as Arc<dyn Any + Send + Sync>;
+        let states = vec![
+            StateData::<i32, i32>::with_initial(1, true),
+            StateData::<i32, i32>::new(2),
+            StateData::<i32, i32>::with_hierarchy(Some(parent.clone()), None, 21, true),
+            StateData::<i32, i32>::with_hierarchy(Some(parent), None, 22, false),
+        ];
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(states.into()),
+            Some(TransitionsData::new(vec![
+                TransitionData::new(1, 2, 100),
+                TransitionData::new(21, 22, 200),
+            ])),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory.get_state_machine().expect("the machine builds");
+
+        block_on(machine.start()).unwrap();
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(100)))).unwrap();
+        assert_eq!(
+            interceptor.events.load(Ordering::SeqCst),
+            1,
+            "the top level machine runs the interceptor"
+        );
+
+        let current_state = machine.state().expect("the machine has a current state");
+        assert!(
+            current_state.contains_id(&21),
+            "entering state 2 starts the submachine on its initial state"
+        );
+
+        // The event is sent to the state which forwards it to its machine.
+        block_on(current_state.send_event(Arc::new(GenericMessage::with_payload(200))));
+
+        assert_eq!(
+            interceptor.events.load(Ordering::SeqCst),
+            2,
+            "the submachine runs the configured interceptor too"
         );
     }
 
