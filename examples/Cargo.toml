@@ -180,6 +180,10 @@ name = "state_machine_service"
 path = "state_machine_service.rs"
 
 [[bin]]
+name = "state_machine_handler"
+path = "state_machine_handler.rs"
+
+[[bin]]
 name = "stream"
 path = "stream.rs"
 
