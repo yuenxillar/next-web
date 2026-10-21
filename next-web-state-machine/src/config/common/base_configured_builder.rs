@@ -6,7 +6,6 @@ use std::any::{Any, TypeId};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::marker::PhantomData;
-use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -337,14 +336,17 @@ pub enum BuildState {
 }
 
 impl BuildState {
-    /// Checks whether the builder is initializing its main configurers.
+    /// Determines whether the build reached the configuring phase or later.
+    ///
+    /// Configurers registered from here on belong to the post bucket, so they do
+    /// not join the bucket which is being iterated.
     pub fn is_configured(&self) -> bool {
-        self == &Self::InitializingMains
+        self >= &Self::ConfiguringMains
     }
 
-    /// Checks whether the builder is configuring its main configurers.
+    /// Checks whether the builder is initializing its main configurers.
     pub fn is_initializing(&self) -> bool {
-        self == &Self::ConfiguringMains
+        self == &Self::InitializingMains
     }
 }
 
@@ -588,14 +590,19 @@ where
 
     /// Initializes the main configurers.
     fn init_main_configurers(&mut self) -> Result<(), BoxError> {
-        let mut main_configurers = mem::take(&mut self.get_mut_object().main_configurers);
+        // Iterate a snapshot so a configurer which registers another one while it
+        // is initialized does not lose that registration.
+        let mut main_configurers: Vec<Box<dyn Configurer<O, B>>> = self
+            .get_mut_object()
+            .main_configurers
+            .values()
+            .flatten()
+            .map(|configurer| clone_box(configurer.as_ref()))
+            .collect();
         let builder = self.as_ref();
-        for configurers in main_configurers.values_mut() {
-            for configurer in configurers.iter_mut() {
-                configurer.init(builder)?;
-            }
+        for configurer in main_configurers.iter_mut() {
+            configurer.init(builder)?;
         }
-        self.get_mut_object().main_configurers = main_configurers;
         Ok(())
     }
 
@@ -604,14 +611,17 @@ where
     where
         B: Clone,
     {
-        let mut main_configurers = mem::take(&mut self.get_mut_object().main_configurers);
+        let mut main_configurers: Vec<Box<dyn Configurer<O, B>>> = self
+            .get_mut_object()
+            .main_configurers
+            .values()
+            .flatten()
+            .map(|configurer| clone_box(configurer.as_ref()))
+            .collect();
         let builder = self.as_ref();
-        for configurers in main_configurers.values_mut() {
-            for configurer in configurers.iter_mut() {
-                configurer.configure(builder)?;
-            }
+        for configurer in main_configurers.iter_mut() {
+            configurer.configure(builder)?;
         }
-        self.get_mut_object().main_configurers = main_configurers;
         Ok(())
     }
 
@@ -621,14 +631,17 @@ where
     where
         B: Clone,
     {
-        let mut post_configurers = mem::take(&mut self.get_mut_object().post_configurers);
+        let mut post_configurers: Vec<Box<dyn Configurer<O, B>>> = self
+            .get_mut_object()
+            .post_configurers
+            .values()
+            .flatten()
+            .map(|configurer| clone_box(configurer.as_ref()))
+            .collect();
         let builder = self.as_ref();
-        for configurers in post_configurers.values_mut() {
-            for configurer in configurers.iter_mut() {
-                configurer.configure(builder)?;
-            }
+        for configurer in post_configurers.iter_mut() {
+            configurer.configure(builder)?;
         }
-        self.get_mut_object().post_configurers = post_configurers;
         Ok(())
     }
 }
@@ -671,5 +684,74 @@ where
 
     fn get_mut_object(&mut self) -> &mut BaseBuilder<O> {
         &mut self.base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::common::builder::Builder;
+
+    #[derive(Clone, Default)]
+    struct TestBuilder;
+
+    impl Builder<u32> for TestBuilder {
+        fn build(&mut self) -> Result<u32, BoxError> {
+            Ok(1)
+        }
+    }
+
+    #[derive(Clone)]
+    struct MarkerConfigurer;
+
+    impl Configurer<u32, TestBuilder> for MarkerConfigurer {
+        fn init(&mut self, _builder: &TestBuilder) -> Result<(), BoxError> {
+            Ok(())
+        }
+
+        fn configure(&mut self, _builder: &TestBuilder) -> Result<(), BoxError> {
+            Ok(())
+        }
+
+        fn is_assignable(&self, _builder: &TestBuilder) -> bool {
+            true
+        }
+    }
+
+    type TestConfiguredBuilder =
+        BaseConfiguredBuilder<u32, Box<dyn Configurer<u32, TestBuilder>>, TestBuilder>;
+
+    #[test]
+    fn build_state_matches_the_configuration_phases() {
+        assert!(!BuildState::Unbuilt.is_configured());
+        assert!(!BuildState::InitializingMains.is_configured());
+        assert!(BuildState::ConfiguringMains.is_configured());
+        assert!(BuildState::ConfiguringPosts.is_configured());
+        assert!(BuildState::Building.is_configured());
+        assert!(BuildState::Built.is_configured());
+
+        assert!(BuildState::InitializingMains.is_initializing());
+        assert!(!BuildState::ConfiguringMains.is_initializing());
+        assert!(!BuildState::Unbuilt.is_initializing());
+    }
+
+    #[test]
+    fn configurers_registered_while_configuring_go_to_the_post_bucket() {
+        let mut builder = TestConfiguredBuilder::with_allow_configurers_of_same_type(true);
+
+        builder.build_state = BuildState::ConfiguringMains;
+        builder
+            .apply(&mut MarkerConfigurer)
+            .expect("the configurer is registered");
+
+        assert!(
+            builder.get_configurer::<MarkerConfigurer>().is_none(),
+            "a configurer registered during the configure phase must not join the main bucket"
+        );
+        assert_eq!(
+            builder.post_configurers.len(),
+            1,
+            "it must be queued in the post bucket instead"
+        );
     }
 }
