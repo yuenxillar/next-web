@@ -36,3 +36,6 @@ settings.local.json
 .codex/
 # Artifact written by the local agent sandbox
 .dsh_probe
+
+# Scratch workspace of the plan executor
+.superpowers/
