@@ -4,6 +4,7 @@ use std::{
     any::Any,
     cell::{Cell, RefCell},
     ops::{Deref, DerefMut},
+    rc::Rc,
     sync::Arc,
     time::Duration,
 };
@@ -62,42 +63,42 @@ where
     E: Clone + 'static,
 {
     /// Unique identifier for the state machine
-    machine_id: RefCell<Option<String>>,
+    machine_id: Rc<RefCell<Option<String>>>,
     /// Flag indicating if state machine should start automatically
-    auto_start: Cell<bool>,
+    auto_start: Rc<Cell<bool>>,
     /// Policy for handling transition conflicts
-    transition_conflict_policy: RefCell<Option<TransitionConflictPolicy>>,
+    transition_conflict_policy: Rc<RefCell<Option<TransitionConflictPolicy>>>,
     /// Policy for state action execution
-    state_do_action_policy: RefCell<Option<StateDoActionPolicy>>,
+    state_do_action_policy: Rc<RefCell<Option<StateDoActionPolicy>>>,
     /// Timeout for state action policy
-    state_do_action_policy_timeout: Cell<Option<Duration>>,
+    state_do_action_policy_timeout: Rc<Cell<Option<Duration>>>,
     /// Execution policy for regions (parallel/sequential)
-    region_execution_policy: RefCell<Option<RegionExecutionPolicy>>,
+    region_execution_policy: Rc<RefCell<Option<RegionExecutionPolicy>>>,
     /// Ensemble for distributed state machines
-    ensemble: RefCell<Option<Arc<dyn StateMachineEnsemble<S, E>>>>,
+    ensemble: Rc<RefCell<Option<Arc<dyn StateMachineEnsemble<S, E>>>>>,
     /// Collection of state machine listeners
-    listeners: RefCell<Vec<Arc<dyn StateMachineListener<S, E>>>>,
+    listeners: Rc<RefCell<Vec<Arc<dyn StateMachineListener<S, E>>>>>,
     /// Flag indicating if security features are enabled
-    security_enabled: Cell<bool>,
+    security_enabled: Rc<Cell<bool>>,
     /// Flag indicating if model verification is enabled
-    verifier_enabled: Cell<bool>,
+    verifier_enabled: Rc<Cell<bool>>,
     /// Model verifier for state machine validation
-    verifier: RefCell<Option<Arc<dyn StateMachineModelVerifier<S, E>>>>,
+    verifier: Rc<RefCell<Option<Arc<dyn StateMachineModelVerifier<S, E>>>>>,
     /// Access decision manager for transition security
-    transition_security_access_decision_manager: RefCell<Option<Arc<dyn AccessDecisionManager>>>,
+    transition_security_access_decision_manager:
+        Rc<RefCell<Option<Arc<dyn AccessDecisionManager>>>>,
     /// Access decision manager for event security
-    event_security_access_decision_manager: RefCell<Option<Arc<dyn AccessDecisionManager>>>,
+    event_security_access_decision_manager: Rc<RefCell<Option<Arc<dyn AccessDecisionManager>>>>,
     /// Security rule for event authorization
-    event_security_rule: RefCell<Option<SecurityRule>>,
+    event_security_rule: Rc<RefCell<Option<SecurityRule>>>,
     /// Security rule for transition authorization
-    transition_security_rule: RefCell<Option<SecurityRule>>,
+    transition_security_rule: Rc<RefCell<Option<SecurityRule>>>,
     /// Monitor for state machine metrics and monitoring
-    state_machine_monitor: RefCell<Option<Arc<dyn StateMachineMonitor<S, E>>>>,
+    state_machine_monitor: Rc<RefCell<Option<Arc<dyn StateMachineMonitor<S, E>>>>>,
     /// Collection of state machine interceptors for cross-cutting concerns
-    interceptors: RefCell<Vec<Arc<dyn StateMachineInterceptor<S, E>>>>,
+    interceptors: Rc<RefCell<Vec<Arc<dyn StateMachineInterceptor<S, E>>>>>,
     /// Persister for state machine runtime state persistence
-    persister: RefCell<Option<Arc<dyn StateMachineRuntimePersister<S, E, Box<dyn Any>>>>>,
-
+    persister: Rc<RefCell<Option<Arc<dyn StateMachineRuntimePersister<S, E, Box<dyn Any>>>>>>,
     base: BaseConfiguredBuilder<
         ConfigurationData<S, E>,
         Box<dyn StateMachineConfigurationConfigurer<S, E>>,
@@ -128,24 +129,24 @@ where
         >,
     ) -> Self {
         Self {
-            machine_id: RefCell::new(None),
-            auto_start: Cell::new(false),
-            transition_conflict_policy: RefCell::new(None),
-            state_do_action_policy: RefCell::new(None),
-            state_do_action_policy_timeout: Cell::new(None),
-            region_execution_policy: RefCell::new(None),
-            ensemble: RefCell::new(None),
-            listeners: RefCell::new(Vec::new()),
-            security_enabled: Cell::new(false),
-            verifier_enabled: Cell::new(true),
-            verifier: RefCell::new(None),
-            transition_security_access_decision_manager: RefCell::new(None),
-            event_security_access_decision_manager: RefCell::new(None),
-            event_security_rule: RefCell::new(None),
-            transition_security_rule: RefCell::new(None),
-            state_machine_monitor: RefCell::new(None),
-            interceptors: RefCell::new(Vec::new()),
-            persister: RefCell::new(None),
+            machine_id: Rc::new(RefCell::new(None)),
+            auto_start: Rc::new(Cell::new(false)),
+            transition_conflict_policy: Rc::new(RefCell::new(None)),
+            state_do_action_policy: Rc::new(RefCell::new(None)),
+            state_do_action_policy_timeout: Rc::new(Cell::new(None)),
+            region_execution_policy: Rc::new(RefCell::new(None)),
+            ensemble: Rc::new(RefCell::new(None)),
+            listeners: Rc::new(RefCell::new(Vec::new())),
+            security_enabled: Rc::new(Cell::new(false)),
+            verifier_enabled: Rc::new(Cell::new(true)),
+            verifier: Rc::new(RefCell::new(None)),
+            transition_security_access_decision_manager: Rc::new(RefCell::new(None)),
+            event_security_access_decision_manager: Rc::new(RefCell::new(None)),
+            event_security_rule: Rc::new(RefCell::new(None)),
+            transition_security_rule: Rc::new(RefCell::new(None)),
+            state_machine_monitor: Rc::new(RefCell::new(None)),
+            interceptors: Rc::new(RefCell::new(Vec::new())),
+            persister: Rc::new(RefCell::new(None)),
             base,
         }
     }
@@ -376,6 +377,7 @@ where
 {
     fn with_configuration(&mut self) -> Result<Box<dyn ConfigurationConfigurer<S, E>>, BoxError> {
         let mut configurer = DefaultConfigurationConfigurer::default();
+        configurer.base.set_builder(self.clone());
         self.base.apply(&mut configurer)?;
 
         Ok(Box::new(configurer))
@@ -385,6 +387,7 @@ where
         &mut self,
     ) -> Result<Box<dyn DistributedStateMachineConfigurer<S, E>>, BoxError> {
         let mut configurer = DefaultDistributedStateMachineConfigurer::default();
+        configurer.base.set_builder(self.clone());
         self.base.apply_adapter(&mut configurer.base)?;
 
         Ok(Box::new(configurer))
@@ -392,6 +395,7 @@ where
 
     fn with_security(&mut self) -> Result<Box<dyn StateMachineSecurityConfigurer<S, E>>, BoxError> {
         let mut configurer = DefaultSecurityConfigurer::default();
+        configurer.base.set_builder(self.clone());
         self.base.apply_adapter(&mut configurer.base)?;
 
         Ok(Box::new(configurer))
@@ -401,6 +405,7 @@ where
         &mut self,
     ) -> Result<Box<dyn StateMachineModelVerifierConfigurer<S, E>>, BoxError> {
         let mut configurer = DefaultVerifierConfigurer::default();
+        configurer.base.set_builder(self.clone());
         self.base.apply_adapter(&mut configurer.base)?;
 
         Ok(Box::new(configurer))
@@ -408,6 +413,7 @@ where
 
     fn with_monitoring(&mut self) -> Result<Box<dyn MonitoringConfigurer<S, E>>, BoxError> {
         let mut configurer = DefaultMonitoringConfigurer::default();
+        configurer.base.set_builder(self.clone());
         self.base.apply_adapter(&mut configurer.base)?;
 
         Ok(Box::new(configurer))
@@ -417,6 +423,7 @@ where
         &mut self,
     ) -> Result<Box<dyn PersistenceConfigurer<S, E, Box<dyn Any>>>, BoxError> {
         let mut configurer = DefaultPersistenceConfigurer::default();
+        configurer.base.set_builder(self.clone());
         self.base.apply_adapter(&mut configurer.base)?;
 
         Ok(Box::new(configurer))
@@ -572,24 +579,24 @@ where
 {
     fn default() -> Self {
         Self {
-            machine_id: RefCell::new(None),
-            auto_start: Cell::new(false),
-            transition_conflict_policy: RefCell::new(None),
-            state_do_action_policy: RefCell::new(None),
-            state_do_action_policy_timeout: Cell::new(None),
-            region_execution_policy: RefCell::new(None),
-            ensemble: RefCell::new(None),
-            listeners: RefCell::new(Vec::new()),
-            security_enabled: Cell::new(false),
-            verifier_enabled: Cell::new(true),
-            verifier: RefCell::new(None),
-            transition_security_access_decision_manager: RefCell::new(None),
-            event_security_access_decision_manager: RefCell::new(None),
-            event_security_rule: RefCell::new(None),
-            transition_security_rule: RefCell::new(None),
-            state_machine_monitor: RefCell::new(None),
-            interceptors: RefCell::new(Vec::new()),
-            persister: RefCell::new(None),
+            machine_id: Rc::new(RefCell::new(None)),
+            auto_start: Rc::new(Cell::new(false)),
+            transition_conflict_policy: Rc::new(RefCell::new(None)),
+            state_do_action_policy: Rc::new(RefCell::new(None)),
+            state_do_action_policy_timeout: Rc::new(Cell::new(None)),
+            region_execution_policy: Rc::new(RefCell::new(None)),
+            ensemble: Rc::new(RefCell::new(None)),
+            listeners: Rc::new(RefCell::new(Vec::new())),
+            security_enabled: Rc::new(Cell::new(false)),
+            verifier_enabled: Rc::new(Cell::new(true)),
+            verifier: Rc::new(RefCell::new(None)),
+            transition_security_access_decision_manager: Rc::new(RefCell::new(None)),
+            event_security_access_decision_manager: Rc::new(RefCell::new(None)),
+            event_security_rule: Rc::new(RefCell::new(None)),
+            transition_security_rule: Rc::new(RefCell::new(None)),
+            state_machine_monitor: Rc::new(RefCell::new(None)),
+            interceptors: Rc::new(RefCell::new(Vec::new())),
+            persister: Rc::new(RefCell::new(None)),
             base: Default::default(),
         }
     }
@@ -617,5 +624,48 @@ mod tests {
 
         assert_eq!(configuration.machine_id(), Some("demo"));
         assert!(configuration.is_auto_start());
+    }
+
+    #[test]
+    fn and_after_a_monitoring_configurer_continues_the_same_builder() {
+        let mut builder = StateMachineConfigurationBuilder::<i32, i32>::new(true);
+
+        let mut monitoring = builder.with_monitoring().expect("the configurer");
+
+        let mut parent = monitoring.and();
+        parent
+            .with_configuration()
+            .expect("the configurer")
+            .machine_id("demo".to_owned());
+
+        let configuration = builder.build().unwrap();
+
+        assert_eq!(
+            configuration.machine_id(),
+            Some("demo"),
+            "a chain which starts at the monitoring configurer reaches the builder"
+        );
+    }
+
+    #[test]
+    fn and_after_a_configuration_configurer_continues_the_same_builder() {
+        let mut builder = StateMachineConfigurationBuilder::<i32, i32>::new(true);
+
+        let mut configuration = builder.with_configuration().expect("the configurer");
+        configuration.machine_id("demo".to_owned());
+
+        let mut parent = configuration.and();
+        parent
+            .with_configuration()
+            .expect("the configurer")
+            .auto_startup(true);
+
+        let configuration = builder.build().unwrap();
+
+        assert_eq!(configuration.machine_id(), Some("demo"));
+        assert!(
+            configuration.is_auto_start(),
+            "the configuration applied after and() reaches the builder"
+        );
     }
 }
