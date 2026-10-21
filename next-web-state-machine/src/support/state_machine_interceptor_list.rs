@@ -175,14 +175,20 @@ impl<S, E> StateMachineInterceptorList<S, E> {
 
     /// Post-processes a transition after it has occurred.
     ///
+    /// The first error stops the chain and is returned to the caller, which
+    /// reports it to whoever sent the event.
+    ///
     /// # Arguments
     /// * `state_context` - the state context
-    pub fn post_transition(&self, state_context: &dyn StateContext<S, E>) {
+    pub fn post_transition(
+        &self,
+        state_context: &dyn StateContext<S, E>,
+    ) -> Result<(), BoxError> {
         for interceptor in self.snapshot().iter() {
-            if let Err(error) = interceptor.post_transition(state_context) {
-                debug!(%error, "an interceptor failed in post transition");
-            }
+            interceptor.post_transition(state_context)?;
         }
+
+        Ok(())
     }
 
     /// Handles an error that occurred in the state machine.

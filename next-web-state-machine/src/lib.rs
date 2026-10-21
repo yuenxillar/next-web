@@ -24,6 +24,8 @@ pub mod ensemble;
 pub mod event;
 /// The extended state of a machine.
 pub mod extended_state;
+/// Handlers which react to the transitions of a machine.
+pub mod handler;
 /// Listeners of a machine.
 pub mod listener;
 /// Monitors which measure transitions and actions.

@@ -1376,9 +1376,12 @@ where
             None,
         );
         self.notify_transition_end(&end_context).await;
+
+        // A handler which fails reports it to the caller of the event. The
+        // transition already happened, so the state stays where it moved to.
         self.object_support
             .get_state_machine_interceptors()
-            .post_transition(&context);
+            .post_transition(&context)?;
 
         if let Some(state_machine) = self.relay_or_self() {
             self.object_support.notify_transition_monitor(
