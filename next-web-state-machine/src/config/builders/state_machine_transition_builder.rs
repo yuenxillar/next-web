@@ -1,6 +1,8 @@
 use std::{
+    cell::{RefCell, RefMut},
     collections::HashMap,
     hash::Hash,
+    rc::Rc,
     sync::{Arc, Mutex},
 };
 
@@ -218,16 +220,67 @@ pub struct StateMachineTransitionBuilder<S, E>
 where
     S: Eq + Hash,
 {
+    /// The transitions which are already finalized
     shared: Arc<Mutex<SharedState<S, E>>>,
+
+    /// The transition which is currently being configured
+    ///
+    /// It is shared by the builder and every view it hands out, so the data a
+    /// view collects is not lost when the view is dropped. The cell is a
+    /// [`RefCell`] because a mutator hands out a mutable borrow of one slot.
+    pending: Rc<RefCell<PendingState<S, E>>>,
+}
+
+/// The data of the transition kind which is currently being configured.
+struct PendingState<S, E>
+where
+    S: Eq + Hash,
+{
+    /// The kind of the transition which is being configured
     active_kind: Option<ActiveKind>,
+
+    /// The pending external, internal or local transition
     pending_transition: Option<PendingTransition<S, E>>,
+
+    /// The pending choice branches
     pending_choice: Option<PendingChoice<S, E>>,
+
+    /// The pending junction branches
     pending_junction: Option<PendingChoice<S, E>>,
+
+    /// The pending fork
     pending_fork: Option<PendingFork<S>>,
+
+    /// The pending join
     pending_join: Option<PendingJoin<S>>,
+
+    /// The pending entry point
     pending_entry: Option<PendingPair<S>>,
+
+    /// The pending exit point
     pending_exit: Option<PendingPair<S>>,
+
+    /// The pending history transition
     pending_history: Option<PendingPair<S>>,
+}
+
+impl<S, E> Default for PendingState<S, E>
+where
+    S: Eq + Hash,
+{
+    fn default() -> Self {
+        Self {
+            active_kind: None,
+            pending_transition: None,
+            pending_choice: None,
+            pending_junction: None,
+            pending_fork: None,
+            pending_join: None,
+            pending_entry: None,
+            pending_exit: None,
+            pending_history: None,
+        }
+    }
 }
 
 impl<S, E> StateMachineTransitionBuilder<S, E>
@@ -242,49 +295,36 @@ where
     pub fn new(_allow_configurers_of_same_type: bool) -> Self {
         Self {
             shared: Arc::new(Mutex::new(SharedState::default())),
-            active_kind: None,
-            pending_transition: None,
-            pending_choice: None,
-            pending_junction: None,
-            pending_fork: None,
-            pending_join: None,
-            pending_entry: None,
-            pending_exit: None,
-            pending_history: None,
+            pending: Rc::new(RefCell::new(PendingState::default())),
         }
     }
 
     fn root_view(&self) -> Self {
         Self {
             shared: self.shared.clone(),
-            active_kind: None,
-            pending_transition: None,
-            pending_choice: None,
-            pending_junction: None,
-            pending_fork: None,
-            pending_join: None,
-            pending_entry: None,
-            pending_exit: None,
-            pending_history: None,
+            pending: self.pending.clone(),
         }
     }
 
     fn with_kind(&self, kind: ActiveKind) -> Self {
-        let mut next = self.root_view();
-        next.active_kind = Some(kind);
-        match kind {
-            ActiveKind::External | ActiveKind::Internal | ActiveKind::Local => {
-                next.pending_transition = Some(PendingTransition::new())
+        {
+            let mut pending = self.pending.borrow_mut();
+            pending.active_kind = Some(kind);
+            match kind {
+                ActiveKind::External | ActiveKind::Internal | ActiveKind::Local => {
+                    pending.pending_transition = Some(PendingTransition::new())
+                }
+                ActiveKind::Choice => pending.pending_choice = Some(PendingChoice::new()),
+                ActiveKind::Junction => pending.pending_junction = Some(PendingChoice::new()),
+                ActiveKind::Fork => pending.pending_fork = Some(PendingFork::new()),
+                ActiveKind::Join => pending.pending_join = Some(PendingJoin::new()),
+                ActiveKind::Entry => pending.pending_entry = Some(PendingPair::new()),
+                ActiveKind::Exit => pending.pending_exit = Some(PendingPair::new()),
+                ActiveKind::History => pending.pending_history = Some(PendingPair::new()),
             }
-            ActiveKind::Choice => next.pending_choice = Some(PendingChoice::new()),
-            ActiveKind::Junction => next.pending_junction = Some(PendingChoice::new()),
-            ActiveKind::Fork => next.pending_fork = Some(PendingFork::new()),
-            ActiveKind::Join => next.pending_join = Some(PendingJoin::new()),
-            ActiveKind::Entry => next.pending_entry = Some(PendingPair::new()),
-            ActiveKind::Exit => next.pending_exit = Some(PendingPair::new()),
-            ActiveKind::History => next.pending_history = Some(PendingPair::new()),
         }
-        next
+
+        self.root_view()
     }
 
     fn transition_guard(guard: Arc<dyn StateMachineGuard<S, E>>) -> Guard<S, E> {
@@ -300,52 +340,76 @@ where
         Actions::from(action)
     }
 
-    fn pending_transition_mut(&mut self) -> &mut PendingTransition<S, E> {
-        self.pending_transition
-            .as_mut()
-            .expect("transition configurer is not active")
+    fn pending_transition_mut(&mut self) -> RefMut<'_, PendingTransition<S, E>> {
+        RefMut::map(self.pending.borrow_mut(), |pending| {
+            pending
+                .pending_transition
+                .as_mut()
+                .expect("transition configurer is not active")
+        })
     }
 
-    fn pending_choice_mut(&mut self) -> &mut PendingChoice<S, E> {
-        self.pending_choice
-            .as_mut()
-            .expect("choice configurer is not active")
+    fn pending_choice_mut(&mut self) -> RefMut<'_, PendingChoice<S, E>> {
+        RefMut::map(self.pending.borrow_mut(), |pending| {
+            pending
+                .pending_choice
+                .as_mut()
+                .expect("choice configurer is not active")
+        })
     }
 
-    fn pending_junction_mut(&mut self) -> &mut PendingChoice<S, E> {
-        self.pending_junction
-            .as_mut()
-            .expect("junction configurer is not active")
+    fn pending_junction_mut(&mut self) -> RefMut<'_, PendingChoice<S, E>> {
+        RefMut::map(self.pending.borrow_mut(), |pending| {
+            pending
+                .pending_junction
+                .as_mut()
+                .expect("junction configurer is not active")
+        })
     }
 
-    fn pending_fork_mut(&mut self) -> &mut PendingFork<S> {
-        self.pending_fork
-            .as_mut()
-            .expect("fork configurer is not active")
+    fn pending_fork_mut(&mut self) -> RefMut<'_, PendingFork<S>> {
+        RefMut::map(self.pending.borrow_mut(), |pending| {
+            pending
+                .pending_fork
+                .as_mut()
+                .expect("fork configurer is not active")
+        })
     }
 
-    fn pending_join_mut(&mut self) -> &mut PendingJoin<S> {
-        self.pending_join
-            .as_mut()
-            .expect("join configurer is not active")
+    fn pending_join_mut(&mut self) -> RefMut<'_, PendingJoin<S>> {
+        RefMut::map(self.pending.borrow_mut(), |pending| {
+            pending
+                .pending_join
+                .as_mut()
+                .expect("join configurer is not active")
+        })
     }
 
-    fn pending_entry_mut(&mut self) -> &mut PendingPair<S> {
-        self.pending_entry
-            .as_mut()
-            .expect("entry configurer is not active")
+    fn pending_entry_mut(&mut self) -> RefMut<'_, PendingPair<S>> {
+        RefMut::map(self.pending.borrow_mut(), |pending| {
+            pending
+                .pending_entry
+                .as_mut()
+                .expect("entry configurer is not active")
+        })
     }
 
-    fn pending_exit_mut(&mut self) -> &mut PendingPair<S> {
-        self.pending_exit
-            .as_mut()
-            .expect("exit configurer is not active")
+    fn pending_exit_mut(&mut self) -> RefMut<'_, PendingPair<S>> {
+        RefMut::map(self.pending.borrow_mut(), |pending| {
+            pending
+                .pending_exit
+                .as_mut()
+                .expect("exit configurer is not active")
+        })
     }
 
-    fn pending_history_mut(&mut self) -> &mut PendingPair<S> {
-        self.pending_history
-            .as_mut()
-            .expect("history configurer is not active")
+    fn pending_history_mut(&mut self) -> RefMut<'_, PendingPair<S>> {
+        RefMut::map(self.pending.borrow_mut(), |pending| {
+            pending
+                .pending_history
+                .as_mut()
+                .expect("history configurer is not active")
+        })
     }
 
     fn add_branch(
@@ -501,6 +565,8 @@ where
 
     fn finalize_transition(&mut self, kind: ActiveKind) -> Result<(), BoxError> {
         let pending = self
+            .pending
+            .borrow_mut()
             .pending_transition
             .take()
             .ok_or_else(|| builder_error("missing pending transition"))?;
@@ -541,11 +607,15 @@ where
 
     fn finalize_choice_like(&mut self, junction: bool) -> Result<(), BoxError> {
         let pending = if junction {
-            self.pending_junction
+            self.pending
+                .borrow_mut()
+                .pending_junction
                 .take()
                 .ok_or_else(|| builder_error("missing pending junction"))?
         } else {
-            self.pending_choice
+            self.pending
+                .borrow_mut()
+                .pending_choice
                 .take()
                 .ok_or_else(|| builder_error("missing pending choice"))?
         };
@@ -603,9 +673,13 @@ where
     }
 
     fn finalize_pending(&mut self) -> Result<(), BoxError> {
-        let Some(kind) = self.active_kind.take() else {
+        let kind = self.pending.borrow_mut().active_kind.take();
+        let Some(kind) = kind else {
             return Ok(());
         };
+
+        // The pending data is taken out before the finalized record is written,
+        // so no borrow of the cell is held while `shared` is locked.
         match kind {
             ActiveKind::External | ActiveKind::Internal | ActiveKind::Local => {
                 self.finalize_transition(kind)
@@ -614,6 +688,8 @@ where
             ActiveKind::Junction => self.finalize_choice_like(true),
             ActiveKind::Fork => {
                 let pending = self
+                    .pending
+                    .borrow_mut()
                     .pending_fork
                     .take()
                     .ok_or_else(|| builder_error("missing pending fork"))?;
@@ -628,6 +704,8 @@ where
             }
             ActiveKind::Join => {
                 let pending = self
+                    .pending
+                    .borrow_mut()
                     .pending_join
                     .take()
                     .ok_or_else(|| builder_error("missing pending join"))?;
@@ -641,17 +719,20 @@ where
                 Ok(())
             }
             ActiveKind::Entry => {
-                let (source, target) = Self::finalize_pair(self.pending_entry.take(), "entry")?;
+                let pending = self.pending.borrow_mut().pending_entry.take();
+                let (source, target) = Self::finalize_pair(pending, "entry")?;
                 self.add_entry(source, target);
                 Ok(())
             }
             ActiveKind::Exit => {
-                let (source, target) = Self::finalize_pair(self.pending_exit.take(), "exit")?;
+                let pending = self.pending.borrow_mut().pending_exit.take();
+                let (source, target) = Self::finalize_pair(pending, "exit")?;
                 self.add_exit(source, target);
                 Ok(())
             }
             ActiveKind::History => {
-                let (source, target) = Self::finalize_pair(self.pending_history.take(), "history")?;
+                let pending = self.pending.borrow_mut().pending_history.take();
+                let (source, target) = Self::finalize_pair(pending, "history")?;
                 self.add_default_history(source, target);
                 Ok(())
             }
@@ -803,7 +884,7 @@ where
         target: S,
         guard: Arc<dyn StateMachineGuard<S, E>>,
     ) -> &mut dyn ChoiceTransitionConfigurer<S, E> {
-        Self::add_branch(self.pending_choice_mut(), target, guard, Vec::new());
+        Self::add_branch(&mut self.pending_choice_mut(), target, guard, Vec::new());
         self
     }
 
@@ -813,7 +894,7 @@ where
         guard: Arc<dyn StateMachineGuard<S, E>>,
         action: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn ChoiceTransitionConfigurer<S, E> {
-        Self::add_branch(self.pending_choice_mut(), target, guard, vec![action]);
+        Self::add_branch(&mut self.pending_choice_mut(), target, guard, vec![action]);
         self
     }
 
@@ -825,7 +906,7 @@ where
         error: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn ChoiceTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_choice_mut(),
+            &mut self.pending_choice_mut(),
             target,
             guard,
             vec![Actions::error_calling_action(action, error)],
@@ -838,7 +919,7 @@ where
         target: S,
         guard: Arc<dyn StateMachineGuard<S, E>>,
     ) -> &mut dyn ChoiceTransitionConfigurer<S, E> {
-        Self::add_branch(self.pending_choice_mut(), target, guard, Vec::new());
+        Self::add_branch(&mut self.pending_choice_mut(), target, guard, Vec::new());
         self
     }
 
@@ -848,7 +929,7 @@ where
         guard: Arc<dyn StateMachineGuard<S, E>>,
         action: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn ChoiceTransitionConfigurer<S, E> {
-        Self::add_branch(self.pending_choice_mut(), target, guard, vec![action]);
+        Self::add_branch(&mut self.pending_choice_mut(), target, guard, vec![action]);
         self
     }
 
@@ -860,7 +941,7 @@ where
         error: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn ChoiceTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_choice_mut(),
+            &mut self.pending_choice_mut(),
             target,
             guard,
             vec![Actions::error_calling_action(action, error)],
@@ -870,7 +951,7 @@ where
 
     fn last(&mut self, target: S) -> &mut dyn ChoiceTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_choice_mut(),
+            &mut self.pending_choice_mut(),
             target,
             Arc::new(AlwaysTrueGuard),
             Vec::new(),
@@ -884,7 +965,7 @@ where
         action: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn ChoiceTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_choice_mut(),
+            &mut self.pending_choice_mut(),
             target,
             Arc::new(AlwaysTrueGuard),
             vec![action],
@@ -899,7 +980,7 @@ where
         error: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn ChoiceTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_choice_mut(),
+            &mut self.pending_choice_mut(),
             target,
             Arc::new(AlwaysTrueGuard),
             vec![Actions::error_calling_action(action, error)],
@@ -923,7 +1004,7 @@ where
         target: S,
         guard: Arc<dyn StateMachineGuard<S, E>>,
     ) -> &mut dyn JunctionTransitionConfigurer<S, E> {
-        Self::add_branch(self.pending_junction_mut(), target, guard, Vec::new());
+        Self::add_branch(&mut self.pending_junction_mut(), target, guard, Vec::new());
         self
     }
 
@@ -933,7 +1014,7 @@ where
         guard: Arc<dyn StateMachineGuard<S, E>>,
         action: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn JunctionTransitionConfigurer<S, E> {
-        Self::add_branch(self.pending_junction_mut(), target, guard, vec![action]);
+        Self::add_branch(&mut self.pending_junction_mut(), target, guard, vec![action]);
         self
     }
 
@@ -945,7 +1026,7 @@ where
         error: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn JunctionTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_junction_mut(),
+            &mut self.pending_junction_mut(),
             target,
             guard,
             vec![Actions::error_calling_action(action, error)],
@@ -958,7 +1039,7 @@ where
         target: S,
         guard: Arc<dyn StateMachineGuard<S, E>>,
     ) -> &mut dyn JunctionTransitionConfigurer<S, E> {
-        Self::add_branch(self.pending_junction_mut(), target, guard, Vec::new());
+        Self::add_branch(&mut self.pending_junction_mut(), target, guard, Vec::new());
         self
     }
 
@@ -968,7 +1049,7 @@ where
         guard: Arc<dyn StateMachineGuard<S, E>>,
         action: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn JunctionTransitionConfigurer<S, E> {
-        Self::add_branch(self.pending_junction_mut(), target, guard, vec![action]);
+        Self::add_branch(&mut self.pending_junction_mut(), target, guard, vec![action]);
         self
     }
 
@@ -980,7 +1061,7 @@ where
         error: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn JunctionTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_junction_mut(),
+            &mut self.pending_junction_mut(),
             target,
             guard,
             vec![Actions::error_calling_action(action, error)],
@@ -990,7 +1071,7 @@ where
 
     fn last(&mut self, target: S) -> &mut dyn JunctionTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_junction_mut(),
+            &mut self.pending_junction_mut(),
             target,
             Arc::new(AlwaysTrueGuard),
             Vec::new(),
@@ -1004,7 +1085,7 @@ where
         action: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn JunctionTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_junction_mut(),
+            &mut self.pending_junction_mut(),
             target,
             Arc::new(AlwaysTrueGuard),
             vec![action],
@@ -1019,7 +1100,7 @@ where
         error: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn JunctionTransitionConfigurer<S, E> {
         Self::add_branch(
-            self.pending_junction_mut(),
+            &mut self.pending_junction_mut(),
             target,
             Arc::new(AlwaysTrueGuard),
             vec![Actions::error_calling_action(action, error)],
@@ -1134,16 +1215,20 @@ where
     }
 
     fn timer(&mut self, period: u64) -> &mut dyn ExternalTransitionConfigurer<S, E> {
-        let pending = self.pending_transition_mut();
-        pending.period = Some(period);
-        pending.count = None;
+        {
+            let mut pending = self.pending_transition_mut();
+            pending.period = Some(period);
+            pending.count = None;
+        }
         self
     }
 
     fn timer_once(&mut self, period: u64) -> &mut dyn ExternalTransitionConfigurer<S, E> {
-        let pending = self.pending_transition_mut();
-        pending.period = Some(period);
-        pending.count = Some(1);
+        {
+            let mut pending = self.pending_transition_mut();
+            pending.period = Some(period);
+            pending.count = Some(1);
+        }
         self
     }
 
