@@ -66,12 +66,10 @@ async fn a_machine_built_through_the_umbrella_crate_handles_an_event() {
 }
 
 /// A handler which the macro generates against the re-exported state machine.
-#[next_web::on_transition(
-    crate = next_web::state_machine,
-    source = 1,
-    target = 2,
-    event = 100
-)]
+///
+/// The attribute needs no `crate` argument here: the macro targets
+/// `::next_web::state_machine`, which is what an application depends on.
+#[next_web::on_transition(source = 1, target = 2, event = 100)]
 fn record_ship(
     _context: &dyn next_web::state_machine::state_context::StateContext<i32, i32>,
 ) -> Result<(), next_web_core::error::BoxError> {

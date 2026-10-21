@@ -41,13 +41,14 @@ fn expand(function: &ItemFn, attr: TokenStream) -> syn::Result<proc_macro2::Toke
     let name = &function.sig.ident;
     let handler = format_ident!("{}_handler", name);
 
-    // A crate which re-exports the state machine, such as `next_web`, is passed
-    // as `crate = ..`, so the generated code does not need the state machine
-    // crate as a direct dependency.
+    // The generated code targets the re-export of the umbrella crate by
+    // default, because that is the crate an application depends on. A project
+    // which depends on the state machine crate directly passes
+    // `crate = next_web_state_machine`.
     let root = arguments
         .krate
         .map(|path| quote! { #path })
-        .unwrap_or_else(|| quote! { ::next_web_state_machine });
+        .unwrap_or_else(|| quote! { ::next_web::state_machine });
 
     let source = arguments.conditions.source.map(|expression| {
         quote! { .source(#expression) }

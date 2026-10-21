@@ -1243,24 +1243,24 @@ pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// parameter has to be `&dyn StateContext<S, E>`, which is where the macro reads
 /// the state and the event type from.
 ///
-/// The generated code refers to `::next_web_state_machine` by default. A crate
-/// which re-exports that crate, such as `next_web` with the
-/// `enable-state-machine` feature, passes its path with `crate = ..`, so the
-/// application does not need the state machine crate as a direct dependency.
+/// The generated code refers to `::next_web::state_machine` by default, so an
+/// application which depends on the umbrella crate with the
+/// `enable-state-machine` feature needs nothing else. A project which depends on
+/// the state machine crate directly passes `crate = next_web_state_machine`.
 ///
 /// # Example
 /// ```ignore
-/// #[on_transition(source = 1, target = 2, event = 100)]
-/// fn ship(context: &dyn StateContext<i32, i32>) -> Result<(), BoxError> {
+/// #[next_web::on_transition(source = 1, target = 2, event = 100)]
+/// fn ship(
+///     context: &dyn next_web::state_machine::state_context::StateContext<i32, i32>,
+/// ) -> Result<(), BoxError> {
 ///     println!("shipping");
 ///
 ///     Ok(())
 /// }
 ///
-/// #[next_web::on_transition(crate = next_web::state_machine, target = 3)]
-/// fn deliver(
-///     context: &dyn next_web::state_machine::state_context::StateContext<i32, i32>,
-/// ) -> Result<(), BoxError> {
+/// #[on_transition(crate = next_web_state_machine, target = 3)]
+/// fn deliver(context: &dyn StateContext<i32, i32>) -> Result<(), BoxError> {
 ///     println!("delivering");
 ///
 ///     Ok(())

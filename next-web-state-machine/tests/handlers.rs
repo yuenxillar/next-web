@@ -156,7 +156,9 @@ async fn a_handler_failure_reaches_the_caller() {    let handler = OnTransition:
     }
 }
 
-#[next_web_macros::on_transition(source = 1, target = 2, event = 100)]
+// A project which depends on the state machine crate directly names it, because
+// the macro targets the re-export of the umbrella crate by default.
+#[next_web_macros::on_transition(crate = next_web_state_machine, source = 1, target = 2, event = 100)]
 fn ship(context: &dyn StateContext<i32, i32>) -> Result<(), BoxError> {
     let _ = context;
 
