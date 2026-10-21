@@ -2,8 +2,9 @@
 //!
 //! Spring Security evaluates SpEL expressions against an expression root. Rust
 //! has no SpEL equivalent, so an expression rule is evaluated by a pluggable
-//! [`ExpressionEvaluator`]. Without one an expression rule denies the operation,
-//! which fails closed instead of silently allowing it.
+//! [`ExpressionEvaluator`](crate::security::expression_evaluator::ExpressionEvaluator).
+//! Without one an expression rule denies the operation, which fails closed
+//! instead of silently allowing it.
 
 use next_web_core::any::AnyValue;
 

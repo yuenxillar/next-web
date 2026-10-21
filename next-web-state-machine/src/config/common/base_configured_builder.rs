@@ -501,7 +501,11 @@ where
         Ok(())
     }
 
-    /// Similar to build() and get_object() but checks the state to determine if build() needs to Required<BaseBuilder<O>>be called first
+    /// Similar to `build()` and `get_object()`, but checks the build state to
+    /// determine whether `build()` has to be called first.
+    ///
+    /// # Returns
+    /// The built object, or `None` when the build failed
     fn get_or_build(&mut self) -> Option<O>
     where
         O: Clone,

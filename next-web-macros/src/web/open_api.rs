@@ -5,6 +5,11 @@ use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned, Ident, Token}
 
 use crate::{util::logic::Logic, web::routing::Method};
 
+/// Expands the `open_api` attribute.
+///
+/// The entry point is compiled behind the `open-api` feature, so the module is
+/// unused when the feature is off.
+#[allow(dead_code)]
 pub(crate) fn impl_macro_open_api(attr: TokenStream, item: TokenStream) -> TokenStream {
     let expand = TokenStream2::from(attr);
     let item_fn = syn::parse_macro_input!(item as syn::ItemFn);

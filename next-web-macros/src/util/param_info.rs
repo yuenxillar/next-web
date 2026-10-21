@@ -1,5 +1,10 @@
 use syn::{FnArg, ItemFn, Pat, PatIdent, Type, TypeReference};
 
+/// The information the macros need about one parameter of a handler.
+///
+/// The fields are filled for every parameter even when a particular macro only
+/// reads a few of them, so the ones which are unread stay part of the shape.
+#[allow(dead_code)]
 pub(crate) struct ParamInfo {
     pub(crate) name: String,
     pub(crate) is_reference: bool,

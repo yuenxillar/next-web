@@ -1,5 +1,10 @@
 use syn::{GenericArgument, PathArguments, ReturnType, Type};
 
+/// Extracts the error type of a `Result` return type.
+///
+/// The helpers in this module are shared by the attribute macros, so a macro
+/// which is only compiled behind a feature does not report this one as dead.
+#[allow(dead_code)]
 pub fn extract_result_error_type(return_type: &ReturnType) -> Option<Type> {
     if let ReturnType::Type(_, ty) = return_type {
         if let Type::Path(type_path) = &**ty {

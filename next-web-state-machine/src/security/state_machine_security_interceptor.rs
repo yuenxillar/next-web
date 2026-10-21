@@ -3,8 +3,9 @@
 //! The Java original splits this into a `StateMachineSecurityInterceptor` plus
 //! four voters and two expression handlers, because Spring Security evaluates
 //! SpEL expressions. The Rust port enforces attributes with a
-//! [`AccessDecisionManager`] and expressions with a pluggable
-//! [`ExpressionEvaluator`].
+//! [`AccessDecisionManager`](crate::security::access_decision_manager::AccessDecisionManager)
+//! and expressions with a pluggable
+//! [`ExpressionEvaluator`](crate::security::expression_evaluator::ExpressionEvaluator).
 
 use std::marker::PhantomData;
 use std::sync::Arc;

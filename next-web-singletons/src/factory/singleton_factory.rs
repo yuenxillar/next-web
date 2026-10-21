@@ -42,7 +42,7 @@ pub trait SingletonFactory {
         if !self.registry().contains_singleton::<T, _>(name.clone()) {
             let instance = factory();
             self.registry_mut()
-                .register_singleton(name.to_owned(), instance);
+                .register_singleton(name.to_string(), instance);
         }
         self.registry_mut()
             .get_singleton::<T, _>(name)

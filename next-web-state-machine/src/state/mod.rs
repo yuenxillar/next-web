@@ -2,8 +2,10 @@
 //!
 //! A state is a region of its own: it can hold entry, exit and state actions,
 //! deferred events, a pseudo state, orthogonal regions and a submachine. The
-//! [`StateMachineState`] trait is the runtime view of a state, [`ObjectState`]
-//! is the default implementation and [`AbstractState`] holds the behaviour
+//! [`StateMachineState`](crate::state::StateMachineState) trait is the runtime
+//! view of a state, [`ObjectState`](crate::state::object_state::ObjectState) is
+//! the default implementation and
+//! [`AbstractState`](crate::state::base_state::AbstractState) holds the behaviour
 //! shared by every state implementation.
 
 /// Listener of the actions a state executes.
