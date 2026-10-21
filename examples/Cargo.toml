@@ -172,6 +172,10 @@ name = "state_machine_basic"
 path = "state_machine_basic.rs"
 
 [[bin]]
+name = "state_machine_hierarchy"
+path = "state_machine_hierarchy.rs"
+
+[[bin]]
 name = "stream"
 path = "stream.rs"
 
