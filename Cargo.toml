@@ -48,7 +48,7 @@ next-web-resilience         = { path = "./next-web-resilience"      }
 next-web-retry              = { path = "./next-web-retry"           }
 next-web-security           = { path = "./next-web-security"        }
 next-web-open-api           = { path = "./next-web-open-api"        }
-next-web-state-machine      = { path = "./next-web-state-machine"   }
+next-web-state-machine      = { path = "./next-web-state-machine", version = "0.2.0" }
 next-web-websocket          = { path = "./next-web-websocket"       }
 
 # main dependencies

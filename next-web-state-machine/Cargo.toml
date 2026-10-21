@@ -1,6 +1,6 @@
 [package]
 name = "next-web-state-machine"
-version = "0.1.0"
+version = "0.2.0"
 description = "State machine modeling and runtime support for Next Web applications"
 rust-version.workspace = true
 edition.workspace = true
