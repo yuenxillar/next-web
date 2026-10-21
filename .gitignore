@@ -34,3 +34,5 @@ settings.local.json
 
 .claude/
 .codex/
+# Artifact written by the local agent sandbox
+.dsh_probe
