@@ -64,3 +64,62 @@ async fn a_machine_built_through_the_umbrella_crate_handles_an_event() {
     assert_eq!(result.result_type(), ResultType::Accepted);
     assert_eq!(machine.state().map(|state| *state.id()), Some(2));
 }
+
+/// A handler which the macro generates against the re-exported state machine.
+#[next_web::on_transition(
+    crate = next_web::state_machine,
+    source = 1,
+    target = 2,
+    event = 100
+)]
+fn record_ship(
+    _context: &dyn next_web::state_machine::state_context::StateContext<i32, i32>,
+) -> Result<(), next_web_core::error::BoxError> {
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_attribute_of_the_umbrella_crate_builds_a_handler() {
+    let configuration = ConfigurationData::<i32, i32>::with_parameters(
+        false,
+        None,
+        Vec::new(),
+        false,
+        None,
+        None,
+        None,
+        None,
+        false,
+        None,
+        Some("handler".to_owned()),
+        None,
+        Vec::new(),
+    );
+
+    let model = DefaultStateMachineModel::new(
+        configuration,
+        Some(
+            vec![
+                StateData::<i32, i32>::with_initial(1, true),
+                StateData::<i32, i32>::new(2),
+            ]
+            .into(),
+        ),
+        Some(TransitionsData::new(vec![TransitionData::new(1, 2, 100)])),
+    );
+
+    let factory = BaseStateMachineFactory::<i32, i32>::new(Arc::new(model), None);
+    let machine = factory.get_state_machine().expect("the machine builds");
+
+    machine
+        .add_transition_handler(Arc::new(record_ship_handler()))
+        .expect("the handler is registered");
+
+    machine.start().await.expect("the machine starts");
+    machine
+        .send_event(Arc::new(GenericMessage::with_payload(100)))
+        .await
+        .expect("the event is sent");
+
+    assert_eq!(machine.state().map(|state| *state.id()), Some(2));
+}

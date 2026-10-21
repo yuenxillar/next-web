@@ -84,6 +84,13 @@ pub use web::i18n;
 #[cfg(feature = "enable-state-machine")]
 pub use next_web_state_machine as state_machine;
 
+/// Marks a function as the handler of a state machine transition.
+///
+/// Pass `crate = next_web::state_machine` so the generated code refers to the
+/// re-export of this crate instead of the state machine crate itself.
+#[cfg(feature = "enable-state-machine")]
+pub use next_web_macros::on_transition;
+
 #[cfg(feature = "enable-websocket")]
 pub use next_web_websocket as ws;
 

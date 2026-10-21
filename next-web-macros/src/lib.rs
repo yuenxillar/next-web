@@ -1243,6 +1243,11 @@ pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// parameter has to be `&dyn StateContext<S, E>`, which is where the macro reads
 /// the state and the event type from.
 ///
+/// The generated code refers to `::next_web_state_machine` by default. A crate
+/// which re-exports that crate, such as `next_web` with the
+/// `enable-state-machine` feature, passes its path with `crate = ..`, so the
+/// application does not need the state machine crate as a direct dependency.
+///
 /// # Example
 /// ```ignore
 /// #[on_transition(source = 1, target = 2, event = 100)]
@@ -1252,7 +1257,16 @@ pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     Ok(())
 /// }
 ///
-/// machine.add_state_machine_interceptor(Arc::new(ship_handler()))?;
+/// #[next_web::on_transition(crate = next_web::state_machine, target = 3)]
+/// fn deliver(
+///     context: &dyn next_web::state_machine::state_context::StateContext<i32, i32>,
+/// ) -> Result<(), BoxError> {
+///     println!("delivering");
+///
+///     Ok(())
+/// }
+///
+/// machine.add_transition_handler(Arc::new(ship_handler()))?;
 /// ```
 #[proc_macro_attribute]
 pub fn on_transition(attr: TokenStream, item: TokenStream) -> TokenStream {
