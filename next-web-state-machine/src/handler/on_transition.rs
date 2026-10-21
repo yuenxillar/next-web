@@ -4,7 +4,7 @@
 //! implementation: a piece of user code which runs when the machine takes a
 //! transition from one state to another for a given event. It is plugged in as a
 //! state machine interceptor, which is the hook which receives the
-//! [`StateContext`].
+//! [`StateContext`](crate::state_context::StateContext).
 
 use std::sync::Arc;
 

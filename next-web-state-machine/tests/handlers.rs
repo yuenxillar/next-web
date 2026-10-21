@@ -134,8 +134,7 @@ async fn a_handler_can_filter_by_event_and_source() {
 }
 
 #[tokio::test]
-async fn a_handler_failure_reaches_the_caller() {
-    let handler = OnTransition::<i32, i32>::new(Arc::new(
+async fn a_handler_failure_reaches_the_caller() {    let handler = OnTransition::<i32, i32>::new(Arc::new(
         |_context: &dyn StateContext<i32, i32>| {
             Err(Box::new(std::io::Error::other("the handler failed")) as BoxError)
         },
@@ -155,4 +154,23 @@ async fn a_handler_failure_reaches_the_caller() {
             "a failed handler does not report an accepted event"
         );
     }
+}
+
+#[next_web_macros::on_transition(source = 1, target = 2, event = 100)]
+fn ship(context: &dyn StateContext<i32, i32>) -> Result<(), BoxError> {
+    let _ = context;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_attribute_builds_the_handler() {
+    let machine = build_machine(ship_handler());
+    machine.start().await.expect("the machine starts");
+
+    machine
+        .send_event(Arc::new(GenericMessage::with_payload(100)))
+        .await
+        .expect("the event is sent");
+    assert_eq!(machine.state().map(|state| *state.id()), Some(2));
 }

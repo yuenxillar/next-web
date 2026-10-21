@@ -25,6 +25,7 @@ mod data;
 mod di;
 mod util;
 mod web;
+mod state_machine;
 
 #[cfg(feature = "resilience")]
 mod resilience;
@@ -1233,4 +1234,27 @@ pub fn time_limiter(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {
     apply(Pattern::Retry, attr.into(), item.into()).into()
+}
+
+/// Marks a function as the handler of a transition.
+///
+/// The function keeps its name and body, and the macro adds `<name>_handler()`
+/// which builds the `OnTransition` value the machine registers. The first
+/// parameter has to be `&dyn StateContext<S, E>`, which is where the macro reads
+/// the state and the event type from.
+///
+/// # Example
+/// ```ignore
+/// #[on_transition(source = 1, target = 2, event = 100)]
+/// fn ship(context: &dyn StateContext<i32, i32>) -> Result<(), BoxError> {
+///     println!("shipping");
+///
+///     Ok(())
+/// }
+///
+/// machine.add_state_machine_interceptor(Arc::new(ship_handler()))?;
+/// ```
+#[proc_macro_attribute]
+pub fn on_transition(attr: TokenStream, item: TokenStream) -> TokenStream {
+    crate::state_machine::on_transition::impl_macro_on_transition(attr, item)
 }
