@@ -50,6 +50,8 @@ pub struct DefaultStateMachineExecutor<S, E> {
     transit: RwLock<Option<Arc<dyn StateMachineExecutorTransit<S, E>>>>,
     self_weak: RwLock<Weak<DefaultStateMachineExecutor<S, E>>>,
     triggers_registered: AtomicBool,
+    /// Serializes the event processing of one machine
+    processing: tokio::sync::Mutex<()>,
 }
 
 impl<S, E> DefaultStateMachineExecutor<S, E>
@@ -112,6 +114,7 @@ where
             transit: RwLock::new(None),
             self_weak: RwLock::new(Weak::new()),
             triggers_registered: AtomicBool::new(false),
+            processing: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -162,6 +165,10 @@ where
         &self,
         trigger: &Arc<dyn Trigger<S, E>>,
     ) -> Result<bool, BoxError> {
+        // A trigger fires from its own task, so it competes with the events for
+        // the same machine.
+        let _processing = self.processing.lock().await;
+
         let Some(machine) = self.state_machine() else {
             return Ok(false);
         };
@@ -450,6 +457,11 @@ where
         message: Arc<dyn Message<E>>,
         callback: Arc<dyn StateMachineExecutorCallback>,
     ) -> Result<bool, BoxError> {
+        // One event at a time: the transitions of a machine exit and enter
+        // states, so two events processed in parallel would interleave those
+        // steps. Callers which send from several tasks wait here instead.
+        let _processing = self.processing.lock().await;
+
         let matched = match self.process_message(message).await {
             Ok(matched) => matched,
             Err(error) => {

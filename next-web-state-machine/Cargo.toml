@@ -12,7 +12,7 @@ repository.workspace = true
 next-web-core   = { workspace = true }
 next-web-macros = { workspace = true }
 
-tokio           = { workspace = true }
+tokio           = { workspace = true, features = ["sync", "time"] }
 
 futures         = { workspace = true }
 uuid            = { workspace = true }

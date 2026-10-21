@@ -40,6 +40,13 @@ where
 
     /// Sends an event to the region.
     ///
+    /// The events of one machine are processed one at a time: a caller which
+    /// sends from several tasks waits until the running event finished.
+    ///
+    /// A state action must not await a send to its own machine, because the
+    /// event which runs the action still holds the processing slot; spawn the
+    /// follow-up event instead.
+    ///
     /// # Arguments
     /// * `event` - the event to send
     async fn send_event(
