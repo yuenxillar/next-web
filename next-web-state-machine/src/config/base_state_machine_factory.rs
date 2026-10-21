@@ -320,6 +320,18 @@ where
             ));
         }
 
+        // The runtime processes the events of a machine one at a time, so the
+        // sequential policy is what it does and the parallel one cannot be
+        // honoured.
+        if configuration.region_execution_policy()
+            == Some(&crate::region::region_execution_policy::RegionExecutionPolicy::Parallel)
+        {
+            return Err(unsupported_feature(
+                "parallel region execution",
+                "the runtime processes the events of a machine sequentially; remove the parallel region execution policy",
+            ));
+        }
+
         Ok(())
     }
 
@@ -1001,13 +1013,24 @@ where
         exit_actions: Vec<BoxedStateAction<S, E>>,
         state_actions: Vec<BoxedStateAction<S, E>>,
         pseudo_state: Option<Arc<dyn PseudoState<S, E>>>,
-        _state_machine_model: &dyn StateMachineModel<S, E>,
+        state_machine_model: &dyn StateMachineModel<S, E>,
     ) -> Result<Arc<dyn StateMachineState<S, E>>, BoxError> {
+        let policy = state_machine_model
+            .get_configuration_data()
+            .state_do_action_policy()
+            .copied();
+
+        let timeout = state_machine_model
+            .get_configuration_data()
+            .state_do_action_policy_timeout();
+
         let state = crate::state::object_state::ObjectState::new(id, pseudo_state)
             .with_deferred(deferred)
             .with_entry_actions(entry_actions)
             .with_exit_actions(exit_actions)
-            .with_state_actions(state_actions);
+            .with_state_actions(state_actions)
+            .with_state_do_action_policy(policy, timeout);
+
         Ok(Arc::new(state))
     }
 

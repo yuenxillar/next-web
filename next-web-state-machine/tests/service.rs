@@ -250,8 +250,7 @@ async fn releasing_twice_is_idempotent() {
 }
 
 #[tokio::test]
-async fn acquire_builds_a_fresh_machine_when_nothing_was_persisted() {
-    let service = service_with_persister();
+async fn acquire_builds_a_fresh_machine_when_nothing_was_persisted() {    let service = service_with_persister();
 
     let machine = service
         .acquire_state_machine("flow")
@@ -260,4 +259,49 @@ async fn acquire_builds_a_fresh_machine_when_nothing_was_persisted() {
 
     assert!(machine.is_running());
     assert_eq!(machine.state().map(|state| *state.id()), Some(1));
+}
+
+/// A persister whose store rejects every write.
+struct FailingPersister;
+
+#[next_web_core::async_trait]
+impl StateMachinePersister<i32, i32, String> for FailingPersister {
+    async fn persist(
+        &self,
+        _state_machine: Arc<dyn StateMachine<i32, i32>>,
+        _context: String,
+    ) -> Result<(), BoxError> {
+        Err(Box::new(std::io::Error::other("the store is down")))
+    }
+
+    async fn restore(
+        &self,
+        _context: String,
+    ) -> Result<Arc<dyn StateMachine<i32, i32>>, BoxError> {
+        Err(state_machine_error(
+            StateMachineErrorKind::MachineNotFound,
+            "no persisted state exists",
+        ))
+    }
+}
+
+#[tokio::test]
+async fn a_failed_release_still_stops_the_machine() {
+    let service = DefaultStateMachineService::new(build_factory())
+        .with_persister(Arc::new(FailingPersister));
+
+    let machine = service
+        .acquire_state_machine("flow")
+        .await
+        .expect("the machine is acquired");
+    assert!(machine.is_running());
+
+    let result = service.release_state_machine("flow").await;
+
+    assert!(result.is_err(), "the error of the store is reported");
+    assert!(
+        !machine.is_running(),
+        "the machine is stopped even when persisting it failed"
+    );
+    assert!(machine.state().is_none());
 }

@@ -171,13 +171,19 @@ where
 
         // The machine is written before it stops, because stopping clears the
         // current state which the persisted context captures.
-        if persist && let Some(persister) = self.persister.as_ref() {
+        let persisted = if persist && let Some(persister) = self.persister.as_ref() {
             persister
                 .persist(machine.clone(), machine_id.to_owned())
-                .await?;
-        }
+                .await
+        } else {
+            Ok(())
+        };
 
-        machine.stop().await
+        // The machine is stopped even when persisting it failed, so its triggers
+        // are disarmed and it does not keep running without an owner.
+        let stopped = machine.stop().await;
+
+        persisted.and(stopped)
     }
 }
 

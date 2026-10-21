@@ -8,6 +8,7 @@ use next_web_core::messaging::Message;
 use tracing::warn;
 
 use crate::BoxedStateAction;
+use crate::action::state_do_action_policy::StateDoActionPolicy;
 use crate::region::Region;
 use crate::state::StateMachineState;
 use crate::state::action_listener::ActionListener;
@@ -96,6 +97,20 @@ where
     /// * `actions` - the actions executed once, right after entry
     pub fn with_state_actions(mut self, actions: Vec<BoxedStateAction<S, E>>) -> Self {
         self.base = self.base.with_state_actions(actions);
+        self
+    }
+
+    /// Sets the policy which decides how the state actions are executed.
+    ///
+    /// # Arguments
+    /// * `policy` - the policy applied to the state actions
+    /// * `timeout` - the timeout used by the timeout policy
+    pub fn with_state_do_action_policy(
+        mut self,
+        policy: Option<StateDoActionPolicy>,
+        timeout: Option<std::time::Duration>,
+    ) -> Self {
+        self.base = self.base.with_state_do_action_policy(policy, timeout);
         self
     }
 
