@@ -156,6 +156,10 @@ where
     }
 
     /// Gets a configurer by type
+    ///
+    /// Returns `None` when the type is not registered, and also when several
+    /// configurers of the type are registered, because the caller asked for the
+    /// one of its type. Use [`Self::get_configurers`] for the latter case.
     pub fn get_configurer<C>(&self) -> Option<Box<dyn Configurer<O, B>>>
     where
         C: Configurer<O, B> + 'static,
@@ -163,20 +167,19 @@ where
         let type_id = TypeId::of::<C>();
         let main_configurers = self.main_configurers.borrow();
 
-        if let Some(configs) = main_configurers.get(&type_id) {
-            if configs.len() != 1 {
-                panic!(
-                    "Only one configurer expected for type, but got {}",
-                    configs.len()
-                )
-            } else {
-                return configs
-                    .first()
-                    .map(|configurer| clone_box(configurer.as_ref()));
-            }
+        let configs = main_configurers.get(&type_id)?;
+
+        if configs.len() != 1 {
+            error!(
+                count = configs.len(),
+                "several configurers are registered for the requested type"
+            );
+            return None;
         }
 
-        None
+        configs
+            .first()
+            .map(|configurer| clone_box(configurer.as_ref()))
     }
 
     /// Invoked prior to invoking each init() method
@@ -268,24 +271,30 @@ where
     }
 
     /// Removes and returns a configurer by type
+    ///
+    /// When several configurers of the type are registered the first one is
+    /// removed and the rest are kept, which the error log reports; the builder
+    /// never panics for it.
     pub fn remove_configurer<C>(&mut self) -> Option<Box<dyn Configurer<O, B>>>
     where
         C: Configurer<O, B> + 'static,
     {
         let type_id = TypeId::of::<C>();
+        let mut configs = self.main_configurers.borrow_mut();
+        let mut registered = configs.remove(&type_id)?;
 
-        if let Some(mut configs) = self.main_configurers.borrow_mut().remove(&type_id) {
-            if configs.len() != 1 {
-                panic!(
-                    "Only one configurer expected for type, but got {}",
-                    configs.len()
-                );
-            } else {
-                return Some(configs.remove(0));
-            }
+        if registered.len() != 1 {
+            error!(
+                count = registered.len(),
+                "several configurers are registered for the requested type"
+            );
+            let first = registered.remove(0);
+            configs.insert(type_id, registered);
+
+            return Some(first);
         }
 
-        None
+        registered.pop()
     }
 
     /// Sets the post processor applied to the objects of the build.
@@ -439,8 +448,25 @@ where
     builder.get_mut_object().build_state = BuildState::Building;
     let result = builder.perform_build()?;
 
+    // The configurers are dropped once the object is built: a configurer may
+    // hold a clone of the builder it belongs to, so keeping them registered
+    // would leave a reference cycle behind, and the build reads its data from
+    // the shared objects instead of the registry.
+    builder.get_mut_object().release_configurers();
+
     builder.get_mut_object().build_state = BuildState::Built;
     Ok(result)
+}
+
+impl<O, I, B> BaseConfiguredBuilder<O, I, B>
+where
+    B: Builder<O>,
+{
+    /// Drops the registered configurers of both buckets.
+    fn release_configurers(&mut self) {
+        self.main_configurers.borrow_mut().clear();
+        self.post_configurers.borrow_mut().clear();
+    }
 }
 
 impl<T, O, I, B> Required<BaseConfiguredBuilder<O, I, B>> for WithTypes<T, I, B>
@@ -552,7 +578,9 @@ where
         O: 'static,
     {
         if !self.get_object().build_state.is_configured() {
-            let type_id = TypeId::of::<Box<dyn Configurer<O, B>>>();
+            // The registry is keyed by the configurer type, so a lookup by type
+            // finds it again and two different configurers do not share a slot.
+            let type_id = TypeId::of::<C>();
 
             if self.get_object().build_state.is_initializing() {
                 configurer.init(self.as_ref())?;
@@ -572,7 +600,7 @@ where
                     .insert(type_id, vec![clone_box(configurer)]);
             }
         } else {
-            let type_id = TypeId::of::<Box<dyn Configurer<O, B>>>();
+            let type_id = TypeId::of::<C>();
 
             configurer.init(self.as_ref())?;
             if self.get_object().allow_configurers_of_same_type {
@@ -758,6 +786,82 @@ mod tests {
             builder.post_configurers.borrow().len(),
             1,
             "it must be queued in the post bucket instead"
+        );
+    }
+
+    #[test]
+    fn several_configurers_of_one_type_do_not_panic_the_lookup() {
+        let mut builder = TestConfiguredBuilder::with_allow_configurers_of_same_type(true);
+
+        builder
+            .apply(&mut MarkerConfigurer)
+            .expect("the first configurer is registered");
+        builder
+            .apply(&mut MarkerConfigurer)
+            .expect("the second configurer is registered");
+
+        assert!(
+            builder.get_configurer::<MarkerConfigurer>().is_none(),
+            "a lookup for the single configurer of a type returns None when there are several"
+        );
+        assert_eq!(builder.get_configurers::<MarkerConfigurer>().len(), 2);
+        assert!(builder.remove_configurer::<MarkerConfigurer>().is_some());
+        assert_eq!(
+            builder.get_configurers::<MarkerConfigurer>().len(),
+            1,
+            "removing one configurer keeps the rest"
+        );
+    }
+
+    #[test]
+    fn a_built_builder_releases_its_configurers() {
+        use crate::config::builders::state_machine_state_builder::StateMachineStateBuilder;
+        use crate::config::model::states_data::StatesData;
+
+        #[derive(Clone)]
+        struct PlainStatesConfigurer;
+
+        impl Configurer<StatesData<i32, i32>, StateMachineStateBuilder<i32, i32>>
+            for PlainStatesConfigurer
+        {
+            fn init(
+                &mut self,
+                _builder: &StateMachineStateBuilder<i32, i32>,
+            ) -> Result<(), BoxError> {
+                Ok(())
+            }
+
+            fn configure(
+                &mut self,
+                _builder: &StateMachineStateBuilder<i32, i32>,
+            ) -> Result<(), BoxError> {
+                Ok(())
+            }
+
+            fn is_assignable(&self, _builder: &StateMachineStateBuilder<i32, i32>) -> bool {
+                true
+            }
+        }
+
+        let mut builder = StateMachineStateBuilder::<i32, i32>::new(true);
+
+        builder
+            .apply(&mut PlainStatesConfigurer)
+            .expect("the configurer is registered");
+
+        assert_eq!(
+            builder.get_configurers::<PlainStatesConfigurer>().len(),
+            1,
+            "the builder keeps the registered configurer"
+        );
+
+        builder
+            .build()
+            .expect("the object is built without an error");
+
+        assert!(
+            builder.get_configurers::<PlainStatesConfigurer>().is_empty(),
+            "the configurers are released after the build, which breaks the cycle a configurer creates when it holds its builder"
         );
     }
 }
