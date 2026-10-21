@@ -9,6 +9,7 @@ pub mod region_execution_policy;
 use std::sync::Arc;
 
 use next_web_core::{async_trait, error::BoxError, messaging::Message};
+use tokio::sync::Mutex as AsyncMutex;
 use uuid::Uuid;
 
 use crate::listener::state_machine_listener::StateMachineListener;
@@ -65,6 +66,14 @@ where
 
     /// Gets the current state.
     fn state(&self) -> Option<Arc<dyn StateMachineState<S, E>>>;
+
+    /// Gets the lock which serializes the event processing of this region.
+    ///
+    /// Sending an event takes the lock before it touches the state, and the
+    /// trigger which fires from a timer takes the same lock, so a transition and
+    /// a timer cannot interleave. The lock is not reentrant: a state action must
+    /// not wait for an event of its own machine.
+    fn event_lock(&self) -> &AsyncMutex<()>;
 
     /// Gets the current states.
     fn states(&self) -> Vec<Arc<dyn StateMachineState<S, E>>>;

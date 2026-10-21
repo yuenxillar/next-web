@@ -1109,6 +1109,10 @@ where
         Ok(results)
     }
 
+    fn event_lock(&self) -> &AsyncMutex<()> {
+        &self.event_lock
+    }
+
     fn state(&self) -> Option<Arc<dyn StateMachineState<S, E>>> {
         // Once a machine stopped, the state it left is still reported while it
         // is an end state, which is what the Java implementation does.
