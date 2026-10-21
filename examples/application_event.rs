@@ -36,7 +36,7 @@ use next_web::{
     macros::bind::{get_mapping, post_mapping, singleton},
 };
 use next_web_context::{
-    ApplicationEvent, ApplicationEventPublisher, ApplicationEventPublisherExt, ApplicationListener,
+    ApplicationEventPublisher, ApplicationEventPublisherExt, ApplicationListener,
     event::{
         ApplicationEventMulticaster, ApplicationListenerRegistration, ChannelDispatch,
         DefaultApplicationEventMulticaster, ListenerDispatch, typed_listener_fn,

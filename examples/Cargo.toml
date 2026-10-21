@@ -96,6 +96,10 @@ name = "auto_configuration"
 path = "auto_configuration.rs"
 
 [[bin]]
+name = "background_service"
+path = "background_service.rs"
+
+[[bin]]
 name = "data"
 path = "data.rs"
 

@@ -17,7 +17,9 @@ where
     Self: 'static,
 {
     /// Returns a stable, unique name within one manager.
-    fn name(&self) -> &'static str;
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 
     /// Runs the service.
     async fn run(self: Arc<Self>) -> Result<(), ServiceError>;
