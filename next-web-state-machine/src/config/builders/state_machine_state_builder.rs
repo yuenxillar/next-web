@@ -211,20 +211,28 @@ mod tests {
     }
 
     #[test]
-    fn and_returns_a_usable_parent() {
+    fn and_continues_the_same_builder() {
         let mut builder = StateMachineStateBuilder::<i32, i32>::new(true);
 
         let mut states = builder.with_states().unwrap();
         states.initial(1);
 
-        // `and()` hands a parent configurer back to the fluent chain instead of
-        // panicking with `todo!()`.
+        // `and()` hands the parent configurer back, and the configurers applied
+        // through it land in the same builder.
         let mut parent = states.and();
-        assert!(parent.with_states().is_ok());
+        parent.with_states().unwrap().state(2);
 
-        // The data configured before `and()` still reaches the builder.
         let built = builder.build().unwrap();
-        assert_eq!(built.state_data().len(), 1);
-        assert!(built.state_data()[0].is_initial());
+        let mut states = built.state_data().iter().collect::<Vec<_>>();
+        states.sort_by_key(|state| *state.state());
+
+        assert_eq!(
+            states.len(),
+            2,
+            "both configuration steps reached the builder"
+        );
+        assert!(states[0].is_initial());
+        assert_eq!(states[0].state(), &1);
+        assert_eq!(states[1].state(), &2);
     }
 }

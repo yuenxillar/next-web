@@ -24,10 +24,10 @@ where
     B: Builder<O>,
 {
     /// Configurers which are added before the configure step
-    main_configurers: BTreeMap<TypeId, Vec<Box<dyn Configurer<O, B>>>>,
+    main_configurers: Rc<RefCell<BTreeMap<TypeId, Vec<Box<dyn Configurer<O, B>>>>>>,
 
     /// Configurers which are added during the configuration phase
-    post_configurers: BTreeMap<TypeId, Vec<Box<dyn Configurer<O, B>>>>,
+    post_configurers: Rc<RefCell<BTreeMap<TypeId, Vec<Box<dyn Configurer<O, B>>>>>>,
 
     /// Shared objects
     shared_objects: Rc<RefCell<HashMap<TypeId, Box<dyn Any>>>>,
@@ -53,8 +53,8 @@ where
     /// Creates a new builder with specified post processor
     pub fn with_post_processor<T: ObjectPostProcessor>(object_post_processor: T) -> Self {
         Self {
-            main_configurers: BTreeMap::new(),
-            post_configurers: BTreeMap::new(),
+            main_configurers: Rc::new(RefCell::new(BTreeMap::new())),
+            post_configurers: Rc::new(RefCell::new(BTreeMap::new())),
             shared_objects: Rc::new(RefCell::new(HashMap::new())),
             allow_configurers_of_same_type: false,
             build_state: BuildState::Unbuilt,
@@ -70,8 +70,8 @@ where
     /// * `allow_configurers_of_same_type` - whether several configurers of one type are kept
     pub fn with_allow_configurers_of_same_type(allow_configurers_of_same_type: bool) -> Self {
         Self {
-            main_configurers: BTreeMap::new(),
-            post_configurers: BTreeMap::new(),
+            main_configurers: Rc::new(RefCell::new(BTreeMap::new())),
+            post_configurers: Rc::new(RefCell::new(BTreeMap::new())),
             shared_objects: Rc::new(RefCell::new(HashMap::new())),
             allow_configurers_of_same_type,
             build_state: BuildState::Unbuilt,
@@ -87,8 +87,8 @@ where
         allow_configurers_of_same_type: bool,
     ) -> Self {
         Self {
-            main_configurers: BTreeMap::new(),
-            post_configurers: BTreeMap::new(),
+            main_configurers: Rc::new(RefCell::new(BTreeMap::new())),
+            post_configurers: Rc::new(RefCell::new(BTreeMap::new())),
             shared_objects: Rc::new(RefCell::new(HashMap::new())),
             allow_configurers_of_same_type,
             build_state: BuildState::Unbuilt,
@@ -104,22 +104,16 @@ where
     B: Builder<O>,
 {
     fn add_boxed_configurer(&mut self, type_id: TypeId, configurer: Box<dyn Configurer<O, B>>) {
-        if !self.build_state.is_configured() {
-            if self.allow_configurers_of_same_type {
-                self.main_configurers
-                    .entry(type_id)
-                    .or_default()
-                    .push(configurer);
-            } else {
-                self.main_configurers.insert(type_id, vec![configurer]);
-            }
-        } else if self.allow_configurers_of_same_type {
-            self.post_configurers
-                .entry(type_id)
-                .or_default()
-                .push(configurer);
+        let mut bucket = if self.build_state.is_configured() {
+            self.post_configurers.borrow_mut()
         } else {
-            self.post_configurers.insert(type_id, vec![configurer]);
+            self.main_configurers.borrow_mut()
+        };
+
+        if self.allow_configurers_of_same_type {
+            bucket.entry(type_id).or_default().push(configurer);
+        } else {
+            bucket.insert(type_id, vec![configurer]);
         }
     }
 
@@ -162,20 +156,23 @@ where
     }
 
     /// Gets a configurer by type
-    pub fn get_configurer<C>(&self) -> Option<&dyn Configurer<O, B>>
+    pub fn get_configurer<C>(&self) -> Option<Box<dyn Configurer<O, B>>>
     where
         C: Configurer<O, B> + 'static,
     {
         let type_id = TypeId::of::<C>();
+        let main_configurers = self.main_configurers.borrow();
 
-        if let Some(configs) = self.main_configurers.get(&type_id) {
+        if let Some(configs) = main_configurers.get(&type_id) {
             if configs.len() != 1 {
                 panic!(
                     "Only one configurer expected for type, but got {}",
                     configs.len()
                 )
             } else {
-                return configs.first().map(|configurer| configurer.as_ref());
+                return configs
+                    .first()
+                    .map(|configurer| clone_box(configurer.as_ref()));
             }
         }
 
@@ -241,16 +238,17 @@ where
     }
 
     /// Gets all configurer instances by type
-    pub fn get_configurers<C>(&self) -> Vec<&dyn Configurer<O, B>>
+    pub fn get_configurers<C>(&self) -> Vec<Box<dyn Configurer<O, B>>>
     where
         C: Configurer<O, B> + Clone + 'static,
     {
         let type_id = TypeId::of::<C>();
+        let main_configurers = self.main_configurers.borrow();
 
-        match self.main_configurers.get(&type_id) {
+        match main_configurers.get(&type_id) {
             Some(configs) => configs
                 .iter()
-                .map(|configurer| configurer.as_ref())
+                .map(|configurer| clone_box(configurer.as_ref()))
                 .collect::<Vec<_>>(),
             None => Default::default(),
         }
@@ -263,7 +261,10 @@ where
     {
         let type_id = TypeId::of::<C>();
 
-        self.main_configurers.remove(&type_id).unwrap_or_default()
+        self.main_configurers
+            .borrow_mut()
+            .remove(&type_id)
+            .unwrap_or_default()
     }
 
     /// Removes and returns a configurer by type
@@ -273,7 +274,7 @@ where
     {
         let type_id = TypeId::of::<C>();
 
-        if let Some(mut configs) = self.main_configurers.remove(&type_id) {
+        if let Some(mut configs) = self.main_configurers.borrow_mut().remove(&type_id) {
             if configs.len() != 1 {
                 panic!(
                     "Only one configurer expected for type, but got {}",
@@ -549,22 +550,21 @@ where
         if !self.get_object().build_state.is_configured() {
             let type_id = TypeId::of::<Box<dyn Configurer<O, B>>>();
 
+            if self.get_object().build_state.is_initializing() {
+                configurer.init(self.as_ref())?;
+            }
+
             if self.get_object().allow_configurers_of_same_type {
-                if self.get_object().build_state.is_initializing() {
-                    configurer.init(self.as_ref())?;
-                }
-                let configs = self
-                    .get_mut_object()
-                    .main_configurers
-                    .entry(type_id)
-                    .or_insert_with(Vec::new);
-                configs.push(clone_box(configurer));
-            } else {
-                if self.get_object().build_state.is_initializing() {
-                    configurer.init(self.as_ref())?;
-                }
                 self.get_mut_object()
                     .main_configurers
+                    .borrow_mut()
+                    .entry(type_id)
+                    .or_default()
+                    .push(clone_box(configurer));
+            } else {
+                self.get_mut_object()
+                    .main_configurers
+                    .borrow_mut()
                     .insert(type_id, vec![clone_box(configurer)]);
             }
         } else {
@@ -572,15 +572,16 @@ where
 
             configurer.init(self.as_ref())?;
             if self.get_object().allow_configurers_of_same_type {
-                let configs = self
-                    .get_mut_object()
+                self.get_mut_object()
                     .post_configurers
+                    .borrow_mut()
                     .entry(type_id)
-                    .or_insert_with(Vec::new);
-                configs.push(clone_box(configurer));
+                    .or_default()
+                    .push(clone_box(configurer));
             } else {
                 self.get_mut_object()
                     .post_configurers
+                    .borrow_mut()
                     .insert(type_id, vec![clone_box(configurer)]);
             }
         }
@@ -592,13 +593,7 @@ where
     fn init_main_configurers(&mut self) -> Result<(), BoxError> {
         // Iterate a snapshot so a configurer which registers another one while it
         // is initialized does not lose that registration.
-        let mut main_configurers: Vec<Box<dyn Configurer<O, B>>> = self
-            .get_mut_object()
-            .main_configurers
-            .values()
-            .flatten()
-            .map(|configurer| clone_box(configurer.as_ref()))
-            .collect();
+        let mut main_configurers = self.snapshot_main_configurers();
         let builder = self.as_ref();
         for configurer in main_configurers.iter_mut() {
             configurer.init(builder)?;
@@ -611,13 +606,7 @@ where
     where
         B: Clone,
     {
-        let mut main_configurers: Vec<Box<dyn Configurer<O, B>>> = self
-            .get_mut_object()
-            .main_configurers
-            .values()
-            .flatten()
-            .map(|configurer| clone_box(configurer.as_ref()))
-            .collect();
+        let mut main_configurers = self.snapshot_main_configurers();
         let builder = self.as_ref();
         for configurer in main_configurers.iter_mut() {
             configurer.configure(builder)?;
@@ -632,8 +621,9 @@ where
         B: Clone,
     {
         let mut post_configurers: Vec<Box<dyn Configurer<O, B>>> = self
-            .get_mut_object()
+            .get_object()
             .post_configurers
+            .borrow()
             .values()
             .flatten()
             .map(|configurer| clone_box(configurer.as_ref()))
@@ -643,6 +633,18 @@ where
             configurer.configure(builder)?;
         }
         Ok(())
+    }
+
+    /// Clones the main configurers so they can be iterated while the registry
+    /// stays available for registrations.
+    fn snapshot_main_configurers(&self) -> Vec<Box<dyn Configurer<O, B>>> {
+        self.get_object()
+            .main_configurers
+            .borrow()
+            .values()
+            .flatten()
+            .map(|configurer| clone_box(configurer.as_ref()))
+            .collect()
     }
 }
 
@@ -749,7 +751,7 @@ mod tests {
             "a configurer registered during the configure phase must not join the main bucket"
         );
         assert_eq!(
-            builder.post_configurers.len(),
+            builder.post_configurers.borrow().len(),
             1,
             "it must be queued in the post bucket instead"
         );
