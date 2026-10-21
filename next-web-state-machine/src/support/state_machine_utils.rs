@@ -1,36 +1,75 @@
+//! Utilities shared by the runtime.
+
 use std::any::Any;
-use std::collections::HashSet;
+use std::sync::Arc;
 
 use crate::state::StateMachineState;
 use crate::state::pseudo_state_kind::PseudoStateKind;
 use crate::state_context::StateContext;
 
+/// The message header which carries the timeout of a state do action.
 pub const HEADER_DO_ACTION_TIMEOUT: &str = "STATEMACHINE_DO_ACTION_TIMEOUT";
 
-/// 状态机工具类
+/// State machine utility functions.
 pub struct StateMachineUtils;
 
 impl StateMachineUtils {
-    /// 检查 right 是否是 left 的子状态
+    /// Checks whether `right` is a substate of `left`.
+    ///
+    /// A state is a substate of another state when it lives in one of its
+    /// regions or in its submachine.
+    ///
+    /// # Arguments
+    /// * `left` - the potential parent state
+    /// * `right` - the potential child state
     pub fn is_substate<S, E>(
-        left: &dyn StateMachineState<S, E>,
-        right: &dyn StateMachineState<S, E>,
+        left: &Arc<dyn StateMachineState<S, E>>,
+        right: &Arc<dyn StateMachineState<S, E>>,
     ) -> bool
     where
-        S: PartialEq,
-        S: Send + Sync,
-        S: 'static,
-        E: Send + Sync,
-        E: 'static,
+        S: PartialEq + Send + Sync + 'static,
+        E: Send + Sync + 'static,
     {
-        let states = left.states();
-        // 移除自身（如果有）
-        let filtered: Vec<_> = states.into_iter().filter(|s| s.id() != left.id()).collect();
+        if left.id() == right.id() {
+            return false;
+        }
 
-        filtered.iter().any(|s| s.id() == right.id())
+        Self::state_contains(left, right.id())
     }
 
-    /// 检查 right 集合是否包含至少一个 left 集合中的元素
+    /// Checks whether the given state contains a state with the given id.
+    ///
+    /// # Arguments
+    /// * `state` - the state to inspect
+    /// * `id` - the identifier to look for
+    pub fn state_contains<S, E>(state: &Arc<dyn StateMachineState<S, E>>, id: &S) -> bool
+    where
+        S: PartialEq + Send + Sync + 'static,
+        E: Send + Sync + 'static,
+    {
+        for region in state.regions() {
+            if let Some(current) = region.state()
+                && current.id() == id {
+                    return true;
+                }
+        }
+
+        if let Some(submachine) = state.submachine() {
+            for nested in submachine.states() {
+                if nested.id() == id {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Checks whether at least one element of `left` is contained in `right`.
+    ///
+    /// # Arguments
+    /// * `left` - the left collection
+    /// * `right` - the right collection
     pub fn contains_at_least_one<T: PartialEq>(left: &[T], right: &[T]) -> bool {
         if left.is_empty() || right.is_empty() {
             return false;
@@ -38,39 +77,40 @@ impl StateMachineUtils {
         left.iter().any(|item| right.contains(item))
     }
 
-    /// 检查状态是否为普通的伪状态（非 INITIAL 或 END）
+    /// Checks whether a state is a pseudo state which is not initial or end.
+    ///
+    /// # Arguments
+    /// * `state` - the state to inspect
     pub fn is_normal_pseudo_state<S, E>(state: &dyn StateMachineState<S, E>) -> bool
     where
-        S: Send + Sync,
-        S: 'static,
-        E: Send + Sync,
-        E: 'static,
+        S: PartialEq + Send + Sync + 'static,
+        E: Send + Sync + 'static,
     {
-        let pseudo_state = match state.pseudo_state() {
-            Some(ps) => ps,
-            None => return false,
+        let Some(pseudo_state) = state.pseudo_state() else {
+            return false;
         };
 
-        let kind = pseudo_state.get_kind();
-        !matches!(kind, PseudoStateKind::Initial | PseudoStateKind::End)
+        !matches!(
+            pseudo_state.get_kind(),
+            PseudoStateKind::Initial | PseudoStateKind::End
+        )
     }
 
-    /// 检查状态是否为瞬态伪状态（RTC 完成后不会停留）
+    /// Checks whether a state is a transient pseudo state.
+    ///
+    /// # Arguments
+    /// * `state` - the state to inspect
     pub fn is_transient_pseudo_state<S, E>(state: &dyn StateMachineState<S, E>) -> bool
     where
-        S: Send + Sync,
-        S: 'static,
-        E: Send + Sync,
-        E: 'static,
+        S: PartialEq + Send + Sync + 'static,
+        E: Send + Sync + 'static,
     {
-        let pseudo_state = match state.pseudo_state() {
-            Some(ps) => ps,
-            None => return false,
+        let Some(pseudo_state) = state.pseudo_state() else {
+            return false;
         };
 
-        let kind = pseudo_state.get_kind();
         matches!(
-            kind,
+            pseudo_state.get_kind(),
             PseudoStateKind::Choice
                 | PseudoStateKind::Junction
                 | PseudoStateKind::Entry
@@ -82,51 +122,65 @@ impl StateMachineUtils {
         )
     }
 
-    /// 检查状态是否为指定类型的伪状态
+    /// Checks whether a state carries a pseudo state of the given kind.
+    ///
+    /// # Arguments
+    /// * `state` - the state to inspect
+    /// * `kind` - the kind to compare against
     pub fn is_pseudo_state_of_kind<S, E>(
         state: &dyn StateMachineState<S, E>,
         kind: PseudoStateKind,
     ) -> bool
     where
-        S: Send + Sync,
-        S: 'static,
-        E: Send + Sync,
-        E: 'static,
+        S: PartialEq + Send + Sync + 'static,
+        E: Send + Sync + 'static,
     {
         state
             .pseudo_state()
-            .map(|ps| ps.get_kind() == kind)
+            .map(|pseudo_state| pseudo_state.get_kind() == kind)
             .unwrap_or(false)
     }
 
-    /// 将集合转换为字符串集合
+    /// Converts a collection into a collection of strings.
+    ///
+    /// # Arguments
+    /// * `collection` - the collection to convert
     pub fn to_string_collection<T: ToString>(collection: &[T]) -> Vec<String> {
-        collection.iter().map(|item| item.to_string()).collect()
+        collection.iter().map(ToString::to_string).collect()
     }
 
-    /// 将任意对象转换为字符串集合（处理数组）
+    /// Converts any value into a collection of strings.
+    ///
+    /// # Arguments
+    /// * `object` - the value to convert
     pub fn to_string_collection_from_any(object: &dyn Any) -> Vec<String> {
         let mut result = Vec::new();
 
-        // 尝试处理数组类型
         if let Some(array) = object.downcast_ref::<Vec<&dyn Any>>() {
             for item in array {
-                result.push(format!("{:?}", item));
+                result.push(format!("{item:?}"));
             }
         } else {
-            // 单个对象
-            result.push(format!("{:?}", object));
+            result.push(format!("{object:?}"));
         }
 
         result
     }
 
-    /// 检查字符串集合是否包含指定字符串
+    /// Checks whether a collection of strings contains the given string.
+    ///
+    /// # Arguments
+    /// * `left` - the collection to search
+    /// * `right` - the value to look for
     pub fn contains_at_least_one_equal_string(left: &[String], right: &str) -> bool {
-        left.iter().any(|s| s == right)
+        left.iter().any(|item| item == right)
     }
 
-    /// 检查两个字符串集合是否有交集
+    /// Checks whether two collections of strings share at least one element.
+    ///
+    /// # Arguments
+    /// * `left` - the left collection
+    /// * `right` - the right collection
     pub fn contains_at_least_one_equal_string_collection(
         left: &[String],
         right: &[String],
@@ -135,28 +189,23 @@ impl StateMachineUtils {
             return false;
         }
 
-        let right_set: HashSet<_> = right.iter().collect();
-        left.iter().any(|item| right_set.contains(item))
+        left.iter().any(|item| right.contains(item))
     }
 
-    /// 从状态上下文中获取 DO_ACTION_TIMEOUT 消息头
+    /// Reads the do action timeout from the message headers.
+    ///
+    /// # Arguments
+    /// * `context` - the state context
     pub fn get_message_header_do_action_timeout<S, E>(
         context: &dyn StateContext<S, E>,
     ) -> Option<i64>
     where
-        S: 'static,
-        E: 'static,
+        S: Send + Sync + 'static,
+        E: Send + Sync + 'static,
     {
-        context.message_headers().map(|headers| {
-            headers
-                .get(HEADER_DO_ACTION_TIMEOUT)
-                .map(|val| val.as_i64())
-                .unwrap_or_default()
-        })?
+        context
+            .message_headers()
+            .and_then(|headers| headers.get(HEADER_DO_ACTION_TIMEOUT))
+            .and_then(|value| value.as_i64())
     }
-
-    // /// 将错误存入 Reactor context 的工具函数
-    // pub fn resume_error_to_context<F>(executor_exception_holder: &mut ExecutorErrorHolder) {
-    //     executor_exception_holder.set_error(error);
-    // }
 }

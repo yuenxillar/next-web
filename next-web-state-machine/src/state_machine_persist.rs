@@ -5,7 +5,10 @@ use next_web_core::error::BoxError;
 use crate::state_machine_context::StateMachineContext;
 
 /// StateMachinePersist is an interface handling serialization
-pub trait StateMachinePersist<S, E, T> {
+pub trait StateMachinePersist<S, E, T>
+where
+    Self: Send + Sync,
+{
     /// Write a StateMachineContext into a persistent store
     fn write(
         &self,

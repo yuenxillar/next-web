@@ -8,6 +8,7 @@ pub trait StateMachineModel<S, E>
 where
     S: Send + Sync,
     E: Send + Sync,
+    Self: Send + Sync,
 {
     /// Gets the configuration config data.
     fn get_configuration_data(&self) -> &ConfigurationData<S, E>;

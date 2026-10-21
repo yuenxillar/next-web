@@ -25,6 +25,7 @@ where
         Self::default()
     }
 
+    /// Gets the built object, if the builder is currently building one.
     pub fn get_object(&self) -> Option<O> {
         if !self.building.load(Ordering::Acquire) {
             return None;
@@ -68,6 +69,8 @@ where
     }
 }
 
+/// Callback which builds the object of a builder.
 pub trait BaseBuilderExt<O> {
+    /// Builds the object.
     fn do_build(&mut self) -> Result<O, BoxError>;
 }

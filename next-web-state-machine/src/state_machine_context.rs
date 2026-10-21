@@ -11,7 +11,10 @@ use crate::extended_state::ExtendedState;
 /// # Type Parameters
 /// - `S`: the type of state
 /// - `E`: the type of event
-pub trait StateMachineContext<S, E> {
+pub trait StateMachineContext<S, E>
+where
+    Self: Send + Sync,
+{
     /// Gets the machine id.
     ///
     /// # Returns

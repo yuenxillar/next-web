@@ -10,7 +10,9 @@ use crate::{
     trigger::trigger_listener::TriggerListener,
 };
 
+/// A trigger listener which dispatches to a set of listeners.
 #[derive(Clone)]
+#[derive(Default)]
 pub struct CompositeTriggerListener {
     base: BaseCompositeListener<Arc<dyn TriggerListener>>,
 }
@@ -38,10 +40,3 @@ impl DerefMut for CompositeTriggerListener {
     }
 }
 
-impl Default for CompositeTriggerListener {
-    fn default() -> Self {
-        Self {
-            base: Default::default(),
-        }
-    }
-}

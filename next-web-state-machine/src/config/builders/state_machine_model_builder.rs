@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 use std::sync::Arc;
 
 use next_web_core::{Required, error::BoxError};
@@ -10,7 +12,6 @@ use crate::config::{
         base_configured_builder::{
             BaseConfiguredBuilder, BaseConfiguredBuilderExt, execute_configured_build,
         },
-        builder::Builder,
     },
     configurers::{
         default_model_configurer::DefaultModelConfigurer, model_configurer::ModelConfigurer,
@@ -30,7 +31,7 @@ where
     E: Clone + Send + Sync + 'static,
 {
     /// Factory for creating state machine models
-    factory: Option<Arc<dyn StateMachineModelFactory<S, E>>>,
+    factory: Rc<RefCell<Option<Arc<dyn StateMachineModelFactory<S, E>>>>>,
 
     base: BaseConfiguredBuilder<
         ModelData<S, E>,
@@ -51,7 +52,7 @@ where
         );
 
         StateMachineModelBuilder {
-            factory: None,
+            factory: Rc::new(RefCell::new(None)),
             base,
         }
     }
@@ -76,7 +77,18 @@ where
     where
         F: StateMachineModelFactory<S, E> + 'static,
     {
-        self.factory = Some(Arc::new(factory));
+        *self.factory.borrow_mut() = Some(Arc::new(factory));
+    }
+
+    /// Sets the state machine model factory from a shared handle.
+    ///
+    /// # Arguments
+    /// * `factory` - The factory to use for creating state machine models
+    pub fn set_state_machine_model_factory_arc(
+        &mut self,
+        factory: Arc<dyn StateMachineModelFactory<S, E>>,
+    ) {
+        *self.factory.borrow_mut() = Some(factory);
     }
 }
 
@@ -87,7 +99,7 @@ where
 {
     fn default() -> Self {
         Self {
-            factory: None,
+            factory: Rc::new(RefCell::new(None)),
             base: BaseConfiguredBuilder::with_allow_configurers_of_same_type(false),
         }
     }
@@ -127,7 +139,9 @@ where
     E: Clone,
 {
     fn with_model(&mut self) -> Result<Box<dyn ModelConfigurer<S, E>>, BoxError> {
-        let configurer = DefaultModelConfigurer::default();
+        // The configurer writes the factory into this builder, so the fluent
+        // chain `with_model()?.factory(..)` is not lost.
+        let configurer = DefaultModelConfigurer::default().with_builder(self.clone());
 
         Ok(Box::new(configurer))
     }
@@ -139,7 +153,7 @@ where
     E: Clone + Send + Sync + 'static,
 {
     fn perform_build(&mut self) -> Result<ModelData<S, E>, BoxError> {
-        let factory = self.factory.clone();
+        let factory = self.factory.borrow().clone();
 
         Ok(ModelData::new(factory))
     }
@@ -222,5 +236,55 @@ where
     ) -> &mut BaseConfiguredBuilder<ModelData<S, E>, Box<dyn StateMachineModelConfigurer<S, E>>, Self>
     {
         &mut self.base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use crate::config::{
+        builders::state_machine_model_configurer::StateMachineModelConfigurer,
+        common::builder::Builder, configurer_builder::ConfigurerBuilder,
+        model::state_machine_model::StateMachineModel,
+        model::state_machine_model_factory::StateMachineModelFactory,
+        model::configuration_data::ConfigurationData,
+        model::default_state_machine_model::DefaultStateMachineModel,
+    };
+
+    use super::StateMachineModelBuilder;
+
+    struct TestFactory;
+
+    impl StateMachineModelFactory<i32, i32> for TestFactory {
+        fn build(&self) -> Arc<dyn StateMachineModel<i32, i32>> {
+            Arc::new(DefaultStateMachineModel::new(
+                ConfigurationData::default(),
+                None,
+                None,
+            ))
+        }
+
+        fn build_with_machine_id(
+            &self,
+            _machine_id: String,
+        ) -> Arc<dyn StateMachineModel<i32, i32>> {
+            self.build()
+        }
+    }
+
+    #[test]
+    fn model_factory_survives_the_fluent_chain() {
+        let mut builder = StateMachineModelBuilder::<i32, i32>::new(true);
+
+        let mut model = builder.with_model().unwrap();
+        model.factory(Arc::new(TestFactory)).and();
+
+        let data = builder.build().unwrap();
+
+        assert!(
+            data.factory().is_some(),
+            "the factory configured through with_model() reaches the builder"
+        );
     }
 }

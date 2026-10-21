@@ -21,6 +21,7 @@ use crate::config::{
     model::{state_data::StateData, states_data::StatesData},
 };
 
+/// Builder which collects the states of a machine.
 #[derive(Clone)]
 pub struct StateMachineStateBuilder<S, E>
 where
@@ -41,6 +42,10 @@ where
     S: Clone + 'static,
     E: Clone + 'static,
 {
+    /// Creates a new builder.
+    ///
+    /// # Arguments
+    /// * `allow_configurers_of_same_type` - whether several configurers of one type are kept
     pub fn new(allow_configurers_of_same_type: bool) -> Self {
         Self {
             state_datas: Rc::new(RefCell::new(Vec::new())),
@@ -51,6 +56,10 @@ where
         }
     }
 
+    /// Appends the state data the configurers collected.
+    ///
+    /// # Arguments
+    /// * `state_data` - the state data to append
     pub fn add_state_data(&self, state_data: Vec<StateData<S, E>>) {
         self.state_datas.borrow_mut().extend(state_data);
     }
@@ -155,7 +164,7 @@ where
     E: Send + Sync + Clone + 'static,
 {
     fn with_states(&mut self) -> Result<Box<dyn StateConfigurer<S, E>>, BoxError> {
-        let mut state_configurer = DefaultStateConfigurer::default();
+        let mut state_configurer = DefaultStateConfigurer::default().with_builder(self.clone());
         self.base.apply(&mut state_configurer)?;
 
         Ok(Box::new(state_configurer))
@@ -180,7 +189,8 @@ where
 mod tests {
     use crate::config::{
         builders::state_machine_state_configurer::StateMachineStateConfigurer,
-        common::builder::Builder, configurers::state_configurer::StateConfigurer,
+        common::builder::Builder, configurer_builder::ConfigurerBuilder,
+        configurers::state_configurer::StateConfigurer,
     };
 
     use super::StateMachineStateBuilder;
@@ -198,5 +208,23 @@ mod tests {
         assert_eq!(states[0].state(), &1);
         assert!(states[0].is_initial());
         assert_eq!(states[1].state(), &2);
+    }
+
+    #[test]
+    fn and_returns_a_usable_parent() {
+        let mut builder = StateMachineStateBuilder::<i32, i32>::new(true);
+
+        let mut states = builder.with_states().unwrap();
+        states.initial(1);
+
+        // `and()` hands a parent configurer back to the fluent chain instead of
+        // panicking with `todo!()`.
+        let mut parent = states.and();
+        assert!(parent.with_states().is_ok());
+
+        // The data configured before `and()` still reaches the builder.
+        let built = builder.build().unwrap();
+        assert_eq!(built.state_data().len(), 1);
+        assert!(built.state_data()[0].is_initial());
     }
 }

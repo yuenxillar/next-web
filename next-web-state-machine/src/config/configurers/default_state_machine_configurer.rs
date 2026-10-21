@@ -51,7 +51,10 @@ where
     E: Clone + 'static,
 {
     fn and(&mut self) -> Box<dyn StateMachineConfigurationConfigurer<S, E>> {
-        todo!()
+        match self.base.take_builder() {
+            Some(builder) => Box::new(builder),
+            None => Box::new(StateMachineConfigurationBuilder::<S, E>::new(true)),
+        }
     }
 }
 
@@ -119,29 +122,21 @@ where
     fn apply_to_builder(&self, builder: &StateMachineConfigurationBuilder<S, E>) {
         let data = self.shared.borrow();
 
-        data.machine_id.as_ref().map(|id| {
-            builder.set_machine_id(id.clone());
-        });
+        if let Some(id) = data.machine_id.as_ref() { builder.set_machine_id(id.clone()); }
 
         builder
             .set_auto_start(data.auto_start)
             .set_state_machine_listeners(data.listeners.clone());
 
-        data.transition_conflict_policy.as_ref().map(|policy| {
-            builder.set_transition_conflict_policy(policy.clone());
-        });
+        if let Some(policy) = data.transition_conflict_policy.as_ref() { builder.set_transition_conflict_policy(*policy); }
 
-        data.state_do_action_policy.as_ref().map(|policy| {
-            builder.set_state_do_action_policy(
-                policy.clone(),
+        if let Some(policy) = data.state_do_action_policy.as_ref() { builder.set_state_do_action_policy(
+                *policy,
                 data.state_do_action_policy_timeout
                     .unwrap_or(Duration::from_millis(1)),
-            );
-        });
+            ); }
 
-        data.region_execution_policy.as_ref().map(|policy| {
-            builder.set_region_execution_policy(policy.clone());
-        });
+        if let Some(policy) = data.region_execution_policy.as_ref() { builder.set_region_execution_policy(*policy); }
     }
 }
 

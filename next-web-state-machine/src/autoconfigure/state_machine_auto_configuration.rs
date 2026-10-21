@@ -16,10 +16,14 @@ use crate::{
     },
 };
 
+/// Builds a machine from a configurer with the default factory.
 pub struct StateMachineAutoConfiguration;
 
 impl StateMachineAutoConfiguration {
-    /// 123
+    /// Builds a machine from the given configurer.
+    ///
+    /// # Arguments
+    /// * `state_machine_configurer` - the configurer of the machine
     pub fn build<T, S, E>(
         state_machine_configurer: T,
     ) -> Result<Arc<dyn StateMachine<S, E>>, BoxError>
@@ -29,7 +33,7 @@ impl StateMachineAutoConfiguration {
         S: Clone + Debug,
         E: Send + Sync + 'static,
         E: Clone,
-        E: Eq,
+        E: Eq + Hash,
         T: StateMachineConfigurer<S, E>,
         T: 'static,
         T: Clone,
@@ -40,8 +44,8 @@ impl StateMachineAutoConfiguration {
         let mut builder = StateMachineConfigBuilder::<S, E>::default();
         builder.apply(&mut configurer)?;
 
-        let state_machine_factory = DefaultStateMachineFactory::create(&mut builder);
-        builder.get_or_build();
+        let state_machine_factory = DefaultStateMachineFactory::create(&mut builder)?;
+        let _ = builder.get_or_build();
 
         state_machine_factory.get_state_machine()
     }

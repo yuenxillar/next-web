@@ -213,6 +213,62 @@ where
         self.historys.as_mut()
     }
 
+    /// Replaces the choices of this data.
+    ///
+    /// # Arguments
+    /// * `choices` - the choices to set
+    pub fn set_choices(&mut self, choices: HashMap<S, Vec<ChoiceData<S, E>>>) {
+        self.choices = Some(choices);
+    }
+
+    /// Replaces the junctions of this data.
+    ///
+    /// # Arguments
+    /// * `junctions` - the junctions to set
+    pub fn set_junctions(&mut self, junctions: HashMap<S, Vec<JunctionData<S, E>>>) {
+        self.junctions = Some(junctions);
+    }
+
+    /// Replaces the forks of this data.
+    ///
+    /// # Arguments
+    /// * `forks` - the forks to set
+    pub fn set_forks(&mut self, forks: HashMap<S, Vec<S>>) {
+        self.forks = Some(forks);
+    }
+
+    /// Replaces the joins of this data.
+    ///
+    /// # Arguments
+    /// * `joins` - the joins to set
+    pub fn set_joins(&mut self, joins: HashMap<S, Vec<S>>) {
+        self.joins = Some(joins);
+    }
+
+    /// Replaces the list of entry transitions.
+    ///
+    /// # Arguments
+    /// * `entrys` - the entry transitions to set
+    pub fn set_entrys(&mut self, entrys: Vec<EntryData<S, E>>) {
+        self.entrys = Some(entrys);
+    }
+
+    /// Replaces the list of exit transitions.
+    ///
+    /// # Arguments
+    /// * `exits` - the exit transitions to set
+    pub fn set_exits(&mut self, exits: Vec<ExitData<S, E>>) {
+        self.exits = Some(exits);
+    }
+
+    /// Replaces the list of history transitions.
+    ///
+    /// # Arguments
+    /// * `historys` - the history transitions to set
+    pub fn set_historys(&mut self, historys: Vec<HistoryData<S, E>>) {
+        self.historys = Some(historys);
+    }
+
     /// Checks if the transitions data is empty.
     ///
     /// # Returns

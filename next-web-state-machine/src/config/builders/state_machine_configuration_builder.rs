@@ -110,6 +110,10 @@ where
     S: Clone + 'static,
     E: Clone + 'static,
 {
+    /// Creates a new builder.
+    ///
+    /// # Arguments
+    /// * `allow_configurers_of_same_type` - whether several configurers of one type are kept
     pub fn new(allow_configurers_of_same_type: bool) -> Self {
         Self::_default(BaseConfiguredBuilder::with_allow_configurers_of_same_type(
             allow_configurers_of_same_type,
@@ -429,18 +433,20 @@ where
         let mut interceptors = Vec::new();
         interceptors.extend(self.interceptors.borrow().clone());
 
-        self.persister
+        let persister_interceptor = self
+            .persister
             .borrow()
             .as_ref()
-            .map(|persister| persister.get_interceptor())
-            .filter(|interceptor| interceptor.is_some())
-            .map(|interceptor| interceptors.push(interceptor.unwrap()));
+            .and_then(|persister| persister.get_interceptor());
+        if let Some(interceptor) = persister_interceptor {
+            interceptors.push(interceptor);
+        }
 
         let configuration_data = ConfigurationData {
             machine_id: self.machine_id.borrow().clone(),
             auto_start: self.auto_start.get(),
-            transition_conflict_policy: self.transition_conflict_policy.borrow().clone(),
-            state_do_action_policy: self.state_do_action_policy.borrow().clone(),
+            transition_conflict_policy: *self.transition_conflict_policy.borrow(),
+            state_do_action_policy: *self.state_do_action_policy.borrow(),
             state_do_action_policy_timeout: self.state_do_action_policy_timeout.get(),
             ensemble: self.ensemble.borrow().clone(),
             listeners: self.listeners.borrow().clone(),
@@ -459,7 +465,7 @@ where
             transition_security_rule: self.transition_security_rule.borrow().clone(),
             state_machine_monitor: self.state_machine_monitor.borrow().clone(),
             interceptors,
-            region_execution_policy: self.region_execution_policy.borrow().clone(),
+            region_execution_policy: *self.region_execution_policy.borrow(),
         };
 
         Ok(configuration_data)
@@ -604,7 +610,7 @@ mod tests {
         builder
             .with_configuration()
             .unwrap()
-            .machine_id("demo".to_string())
+            .machine_id("demo".to_owned())
             .auto_startup(true);
 
         let configuration = builder.build().unwrap();

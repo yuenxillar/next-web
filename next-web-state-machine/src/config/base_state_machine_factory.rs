@@ -1,18 +1,16 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::sync::Arc;
+use std::time::Duration;
 
-use futures::executor::block_on;
 use futures::future::BoxFuture;
-use next_web_core::Id;
-use next_web_core::async_trait;
 use next_web_core::error::BoxError;
-use next_web_core::messaging::Message;
 use uuid::Uuid;
 
+use crate::BoxedStateGuard;
 use crate::config::action::StateMachineAction;
+use crate::config::guard::StateMachineGuard;
 use crate::config::model::state_data::StateData;
 use crate::config::model::state_machine_model::StateMachineModel;
 use crate::config::model::state_machine_model_factory::StateMachineModelFactory;
@@ -23,23 +21,24 @@ use crate::config::state_machine_factory::StateMachineFactory;
 use crate::extended_state::ExtendedState;
 use crate::monitor::state_machine_monitor::StateMachineMonitor;
 use crate::state::StateMachineState;
-use crate::state::action_listener::ActionListener;
+use crate::state::choice_pseudo_state::{ChoicePseudoState, ChoiceStateData};
 use crate::state::default_pseudo_state::DefaultPseudoState;
+use crate::state::entry_pseudo_state::EntryPseudoState;
+use crate::state::exit_pseudo_state::ExitPseudoState;
+use crate::state::fork_pseudo_state::ForkPseudoState;
+use crate::state::history_pseudo_state::HistoryPseudoState;
+use crate::state::join_pseudo_state::{JoinPseudoState, JoinStateData};
+use crate::state::junction_pseudo_state::{JunctionPseudoState, JunctionStateData};
 use crate::state::pseudo_state::PseudoState;
 use crate::state::pseudo_state_kind::PseudoStateKind;
-use crate::state::state_listener::StateListener;
-use crate::state_context::StateContext;
-use crate::state_machine_event_result::DefaultStateMachineEventResult;
+use crate::state::state_holder::StateHolder;
 use crate::support::base_state_machine::BaseStateMachine;
 use crate::support::default_extended_state::DefaultExtendedState;
-use crate::support::lifecycle_object_support::LifecycleObjectSupportExt;
 use crate::transition::StateMachineTransition;
 use crate::transition::base_transition::BaseTransition;
 use crate::transition::initial_transition::InitialTransition;
 use crate::transition::transition_kind::TransitionKind;
 use crate::trigger::Trigger;
-use crate::trigger::trigger_context::TriggerContext;
-use crate::trigger::trigger_listener::TriggerListener;
 use crate::{BoxedStateAction, StateMachine};
 
 fn factory_error(message: impl Into<String>) -> BoxError {
@@ -52,200 +51,12 @@ fn unsupported_feature(feature: &str, reason: &str) -> BoxError {
     ))
 }
 
-struct EventTrigger<S, E> {
-    event: E,
-    _marker: PhantomData<S>,
-}
-
-impl<S, E> EventTrigger<S, E> {
-    fn new(event: E) -> Self {
-        Self {
-            event,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<S, E> Clone for EventTrigger<S, E>
-where
-    E: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            event: self.event.clone(),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<S, E> Id for EventTrigger<S, E> {
-    fn id(&self) -> &str {
-        "eventTrigger"
-    }
-}
-
-#[async_trait]
-impl<S, E> Trigger<S, E> for EventTrigger<S, E>
+fn event_trigger<S, E>(event: E) -> Arc<dyn Trigger<S, E>>
 where
     S: Send + Sync + 'static,
-    E: Eq + Clone + Send + Sync + 'static,
+    E: Clone + PartialEq + Send + Sync + 'static,
 {
-    async fn evaluate(&self, context: &dyn TriggerContext<S, E>) -> bool {
-        context.get_event() == &self.event
-    }
-
-    async fn add_trigger_listener(&self, _listener: Arc<dyn TriggerListener>) {}
-
-    fn event(&self) -> Option<&E> {
-        Some(&self.event)
-    }
-
-    async fn arm(&mut self) {}
-
-    async fn disarm(&mut self) {}
-}
-
-struct FactoryState<S, E> {
-    id: S,
-    deferred_events: Vec<E>,
-    entry_action_exec: Vec<BoxedStateAction<S, E>>,
-    exit_action_exec: Vec<BoxedStateAction<S, E>>,
-    state_action_exec: Vec<BoxedStateAction<S, E>>,
-    pseudo_state: Option<Arc<dyn PseudoState<S, E>>>,
-    submachine: Option<Arc<dyn StateMachine<S, E>>>,
-}
-
-impl<S, E> FactoryState<S, E> {
-    fn new(
-        id: S,
-        deferred_events: Vec<E>,
-        entry_action_exec: Vec<BoxedStateAction<S, E>>,
-        exit_action_exec: Vec<BoxedStateAction<S, E>>,
-        state_action_exec: Vec<BoxedStateAction<S, E>>,
-        pseudo_state: Option<Arc<dyn PseudoState<S, E>>>,
-    ) -> Self {
-        Self {
-            id,
-            deferred_events,
-            entry_action_exec,
-            exit_action_exec,
-            state_action_exec,
-            pseudo_state,
-            submachine: None,
-        }
-    }
-
-    fn with_submachine(
-        id: S,
-        submachine: Arc<dyn StateMachine<S, E>>,
-        deferred_events: Vec<E>,
-        entry_action_exec: Vec<BoxedStateAction<S, E>>,
-        exit_action_exec: Vec<BoxedStateAction<S, E>>,
-        pseudo_state: Option<Arc<dyn PseudoState<S, E>>>,
-    ) -> Self {
-        Self {
-            id,
-            deferred_events,
-            entry_action_exec,
-            exit_action_exec,
-            state_action_exec: Vec::new(),
-            pseudo_state,
-            submachine: Some(submachine),
-        }
-    }
-}
-
-#[async_trait]
-impl<S, E> StateMachineState<S, E> for FactoryState<S, E>
-where
-    S: Clone + Eq + Hash + Send + Sync + 'static,
-    E: Clone + Send + Sync + 'static,
-{
-    async fn send_event(&self, event: Box<dyn Message<E>>) -> DefaultStateMachineEventResult<S, E> {
-        DefaultStateMachineEventResult::new(
-            Some(self.id.clone()),
-            event.get_payload().cloned(),
-            true,
-        )
-    }
-
-    fn should_defer(&self, _event: &dyn Message<E>) -> bool {
-        false
-    }
-
-    async fn exit(&self, context: &dyn StateContext<S, E>) {
-        for action in &self.exit_action_exec {
-            action(context).await;
-        }
-    }
-
-    async fn entry(&self, context: &dyn StateContext<S, E>) {
-        for action in &self.entry_action_exec {
-            action(context).await;
-        }
-
-        for action in &self.state_action_exec {
-            action(context).await;
-        }
-    }
-
-    fn id(&self) -> &S {
-        &self.id
-    }
-
-    fn ids(&self) -> HashSet<&S> {
-        let mut ids = HashSet::with_capacity(1);
-        ids.insert(&self.id);
-        ids
-    }
-
-    fn states(&self) -> Vec<&dyn StateMachineState<S, E>> {
-        vec![self]
-    }
-
-    fn pseudo_state(&self) -> Option<&Arc<dyn PseudoState<S, E>>> {
-        self.pseudo_state.as_ref()
-    }
-
-    fn deferred_events(&self) -> &[E] {
-        &self.deferred_events
-    }
-
-    fn entry_actions(&self) -> &[Box<dyn Fn(&dyn StateContext<S, E>) -> BoxFuture<'static, ()>>] {
-        &[]
-    }
-
-    fn state_actions(&self) -> &[Box<dyn Fn(&dyn StateContext<S, E>) -> BoxFuture<'static, ()>>] {
-        &[]
-    }
-
-    fn exit_actions(&self) -> &[Box<dyn Fn(&dyn StateContext<S, E>) -> BoxFuture<'static, ()>>] {
-        &[]
-    }
-
-    fn is_simple(&self) -> bool {
-        self.submachine.is_none()
-    }
-
-    fn is_composite(&self) -> bool {
-        false
-    }
-
-    fn is_orthogonal(&self) -> bool {
-        false
-    }
-
-    fn is_submachine_state(&self) -> bool {
-        self.submachine.is_some()
-    }
-
-    fn add_state_listener(&mut self, _listener: Arc<dyn StateListener<S, E>>) {}
-
-    fn remove_state_listener(&mut self, _listener: &dyn StateListener<S, E>) {}
-
-    fn add_action_listener(&mut self, _listener: Arc<dyn ActionListener<S, E>>) {}
-
-    fn remove_action_listener(&mut self, _listener: &dyn ActionListener<S, E>) {}
+    Arc::new(crate::trigger::event_trigger::EventTrigger::<S, E>::new(event))
 }
 
 /// Base factory translating Next machine-building flow into the current Rust API.
@@ -264,10 +75,15 @@ where
     S: Eq + Hash + Debug,
     S: Clone,
     S: Send + Sync + 'static,
-    E: Eq,
+    E: Eq + Hash,
     E: Clone,
     E: Send + Sync + 'static,
 {
+    /// Creates a new factory.
+    ///
+    /// # Arguments
+    /// * `default_state_machine_model` - the model used when no model factory is set
+    /// * `state_machine_model_factory` - the factory which builds the model by machine id
     pub fn new(
         default_state_machine_model: Arc<dyn StateMachineModel<S, E>>,
         state_machine_model_factory: Option<Arc<dyn StateMachineModelFactory<S, E>>>,
@@ -282,18 +98,34 @@ where
         }
     }
 
+    /// Sets the name of the machines this factory builds.
+    ///
+    /// # Arguments
+    /// * `name` - the machine name
     pub fn set_name(&mut self, name: impl Into<String>) {
         self.name = name.into();
     }
 
+    /// Sets whether the factory starts a machine it builds.
+    ///
+    /// # Arguments
+    /// * `handle_autostartup` - whether to start the machine
     pub fn set_handle_autostartup(&mut self, handle_autostartup: bool) {
         self.handle_autostartup = handle_autostartup;
     }
 
+    /// Sets whether events from the extended state are forwarded to the machine.
+    ///
+    /// # Arguments
+    /// * `context_events` - whether context events are enabled
     pub fn set_context_events_enabled(&mut self, context_events: bool) {
         self.context_events = Some(context_events);
     }
 
+    /// Sets the monitor the factory attaches to the machines it builds.
+    ///
+    /// # Arguments
+    /// * `state_machine_monitor` - the monitor
     pub fn set_state_machine_monitor(
         &mut self,
         state_machine_monitor: Arc<dyn StateMachineMonitor<S, E>>,
@@ -325,6 +157,7 @@ where
             Arc::new(DefaultExtendedState::default());
         let mut state_map: HashMap<S, Arc<dyn StateMachineState<S, E>>> = HashMap::new();
         let mut machine_map: HashMap<S, Arc<dyn StateMachine<S, E>>> = HashMap::new();
+        let mut region_map: HashMap<S, Vec<Arc<dyn crate::region::Region<S, E>>>> = HashMap::new();
         let mut state_stack: Vec<StateData<S, E>> = Vec::new();
         let post_order = self.build_state_data_post_order(state_machine_model.as_ref())?;
         let mut top_level_machine: Option<Arc<dyn StateMachine<S, E>>> = None;
@@ -347,6 +180,7 @@ where
             let built_machine = self.build_machine_group(
                 &machine_map,
                 &mut state_map,
+                &mut region_map,
                 &grouped_states,
                 default_extended_state.clone(),
                 machine_id.as_deref(),
@@ -355,9 +189,11 @@ where
             )?;
 
             if let Some(parent_id) = self.group_parent_id(&grouped_states)? {
-                machine_map.insert(parent_id, built_machine);
+                if let Some(built_machine) = built_machine {
+                    machine_map.insert(parent_id, built_machine);
+                }
             } else {
-                top_level_machine = Some(built_machine);
+                top_level_machine = built_machine;
             }
 
             state_stack.push(state_data);
@@ -368,6 +204,7 @@ where
             let built_machine = self.build_machine_group(
                 &machine_map,
                 &mut state_map,
+                &mut region_map,
                 &grouped_states,
                 default_extended_state.clone(),
                 machine_id.as_deref(),
@@ -376,9 +213,11 @@ where
             )?;
 
             if let Some(parent_id) = self.group_parent_id(&grouped_states)? {
-                machine_map.insert(parent_id, built_machine);
+                if let Some(built_machine) = built_machine {
+                    machine_map.insert(parent_id, built_machine);
+                }
             } else {
-                top_level_machine = Some(built_machine);
+                top_level_machine = built_machine;
             }
         }
 
@@ -455,7 +294,7 @@ where
     ) -> Arc<dyn StateMachineModel<S, E>> {
         match self.state_machine_model_factory.as_ref() {
             Some(model_factory) => {
-                model_factory.build_with_machine_id(machine_id.unwrap_or_default().to_string())
+                model_factory.build_with_machine_id(machine_id.unwrap_or_default().to_owned())
             }
             None => self.default_state_machine_model.clone(),
         }
@@ -474,33 +313,10 @@ where
             ));
         }
 
-        if configuration.is_security_enabled() {
-            return Err(unsupported_feature(
-                "security interceptors",
-                "security post-processing is not implemented",
-            ));
-        }
-
         if configuration.ensemble().is_some() {
             return Err(unsupported_feature(
                 "distributed state machines",
                 "distributed machine wrapping is not implemented",
-            ));
-        }
-
-        if configuration.state_machine_monitor().is_some()
-            || self.default_state_machine_monitor.is_some()
-        {
-            return Err(unsupported_feature(
-                "state machine monitors",
-                "monitor attachment is not implemented",
-            ));
-        }
-
-        if !configuration.interceptors().is_empty() {
-            return Err(unsupported_feature(
-                "state machine interceptors",
-                "interceptor attachment to all regions is not implemented",
             ));
         }
 
@@ -511,23 +327,53 @@ where
         &self,
         machine_map: &HashMap<S, Arc<dyn StateMachine<S, E>>>,
         state_map: &mut HashMap<S, Arc<dyn StateMachineState<S, E>>>,
+        region_map: &mut HashMap<S, Vec<Arc<dyn crate::region::Region<S, E>>>>,
         state_datas: &[StateData<S, E>],
         default_extended_state: Arc<dyn ExtendedState>,
         machine_id: Option<&str>,
         uuid: Option<Uuid>,
         state_machine_model: &dyn StateMachineModel<S, E>,
-    ) -> Result<Arc<dyn StateMachine<S, E>>, BoxError> {
+    ) -> Result<Option<Arc<dyn StateMachine<S, E>>>, BoxError> {
         let initial_count = self.get_initial_count(state_datas);
         if initial_count > 1 {
             let regions = self.split_into_regions(state_datas);
-            return Err(unsupported_feature(
-                "orthogonal regions",
-                &format!(
-                    "found {} initial states across {} region groups, but region-state assembly is not implemented",
-                    initial_count,
-                    regions.len()
-                ),
-            ));
+
+            // Orthogonal assembly groups the children of one parent by their
+            // region key, so the key has to be set for every region.
+            if regions.len() <= 1 {
+                return Err(factory_error(
+                    "the group has several initial states but no distinct region keys; set StateData::region for every region",
+                ));
+            }
+
+            let Some(parent_id) = self.group_parent_id(state_datas)? else {
+                return Err(factory_error(
+                    "an orthogonal group needs a parent state which owns its regions",
+                ));
+            };
+
+            let mut machines: Vec<Arc<dyn crate::region::Region<S, E>>> = Vec::new();
+            for region_states in regions {
+                let built = self.build_machine_group(
+                    machine_map,
+                    state_map,
+                    region_map,
+                    &region_states,
+                    default_extended_state.clone(),
+                    machine_id,
+                    uuid,
+                    state_machine_model,
+                )?;
+
+                if let Some(machine) = built {
+                    machines.push(machine);
+                }
+            }
+
+            // The parent state is built by the group of its own parent, which
+            // picks the regions up from this map.
+            region_map.insert(parent_id, machines);
+            return Ok(None);
         }
 
         let transitions_data = self.resolve_transition_data(
@@ -538,16 +384,19 @@ where
             state_datas,
         )?;
 
-        self.build_machine(
+        let machine = self.build_machine(
             machine_map,
             state_map,
+            region_map,
             state_datas,
             &transitions_data,
             default_extended_state,
             machine_id,
             uuid,
             state_machine_model,
-        )
+        )?;
+
+        Ok(Some(machine))
     }
 
     fn resolve_transition_data(
@@ -556,7 +405,7 @@ where
         state_datas: &[StateData<S, E>],
     ) -> Result<Vec<TransitionData<S, E>>, BoxError>
     where
-        E: Eq,
+        E: Eq + Hash,
     {
         let parent_state_id = self.group_parent_id(state_datas)?;
         let mut transitions = Vec::new();
@@ -578,6 +427,7 @@ where
         &self,
         machine_map: &HashMap<S, Arc<dyn StateMachine<S, E>>>,
         state_map: &mut HashMap<S, Arc<dyn StateMachineState<S, E>>>,
+        region_map: &HashMap<S, Vec<Arc<dyn crate::region::Region<S, E>>>>,
         state_datas: &[StateData<S, E>],
         transitions_data: &[TransitionData<S, E>],
         default_extended_state: Arc<dyn ExtendedState>,
@@ -586,7 +436,7 @@ where
         state_machine_model: &dyn StateMachineModel<S, E>,
     ) -> Result<Arc<dyn StateMachine<S, E>>, BoxError>
     where
-        E: Eq,
+        E: Eq + Hash,
     {
         let mut states: Vec<Arc<dyn StateMachineState<S, E>>> = Vec::new();
         let mut initial_state: Option<Arc<dyn StateMachineState<S, E>>> = None;
@@ -602,7 +452,9 @@ where
                 continue;
             }
 
-            let pseudo_state = self.build_supported_pseudo_state(state_data)?;
+            // Pseudo states are attached in a later pass, once every target
+            // state of this group exists.
+            let pseudo_state: Option<Arc<dyn PseudoState<S, E>>> = None;
             let deferred = state_data
                 .deferred()
                 .map(|items| items.to_vec())
@@ -620,7 +472,17 @@ where
                 .map(|items| items.to_vec())
                 .unwrap_or_default();
 
-            let state = if let Some(submachine) = machine_map.get(state_data.state()) {
+            let state = if let Some(regions) = region_map.get(state_data.state()) {
+                self.build_region_state_internal(
+                    state_data.state().clone(),
+                    regions.clone(),
+                    deferred,
+                    entry_actions,
+                    exit_actions,
+                    pseudo_state,
+                    state_machine_model,
+                )?
+            } else if let Some(submachine) = machine_map.get(state_data.state()) {
                 self.build_submachine_state_internal(
                     state_data.state().clone(),
                     submachine.clone(),
@@ -685,26 +547,12 @@ where
 
         let mut transitions: Vec<Arc<dyn StateMachineTransition<S, E>>> = Vec::new();
         for transition_data in transitions_data {
-            if transition_data.period().is_some() || transition_data.count().is_some() {
-                return Err(unsupported_feature(
-                    "timer or counted transitions",
-                    "trigger implementations for timed transitions are not available in the current factory path",
-                ));
-            }
-
-            if transition_data.has_guard() {
-                return Err(unsupported_feature(
-                    "transition guards",
-                    "TransitionData guard function types are not yet compatible with runtime boxed state guards",
-                ));
-            }
-
             let trigger = self.build_transition_trigger(transition_data)?;
             let security_rule = transition_data.security_rule().cloned();
             let name = if transition_data.name().is_empty() {
                 None
             } else {
-                Some(transition_data.name().to_string())
+                Some(transition_data.name().to_owned())
             };
 
             match transition_data.kind() {
@@ -716,17 +564,16 @@ where
                         continue;
                     };
 
-                    let transition = BaseTransition::with_security_and_name(
+                    let transition = BaseTransition::new(
                         Some(source),
                         target,
                         transition_data.cloned_actions(),
-                        transition_data.event().cloned(),
                         TransitionKind::Local,
-                        None,
+                        transition_data.cloned_guard(),
                         trigger,
-                        security_rule,
-                        name,
-                    );
+                    )
+                    .with_security_rule(security_rule)
+                    .with_name(name.unwrap_or_default());
                     transitions.push(Arc::new(transition));
                 }
                 TransitionKind::External => {
@@ -737,17 +584,16 @@ where
                         continue;
                     };
 
-                    let transition = BaseTransition::with_security_and_name(
+                    let transition = BaseTransition::new(
                         Some(source),
                         target,
                         transition_data.cloned_actions(),
-                        transition_data.event().cloned(),
                         TransitionKind::External,
-                        None,
+                        transition_data.cloned_guard(),
                         trigger,
-                        security_rule,
-                        name,
-                    );
+                    )
+                    .with_security_rule(security_rule)
+                    .with_name(name.unwrap_or_default());
                     transitions.push(Arc::new(transition));
                 }
                 TransitionKind::Internal => {
@@ -761,17 +607,16 @@ where
                             ))
                         })?;
 
-                    let transition = BaseTransition::with_security_and_name(
+                    let transition = BaseTransition::new(
                         Some(source.clone()),
                         source,
                         transition_data.cloned_actions(),
-                        transition_data.event().cloned(),
                         TransitionKind::Internal,
-                        None,
+                        transition_data.cloned_guard(),
                         trigger,
-                        security_rule,
-                        name,
-                    );
+                    )
+                    .with_security_rule(security_rule)
+                    .with_name(name.unwrap_or_default());
                     transitions.push(Arc::new(transition));
                 }
                 TransitionKind::Initial => {
@@ -782,6 +627,8 @@ where
                 }
             }
         }
+
+        self.apply_pseudo_states(&states, state_map, state_datas, state_machine_model)?;
 
         let initial_transition: Arc<dyn StateMachineTransition<S, E>> =
             if initial_actions.is_empty() {
@@ -805,59 +652,208 @@ where
         )
     }
 
-    fn build_supported_pseudo_state(
+    /// Attaches the pseudo states of a built group.
+    ///
+    /// The states of a group are built before its transitions, and a pseudo
+    /// state refers to the states it continues with, so the pseudo states are
+    /// attached in a second pass, when every state of the group exists.
+    ///
+    /// # Arguments
+    /// * `states` - the states built for this group
+    /// * `state_map` - all states built so far, by identifier
+    /// * `state_datas` - the model data of this group
+    /// * `state_machine_model` - the model which holds the pseudo state data
+    fn apply_pseudo_states(
         &self,
-        state_data: &StateData<S, E>,
-    ) -> Result<Option<Arc<dyn PseudoState<S, E>>>, BoxError> {
-        let kind = if state_data.is_initial() {
-            Some(PseudoStateKind::Initial)
-        } else if state_data.is_end() {
-            Some(PseudoStateKind::End)
-        } else {
-            state_data.pseudo_state_kind()
-        };
+        states: &[Arc<dyn StateMachineState<S, E>>],
+        state_map: &HashMap<S, Arc<dyn StateMachineState<S, E>>>,
+        state_datas: &[StateData<S, E>],
+        state_machine_model: &dyn StateMachineModel<S, E>,
+    ) -> Result<(), BoxError>
+    where
+        E: Hash,
+    {
+        let transitions_data = state_machine_model.get_transitions_data();
 
-        match kind {
-            Some(PseudoStateKind::Initial) => Ok(Some(Arc::new(DefaultPseudoState::new(
-                PseudoStateKind::Initial,
-            )))),
-            Some(PseudoStateKind::End) => Ok(Some(Arc::new(DefaultPseudoState::new(
-                PseudoStateKind::End,
-            )))),
-            Some(PseudoStateKind::HistoryShallow) => Err(unsupported_feature(
-                "history shallow pseudo states",
-                "HistoryPseudoState support is not implemented",
-            )),
-            Some(PseudoStateKind::HistoryDeep) => Err(unsupported_feature(
-                "history deep pseudo states",
-                "HistoryPseudoState support is not implemented",
-            )),
-            Some(PseudoStateKind::Choice) => Err(unsupported_feature(
-                "choice pseudo states",
-                "ChoicePseudoState support is not implemented",
-            )),
-            Some(PseudoStateKind::Junction) => Err(unsupported_feature(
-                "junction pseudo states",
-                "JunctionPseudoState support is not implemented",
-            )),
-            Some(PseudoStateKind::Fork) => Err(unsupported_feature(
-                "fork pseudo states",
-                "ForkPseudoState support is not implemented",
-            )),
-            Some(PseudoStateKind::Join) => Err(unsupported_feature(
-                "join pseudo states",
-                "JoinPseudoState support is not implemented",
-            )),
-            Some(PseudoStateKind::Entry) => Err(unsupported_feature(
-                "entry pseudo states",
-                "EntryPseudoState support is not implemented",
-            )),
-            Some(PseudoStateKind::Exit) => Err(unsupported_feature(
-                "exit pseudo states",
-                "ExitPseudoState support is not implemented",
-            )),
-            None => Ok(None),
+        for state_data in state_datas {
+            let id = state_data.state().clone();
+            let Some(state) = states.iter().find(|state| state.id() == &id).cloned() else {
+                continue;
+            };
+
+            let kind = if state_data.is_initial() {
+                Some(PseudoStateKind::Initial)
+            } else if state_data.is_end() {
+                Some(PseudoStateKind::End)
+            } else {
+                state_data.pseudo_state_kind()
+            };
+
+            let Some(kind) = kind else {
+                continue;
+            };
+
+            let pseudo: Arc<dyn PseudoState<S, E>> = match kind {
+                PseudoStateKind::Initial | PseudoStateKind::End => {
+                    Arc::new(DefaultPseudoState::new(kind))
+                }
+                PseudoStateKind::Choice => {
+                    let entries = transitions_data
+                        .and_then(|data| data.choices())
+                        .and_then(|choices| choices.get(&id))
+                        .map(|choices| {
+                            choices
+                                .iter()
+                                .filter_map(|choice| {
+                                    let target = state_map.get(choice.target())?.clone();
+                                    Some(ChoiceStateData::new(
+                                        target,
+                                        Some(self.guard_adapter(choice.guard_arc())),
+                                        choice
+                                            .actions()
+                                            .iter()
+                                            .map(|action| {
+                                                self.wrap_state_machine_action(action.clone())
+                                            })
+                                            .collect(),
+                                    ))
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+
+                    Arc::new(ChoicePseudoState::new(entries))
+                }
+                PseudoStateKind::Junction => {
+                    let entries = transitions_data
+                        .and_then(|data| data.junctions())
+                        .and_then(|junctions| junctions.get(&id))
+                        .map(|junctions| {
+                            junctions
+                                .iter()
+                                .filter_map(|junction| {
+                                    let target = state_map.get(junction.target())?.clone();
+                                    Some(JunctionStateData::new(
+                                        target,
+                                        Some(self.guard_adapter(junction.guard_arc())),
+                                        junction
+                                            .actions()
+                                            .iter()
+                                            .map(|action| {
+                                                self.wrap_state_machine_action(action.clone())
+                                            })
+                                            .collect(),
+                                    ))
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+
+                    Arc::new(JunctionPseudoState::new(entries))
+                }
+                PseudoStateKind::Fork => {
+                    let forks = transitions_data
+                        .and_then(|data| data.forks())
+                        .and_then(|forks| forks.get(&id))
+                        .map(|targets| {
+                            targets
+                                .iter()
+                                .filter_map(|target| state_map.get(target).cloned())
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+
+                    Arc::new(ForkPseudoState::new(forks))
+                }
+                PseudoStateKind::Join => {
+                    let sources = transitions_data
+                        .and_then(|data| data.joins())
+                        .and_then(|joins| joins.get(&id))
+                        .map(|sources| {
+                            sources
+                                .iter()
+                                .filter_map(|source| state_map.get(source).cloned())
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+
+                    let targets = transitions_data
+                        .map(|data| data.transitions())
+                        .map(|transitions| {
+                            transitions
+                                .iter()
+                                .filter(|transition| transition.source() == &id)
+                                .filter_map(|transition| {
+                                    state_map
+                                        .get(transition.target())
+                                        .cloned()
+                                        .map(|target| JoinStateData::new(target, None))
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+
+                    Arc::new(JoinPseudoState::new(vec![sources], targets))
+                }
+                PseudoStateKind::Entry => {
+                    let target = transitions_data
+                        .and_then(|data| data.entrys())
+                        .and_then(|entries| entries.iter().find(|entry| entry.source() == &id))
+                        .and_then(|entry| state_map.get(entry.target()).cloned());
+
+                    let Some(target) = target else {
+                        continue;
+                    };
+                    Arc::new(EntryPseudoState::new(target))
+                }
+                PseudoStateKind::Exit => {
+                    let target = transitions_data
+                        .and_then(|data| data.exits())
+                        .and_then(|exits| exits.iter().find(|exit| exit.source() == &id))
+                        .and_then(|exit| state_map.get(exit.target()).cloned());
+
+                    let Some(target) = target else {
+                        continue;
+                    };
+                    Arc::new(ExitPseudoState::new(StateHolder::with_state(target)))
+                }
+                PseudoStateKind::HistoryShallow | PseudoStateKind::HistoryDeep => {
+                    let default_state = transitions_data
+                        .and_then(|data| data.historys())
+                        .and_then(|historys| historys.iter().find(|history| history.source() == &id))
+                        .and_then(|history| state_map.get(history.target()).cloned());
+
+                    let default_holder = StateHolder::new();
+                    if let Some(default_state) = default_state {
+                        default_holder.set_state(default_state);
+                    }
+
+                    Arc::new(HistoryPseudoState::new(
+                        kind,
+                        default_holder,
+                        StateHolder::new(),
+                    ))
+                }
+            };
+
+            state.set_pseudo_state(Some(pseudo));
         }
+
+        Ok(())
+    }
+
+    /// Adapts a configuration guard to the runtime guard signature.
+    ///
+    /// # Arguments
+    /// * `guard` - the configuration guard
+    fn guard_adapter(&self, guard: Arc<dyn StateMachineGuard<S, E>>) -> BoxedStateGuard<S, E>
+    where
+        E: Hash,
+    {
+        Arc::new(move |context| {
+            let guard = guard.clone();
+            Box::pin(async move { guard.evaluate(context).await })
+        })
     }
 
     fn build_state_machine_internal(
@@ -868,21 +864,35 @@ where
         initial_transition: Arc<dyn StateMachineTransition<S, E>>,
         extended_state: Arc<dyn ExtendedState>,
         machine_id: String,
-        uuid: Option<Uuid>,
+        _uuid: Option<Uuid>,
         _state_machine_model: &dyn StateMachineModel<S, E>,
     ) -> Result<Arc<dyn StateMachine<S, E>>, BoxError> {
-        let mut machine = BaseStateMachine::with_all(
+        let mut machine = BaseStateMachine::new(
             states,
             transitions,
             initial_state,
             Some(initial_transition),
             None,
             extended_state,
-            uuid,
         );
-        machine.on_init()?;
         machine.set_id(machine_id);
-        Ok(Arc::new(machine))
+        machine.init()?;
+
+        let machine = Arc::new(machine);
+        let handle: Arc<dyn StateMachine<S, E>> = machine.clone();
+        let weak: std::sync::Weak<dyn StateMachine<S, E>> = Arc::downgrade(&handle);
+        let executor = Arc::new(
+            crate::support::default_state_machine_executor::DefaultStateMachineExecutor::new(
+                weak,
+                None,
+                machine.transitions_arc().to_vec(),
+                machine.transition_conflict_policy(),
+            ),
+        );
+        executor.set_self_arc();
+        machine.attach(executor);
+
+        Ok(machine)
     }
 
     fn apply_post_build_features(
@@ -892,12 +902,51 @@ where
     ) -> Result<(), BoxError> {
         let configuration = state_machine_model.get_configuration_data();
 
-        if self.handle_autostartup || configuration.is_auto_start() {
-            block_on(machine.start())?;
-        }
+        if (self.handle_autostartup || configuration.is_auto_start())
+            && let Ok(handle) = tokio::runtime::Handle::try_current() {
+                let machine = machine.clone();
+                handle.spawn(async move {
+                    if let Err(error) = machine.start().await {
+                        tracing::warn!(%error, "auto startup of the state machine failed");
+                    }
+                });
+            }
 
         for listener in &configuration.listeners {
             machine.add_state_listener(listener.clone())?;
+        }
+
+        for interceptor in &configuration.interceptors {
+            machine.add_state_machine_interceptor(interceptor.clone())?;
+        }
+
+        if let Some(monitor) = configuration.state_machine_monitor.as_ref() {
+            machine.add_state_machine_monitor(monitor.clone())?;
+        }
+
+        if let Some(monitor) = self.default_state_machine_monitor.as_ref() {
+            machine.add_state_machine_monitor(monitor.clone())?;
+        }
+
+        // Security rules are enforced through the interceptor chain, which the
+        // machine runs around every event and transition.
+        if configuration.is_security_enabled() {
+            let interceptor =
+                crate::security::state_machine_security_interceptor::DefaultStateMachineSecurityInterceptor::<
+                    S,
+                    E,
+                >::new(
+                    configuration.event_security_rule().cloned(),
+                    configuration.transition_security_rule().cloned(),
+                )
+                .with_decision_managers(
+                    configuration.event_security_access_decision_manager.clone(),
+                    configuration.transition_security_access_decision_manager.clone(),
+                );
+
+            if interceptor.has_rules() {
+                machine.add_state_machine_interceptor(Arc::new(interceptor))?;
+            }
         }
 
         Ok(())
@@ -913,14 +962,12 @@ where
         pseudo_state: Option<Arc<dyn PseudoState<S, E>>>,
         _state_machine_model: &dyn StateMachineModel<S, E>,
     ) -> Result<Arc<dyn StateMachineState<S, E>>, BoxError> {
-        Ok(Arc::new(FactoryState::new(
-            id,
-            deferred,
-            entry_actions,
-            exit_actions,
-            state_actions,
-            pseudo_state,
-        )))
+        let state = crate::state::object_state::ObjectState::new(id, pseudo_state)
+            .with_deferred(deferred)
+            .with_entry_actions(entry_actions)
+            .with_exit_actions(exit_actions)
+            .with_state_actions(state_actions);
+        Ok(Arc::new(state))
     }
 
     fn build_submachine_state_internal(
@@ -932,30 +979,30 @@ where
         exit_actions: Vec<BoxedStateAction<S, E>>,
         pseudo_state: Option<Arc<dyn PseudoState<S, E>>>,
     ) -> Result<Arc<dyn StateMachineState<S, E>>, BoxError> {
-        Ok(Arc::new(FactoryState::with_submachine(
-            id,
-            submachine,
-            deferred,
-            entry_actions,
-            exit_actions,
-            pseudo_state,
-        )))
+        let state = crate::state::object_state::ObjectState::new(id, pseudo_state)
+            .with_deferred(deferred)
+            .with_entry_actions(entry_actions)
+            .with_exit_actions(exit_actions)
+            .with_submachine(submachine);
+        Ok(Arc::new(state))
     }
 
     fn build_region_state_internal(
         &self,
-        _id: S,
-        _regions: Vec<Arc<dyn StateMachine<S, E>>>,
-        _deferred: Vec<E>,
-        _entry_actions: Vec<BoxedStateAction<S, E>>,
-        _exit_actions: Vec<BoxedStateAction<S, E>>,
-        _pseudo_state: Option<Arc<dyn PseudoState<S, E>>>,
+        id: S,
+        regions: Vec<Arc<dyn crate::region::Region<S, E>>>,
+        deferred: Vec<E>,
+        entry_actions: Vec<BoxedStateAction<S, E>>,
+        exit_actions: Vec<BoxedStateAction<S, E>>,
+        pseudo_state: Option<Arc<dyn PseudoState<S, E>>>,
         _state_machine_model: &dyn StateMachineModel<S, E>,
     ) -> Result<Arc<dyn StateMachineState<S, E>>, BoxError> {
-        Err(unsupported_feature(
-            "region states",
-            "RegionState wiring is not implemented in the current Rust crate",
-        ))
+        let state = crate::state::object_state::ObjectState::new(id, pseudo_state)
+            .with_deferred(deferred)
+            .with_entry_actions(entry_actions)
+            .with_exit_actions(exit_actions)
+            .with_regions(regions);
+        Ok(Arc::new(state))
     }
 
     fn resolve_machine_id(
@@ -1012,21 +1059,18 @@ where
         let mut summary = Vec::with_capacity(states.len());
 
         for state_data in states {
-            match self.parent_state_id(state_data)? {
-                Some(parent) => summary.push(format!(
-                    "state={:?}, parent={:?}, initial={}",
+            if let Some(parent) = self.parent_state_id(state_data)? { summary.push(format!(
+                "state={:?}, parent={:?}, initial={}",
+                state_data.state(),
+                parent,
+                state_data.is_initial()
+            )) } else {
+                root_states.push(format!("{:?}", state_data.state()));
+                summary.push(format!(
+                    "state={:?}, parent=<root>, initial={}",
                     state_data.state(),
-                    parent,
                     state_data.is_initial()
-                )),
-                None => {
-                    root_states.push(format!("{:?}", state_data.state()));
-                    summary.push(format!(
-                        "state={:?}, parent=<root>, initial={}",
-                        state_data.state(),
-                        state_data.is_initial()
-                    ));
-                }
+                ));
             }
         }
 
@@ -1056,11 +1100,9 @@ where
         &self,
         action: Arc<dyn StateMachineAction<S, E>>,
     ) -> BoxedStateAction<S, E> {
-        Arc::new(move |context| -> BoxFuture<'_, ()> {
+        Arc::new(move |context| -> BoxFuture<'_, Result<(), BoxError>> {
             let action = action.clone();
-            Box::pin(async move {
-                let _ = action.execute(context).await;
-            })
+            Box::pin(async move { action.execute(context).await })
         })
     }
 
@@ -1069,14 +1111,16 @@ where
         transition_data: &TransitionData<S, E>,
     ) -> Result<Option<Arc<dyn Trigger<S, E>>>, BoxError> {
         if let Some(event) = transition_data.event().cloned() {
-            return Ok(Some(Arc::new(EventTrigger::new(event))));
+            return Ok(Some(event_trigger::<S, E>(event)));
         }
 
         if transition_data.period().is_some() || transition_data.count().is_some() {
-            return Err(unsupported_feature(
-                "timer or counted transitions",
-                "timer trigger orchestration is not yet wired into BaseStateMachine execution",
-            ));
+            let period = Duration::from_millis(transition_data.period().unwrap_or(0));
+            let count = transition_data.count().unwrap_or(0) as usize;
+
+            return Ok(Some(Arc::new(
+                crate::trigger::timer_trigger::TimerTrigger::<S, E>::with_count(period, count),
+            )));
         }
 
         Ok(None)
@@ -1107,7 +1151,10 @@ where
         let mut grouped = Vec::new();
         while let Some(item) = stack.last() {
             if self.parent_state_id(item)? == parent {
-                grouped.push(stack.pop().expect("stack element exists"));
+                match stack.pop() {
+                    Some(state) => grouped.push(state),
+                    None => break,
+                }
             } else {
                 break;
             }
@@ -1145,7 +1192,7 @@ where
 impl<S, E> StateMachineFactory<S, E> for BaseStateMachineFactory<S, E>
 where
     S: Clone + Eq + Hash + Debug + Send + Sync + 'static,
-    E: Clone + Eq + Send + Sync + 'static,
+    E: Clone + Eq + Hash + Send + Sync + 'static,
 {
     fn get_state_machine(&self) -> Result<Arc<dyn StateMachine<S, E>>, BoxError> {
         self._get_state_machine(None, None)
@@ -1197,7 +1244,7 @@ mod tests {
         let factory = factory();
 
         let top = StateData::new(1);
-        let child = StateData::with_hierarchy(Some(Arc::new(1) as Arc<dyn Any>), None, 2, false);
+        let child = StateData::with_hierarchy(Some(Arc::new(1) as Arc<dyn Any + Send + Sync>), None, 2, false);
         let sibling = StateData::new(3);
 
         let model = DefaultStateMachineModel::new(
@@ -1219,8 +1266,8 @@ mod tests {
     fn nested_group_uses_parent_scoped_transitions() {
         let factory = factory();
 
-        let child_a = StateData::with_hierarchy(Some(Arc::new(1) as Arc<dyn Any>), None, 10, true);
-        let child_b = StateData::with_hierarchy(Some(Arc::new(1) as Arc<dyn Any>), None, 11, false);
+        let child_a = StateData::with_hierarchy(Some(Arc::new(1) as Arc<dyn Any + Send + Sync>), None, 10, true);
+        let child_b = StateData::with_hierarchy(Some(Arc::new(1) as Arc<dyn Any + Send + Sync>), None, 11, false);
         let group = vec![child_a, child_b];
 
         let by_parent = TransitionData::with_all(
@@ -1323,7 +1370,7 @@ mod tests {
             configuration,
             Some(
                 vec![StateData::with_hierarchy(
-                    Some(Arc::new(1) as Arc<dyn Any>),
+                    Some(Arc::new(1) as Arc<dyn Any + Send + Sync>),
                     None,
                     2,
                     true,
@@ -1359,7 +1406,9 @@ mod tests {
                 Some(100),
                 None,
                 None,
-                vec![Arc::new(|_context| Box::pin(async move {}))],
+                vec![Arc::new(|_context| {
+                    Box::pin(async move { Ok(()) })
+                })],
                 None,
                 crate::transition::transition_kind::TransitionKind::External,
                 None,
@@ -1386,8 +1435,570 @@ mod tests {
         let machine = factory.get_state_machine().unwrap();
 
         block_on(machine.start()).unwrap();
-        block_on(machine.send_event(Box::new(GenericMessage::with_payload(100)))).unwrap();
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(100)))).unwrap();
 
+        assert_eq!(
+            machine.state().map(|state| *state.id()),
+            Some(2)
+        );
+    }
+
+    /// A guard which always allows the branch it selects.
+    struct AlwaysAllow;
+
+    #[next_web_core::async_trait]
+    impl crate::config::guard::StateMachineGuard<i32, i32> for AlwaysAllow {
+        async fn evaluate(
+            &self,
+            _ctx: &dyn crate::state_context::StateContext<i32, i32>,
+        ) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn choice_pseudo_state_is_wired_from_the_model() {
+        use crate::config::model::choice_data::ChoiceData;
+        use crate::region::Region;
+        use crate::state::pseudo_state_kind::PseudoStateKind;
+        use std::collections::HashMap;
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+
+        let mut choice_state = StateData::<i32, i32>::new(2);
+        choice_state.set_pseudo_state_kind(PseudoStateKind::Choice);
+
+        let mut transitions_data =
+            TransitionsData::new(vec![TransitionData::new(1, 2, 100)]);
+        let mut choices: HashMap<i32, Vec<ChoiceData<i32, i32>>> = HashMap::new();
+        choices.insert(
+            2,
+            vec![ChoiceData::new(2, 4, Arc::new(AlwaysAllow))],
+        );
+        transitions_data.set_choices(choices);
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(
+                vec![
+                    StateData::<i32, i32>::with_initial(1, true),
+                    choice_state,
+                    StateData::<i32, i32>::new(3),
+                    StateData::<i32, i32>::new(4),
+                ]
+                .into(),
+            ),
+            Some(transitions_data),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory.get_state_machine().expect("machine builds");
+
+        block_on(machine.start()).unwrap();
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(100)))).unwrap();
+
+        assert_eq!(
+            machine.state().map(|state| *state.id()),
+            Some(4),
+            "the choice pseudo state continues with its selected target"
+        );
+    }
+
+    #[test]
+    fn orthogonal_regions_are_assembled_from_region_keys() {
+        use crate::region::Region;
+        use std::any::Any;
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+
+        let parent = Arc::new(2) as Arc<dyn Any + Send + Sync>;
+        let states = vec![
+            StateData::<i32, i32>::with_initial(1, true),
+            StateData::<i32, i32>::new(2),
+            StateData::<i32, i32>::with_hierarchy(
+                Some(parent.clone()),
+                Some("r1".to_owned()),
+                11,
+                true,
+            ),
+            StateData::<i32, i32>::with_hierarchy(
+                Some(parent.clone()),
+                Some("r1".to_owned()),
+                12,
+                false,
+            ),
+            StateData::<i32, i32>::with_hierarchy(
+                Some(parent.clone()),
+                Some("r2".to_owned()),
+                21,
+                true,
+            ),
+            StateData::<i32, i32>::with_hierarchy(
+                Some(parent),
+                Some("r2".to_owned()),
+                22,
+                false,
+            ),
+        ];
+
+        let to_parent = TransitionData::new(1, 2, 100);
+        let mut region1 = TransitionData::new(11, 12, 200);
+        region1.set_state(2);
+        let mut region2 = TransitionData::new(21, 22, 201);
+        region2.set_state(2);
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(states.into()),
+            Some(TransitionsData::new(vec![to_parent, region1, region2])),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory
+            .get_state_machine()
+            .expect("the orthogonal machine builds");
+
+        block_on(machine.start()).unwrap();
+        assert_eq!(machine.state().map(|state| *state.id()), Some(1));
+
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(100)))).unwrap();
+        let current = machine.state().expect("the machine has a current state");
+        assert_eq!(current.id(), &2);
+        assert!(
+            current.contains_id(&11),
+            "the first region starts at its initial state"
+        );
+        assert!(
+            current.contains_id(&21),
+            "the second region starts at its initial state"
+        );
+
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(200)))).unwrap();
+        let current = machine.state().expect("the machine has a current state");
+        assert!(current.contains_id(&12));
+        assert!(!current.contains_id(&11));
+
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(201)))).unwrap();
+        let current = machine.state().expect("the machine has a current state");
+        assert!(current.contains_id(&22));
+        assert!(!current.contains_id(&21));
+    }
+
+    #[test]
+    fn fork_pseudo_state_is_wired_from_the_model() {
+        use crate::region::Region;
+        use crate::state::pseudo_state_kind::PseudoStateKind;
+        use std::collections::HashMap;
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+
+        let mut fork_state = StateData::<i32, i32>::new(2);
+        fork_state.set_pseudo_state_kind(PseudoStateKind::Fork);
+
+        let mut transitions_data =
+            TransitionsData::new(vec![TransitionData::new(1, 2, 100)]);
+        let mut forks: HashMap<i32, Vec<i32>> = HashMap::new();
+        forks.insert(2, vec![3, 4]);
+        transitions_data.set_forks(forks);
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(
+                vec![
+                    StateData::<i32, i32>::with_initial(1, true),
+                    fork_state,
+                    StateData::<i32, i32>::new(3),
+                    StateData::<i32, i32>::new(4),
+                ]
+                .into(),
+            ),
+            Some(transitions_data),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory.get_state_machine().expect("machine builds");
+
+        block_on(machine.start()).unwrap();
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(100)))).unwrap();
+
+        assert_eq!(
+            machine.state().map(|state| *state.id()),
+            Some(4),
+            "the last fork target stays current"
+        );
+    }
+
+    #[test]
+    fn event_security_rule_vetoes_events_without_authority() {
+        use crate::region::Region;
+        use crate::security::security_rule::SecurityRule;
+        use crate::security::state_machine_security_interceptor::HEADER_AUTHENTICATION;
+        use crate::state_machine_event_result::ResultType;
+        use next_web_core::any::AnyValue;
+        use next_web_core::messaging::message_headers::MessageHeaders;
+        use std::collections::{HashMap, HashSet};
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+        configuration.security_enabled = true;
+        configuration.event_security_rule =
+            Some(SecurityRule::new().with_attributes(HashSet::from(["admin".to_owned()])));
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(
+                vec![
+                    StateData::<i32, i32>::with_initial(1, true),
+                    StateData::<i32, i32>::new(2),
+                ]
+                .into(),
+            ),
+            Some(TransitionsData::new(vec![TransitionData::new(1, 2, 100)])),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory.get_state_machine().expect("machine builds");
+        block_on(machine.start()).unwrap();
+
+        let denied =
+            block_on(machine.send_event(Arc::new(GenericMessage::with_payload(100)))).unwrap();
+        assert_eq!(denied.result_type(), ResultType::Denied);
+        assert_eq!(machine.state().map(|state| *state.id()), Some(1));
+
+        let mut headers: HashMap<String, AnyValue> = HashMap::new();
+        headers.insert(HEADER_AUTHENTICATION.to_owned(), AnyValue::from("admin"));
+
+        let accepted = block_on(machine.send_event(Arc::new(GenericMessage::new(
+            Some(100),
+            MessageHeaders::from(headers),
+        ))))
+        .unwrap();
+        assert_eq!(accepted.result_type(), ResultType::Accepted);
         assert_eq!(machine.state().map(|state| *state.id()), Some(2));
+    }
+
+    #[tokio::test]
+    async fn timer_transition_fires_from_the_model() {
+        use crate::region::Region;
+        use crate::transition::transition_kind::TransitionKind;
+        use std::time::Duration;
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+
+        let states = vec![
+            StateData::<i32, i32>::with_initial(1, true),
+            StateData::<i32, i32>::new(2),
+        ];
+
+        // A transition without an event fires from a timer: 10ms period, one
+        // firing.
+        let timer = TransitionData::with_all(
+            1,
+            2,
+            None,
+            None,
+            Some(10),
+            Some(1),
+            Vec::new(),
+            None,
+            TransitionKind::External,
+            None,
+            "",
+        );
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(states.into()),
+            Some(TransitionsData::new(vec![timer])),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory.get_state_machine().expect("machine builds");
+
+        machine.start().await.expect("start succeeds");
+        assert_eq!(machine.state().map(|state| *state.id()), Some(1));
+
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        assert_eq!(
+            machine.state().map(|state| *state.id()),
+            Some(2),
+            "the timer moved the machine"
+        );
+    }
+
+    #[tokio::test]
+    async fn configured_monitor_and_interceptor_are_attached() {
+        use crate::monitor::state_machine_monitor::StateMachineMonitor;
+        use crate::state::StateMachineState;
+        use crate::state_context::StateContext;
+        use crate::support::state_machine_interceptor::StateMachineInterceptor;
+        use crate::transition::StateMachineTransition;
+        use next_web_core::error::BoxError;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Duration;
+
+        #[derive(Default)]
+        struct CountingMonitor {
+            transitions: AtomicUsize,
+            actions: AtomicUsize,
+        }
+
+        impl StateMachineMonitor<i32, i32> for CountingMonitor {
+            fn transition(
+                &self,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _transition: &dyn StateMachineTransition<i32, i32>,
+                _duration: Duration,
+            ) {
+                self.transitions.fetch_add(1, Ordering::SeqCst);
+            }
+
+            fn action(
+                &self,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _action: &crate::BoxedStateAction<i32, i32>,
+                _duration: Duration,
+            ) {
+                self.actions.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        #[derive(Default)]
+        struct CountingInterceptor {
+            events: AtomicUsize,
+            transitions: AtomicUsize,
+        }
+
+        impl StateMachineInterceptor<i32, i32> for CountingInterceptor {
+            fn pre_event(
+                &self,
+                message: Arc<dyn next_web_core::messaging::Message<i32>>,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+            ) -> Result<Arc<dyn next_web_core::messaging::Message<i32>>, BoxError> {
+                self.events.fetch_add(1, Ordering::SeqCst);
+                Ok(message)
+            }
+
+            fn pre_state_change(
+                &self,
+                _state: &dyn StateMachineState<i32, i32>,
+                _message: Option<&dyn next_web_core::messaging::Message<i32>>,
+                _transition: Option<&dyn StateMachineTransition<i32, i32>>,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _root_state_machine: &dyn crate::StateMachine<i32, i32>,
+            ) -> Result<(), BoxError> {
+                Ok(())
+            }
+
+            fn post_state_change(
+                &self,
+                _state: &dyn StateMachineState<i32, i32>,
+                _message: Option<&dyn next_web_core::messaging::Message<i32>>,
+                _transition: Option<&dyn StateMachineTransition<i32, i32>>,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _root_state_machine: &dyn crate::StateMachine<i32, i32>,
+            ) {
+            }
+
+            fn pre_transition(
+                &self,
+                _state_context: &dyn StateContext<i32, i32>,
+            ) -> Result<(), BoxError> {
+                self.transitions.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+
+            fn post_transition(
+                &self,
+                _state_context: &dyn StateContext<i32, i32>,
+            ) -> Result<(), BoxError> {
+                Ok(())
+            }
+
+            fn state_machine_error(
+                &self,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                error: BoxError,
+            ) -> Option<BoxError> {
+                Some(error)
+            }
+        }
+
+        let monitor = Arc::new(CountingMonitor::default());
+        let interceptor = Arc::new(CountingInterceptor::default());
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+        configuration.state_machine_monitor = Some(monitor.clone());
+        configuration.interceptors = vec![interceptor.clone()];
+
+        let states = vec![
+            StateData::<i32, i32>::with_initial(1, true),
+            StateData::<i32, i32>::new(2),
+        ];
+
+        let action: crate::BoxedStateAction<i32, i32> =
+            Arc::new(|_context| Box::pin(async move { Ok(()) }));
+        let transition = TransitionData::with_all(
+            1,
+            2,
+            None,
+            Some(100),
+            None,
+            None,
+            vec![action],
+            None,
+            crate::transition::transition_kind::TransitionKind::External,
+            None,
+            "",
+        );
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(states.into()),
+            Some(TransitionsData::new(vec![transition])),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory.get_state_machine().expect("machine builds");
+
+        machine.start().await.expect("start succeeds");
+        machine
+            .send_event(Arc::new(GenericMessage::with_payload(100)))
+            .await
+            .expect("event is sent");
+
+        assert_eq!(interceptor.events.load(Ordering::SeqCst), 1);
+        assert_eq!(interceptor.transitions.load(Ordering::SeqCst), 1);
+        assert_eq!(monitor.transitions.load(Ordering::SeqCst), 1);
+        assert_eq!(monitor.actions.load(Ordering::SeqCst), 1);
+    }
+
+    /// A decision manager which denies everything.
+    struct DenyAll;
+
+    impl crate::security::access_decision_manager::AccessDecisionManager for DenyAll {
+        fn decide(
+            &self,
+            _authentication: &next_web_core::any::AnyValue,
+            _value: &next_web_core::any::AnyValue,
+            _config_attributes: Vec<
+                Box<dyn crate::security::access_decision_manager::ConfigAttribute>,
+            >,
+        ) -> Result<(), next_web_core::error::BoxError> {
+            Err(Box::new(std::io::Error::other("denied by policy")))
+        }
+
+        fn supports(
+            &self,
+            _attribute: &dyn crate::security::access_decision_manager::ConfigAttribute,
+        ) -> bool {
+            true
+        }
+    }
+
+    #[tokio::test]
+    async fn custom_decision_manager_vetoes_the_event() {
+        use crate::region::Region;
+        use crate::security::security_rule::SecurityRule;
+        use crate::security::state_machine_security_interceptor::HEADER_AUTHENTICATION;
+        use crate::state_machine_event_result::ResultType;
+        use next_web_core::any::AnyValue;
+        use next_web_core::messaging::message_headers::MessageHeaders;
+        use std::collections::{HashMap, HashSet};
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+        configuration.security_enabled = true;
+        configuration.event_security_rule =
+            Some(SecurityRule::new().with_attributes(HashSet::from(["admin".to_owned()])));
+        configuration.event_security_access_decision_manager = Some(Arc::new(DenyAll));
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(
+                vec![
+                    StateData::<i32, i32>::with_initial(1, true),
+                    StateData::<i32, i32>::new(2),
+                ]
+                .into(),
+            ),
+            Some(TransitionsData::new(vec![TransitionData::new(1, 2, 100)])),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory.get_state_machine().expect("machine builds");
+        machine.start().await.expect("start succeeds");
+
+        // The authority is present, but the configured manager is the one which
+        // decides, and it denies.
+        let mut headers: HashMap<String, AnyValue> = HashMap::new();
+        headers.insert(HEADER_AUTHENTICATION.to_owned(), AnyValue::from("admin"));
+
+        let denied = machine
+            .send_event(Arc::new(GenericMessage::new(
+                Some(100),
+                MessageHeaders::from(headers),
+            )))
+            .await
+            .expect("event is sent");
+
+        assert_eq!(denied.result_type(), ResultType::Denied);
+        assert_eq!(machine.state().map(|state| *state.id()), Some(1));
+    }
+
+    #[tokio::test]
+    async fn expression_rule_denies_without_an_evaluator() {
+        use crate::region::Region;
+        use crate::security::security_rule::SecurityRule;
+        use crate::security::state_machine_security_interceptor::HEADER_AUTHENTICATION;
+        use crate::state_machine_event_result::ResultType;
+        use next_web_core::any::AnyValue;
+        use next_web_core::messaging::message_headers::MessageHeaders;
+        use std::collections::HashMap;
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+        configuration.security_enabled = true;
+        configuration.event_security_rule =
+            Some(SecurityRule::new().with_expression("hasRole('admin')"));
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(
+                vec![
+                    StateData::<i32, i32>::with_initial(1, true),
+                    StateData::<i32, i32>::new(2),
+                ]
+                .into(),
+            ),
+            Some(TransitionsData::new(vec![TransitionData::new(1, 2, 100)])),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory.get_state_machine().expect("machine builds");
+        machine.start().await.expect("start succeeds");
+
+        let mut headers: HashMap<String, AnyValue> = HashMap::new();
+        headers.insert(HEADER_AUTHENTICATION.to_owned(), AnyValue::from("admin"));
+
+        let denied = machine
+            .send_event(Arc::new(GenericMessage::new(
+                Some(100),
+                MessageHeaders::from(headers),
+            )))
+            .await
+            .expect("event is sent");
+
+        assert_eq!(
+            denied.result_type(),
+            ResultType::Denied,
+            "an expression rule fails closed without an evaluator"
+        );
     }
 }

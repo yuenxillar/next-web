@@ -1,3 +1,4 @@
+/// The identifiers the default configuration uses for its beans.
 pub struct StateMachineSystemConstants;
 
 impl StateMachineSystemConstants {

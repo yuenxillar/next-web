@@ -17,6 +17,10 @@ where
     K: 'static,
     V: 'static,
 {
+    /// Creates a map without a listener.
+    ///
+    /// # Arguments
+    /// * `delegate` - the map to wrap
     pub fn new(delegate: HashMap<K, V>) -> Self {
         Self {
             delegate,
@@ -90,7 +94,7 @@ where
 
     /// Returns a set view of the mappings contained in this map.
     pub fn entries(&self) -> Vec<(&K, &V)> {
-        self.delegate.iter().map(|(k, v)| (k, v)).collect()
+        self.delegate.iter().collect()
     }
 
     /// Gets the delegating map instance.
@@ -115,7 +119,7 @@ where
     V: Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", format!("{:?}", self.delegate))
+        write!(f, "{:?}", self.delegate)
     }
 }
 
@@ -133,11 +137,10 @@ where
         if let Some(listener) = self.listener.as_ref() {
             if old_value.is_none() {
                 listener.added(key, value);
-            } else if let Some(old) = old_value.as_ref() {
-                if &value != old {
+            } else if let Some(old) = old_value.as_ref()
+                && &value != old {
                     listener.changed(&key, &value);
                 }
-            }
         }
 
         old_value

@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use futures::future::BoxFuture;
 use next_web_core::any::AnyValue;
 use next_web_core::messaging::Message;
 use tracing::error;
@@ -18,7 +17,6 @@ use crate::monitor::state_machine_monitor::StateMachineMonitor;
 use crate::processor::state_machine_handler_call_helper::StateMachineHandlerCallHelper;
 use crate::state::StateMachineState;
 use crate::state_context::StateContext;
-use crate::support::lifecycle_object_support::LifecycleObjectSupport;
 use crate::support::state_machine_interceptor_list::StateMachineInterceptorList;
 use crate::transition::StateMachineTransition;
 
@@ -51,8 +49,6 @@ pub struct StateMachineObjectSupport<S, E> {
 
     /// State machine handler call helper for annotation handlers
     state_machine_handler_call_helper: StateMachineHandlerCallHelper<S, E>,
-
-    pub(crate) lifecycle_object_support: LifecycleObjectSupport,
 }
 
 impl<S, E> StateMachineObjectSupport<S, E>
@@ -146,23 +142,19 @@ where
         let source = state_context.source();
         let target = state_context.target();
 
-        if !(target.is_some() && source.is_some()) {
+        let (Some(source), Some(target)) = (source, target) else {
             return;
-        }
-
-        let source = source.unwrap();
-        let target = target.unwrap();
+        };
 
         self.state_listener.state_changed(source, target);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = self.state_machine_event_publisher.as_ref() {
+        if self.context_events_enabled
+            && let Some(publisher) = self.state_machine_event_publisher.as_ref() {
                 {
                     publisher.publish_state_changed(self, source, target).await;
                 }
             }
-        }
 
         // warn!("Error during notify_state_changed: {}", e);
     }
@@ -183,11 +175,10 @@ where
         self.state_listener.state_entered(target);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = self.state_machine_event_publisher.as_ref() {
+        if self.context_events_enabled
+            && let Some(publisher) = self.state_machine_event_publisher.as_ref() {
                 publisher.publish_state_entered(self, target).await;
             }
-        }
 
         // warn!("Error during notify_state_entered: {}", e);
     }
@@ -208,11 +199,10 @@ where
         self.state_listener.state_exited(source);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = self.state_machine_event_publisher.as_ref() {
+        if self.context_events_enabled
+            && let Some(publisher) = self.state_machine_event_publisher.as_ref() {
                 publisher.publish_state_exited(self, source).await;
             }
-        }
 
         // warn!("Error during notify_state_exited: {}", e);
     }
@@ -233,11 +223,10 @@ where
         self.state_listener.event_not_accepted(message);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = self.state_machine_event_publisher.as_ref() {
+        if self.context_events_enabled
+            && let Some(publisher) = self.state_machine_event_publisher.as_ref() {
                 publisher.publish_event_not_accepted(self, message).await;
             }
-        }
 
         // warn!("Error during notify_event_not_accepted: {}", e);
     }
@@ -258,11 +247,10 @@ where
         self.state_listener.transition_started(transition);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = self.state_machine_event_publisher.as_ref() {
+        if self.context_events_enabled
+            && let Some(publisher) = self.state_machine_event_publisher.as_ref() {
                 publisher.publish_transition_start(self, transition).await;
             }
-        }
 
         // warn!("Error during notify_transition_start: {}", e);
     }
@@ -283,11 +271,10 @@ where
         self.state_listener.transition(transition);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = &self.state_machine_event_publisher {
+        if self.context_events_enabled
+            && let Some(publisher) = &self.state_machine_event_publisher {
                 publisher.publish_transition(self, transition).await;
             }
-        }
 
         // warn!("Error during notify_transition: {}", e);
     }
@@ -308,11 +295,10 @@ where
         self.state_listener.transition_ended(transition);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = &self.state_machine_event_publisher {
+        if self.context_events_enabled
+            && let Some(publisher) = &self.state_machine_event_publisher {
                 publisher.publish_transition_end(self, transition).await;
             }
-        }
 
         // warn!("Error during notify_transition_end: {}", e);
     }
@@ -333,13 +319,12 @@ where
         self.state_listener.state_machine_started(state_machine);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = &self.state_machine_event_publisher {
+        if self.context_events_enabled
+            && let Some(publisher) = &self.state_machine_event_publisher {
                 publisher
                     .publish_state_machine_start(self, state_machine)
                     .await;
             }
-        }
 
         // warn!("Error during notify_state_machine_started: {}", e);
     }
@@ -360,13 +345,12 @@ where
         self.state_listener.state_machine_stopped(state_machine);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = self.state_machine_event_publisher.as_ref() {
+        if self.context_events_enabled
+            && let Some(publisher) = self.state_machine_event_publisher.as_ref() {
                 publisher
                     .publish_state_machine_stop(self, state_machine)
                     .await;
             }
-        }
 
         // warn!("Error during notify_state_machine_stopped: {}", e);
     }
@@ -393,13 +377,12 @@ where
             .state_machine_error(state_machine, error.as_ref());
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = self.state_machine_event_publisher.as_ref() {
+        if self.context_events_enabled
+            && let Some(publisher) = self.state_machine_event_publisher.as_ref() {
                 publisher
                     .publish_state_machine_error(self, state_machine, error.as_ref())
                     .await;
             }
-        }
 
         // warn!("Error during notify_state_machine_error: {}", e);
     }
@@ -429,35 +412,34 @@ where
         self.state_listener.extended_state_changed(key, value);
         self.state_listener.state_context(state_context);
 
-        if self.context_events_enabled {
-            if let Some(publisher) = self.state_machine_event_publisher.as_ref() {
+        if self.context_events_enabled
+            && let Some(publisher) = self.state_machine_event_publisher.as_ref() {
                 publisher
                     .publish_extended_state_changed(self, key, value)
                     .await;
             }
-        }
 
         // warn!("Error during notify_extended_state_changed: {}", e);
     }
 
     /// Notifies monitors about transition event.
-    pub async fn notify_transition_monitor(
+    pub fn notify_transition_monitor(
         &self,
         state_machine: &dyn StateMachine<S, E>,
         transition: &dyn StateMachineTransition<S, E>,
         duration: Duration,
     ) {
         self.state_machine_monitor
-            .transition(state_machine, transition, duration)
+            .transition(state_machine, transition, duration);
 
         // warn!("Error during notify_transition_monitor: {}", e);
     }
 
     /// Notifies monitors about action event.
-    pub async fn notify_action_monitor(
+    pub fn notify_action_monitor(
         &self,
         state_machine: &dyn StateMachine<S, E>,
-        action: &dyn Fn(&dyn StateContext<S, E>) -> BoxFuture<'static, ()>,
+        action: &crate::BoxedStateAction<S, E>,
         duration: Duration,
     ) {
         self.state_machine_monitor
@@ -487,16 +469,19 @@ impl<S, E> Default for StateMachineObjectSupport<S, E> {
             bean_name: None,
             handlers_initialized: Arc::new(AtomicBool::default()),
             state_machine_handler_call_helper: Default::default(),
-
-            lifecycle_object_support: Default::default(),
         }
     }
 }
 
+/// Relays the state machine callbacks to a listener composite.
 #[derive(Clone)]
 pub struct StateMachineListenerRelay<S, E>(pub(crate) CompositeStateMachineListener<S, E>);
 
 impl<S, E> StateMachineListenerRelay<S, E> {
+    /// Creates a relay around the given composite.
+    ///
+    /// # Arguments
+    /// * `listener` - the composite to relay to
     pub fn new(listener: CompositeStateMachineListener<S, E>) -> Self {
         Self(listener)
     }
@@ -556,6 +541,11 @@ impl<S, E> StateMachineListener<S, E> for StateMachineListenerRelay<S, E> {
     }
 }
 
+/// Helpers which notify the composites of a support object.
 pub trait StateMachineObjectSupportExt<S, E> {
+    /// Notifies the listeners that an event was not accepted.
+    ///
+    /// # Arguments
+    /// * `state_context` - the context of the rejected event
     fn notify_event_not_accepted(&self, state_context: &dyn StateContext<S, E>);
 }

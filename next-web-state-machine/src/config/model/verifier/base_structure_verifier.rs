@@ -7,6 +7,10 @@ use crate::config::model::{
     verifier::state_machine_model_verifier::StateMachineModelVerifier,
 };
 
+/// Verifier of the base structure of a model.
+///
+/// It checks that every group has an initial state and that hierarchical states
+/// reference a parent which exists.
 #[derive(Debug)]
 pub struct BaseStructureVerifier<S, E>(PhantomData<(S, E)>);
 
@@ -64,8 +68,7 @@ where
     ) -> Result<bool, BoxError> {
         match (state_data.parent(), expected_parent) {
             (None, None) => Ok(true),
-            (None, Some(_)) => Ok(false),
-            (Some(_), None) => Ok(false),
+            (None, Some(_)) | (Some(_), None) => Ok(false),
             (Some(parent), Some(expected_parent)) => {
                 let actual_parent = parent.downcast_ref::<S>().ok_or_else(|| -> BoxError {
                     format!(
@@ -86,8 +89,8 @@ where
         children: &[&StateData<S, E>],
     ) -> BoxError {
         let scope = parent
-            .map(|parent| format!("parent state {:?}", parent))
-            .unwrap_or_else(|| "top level".to_string());
+            .map(|parent| format!("parent state {parent:?}"))
+            .unwrap_or_else(|| "top level".to_owned());
 
         let trace = children
             .iter()
@@ -95,7 +98,7 @@ where
             .collect::<Vec<_>>()
             .join("; ");
 
-        format!("Initial state not set for {}. {}", scope, trace).into()
+        format!("Initial state not set for {scope}. {trace}").into()
     }
 }
 
@@ -162,8 +165,18 @@ mod tests {
         let mut root = StateData::new(1);
         root.set_initial(true);
 
-        let child_a = StateData::with_hierarchy(Some(Arc::new(1) as Arc<dyn Any>), None, 10, false);
-        let child_b = StateData::with_hierarchy(Some(Arc::new(1) as Arc<dyn Any>), None, 11, false);
+        let child_a = StateData::with_hierarchy(
+            Some(Arc::new(1) as Arc<dyn Any + Send + Sync>),
+            None,
+            10,
+            false,
+        );
+        let child_b = StateData::with_hierarchy(
+            Some(Arc::new(1) as Arc<dyn Any + Send + Sync>),
+            None,
+            11,
+            false,
+        );
 
         let model = DefaultStateMachineModel::new(
             ConfigurationData::default(),

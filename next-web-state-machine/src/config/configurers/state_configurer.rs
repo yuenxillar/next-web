@@ -57,6 +57,7 @@ where
         actions: Vec<Arc<dyn StateMachineAction<S, E>>>,
     ) -> &mut dyn StateConfigurer<S, E>;
 
+    /// Specify a state S with a single state Action.
     fn state_with_action(
         &mut self,
         state: S,
@@ -70,6 +71,7 @@ where
         action: Arc<dyn StateMachineAction<S, E>>,
     ) -> &mut dyn StateConfigurer<S, E>;
 
+    /// Specify a state S with a state behaviour Action and an optional error Action.
     fn state_do_with_error(
         &mut self,
         state: S,
@@ -175,6 +177,7 @@ where
     fn exit(&mut self, exit: S) -> &mut dyn StateConfigurer<S, E>;
 }
 
+/// The kind of history a composite state remembers.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum History {
     /// Shallow history is a pseudo state representing the most

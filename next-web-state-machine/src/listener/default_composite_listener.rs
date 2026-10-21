@@ -32,7 +32,7 @@ impl<S, E> DefaultCompositeListener<S, E> {
             .is_some()
         {
             self.listeners.push(listener);
-            self.listeners.sort_by(|a, b| a.order().cmp(&b.order()));
+            self.listeners.sort_by_key(|a| a.order());
         }
     }
 

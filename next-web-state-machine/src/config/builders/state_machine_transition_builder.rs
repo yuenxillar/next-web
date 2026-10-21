@@ -198,14 +198,21 @@ impl<S, E> Default for SharedState<S, E> {
 #[derive(Clone)]
 struct AlwaysTrueGuard;
 
+#[next_web_core::async_trait]
 impl<S, E> StateMachineGuard<S, E> for AlwaysTrueGuard
 where
     S: Send + Sync,
     E: Send + Sync,
 {
-    fn evaluate(&self, _ctx: &dyn crate::state_context::StateContext<S, E>) {}
+    async fn evaluate(&self, _ctx: &dyn crate::state_context::StateContext<S, E>) -> bool {
+        true
+    }
 }
 
+/// Builder which collects the transitions of a machine.
+///
+/// Every configurer hands its data to this builder, which keeps it shared so a
+/// view returned by `and()` continues to write into the same machine.
 #[derive(Clone)]
 pub struct StateMachineTransitionBuilder<S, E>
 where
@@ -228,6 +235,10 @@ where
     S: Clone + Eq + Hash + Send + Sync + 'static,
     E: Clone + Send + Sync + 'static,
 {
+    /// Creates a new builder.
+    ///
+    /// # Arguments
+    /// * `_allow_configurers_of_same_type` - kept for API parity with the other builders
     pub fn new(_allow_configurers_of_same_type: bool) -> Self {
         Self {
             shared: Arc::new(Mutex::new(SharedState::default())),
@@ -278,8 +289,8 @@ where
 
     fn transition_guard(guard: Arc<dyn StateMachineGuard<S, E>>) -> Guard<S, E> {
         Arc::new(move |ctx| {
-            guard.evaluate(ctx);
-            Box::pin(async { true })
+            let guard = guard.clone();
+            Box::pin(async move { guard.evaluate(ctx).await })
         })
     }
 
@@ -350,6 +361,20 @@ where
         });
     }
 
+    /// Registers a transition of any kind.
+    ///
+    /// # Arguments
+    /// * `source` - the source state
+    /// * `target` - the target state
+    /// * `state` - the state which scopes the transition
+    /// * `event` - the event which fires the transition
+    /// * `period` - the timer period of a timed transition
+    /// * `count` - how often a timed transition fires
+    /// * `actions` - the actions of the transition
+    /// * `guard` - the guard of the transition
+    /// * `kind` - the kind of the transition
+    /// * `security_rule` - the security rule of the transition
+    /// * `name` - the name of the transition
     pub fn add_transition(
         &mut self,
         source: S,
@@ -383,6 +408,11 @@ where
             });
     }
 
+    /// Registers the branches of a choice state.
+    ///
+    /// # Arguments
+    /// * `source` - the choice state
+    /// * `choices` - the branches
     pub fn add_choice(&mut self, source: S, choices: Vec<ChoiceData<S, E>>) {
         self.shared
             .lock()
@@ -391,6 +421,11 @@ where
             .insert(source, choices);
     }
 
+    /// Registers the branches of a junction state.
+    ///
+    /// # Arguments
+    /// * `source` - the junction state
+    /// * `junctions` - the branches
     pub fn add_junction(&mut self, source: S, junctions: Vec<JunctionData<S, E>>) {
         self.shared
             .lock()
@@ -399,6 +434,11 @@ where
             .insert(source, junctions);
     }
 
+    /// Registers an entry point.
+    ///
+    /// # Arguments
+    /// * `source` - the state the entry point belongs to
+    /// * `target` - the state it continues with
     pub fn add_entry(&mut self, source: S, target: S) {
         self.shared
             .lock()
@@ -407,6 +447,11 @@ where
             .push(EntryData::new(source, target));
     }
 
+    /// Registers an exit point.
+    ///
+    /// # Arguments
+    /// * `source` - the state the exit point belongs to
+    /// * `target` - the state it continues with
     pub fn add_exit(&mut self, source: S, target: S) {
         self.shared
             .lock()
@@ -415,6 +460,11 @@ where
             .push(ExitData::new(source, target));
     }
 
+    /// Registers a fork.
+    ///
+    /// # Arguments
+    /// * `source` - the state the fork starts from
+    /// * `targets` - the regions the fork activates
     pub fn add_fork(&mut self, source: S, targets: Vec<S>) {
         self.shared
             .lock()
@@ -423,6 +473,11 @@ where
             .insert(source, targets);
     }
 
+    /// Registers a join.
+    ///
+    /// # Arguments
+    /// * `target` - the state the join continues with
+    /// * `sources` - the states which have to be active
     pub fn add_join(&mut self, target: S, sources: Vec<S>) {
         self.shared
             .lock()
@@ -431,6 +486,11 @@ where
             .insert(target, sources);
     }
 
+    /// Registers the default history transition of a composite state.
+    ///
+    /// # Arguments
+    /// * `source` - the composite state
+    /// * `target` - the state entered when no history was recorded
     pub fn add_default_history(&mut self, source: S, target: S) {
         self.shared
             .lock()

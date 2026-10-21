@@ -7,6 +7,7 @@ use crate::config::model::{
     verifier::state_machine_model_verifier::StateMachineModelVerifier,
 };
 
+/// The default verifier of a model, which runs every structural check.
 pub struct DefaultStateMachineModelVerifier<S, E>(PhantomData<(S, E)>);
 
 impl<S, E> Default for DefaultStateMachineModelVerifier<S, E> {

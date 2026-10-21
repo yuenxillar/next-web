@@ -18,14 +18,13 @@ use next_web_core::{any::AnyValue, async_trait};
 ///
 /// # Example
 /// ```
-/// use std::sync::{Arc, RwLock};
-/// use std::any::Any;
-/// use statemachine::{ExtendedState, DefaultExtendedState};
+/// use std::collections::HashMap;
 ///
-/// let mut extended_state = DefaultExtendedState::new();
-/// extended_state.set("counter".to_string(), Arc::new(42));
-/// let value: i32 = extended_state.get("counter".to_string()).unwrap();
-/// assert_eq!(value, 42);
+/// use next_web_state_machine::extended_state::ExtendedState;
+/// use next_web_state_machine::support::default_extended_state::DefaultExtendedState;
+///
+/// let extended_state = DefaultExtendedState::with_variables(HashMap::new());
+/// assert!(extended_state.get_variables().is_empty());
 /// ```
 pub trait ExtendedState<K = String>
 where
@@ -41,13 +40,13 @@ where
     fn get(&self, key: &K) -> Option<&AnyValue>;
 
     /// Sets the extended state change listener.
-
     fn set_extended_state_change_listener(
         &mut self,
         listener: Arc<dyn ExtendedStateChangeListener>,
     );
 }
 
+/// Listener notified when an extended state variable changes.
 #[async_trait]
 pub trait ExtendedStateChangeListener
 where

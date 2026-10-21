@@ -1,137 +1,151 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 
+use next_web_core::error::BoxError;
 use next_web_core::messaging::Message;
 use tracing::debug;
 
 use crate::StateMachine;
 use crate::state::StateMachineState;
 use crate::state_context::StateContext;
+use crate::support::lock_util::{read, write};
 use crate::support::state_machine_interceptor::StateMachineInterceptor;
 use crate::transition::StateMachineTransition;
 
 /// A list of state machine interceptors that can be applied in order.
 ///
-/// This struct manages a collection of interceptors and provides methods
-/// to apply them at various points in the state machine lifecycle.
+/// The list is shared between a machine and its executor and interceptors can
+/// be registered while the machine runs, so the collection lives behind a lock
+/// and is replaced copy-on-write: a notification clones one [`Arc`] instead of
+/// every interceptor.
 pub struct StateMachineInterceptorList<S, E> {
-    interceptors: Vec<Arc<dyn StateMachineInterceptor<S, E>>>,
+    interceptors: RwLock<Arc<Vec<Arc<dyn StateMachineInterceptor<S, E>>>>>,
 }
 
 impl<S, E> StateMachineInterceptorList<S, E> {
     /// Creates a new empty interceptor list.
     pub fn new() -> Self {
         Self {
-            interceptors: Default::default(),
+            interceptors: RwLock::new(Arc::new(Vec::new())),
         }
     }
 
     /// Sets the interceptors, clearing any existing interceptors.
     ///
     /// # Arguments
-    /// * `interceptors` - The list of interceptors to set
-    ///
-    /// # Returns
-    /// `true` if the interceptor list changed as a result of the call
-    pub fn set(&mut self, interceptors: Vec<Arc<dyn StateMachineInterceptor<S, E>>>) {
-        self.interceptors.clear();
-        self.interceptors.extend(interceptors);
+    /// * `interceptors` - the interceptors to set
+    pub fn set(&self, interceptors: Vec<Arc<dyn StateMachineInterceptor<S, E>>>) {
+        *write(&self.interceptors) = Arc::new(interceptors);
     }
 
     /// Adds an interceptor to the list.
     ///
     /// # Arguments
-    /// * `interceptor` - The interceptor to add
-    ///
-    /// # Returns
-    /// `true` (as specified by `Collection::add`)
-    pub fn add(&mut self, interceptor: Arc<dyn StateMachineInterceptor<S, E>>) {
-        self.interceptors.push(interceptor);
+    /// * `interceptor` - the interceptor to add
+    pub fn add(&self, interceptor: Arc<dyn StateMachineInterceptor<S, E>>) {
+        let mut guard = write(&self.interceptors);
+        let mut next = Vec::with_capacity(guard.len() + 1);
+        next.extend(guard.iter().cloned());
+        next.push(interceptor);
+        *guard = Arc::new(next);
     }
 
     /// Removes an interceptor from the list.
     ///
     /// # Arguments
-    /// * `interceptor` - The interceptor to remove
-    ///
-    /// # Returns
-    /// `true` if the interceptor was found and removed
-    pub fn remove(&mut self, interceptor: Arc<dyn StateMachineInterceptor<S, E>>) {
-        self.interceptors.retain(|i| !Arc::ptr_eq(i, &interceptor));
+    /// * `interceptor` - the interceptor to remove
+    pub fn remove(&self, interceptor: Arc<dyn StateMachineInterceptor<S, E>>) {
+        let mut guard = write(&self.interceptors);
+        let next: Vec<_> = guard
+            .iter()
+            .filter(|item| !Arc::ptr_eq(item, &interceptor))
+            .cloned()
+            .collect();
+        *guard = Arc::new(next);
+    }
+
+    /// Gets a snapshot of the interceptors.
+    pub fn snapshot(&self) -> Arc<Vec<Arc<dyn StateMachineInterceptor<S, E>>>> {
+        read(&self.interceptors).clone()
     }
 
     /// Pre-processes an event before it is handled by the state machine.
     ///
-    /// Interceptors are applied in order. If any interceptor returns `None`,
-    /// processing stops and `None` is returned.
-    ///
     /// # Arguments
-    /// * `message` - The message containing the event
-    /// * `state_machine` - The state machine instance
+    /// * `message` - the message containing the event
+    /// * `state_machine` - the state machine instance
     ///
     /// # Returns
-    /// The (possibly modified) message, or `None` if processing was stopped
-    pub fn pre_event<'a>(
+    /// The (possibly replaced) message, or `None` if processing must be vetoed
+    pub fn pre_event(
         &self,
-        message: &'a mut dyn Message<E>,
+        message: Arc<dyn Message<E>>,
         state_machine: &dyn StateMachine<S, E>,
-    ) -> &'a mut dyn Message<E> {
-        for interceptor in self.interceptors.iter() {
-            match interceptor.pre_event(message, state_machine) {
-                Ok(_) => {}
+    ) -> Option<Arc<dyn Message<E>>> {
+        let mut current = message;
+        for interceptor in self.snapshot().iter() {
+            match interceptor.pre_event(current, state_machine) {
+                Ok(next) => current = next,
                 Err(error) => {
-                    debug!("Interceptor stopped event processing, case: {:?}", error);
-                    break;
+                    debug!(%error, "an interceptor vetoed the event");
+                    return None;
                 }
             }
         }
-
-        message
+        Some(current)
     }
 
     /// Pre-processes a state change before it occurs.
     ///
     /// # Arguments
-    /// * `state` - The target state
-    /// * `message` - The message that triggered the change
-    /// * `transition` - The transition being performed
-    /// * `state_machine` - The state machine instance
-    /// * `root_state_machine` - The root state machine instance
+    /// * `state` - the target state
+    /// * `message` - the message that triggered the change
+    /// * `transition` - the transition being performed
+    /// * `state_machine` - the state machine instance
+    /// * `root_state_machine` - the root state machine instance
+    ///
+    /// # Returns
+    /// `false` if an interceptor stopped the state change
     pub fn pre_state_change(
         &self,
         state: &dyn StateMachineState<S, E>,
-        message: &dyn Message<E>,
-        transition: &dyn StateMachineTransition<S, E>,
+        message: Option<&dyn Message<E>>,
+        transition: Option<&dyn StateMachineTransition<S, E>>,
         state_machine: &dyn StateMachine<S, E>,
         root_state_machine: &dyn StateMachine<S, E>,
-    ) {
-        for interceptor in self.interceptors.iter() {
-            interceptor.pre_state_change(
+    ) -> bool {
+        for interceptor in self.snapshot().iter() {
+            if let Err(error) = interceptor.pre_state_change(
                 state,
                 message,
                 transition,
                 state_machine,
                 root_state_machine,
-            );
+            ) {
+                debug!(%error, "an interceptor stopped the state change");
+                return false;
+            }
         }
+        true
     }
 
     /// Post-processes a state change after it has occurred.
     ///
     /// # Arguments
-    /// * `state` - The new state
-    /// * `message` - The message that triggered the change
-    /// * `transition` - The transition that was performed
-    /// * `state_machine` - The state machine instance
-    /// * `root_state_machine` - The root state machine instance
+    /// * `state` - the new state
+    /// * `message` - the message that triggered the change
+    /// * `transition` - the transition that was performed
+    /// * `state_machine` - the state machine instance
+    /// * `root_state_machine` - the root state machine instance
     pub fn post_state_change(
         &self,
         state: &dyn StateMachineState<S, E>,
-        message: &dyn Message<E>,
-        transition: &dyn StateMachineTransition<S, E>,
+        message: Option<&dyn Message<E>>,
+        transition: Option<&dyn StateMachineTransition<S, E>>,
         state_machine: &dyn StateMachine<S, E>,
         root_state_machine: &dyn StateMachine<S, E>,
     ) {
-        for interceptor in self.interceptors.iter() {
+        for interceptor in self.snapshot().iter() {
             interceptor.post_state_change(
                 state,
                 message,
@@ -144,105 +158,65 @@ impl<S, E> StateMachineInterceptorList<S, E> {
 
     /// Pre-processes a transition before it occurs.
     ///
-    /// Interceptors are applied in order. If any interceptor returns `None`,
-    /// processing stops and `None` is returned.
-    ///
     /// # Arguments
-    /// * `state_context` - The state context
+    /// * `state_context` - the state context
     ///
     /// # Returns
-    /// The (possibly modified) state context, or `None` if processing was stopped
-    pub async fn pre_transition<'a>(
-        &self,
-        state_context: &'a dyn StateContext<S, E>,
-    ) -> &'a dyn StateContext<S, E> {
-        for interceptor in self.interceptors.iter() {
-            match interceptor.pre_transition(state_context) {
-                Ok(_) => {}
-                Err(error) => {
-                    debug!(
-                        "Interceptor stopped transition processing, case: {:?}",
-                        error
-                    );
-                    break;
-                }
+    /// `false` if an interceptor stopped the transition
+    pub fn pre_transition(&self, state_context: &dyn StateContext<S, E>) -> bool {
+        for interceptor in self.snapshot().iter() {
+            if let Err(error) = interceptor.pre_transition(state_context) {
+                debug!(%error, "an interceptor stopped the transition");
+                return false;
             }
         }
-
-        state_context
+        true
     }
 
     /// Post-processes a transition after it has occurred.
     ///
-    /// Interceptors are applied in order. If any interceptor returns `None`,
-    /// processing stops and `None` is returned.
-    ///
     /// # Arguments
-    /// * `state_context` - The state context
-    ///
-    /// # Returns
-    /// The (possibly modified) state context, or `None` if processing was stopped
-    pub fn post_transition<'a>(
-        &self,
-        state_context: &'a dyn StateContext<S, E>,
-    ) -> &'a dyn StateContext<S, E> {
-        for interceptor in self.interceptors.iter() {
-            match interceptor.post_transition(state_context) {
-                Ok(_) => {}
-                Err(error) => {
-                    debug!(
-                        "Interceptor stopped transition processing, case: {:?}",
-                        error
-                    );
-                    break;
-                }
+    /// * `state_context` - the state context
+    pub fn post_transition(&self, state_context: &dyn StateContext<S, E>) {
+        for interceptor in self.snapshot().iter() {
+            if let Err(error) = interceptor.post_transition(state_context) {
+                debug!(%error, "an interceptor failed in post transition");
             }
         }
-
-        state_context
     }
 
     /// Handles an error that occurred in the state machine.
     ///
-    /// Interceptors are applied in order. If any interceptor returns `None`,
-    /// processing stops and `None` is returned, effectively suppressing the error.
-    ///
     /// # Arguments
-    /// * `state_machine` - The state machine instance
-    /// * `error` - The error that occurred
+    /// * `state_machine` - the state machine instance
+    /// * `error` - the error that occurred
     ///
     /// # Returns
-    /// The (possibly modified) error, or `None` if the error was handled/suppressed
+    /// The (possibly modified) error, or `None` if an interceptor suppressed it
     pub fn state_machine_error(
         &self,
         state_machine: &dyn StateMachine<S, E>,
-        error: Box<dyn std::error::Error>,
-    ) -> Box<dyn std::error::Error> {
-        let mut e = error;
-        for interceptor in self.interceptors.iter() {
-            e = interceptor.state_machine_error(state_machine, e);
+        error: BoxError,
+    ) -> Option<BoxError> {
+        let mut current = Some(error);
+        for interceptor in self.snapshot().iter() {
+            let error = current?;
+            current = interceptor.state_machine_error(state_machine, error);
         }
-
-        e
+        current
     }
 }
 
-impl<S, E> Clone for StateMachineInterceptorList<S, E>
-where
-    S: Clone,
-    E: Clone,
-{
+impl<S, E> Clone for StateMachineInterceptorList<S, E> {
     fn clone(&self) -> Self {
         Self {
-            interceptors: self.interceptors.clone(),
+            interceptors: RwLock::new(self.snapshot()),
         }
     }
 }
 
 impl<S, E> Default for StateMachineInterceptorList<S, E> {
     fn default() -> Self {
-        Self {
-            interceptors: Default::default(),
-        }
+        Self::new()
     }
 }

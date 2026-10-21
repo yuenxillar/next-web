@@ -20,7 +20,7 @@ use crate::{
 #[derive(Clone)]
 pub struct StateData<S, E> {
     /// Parent state reference in a hierarchical state machine
-    pub(crate) parent: Option<Arc<dyn Any>>,
+    pub(crate) parent: Option<Arc<dyn Any + Send + Sync>>,
     /// Region identifier for parallel state machines
     pub(crate) region: Option<String>,
     /// The actual state value
@@ -99,7 +99,7 @@ impl<S, E> StateData<S, E> {
     /// # Returns
     /// A new `StateData` instance
     pub fn with_hierarchy(
-        parent: Option<Arc<dyn Any>>,
+        parent: Option<Arc<dyn Any + Send + Sync>>,
         region: Option<String>,
         state: S,
         initial: bool,
@@ -135,7 +135,7 @@ impl<S, E> StateData<S, E> {
     /// # Returns
     /// A new `StateData` instance
     pub fn with_actions(
-        parent: Option<Arc<dyn Any>>,
+        parent: Option<Arc<dyn Any + Send + Sync>>,
         region: Option<String>,
         state: S,
         deferred: Option<Vec<E>>,
@@ -169,7 +169,7 @@ impl<S, E> StateData<S, E> {
     /// # Returns
     /// A new `StateData` instance
     pub fn with_actions_extended(
-        parent: Option<Arc<dyn Any>>,
+        parent: Option<Arc<dyn Any + Send + Sync>>,
         region: Option<String>,
         state: S,
         deferred: Option<Vec<E>>,
@@ -333,7 +333,7 @@ impl<S, E> StateData<S, E> {
     ///
     /// # Returns
     /// The parent reference if present
-    pub fn parent(&self) -> Option<&dyn Any> {
+    pub fn parent(&self) -> Option<&(dyn Any + Send + Sync)> {
         self.parent.as_deref()
     }
 
@@ -341,7 +341,7 @@ impl<S, E> StateData<S, E> {
     ///
     /// # Arguments
     /// * `parent` - Parent state reference
-    pub fn set_parent(&mut self, parent: Arc<dyn Any>) {
+    pub fn set_parent(&mut self, parent: Arc<dyn Any + Send + Sync>) {
         self.parent = Some(parent);
     }
 
@@ -442,9 +442,7 @@ where
             .field(
                 "region",
                 &self
-                    .region
-                    .as_ref()
-                    .map(|s| s.to_string())
+                    .region.clone()
                     .unwrap_or_default(),
             )
             .field("state", &self.state)

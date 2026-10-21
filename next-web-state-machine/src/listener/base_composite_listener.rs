@@ -14,6 +14,7 @@ impl<T> BaseCompositeListener<T> {
         &self.listeners
     }
 
+    /// Gets the mutable listener composite.
     pub fn get_mut_listeners(&mut self) -> &mut OrderedComposite<T> {
         &mut self.listeners
     }

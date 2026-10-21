@@ -17,6 +17,15 @@ use crate::config::{
 
 type Result<T> = std::result::Result<T, BoxError>;
 
+/// Adapts a [`StateMachineConfigurer`] so it can configure a whole machine.
+///
+/// The adapter creates the builders of the four parts, lets the configurer fill
+/// them in, and hands them to the configuration builder.
+///
+/// # Type Parameters
+/// * `T` - the configurer
+/// * `S` - the type of state
+/// * `E` - the type of event
 pub struct StateMachineConfigurerAdapter<T, S, E>
 where
     S: Clone + Eq + Hash,
@@ -39,9 +48,17 @@ where
     S: Clone,
     E: Send + Sync + 'static,
     E: Clone,
-    E: Eq,
+    E: Eq + Hash,
     T: StateMachineConfigurer<S, E>,
 {
+    /// Creates an adapter from the four builders and the configurer.
+    ///
+    /// # Arguments
+    /// * `model_builder` - the builder of the model
+    /// * `transition_builder` - the builder of the transitions
+    /// * `state_builder` - the builder of the states
+    /// * `configuration_builder` - the builder of the configuration
+    /// * `state_machine_configurer` - the configurer to apply
     pub fn new(
         model_builder: StateMachineModelBuilder<S, E>,
         transition_builder: StateMachineTransitionBuilder<S, E>,
@@ -54,10 +71,14 @@ where
             transition_builder: Some(transition_builder),
             state_builder: Some(state_builder),
             configuration_builder: Some(configuration_builder),
-            state_machine_configurer: state_machine_configurer,
+            state_machine_configurer,
         }
     }
 
+    /// Creates an adapter which only wraps the configurer.
+    ///
+    /// # Arguments
+    /// * `state_machine_configurer` - the configurer to apply
     pub fn with_state_machine_configurer(state_machine_configurer: T) -> Self {
         Self {
             state_machine_configurer,
@@ -68,6 +89,7 @@ where
         }
     }
 
+    /// Gets the builder of the model, configuring it when it is created.
     pub fn get_state_machine_model_builder(&mut self) -> Result<StateMachineModelBuilder<S, E>> {
         if let Some(model_builder) = self.model_builder.take() {
             return Ok(model_builder);
@@ -80,6 +102,7 @@ where
         Ok(model_builder)
     }
 
+    /// Gets the builder of the transitions, configuring it when it is created.
     pub fn get_state_machine_transition_builder(
         &mut self,
     ) -> Result<StateMachineTransitionBuilder<S, E>> {
@@ -94,6 +117,7 @@ where
         Ok(transition_builder)
     }
 
+    /// Gets the builder of the states, configuring it when it is created.
     pub fn get_state_machine_state_builder(&mut self) -> Result<StateMachineStateBuilder<S, E>> {
         if let Some(state_builder) = self.state_builder.take() {
             return Ok(state_builder);
@@ -106,6 +130,7 @@ where
         Ok(state_builder)
     }
 
+    /// Gets the builder of the configuration, configuring it when it is created.
     pub fn get_state_machine_configuration_builder(
         &mut self,
     ) -> Result<StateMachineConfigurationBuilder<S, E>> {
@@ -120,6 +145,10 @@ where
         Ok(configuration_builder)
     }
 
+    /// Replaces the configurer of the adapter.
+    ///
+    /// # Arguments
+    /// * `state_machine_configurer` - the new configurer
     pub fn set_state_machine_configurer(&mut self, state_machine_configurer: T) {
         self.state_machine_configurer = state_machine_configurer;
     }
@@ -132,7 +161,7 @@ where
     S: Clone,
     S: Eq + Hash,
     E: Send + Sync + 'static,
-    E: Eq,
+    E: Eq + Hash,
     E: Clone,
     T: StateMachineConfigurer<S, E>,
     T: Clone,
@@ -162,7 +191,7 @@ where
     S: Clone,
     E: Send + Sync + 'static,
     E: Clone,
-    E: Eq,
+    E: Eq + Hash,
     T: StateMachineConfigurer<S, E>,
     T: Clone,
 {

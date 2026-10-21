@@ -30,14 +30,6 @@ where
         Self::default()
     }
 
-    /// Gets the builder reference. Cannot be None.
-    ///
-    /// # Panics
-    /// Panics if the builder has not been set.
-    fn get_builder(&mut self) -> Option<&mut B> {
-        self.builder.as_mut()
-    }
-
     /// Adds an ObjectPostProcessor to be used by this adapter.
     ///
     /// # Arguments
@@ -111,6 +103,7 @@ where
 
 /// A composite ObjectPostProcessor that delegates work to multiple ObjectPostProcessor implementations.
 #[derive(Clone)]
+#[derive(Default)]
 pub struct CompositeObjectPostProcessor {
     post_processors: Vec<Arc<dyn ObjectPostProcessor>>,
 }
@@ -140,17 +133,15 @@ impl ObjectPostProcessor for CompositeObjectPostProcessor {
     }
 }
 
-impl Default for CompositeObjectPostProcessor {
-    fn default() -> Self {
-        Self {
-            post_processors: Default::default(),
-        }
-    }
-}
 
+/// Applies a configurer adapter to a builder.
 pub trait ConfigurerAdapterExt<O, B>
 where
     B: Builder<O>,
 {
+    /// Runs the configurer against the builder.
+    ///
+    /// # Arguments
+    /// * `builder` - the builder to configure
     fn configure(&mut self, builder: &mut B) -> Result<(), BoxError>;
 }

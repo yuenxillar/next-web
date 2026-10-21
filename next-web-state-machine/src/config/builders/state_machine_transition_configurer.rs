@@ -13,6 +13,7 @@ use crate::config::configurers::{
     local_transition_configurer::LocalTransitionConfigurer,
 };
 
+/// Configurer interface exposing the transitions of a machine.
 pub trait StateMachineTransitionConfigurer<S, E>
 where
     Self: DynClone,

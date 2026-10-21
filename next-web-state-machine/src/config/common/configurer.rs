@@ -8,7 +8,7 @@ use next_web_core::{DynClone, clone_trait_object, error::BoxError};
 /// # Type Parameters
 /// * `O` - The object being built by the `Builder` B
 /// * `B` - The `Builder` that builds objects of type O. This is
-///         also the `Builder` that is being configured.
+///   also the `Builder` that is being configured.
 pub trait Configurer<O, B>
 where
     B: super::builder::Builder<O>,
@@ -44,7 +44,7 @@ where
     ///
     /// # Returns
     /// * `bool` - `true` if this configurer can be assigned to the builder,
-    ///           `false` otherwise
+    ///   `false` otherwise
     fn is_assignable(&self, builder: &B) -> bool;
 }
 

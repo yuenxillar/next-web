@@ -22,6 +22,8 @@ use crate::config::{
     state_machine_config::StateMachineConfig,
 };
 
+/// Builder of a whole machine, which collects the configuration, the model, the
+/// states and the transitions.
 #[derive(Clone)]
 pub struct StateMachineConfigBuilder<S, E>
 where
@@ -64,6 +66,17 @@ where
     }
 }
 
+/// Builds the error reported when a builder was not registered.
+///
+/// # Arguments
+/// * `name` - the name of the missing builder
+fn missing_builder(name: &str) -> BoxError {
+    crate::state_machine_exception::state_machine_error(
+        crate::state_machine_exception::StateMachineErrorKind::MalformedConfiguration,
+        format!("the state machine configuration is missing its {name}"),
+    )
+}
+
 impl<S, E> BaseConfiguredBuilderExt<StateMachineConfig<S, E>> for StateMachineConfigBuilder<S, E>
 where
     S: Clone + Eq + Hash,
@@ -74,16 +87,16 @@ where
     fn perform_build(&mut self) -> Result<StateMachineConfig<S, E>, BoxError> {
         let mut model_builder = self
             .get_own_shared_object::<StateMachineModelBuilder<S, E>>()
-            .unwrap();
+            .ok_or_else(|| missing_builder("StateMachineModelBuilder"))?;
         let mut configuration_builder = self
             .get_own_shared_object::<StateMachineConfigurationBuilder<S, E>>()
-            .unwrap();
+            .ok_or_else(|| missing_builder("StateMachineConfigurationBuilder"))?;
         let mut transition_builder = self
             .get_own_shared_object::<StateMachineTransitionBuilder<S, E>>()
-            .unwrap();
+            .ok_or_else(|| missing_builder("StateMachineTransitionBuilder"))?;
         let mut state_builder = self
             .get_own_shared_object::<StateMachineStateBuilder<S, E>>()
-            .unwrap();
+            .ok_or_else(|| missing_builder("StateMachineStateBuilder"))?;
 
         let model = model_builder.build()?;
 

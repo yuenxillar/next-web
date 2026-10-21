@@ -28,6 +28,14 @@ where
     /// Message may be `None` if the transition is not triggered by a signal.
     fn message(&self) -> Option<&dyn Message<E>>;
 
+    /// Gets the message as a shared handle.
+    ///
+    /// The default implementation returns `None`; contexts which own the
+    /// message override it so passing the message on does not copy it.
+    fn message_arc(&self) -> Option<std::sync::Arc<dyn Message<E>>> {
+        None
+    }
+
     /// Gets the event associated with this context.
     /// Event may be `None` if the transition is not triggered by a signal.
     fn event(&self) -> Option<&E>;
@@ -75,6 +83,7 @@ where
     /// Gets the error associated with this context.
     fn error(&self) -> Option<&BoxError>;
 
+    /// Sets the error associated with this context.
     fn set_error(&mut self, error: BoxError);
 }
 

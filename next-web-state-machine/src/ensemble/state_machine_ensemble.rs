@@ -15,7 +15,10 @@ use crate::{
 /// # Type Parameters
 /// - `S`: the type of state
 /// - `E`: the type of event
-pub trait StateMachineEnsemble<S, E> {
+pub trait StateMachineEnsemble<S, E>
+where
+    Self: Send + Sync,
+{
     /// Request a join to a state machine ensemble. This method
     /// is a request to join an ensemble and doesn't guarantee
     /// a requester will eventually successfully join. Join operation

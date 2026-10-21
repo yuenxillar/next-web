@@ -94,6 +94,14 @@ where
         self.guard.as_ref()
     }
 
+    /// Gets the guard condition as a shared handle.
+    ///
+    /// # Returns
+    /// The guard condition
+    pub fn guard_arc(&self) -> Arc<dyn StateMachineGuard<S, E>> {
+        self.guard.clone()
+    }
+
     /// Gets the actions to execute.
     ///
     /// # Returns

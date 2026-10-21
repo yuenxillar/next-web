@@ -5,7 +5,9 @@ use crate::{
     state_context::StateContext, transition::transition_kind::TransitionKind,
 };
 
+/// The boxed action type used by a transition.
 pub type Action<S, E> = BoxedStateAction<S, E>;
+/// The boxed guard type used by a transition.
 pub type Guard<S, E> = BoxedStateGuard<S, E>;
 
 /// A simple data object keeping transition related configs in a same place.
@@ -287,6 +289,17 @@ where
     /// The state, if any
     pub fn state(&self) -> Option<&S> {
         self.state.as_ref()
+    }
+
+    /// Sets the state which scopes this transition.
+    ///
+    /// A scoped transition belongs to the machine of that state, which is how a
+    /// transition of a region is kept apart from a transition of its parent.
+    ///
+    /// # Arguments
+    /// * `state` - the scoping state
+    pub fn set_state(&mut self, state: S) {
+        self.state = Some(state);
     }
 
     /// Gets the event that triggers the transition.

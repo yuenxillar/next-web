@@ -5,6 +5,11 @@ use crate::{
     transition::{StateMachineTransition, transition_conflict_policy::TransitionConflictPolicy},
 };
 
+/// Compares transitions so that the machine picks the same one the Java
+/// implementation would.
+///
+/// The policy decides whether a transition of a child state wins over a
+/// transition of its parent state.
 #[derive(Debug, Clone)]
 pub struct TransitionComparator<S, E> {
     transition_conflict_policy: TransitionConflictPolicy,
@@ -12,127 +17,56 @@ pub struct TransitionComparator<S, E> {
 }
 
 impl<S, E> TransitionComparator<S, E> {
+    /// Creates a comparator for the given conflict policy.
+    ///
+    /// # Arguments
+    /// * `transition_conflict_policy` - the conflict policy
     pub fn new(transition_conflict_policy: TransitionConflictPolicy) -> Self {
         TransitionComparator {
             transition_conflict_policy,
-
             _marker: PhantomData,
         }
     }
 
-    /// 比较两个转换
+    /// Compares two transitions.
+    ///
+    /// # Arguments
+    /// * `left` - the left transition
+    /// * `right` - the right transition
     pub fn compare(
         &self,
         left: &dyn StateMachineTransition<S, E>,
         right: &dyn StateMachineTransition<S, E>,
     ) -> Ordering
     where
-        S: PartialEq,
-        S: Send + Sync + 'static,
-        E: Send + Sync + 'static,
+        S: Clone + PartialEq + Send + Sync + 'static,
+        E: Clone + Send + Sync + 'static,
     {
-        #[cfg(feature = "trace-log")]
-        tracing::trace!("Compare left='{:?}' right='{:?}'", left, right);
-
         if std::ptr::eq(left, right) {
             return Ordering::Equal;
         }
 
-        let is_substate = StateMachineUtils::is_substate(left.source(), right.source());
+        let (Some(left_source), Some(right_source)) = (left.source(), right.source()) else {
+            return Ordering::Equal;
+        };
+
+        let is_substate = StateMachineUtils::is_substate(&left_source, &right_source);
 
         match self.transition_conflict_policy {
             TransitionConflictPolicy::Child => {
                 if is_substate {
-                    Ordering::Greater // 1 表示 left > right
+                    Ordering::Greater
                 } else {
-                    Ordering::Less // -1 表示 left < right
+                    Ordering::Less
                 }
             }
             TransitionConflictPolicy::Parent => {
                 if is_substate {
-                    Ordering::Less // -1 表示 left < right
+                    Ordering::Less
                 } else {
-                    Ordering::Greater // 1 表示 left > right
+                    Ordering::Greater
                 }
             }
         }
-    }
-}
-
-impl<S, E> ToString for TransitionComparator<S, E> {
-    fn to_string(&self) -> String {
-        format!(
-            "TransitionComparator [transitionConflictPolicy={:?}]",
-            self.transition_conflict_policy
-        )
-    }
-}
-
-// ============ 可选：实现 Ord 和 PartialOrd 的包装器 ============
-
-/// 可排序的转换包装器
-pub struct SortableTransition<'a, S, E> {
-    transition: &'a dyn StateMachineTransition<S, E>,
-    comparator: &'a TransitionComparator<S, E>,
-}
-
-impl<'a, S, E> SortableTransition<'a, S, E> {
-    pub fn new(
-        transition: &'a dyn StateMachineTransition<S, E>,
-        comparator: &'a TransitionComparator<S, E>,
-    ) -> Self {
-        SortableTransition {
-            transition,
-            comparator,
-        }
-    }
-}
-
-impl<'a, S, E> PartialEq for SortableTransition<'a, S, E>
-where
-    S: PartialEq,
-    S: Send + Sync,
-    S: 'static,
-    E: Send + Sync,
-    E: 'static,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.comparator.compare(self.transition, other.transition) == Ordering::Equal
-    }
-}
-
-impl<'a, S, E> Eq for SortableTransition<'a, S, E>
-where
-    S: PartialEq,
-    S: Send + Sync,
-    S: 'static,
-    E: Send + Sync,
-    E: 'static,
-{
-}
-
-impl<'a, S, E> PartialOrd for SortableTransition<'a, S, E>
-where
-    S: PartialEq,
-    S: Send + Sync,
-    S: 'static,
-    E: Send + Sync,
-    E: 'static,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<'a, S, E> Ord for SortableTransition<'a, S, E>
-where
-    S: PartialEq,
-    S: Send + Sync,
-    S: 'static,
-    E: Send + Sync,
-    E: 'static,
-{
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.comparator.compare(self.transition, other.transition)
     }
 }

@@ -53,7 +53,10 @@ where
     E: Clone + 'static,
 {
     fn and(&mut self) -> Box<dyn StateMachineConfigurationConfigurer<S, E>> {
-        todo!()
+        match self.base.take_builder() {
+            Some(builder) => Box::new(builder),
+            None => Box::new(StateMachineConfigurationBuilder::<S, E>::new(true)),
+        }
     }
 }
 

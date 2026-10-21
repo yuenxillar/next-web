@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use next_web_core::{error::BoxError, messaging::Message};
 
 use crate::{
@@ -19,20 +21,21 @@ pub trait StateMachineInterceptor<S, E>
 where
     Self: Send + Sync,
 {
-    /// Called before message is sent to processing.
-    /// returning Err will skip the message.
+    /// Called before a message is sent to processing.
     ///
     /// # Arguments
     /// * `message` - the message
     /// * `state_machine` - the state machine
     ///
     /// # Returns
-    /// The intercepted message, or `None` to skip the message
+    /// The message to continue with, or an error to skip the message. The
+    /// returned message allows an interceptor to replace the payload, which is
+    /// what the Java implementation does by returning a new `Message`.
     fn pre_event(
         &self,
-        message: &mut dyn Message<E>,
+        message: Arc<dyn Message<E>>,
         state_machine: &dyn StateMachine<S, E>,
-    ) -> Result<(), BoxError>;
+    ) -> Result<Arc<dyn Message<E>>, BoxError>;
 
     /// Called prior of a state change. Returning an error
     /// from this method will stop a state change logic.
@@ -49,8 +52,8 @@ where
     fn pre_state_change(
         &self,
         state: &dyn StateMachineState<S, E>,
-        message: &dyn Message<E>,
-        transition: &dyn StateMachineTransition<S, E>,
+        message: Option<&dyn Message<E>>,
+        transition: Option<&dyn StateMachineTransition<S, E>>,
         state_machine: &dyn StateMachine<S, E>,
         root_state_machine: &dyn StateMachine<S, E>,
     ) -> Result<(), BoxError>;
@@ -66,43 +69,40 @@ where
     fn post_state_change(
         &self,
         state: &dyn StateMachineState<S, E>,
-        message: &dyn Message<E>,
-        transition: &dyn StateMachineTransition<S, E>,
+        message: Option<&dyn Message<E>>,
+        transition: Option<&dyn StateMachineTransition<S, E>>,
         state_machine: &dyn StateMachine<S, E>,
         root_state_machine: &dyn StateMachine<S, E>,
     );
 
-    /// Called prior of a start of a transition. Returning
-    /// `None` from this method will break the transition
-    /// chain.
+    /// Called prior of a start of a transition. Returning an
+    /// error from this method will break the transition chain.
     ///
     /// # Arguments
     /// * `state_context` - the state context
     ///
     /// # Returns
-    /// The state context, or `None` to break the transition chain
+    /// `Ok(())` to continue, `Err(error)` to break the transition chain
     fn pre_transition(&self, state_context: &dyn StateContext<S, E>) -> Result<(), BoxError>;
 
-    /// Called after of a transition if transition happened.
+    /// Called after a transition if the transition happened.
     ///
     /// # Arguments
     /// * `state_context` - the state context
-    ///
-    /// # Returns
-    /// The state context
     fn post_transition(&self, state_context: &dyn StateContext<S, E>) -> Result<(), BoxError>;
 
-    /// State when state machine is about to enter error it can't recover.
+    /// Called when the state machine is about to enter an error it cannot
+    /// recover from.
     ///
     /// # Arguments
     /// * `state_machine` - the state machine
-    /// * `exception` - the exception
+    /// * `error` - the error
     ///
     /// # Returns
-    /// The exception, potentially modified
+    /// The error, potentially modified. `None` suppresses the error.
     fn state_machine_error(
         &self,
         state_machine: &dyn StateMachine<S, E>,
-        error: Box<dyn std::error::Error>,
-    ) -> Box<dyn std::error::Error>;
+        error: BoxError,
+    ) -> Option<BoxError>;
 }

@@ -97,7 +97,7 @@ impl std::fmt::Display for StateMachineEnsembleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "StateMachineEnsembleError: {}", self.message)?;
         if let Some(cause) = &self.cause {
-            write!(f, " (caused by: {})", cause)?;
+            write!(f, " (caused by: {cause})")?;
         }
         Ok(())
     }

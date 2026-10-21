@@ -1,143 +1,166 @@
-use crate::{
-    state::StateMachineState, state_context::StateContext,
-    support::state_machine_interceptor::StateMachineInterceptor,
-    transition::StateMachineTransition,
-};
-use next_web_core::{async_trait, messaging::Message};
+//! The executor processes events and triggerless transitions of a state machine.
+
 use std::sync::Arc;
 
-/// Interface for a StateMachine event executor.
+use next_web_core::{async_trait, error::BoxError, messaging::Message};
+
+use crate::state::StateMachineState;
+use crate::state_context::StateContext;
+use crate::support::state_machine_interceptor::StateMachineInterceptor;
+use crate::transition::StateMachineTransition;
+
+/// Interface for a state machine event executor.
 #[async_trait]
-pub trait StateMachineExecutor<S, E>
+pub trait StateMachineExecutor<S, E>: Send + Sync
 where
-    Self: Send + Sync,
+    S: Send + Sync + 'static,
+    E: Send + Sync + 'static,
 {
-    /// Queue event.
+    /// Queues an event for processing.
     ///
     /// # Arguments
-    /// * `message` - The message to queue
-    /// * `callback` - The executor callback
+    /// * `message` - the message to queue
+    /// * `callback` - the callback notified when processing finished
     ///
     /// # Returns
-    /// Completion when event is queued
+    /// `true` when a transition happened, `false` when no transition matched
     async fn queue_event(
         &self,
-        message: Box<dyn Message<E>>,
+        message: Arc<dyn Message<E>>,
         callback: Arc<dyn StateMachineExecutorCallback>,
-    );
+    ) -> Result<bool, BoxError>;
 
-    /// Queue deferred event.
+    /// Queues a deferred event. Deferred events are replayed the next time an
+    /// event is queued.
     ///
     /// # Arguments
-    /// * `message` - The message to queue
-    fn queue_deferred_event(&self, message: Box<dyn Message<E>>);
+    /// * `message` - the message to defer
+    fn queue_deferred_event(&self, message: Arc<dyn Message<E>>);
 
-    /// Execute and check all triggerless transitions.
+    /// Executes and checks all triggerless transitions.
     ///
     /// # Arguments
-    /// * `context` - The state context
-    /// * `state` - The state
-    ///
-    /// # Returns
-    /// Completion when handled
+    /// * `context` - the state context
+    /// * `state` - the state to start from
     async fn execute_triggerless_transitions(
         &self,
         context: &dyn StateContext<S, E>,
         state: &dyn StateMachineState<S, E>,
-    );
+    ) -> Result<(), BoxError>;
 
-    /// Sets if initial stage is enabled.
+    /// Sets whether the initial transition is enabled.
     ///
     /// # Arguments
-    /// * `enabled` - The new flag
+    /// * `enabled` - the new flag
     fn set_initial_enabled(&self, enabled: bool);
 
-    /// Set initial forwarded event.
+    /// Arms the triggers of the machine.
     ///
-    /// # Arguments
-    /// * `message` - The forwarded message
-    fn set_forwarded_initial_event(&self, message: Box<dyn Message<E>>);
+    /// A timer trigger only fires while it is armed, so the machine arms them
+    /// when it starts.
+    fn start_triggers(&self) {}
 
-    /// Sets the state machine executor transit handler.
+    /// Disarms the triggers of the machine.
+    fn stop_triggers(&self) {}
+
+    /// Sets the event forwarded to the initial transition.
     ///
     /// # Arguments
-    /// * `state_machine_executor_transit` - The state machine executor transit handler
+    /// * `message` - the forwarded message
+    fn set_forwarded_initial_event(&self, message: Arc<dyn Message<E>>);
+
+    /// Sets the handler which performs the actual state change.
+    ///
+    /// # Arguments
+    /// * `transit_handler` - the transit handler
     fn set_state_machine_executor_transit(
-        &mut self,
+        &self,
         transit_handler: Arc<dyn StateMachineExecutorTransit<S, E>>,
     );
 
     /// Adds a state machine interceptor.
     ///
     /// # Arguments
-    /// * `interceptor` - The interceptor
-    fn add_state_machine_interceptor(
-        &mut self,
-        interceptor: Arc<dyn StateMachineInterceptor<S, E>>,
-    );
+    /// * `interceptor` - the interceptor
+    fn add_state_machine_interceptor(&self, interceptor: Arc<dyn StateMachineInterceptor<S, E>>);
 }
 
-/// Callback interface when executor wants to handle transit.
+/// Callback interface used when the executor wants to perform a transit.
 #[async_trait]
-pub trait StateMachineExecutorTransit<S, E>
-where
-    Self: Send + Sync,
-{
-    /// Called when executor wants to do a transit.
+pub trait StateMachineExecutorTransit<S, E>: Send + Sync {
+    /// Called when the executor wants to perform a transit.
+    ///
+    /// The machine builds its own state context, so the executor only has to
+    /// name the transition and the message to apply.
     ///
     /// # Arguments
-    /// * `transition` - The transition
-    /// * `state_context` - The state context
-    /// * `message` - The message
+    /// * `transition` - the transition to apply
+    /// * `message` - the message which caused the transition
     ///
     /// # Returns
-    /// Completion when handled
+    /// `true` if the transition happened
     async fn transit(
         &self,
         transition: Arc<dyn StateMachineTransition<S, E>>,
-        state_context: Arc<dyn StateContext<S, E>>,
-        message: Box<dyn Message<E>>,
-    );
+        message: Option<Arc<dyn Message<E>>>,
+    ) -> Result<bool, BoxError>;
 }
 
-/// Completion callback to notify back complete or error.
+/// Completion callback reporting success or a failure of event processing.
 pub trait StateMachineExecutorCallback: Send + Sync {
-    fn complete(&mut self);
-    fn error(&mut self, error: Box<dyn std::error::Error + Send + Sync>);
+    /// Called when processing completed successfully.
+    fn complete(&self);
+
+    /// Called when processing failed.
+    ///
+    /// # Arguments
+    /// * `error` - the failure
+    fn error(&self, error: BoxError);
 }
 
-/// Implementation of StateMachineExecutorCallback that uses a oneshot channel
+/// A callback that records the outcome, so a caller can await the completion of
+/// an event that was queued.
 pub struct DefaultStateMachineExecutorCallback {
-    complete: Option<bool>,
-    error: Option<Box<dyn std::error::Error + Send + Sync>>,
+    inner: std::sync::Mutex<CallbackOutcome>,
+}
+
+#[derive(Default)]
+struct CallbackOutcome {
+    completed: bool,
+    error: Option<String>,
 }
 
 impl DefaultStateMachineExecutorCallback {
-    pub fn accept(&self) {
-        if self.complete.as_ref().map(|s| *s).unwrap_or_default() {
-            todo!()
+    /// Creates a new callback.
+    pub fn new() -> Self {
+        Self {
+            inner: std::sync::Mutex::new(CallbackOutcome::default()),
         }
+    }
+
+    /// Checks whether the callback was completed successfully.
+    pub fn is_completed(&self) -> bool {
+        crate::support::lock_util::lock(&self.inner).completed
+    }
+
+    /// Gets the recorded error message, if any.
+    pub fn error_message(&self) -> Option<String> {
+        crate::support::lock_util::lock(&self.inner).error.clone()
+    }
+}
+
+impl Default for DefaultStateMachineExecutorCallback {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl StateMachineExecutorCallback for DefaultStateMachineExecutorCallback {
-    fn complete(&mut self) {
-        let _ = self.complete.replace(true);
+    fn complete(&self) {
+        crate::support::lock_util::lock(&self.inner).completed = true;
     }
 
-    fn error(&mut self, error: Box<dyn std::error::Error + Send + Sync>) {
-        let _ = self.error.replace(error);
-    }
-}
-
-pub struct ExecutorErrorHolder(pub Box<dyn std::error::Error + Send + Sync>);
-
-impl ExecutorErrorHolder {
-    pub fn set_error(&mut self, error: Box<dyn std::error::Error + Send + Sync>) {
-        self.0 = error;
-    }
-
-    pub fn get_error(&self) -> &Box<dyn std::error::Error + Send + Sync> {
-        &self.0
+    fn error(&self, error: BoxError) {
+        crate::support::lock_util::lock(&self.inner).error = Some(error.to_string());
     }
 }

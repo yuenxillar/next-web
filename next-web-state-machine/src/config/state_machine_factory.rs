@@ -6,7 +6,10 @@ use uuid::Uuid;
 use crate::StateMachine;
 
 /// StateMachineFactory is a strategy interface building StateMachines.
-pub trait StateMachineFactory<S, E> {
+pub trait StateMachineFactory<S, E>
+where
+    Self: Send + Sync,
+{
     /// Build a new StateMachine instance.
     fn get_state_machine(&self) -> Result<Arc<dyn StateMachine<S, E>>, BoxError>;
 
@@ -16,6 +19,7 @@ pub trait StateMachineFactory<S, E> {
         machine_id: String,
     ) -> Result<Arc<dyn StateMachine<S, E>>, BoxError>;
 
+    /// Build a new StateMachine instance with a given machine uuid.
     fn get_state_machine_with_uuid(
         &self,
         machine_id: Uuid,

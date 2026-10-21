@@ -8,6 +8,7 @@ use crate::config::{
     guard::StateMachineGuard,
 };
 
+/// Configurer shared by every kind of transition.
 pub trait TransitionConfigurer<S, E>
 where
     Self: ConfigurerBuilder<Box<dyn StateMachineTransitionConfigurer<S, E>>>,

@@ -12,7 +12,10 @@ use crate::state_context::StateContext;
 /// - `S`: the type of state
 /// - `E`: the type of event
 #[async_trait]
-pub trait StateListener<S, E> {
+pub trait StateListener<S, E>
+where
+    Self: Send + Sync,
+{
     /// Called when `State` want to notify of its entry.
     ///
     /// # Arguments

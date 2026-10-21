@@ -2,14 +2,15 @@ use crate::state::pseudo_state::PseudoState;
 
 /// Context object using in PseudoStateListener.
 pub trait PseudoStateContext<S, E> {
-    ///  Gets the pseudo state.
+    /// Gets the pseudo state.
     fn get_pseudo_state(&self) -> Option<&dyn PseudoState<S, E>>;
 
-    ///  Gets the pseudo action.
+    /// Gets the pseudo action.
     fn get_pseudo_action(&self) -> PseudoAction;
 }
 
 /// The PseudoAction enumeration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PseudoAction {
     /// Indication that states has been joined.
     JoinCompleted,

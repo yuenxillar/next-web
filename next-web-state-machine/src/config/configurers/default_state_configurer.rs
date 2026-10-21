@@ -33,6 +33,8 @@ where
 {
     shared: Rc<RefCell<DefaultStateConfigurerData<S, E>>>,
 
+    builder: Option<StateMachineStateBuilder<S, E>>,
+
     pub(crate) base: ConfigurerAdapter<
         StatesData<S, E>,
         Box<dyn StateMachineStateConfigurer<S, E>>,
@@ -82,7 +84,10 @@ where
     E: Clone + 'static,
 {
     fn and(&mut self) -> Box<dyn StateMachineStateConfigurer<S, E>> {
-        todo!()
+        match self.builder.take() {
+            Some(builder) => Box::new(builder),
+            None => Box::new(StateMachineStateBuilder::<S, E>::new(true)),
+        }
     }
 }
 
@@ -95,7 +100,11 @@ where
     E: Clone + 'static,
 {
     fn build(&mut self) -> Result<StatesData<S, E>, BoxError> {
-        todo!()
+        // The states are collected into the shared map while the configurer
+        // runs, so building returns a snapshot of it.
+        let data = self.shared.borrow();
+
+        Ok(StatesData::new(data.incomplete.values().cloned().collect()))
     }
 }
 
@@ -109,21 +118,17 @@ where
         let mut state_datas = Vec::new();
 
         for mut state_data in data.incomplete.values().cloned().collect::<Vec<_>>() {
-            if state_data.parent().is_none() {
-                if let Some(parent) = data.parent.as_ref() {
+            if state_data.parent().is_none()
+                && let Some(parent) = data.parent.as_ref() {
                     state_data.set_parent(Arc::new(parent.clone()));
                 }
-            }
 
-            if let Some(initial_state) = &data.initial_state {
-                if state_data.state() == initial_state {
+            if let Some(initial_state) = &data.initial_state
+                && state_data.state() == initial_state {
                     state_data.set_initial(true);
 
-                    data.initial_action.as_ref().map(|action| {
-                        state_data.set_initial_action(action.clone());
-                    });
+                    if let Some(action) = data.initial_action.as_ref() { state_data.set_initial_action(action.clone()); }
                 }
-            }
 
             if data.ends.contains(&state_data.state) {
                 state_data.set_end(true);
@@ -143,16 +148,14 @@ where
                 state_data.set_pseudo_state_kind(PseudoStateKind::Exit);
             }
 
-            if let Some(history) = &data.history {
-                if state_data.state() == history {
-                    if let Some(history_type) = data.history_type.as_ref() {
+            if let Some(history) = &data.history
+                && state_data.state() == history
+                    && let Some(history_type) = data.history_type.as_ref() {
                         state_data.set_pseudo_state_kind(match history_type {
                             History::Shallow => PseudoStateKind::HistoryShallow,
                             History::Deep => PseudoStateKind::HistoryDeep,
                         });
                     }
-                }
-            }
 
             if let Some(submachine) = data.submachines.get(state_data.state()) {
                 state_data.set_submachine(submachine.clone());
@@ -539,6 +542,14 @@ where
         self.shared.borrow().parent.clone()
     }
 
+    /// Records the data of a state which is still being configured.
+    ///
+    /// # Arguments
+    /// * `parent` - the parent state of a hierarchical state
+    /// * `state` - the state
+    /// * `deferred` - the events deferred while the state is active
+    /// * `entry_actions` - the actions executed on entry
+    /// * `exit_actions` - the actions executed on exit
     pub fn add_incomplete(
         &mut self,
         parent: Option<S>,
@@ -554,7 +565,9 @@ where
             .incomplete
             .entry(state.clone())
             .or_insert(StateData::with_actions(
-                parent.as_ref().map(|s| Arc::new(s.clone()) as Arc<dyn Any>),
+                parent
+                    .as_ref()
+                    .map(|s| Arc::new(s.clone()) as Arc<dyn Any + Send + Sync>),
                 Some(region.clone()),
                 state,
                 deferred.clone(),
@@ -562,39 +575,34 @@ where
                 exit_actions.clone(),
             ));
 
-        if state_data.parent().is_none() {
-            if let Some(parent) = parent.map(|s| Arc::new(s) as Arc<dyn Any>) {
+        if state_data.parent().is_none()
+            && let Some(parent) = parent.map(|s| Arc::new(s) as Arc<dyn Any + Send + Sync>) {
                 state_data.set_parent(parent);
             }
-        }
 
         if state_data.region().is_none() {
             state_data.set_region(region.as_str());
         }
 
-        if state_data.deferred().is_none() {
-            if let Some(deferred) = deferred {
+        if state_data.deferred().is_none()
+            && let Some(deferred) = deferred {
                 state_data.set_deferred(deferred);
             }
-        }
 
-        if state_data.entry_actions().is_none() {
-            if let Some(entry_actions) = entry_actions {
+        if state_data.entry_actions().is_none()
+            && let Some(entry_actions) = entry_actions {
                 state_data.set_entry_actions(entry_actions);
             }
-        }
 
-        if state_data.exit_actions().is_none() {
-            if let Some(exit_actions) = exit_actions {
+        if state_data.exit_actions().is_none()
+            && let Some(exit_actions) = exit_actions {
                 state_data.set_exit_actions(exit_actions);
             }
-        }
 
-        if state_data.state_actions().is_none() {
-            if let Some(state_actions) = state_actions {
+        if state_data.state_actions().is_none()
+            && let Some(state_actions) = state_actions {
                 state_data.set_state_actions(state_actions);
             }
-        }
 
         drop(data);
         self
@@ -627,9 +635,26 @@ where
                 submachines: HashMap::new(),
                 submachine_factories: HashMap::new(),
             })),
+            builder: None,
 
             base: Default::default(),
         }
+    }
+}
+
+impl<S, E> DefaultStateConfigurer<S, E>
+where
+    S: Eq + Hash,
+    S: Clone + 'static,
+    E: Clone + 'static,
+{
+    /// Keeps the builder which created this configurer.
+    ///
+    /// # Arguments
+    /// * `builder` - the state builder
+    pub fn with_builder(mut self, builder: StateMachineStateBuilder<S, E>) -> Self {
+        self.builder = Some(builder);
+        self
     }
 }
 
@@ -641,6 +666,7 @@ where
     fn clone(&self) -> Self {
         Self {
             shared: self.shared.clone(),
+            builder: self.builder.clone(),
             base: self.base.clone(),
         }
     }

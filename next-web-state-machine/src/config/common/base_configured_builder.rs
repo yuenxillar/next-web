@@ -65,6 +65,10 @@ where
         }
     }
 
+    /// Creates a new builder which allows several configurers of the same type.
+    ///
+    /// # Arguments
+    /// * `allow_configurers_of_same_type` - whether several configurers of one type are kept
     pub fn with_allow_configurers_of_same_type(allow_configurers_of_same_type: bool) -> Self {
         Self {
             main_configurers: BTreeMap::new(),
@@ -105,7 +109,7 @@ where
             if self.allow_configurers_of_same_type {
                 self.main_configurers
                     .entry(type_id)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(configurer);
             } else {
                 self.main_configurers.insert(type_id, vec![configurer]);
@@ -113,13 +117,17 @@ where
         } else if self.allow_configurers_of_same_type {
             self.post_configurers
                 .entry(type_id)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(configurer);
         } else {
             self.post_configurers.insert(type_id, vec![configurer]);
         }
     }
 
+    /// Registers a configurer adapter, so it is applied during the build.
+    ///
+    /// # Arguments
+    /// * `configurer` - the configurer adapter to register
     pub fn apply_adapter(
         &mut self,
         configurer: &mut ConfigurerAdapter<O, I, B>,
@@ -140,6 +148,10 @@ where
         Ok(())
     }
 
+    /// Registers a configurer, so it is applied during the build.
+    ///
+    /// # Arguments
+    /// * `configurer` - the configurer to register
     pub fn apply<C>(&mut self, configurer: &mut C) -> Result<(), BoxError>
     where
         C: Configurer<O, B> + 'static,
@@ -151,7 +163,7 @@ where
     }
 
     /// Gets a configurer by type
-    pub fn get_configurer<C>(&self) -> Option<&Box<dyn Configurer<O, B>>>
+    pub fn get_configurer<C>(&self) -> Option<&dyn Configurer<O, B>>
     where
         C: Configurer<O, B> + 'static,
     {
@@ -164,7 +176,7 @@ where
                     configs.len()
                 )
             } else {
-                return configs.get(0);
+                return configs.first().map(|configurer| configurer.as_ref());
             }
         }
 
@@ -212,6 +224,10 @@ where
         Some(f(obj))
     }
 
+    /// Takes the shared object of the given type out of the shared map.
+    ///
+    /// # Type Parameters
+    /// * `C` - the type of the shared object
     pub fn get_own_shared_object<C: Any + 'static>(&self) -> Option<C> {
         self.shared_objects
             .borrow_mut()
@@ -226,14 +242,17 @@ where
     }
 
     /// Gets all configurer instances by type
-    pub fn get_configurers<C>(&self) -> Vec<&Box<dyn Configurer<O, B>>>
+    pub fn get_configurers<C>(&self) -> Vec<&dyn Configurer<O, B>>
     where
         C: Configurer<O, B> + Clone + 'static,
     {
         let type_id = TypeId::of::<C>();
 
         match self.main_configurers.get(&type_id) {
-            Some(configs) => configs.iter().collect::<Vec<_>>(),
+            Some(configs) => configs
+                .iter()
+                .map(|configurer| configurer.as_ref())
+                .collect::<Vec<_>>(),
             None => Default::default(),
         }
     }
@@ -245,10 +264,7 @@ where
     {
         let type_id = TypeId::of::<C>();
 
-        match self.main_configurers.remove(&type_id) {
-            Some(configs) => configs,
-            None => Default::default(),
-        }
+        self.main_configurers.remove(&type_id).unwrap_or_default()
     }
 
     /// Removes and returns a configurer by type
@@ -272,6 +288,10 @@ where
         None
     }
 
+    /// Sets the post processor applied to the objects of the build.
+    ///
+    /// # Arguments
+    /// * `object_post_processor` - the post processor
     pub fn set_object_post_processor(
         &mut self,
         object_post_processor: Arc<dyn ObjectPostProcessor>,
@@ -279,32 +299,14 @@ where
         self.object_post_processor = Some(object_post_processor);
     }
 
+    /// Applies the post processor to a value, when one is configured.
+    ///
+    /// # Arguments
+    /// * `value` - the value to post process
     pub fn post_process(&self, value: &mut AnyValue) {
-        self.object_post_processor
-            .as_ref()
-            .map(|object_post_processor| {
-                object_post_processor.post_process(value);
-            });
-    }
-
-    fn get_main_configurers(&mut self) -> Vec<&mut Box<dyn Configurer<O, B>>> {
-        self.main_configurers
-            .values_mut()
-            .into_iter()
-            .fold(Vec::new(), |mut acc, var| {
-                var.iter_mut().map(|var2| acc.push(var2));
-                acc
-            })
-    }
-
-    fn get_post_configurers(&mut self) -> Vec<&mut Box<dyn Configurer<O, B>>> {
-        self.post_configurers
-            .values_mut()
-            .into_iter()
-            .fold(Vec::new(), |mut acc, var| {
-                var.iter_mut().map(|var2| acc.push(var2));
-                acc
-            })
+        if let Some(object_post_processor) = self.object_post_processor.as_ref() {
+            object_post_processor.post_process(value);
+        }
     }
 
     fn is_unbuilt(&self) -> bool {
@@ -335,10 +337,12 @@ pub enum BuildState {
 }
 
 impl BuildState {
+    /// Checks whether the builder is initializing its main configurers.
     pub fn is_configured(&self) -> bool {
         self == &Self::InitializingMains
     }
 
+    /// Checks whether the builder is configuring its main configurers.
     pub fn is_initializing(&self) -> bool {
         self == &Self::ConfiguringMains
     }
@@ -355,12 +359,18 @@ where
     }
 }
 
+/// Wraps a builder so the type parameters the configured builder needs are
+/// explicit at the call site.
 pub struct WithTypes<T, I, B> {
     inner: T,
     _marker: std::marker::PhantomData<(I, B)>,
 }
 
 impl<T, I, B> WithTypes<T, I, B> {
+    /// Wraps the given builder.
+    ///
+    /// # Arguments
+    /// * `inner` - the builder to wrap
     pub fn new(inner: T) -> Self {
         Self {
             inner,
@@ -443,10 +453,13 @@ where
     }
 }
 
+/// Callback which builds the object after every configurer has run.
 pub trait BaseConfiguredBuilderExt<O> {
+    /// Builds the object.
     fn perform_build(&mut self) -> Result<O, BoxError>;
 }
 
+/// Extends a builder with the registration helpers of the configuration layer.
 pub trait BaseConfiguredBuilderExtOwn<O, I, B>
 where
     Self: AsRef<B>,
@@ -514,10 +527,9 @@ where
         I: 'static,
     {
         self.add(configurer)?;
-        self.get_mut_object()
+        if let Some(processor) = self.get_mut_object()
             .object_post_processor
-            .as_ref()
-            .map(|processor| configurer.add_object_post_processor(processor.clone()));
+            .as_ref() { configurer.add_object_post_processor(processor.clone()) }
         configurer.set_builder(self.as_ref().clone());
 
         Ok(())
@@ -574,18 +586,20 @@ where
         Ok(())
     }
 
+    /// Initializes the main configurers.
     fn init_main_configurers(&mut self) -> Result<(), BoxError> {
         let mut main_configurers = mem::take(&mut self.get_mut_object().main_configurers);
         let builder = self.as_ref();
         for configurers in main_configurers.values_mut() {
             for configurer in configurers.iter_mut() {
-                configurer.init(&builder)?;
+                configurer.init(builder)?;
             }
         }
         self.get_mut_object().main_configurers = main_configurers;
         Ok(())
     }
 
+    /// Configures the main configurers.
     fn configure_main_configurers(&mut self) -> Result<(), BoxError>
     where
         B: Clone,
@@ -594,13 +608,15 @@ where
         let builder = self.as_ref();
         for configurers in main_configurers.values_mut() {
             for configurer in configurers.iter_mut() {
-                configurer.configure(&builder)?;
+                configurer.configure(builder)?;
             }
         }
         self.get_mut_object().main_configurers = main_configurers;
         Ok(())
     }
 
+    /// Configures the post configurers, which are registered while the main ones
+    /// are configured.
     fn configure_post_configurers(&mut self) -> Result<(), BoxError>
     where
         B: Clone,
@@ -609,7 +625,7 @@ where
         let builder = self.as_ref();
         for configurers in post_configurers.values_mut() {
             for configurer in configurers.iter_mut() {
-                configurer.configure(&builder)?;
+                configurer.configure(builder)?;
             }
         }
         self.get_mut_object().post_configurers = post_configurers;

@@ -18,6 +18,16 @@ use crate::config::{
     state_machine_config::StateMachineConfig,
 };
 
+/// Configurer of a whole machine.
+///
+/// The callbacks receive the configurer of one part of the machine, so an
+/// implementation can configure the configuration, the model, the states and the
+/// transitions in one place.
+///
+/// # Type Parameters
+/// * `S` - the type of state
+/// * `E` - the type of event
+/// * `T1` .. `T4` - the configurers of the four parts
 pub trait StateMachineConfigurer<
     S,
     E,

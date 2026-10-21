@@ -107,7 +107,7 @@ impl SecurityRule {
     /// # Returns
     /// `true` if the rule has attributes, `false` otherwise
     pub fn has_attributes(&self) -> bool {
-        self.attributes.as_ref().map_or(false, |a| !a.is_empty())
+        self.attributes.as_ref().is_some_and(|a| !a.is_empty())
     }
 
     /// Checks if the rule has an expression.

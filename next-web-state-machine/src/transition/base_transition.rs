@@ -1,113 +1,65 @@
+//! Base implementation of a transition.
+
 use std::sync::Arc;
 
 use futures::FutureExt;
 use next_web_core::async_trait;
+use next_web_core::error::BoxError;
 use tracing::warn;
 
-use crate::{
-    BoxedStateAction, BoxedStateGuard,
-    security::security_rule::SecurityRule,
-    state::{StateMachineState, action_listener::ActionListener},
-    state_context::StateContext,
-    transition::{StateMachineTransition, transition_kind::TransitionKind},
-    trigger::Trigger,
-};
+use crate::BoxedStateAction;
+use crate::BoxedStateGuard;
+use crate::action::composite_action_listener::CompositeActionListener;
+use crate::security::security_rule::SecurityRule;
+use crate::state::{StateMachineState, action_listener::ActionListener};
+use crate::state_context::StateContext;
+use crate::transition::{StateMachineTransition, transition_kind::TransitionKind};
+use crate::trigger::Trigger;
 
 /// Base implementation of a transition in a state machine.
 ///
-/// This abstract class provides common functionality for state transitions,
-/// including source/target states, guard conditions, actions, and triggers.
+/// The Java class hierarchy splits this into `AbstractTransition`,
+/// `AbstractExternalTransition`, `AbstractInternalTransition` and
+/// `AbstractLocalTransition`; the Rust port keeps the kind in a field, because
+/// the only difference between the subclasses is how the machine treats the
+/// source and target state, which the machine decides on [`TransitionKind`].
 ///
 /// # Type Parameters
-///
-/// * `S` - The type of state
-/// * `E` - The type of event
+/// * `S` - the type of state
+/// * `E` - the type of event
 pub struct BaseTransition<S, E> {
-    /// The source state of this transition.
     source: Option<Arc<dyn StateMachineState<S, E>>>,
-
-    /// The target state of this transition.
     target: Arc<dyn StateMachineState<S, E>>,
-
-    /// The kind of this transition (e.g., internal, external, local).
     kind: TransitionKind,
-
-    /// The guard condition that must be satisfied for the transition to occur.
     guard: Option<BoxedStateGuard<S, E>>,
-
-    /// The trigger that activates this transition.
     trigger: Option<Arc<dyn Trigger<S, E>>>,
-
-    /// Security rules associated with this transition.
     security_rule: Option<SecurityRule>,
-
-    /// The name of this transition.
     name: String,
-
-    /// Actions to execute when this transition occurs.
     actions: Vec<BoxedStateAction<S, E>>,
-
-    /// Listener for action execution events.
-    action_listener: Option<Arc<dyn ActionListener<S, E>>>,
+    action_listener: CompositeActionListener<S, E>,
 }
 
-impl<S, E> BaseTransition<S, E> {
-    /// Creates a new abstract transition.
+impl<S, E> BaseTransition<S, E>
+where
+    S: Send + Sync + 'static,
+    E: Send + Sync + 'static,
+{
+    /// Creates a new transition.
     ///
     /// # Arguments
-    ///
-    /// * `source` - The source state
-    /// * `target` - The target state
-    /// * `actions` - Actions to execute during the transition
-    /// * `event` - The event associated with this transition
-    /// * `kind` - The kind of transition
-    /// * `guard` - The guard condition function
-    /// * `trigger` - The trigger for this transition
+    /// * `source` - the source state, `None` for an initial transition
+    /// * `target` - the target state
+    /// * `actions` - the actions to execute
+    /// * `kind` - the kind of the transition
+    /// * `guard` - the guard condition
+    /// * `trigger` - the trigger of the transition
     pub fn new(
-        source: Arc<dyn StateMachineState<S, E>>,
-        target: Arc<dyn StateMachineState<S, E>>,
-        actions: Vec<BoxedStateAction<S, E>>,
-        _event: E,
-        kind: TransitionKind,
-        guard: Option<BoxedStateGuard<S, E>>,
-        trigger: Option<Arc<dyn Trigger<S, E>>>,
-    ) -> Self {
-        Self {
-            source: Some(source),
-            target,
-            kind,
-            guard,
-            trigger,
-            security_rule: None,
-            name: String::new(),
-            actions,
-            action_listener: None,
-        }
-    }
-
-    /// Creates a new abstract transition with security rule and name.
-    ///
-    /// # Arguments
-    ///
-    /// * `source` - The source state
-    /// * `target` - The target state
-    /// * `actions` - Actions to execute during the transition
-    /// * `event` - The event associated with this transition
-    /// * `kind` - The kind of transition
-    /// * `guard` - The guard condition function
-    /// * `trigger` - The trigger for this transition
-    /// * `security_rule` - Security rules for this transition
-    /// * `name` - The name of this transition
-    pub fn with_security_and_name(
         source: Option<Arc<dyn StateMachineState<S, E>>>,
         target: Arc<dyn StateMachineState<S, E>>,
         actions: Vec<BoxedStateAction<S, E>>,
-        _event: Option<E>,
         kind: TransitionKind,
         guard: Option<BoxedStateGuard<S, E>>,
         trigger: Option<Arc<dyn Trigger<S, E>>>,
-        security_rule: Option<SecurityRule>,
-        name: Option<String>,
     ) -> Self {
         Self {
             source,
@@ -115,159 +67,116 @@ impl<S, E> BaseTransition<S, E> {
             kind,
             guard,
             trigger,
-            security_rule,
-            name: name.unwrap_or_default(),
+            security_rule: None,
+            name: String::new(),
             actions,
-            action_listener: None,
+            action_listener: CompositeActionListener::new(),
         }
+    }
+
+    /// Sets the security rule of this transition.
+    ///
+    /// # Arguments
+    /// * `security_rule` - the security rule
+    pub fn with_security_rule(mut self, security_rule: Option<SecurityRule>) -> Self {
+        self.security_rule = security_rule;
+        self
+    }
+
+    /// Sets the name of this transition.
+    ///
+    /// # Arguments
+    /// * `name` - the transition name
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    /// Gets the guard as a shared handle, for the machine and the executor.
+    pub fn guard_arc(&self) -> Option<BoxedStateGuard<S, E>> {
+        self.guard.clone()
     }
 }
 
 #[async_trait]
 impl<S, E> StateMachineTransition<S, E> for BaseTransition<S, E>
 where
-    S: Send + Sync,
-    S: 'static,
-    E: Send + Sync,
-    E: 'static,
+    S: Send + Sync + 'static,
+    E: Send + Sync + 'static,
 {
-    /// Transit this transition with a give state context.
-    ///
-    /// # Arguments
-    /// * `context` - the state context
-    ///
-    /// # Returns
-    /// A future that resolves to `true` if transition happened, `false` otherwise
     async fn transit(&self, context: &dyn StateContext<S, E>) -> bool {
-        let guard = match self.guard.as_ref() {
-            Some(guard) => guard,
-            None => return true,
+        let Some(guard) = self.guard.as_ref() else {
+            return true;
         };
 
-        let future = std::panic::AssertUnwindSafe(guard(context));
-
-        match future.catch_unwind().await {
-            Ok(value) => value,
-            Err(_) => {
-                warn!("Deny guard due to panic - guard should not panic");
-                false
-            }
+        if let Ok(value) = std::panic::AssertUnwindSafe(guard(context))
+            .catch_unwind()
+            .await { value } else {
+            warn!("denying the transition because the guard panicked");
+            false
         }
     }
 
-    /// Execute transition actions.
-    ///
-    /// # Arguments
-    /// * `context` - the state context
-    ///
-    /// # Returns
-    /// A future that completes when all transition actions have been executed
-    async fn execute_transition_actions(&self, context: &dyn StateContext<S, E>) {
+    async fn execute_transition_actions(
+        &self,
+        context: &dyn StateContext<S, E>,
+    ) -> Result<(), BoxError> {
         if self.actions.is_empty() {
-            return;
+            return Ok(());
         }
 
-        for action in self.actions.iter() {
-            let start_time = std::time::Instant::now();
-
-            // Execute the action
-            action(context).await;
-
-            // Notify the action listener if present
-            if let Some(listener) = &self.action_listener {
-                let duration = start_time.elapsed();
-                if let Some(state_machine) = context.state_machine() {
-                    listener.on_execute(state_machine, action, duration).await;
-                }
+        for action in &self.actions {
+            let started = std::time::Instant::now();
+            action(context).await?;
+            let elapsed = started.elapsed();
+            if let Some(state_machine) = context.state_machine() {
+                self.action_listener
+                    .notify(state_machine, action, elapsed)
+                    .await;
+                state_machine.notify_action_executed(action, elapsed);
             }
         }
+
+        Ok(())
     }
 
-    /// Gets the source state of this transition.
-    ///
-    /// # Returns
-    /// The source state
-    fn source(&self) -> &dyn StateMachineState<S, E> {
-        self.source.as_ref().map(AsRef::as_ref).unwrap()
+    fn source(&self) -> Option<Arc<dyn StateMachineState<S, E>>> {
+        self.source.clone()
     }
 
-    /// Gets the target state of this transition.
-    ///
-    /// # Returns
-    /// The target state
-    fn target(&self) -> &dyn StateMachineState<S, E> {
-        self.target.as_ref()
+    fn target(&self) -> Arc<dyn StateMachineState<S, E>> {
+        self.target.clone()
     }
 
-    /// Gets the guard of this transition.
-    ///
-    /// # Returns
-    /// The guard function that determines if the transition can be taken
     fn guard(&self) -> Option<&BoxedStateGuard<S, E>> {
         self.guard.as_ref()
     }
 
-    /// Gets the transition actions.
-    ///
-    /// # Returns
-    /// A collection of action functions to execute during the transition
     fn actions(&self) -> &[BoxedStateAction<S, E>] {
         &self.actions
     }
 
-    /// Gets the transition trigger.
-    ///
-    /// # Returns
-    /// The trigger that initiates this transition
-    fn trigger(&self) -> Option<&dyn Trigger<S, E>> {
-        self.trigger.as_deref()
+    fn trigger(&self) -> Option<&Arc<dyn Trigger<S, E>>> {
+        self.trigger.as_ref()
     }
 
-    /// Gets the transition kind.
-    ///
-    /// # Returns
-    /// The kind of transition
     fn kind(&self) -> TransitionKind {
         self.kind
     }
 
-    /// Gets the security rule.
-    ///
-    /// # Returns
-    /// The security rule for this transition, if any
     fn security_rule(&self) -> Option<&SecurityRule> {
         self.security_rule.as_ref()
     }
 
-    /// Gets the name.
-    ///
-    /// # Returns
-    /// The name of this transition
     fn name(&self) -> &str {
         &self.name
     }
 
-    /// Adds the action listener.
-    ///
-    /// # Arguments
-    /// * `listener` - the listener
-    fn add_action_listener(&mut self, listener: Arc<dyn ActionListener<S, E>>) {
-        self.action_listener = Some(listener);
+    fn add_action_listener(&self, listener: Arc<dyn ActionListener<S, E>>) {
+        self.action_listener.register(listener);
     }
 
-    /// Removes the action listener.
-    ///
-    /// # Arguments
-    /// * `listener` - the listener
-    fn remove_action_listener(&mut self, listener: &dyn ActionListener<S, E>) {
-        if let Some(current_listener) = &self.action_listener {
-            // Compare listener references
-            if std::ptr::eq(
-                current_listener.as_ref() as *const _ as *const (),
-                listener as *const _ as *const (),
-            ) {
-                self.action_listener = None;
-            }
-        }
+    fn remove_action_listener(&self, listener: Arc<dyn ActionListener<S, E>>) {
+        self.action_listener.unregister(listener);
     }
 }

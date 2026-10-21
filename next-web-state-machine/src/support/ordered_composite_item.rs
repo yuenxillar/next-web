@@ -1,7 +1,9 @@
 use next_web_core::Ordered;
 
+/// Composite item which can be ordered by its entries.
 #[derive(Clone)]
 pub struct OrderedCompositeItem<S> {
+    /// The ordered items.
     pub ordered: Vec<S>,
 }
 
@@ -27,7 +29,7 @@ where
     pub fn add(&mut self, item: S) {
         if !self.ordered.contains(&item) {
             self.ordered.push(item);
-            self.ordered.sort_by(|a, b| a.order().cmp(&b.order()));
+            self.ordered.sort_by_key(|a| a.order());
         }
     }
 }

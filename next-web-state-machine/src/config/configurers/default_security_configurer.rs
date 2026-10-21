@@ -56,7 +56,10 @@ where
     E: Clone + 'static,
 {
     fn and(&mut self) -> Box<dyn StateMachineConfigurationConfigurer<S, E>> {
-        todo!()
+        match self.base.take_builder() {
+            Some(builder) => Box::new(builder),
+            None => Box::new(StateMachineConfigurationBuilder::<S, E>::new(true)),
+        }
     }
 }
 
@@ -129,12 +132,15 @@ where
         match_type: ComparisonType,
     ) -> &mut dyn StateMachineSecurityConfigurer<S, E> {
         if self.event_security_rule.is_none() {
-            self.event_security_rule = Some(Default::default());
+            self.event_security_rule = Some(SecurityRule::default());
         }
 
-        self.event_security_rule.as_mut().unwrap().set_attributes(
-            SecurityRule::comma_delimited_list_to_security_attributes(&attributes),
-        );
+        if let Some(rule) = self.event_security_rule.as_mut() {
+            rule.set_attributes(SecurityRule::comma_delimited_list_to_security_attributes(
+                &attributes,
+            ));
+            rule.set_comparison_type(match_type);
+        }
 
         self
     }
@@ -144,13 +150,12 @@ where
         expression: String,
     ) -> &mut dyn StateMachineSecurityConfigurer<S, E> {
         if self.event_security_rule.is_none() {
-            self.event_security_rule = Some(Default::default());
+            self.event_security_rule = Some(SecurityRule::default());
         }
 
-        self.event_security_rule
-            .as_mut()
-            .unwrap()
-            .set_expression(expression);
+        if let Some(rule) = self.event_security_rule.as_mut() {
+            rule.set_expression(expression);
+        }
 
         self
     }
@@ -160,13 +165,16 @@ where
         attributes: String,
         match_type: ComparisonType,
     ) -> &mut dyn StateMachineSecurityConfigurer<S, E> {
-        if self.event_security_rule.is_none() {
-            self.event_security_rule = Some(Default::default());
+        if self.transition_security_rule.is_none() {
+            self.transition_security_rule = Some(SecurityRule::default());
         }
 
-        self.event_security_rule.as_mut().unwrap().set_attributes(
-            SecurityRule::comma_delimited_list_to_security_attributes(&attributes),
-        );
+        if let Some(rule) = self.transition_security_rule.as_mut() {
+            rule.set_attributes(SecurityRule::comma_delimited_list_to_security_attributes(
+                &attributes,
+            ));
+            rule.set_comparison_type(match_type);
+        }
 
         self
     }
@@ -175,14 +183,13 @@ where
         &mut self,
         expression: String,
     ) -> &mut dyn StateMachineSecurityConfigurer<S, E> {
-        if self.event_security_rule.is_none() {
-            self.event_security_rule = Some(Default::default());
+        if self.transition_security_rule.is_none() {
+            self.transition_security_rule = Some(SecurityRule::default());
         }
 
-        self.event_security_rule
-            .as_mut()
-            .unwrap()
-            .set_expression(expression);
+        if let Some(rule) = self.transition_security_rule.as_mut() {
+            rule.set_expression(expression);
+        }
 
         self
     }

@@ -10,6 +10,7 @@ use crate::{
 };
 
 /// Default implementation of an `ExtendedState`.
+#[derive(Default)]
 pub struct DefaultExtendedState {
     variables: ObservableMap<String, AnyValue>,
     listener: Option<Arc<dyn ExtendedStateChangeListener>>,
@@ -47,38 +48,58 @@ impl ExtendedState for DefaultExtendedState {
 }
 
 #[derive(Default)]
-pub(super) struct LocalMapChangeListener {
+struct LocalMapChangeListener {
     listener: Option<Arc<dyn ExtendedStateChangeListener>>,
 }
 
 impl LocalMapChangeListener {
-    pub fn new(listener: Arc<dyn ExtendedStateChangeListener>) -> Self {
+    fn new(listener: Arc<dyn ExtendedStateChangeListener>) -> Self {
         Self {
             listener: Some(listener),
         }
-    }
-
-    pub fn set_listener(&mut self, listener: Arc<dyn ExtendedStateChangeListener>) {
-        self.listener = Some(listener);
     }
 }
 
 impl MapChangeListener<String, AnyValue> for LocalMapChangeListener {
     fn added(&self, key: String, value: AnyValue) {
         if let Some(listener) = &self.listener {
-            listener.changed(&key, &value);
+            notify_change(listener, &key, &value);
         }
     }
 
     fn changed(&self, key: &String, value: &AnyValue) {
         if let Some(listener) = &self.listener {
-            listener.changed(key, value);
+            notify_change(listener, key, value);
         }
     }
 
     fn removed(&self, key: &String, value: &AnyValue) {
         if let Some(listener) = &self.listener {
-            listener.changed(key, value);
+            notify_change(listener, key, value);
+        }
+    }
+}
+
+/// Drives the future of the change listener.
+///
+/// The listener is async, so the future has to be polled; without a runtime the
+/// change is only logged, because blocking here would deadlock an async caller.
+fn notify_change(listener: &Arc<dyn ExtendedStateChangeListener>, key: &str, value: &AnyValue) {
+    let listener = listener.clone();
+    let key = key.to_owned();
+    let value = value.clone();
+
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => {
+            handle.spawn(async move {
+                listener.changed(&key, &value).await;
+            });
+        }
+        Err(_) => {
+            tracing::debug!(
+                key = key,
+                "no runtime is available to notify the extended state change listener"
+            );
         }
     }
 }
@@ -89,11 +110,3 @@ impl fmt::Debug for DefaultExtendedState {
     }
 }
 
-impl Default for DefaultExtendedState {
-    fn default() -> Self {
-        Self {
-            variables: ObservableMap::default(),
-            listener: None,
-        }
-    }
-}
