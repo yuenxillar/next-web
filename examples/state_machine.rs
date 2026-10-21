@@ -243,7 +243,7 @@ async fn main() -> Result<(), BoxError> {
     state_machine.start().await?;
 
     state_machine
-        .send_event(Box::new(GenericMessage::with_payload(OrderEvent::Pay)))
+        .send_event(Arc::new(GenericMessage::with_payload(OrderEvent::Pay)))
         .await?;
 
     Ok(())
