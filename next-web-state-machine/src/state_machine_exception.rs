@@ -31,6 +31,8 @@ pub enum StateMachineErrorKind {
     AccessDenied,
     /// The configuration asks for a feature that is not supported.
     Unsupported,
+    /// No machine or persisted state exists for the requested identifier.
+    MachineNotFound,
 }
 
 impl StateMachineErrorKind {
@@ -44,6 +46,7 @@ impl StateMachineErrorKind {
             Self::MalformedConfiguration => "malformed configuration",
             Self::AccessDenied => "access denied",
             Self::Unsupported => "unsupported feature",
+            Self::MachineNotFound => "state machine not found",
         }
     }
 }

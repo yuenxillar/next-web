@@ -102,7 +102,9 @@ where
     /// Restores the state and the extended state variables of a context.
     ///
     /// The extended state variables which the context carries replace the ones
-    /// of a machine which is restored from a store.
+    /// of a machine which is restored from a store. The initial transition is
+    /// disabled, so starting the restored machine continues in the restored
+    /// state instead of re-entering the initial one.
     ///
     /// # Arguments
     /// * `context` - the context to restore
@@ -115,6 +117,8 @@ where
         for (key, value) in context.extended_state().get_variables() {
             self.extended_state().set(key, value);
         }
+
+        self.set_initial_enabled(false);
 
         Ok(())
     }

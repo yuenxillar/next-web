@@ -36,6 +36,8 @@ pub mod processor;
 pub mod region;
 /// Security rules and their enforcement.
 pub mod security;
+/// The service layer which owns the machines of an application.
+pub mod service;
 /// The state model.
 pub mod state;
 /// The context passed to actions, guards and listeners.

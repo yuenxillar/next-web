@@ -1278,6 +1278,10 @@ where
         *write(&self.error) = None;
         *write(&self.current) = Some(target);
 
+        // A restored machine continues in the given state, so starting it must
+        // not run the initial transition again.
+        self.initial_enabled.store(false, Ordering::SeqCst);
+
         Ok(())
     }
 }
