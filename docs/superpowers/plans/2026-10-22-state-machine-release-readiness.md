@@ -4,7 +4,7 @@
 
 **Goal:** 让 `next-web-state-machine` 具备对外发布的最低文档与示例门槛：4 个可运行示例、crate README、CHANGELOG（含迁移说明）、`0.1.0 → 0.2.0` 版本提升、死文件清理，全部以可执行命令验证。
 
-**Architecture:** 示例放在 workspace 的 `examples/` crate（它已依赖 `next-web`（`full` feature）与 `next-web-state-machine`，每个示例是一个 `[[bin]]`，二进制内用 `assert!`/`expect` 自校验，因此 `cargo run --example <name>` 本身就是测试）。README 的快速上手片段直接取自 `examples/basic.rs`，避免文档与代码漂移。CHANGELOG 逐个列出本次周期已合并的破坏性 API 变更；版本只提升状态机 crate，umbrella 不变。
+**Architecture:** 示例放在 workspace 的 `examples/` crate（它已依赖 `next-web`（`full` feature）与 `next-web-state-machine`，每个示例是一个 `[[bin]]`，二进制内用 `assert!`/`expect` 自校验，因此 `cargo run --example <name>` 本身就是测试）。README 的快速上手片段直接取自 `examples/state_machine_basic.rs`，避免文档与代码漂移。CHANGELOG 逐个列出本次周期已合并的破坏性 API 变更；版本只提升状态机 crate，umbrella 不变。
 
 **Tech Stack:** Rust edition 2024、tokio（`rt-multi-thread`、`macros`、`sync`、`time`）、cargo `--example`、`next-web` umbrella crate 的 `enable-state-machine` 特性。
 
@@ -25,17 +25,17 @@
 ## Review Focus
 
 - **单特性构建**：示例只在 `examples` crate 的 `full` 特性下编译；`next-web` 关闭 `enable-state-machine` 时不得因示例或 README 引用而失败。
-- **README 与示例漂移**：README 的快速上手代码块必须与 `examples/basic.rs` 可运行版本一致（改一处必须改另一处）。
+- **README 与示例漂移**：README 的快速上手代码块必须与 `examples/state_machine_basic.rs` 可运行版本一致（改一处必须改另一处）。
 - **版本一致性**：`next-web-state-machine` 提升到 `0.2.0` 后，`[workspace.dependencies]` 里该条目目前**没有** `version` 字段（与其它 crate 不同），发布前需要补，否则 crates.io 依赖解析会失败。
 - **自定义 `Region` 实现者**：`Region::event_lock` 是新增的必需方法，CHANGELOG 必须点明，否则第三方实现编译失败且不知原因。
 - **示例对 API 的过度依赖**：示例若大量使用内部类型（如 `BaseStateMachineFactory`），用户会误以为这是推荐入口；每个示例顶部需要一句"示例用工厂直接建机，生产建议用 `StateMachineService`"的注释。
 
 ---
 
-### Task 1: 基础示例 `examples/basic.rs`
+### Task 1: 基础示例 `examples/state_machine_basic.rs`
 
 **Files:**
-- Create: `examples/basic.rs`
+- Create: `examples/state_machine_basic.rs`
 - Modify: `examples/Cargo.toml`（在 `[[bin]] name = "state_machine"` 之后追加一条）
 
 **Interfaces:**
@@ -46,7 +46,7 @@
   `Region::start/stop/send_event/state`、
   `ConfigurationData::<i32, i32>::with_parameters(auto_start: bool, ensemble: Option<…>, listeners: Vec<…>, security_enabled: bool, transition_decision: Option<…>, event_decision: Option<…>, event_rule: Option<…>, transition_rule: Option<…>, verifier_enabled: bool, verifier: Option<…>, machine_id: Option<String>, monitor: Option<…>, interceptors: Vec<…>)`、
   `DefaultStateMachineModel::new(configuration, Some(Vec<StateData>.into()), Some(TransitionsData::new(vec![TransitionData::new(1, 2, 100)])))`。
-- Produces: 二进制 `basic`；README 快速上手片段将复制本文件主体。
+- Produces: 二进制 `state_machine_basic`；README 快速上手片段将复制本文件主体。
 
 - [ ] **Step 1: 在 `examples/Cargo.toml` 注册二进制**
 
@@ -54,55 +54,55 @@
 
 ```toml
 [[bin]]
-name = "basic"
-path = "basic.rs"
+name = "state_machine_basic"
+path = "state_machine_basic.rs"
 ```
 
 - [ ] **Step 2: 运行以确认失败**
 
-Run: `cargo run -p next-web-examples --bin basic`（带 `CARGO_TARGET_DIR`）
-Expected: 失败，`can't find bin 'basic'` 或 `couldn't read examples/basic.rs`。
+Run: `cargo run -p next-web-examples --bin state_machine_basic`（带 `CARGO_TARGET_DIR`）
+Expected: 失败，`can't find bin 'basic'` 或 `couldn't read examples/state_machine_basic.rs`。
 
-- [ ] **Step 3: 写示例 `examples/basic.rs`**
+- [ ] **Step 3: 写示例 `examples/state_machine_basic.rs`**
 
 要求：3 个状态 `1 → 2 → 3`，`100` 触发 `1 → 2`，`200` 触发 `2 → 3`；每步 `assert_eq!(machine.state().map(|s| *s.id()), Some(n), "…")`；结尾 `println!` 输出 `state: 3`；`main` 返回 `()`，所有 `Result` 用 `expect("…")`。
 
 - [ ] **Step 4: 运行以确认通过**
 
-Run: `cargo run -p next-web-examples --bin basic`
+Run: `cargo run -p next-web-examples --bin state_machine_basic`
 Expected: 输出包含 `state: 3`，退出码 0。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add examples/Cargo.toml examples/basic.rs
+git add examples/Cargo.toml examples/state_machine_basic.rs
 git commit -m "docs(examples): add the basic state machine example"
 ```
 
 ---
 
-### Task 2: 层级示例 `examples/hierarchy.rs`
+### Task 2: 层级示例 `examples/state_machine_hierarchy.rs`
 
 **Files:**
-- Create: `examples/hierarchy.rs`
+- Create: `examples/state_machine_hierarchy.rs`
 - Modify: `examples/Cargo.toml`
 
 **Interfaces:**
 - Consumes: Task 1 的全部构造方式；`StateData::<i32, i32>::with_submachine_factory(Arc<dyn StateMachineFactory<S, E>>)`（父状态持有子机工厂）、`TransitionData::new(21, 22, 200)`（子机内部转移）。
-- Produces: 二进制 `hierarchy`。
+- Produces: 二进制 `state_machine_hierarchy`。
 
 - [ ] **Step 1: 注册二进制**
 
 ```toml
 [[bin]]
-name = "hierarchy"
-path = "hierarchy.rs"
+name = "state_machine_hierarchy"
+path = "state_machine_hierarchy.rs"
 ```
 
 - [ ] **Step 2: 运行以确认失败**
 
-Run: `cargo run -p next-web-examples --bin hierarchy`
-Expected: 失败，缺少 `examples/hierarchy.rs`。
+Run: `cargo run -p next-web-examples --bin state_machine_hierarchy`
+Expected: 失败，缺少 `examples/state_machine_hierarchy.rs`。
 
 - [ ] **Step 3: 写示例**
 
@@ -110,39 +110,39 @@ Expected: 失败，缺少 `examples/hierarchy.rs`。
 
 - [ ] **Step 4: 运行以确认通过**
 
-Run: `cargo run -p next-web-examples --bin hierarchy`
+Run: `cargo run -p next-web-examples --bin state_machine_hierarchy`
 Expected: 输出 `child moved: true`（或断言通过的等价输出），退出码 0。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add examples/Cargo.toml examples/hierarchy.rs
+git add examples/Cargo.toml examples/state_machine_hierarchy.rs
 git commit -m "docs(examples): add the hierarchy example"
 ```
 
 ---
 
-### Task 3: 服务与持久化示例 `examples/service.rs`
+### Task 3: 服务与持久化示例 `examples/state_machine_service.rs`
 
 **Files:**
-- Create: `examples/service.rs`
+- Create: `examples/state_machine_service.rs`
 - Modify: `examples/Cargo.toml`
 
 **Interfaces:**
 - Consumes: `next_web_state_machine::service::{state_machine_service::StateMachineService, default_state_machine_service::DefaultStateMachineService}`（`new(Arc<dyn StateMachineFactory<S,E>>)`, `with_persister(Arc<dyn StateMachinePersister<S, E, String>>)`, `acquire_state_machine(&str)`, `release_state_machine(&str)`）、`persist::default_state_machine_persister::DefaultStateMachinePersister::new(factory: Arc<dyn StateMachineFactory<S, E>>, persist: Arc<dyn StateMachinePersist<S, E, T>>)`、`state_machine_persist::StateMachinePersist`（注意：在 crate 根模块，不在 `persist` 下）、`DefaultStateMachineContext::new(id: String, state: S) -> Self`、`TransitionData::with_all(1, 2, None, None, Some(20), Some(1), Vec::new(), None, TransitionKind::External, None, "timer")`。
-- Produces: 二进制 `service`；README 的"持久化与恢复"小节引用它。
+- Produces: 二进制 `state_machine_service`；README 的"持久化与恢复"小节引用它。
 
 - [ ] **Step 1: 注册二进制**
 
 ```toml
 [[bin]]
-name = "service"
-path = "service.rs"
+name = "state_machine_service"
+path = "state_machine_service.rs"
 ```
 
 - [ ] **Step 2: 运行以确认失败**
 
-Run: `cargo run -p next-web-examples --bin service`
+Run: `cargo run -p next-web-examples --bin state_machine_service`
 Expected: 失败，缺少文件。
 
 - [ ] **Step 3: 写示例**
@@ -158,39 +158,39 @@ fn read(&self, _context_obj: ()) -> Result<Arc<dyn StateMachineContext<i32, i32>
 
 - [ ] **Step 4: 运行以确认通过**
 
-Run: `cargo run -p next-web-examples --bin service`
+Run: `cargo run -p next-web-examples --bin state_machine_service`
 Expected: 输出 `restored: 2`，退出码 0。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add examples/Cargo.toml examples/service.rs
+git add examples/Cargo.toml examples/state_machine_service.rs
 git commit -m "docs(examples): add the service and persistence example"
 ```
 
 ---
 
-### Task 4: 迁移处理器示例 `examples/handler.rs`
+### Task 4: 迁移处理器示例 `examples/state_machine_handler.rs`
 
 **Files:**
-- Create: `examples/handler.rs`
+- Create: `examples/state_machine_handler.rs`
 - Modify: `examples/Cargo.toml`
 
 **Interfaces:**
 - Consumes: `#[next_web::on_transition(source = 1, target = 2, event = 100)]`（零参数形式，默认目标 `::next_web::state_machine`）、生成的 `<name>_handler()`、`StateMachine::add_transition_handler(Arc<OnTransition<S, E>>)`、`next_web::state_machine::handler::on_transition::OnTransition`、`next_web::state_machine::state_context::StateContext`。
-- Produces: 二进制 `handler`。
+- Produces: 二进制 `state_machine_handler`。
 
 - [ ] **Step 1: 注册二进制**
 
 ```toml
 [[bin]]
-name = "handler"
-path = "handler.rs"
+name = "state_machine_handler"
+path = "state_machine_handler.rs"
 ```
 
 - [ ] **Step 2: 运行以确认失败**
 
-Run: `cargo run -p next-web-examples --bin handler`
+Run: `cargo run -p next-web-examples --bin state_machine_handler`
 Expected: 失败，缺少文件。
 
 - [ ] **Step 3: 写示例**
@@ -200,13 +200,13 @@ Expected: 失败，缺少文件。
 
 - [ ] **Step 4: 运行以确认通过**
 
-Run: `cargo run -p next-web-examples --bin handler`
+Run: `cargo run -p next-web-examples --bin state_machine_handler`
 Expected: 输出 `audited: true`，退出码 0。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add examples/Cargo.toml examples/handler.rs
+git add examples/Cargo.toml examples/state_machine_handler.rs
 git commit -m "docs(examples): add the transition handler example"
 ```
 
@@ -218,12 +218,12 @@ git commit -m "docs(examples): add the transition handler example"
 - Create: `next-web-state-machine/README.md`
 
 **Interfaces:**
-- Consumes: Task 1–4 的示例名（`basic`、`hierarchy`、`service`、`handler`）与它们打印的文本。
-- Produces: README 中的快速上手代码块（与 `examples/basic.rs` 主体一致）、特性表、"不支持/未实现"清单。
+- Consumes: Task 1–4 的示例名（`state_machine_basic`、`state_machine_hierarchy`、`state_machine_service`、`state_machine_handler`）与它们打印的文本。
+- Produces: README 中的快速上手代码块（与 `examples/state_machine_basic.rs` 主体一致）、特性表、"不支持/未实现"清单。
 
 - [ ] **Step 1: 写 README**
 
-必须包含且仅包含以下小节：`# next-web-state-machine`（一句话定位）、`## Quick start`（Task 1 的代码块 + `cargo run --example basic` 输出）、`## What it supports`（状态/转移、守卫与动作、层级子机、正交区域、延迟事件、fork/join、历史状态、定时转移、扩展状态、监听器/拦截器/监视器、安全规则、持久化、service 层、`#[on_transition]`）、`## Configuration`（`ConfigurationData` 的 13 个参数各一句）、`## Not supported`（并行区域执行 = 构建期拒绝；分布式 `ensemble` = 拒绝；`ImmediateCancel` 无法被 exit 中断；状态动作内联执行不可并发取消）、`## Examples`（四个示例的命令与预期输出）、`## Feature flags`（`next-web` 侧 `enable-state-machine`）、`## License`（指向 workspace）。
+必须包含且仅包含以下小节：`# next-web-state-machine`（一句话定位）、`## Quick start`（Task 1 的代码块 + `cargo run --example state_machine_basic` 输出）、`## What it supports`（状态/转移、守卫与动作、层级子机、正交区域、延迟事件、fork/join、历史状态、定时转移、扩展状态、监听器/拦截器/监视器、安全规则、持久化、service 层、`#[on_transition]`）、`## Configuration`（`ConfigurationData` 的 13 个参数各一句）、`## Not supported`（并行区域执行 = 构建期拒绝；分布式 `ensemble` = 拒绝；`ImmediateCancel` 无法被 exit 中断；状态动作内联执行不可并发取消）、`## Examples`（四个示例的命令与预期输出）、`## Feature flags`（`next-web` 侧 `enable-state-machine`）、`## License`（指向 workspace）。
 
 - [ ] **Step 2: 验证 README 中的命令可执行**
 
@@ -338,7 +338,7 @@ Expected: `37 lib + 4 concurrency + 4 configuration + 4 handlers + 3 fluent + 4 
 `cargo doc -p next-web-state-machine --no-deps`（0 告警）、
 `cargo test -p next-web --features enable-state-machine --test state_machine_auto_configuration`（2 passed）、
 `cargo check -p next-web`（**默认特性**，确认关闭 `enable-state-machine` 时 umbrella 仍可编译）、
-`cargo run -p next-web-examples --bin basic` / `hierarchy` / `service` / `handler`（预期输出见 README）。
+`cargo run -p next-web-examples --bin state_machine_basic` / `state_machine_hierarchy` / `state_machine_service` / `state_machine_handler`（预期输出见 README）。
 
 - [ ] **Step 5: 提交**
 
