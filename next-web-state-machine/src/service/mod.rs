@@ -8,3 +8,6 @@
 pub mod state_machine_service;
 /// The default service, which keeps the acquired machines in memory.
 pub mod default_state_machine_service;
+
+pub use default_state_machine_service::DefaultStateMachineService;
+pub use state_machine_service::StateMachineService;

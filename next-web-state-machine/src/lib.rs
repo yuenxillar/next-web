@@ -65,3 +65,9 @@ pub use state_machine::{BoxedStateAction, BoxedStateGuard, StateMachine, StateMa
 pub use state_machine_exception::{
     StateMachineErrorKind, StateMachineException, execution_error, state_machine_error,
 };
+
+/// Marks a function as the handler of a transition.
+///
+/// The generated code targets `::next_web::state_machine` by default; a project
+/// which depends on this crate directly passes `crate = next_web_state_machine`.
+pub use next_web_macros::on_transition;

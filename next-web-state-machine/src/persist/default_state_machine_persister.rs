@@ -123,7 +123,10 @@ mod tests {
                             .with_extended_state(extended_state),
                     ))
                 }
-                None => Err(Box::new(std::io::Error::other("nothing was persisted"))),
+                None => Err(crate::state_machine_exception::state_machine_error(
+                    crate::state_machine_exception::StateMachineErrorKind::MachineNotFound,
+                    "nothing was persisted",
+                )),
             }
         }
     }

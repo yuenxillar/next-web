@@ -12,7 +12,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use next_web::state_machine::StateMachine;
 use next_web::state_machine::config::base_state_machine_factory::BaseStateMachineFactory;
 use next_web::state_machine::config::model::configuration_data::ConfigurationData;
 use next_web::state_machine::config::model::default_state_machine_model::DefaultStateMachineModel;
@@ -20,7 +19,6 @@ use next_web::state_machine::config::model::state_data::StateData;
 use next_web::state_machine::config::model::transition_data::TransitionData;
 use next_web::state_machine::config::model::transitions_data::TransitionsData;
 use next_web::state_machine::config::state_machine_factory::StateMachineFactory;
-use next_web::state_machine::region::Region;
 use next_web::state_machine::state_context::StateContext;
 use next_web_core::error::BoxError;
 use next_web_core::messaging::generic_message::GenericMessage;
@@ -85,6 +83,19 @@ async fn main() {
     let audits = AUDITS.load(Ordering::SeqCst);
 
     assert_eq!(audits, 1, "the handler ran once for the transition");
+
+    // The machine is in state 2 and the handler filters on the source state 1, so
+    // an event it does not filter for must not run it again.
+    machine
+        .send_event(Arc::new(GenericMessage::with_payload(999)))
+        .await
+        .expect("the event is sent");
+
+    assert_eq!(
+        AUDITS.load(Ordering::SeqCst),
+        1,
+        "the handler ignores an event it does not filter for"
+    );
     assert_eq!(
         machine.state().map(|state| *state.id()),
         Some(2),

@@ -2,14 +2,20 @@
 
 A state machine for Next Web applications: states and transitions, orthogonal
 regions, timers, guards and actions, a service layer which owns a machine, and
-persistence of the current state.
+persistence of the current state and of the extended state.
 
 ## Quick start
+
+```toml
+[dependencies]
+next-web = { version = "0.2", features = ["enable-state-machine"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+```
 
 ```rust
 use std::sync::Arc;
 
-use next_web::state_machine::StateMachine;
+use next_web::core::messaging::generic_message::GenericMessage;
 use next_web::state_machine::config::base_state_machine_factory::BaseStateMachineFactory;
 use next_web::state_machine::config::model::configuration_data::ConfigurationData;
 use next_web::state_machine::config::model::default_state_machine_model::DefaultStateMachineModel;
@@ -18,7 +24,6 @@ use next_web::state_machine::config::model::transition_data::TransitionData;
 use next_web::state_machine::config::model::transitions_data::TransitionsData;
 use next_web::state_machine::config::state_machine_factory::StateMachineFactory;
 use next_web::state_machine::region::Region;
-use next_web_core::messaging::generic_message::GenericMessage;
 
 #[tokio::main]
 async fn main() {
@@ -32,8 +37,12 @@ async fn main() {
         Some(vec![
             StateData::<i32, i32>::with_initial(1, true),
             StateData::<i32, i32>::new(2),
+            StateData::<i32, i32>::new(3),
         ].into()),
-        Some(TransitionsData::new(vec![TransitionData::new(1, 2, 100)])),
+        Some(TransitionsData::new(vec![
+            TransitionData::new(1, 2, 100),
+            TransitionData::new(2, 3, 200),
+        ])),
     );
 
     let machine = BaseStateMachineFactory::<i32, i32>::new(Arc::new(model), None)
@@ -45,14 +54,17 @@ async fn main() {
         .send_event(Arc::new(GenericMessage::with_payload(100)))
         .await
         .expect("the event is sent");
+    machine
+        .send_event(Arc::new(GenericMessage::with_payload(200)))
+        .await
+        .expect("the event is sent");
 
-    assert_eq!(machine.state().map(|state| *state.id()), Some(2));
+    println!("state: {}", machine.state().map(|state| *state.id()).expect("a state"));
 }
 ```
 
-The full version of this machine is `examples/state_machine_basic.rs`; run it
-with `cargo run -p next-web-examples --bin state_machine_basic`, which prints
-`state: 3`.
+The same machine is `examples/state_machine_basic.rs` in this repository, which
+also asserts every step and stops the machine.
 
 ## What it supports
 
@@ -62,7 +74,7 @@ with `cargo run -p next-web-examples --bin state_machine_basic`, which prints
 - Orthogonal regions, fork and join.
 - Deferred events, which a state postpones until it is left.
 - History pseudo states.
-- Timed transitions, armed when a state is entered.
+- Timed transitions, armed when the machine starts (see the limitation below).
 - Extended state variables with change notifications.
 - Listeners, interceptors and monitors for observability.
 - Security rules for events and transitions, enforced fail-closed.
@@ -103,11 +115,17 @@ state action policy with its timeout, and the region execution policy.
 - **Interrupting a state action by leaving the state** (`ImmediateCancel`): the
   runtime awaits a state action inline, so exiting the state cannot cancel it.
   A policy which bounds the action with a timeout (`TimeoutCancel`) is honoured.
+- **A timer which starts counting when its state is entered**: every timer is
+  armed when the machine starts and keeps counting from that moment, so a timer
+  whose source state is entered later may fire before the machine reaches it.
+  Model a timed transition from the initial state, or send the event yourself.
 - **Reentrant event processing**: an action must not await an event of its own
   machine, because the machine holds the slot while the action runs. Spawn the
   send instead.
 
 ## Examples
+
+The examples live in this repository and are not shipped with the crate:
 
 | Example | Command | Output |
 | --- | --- | --- |
@@ -118,11 +136,11 @@ state action policy with its timeout, and the region execution policy.
 
 ## Feature flags
 
-The state machine is reached through the umbrella crate:
-`next-web = { features = ["enable-state-machine"] }`, which re-exports this crate
-as `next_web::state_machine` and its `#[on_transition]` attribute. A project
-which depends on this crate directly passes `crate = next_web_state_machine` to
-the attribute.
+The state machine is reached through the umbrella crate with
+`enable-state-machine`; `full` does not enable it. The umbrella re-exports this
+crate as `next_web::state_machine` and its `#[on_transition]` attribute, which
+this crate re-exports as well, so a project which depends on this crate directly
+uses `next_web_state_machine::on_transition`.
 
 ## License
 

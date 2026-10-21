@@ -7,14 +7,15 @@ All notable changes to `next-web-state-machine` are listed here.
 ### Added
 
 - A service layer which owns the machines of an application by identifier:
-  `service::StateMachineService` and `service::DefaultStateMachineService`. It
-  builds a machine on demand, restores a persisted one, starts it, and stops and
-  persists it when it is released.
+  `service::StateMachineService` and `service::DefaultStateMachineService`, also
+  re-exported from `service`. It builds a machine on demand, restores a persisted
+  one, starts it, and stops and persists it when it is released.
 - Transition handlers: `handler::on_transition::OnTransition` runs an action when
   a transition matches a source, a target or an event, registered through
   `StateMachine::add_transition_handler`. The `#[on_transition]` attribute
-  generates the handler and targets `::next_web::state_machine` by default, with
-  `crate = ..` for a project which depends on this crate directly.
+  generates the handler; it targets `::next_web::state_machine` by default and is
+  re-exported from this crate, with `crate = ..` for a project which depends on
+  this crate directly.
 - `StateMachineErrorKind::MachineNotFound`, which a store reports when it has
   nothing for a key, and which a service uses to build a fresh machine.
 - `ExtendedState::set`, `StateMachine::restore_context` and
@@ -55,7 +56,11 @@ All notable changes to `next-web-state-machine` are listed here.
 | 0.1 | 0.2.0 |
 | --- | --- |
 | `send_event(Box<dyn Message<E>>)` | `send_event(Arc<dyn Message<E>>)` |
-| `send_event` returns `Vec<Arc<dyn StateMachineEventResult<S, E>>>` | returns `Arc<dyn StateMachineEventResult<S, E>>` |
+| `send_event` returns `Box<dyn StateMachineEventResult<S, E>>` | returns `Arc<dyn StateMachineEventResult<S, E>>` |
+| `send_events(Vec<Box<dyn Message<E>>>) -> Box<dyn StateMachineEventResult<S, E>>` | `send_events(Vec<Arc<dyn Message<E>>>) -> Vec<Arc<dyn StateMachineEventResult<S, E>>>` |
+| `Region::state() -> Option<&dyn StateMachineState<S, E>>` | `-> Option<Arc<dyn StateMachineState<S, E>>>` |
+| `Region::states() -> Vec<&dyn StateMachineState<S, E>>` | `-> Vec<Arc<dyn StateMachineState<S, E>>>` |
+| `StateMachine::set_state_machine_error(&mut self, Box<dyn Error + Send>)` | `&self, BoxError` |
 | `ExtendedState::get_variables() -> &HashMap<K, AnyValue>` | `-> HashMap<K, AnyValue>` (a copy) |
 | `ExtendedState::get(&K) -> Option<&AnyValue>` | `-> Option<AnyValue>` |
 | — | `ExtendedState::set(&self, K, AnyValue)` |
@@ -69,3 +74,8 @@ which is held by `send_event` is what the built-in machine does.
 
 A custom `StateMachineRuntimePersister` is still needed if the runtime persistence
 of a machine is configured: this crate does not ship a default implementation.
+
+A timed transition is armed when the machine starts, not when its source state is
+entered, so a timer whose source state is reached later still counts from the
+start of the machine. Model a timed transition from the initial state, or send
+the event yourself.

@@ -1,6 +1,6 @@
 [package]
 name = "next-web"
-version = "0.2.2"
+version = "0.2.3"
 description = "Macro-driven web application framework for Rust, built on Tokio and Axum"
 homepage = "https://crates.io/crates/next-web"
 keywords = ["http", "web", "framework"]

@@ -5,7 +5,6 @@
 
 use std::sync::Arc;
 
-use next_web::state_machine::StateMachine;
 use next_web::state_machine::config::base_state_machine_factory::BaseStateMachineFactory;
 use next_web::state_machine::config::model::configuration_data::ConfigurationData;
 use next_web::state_machine::config::model::default_state_machine_model::DefaultStateMachineModel;
@@ -13,7 +12,6 @@ use next_web::state_machine::config::model::state_data::StateData;
 use next_web::state_machine::config::model::transition_data::TransitionData;
 use next_web::state_machine::config::model::transitions_data::TransitionsData;
 use next_web::state_machine::config::state_machine_factory::StateMachineFactory;
-use next_web::state_machine::region::Region;
 use next_web::state_machine::state_machine_event_result::ResultType;
 use next_web_core::messaging::generic_message::GenericMessage;
 
@@ -57,6 +55,9 @@ async fn main() {
 
     // The parent moves from 1 to 2 on the event 100, and the state 2 owns the
     // child machine.
+    // The state 2 owns the child machine. The model holds that one instance, so a
+    // model which builds the parent more than once uses
+    // `StateData::set_submachine_factory` to give every parent a fresh child.
     let mut parent_state_2 = StateData::<i32, i32>::new(2);
     parent_state_2.set_submachine(child.clone());
 
@@ -111,4 +112,8 @@ async fn main() {
     println!("child moved: true");
 
     parent.stop().await.expect("the parent machine stops");
+
+    // Stopping the parent does not exit its current state, so the child keeps
+    // running and the application which owns it stops it.
+    child.stop().await.expect("the child machine stops");
 }
