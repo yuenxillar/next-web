@@ -366,6 +366,9 @@ where
                 )?;
 
                 if let Some(machine) = built {
+                    // The region machines get the configured listeners, monitors
+                    // and interceptors too, not only the top level machine.
+                    self.apply_machine_features(&machine, state_machine_model)?;
                     machines.push(machine);
                 }
             }
@@ -911,6 +914,21 @@ where
                     }
                 });
             }
+
+        self.apply_machine_features(&machine, state_machine_model)
+    }
+
+    /// Attaches the configured listeners, interceptors, monitors and the security
+    /// interceptor to one machine.
+    ///
+    /// It is applied to the machines of the orthogonal regions as well, so a
+    /// monitor sees the transitions a region runs.
+    fn apply_machine_features(
+        &self,
+        machine: &Arc<dyn StateMachine<S, E>>,
+        state_machine_model: &dyn StateMachineModel<S, E>,
+    ) -> Result<(), BoxError> {
+        let configuration = state_machine_model.get_configuration_data();
 
         for listener in &configuration.listeners {
             machine.add_state_listener(listener.clone())?;
@@ -1584,6 +1602,116 @@ mod tests {
         let current = machine.state().expect("the machine has a current state");
         assert!(current.contains_id(&22));
         assert!(!current.contains_id(&21));
+    }
+
+    #[test]
+    fn configured_monitor_also_observes_the_region_machines() {
+        use crate::monitor::state_machine_monitor::StateMachineMonitor;
+        use crate::transition::StateMachineTransition;
+        use std::any::Any;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Duration;
+
+        #[derive(Default)]
+        struct RegionMonitor {
+            transitions: AtomicUsize,
+        }
+
+        impl StateMachineMonitor<i32, i32> for RegionMonitor {
+            fn transition(
+                &self,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _transition: &dyn StateMachineTransition<i32, i32>,
+                _duration: Duration,
+            ) {
+                self.transitions.fetch_add(1, Ordering::SeqCst);
+            }
+
+            fn action(
+                &self,
+                _state_machine: &dyn crate::StateMachine<i32, i32>,
+                _action: &crate::BoxedStateAction<i32, i32>,
+                _duration: Duration,
+            ) {
+            }
+        }
+
+        let monitor = Arc::new(RegionMonitor::default());
+
+        let mut configuration = ConfigurationData::default();
+        configuration.verifier_enabled = false;
+        configuration.state_machine_monitor = Some(monitor.clone());
+
+        let parent = Arc::new(2) as Arc<dyn Any + Send + Sync>;
+        let states = vec![
+            StateData::<i32, i32>::with_initial(1, true),
+            StateData::<i32, i32>::new(2),
+            StateData::<i32, i32>::with_hierarchy(
+                Some(parent.clone()),
+                Some("r1".to_owned()),
+                11,
+                true,
+            ),
+            StateData::<i32, i32>::with_hierarchy(
+                Some(parent.clone()),
+                Some("r1".to_owned()),
+                12,
+                false,
+            ),
+            StateData::<i32, i32>::with_hierarchy(
+                Some(parent.clone()),
+                Some("r2".to_owned()),
+                21,
+                true,
+            ),
+            StateData::<i32, i32>::with_hierarchy(
+                Some(parent),
+                Some("r2".to_owned()),
+                22,
+                false,
+            ),
+        ];
+
+        let to_parent = TransitionData::new(1, 2, 100);
+        let mut region1 = TransitionData::new(11, 12, 200);
+        region1.set_state(2);
+        let mut region2 = TransitionData::new(21, 22, 201);
+        region2.set_state(2);
+
+        let model = DefaultStateMachineModel::new(
+            configuration,
+            Some(states.into()),
+            Some(TransitionsData::new(vec![to_parent, region1, region2])),
+        );
+
+        let factory = BaseStateMachineFactory::new(Arc::new(model), None);
+        let machine = factory
+            .get_state_machine()
+            .expect("the orthogonal machine builds");
+
+        block_on(machine.start()).unwrap();
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(100)))).unwrap();
+        assert_eq!(
+            monitor.transitions.load(Ordering::SeqCst),
+            1,
+            "only the top level transition is reported so far"
+        );
+
+        // The region transitions are run by the region machines, which only
+        // report them when the configured monitor is attached to them as well.
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(200)))).unwrap();
+        assert_eq!(
+            monitor.transitions.load(Ordering::SeqCst),
+            2,
+            "the first region transition must reach the monitor"
+        );
+
+        block_on(machine.send_event(Arc::new(GenericMessage::with_payload(201)))).unwrap();
+        assert_eq!(
+            monitor.transitions.load(Ordering::SeqCst),
+            3,
+            "the second region transition must reach the monitor"
+        );
     }
 
     #[test]
