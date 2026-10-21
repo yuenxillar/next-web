@@ -1,12 +1,10 @@
 //! Support and helper module for base state machine implementation.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use next_web_core::any::AnyValue;
 use next_web_core::messaging::Message;
-use tracing::error;
 
 use crate::StateMachine;
 use crate::event::state_machine_event_publisher::StateMachineEventPublisher;
@@ -14,7 +12,6 @@ use crate::listener::composite_state_machine_listener::CompositeStateMachineList
 use crate::listener::state_machine_listener::StateMachineListener;
 use crate::monitor::composite_state_machine_monitor::CompositeStateMachineMonitor;
 use crate::monitor::state_machine_monitor::StateMachineMonitor;
-use crate::processor::state_machine_handler_call_helper::StateMachineHandlerCallHelper;
 use crate::state::StateMachineState;
 use crate::state_context::StateContext;
 use crate::support::state_machine_interceptor_list::StateMachineInterceptorList;
@@ -43,12 +40,6 @@ pub struct StateMachineObjectSupport<S, E> {
 
     /// Bean name for this instance
     bean_name: Option<String>,
-
-    /// Flag indicating if handlers have been initialized
-    handlers_initialized: Arc<AtomicBool>,
-
-    /// State machine handler call helper for annotation handlers
-    state_machine_handler_call_helper: StateMachineHandlerCallHelper<S, E>,
 }
 
 impl<S, E> StateMachineObjectSupport<S, E>
@@ -61,25 +52,6 @@ where
     /// Creates a new instance of StateMachineObjectSupport with default settings.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Starts the state machine object support.
-    pub async fn start(&mut self) {
-        if !self.handlers_initialized.load(Ordering::SeqCst) {
-            match self
-                .state_machine_handler_call_helper
-                .after_properties_set()
-                .await
-            {
-                Ok(_) => {
-                    self.handlers_initialized.store(true, Ordering::SeqCst);
-                }
-                Err(e) => {
-                    error!("Unable to initialize annotation handlers: {}", e);
-                    self.handlers_initialized.store(true, Ordering::SeqCst);
-                }
-            }
-        }
     }
 
     /// Sets the bean name for this instance.
@@ -467,8 +439,6 @@ impl<S, E> Default for StateMachineObjectSupport<S, E> {
             context_events_enabled: true,
             interceptors: Default::default(),
             bean_name: None,
-            handlers_initialized: Arc::new(AtomicBool::default()),
-            state_machine_handler_call_helper: Default::default(),
         }
     }
 }

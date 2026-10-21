@@ -57,7 +57,7 @@ fn build_machine(
         .expect("the machine builds");
 
     machine
-        .add_state_machine_interceptor(Arc::new(handler))
+        .add_transition_handler(Arc::new(handler))
         .expect("the handler is registered");
 
     machine

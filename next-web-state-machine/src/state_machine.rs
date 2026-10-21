@@ -62,6 +62,26 @@ where
         interceptor: Arc<dyn StateMachineInterceptor<S, E>>,
     ) -> Result<(), BoxError>;
 
+    /// Registers a handler which runs when a transition matches.
+    ///
+    /// It is the counterpart of the `@OnTransition` methods of the Java
+    /// implementation and a thin wrapper around
+    /// [`Self::add_state_machine_interceptor`], which is the hook that receives
+    /// the state context a handler needs.
+    ///
+    /// # Arguments
+    /// * `handler` - the handler to register
+    fn add_transition_handler(
+        &self,
+        handler: Arc<crate::handler::on_transition::OnTransition<S, E>>,
+    ) -> Result<(), BoxError>
+    where
+        S: Clone + PartialEq,
+        E: Clone + PartialEq,
+    {
+        self.add_state_machine_interceptor(handler)
+    }
+
     /// Adds a state machine monitor.
     ///
     /// # Arguments

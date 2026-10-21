@@ -32,8 +32,6 @@ pub mod listener;
 pub mod monitor;
 /// Persistence of a machine state.
 pub mod persist;
-/// Annotation driven listener wiring.
-pub mod processor;
 /// Regions, the executable part of a machine.
 pub mod region;
 /// Security rules and their enforcement.
