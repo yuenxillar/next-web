@@ -14,7 +14,7 @@ name = "next-web-gateway"
 path = "src/bin/next_web_gateway.rs"
 
 [dependencies]
-pingora         = { workspace = true }
+pingora         = { workspace = true, features = ["lb", "proxy", "rustls"]}
 pingora-limits  = { workspace = true}
 
 tokio           = { workspace = true, features = ["fs", "time"] }
@@ -35,12 +35,17 @@ bytes           = { workspace = true }
 form_urlencoded = { workspace = true }
 rand            = { workspace = true }
 uuid            = { workspace = true }
+# Parses the PEM bundle behind `upstream.tls.ca_file`.
+rustls-pemfile  = { workspace = true }
 
 tracing             = { workspace = true }
 tracing-subscriber  = { workspace = true }
 
 [dev-dependencies]
 futures             = { workspace = true }
+# The TLS upstream tests serve a real handshake against a fixture certificate.
+tokio-rustls        = { workspace = true }
+rustls              = { workspace = true }
 
 [features]
 default = []

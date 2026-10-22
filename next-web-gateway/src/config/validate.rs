@@ -74,15 +74,6 @@ fn validate_server_knobs(config: &GatewayConfig, errors: &mut Vec<ConfigError>) 
              502 and as breaker failures. Remove the key or set `enabled: false`",
         ));
     }
-
-    // TLS is unavailable, so a verification bypass would only be theatre.
-    if config.upstream.tls.insecure_skip_verify {
-        errors.push(ConfigError::new(
-            "upstream.tls.insecure_skip_verify",
-            "TLS upstreams are unavailable in this build, so there is nothing to skip; \
-             remove the key",
-        ));
-    }
 }
 
 fn validate_trusted_proxies(entries: &[String], errors: &mut Vec<ConfigError>) {
@@ -193,19 +184,6 @@ fn validate_uri(uri: &str, path: &str, errors: &mut Vec<ConfigError>) -> Option<
                 "unsupported scheme `{scheme}`, expected one of {}",
                 SCHEMES.join(", ")
             ),
-        ));
-        return None;
-    }
-
-    // This build of pingora carries no TLS backend, so an `https://` route
-    // could only ever answer 502. Fail at startup instead (A1).
-    if scheme == "https" {
-        errors.push(ConfigError::new(
-            path,
-            "TLS upstreams are unavailable: this build of pingora has no TLS \
-             backend compiled in, so an `https://` route can never connect. \
-             Use `http://` or `lb://`, or rebuild with pingora's `openssl`, \
-             `boringssl` or `rustls` feature and remove this guard",
         ));
         return None;
     }

@@ -320,12 +320,13 @@ mod tests {
     }
 
     #[test]
-    fn rejects_an_https_route_because_this_build_has_no_tls_backend() {
-        let text = errors_for(
-            "next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'https://example.com'\n",
-        );
-        assert!(text.contains("routes[0].uri"), "{text}");
-        assert!(text.contains("TLS upstreams are unavailable"), "{text}");
+    fn accepts_an_https_route_now_that_a_tls_backend_is_compiled_in() {
+        use std::str::FromStr;
+
+        let yaml = "next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'https://example.com'\n        predicates:\n          - Path=/**\n";
+        let config = GatewayConfig::from_str(yaml).expect("https routes are supported");
+
+        assert_eq!(config.routes[0].uri, "https://example.com");
     }
 
     #[test]
@@ -349,11 +350,13 @@ mod tests {
     }
 
     #[test]
-    fn rejects_insecure_skip_verify_because_tls_is_unavailable() {
-        let text = errors_for(
-            "next:\n  gateway:\n    upstream:\n      tls:\n        insecure_skip_verify: true\n",
-        );
-        assert!(text.contains("insecure_skip_verify"), "{text}");
+    fn accepts_the_tls_verification_controls() {
+        use std::str::FromStr;
+
+        let yaml = "next:\n  gateway:\n    upstream:\n      tls:\n        verify_cert: false\n        insecure_skip_verify: true\n";
+        let config = GatewayConfig::from_str(yaml).expect("TLS settings are supported");
+
+        assert!(config.upstream.tls.insecure_skip_verify);
     }
 
     #[test]

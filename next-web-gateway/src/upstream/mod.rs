@@ -1,5 +1,6 @@
 //! Upstream selection: URI parsing, name resolution and load balancing.
 
+pub mod ca;
 pub mod dns_cache;
 pub mod load_balancer;
 pub mod uri;
@@ -9,6 +10,7 @@ use std::net::SocketAddr;
 use pingora::upstreams::peer::HttpPeer;
 
 use crate::config::{RouteConfig, UpstreamConfig};
+pub use ca::{CaBundle, load as load_ca_bundle};
 pub use dns_cache::DnsCache;
 pub use load_balancer::StaticUpstreams;
 pub use uri::{UpstreamScheme, UpstreamUri};
@@ -38,10 +40,13 @@ pub trait UpstreamResolver: Send + Sync {
 }
 
 /// Build the pingora peer for a selection, applying route then gateway timeouts.
+///
+/// `ca` carries the bundle parsed from `upstream.tls.ca_file`, if any.
 pub fn build_peer(
     selection: &UpstreamSelection,
     config: &UpstreamConfig,
     route: &RouteConfig,
+    ca: Option<&std::sync::Arc<ca::CaBundle>>,
 ) -> HttpPeer {
     let mut peer = HttpPeer::new(selection.addr, selection.tls, selection.sni.clone());
     peer.group_key = selection.group_key;
@@ -56,6 +61,10 @@ pub fn build_peer(
     }
     peer.options.verify_cert = tls.verify_cert && !insecure;
     peer.options.verify_hostname = tls.verify_hostname && !insecure;
+
+    if let Some(ca) = ca {
+        peer.options.ca = Some(ca.clone());
+    }
 
     let client = &route.metadata.client;
     peer.options.connection_timeout =
@@ -105,6 +114,7 @@ mod tests {
             &selection(true),
             &UpstreamConfig::default(),
             &route("a", "https://example.com", None),
+            None,
         );
 
         assert!(peer.is_tls());
@@ -117,6 +127,7 @@ mod tests {
             &selection(true),
             &UpstreamConfig::default(),
             &route("a", "https://example.com", None),
+            None,
         );
         assert!(peer.options.verify_cert);
         assert!(peer.options.verify_hostname);
@@ -127,6 +138,7 @@ mod tests {
             &selection(true),
             &config,
             &route("a", "https://example.com", None),
+            None,
         );
 
         assert!(!peer.options.verify_cert);
@@ -140,6 +152,7 @@ mod tests {
             &selection(false),
             &config,
             &route("a", "http://example.com", Some(9)),
+            None,
         );
 
         assert_eq!(

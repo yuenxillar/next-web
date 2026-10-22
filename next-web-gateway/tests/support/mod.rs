@@ -480,15 +480,26 @@ impl TestGateway {
         let out_path = std::env::temp_dir().join(format!("next-web-gateway-{proxy_port}.out"));
         let out = std::fs::File::create(&out_path).expect("create the gateway stdout");
 
-        let mut child = Command::new(env!("CARGO_BIN_EXE_next-web-gateway"))
+        let mut command = Command::new(env!("CARGO_BIN_EXE_next-web-gateway"));
+        command
             .arg("--config")
             .arg(&config_path)
             .arg("--log-level")
             .arg("info")
             .stdout(Stdio::from(out))
-            .stderr(Stdio::from(log))
-            .spawn()
-            .expect("start the gateway binary");
+            .stderr(Stdio::from(log));
+
+        // pingora's TLS connector loads a trust store before serving anything and
+        // panics when it can read neither the platform store nor a bundle. Point
+        // it at a real CA bundle when the host provides one, so the suite works
+        // in sandboxes where the platform store is unreachable.
+        if std::env::var_os("SSL_CERT_FILE").is_none()
+            && let Some(bundle) = system_ca_bundle()
+        {
+            command.env("SSL_CERT_FILE", bundle);
+        }
+
+        let mut child = command.spawn().expect("start the gateway binary");
 
         let addr: SocketAddr = format!("127.0.0.1:{proxy_port}")
             .parse()
@@ -554,6 +565,22 @@ pub fn free_port() -> u16 {
     let port = listener.local_addr().expect("ephemeral address").port();
     drop(listener);
     port
+}
+
+/// A CA bundle the host already ships, used only to keep pingora's TLS connector
+/// happy on hosts where the platform certificate store is unreachable.
+fn system_ca_bundle() -> Option<std::path::PathBuf> {
+    const CANDIDATES: [&str; 4] = [
+        r"D:\DevApp\Git\mingw64\etc\ssl\certs\ca-bundle.crt",
+        r"D:\DevApp\Git\usr\ssl\certs\ca-bundle.crt",
+        r"C:\Program Files\Git\mingw64\etc\ssl\certs\ca-bundle.crt",
+        "/etc/ssl/certs/ca-certificates.crt",
+    ];
+
+    CANDIDATES
+        .iter()
+        .map(std::path::PathBuf::from)
+        .find(|path| path.is_file())
 }
 
 /// Re-indent a YAML block so its list items sit under a `routes:` key at four

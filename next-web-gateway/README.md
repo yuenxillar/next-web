@@ -128,7 +128,7 @@ a deprecation warning.
 |---|---|
 | `http://host:port` | Proxy to a fixed authority over plain HTTP |
 | `lb://name` | Round robin across the route's `upstreams`, weighted by `weight` |
-| `https://host:port` | **Rejected at startup** in this build: pingora is compiled without a TLS backend, so such a route could only ever answer 502 |
+| `https://host:port` | Proxy to a fixed authority over TLS (pingora's `rustls` backend) |
 
 Validation collects every problem and reports them together with a document path, for example
 `routes[1].upstreams[0].addr: 'svc.local:8080' is not a 'IP:port' address`.
@@ -281,16 +281,15 @@ Gateway generated responses also pass through the response filters, so `SecureHe
   shared between worker processes. A response is only cached when it is a `200`/`206`/`301` that
   carries neither `Set-Cookie` nor a `Vary` field other than `accept-encoding`; a `no-cache` or
   `no-store` request bypasses the cache entirely.
-- **TLS upstreams are unavailable.** pingora is built here without `openssl`, `boringssl` or
-  `rustls`, so it has no TLS connector at all: an `https://` route is rejected at startup with
-  the reason instead of failing every request at runtime (502). Enabling one of pingora's TLS
-  features and deleting the guard in `config/validate.rs` is the whole change.
-  `upstream.tls.insecure_skip_verify: true` is rejected too, because there is nothing to skip.
+- **TLS upstreams use pingora's `rustls` backend.** Certificate and host name verification are on
+  by default; `upstream.tls.ca_file` trusts a private CA bundle and `insecure_skip_verify` turns
+  both checks off with a warning. `tests/tls.rs` covers all three cases over a real handshake.
+  The connector needs a trust store at startup: a configured `ca_file` wins, then the
+  `SSL_CERT_FILE` environment variable, then the platform store. On a host where the platform
+  store cannot be read (some CI sandboxes), set one of the first two.
 - **Health checking is not implemented.** `upstream.health_check.enabled: true` is rejected at
   startup; dead backends surface as 502 and as breaker failures (this is what makes the static
   load balancer's "no active health check" note above safe to rely on).
-- **`upstream.tls.ca_file` is rejected at startup.** This build cannot install a custom trust
-  anchor, and accepting the key would silently fail every request to a private CA.
 - **`server.keepalive` and `server.max_connection` are rejected at startup** because pingora 0.9
   exposes no downstream knob for them. `server.threads` and `server.graceful_shutdown` *are*
   applied to pingora's `ServerConf`.

@@ -1,0 +1,28 @@
+# TLS upstream. Certificate and host name verification are on by default; point
+# `ca_file` at a PEM bundle when the backend uses a private CA. `SSL_CERT_FILE`
+# is used as a fallback when `ca_file` is omitted.
+next:
+  gateway:
+    server:
+      bind: "127.0.0.1:8080"
+      admin:
+        enabled: true
+        bind: "127.0.0.1:9001"
+    upstream:
+      connect_timeout: 2s
+      read_timeout: 30s
+      tls:
+        verify_cert: true
+        verify_hostname: true
+        # Path to a PEM bundle trusted in addition to the system roots.
+        ca_file: null
+        # Only for development against a self signed backend.
+        insecure_skip_verify: false
+    routes:
+      - id: api
+        uri: "https://api.example.com"
+        predicates:
+          - Path=/api/**
+        filters:
+          - RewritePath=/api/(?<rest>.*), /${rest}
+          - SecureHeaders

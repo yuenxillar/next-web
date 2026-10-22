@@ -88,10 +88,9 @@ csv = { version = "1.3.1" }
 printpdf = { version = "0.8.2" }
 
 # proxy
-# pingora needs one of its TLS features (`openssl`, `boringssl` or `rustls`)
-# for `https://` upstreams; none is enabled here, so `next-web-gateway` rejects
-# an `https://` route at startup instead of failing every request at runtime.
-pingora         = { version = "0.9.0", features = ["lb", "proxy"] }
+# `rustls` is the TLS backend: without one of pingora's TLS features there is no
+# connector at all and every `https://` upstream fails at the handshake.
+pingora         = { version = "0.9.0", features = ["lb", "proxy", "rustls"] }
 pingora-limits  = "0.9.0"
 
 # pay

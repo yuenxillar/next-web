@@ -43,7 +43,9 @@ use crate::handler::predicate::RouteServiceManager;
 use crate::metrics::Metrics;
 use crate::proxy::error_response::{render_error, status_for_error};
 use crate::service::route_service::RouteWork;
-use crate::upstream::{DnsCache, StaticUpstreams, UpstreamResolver, UpstreamSelection, build_peer};
+use crate::upstream::{
+    DnsCache, StaticUpstreams, UpstreamResolver, UpstreamSelection, build_peer, load_ca_bundle,
+};
 
 /// Maximum response body buffered for a body filter, in bytes.
 const MAX_BUFFER_BYTES: usize = 8 * 1024 * 1024;
@@ -70,6 +72,7 @@ pub struct GatewayProxy {
     cache: Option<Arc<LocalResponseCacheManager>>,
     metrics: Arc<Metrics>,
     ready: Arc<AtomicBool>,
+    ca: Option<Arc<crate::upstream::CaBundle>>,
 }
 
 impl GatewayProxy {
@@ -89,17 +92,12 @@ impl GatewayProxy {
             return Err(crate::config::ConfigErrors::new(errors));
         }
 
-        // A trust anchor that is accepted but never applied would silently fail
-        // every request to a private CA, so it is rejected instead.
-        if config.upstream.tls.ca_file.is_some() {
-            return Err(crate::config::ConfigErrors::new(vec![
-                crate::config::ConfigError::new(
-                    "upstream.tls.ca_file",
-                    "custom CA bundles are not supported by this build; use the system \
-                     trust store, or `insecure_skip_verify` only for development",
-                ),
-            ]));
-        }
+        // A trust anchor is loaded once at startup: a bundle that cannot be read
+        // or parsed must fail here, not on the first TLS request.
+        let ca = match load_ca_bundle(&config.upstream.tls) {
+            Ok(ca) => ca,
+            Err(error) => return Err(crate::config::ConfigErrors::new(vec![error])),
+        };
         let mut errors = Vec::new();
         for route in &route_services {
             if !route.fallback_id.is_empty() && !config.breakers.contains_key(&route.fallback_id) {
@@ -160,6 +158,7 @@ impl GatewayProxy {
             cache,
             metrics: Arc::new(Metrics::default()),
             ready: Arc::new(AtomicBool::new(true)),
+            ca,
         })
     }
 
@@ -573,7 +572,12 @@ impl ProxyHttp for GatewayProxy {
         };
 
         ctx.selected = Some(selection.clone());
-        let peer = build_peer(&selection, &self.config.upstream, route_config);
+        let peer = build_peer(
+            &selection,
+            &self.config.upstream,
+            route_config,
+            self.ca.as_ref(),
+        );
         Ok(Box::new(peer))
     }
 

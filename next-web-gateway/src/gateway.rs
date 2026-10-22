@@ -215,6 +215,23 @@ impl Gateway {
         conf.grace_period_seconds = Some(shutdown);
         conf.graceful_shutdown_timeout_seconds = Some(shutdown);
 
+        // The TLS connector loads its trust store here, before any route runs. A
+        // configured bundle wins; `SSL_CERT_FILE` is the standard fallback for
+        // hosts whose platform store is unavailable (pingora panics when it can
+        // read neither).
+        conf.ca_file = self
+            .config
+            .upstream
+            .tls
+            .ca_file
+            .as_ref()
+            .map(|path| path.display().to_string())
+            .or_else(|| {
+                std::env::var("SSL_CERT_FILE")
+                    .ok()
+                    .filter(|path| !path.is_empty())
+            });
+
         // `-d`/`-u`/`-t` are pingora flags: forwarding them means `--daemon`
         // really backgrounds the process and `--test` really validates the
         // startup instead of being parsed and dropped.
