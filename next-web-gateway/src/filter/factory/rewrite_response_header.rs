@@ -1,16 +1,25 @@
+//! `RewriteResponseHeader` filter: regex rewrite of a response header value.
+//!
+//! Configuration uses the Spring Cloud Gateway argument order:
+//! `RewriteResponseHeader=Name, regexp, replacement`.
+
 use async_trait::async_trait;
+use regex::Regex;
 
 use crate::error::GatewayError;
 use crate::filter::gateway_filter::GatewayFilter;
 use crate::filter::gateway_filter_chain::GatewayFilterChain;
 use crate::server::ServerWebExchange;
-use regex::Regex;
 
-use crate::util::key_value::KeyValue;
-
+/// Rewrites every value of a response header with a regular expression.
 #[derive(Debug, Clone)]
 pub struct RewriteResponseHeaderFilter {
-    pub header: (KeyValue<String, String>, Option<Regex>),
+    /// Header name to rewrite.
+    pub header: String,
+    /// Pattern applied to the current value.
+    pub regex: Regex,
+    /// Replacement, which may reference capture groups with `$1`.
+    pub replacement: String,
 }
 
 #[async_trait]
@@ -25,18 +34,54 @@ impl GatewayFilter for RewriteResponseHeaderFilter {
             None => return chain.filter(exchange).await,
         };
 
-        if let Some(value) = response_header.headers.get(&self.header.0.k) {
-            if let Some(regex) = &self.header.1 {
-                if regex.is_match(value.to_str().unwrap_or_default()) {
-                    let _ = response_header
-                        .insert_header(self.header.0.k.clone(), self.header.0.v.as_str());
-                }
-            } else {
-                let _ = response_header
-                    .insert_header(self.header.0.k.clone(), self.header.0.v.as_str());
+        if let Some(value) = response_header
+            .headers
+            .get(&self.header)
+            .and_then(|value| value.to_str().ok())
+        {
+            let rewritten = rewrite_value(value, &self.regex, &self.replacement);
+            if rewritten != value {
+                response_header
+                    .insert_header(self.header.clone(), rewritten)
+                    .ok();
             }
         }
 
         chain.filter(exchange).await
+    }
+}
+
+/// Rewrite every match inside an existing header value.
+pub(crate) fn rewrite_value(value: &str, regex: &Regex, replacement: &str) -> String {
+    regex.replace_all(value, replacement).into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rewrite_value;
+    use regex::Regex;
+
+    #[test]
+    fn rewrite_response_header_keeps_the_untouched_parts_of_the_value() {
+        let regex = Regex::new("abc").unwrap();
+        assert_eq!(
+            rewrite_value("prefix abc suffix", &regex, "abc-kept"),
+            "prefix abc-kept suffix"
+        );
+    }
+
+    #[test]
+    fn rewrite_response_header_supports_capture_group_references() {
+        let regex = Regex::new(r"abc-(\w+)").unwrap();
+        assert_eq!(rewrite_value("x abc-123 y", &regex, "id:$1"), "x id:123 y");
+    }
+
+    #[test]
+    fn rewrite_response_header_replaces_every_match() {
+        let regex = Regex::new("http://").unwrap();
+        assert_eq!(
+            rewrite_value("http://a, http://b", &regex, "https://"),
+            "https://a, https://b"
+        );
     }
 }

@@ -404,14 +404,11 @@ impl TryFrom<&str> for DefaultGatewayFilter {
             }
 
             "RewriteResponseHeader" => {
-                let args = expect_args(&spec, 2, 3)?;
-                let replacement = args.get(2).cloned().unwrap_or_default();
-                let regex = match args.get(1) {
-                    Some(pattern) => Some(compile_regex(&spec, pattern)?),
-                    None => None,
-                };
+                let args = expect_args(&spec, 3, 3)?;
                 Self::RewriteResponseHeader(RewriteResponseHeaderFilter {
-                    header: (KeyValue::from((args[0].as_str(), replacement.as_str())), regex),
+                    header: args[0].clone(),
+                    regex: compile_regex(&spec, &args[1])?,
+                    replacement: args[2].clone(),
                 })
             }
 
