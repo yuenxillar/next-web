@@ -1,4 +1,8 @@
 # Build the gateway from the workspace.
+#
+# The build context is the repository root (the workspace `Cargo.toml` and
+# `Cargo.lock` must be present):
+#   docker build -f next-web-gateway/Dockerfile -t next-web-gateway .
 FROM rust:1.98-slim AS builder
 
 # pingora pulls flate2 with the zlib-ng backend, which needs cmake and a C toolchain.

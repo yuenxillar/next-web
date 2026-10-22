@@ -35,16 +35,22 @@ pub(crate) fn validate(config: &GatewayConfig) -> Vec<ConfigError> {
 }
 
 fn validate_bind(path: &str, value: &str, errors: &mut Vec<ConfigError>) {
-    let invalid = match value.rsplit_once(':') {
-        Some((host, port)) if !host.is_empty() => port.parse::<u16>().is_err(),
-        _ => true,
-    };
-
-    if invalid {
+    if !is_valid_bind(value) {
         errors.push(ConfigError::new(
             path,
             format!("`{value}` is not a `host:port` listen address"),
         ));
+    }
+}
+
+/// Whether `value` looks like a `host:port` listen address.
+///
+/// The command line overrides go through the same check, so `--bind nonsense`
+/// is a configuration error instead of a listener panic.
+pub fn is_valid_bind(value: &str) -> bool {
+    match value.rsplit_once(':') {
+        Some((host, port)) if !host.is_empty() => port.parse::<u16>().is_ok(),
+        _ => false,
     }
 }
 
@@ -160,6 +166,20 @@ fn validate_uri(uri: &str, path: &str, errors: &mut Vec<ConfigError>) -> Option<
     let authority = rest.split('/').next().unwrap_or_default();
     if authority.is_empty() {
         errors.push(ConfigError::new(path, "uri has an empty authority"));
+        return None;
+    }
+
+    // `https://:443` has an authority but no host, which would produce an empty
+    // SNI and disable TLS verification downstream.
+    let host_part = authority
+        .rsplit_once(':')
+        .map(|(host, _)| host)
+        .unwrap_or(authority);
+    if host_part.is_empty() || host_part == "[]" {
+        errors.push(ConfigError::new(
+            path,
+            format!("`{authority}` has no host name"),
+        ));
         return None;
     }
 

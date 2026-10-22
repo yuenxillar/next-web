@@ -24,8 +24,8 @@ cargo run -p next-web-gateway -- --config next-web-gateway/application.yaml
 ```
 
 ```bash
-# Container
-docker build -t next-web-gateway next-web-gateway
+# Container: the build context is the workspace root, the Dockerfile lives here.
+docker build -f next-web-gateway/Dockerfile -t next-web-gateway .
 docker run --rm -p 8080:8080 -p 9001:9001 \
   -v "$PWD/next-web-gateway/application.yaml:/etc/next-web-gateway/application.yaml:ro" \
   next-web-gateway --config /etc/next-web-gateway/application.yaml

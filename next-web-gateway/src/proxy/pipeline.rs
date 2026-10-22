@@ -17,6 +17,7 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -67,6 +68,7 @@ pub struct GatewayProxy {
     breakers: Option<Arc<CircuitBreakerServiceManager>>,
     cache: Option<Arc<LocalResponseCacheManager>>,
     metrics: Arc<Metrics>,
+    ready: Arc<AtomicBool>,
 }
 
 impl GatewayProxy {
@@ -156,7 +158,16 @@ impl GatewayProxy {
             breakers: Some(Arc::new(breakers)),
             cache,
             metrics: Arc::new(Metrics::default()),
+            ready: Arc::new(AtomicBool::new(true)),
         })
+    }
+
+    /// Shared readiness flag, read by the admin listener's `/health/ready`.
+    ///
+    /// True while a backend is selectable, false once an `lb://` pool could not
+    /// produce one.
+    pub fn readiness(&self) -> Arc<AtomicBool> {
+        self.ready.clone()
     }
 
     /// Routes, for the admin listener.
@@ -200,6 +211,8 @@ impl GatewayProxy {
 
     /// Build the "no upstream" error, recording the failure first.
     fn no_upstream_error(&self, ctx: &mut RequestContext) -> Box<pingora::Error> {
+        // A pool that cannot produce a backend means this instance cannot serve.
+        self.ready.store(false, Ordering::Relaxed);
         let error: Box<pingora::Error> = GatewayError::ServerNoUpstreamServices.into();
         self.record_upstream_failure(ctx, &error);
         error

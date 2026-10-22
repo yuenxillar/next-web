@@ -52,14 +52,15 @@ impl RoutePredicate for WeightRoutePredicateFactory {
             return false;
         }
 
-        // Spring re-randomises for every evaluation, so the split is a stable
-        // ratio over many requests rather than a sticky per-client choice.
-        self.owns_bucket(random_bucket(self.total_weight))
+        // The bucket is drawn once per request by the route matcher and shared
+        // across the whole group; drawing per route would make the last route of
+        // an 8:2 group win ~4 % instead of 20 %.
+        self.owns_bucket(draw_bucket(self.total_weight))
     }
 }
 
-/// Draw a bucket uniformly from `0..total_weight`.
-fn random_bucket(total_weight: u32) -> u32 {
+/// Draw a bucket uniformly from `0..total_weight`, once per request.
+pub(crate) fn draw_bucket(total_weight: u32) -> u32 {
     if total_weight == 0 {
         return 0;
     }
@@ -71,7 +72,7 @@ fn random_bucket(total_weight: u32) -> u32 {
 mod tests {
     use std::collections::HashSet;
 
-    use super::{random_bucket, WeightRoutePredicateFactory};
+    use super::{draw_bucket, WeightRoutePredicateFactory};
 
     #[test]
     fn configure_range_sets_expected_window() {
@@ -86,13 +87,13 @@ mod tests {
     #[test]
     fn bucket_is_bounded_by_the_group_weight() {
         for _ in 0..1_000 {
-            assert!(random_bucket(10) < 10);
+            assert!(draw_bucket(10) < 10);
         }
     }
 
     #[test]
     fn bucket_is_randomised_per_request() {
-        let buckets: HashSet<u32> = (0..200).map(|_| random_bucket(10)).collect();
+        let buckets: HashSet<u32> = (0..200).map(|_| draw_bucket(10)).collect();
         assert!(
             buckets.len() > 1,
             "expected several distinct buckets, got {buckets:?}"

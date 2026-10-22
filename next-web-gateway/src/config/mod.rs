@@ -40,6 +40,7 @@ pub use route::{
 };
 pub use server::{AdminConfig, ServerConfig};
 pub use upstream::{HealthCheckConfig, TlsConfig, UpstreamConfig};
+pub use validate::is_valid_bind;
 
 /// A single configuration problem, addressed by a dotted path.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -309,6 +310,15 @@ mod tests {
     fn rejects_uri_without_authority() {
         let text = errors_for("next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'http://'\n");
         assert!(text.contains("routes[0].uri"), "{text}");
+    }
+
+    #[test]
+    fn rejects_an_authority_without_a_host() {
+        let text = errors_for(
+            "next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'https://:443'\n",
+        );
+        assert!(text.contains("routes[0].uri"), "{text}");
+        assert!(text.contains("host"), "{text}");
     }
 
     #[test]

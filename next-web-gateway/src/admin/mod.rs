@@ -4,6 +4,7 @@
 //! or a filter, so a broken route configuration cannot take the health endpoint
 //! down with it.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -51,28 +52,37 @@ pub struct AdminService {
     routes: Arc<RouteServiceManager>,
     metrics: Arc<Metrics>,
     started: Instant,
-    ready: bool,
+    ready: Arc<AtomicBool>,
 }
 
 impl AdminService {
     /// Build the service.
+    ///
+    /// `ready` is the proxy's own readiness flag: the admin listener reports what
+    /// the proxy can actually serve, not a constant.
     pub fn new(
         config: Arc<GatewayConfig>,
         routes: Arc<RouteServiceManager>,
         metrics: Arc<Metrics>,
+        ready: Arc<AtomicBool>,
     ) -> Self {
         Self {
             config,
             routes,
             metrics,
             started: Instant::now(),
-            ready: true,
+            ready,
         }
     }
 
     /// Mark the gateway ready or not ready.
-    pub fn set_ready(&mut self, ready: bool) {
-        self.ready = ready;
+    pub fn set_ready(&self, ready: bool) {
+        self.ready.store(ready, Ordering::Relaxed);
+    }
+
+    /// Whether the gateway reports itself ready.
+    pub fn is_ready(&self) -> bool {
+        self.ready.load(Ordering::Relaxed)
     }
 
     /// Port and address of the admin listener, when enabled.
@@ -109,11 +119,6 @@ impl AdminService {
                 })
             })
             .collect()
-    }
-
-    /// Whether the gateway is ready to serve traffic.
-    pub fn is_ready(&self) -> bool {
-        self.ready
     }
 
     /// Answer one request path.
@@ -193,6 +198,7 @@ impl ProxyHttp for AdminService {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    use std::sync::atomic::AtomicBool;
     use std::sync::Arc;
 
     use crate::config::GatewayConfig;
@@ -219,7 +225,12 @@ next:
             RoutePredicateService::try_from(config.routes[0].clone()).unwrap(),
         ]);
 
-        AdminService::new(Arc::new(config), Arc::new(routes), Arc::new(Metrics::default()))
+        AdminService::new(
+            Arc::new(config),
+            Arc::new(routes),
+            Arc::new(Metrics::default()),
+            Arc::new(AtomicBool::new(true)),
+        )
     }
 
     #[test]
@@ -252,10 +263,17 @@ next:
     }
 
     #[test]
-    fn health_ready_is_503_until_marked_ready() {
-        let mut service = service();
+    fn health_ready_follows_the_shared_readiness_flag() {
+        let service = service();
+        assert_eq!(service.respond("/health/ready").status, 200);
+
+        // The proxy flips the same flag when a pool cannot produce a backend.
         service.set_ready(false);
-        assert_eq!(service.respond("/health/ready").status, 503);
+        assert_eq!(
+            service.respond("/health/ready").status,
+            503,
+            "readiness must follow the proxy, not a constant"
+        );
 
         service.set_ready(true);
         assert_eq!(service.respond("/health/ready").status, 200);

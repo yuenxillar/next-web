@@ -114,8 +114,38 @@ impl Gateway {
 
     /// Validate the configuration and return the route ids it defines.
     pub fn check(&self) -> Result<Vec<String>, ConfigErrors> {
+        self.validate_bindings()?;
         let proxy = GatewayProxy::new(self.config.clone())?;
         Ok(proxy.routes().ordered_route_ids().to_vec())
+    }
+
+    /// Check the effective listen addresses, including the CLI overrides.
+    fn validate_bindings(&self) -> Result<(), ConfigErrors> {
+        let mut errors = Vec::new();
+
+        let bind = self.bind();
+        if !crate::config::is_valid_bind(&bind) {
+            errors.push(crate::config::ConfigError::new(
+                "bind",
+                format!("`{bind}` is not a `host:port` listen address"),
+            ));
+        }
+
+        if self.config.server.admin.enabled {
+            let admin_bind = self.admin_bind();
+            if !crate::config::is_valid_bind(&admin_bind) {
+                errors.push(crate::config::ConfigError::new(
+                    "admin.bind",
+                    format!("`{admin_bind}` is not a `host:port` listen address"),
+                ));
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(ConfigErrors::new(errors))
+        }
     }
 
     /// The configured bind address.
@@ -134,6 +164,11 @@ impl Gateway {
 
     /// Run the gateway until it is shut down.
     pub fn run(self) -> ! {
+        if let Err(error) = self.validate_bindings() {
+            eprintln!("{error}");
+            std::process::exit(EXIT_CONFIG);
+        }
+
         let bind = self.bind();
         let admin_bind = self.admin_bind();
 
@@ -147,7 +182,8 @@ impl Gateway {
 
         let routes = proxy.shared_routes();
         let metrics = proxy.metrics().clone();
-        let admin = AdminService::new(Arc::new(self.config.clone()), routes, metrics);
+        let ready = proxy.readiness();
+        let admin = AdminService::new(Arc::new(self.config.clone()), routes, metrics, ready);
 
         let mut server = match Server::new(Opt::default()) {
             Ok(server) => server,
@@ -305,5 +341,22 @@ next:
 
         assert_eq!(gateway.bind(), "0.0.0.0:9000");
         assert_eq!(gateway.admin_bind(), "127.0.0.1:9001");
+    }
+
+    #[test]
+    fn a_bad_bind_override_is_a_configuration_error() {
+        let cli = Cli::try_parse_from(["next-web-gateway", "--bind", "nonsense"]).unwrap();
+        let gateway = Gateway::parse_str(VALID).unwrap().with_overrides(&cli);
+
+        let error = gateway.check().unwrap_err().to_string();
+        assert!(error.contains("bind"), "{error}");
+    }
+
+    #[test]
+    fn a_bad_admin_bind_override_is_a_configuration_error() {
+        let cli = Cli::try_parse_from(["next-web-gateway", "--admin-bind", "9001"]).unwrap();
+        let gateway = Gateway::parse_str(VALID).unwrap().with_overrides(&cli);
+
+        assert!(gateway.check().is_err());
     }
 }

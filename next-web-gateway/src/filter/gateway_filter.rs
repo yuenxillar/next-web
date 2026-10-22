@@ -166,7 +166,6 @@ impl DefaultGatewayFilter {
     /// The proxy pass this filter runs in.
     pub fn phase(&self) -> FilterPhase {
         match self {
-            Self::RequestSize(_) => FilterPhase::RequestBody,
             Self::RemoveJsonAttributesResponseBody(_) => FilterPhase::ResponseBody,
             Self::AddResponseHeader(_)
             | Self::DedupeResponseHeader(_)

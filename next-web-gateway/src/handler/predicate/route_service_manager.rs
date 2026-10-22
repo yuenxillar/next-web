@@ -15,6 +15,7 @@ use crate::server::DefaultServerWebExchange;
 use crate::service::route_service::{RoutePredicateService, RouteWork};
 
 use super::route_predicate_factory::RoutePredicateFactory;
+use super::weight_route_predicate_factory::draw_bucket;
 
 /// The route selected for one request, with everything the proxy needs.
 #[derive(Debug, Clone)]
@@ -60,13 +61,25 @@ impl RouteServiceManager {
 
     /// Return the first route whose predicates all match.
     pub fn match_route(&self, session: &mut Session) -> Option<RouteMatch> {
+        // One bucket per request, shared by every route of the same weight
+        // group, so an 8:2 split really delivers 8:2.
+        let mut group_buckets: HashMap<String, u32> = HashMap::new();
+
         for route_id in &self.ordered_route_ids {
             let service = self.services.get(route_id)?;
 
             let allowable = service
                 .route_predicate_factory
                 .iter()
-                .all(|factory| factory.matches(session));
+                .all(|factory| match factory {
+                    RoutePredicateFactory::WeightPredicates(weight) => {
+                        let bucket = *group_buckets
+                            .entry(weight.group.clone())
+                            .or_insert_with(|| draw_bucket(weight.total_weight));
+                        weight.owns_bucket(bucket)
+                    }
+                    other => other.matches(session),
+                });
 
             if !allowable {
                 continue;

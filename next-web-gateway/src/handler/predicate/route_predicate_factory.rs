@@ -95,23 +95,23 @@ impl TryFrom<&str> for RoutePredicateFactory {
 
         let factory = match name {
             "Before" | "After" | "Between" => {
-                let value = match name {
-                    "Before" => before(spec.args.join(",").trim()),
-                    "After" => after(spec.args.join(",").trim()),
-                    "Between" => {
-                        let joined = spec.args.join(",");
-                        let (start, end) = joined
-                            .split_once(',')
-                            .or_else(|| joined.split_once('/'))
-                            .ok_or_else(|| {
-                                ConfigError::new(
-                                    "predicates.Between",
-                                    "expects two timestamps separated by `,` or `/`",
-                                )
-                            })?;
-                        between(start.trim(), end.trim())
+                let joined = spec.args.join(",");
+                let raw = joined.trim();
+
+                let value = if name == "Between" {
+                    match joined.split_once(',').or_else(|| joined.split_once('/')) {
+                        Some((start, end)) => between(start.trim(), end.trim()),
+                        None => {
+                            return Err(ConfigError::new(
+                                "predicates.Between",
+                                "expects two timestamps separated by `,` or `/`",
+                            ));
+                        }
                     }
-                    _ => unreachable!(),
+                } else if name == "Before" {
+                    before(raw)
+                } else {
+                    after(raw)
                 };
 
                 match value {

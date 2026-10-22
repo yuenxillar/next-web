@@ -14,12 +14,14 @@ use crate::config::ConfigError;
 /// Filters declare their pass instead of probing `exchange.request_header()` at
 /// run time; a filter that runs in the wrong pass is how the old rate limiter
 /// ended up counting every request twice.
+///
+/// There is no request *body* phase: the only body limit is `RequestSize`, whose
+/// `Content-Length` check runs in the request pass and whose chunked-body check
+/// lives in the proxy's `request_body_filter`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterPhase {
     /// Runs once, before the upstream connection, with the request header.
     RequestHeader,
-    /// Runs while the request body streams to the upstream.
-    RequestBody,
     /// Runs once, with the upstream response header.
     ResponseHeader,
     /// Runs once, with the fully buffered upstream response body.
@@ -221,6 +223,6 @@ mod tests {
         assert_eq!(body.phase(), FilterPhase::ResponseBody);
 
         let size = DefaultGatewayFilter::try_from("RequestSize=1024").unwrap();
-        assert_eq!(size.phase(), FilterPhase::RequestBody);
+        assert_eq!(size.phase(), FilterPhase::RequestHeader);
     }
 }

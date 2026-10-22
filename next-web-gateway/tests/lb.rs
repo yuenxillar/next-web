@@ -84,6 +84,47 @@ fn a_weighted_route_prefers_the_heavier_backend() {
 }
 
 #[test]
+fn a_weight_group_delivers_the_configured_ratio() {
+    let heavy = MockUpstream::start(Behavior::Echo);
+    let light = MockUpstream::start(Behavior::Echo);
+
+    let template = format!(
+        "\
+- id: heavy
+  uri: \"http://{}\"
+  order: 10
+  predicates:
+    - Path=/weighted/**
+    - Weight=canary, 8
+- id: light
+  uri: \"http://{}\"
+  order: 20
+  predicates:
+    - Path=/weighted/**
+    - Weight=canary, 2
+",
+        heavy.addr, light.addr
+    );
+    let gateway = TestGateway::start(&template);
+
+    for _ in 0..200 {
+        let response = get(gateway.addr, "/weighted", &[]);
+        assert_eq!(response.status, 200);
+    }
+
+    let total = heavy.request_count() + light.request_count();
+    assert_eq!(total, 200);
+    // 8:2 means about 160 for the heavy route. The bug this guards against
+    // (drawing a bucket per route) produced about 164:36 -> 90:10, which is
+    // outside this window on the light side.
+    assert!(
+        (30..=55).contains(&light.request_count()),
+        "an 8:2 group must send about 20% to the light route, got {} of {total}",
+        light.request_count()
+    );
+}
+
+#[test]
 fn the_upstream_receives_the_request_target() {
     let upstream = MockUpstream::start(Behavior::Echo);
     let template = format!(

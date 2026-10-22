@@ -1,0 +1,10 @@
+# Build artifacts and local state must never enter the image build context.
+target/
+.cargo-target/
+.git/
+.idea/
+.vscode/
+*.log
+**/*.rs.bk
+docs/
+superpowers/
