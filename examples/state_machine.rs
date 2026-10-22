@@ -192,6 +192,31 @@ impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig 
     }
 }
 
+impl
+    Configurer<
+        StateMachineConfig<OrderState, OrderEvent>,
+        StateMachineConfigBuilder<OrderState, OrderEvent>,
+    > for OrderStateMachineConfig
+{
+    fn init(
+        &mut self,
+        _builder: &StateMachineConfigBuilder<OrderState, OrderEvent>,
+    ) -> Result<(), next_web_core::error::BoxError> {
+        Ok(())
+    }
+
+    fn configure(
+        &mut self,
+        _builder: &StateMachineConfigBuilder<OrderState, OrderEvent>,
+    ) -> Result<(), next_web_core::error::BoxError> {
+        Ok(())
+    }
+
+    fn is_assignable(&self, _builder: &StateMachineConfigBuilder<OrderState, OrderEvent>) -> bool {
+        true
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
     let config = OrderStateMachineConfig {};

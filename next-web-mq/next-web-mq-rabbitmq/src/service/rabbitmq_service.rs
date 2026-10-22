@@ -9,7 +9,6 @@ use amqprs::{
     },
     connection::{Connection, OpenConnectionArguments},
 };
-use next_web_core::error::BoxError;
 use tracing::{error, info, warn};
 
 use crate::{
