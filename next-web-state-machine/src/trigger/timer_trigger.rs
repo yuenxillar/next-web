@@ -1,6 +1,6 @@
 //! A trigger which fires repeatedly on a fixed period.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
@@ -13,10 +13,23 @@ use crate::trigger::Trigger;
 use crate::trigger::trigger_context::TriggerContext;
 use crate::trigger::trigger_listener::TriggerListener;
 
+/// The part of a timer which the trigger and its task share.
+///
+/// The task observes the armed flag between two ticks, so a timer which is
+/// disarmed while its own task runs a transition is not aborted mid flight. The
+/// generation tells a finishing task whether a newer task replaced it.
+#[derive(Default)]
+struct TimerControl {
+    armed: AtomicBool,
+    generation: AtomicU64,
+}
+
 /// A timer trigger.
 ///
 /// The Java implementation schedules on a `Scheduler` and keeps a `Disposable`;
-/// the Rust port spawns a tokio task and aborts it on disarm.
+/// the Rust port spawns a tokio task. Disarming it from another task aborts the
+/// task, while disarming it from the task itself lets the running transition
+/// finish and stops the timer at its next tick.
 ///
 /// # Type Parameters
 /// * `S` - the type of state
@@ -25,7 +38,7 @@ pub struct TimerTrigger<S, E> {
     listeners: RwLock<Arc<Vec<Arc<dyn TriggerListener>>>>,
     period: Duration,
     count: usize,
-    armed: AtomicBool,
+    control: Arc<TimerControl>,
     handle: Mutex<Option<JoinHandle<()>>>,
     _marker: std::marker::PhantomData<(S, E)>,
 }
@@ -36,7 +49,7 @@ impl<S, E> Clone for TimerTrigger<S, E> {
             listeners: RwLock::new(read(&self.listeners).clone()),
             period: self.period,
             count: self.count,
-            armed: AtomicBool::new(self.armed.load(Ordering::SeqCst)),
+            control: self.control.clone(),
             handle: Mutex::new(None),
             _marker: std::marker::PhantomData,
         }
@@ -66,7 +79,7 @@ where
             listeners: RwLock::new(Arc::new(Vec::new())),
             period,
             count,
-            armed: AtomicBool::new(false),
+            control: Arc::new(TimerControl::default()),
             handle: Mutex::new(None),
             _marker: std::marker::PhantomData,
         }
@@ -80,25 +93,13 @@ where
         Self::new(Duration::from_millis(period_millis))
     }
 
-    /// Gets the period.
-    pub fn get_period(&self) -> Duration {
-        self.period
-    }
-
-    /// Gets the firing limit, `0` when the trigger fires forever.
-    pub fn get_count(&self) -> usize {
-        self.count
-    }
-
     /// Schedules the timer task.
     fn schedule(&self) {
-        if lock(&self.handle).is_some() {
-            return;
-        }
-
         let period = self.period;
         let count = self.count;
         let listeners = read(&self.listeners).clone();
+        let control = self.control.clone();
+        let generation = self.control.generation.fetch_add(1, Ordering::SeqCst) + 1;
 
         let spawned = tokio::runtime::Handle::try_current().ok().map(|handle| {
             handle.spawn(async move {
@@ -113,6 +114,12 @@ where
                 loop {
                     ticker.tick().await;
 
+                    // A timer which was disarmed while its own task ran a
+                    // transition stops here, with the transition complete.
+                    if !control.armed.load(Ordering::SeqCst) {
+                        return;
+                    }
+
                     for listener in listeners.iter() {
                         listener.triggered().await;
                     }
@@ -121,6 +128,12 @@ where
                     if count > 0 && fired >= count {
                         break;
                     }
+                }
+
+                // The fired-out timer is ready to be armed again, unless a newer
+                // task replaced this one.
+                if control.generation.load(Ordering::SeqCst) == generation {
+                    control.armed.store(false, Ordering::SeqCst);
                 }
             })
         });
@@ -131,9 +144,16 @@ where
     }
 
     /// Cancels the timer task.
+    ///
+    /// A task which cancels the timer while it runs the transition is left to
+    /// finish, so the transition is not dropped in the middle.
     fn cancel(&self) {
         if let Some(handle) = lock(&self.handle).take() {
-            handle.abort();
+            let own_task = tokio::task::try_id().is_some_and(|id| id == handle.id());
+
+            if !own_task {
+                handle.abort();
+            }
         }
     }
 }
@@ -168,14 +188,14 @@ where
     }
 
     fn arm(&self) {
-        if self.armed.swap(true, Ordering::SeqCst) {
+        if self.control.armed.swap(true, Ordering::SeqCst) {
             return;
         }
         self.schedule();
     }
 
     fn disarm(&self) {
-        if !self.armed.swap(false, Ordering::SeqCst) {
+        if !self.control.armed.swap(false, Ordering::SeqCst) {
             return;
         }
         self.cancel();

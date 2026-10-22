@@ -75,7 +75,8 @@ also asserts every step and stops the machine.
 - Deferred events, which a state postpones until it is left.
 - History pseudo states.
 - Timed transitions, which start counting when the source state of the
-  transition is entered.
+  transition is entered. The platform timer bounds the resolution: on Windows a
+  period below about 16ms is rounded up, so measure before you rely on one.
 - Extended state variables with change notifications.
 - Listeners, interceptors and monitors for observability.
 - Security rules for events and transitions, enforced fail-closed.
@@ -130,6 +131,29 @@ The examples live in this repository and are not shipped with the crate:
 | Parent and child machine | `cargo run -p next-web-examples --bin state_machine_hierarchy` | `child moved: true` |
 | Service and persistence | `cargo run -p next-web-examples --bin state_machine_service` | `restored: 2` |
 | Transition handler | `cargo run -p next-web-examples --bin state_machine_handler` | `audited: 1` |
+
+## Performance
+
+`tests/performance.rs` holds a throughput matrix of the runtime, run on demand:
+
+```text
+cargo test -p next-web-state-machine --release --test performance -- --ignored --nocapture
+```
+
+It reports nanoseconds per event for a two state cycle under these conditions:
+
+| Scenario | What it isolates |
+| --- | --- |
+| sync actions, current thread | the pipeline itself, actions without an await |
+| async actions, current thread | the cost of an action which awaits once |
+| sync and async actions, four workers | the same work with a scheduler which can park the task |
+| concurrent senders, four tasks | the contention for the single event slot of a machine |
+| denied event | the path of an event which no transition accepts |
+| timer driven | transitions driven by a timer, and the resolution of the platform timer |
+
+Compare the numbers within one run on one machine; they are not a promise about
+another machine. The release build matters: a debug build measures the debug
+profile of this crate and of its dependencies.
 
 ## Feature flags
 

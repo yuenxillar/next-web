@@ -54,6 +54,9 @@ All notable changes to `next-web-state-machine` are listed here.
   it fires for the first time after its period. Before, every timer was armed
   when the machine started and its first firing was immediate, so a timer out of
   a state entered later had usually expired before the machine arrived.
+- Leaving the state which owns a timer no longer aborts the transition which that
+  timer is running: the timer task stops at its next tick instead of cancelling
+  itself in the middle of the transition.
 
 ## Migration from 0.1
 
