@@ -4,17 +4,16 @@ use crate::error::GatewayError;
 use crate::filter::gateway_filter::GatewayFilter;
 use crate::filter::gateway_filter_chain::GatewayFilterChain;
 use crate::server::ServerWebExchange;
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(clippy::enum_variant_names)]
 pub enum DedupeStrategy {
+    /// Keep the first value.
+    #[default]
     RetainFirst,
+    /// Keep the last value.
     RetainLast,
+    /// Keep one copy of each distinct value.
     RetainUnique,
-}
-
-impl Default for DedupeStrategy {
-    fn default() -> Self {
-        Self::RetainFirst
-    }
 }
 
 impl DedupeStrategy {
@@ -120,6 +119,7 @@ impl GatewayFilter for DedupeResponseHeaderFilter {
 }
 
 #[cfg(test)]
+#[allow(clippy::drop_non_drop)]
 mod tests {
     use pingora::http::ResponseHeader;
 

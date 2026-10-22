@@ -4,6 +4,7 @@ use std::error::Error;
 
 /// Errors the gateway raises itself, before or instead of an upstream call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 pub enum GatewayError {
     /// No route matched the request.
     ServerNoRoute,

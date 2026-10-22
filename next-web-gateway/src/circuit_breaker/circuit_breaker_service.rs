@@ -10,9 +10,6 @@ pub struct CircuitBreakerService {
     /// Unique identifier of the breaker.
     pub id: String,
 
-    /// Whether the breaker may open at all.
-    pub active: bool,
-
     /// The state machine.
     pub controller: CircuitBreakerController,
 }
@@ -22,7 +19,6 @@ impl CircuitBreakerService {
     pub fn from_config(id: &str, config: &BreakerConfig) -> Self {
         Self {
             id: id.to_string(),
-            active: config.enabled,
             controller: CircuitBreakerController::with_permits(
                 config.enabled,
                 config.failure_threshold,

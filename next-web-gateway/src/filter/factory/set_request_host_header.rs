@@ -16,12 +16,12 @@ impl GatewayFilter for SetRequestHostHeaderFilter {
         exchange: &mut dyn ServerWebExchange,
         chain: &dyn GatewayFilterChain,
     ) -> Result<(), GatewayError> {
-        exchange.request_header().map(|request_header| {
+        if let Some(request_header) = exchange.request_header() {
             // Set the upstream Host header explicitly so H1 and H2 forwarding use the same host.
             request_header
                 .insert_header("Host".to_string(), self.host.as_str())
                 .ok();
-        });
+        }
 
         chain.filter(exchange).await
     }

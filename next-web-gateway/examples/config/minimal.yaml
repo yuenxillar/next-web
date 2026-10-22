@@ -1,0 +1,15 @@
+# Smallest useful configuration: one route to one upstream, admin disabled.
+next:
+  gateway:
+    server:
+      bind: "127.0.0.1:8080"
+      admin:
+        enabled: false
+    logging:
+      level: info
+      access_log: true
+    routes:
+      - id: users
+        uri: "http://127.0.0.1:9000"
+        predicates:
+          - Path=/api/users/**

@@ -321,6 +321,7 @@ impl ProxyHttp for GatewayProxy {
             if let Some(breakers) = self.breakers.as_ref() {
                 if let Some(service) = breakers.services.get(&breaker_id) {
                     if service.controller.try_acquire().await.is_err() {
+                        warn!(breaker = %service.id, "circuit breaker is open, rejecting");
                         return self.respond_directly(session, ctx, 503).await;
                     }
                 }

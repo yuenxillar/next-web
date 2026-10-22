@@ -1,7 +1,6 @@
 //! Route matching, filter application and the per-route response cache hook.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use hashbrown::HashMap as FastMap;
 use pingora::proxy::Session;
@@ -232,9 +231,6 @@ fn configure_weight_predicates(services: &mut [RoutePredicateService]) {
         }
     }
 }
-
-/// Shared handle so health checks and the admin endpoint can share routes.
-pub type SharedRoutes = Arc<RouteServiceManager>;
 
 #[cfg(test)]
 mod tests {

@@ -12,19 +12,12 @@ pub struct DefaultServerWebExchange<'ctx, 'a, 'b> {
 }
 
 impl<'ctx, 'a, 'b> DefaultServerWebExchange<'ctx, 'a, 'b> {
+    /// Wrap a request context and the part of the exchange a filter may touch.
     pub fn new(req_ctx: &'ctx mut RequestContext, header_and_body: HeaderAndBody<'a, 'b>) -> Self {
         Self {
             req_ctx,
             header_and_body,
         }
-    }
-
-    pub fn req_ctx(&self) -> &RequestContext {
-        self.req_ctx
-    }
-
-    pub fn header_and_body(&self) -> &HeaderAndBody<'a, 'b> {
-        &self.header_and_body
     }
 }
 

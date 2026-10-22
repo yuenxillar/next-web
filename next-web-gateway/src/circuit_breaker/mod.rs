@@ -1,16 +1,11 @@
-//! Circuit breaking: controller, per-route service and fallback plumbing.
+//! Circuit breaking: the breaker state machine and its registry.
 
-/// The breaker state machine. The module name is kept for compatibility.
-#[path = "breaker_controller.rs"]
-pub mod circuit_breaker_controller;
-
-/// The breaker state machine, under its short name.
-pub use circuit_breaker_controller as breaker_controller;
-
+/// The breaker state machine.
+pub mod breaker_controller;
 pub mod circuit_breaker_error;
 pub(crate) mod circuit_breaker_service;
 pub(crate) mod circuit_breaker_service_manager;
 pub mod circuit_state;
-pub mod default_fallback_provider;
-pub mod fallback_error;
-pub mod fallback_provider;
+
+/// Short alias for the breaker state machine.
+pub use breaker_controller as circuit_breaker_controller;

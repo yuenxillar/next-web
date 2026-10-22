@@ -1,3 +1,5 @@
+//! The filter chain: each filter either continues the chain or aborts.
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -8,25 +10,15 @@ use crate::{
     server::ServerWebExchange,
 };
 
+/// Runs a list of filters in order.
 pub struct DefaultGatewayFilterChain {
-    index: usize,
     filters: Vec<Arc<dyn GatewayFilter>>,
 }
 
 impl DefaultGatewayFilterChain {
+    /// Build a chain from the filters of one phase.
     pub fn new(filters: Vec<Arc<dyn GatewayFilter>>) -> Self {
-        Self { index: 0, filters }
-    }
-
-    pub fn from_parent(value: DefaultGatewayFilterChain) -> Self {
-        Self {
-            index: value.index,
-            filters: value.filters,
-        }
-    }
-
-    pub fn filters(&self) -> &[Arc<dyn GatewayFilter>] {
-        &self.filters
+        Self { filters }
     }
 }
 
@@ -41,12 +33,13 @@ impl GatewayFilterChain for DefaultGatewayFilterChain {
     async fn filter(&self, exchange: &mut dyn ServerWebExchange) -> Result<(), GatewayError> {
         let wrapper = DefaultGatewayFilterChainWrapper {
             chain: self,
-            index: self.index,
+            index: 0,
         };
         wrapper.filter(exchange).await
     }
 }
 
+/// Carries the position in the chain through the recursive calls.
 struct DefaultGatewayFilterChainWrapper<'a> {
     chain: &'a DefaultGatewayFilterChain,
     index: usize,
@@ -55,17 +48,15 @@ struct DefaultGatewayFilterChainWrapper<'a> {
 #[async_trait]
 impl GatewayFilterChain for DefaultGatewayFilterChainWrapper<'_> {
     async fn filter(&self, exchange: &mut dyn ServerWebExchange) -> Result<(), GatewayError> {
-        if self.index < self.chain.filters.len() {
-            if let Some(filter) = self.chain.filters.get(self.index) {
-                let chain = DefaultGatewayFilterChainWrapper {
-                    chain: self.chain,
-                    index: self.index + 1,
-                };
-                return filter.filter(exchange, &chain).await;
-            }
-        }
+        let Some(filter) = self.chain.filters.get(self.index) else {
+            return Ok(());
+        };
 
-        // complete
-        Ok(())
+        let chain = DefaultGatewayFilterChainWrapper {
+            chain: self.chain,
+            index: self.index + 1,
+        };
+
+        filter.filter(exchange, &chain).await
     }
 }

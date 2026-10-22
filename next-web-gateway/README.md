@@ -1,21 +1,296 @@
-# 基础通信功能
- ## 反向代理：接收客户端的请求，将请求转发到后端的实际服务节点上，并将服务节点的响应返回给客户端。这样客户端只需与网关进行通信，无需了解后端服务的具体位置和细节。例如，当客户端访问一个电商网站的商品列表时，请求先到达网关，网关再将请求转发到负责商品信息的后端服务。
-# 负载均衡：在多个后端服务实例之间分配请求，以平衡各个实例的负载，避免部分实例过载而部分实例空闲，从而提高系统的整体性能和可用性。常见的负载均衡算法有轮询、随机、加权轮询、IP 哈希等。比如，对于一个大型的社交平台，网关会根据各个服务器的负载情况，将用户的请求均匀地分配到不同的服务器上。
-# 协议转换：可以将客户端使用的协议转换为后端服务支持的协议，实现不同协议之间的通信。例如，将 HTTP 协议的请求转换为 gRPC 协议与后端服务进行交互，或者反之。在一个混合架构的系统中，部分旧服务使用 HTTP 协议，新服务采用 gRPC 协议，网关就可以完成协议的转换。
-# 安全防护功能
- ## 身份验证与授权：验证客户端请求的身份，确保只有合法的用户或服务能够访问后端资源。可以使用多种身份验证方式，如 OAuth、JWT（JSON Web Token）等。同时，根据用户的角色和权限，控制其对不同资源的访问权限。例如，在企业内部系统中，普通员工只能访问自己权限范围内的数据，而管理员可以进行系统配置等高级操作。
- ## IP 黑白名单：通过设置 IP 地址的黑白名单，限制或允许特定 IP 地址的访问。可以将恶意 IP 地址加入黑名单，防止其发起攻击；将可信的 IP 地址加入白名单，只有白名单内的 IP 才能访问系统。比如，为了防止外部的恶意扫描和攻击，只允许公司内部办公网络的 IP 地址访问某些敏感服务。
- ## 防止 DDoS 攻击：检测并抵御分布式拒绝服务（DDoS）攻击，通过流量清洗、限流等手段，过滤掉恶意的流量，确保系统在遭受攻击时仍能正常提供服务。例如，当检测到某个 IP 地址在短时间内发送大量请求时，网关可以对其进行限流或直接封禁。
- ## 数据加密与解密：对客户端和后端服务之间传输的数据进行加密，防止数据在传输过程中被窃取或篡改。常见的加密算法有 SSL/TLS 等。在金融系统中，涉及用户资金交易的请求和响应数据都会进行加密处理，保障数据的安全性。
-# 流量管理功能
- ## 限流：限制客户端在一定时间内的请求数量，防止某个客户端或服务对系统资源的过度占用，保护后端服务不被大量请求压垮。可以根据不同的维度进行限流，如 IP 地址、用户 ID、接口等。例如，对于一个公共 API 服务，为了避免某个开发者过度调用，限制每个 IP 地址每分钟只能发起 100 次请求。
- ## 熔断：当后端服务出现故障或响应超时达到一定阈值时，网关自动切断对该服务的请求，避免故障扩散，同时可以返回预设的默认响应给客户端。例如，当某个微服务出现异常，网关可以快速熔断对该服务的请求，避免其他依赖该服务的业务受到影响。
- ## 降级：在系统资源紧张或后端服务出现问题时，暂时关闭一些非核心的业务功能，优先保障核心业务的正常运行。例如，在电商平台的大促活动期间，如果系统负载过高，网关可以对一些次要的推荐功能进行降级处理，确保商品下单等核心功能的可用性。
-# 可观测性功能
- ## 日志记录：记录客户端的请求信息、后端服务的响应信息以及网关自身的运行状态信息等，方便后续的问题排查和分析。日志内容可以包括请求的时间、请求的 URL、请求方法、响应状态码等。例如，当系统出现故障时，可以通过查看日志来确定是哪个请求出现了问题。
- ## 监控与统计：对网关的各项指标进行实时监控和统计，如请求的吞吐量、响应时间、错误率等。通过监控这些指标，可以及时发现系统的性能瓶颈和潜在问题，并采取相应的措施进行优化。例如，当发现某个接口的响应时间突然变长时，可以及时排查后端服务是否出现问题。
- ## 链路追踪：在分布式系统中，对请求的整个调用链路进行追踪，记录请求在各个服务之间的传递过程和处理时间，帮助开发人员快速定位问题。例如，使用 Jaeger、Zipkin 等链路追踪工具，网关可以将请求的追踪信息传递给后端服务，方便对整个调用链进行监控和分析。
-# 业务增强功能
- ## 请求 / 响应转换：对客户端的请求进行预处理，如修改请求参数、添加请求头信息等；对后端服务的响应进行后处理，如修改响应数据格式、添加响应头信息等。例如，将客户端发送的 JSON 数据转换为 XML 格式再转发给后端服务，或者在响应头中添加自定义的信息。
- ## 缓存：对一些经常被请求的数据进行缓存，当有相同的请求到来时，直接从缓存中获取数据并返回给客户端，减少对后端服务的请求，提高系统的响应速度。例如，对于一些静态的商品信息，可以在网关层进行缓存，当用户再次请求这些信息时，直接从缓存中获取。
- ## API 聚合：将多个后端服务的接口进行组合和聚合，为客户端提供一个统一的接口。这样客户端只需调用一个接口，就可以获取多个服务的信息，减少客户端与服务端的交互次数。例如，在一个电商应用中，客户端可以通过一个接口同时获取商品信息、用户评价和库存信息，而这些信息分别来自不同的后端服务。
+# next-web-gateway
+
+A Spring Cloud Gateway equivalent for Rust, built on [pingora](https://github.com/cloudflare/pingora).
+Routes, predicates and filters are declared in YAML; no code changes are needed to add a route.
+
+## Contents
+
+- [Quick start](#quick-start)
+- [Configuration reference](#configuration-reference)
+- [Predicates](#predicates)
+- [Filters](#filters)
+- [Operations](#operations)
+- [Differences from Spring Cloud Gateway](#differences-from-spring-cloud-gateway)
+- [Roadmap](#roadmap)
+
+## Quick start
+
+```bash
+# Validate a configuration without starting the server (exit 0 valid, 2 invalid)
+cargo run -p next-web-gateway -- --check --config next-web-gateway/application.yaml
+
+# Run it
+cargo run -p next-web-gateway -- --config next-web-gateway/application.yaml
+```
+
+```bash
+# Container
+docker build -t next-web-gateway next-web-gateway
+docker run --rm -p 8080:8080 -p 9001:9001 \
+  -v "$PWD/next-web-gateway/application.yaml:/etc/next-web-gateway/application.yaml:ro" \
+  next-web-gateway --config /etc/next-web-gateway/application.yaml
+```
+
+The proxy listens on `0.0.0.0:8080` and the admin listener on `127.0.0.1:9001` by default.
+
+### Command line
+
+Every flag has an environment variable so the container can be configured without arguments.
+
+| Flag | Environment variable | Default |
+|---|---|---|
+| `--config <PATH>` | `NEXT_WEB_GATEWAY_CONFIG` | `application.yaml` |
+| `--bind <ADDR>` | `NEXT_WEB_GATEWAY_BIND` | `next.gateway.server.bind` |
+| `--admin-bind <ADDR>` | `NEXT_WEB_GATEWAY_ADMIN_BIND` | `next.gateway.server.admin.bind` |
+| `--log-level <LEVEL>` | `NEXT_WEB_GATEWAY_LOG_LEVEL`, `RUST_LOG` | `next.gateway.logging.level` |
+| `--log-format <text|json>` | `NEXT_WEB_GATEWAY_LOG_FORMAT` | `next.gateway.logging.format` |
+| `--check` | — | validate and exit |
+| `-d`, `--daemon` | — | run in the background |
+| `-u`, `--upgrade` | — | upgrade a running instance in place |
+| `-t`, `--test` | — | pingora configuration self-test |
+
+Exit codes: `0` success, `1` runtime failure, `2` invalid configuration.
+
+## Configuration reference
+
+The configuration lives under `next.gateway`. A legacy top level `gateway` block is still
+accepted with a deprecation warning. Unknown keys are rejected, so a typo can never silently
+disable a filter.
+
+```yaml
+next:
+  gateway:
+    server:
+      bind: "0.0.0.0:8080"
+      threads: 0                  # 0 = let pingora decide
+      graceful_shutdown: 30s
+      keepalive: 60s
+      max_connection: 0           # 0 = unlimited
+      admin:
+        enabled: true
+        bind: "127.0.0.1:9001"
+    logging:
+      level: info
+      format: text                # text | json
+      access_log: true
+    upstream:
+      connect_timeout: 2s
+      read_timeout: 30s
+      write_timeout: 30s
+      idle_timeout: 60s
+      health_check:
+        enabled: true
+        interval: 5s
+      tls:
+        verify_cert: true
+        verify_hostname: true
+        ca_file: null
+        insecure_skip_verify: false
+    error:
+      format: json                # json | text
+      request_id_header: X-Request-Id
+    trusted_proxies: []           # CIDR list; empty trusts nobody
+    breakers:
+      main:
+        enabled: true
+        failure_threshold: 10
+        wait_duration_in_open_state: 5s
+        half_open_permits: 1
+    routes:
+      - id: users
+        uri: "lb://user-service"
+        order: 100                # omitted = i32::MAX
+        predicates:
+          - Path=/api/users/**
+          - Method=GET,POST
+        filters:
+          - StripPrefix=1
+        upstreams:
+          - addr: "10.0.0.11:8080"
+            weight: 2
+          - addr: "10.0.0.12:8080"
+            weight: 1
+        metadata:
+          client:
+            connect_timeout: 1s
+            read_timeout: 10s
+            write_timeout: 10s
+```
+
+Durations accept `500ms`, `30s`, `2m` and `1h`. A bare integer is read as milliseconds and logs
+a deprecation warning.
+
+`uri` accepts three schemes:
+
+| Scheme | Meaning |
+|---|---|
+| `http://host:port` | Proxy to a fixed authority over plain HTTP |
+| `https://host:port` | Proxy to a fixed authority over TLS |
+| `lb://name` | Round robin across the route's `upstreams`, weighted by `weight` |
+
+Validation collects every problem and reports them together with a document path, for example
+`routes[1].upstreams[0].addr: 'svc.local:8080' is not a 'IP:port' address`.
+
+## Predicates
+
+All predicates of a route must match.
+
+| Predicate | Arguments | Matches when |
+|---|---|---|
+| `Path` | one or more ANT patterns | the request path matches. `{name}` captures one segment, `{*name}` captures the rest; captures feed `SetPath` |
+| `Method` | one or more HTTP methods | the request method is in the list |
+| `Host` | one or more host patterns | the `Host` matches. `*` matches one label, `**` matches zero or more |
+| `Header` | `name[, regex]` | any value of the header matches; without a regex the header only has to exist |
+| `Cookie` | `name[, regex]` | the first cookie with that name matches |
+| `Query` | `name[, regex]` | the first query parameter with that name matches |
+| `RemoteAddr` | one or more IPs or CIDRs | the TCP peer is inside one of the ranges |
+| `XForwardedRemoteAddr` | one or more IPs or CIDRs | the client resolved from `X-Forwarded-For` is inside one of the ranges |
+| `Weight` | `group, weight` | the route wins its share of the group's bucket space |
+| `After` | timestamp | now is at or after it |
+| `Before` | timestamp | now is before it |
+| `Between` | `start, end` or `start/end` | now is inside `[start, end)` |
+
+Timestamps are RFC 3339 and may carry a Spring style zone suffix, for example
+`2017-01-20T17:42:47[America/Denver]`. Regular expressions are anchored on both ends, so
+`Header=X-Test, abc` does not match `xabc`.
+
+## Filters
+
+Filters run in declaration order, once, in the pass they belong to.
+
+### Request filters
+
+| Filter | Arguments | Effect |
+|---|---|---|
+| `AddRequestHeader` | `name, value, ...` | appends request headers |
+| `AddRequestHeadersIfNotPresent` | `name, value, ...` | inserts request headers that are absent |
+| `SetRequestHeader` | `name, value, ...` | replaces request headers |
+| `RemoveRequestHeader` | `name, ...` | removes request headers |
+| `AddRequestParameter` | `name, value & name, value` | appends query parameters, keeping existing ones verbatim |
+| `RemoveRequestParameter` | `name, ...` | removes query parameters |
+| `PrefixPath` | `path` | prepends a path prefix |
+| `StripPrefix` | `segments` | drops leading path segments |
+| `SetPath` | `path[?query]` | replaces the path, substituting `{captures}` |
+| `RewritePath` | `regex, replacement` | replaces every match; `$1` refers to capture groups |
+| `MapRequestHeader` | `from, to` | copies one header onto another |
+| `SetRequestHostHeader` | `host` | replaces the upstream `Host` |
+| `PreserveHostHeader` | — | keeps the downstream `Host` instead of using the upstream authority |
+| `RequestHeaderSize` | `bytes[, message]` | rejects a request head larger than `bytes` with 431 |
+| `CircuitBreaker` | `breaker-id` | binds the route to a breaker defined under `breakers` |
+| `RedirectTo` | `status, url` | answers with a redirect instead of proxying |
+
+### Request body filters
+
+| Filter | Arguments | Effect |
+|---|---|---|
+| `RequestSize` | `bytes` | rejects a body larger than `bytes` with 413, including chunked bodies with no `Content-Length` |
+| `RequestRateLimiter` | `requests-per-second` | admits at most that many requests per second per client address and answers 429 with `Retry-After` |
+
+### Response filters
+
+| Filter | Arguments | Effect |
+|---|---|---|
+| `AddResponseHeader` | `name, value, ...` | appends response headers |
+| `SetResponseHeader` | `name, value, ...` | replaces response headers |
+| `RemoveResponseHeader` | `name, ...` | removes response headers |
+| `RewriteResponseHeader` | `name, regex, replacement` | rewrites every match inside the header value |
+| `RewriteLocationResponseHeader` | `mode[, header[, host[, protocols-regex]]]` | rewrites `Location` |
+| `DedupeResponseHeader` | `name, ...[, RETAIN_FIRST / RETAIN_LAST / RETAIN_UNIQUE]` | collapses duplicated header values |
+| `SetStatus` | `100..=599` | replaces the response status |
+| `SecureHeaders` | — | applies the hardening header set and overrides weakened upstream values |
+| `LocalResponseCache` | `ttl, max-size-bytes` | serves and stores responses from the in-process cache |
+
+### Response body filter
+
+| Filter | Arguments | Effect |
+|---|---|---|
+| `RemoveJsonAttributesResponseBody` | `name, ...[, true]` | removes attributes from a JSON response body; `true` removes them at any depth |
+
+## Operations
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health/live` | process liveness, always 200 |
+| `GET /health/ready` | 200 when the gateway can serve, 503 otherwise |
+| `GET /metrics` | Prometheus text exposition |
+| `GET /routes` | JSON snapshot of the configured routes |
+| `GET /version` | crate name, version and uptime |
+
+The admin listener never runs a route or a filter, so a broken route configuration cannot take
+it down. It is bound to `127.0.0.1` by default; binding it to a public address exposes the route
+table and metrics to anyone who can reach it.
+
+Metrics:
+
+| Metric | Type | Labels |
+|---|---|---|
+| `gateway_requests_total` | counter | `route`, `method`, `status` |
+| `gateway_request_duration_seconds` | histogram | `route` |
+| `gateway_upstream_errors_total` | counter | `route`, `kind` |
+| `gateway_inflight_requests` | gauge | — |
+| `gateway_local_cache_hits_total`, `gateway_local_cache_misses_total` | counter | — |
+
+One access log line per request:
+
+```
+INFO next_web_gateway::proxy::pipeline: access request_id=8bc9... client=Some(203.0.113.9)
+  method=GET path=/ping status=200 route=ping upstream=10.0.0.11:8080 latency_ms=6
+```
+
+With `logging.format: json` the same fields are emitted as one JSON object per line.
+
+### Error responses
+
+| Situation | Status |
+|---|---|
+| no route matched | 404 |
+| circuit breaker open | 503 (with `Retry-After`) |
+| no backend available | 503 |
+| upstream connect failure or reset | 502 |
+| connect, read, write or TLS handshake timeout | 504 |
+| rejected by a filter | what the filter chose (429, 413, 431, ...) |
+| internal error | 500 |
+
+The body follows `next.gateway.error.format`:
+
+```json
+{"status":503,"error":"Service Unavailable","route":"users","requestId":"8bc9..."}
+```
+
+Gateway generated responses also pass through the response filters, so `SecureHeaders` and
+`AddResponseHeader` apply to error pages too.
+
+## Differences from Spring Cloud Gateway
+
+- **No global filter chain yet.** Phase 1 runs the forwarding headers, hop-by-hop stripping,
+  request id and metrics inside the proxy rather than as ordered global filters.
+- **Weights are exact.** The load balancer repeats a backend `weight` times in its rotation, so a
+  3:1 configuration really produces 3:1 rather than a statistical approximation. It also means
+  there is no active health checking in Phase 1: a dead backend surfaces as 502 and as breaker
+  failures instead of being drained.
+- **`XForwardedRemoteAddr` arguments are the client ranges**, and the trusted proxy list comes
+  from the global `trusted_proxies` setting.
+- **`RequestRateLimiter` takes a bare rate.** The key is always the client address; there is no
+  `KeyResolver`/`RateLimiter` bean pair to compose.
+- **`SaveSession` and `TokenRelay` are rejected at startup** because there is no authentication
+  backend to relay a session or a token from.
+- **`LocalResponseCache` is opt-in per route** and stores bodies in process memory; it is not
+  shared between worker processes.
+
+## Roadmap
+
+Phase 2 adds the global filter chain (`X-Forwarded-*`, hop-by-hop, route-to-URL, metrics), `Retry`,
+`ModifyRequestBody`, `ModifyResponseBody`, `CacheRequestBody`, `FallbackHeaders`, `CircuitBreaker`
+fallbacks, CORS and the actuator endpoints. Phase 3 adds configuration hot reload, gateway side TLS
+termination, service discovery and mTLS upstreams.
+
+## Testing
+
+```bash
+cargo test -p next-web-gateway
+```
+
+The suite has unit tests per module and `tests/` suites that start the real binary as a
+subprocess, point it at a mock upstream and assert on the wire: routing, rewrites, limits, load
+balancing, error mapping, observability and the CLI. The end-to-end tests pick free ports and
+retry a start when a port is taken.

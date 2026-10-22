@@ -174,6 +174,20 @@ next:
 
 更多示例（邮件、MQTT、XXL-JOB、支付、AI、流式响应等）见 `examples/` 目录。
 
+## 网关
+
+`next-web-gateway` 是基于 pingora 的 Spring Cloud Gateway 对应物：路由、谓词与过滤器全部用 YAML
+声明，配有会一次性报出全部问题的配置校验、静态负载均衡、熔断、限流、进程内响应缓存、结构化访问
+日志与 Prometheus 指标。
+
+```bash
+cargo run -p next-web-gateway -- --check --config next-web-gateway/application.yaml
+cargo run -p next-web-gateway -- --config next-web-gateway/application.yaml
+```
+
+配置项、谓词与过滤器清单、admin 端点以及与 Spring Cloud Gateway 的差异见
+[`next-web-gateway/README.md`](next-web-gateway/README.md)。
+
 ## 版本与反馈
 
 当前版本处于 `0.x` 阶段，API 仍在持续演进。欢迎通过 [Issues](https://github.com/yuenxillar/next-web/issues) 反馈问题、建议使用场景或参与贡献。

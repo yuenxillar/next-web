@@ -1,4 +1,11 @@
+//! One module per filter implementation.
 
+pub mod add_request_header;
+pub mod add_request_headers_if_not_present;
+pub mod add_request_parameter;
+pub mod add_response_header;
+pub mod circuit_breaker;
+pub mod dedupe_response_header;
 pub mod local_response_cache;
 pub mod map_request_header;
 pub mod prefix_path;
@@ -14,7 +21,6 @@ pub mod request_size;
 pub mod rewrite_location_response_header;
 pub mod rewrite_path;
 pub mod rewrite_response_header;
-pub mod save_session;
 pub mod secure_headers;
 pub mod set_path;
 pub mod set_request_header;
@@ -22,11 +28,3 @@ pub mod set_request_host_header;
 pub mod set_response_header;
 pub mod set_status;
 pub mod strip_prefix;
-pub mod token_relay;
-pub mod add_request_header;
-pub mod add_request_headers_if_not_present;
-pub mod add_request_parameter;
-pub mod add_response_header;
-pub mod circuit_breaker;
-pub mod dedupe_response_header;
-pub mod default;

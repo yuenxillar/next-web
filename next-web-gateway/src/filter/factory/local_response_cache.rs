@@ -133,6 +133,7 @@ impl LocalResponseCacheManager {
         Some(entry)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn put(
         &self,
         route_id: String,
@@ -647,7 +648,7 @@ mod tests {
 
     #[test]
     fn cache_key_separates_authorization_and_cookie() {
-        let mut anonymous = RequestHeader::build("GET", b"/resource", None).unwrap();
+        let anonymous = RequestHeader::build("GET", b"/resource", None).unwrap();
         let mut authenticated = RequestHeader::build("GET", b"/resource", None).unwrap();
         authenticated
             .insert_header("Authorization", "Bearer token-a")

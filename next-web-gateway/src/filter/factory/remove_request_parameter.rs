@@ -109,6 +109,7 @@ fn build_uri_string(scheme: &str, authority: &str, path: &str, query: &str) -> S
 }
 
 #[cfg(test)]
+#[allow(clippy::drop_non_drop)]
 mod tests {
     use pingora::http::RequestHeader;
 

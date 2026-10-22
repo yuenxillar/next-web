@@ -192,6 +192,7 @@ fn remove_attributes_recursively(value: &mut Value, names: &HashSet<&str>) -> bo
 }
 
 #[cfg(test)]
+#[allow(clippy::drop_non_drop)]
 mod tests {
     use bytes::Bytes;
 

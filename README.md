@@ -177,6 +177,21 @@ The `examples` directory contains runnable examples:
 
 More examples — mail, MQTT, XXL-JOB, payments, AI, streaming responses, and others — are available in the `examples/` directory.
 
+## Gateway
+
+`next-web-gateway` is a Spring Cloud Gateway equivalent built on pingora. It serves routes,
+predicates and filters declared in YAML, with a validating configuration loader, a static load
+balancer, circuit breaking, rate limiting, an in-process response cache, structured access logs
+and Prometheus metrics.
+
+```bash
+cargo run -p next-web-gateway -- --check --config next-web-gateway/application.yaml
+cargo run -p next-web-gateway -- --config next-web-gateway/application.yaml
+```
+
+See [`next-web-gateway/README.md`](next-web-gateway/README.md) for the configuration reference,
+the predicate and filter tables, the admin endpoints and the differences from Spring Cloud Gateway.
+
 ## Status and Feedback
 
 The project is in the `0.x` stage, and its APIs are still evolving. Please use [Issues](https://github.com/yuenxillar/next-web/issues) to report problems, suggest use cases, or contribute.

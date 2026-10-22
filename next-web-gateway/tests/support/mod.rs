@@ -387,10 +387,7 @@ fn parse_response(raw: &[u8]) -> HttpResponse {
 fn decode_chunked(mut raw: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
 
-    loop {
-        let Some(position) = raw.windows(2).position(|window| window == b"\r\n") else {
-            break;
-        };
+    while let Some(position) = raw.windows(2).position(|window| window == b"\r\n") {
         let size_line = String::from_utf8_lossy(&raw[..position]).into_owned();
         let Ok(size) = usize::from_str_radix(size_line.trim(), 16) else {
             break;

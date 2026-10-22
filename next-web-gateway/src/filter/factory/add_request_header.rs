@@ -12,20 +12,19 @@ pub struct AddRequestHeaderFilter {
 }
 
 #[async_trait]
-#[async_trait]
 impl GatewayFilter for AddRequestHeaderFilter {
     async fn filter(
         &self,
         exchange: &mut dyn ServerWebExchange,
         chain: &dyn GatewayFilterChain,
     ) -> Result<(), GatewayError> {
-        exchange.request_header().map(|request_header| {
+        if let Some(request_header) = exchange.request_header() {
             for header in self.headers.iter() {
                 request_header
                     .append_header(header.k.clone(), &header.v)
                     .ok();
             }
-        });
+        }
 
         chain.filter(exchange).await
     }

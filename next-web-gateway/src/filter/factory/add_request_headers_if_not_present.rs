@@ -12,14 +12,13 @@ pub struct AddRequestHeaderIfNotPresentFilter {
 }
 
 #[async_trait]
-#[async_trait]
 impl GatewayFilter for AddRequestHeaderIfNotPresentFilter {
     async fn filter(
         &self,
         exchange: &mut dyn ServerWebExchange,
         chain: &dyn GatewayFilterChain,
     ) -> Result<(), GatewayError> {
-        exchange.request_header().map(|request_header| {
+        if let Some(request_header) = exchange.request_header() {
             for header in &self.headers {
                 if !request_header.headers.contains_key(header.k.as_str()) {
                     request_header
@@ -27,7 +26,7 @@ impl GatewayFilter for AddRequestHeaderIfNotPresentFilter {
                         .ok();
                 }
             }
-        });
+        }
 
         chain.filter(exchange).await
     }

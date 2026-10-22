@@ -12,16 +12,5 @@ mod weight_route_predicate_factory;
 mod x_forwarded_remote_addr_route_predicate_factory;
 mod zoned_datetime_route_predicate_factory;
 
-pub use cookie_route_predicate_factory::CookieRoutePredicateFactory;
-pub use header_route_predicate_factory::HeaderRoutePredicateFactory;
-pub use host_route_predicate_factory::HostRoutePredicateFactory;
-pub use mehod_route_predicate_factory::MethodRoutePredicateFactory;
-pub use path_route_predicate_factory::PathRoutePredicateFactory;
-pub use query_route_predicate_factory::QueryRoutePredicateFactory;
-pub use remote_addr_route_predicate_factory::RemoteAddrRoutePredicateFactory;
-pub use route_predicate::RoutePredicate;
-pub use route_predicate_factory::RoutePredicateFactory;
-pub use route_service_manager::{RouteMatch, RouteServiceManager};
-pub use weight_route_predicate_factory::WeightRoutePredicateFactory;
-pub use x_forwarded_remote_addr_route_predicate_factory::XForwardedRemoteAddrRoutePredicateFactory;
-pub use zoned_datetime_route_predicate_factory::ZonedDateTimeRoutePredicateFactory;
+pub use route_predicate_factory::{RoutePredicateFactory, KNOWN_PREDICATES};
+pub use route_service_manager::RouteServiceManager;

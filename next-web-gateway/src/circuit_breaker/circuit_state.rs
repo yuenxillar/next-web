@@ -21,10 +21,9 @@ impl fmt::Display for CircuitState {
     }
 }
 
-impl Into<CircuitState> for u8 {
-    fn into(self) -> CircuitState {
-        match self {
-            0 => CircuitState::Closed,
+impl From<u8> for CircuitState {
+    fn from(value: u8) -> Self {
+        match value {
             1 => CircuitState::Open,
             2 => CircuitState::HalfOpen,
             _ => CircuitState::Closed,

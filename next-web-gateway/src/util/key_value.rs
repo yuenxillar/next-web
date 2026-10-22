@@ -1,15 +1,21 @@
+//! A small key/value pair used by the filter constructors.
+
+/// A borrowed-free `name`/`value` pair.
 #[derive(Debug, Clone)]
 pub struct KeyValue<V: Clone, K = Box<str>> {
+    /// Name part.
     pub k: K,
+    /// Value part.
     pub v: V,
 }
 
-impl Into<KeyValue<String>> for Vec<&str> {
-    fn into(self) -> KeyValue<String> {
-        if self.len() == 2 {
-            let k = self[0].into();
-            let v = self[1].to_string();
-            KeyValue { k, v }
+impl From<Vec<&str>> for KeyValue<String> {
+    fn from(value: Vec<&str>) -> Self {
+        if value.len() == 2 {
+            KeyValue {
+                k: value[0].into(),
+                v: value[1].to_string(),
+            }
         } else {
             KeyValue {
                 k: "".into(),
@@ -19,12 +25,13 @@ impl Into<KeyValue<String>> for Vec<&str> {
     }
 }
 
-impl Into<KeyValue<String, String>> for Vec<&str> {
-    fn into(self) -> KeyValue<String, String> {
-        if self.len() == 2 {
-            let k = self[0].to_string();
-            let v = self[1].to_string();
-            KeyValue { k, v }
+impl From<Vec<&str>> for KeyValue<String, String> {
+    fn from(value: Vec<&str>) -> Self {
+        if value.len() == 2 {
+            KeyValue {
+                k: value[0].to_string(),
+                v: value[1].to_string(),
+            }
         } else {
             KeyValue {
                 k: "".into(),
@@ -52,8 +59,11 @@ impl From<(&str, &str)> for KeyValue<String, String> {
     }
 }
 
-impl Into<KeyValue<Box<str>>> for Vec<String> {
-    fn into(self) -> KeyValue<Box<str>> {
-        KeyValue::from((self[0].as_str(), self[1].as_str()))
+impl From<Vec<String>> for KeyValue<Box<str>> {
+    fn from(value: Vec<String>) -> Self {
+        let first = value.first().map(String::as_str).unwrap_or_default();
+        let second = value.get(1).map(String::as_str).unwrap_or_default();
+
+        KeyValue::from((first, second))
     }
 }

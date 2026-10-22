@@ -13,7 +13,7 @@ use pingora::protocols::http::ServerSession;
 use pingora::protocols::l4::socket::SocketAddr;
 
 use super::remote_addr_route_predicate_factory::normalize_ip;
-use super::RoutePredicate;
+use super::route_predicate::RoutePredicate;
 
 static TRUSTED_PROXIES: OnceLock<Vec<IpNetwork>> = OnceLock::new();
 
@@ -46,8 +46,12 @@ impl RoutePredicate for XForwardedRemoteAddrRoutePredicateFactory {
         let Some(direct) = session.client_addr() else {
             return false;
         };
-        let SocketAddr::Inet(direct) = direct else {
-            return false;
+        // On Windows the enum has a single variant, so `Inet` is irrefutable.
+        #[allow(clippy::infallible_destructuring_match)]
+        let direct = match direct {
+            SocketAddr::Inet(addr) => addr,
+            #[cfg(unix)]
+            SocketAddr::Unix(_) => return false,
         };
 
         let forwarded = session

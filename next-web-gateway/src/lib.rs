@@ -29,8 +29,7 @@ pub mod upstream;
 pub use gateway::Gateway;
 pub use proxy::GatewayProxy;
 
-/// A component with an explicit ordering value.
-pub trait Ordered {
-    /// Lower values run first.
-    fn order(&self) -> i32;
-}
+/// Every filter name the parser accepts, for documentation and drift tests.
+pub use filter::gateway_filter::KNOWN_FILTERS;
+/// Every predicate name the parser accepts, for documentation and drift tests.
+pub use handler::predicate::KNOWN_PREDICATES;
