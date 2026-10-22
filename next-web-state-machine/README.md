@@ -74,7 +74,8 @@ also asserts every step and stops the machine.
 - Orthogonal regions, fork and join.
 - Deferred events, which a state postpones until it is left.
 - History pseudo states.
-- Timed transitions, armed when the machine starts (see the limitation below).
+- Timed transitions, which start counting when the source state of the
+  transition is entered.
 - Extended state variables with change notifications.
 - Listeners, interceptors and monitors for observability.
 - Security rules for events and transitions, enforced fail-closed.
@@ -115,10 +116,6 @@ state action policy with its timeout, and the region execution policy.
 - **Interrupting a state action by leaving the state** (`ImmediateCancel`): the
   runtime awaits a state action inline, so exiting the state cannot cancel it.
   A policy which bounds the action with a timeout (`TimeoutCancel`) is honoured.
-- **A timer which starts counting when its state is entered**: every timer is
-  armed when the machine starts and keeps counting from that moment, so a timer
-  whose source state is entered later may fire before the machine reaches it.
-  Model a timed transition from the initial state, or send the event yourself.
 - **Reentrant event processing**: an action must not await an event of its own
   machine, because the machine holds the slot while the action runs. Spawn the
   send instead.

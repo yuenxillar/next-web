@@ -102,7 +102,12 @@ where
 
         let spawned = tokio::runtime::Handle::try_current().ok().map(|handle| {
             handle.spawn(async move {
+                // `interval` completes its first tick immediately, so the first
+                // tick is consumed: a timer waits for its period before it fires
+                // for the first time.
                 let mut ticker = tokio::time::interval(period);
+                ticker.tick().await;
+
                 let mut fired = 0;
 
                 loop {

@@ -61,6 +61,8 @@ where
     fn start_triggers(&self) {}
 
     /// Disarms the triggers of the machine.
+    fn disarm_triggers(&self) {}
+    /// Disarms the triggers of the machine.
     fn stop_triggers(&self) {}
 
     /// Sets the event forwarded to the initial transition.

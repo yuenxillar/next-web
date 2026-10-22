@@ -574,7 +574,10 @@ where
 
         let mut transitions: Vec<Arc<dyn StateMachineTransition<S, E>>> = Vec::new();
         for transition_data in transitions_data {
+            let before = transitions.len();
+            let is_timer = transition_data.period().is_some() || transition_data.count().is_some();
             let trigger = self.build_transition_trigger(transition_data)?;
+            let state_trigger = if is_timer { trigger.clone() } else { None };
             let security_rule = transition_data.security_rule().cloned();
             let name = if transition_data.name().is_empty() {
                 None
@@ -652,6 +655,15 @@ where
                         "initial transitions are derived from state metadata, not TransitionData, in the current factory path",
                     ));
                 }
+            }
+
+            if let Some(trigger) = state_trigger
+                && let Some(source) = transitions
+                    .iter()
+                    .skip(before)
+                    .find_map(|transition| transition.source())
+            {
+                source.add_trigger(trigger);
             }
         }
 

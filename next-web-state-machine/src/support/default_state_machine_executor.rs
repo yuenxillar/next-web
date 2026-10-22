@@ -508,6 +508,12 @@ where
         self.arm_triggers();
     }
 
+    fn disarm_triggers(&self) {
+        // The inherent method does the work; naming the type keeps this from
+        // resolving back to the trait method.
+        DefaultStateMachineExecutor::disarm_triggers(self);
+    }
+
     fn stop_triggers(&self) {
         self.disarm_triggers();
     }

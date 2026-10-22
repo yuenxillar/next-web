@@ -296,6 +296,14 @@ where
         self.action_listener.unregister(listener);
     }
 
+    /// Attaches a trigger which the state arms when it is entered.
+    ///
+    /// # Arguments
+    /// * `trigger` - the trigger to arm on entry
+    pub fn add_trigger(&self, trigger: Arc<dyn Trigger<S, E>>) {
+        write(&self.triggers).push(trigger);
+    }
+
     /// Arms the triggers of this state.
     pub fn arm_triggers(&self) {
         for trigger in read(&self.triggers).iter() {

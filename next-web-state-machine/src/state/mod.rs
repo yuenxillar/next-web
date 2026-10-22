@@ -157,6 +157,21 @@ where
     /// Gets the events deferred by this state.
     fn deferred_events(&self) -> &[E];
 
+    /// Attaches a trigger which belongs to a transition out of this state.
+    ///
+    /// A state arms its triggers when it is entered, so a timer which belongs to
+    /// a transition out of this state starts counting at that moment.
+    ///
+    /// # Arguments
+    /// * `trigger` - the trigger to arm on entry
+    fn add_trigger(&self, _trigger: Arc<dyn crate::trigger::Trigger<S, E>>) {}
+
+    /// Arms the triggers of this state.
+    fn arm_triggers(&self) {}
+
+    /// Disarms the triggers of this state.
+    fn disarm_triggers(&self) {}
+
     /// Gets the actions executed when the state is entered.
     fn entry_actions(&self) -> &[BoxedStateAction<S, E>];
 

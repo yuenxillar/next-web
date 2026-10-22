@@ -50,6 +50,10 @@ All notable changes to `next-web-state-machine` are listed here.
   which no transition of the current state accepts is forwarded to the
   submachine of that state.
 - A guard which refuses every candidate no longer looks like an accepted event.
+- A timer starts counting when the source state of its transition is entered, and
+  it fires for the first time after its period. Before, every timer was armed
+  when the machine started and its first firing was immediate, so a timer out of
+  a state entered later had usually expired before the machine arrived.
 
 ## Migration from 0.1
 
@@ -74,8 +78,3 @@ which is held by `send_event` is what the built-in machine does.
 
 A custom `StateMachineRuntimePersister` is still needed if the runtime persistence
 of a machine is configured: this crate does not ship a default implementation.
-
-A timed transition is armed when the machine starts, not when its source state is
-entered, so a timer whose source state is reached later still counts from the
-start of the machine. Model a timed transition from the initial state, or send
-the event yourself.

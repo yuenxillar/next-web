@@ -151,3 +151,82 @@ async fn a_sequential_region_policy_is_accepted() {
     machine.start().await.expect("the machine starts");
     assert_eq!(machine.state().map(|state| *state.id()), Some(1));
 }
+
+/// A timer starts counting when the state which owns it is entered.
+#[tokio::test]
+async fn a_timer_starts_counting_when_its_state_is_entered() {
+    let configuration = ConfigurationData::<i32, i32>::with_parameters(
+        false,
+        None,
+        Vec::new(),
+        false,
+        None,
+        None,
+        None,
+        None,
+        false,
+        None,
+        Some("timer".to_owned()),
+        None,
+        Vec::new(),
+    );
+
+    let model = DefaultStateMachineModel::new(
+        configuration,
+        Some(
+            vec![
+                StateData::<i32, i32>::with_initial(1, true),
+                StateData::<i32, i32>::new(2),
+                StateData::<i32, i32>::new(3),
+            ]
+            .into(),
+        ),
+        Some(TransitionsData::new(vec![
+            TransitionData::new(1, 2, 100),
+            TransitionData::with_all(
+                2,
+                3,
+                None,
+                None,
+                Some(20),
+                Some(1),
+                Vec::new(),
+                None,
+                next_web_state_machine::transition::transition_kind::TransitionKind::External,
+                None,
+                "timer",
+            ),
+        ])),
+    );
+
+    let machine = BaseStateMachineFactory::<i32, i32>::new(Arc::new(model), None)
+        .get_state_machine()
+        .expect("the machine builds");
+
+    machine.start().await.expect("the machine starts");
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    assert_eq!(
+        machine.state().map(|state| *state.id()),
+        Some(1),
+        "the timer of state 2 does not move a machine which is in state 1"
+    );
+
+    machine
+        .send_event(Arc::new(
+            next_web_core::messaging::generic_message::GenericMessage::with_payload(100),
+        ))
+        .await
+        .expect("the event is sent");
+
+    assert_eq!(machine.state().map(|state| *state.id()), Some(2));
+
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    assert_eq!(
+        machine.state().map(|state| *state.id()),
+        Some(3),
+        "the timer of state 2 counts from the moment state 2 was entered"
+    );
+}

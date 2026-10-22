@@ -299,6 +299,18 @@ where
         self.base.deferred_events()
     }
 
+    fn add_trigger(&self, trigger: Arc<dyn crate::trigger::Trigger<S, E>>) {
+        self.base.add_trigger(trigger);
+    }
+
+    fn arm_triggers(&self) {
+        self.base.arm_triggers();
+    }
+
+    fn disarm_triggers(&self) {
+        self.base.disarm_triggers();
+    }
+
     fn entry_actions(&self) -> &[BoxedStateAction<S, E>] {
         self.base.entry_actions()
     }

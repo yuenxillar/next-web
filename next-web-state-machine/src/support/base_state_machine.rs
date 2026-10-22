@@ -920,15 +920,16 @@ where
             return Ok(());
         }
 
-        if self.initial_enabled.load(Ordering::SeqCst) {
-            self.start_initial().await?;
-        }
-
-        // Triggers are armed after the initial transition, so a timer cannot
-        // fire before the machine has a current state.
         let executor = read(&self.executor).clone();
         if let Some(executor) = executor {
             executor.start_triggers();
+            executor.disarm_triggers();
+        }
+
+        if self.initial_enabled.load(Ordering::SeqCst) {
+            self.start_initial().await?;
+        } else if let Some(current) = self.current_state_arc() {
+            current.arm_triggers();
         }
 
         Ok(())
