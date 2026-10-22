@@ -119,7 +119,7 @@ impl TryFrom<&str> for RoutePredicateFactory {
                     Err(error) => {
                         return Err(ConfigError::new(
                             format!("predicates.{name}"),
-                            error.to_string(),
+                            error,
                         ));
                     }
                 }
@@ -259,7 +259,7 @@ impl TryFrom<&str> for RoutePredicateFactory {
                 }
 
                 RoutePredicateFactory::WeightPredicates(WeightRoutePredicateFactory::new(
-                    group.to_string(),
+                    group.to_owned(),
                     weight,
                 ))
             }
@@ -307,7 +307,7 @@ fn name_and_pattern(spec: &FilterSpec) -> Result<(String, Option<Regex>), Config
         _ => None,
     };
 
-    Ok((name.to_string(), pattern))
+    Ok((name.to_owned(), pattern))
 }
 
 /// Parse every argument as an IP address or CIDR block.

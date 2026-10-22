@@ -60,14 +60,14 @@ impl FilterSpec {
         let args = match rest {
             Some(rest) if !rest.trim().is_empty() => rest
                 .split(',')
-                .map(|arg| arg.trim().to_string())
+                .map(|arg| arg.trim().to_owned())
                 .filter(|arg| !arg.is_empty())
                 .collect(),
             _ => Vec::new(),
         };
 
         Ok(Self {
-            name: name.to_string(),
+            name: name.to_owned(),
             args,
         })
     }
@@ -98,7 +98,7 @@ pub(crate) fn expect_args(spec: &FilterSpec, min: usize, max: usize) -> Result<&
 pub(crate) fn unknown_name_error(kind: &str, name: &str, known: &[&str]) -> ConfigError {
     let suggestion = closest_name(name, known)
         .map(|candidate| format!(", did you mean `{candidate}`?"))
-        .unwrap_or_else(|| ". ".to_string());
+        .unwrap_or_else(|| ". ".to_owned());
 
     ConfigError::new(
         format!("{kind}s.{name}"),
@@ -160,15 +160,15 @@ mod tests {
         assert_eq!(
             filter.header_pairs(),
             &[
-                ("X-A".to_string(), "1".to_string()),
-                ("X-B".to_string(), "2".to_string())
+                ("X-A".to_owned(), "1".to_owned()),
+                ("X-B".to_owned(), "2".to_owned())
             ]
         );
 
         let legacy = DefaultGatewayFilter::try_from("AddRequestHeader=X-A: 1").unwrap();
         assert_eq!(
             legacy.header_pairs(),
-            &[("X-A".to_string(), "1".to_string())]
+            &[("X-A".to_owned(), "1".to_owned())]
         );
     }
 
@@ -182,7 +182,7 @@ mod tests {
     fn spec_splits_name_and_arguments() {
         let spec = FilterSpec::parse("StripPrefix=1").unwrap();
         assert_eq!(spec.name, "StripPrefix");
-        assert_eq!(spec.args, vec!["1".to_string()]);
+        assert_eq!(spec.args, vec!["1".to_owned()]);
     }
 
     #[test]

@@ -109,7 +109,7 @@ impl GatewayProxy {
                         "unknown circuit breaker `{}`, defined breakers: {}",
                         route.fallback_id,
                         if config.breakers.is_empty() {
-                            "none".to_string()
+                            "none".to_owned()
                         } else {
                             config
                                 .breakers
@@ -254,28 +254,25 @@ impl GatewayProxy {
         ctx: &mut RequestContext,
         status: u16,
     ) -> pingora::Result<bool> {
-        let (mut header, body) = match ctx.direct_response.take() {
-            Some(direct) => {
-                let mut header = ResponseHeader::build(direct.status, None)?;
-                for (name, value) in &direct.headers {
-                    header.insert_header(name.clone(), value.as_str()).ok();
-                }
-                if !header.headers.contains_key("content-type") {
-                    header
-                        .insert_header("Content-Type", "text/plain; charset=utf-8")
-                        .ok();
-                }
-                (header, direct.body)
+        let (mut header, body) = if let Some(direct) = ctx.direct_response.take() {
+            let mut header = ResponseHeader::build(direct.status, None)?;
+            for (name, value) in &direct.headers {
+                header.insert_header(name.clone(), value.as_str()).ok();
             }
-            None => {
-                let route = ctx.route_id.as_deref();
-                match render_error(&self.config.error, status, route, ctx.request_id.as_str()) {
-                    Ok(rendered) => rendered,
-                    Err(error) => {
-                        error!("failed to build the error response for {status}: {error}");
-                        session.respond_error(500).await?;
-                        return Ok(true);
-                    }
+            if !header.headers.contains_key("content-type") {
+                header
+                    .insert_header("Content-Type", "text/plain; charset=utf-8")
+                    .ok();
+            }
+            (header, direct.body)
+        } else {
+            let route = ctx.route_id.as_deref();
+            match render_error(&self.config.error, status, route, ctx.request_id.as_str()) {
+                Ok(rendered) => rendered,
+                Err(error) => {
+                    error!("failed to build the error response for {status}: {error}");
+                    session.respond_error(500).await?;
+                    return Ok(true);
                 }
             }
         };
@@ -376,7 +373,7 @@ pub(crate) fn sanitize_request_id(raw: &str) -> Option<String> {
         return None;
     }
 
-    Some(trimmed.to_string())
+    Some(trimmed.to_owned())
 }
 
 /// Downstream peer address, if the connection is an IP socket.
@@ -476,7 +473,7 @@ impl ProxyHttp for GatewayProxy {
             // Tell the client when the breaker will probe again instead of a
             // hard coded second.
             let retry_after = rejection.retry_after.as_secs().max(1).to_string();
-            ctx.respond_with_empty(503, vec![("Retry-After".to_string(), retry_after)])
+            ctx.respond_with_empty(503, vec![("Retry-After".to_owned(), retry_after)])
                 .ok();
             return self.respond_directly(session, ctx, 503).await;
         }
@@ -504,7 +501,7 @@ impl ProxyHttp for GatewayProxy {
         let parsed = crate::upstream::UpstreamUri::parse(&route_config.uri)
             .map_err(|_| GatewayError::ServerNoUpstreamServices)?;
 
-        let path = session.req_header().uri.path().to_string();
+        let path = session.req_header().uri.path().to_owned();
         let group_key = selection_key(ctx, &path);
 
         let selection = match route.work {
@@ -575,7 +572,7 @@ impl ProxyHttp for GatewayProxy {
             ctx.original_request_path = upstream_request
                 .uri
                 .path_and_query()
-                .map(|value| value.as_str().to_string());
+                .map(|value| value.as_str().to_owned());
         }
 
         for name in HOP_BY_HOP {
@@ -600,7 +597,7 @@ impl ProxyHttp for GatewayProxy {
                 .headers
                 .get("x-forwarded-for")
                 .and_then(|value| value.to_str().ok())
-                .map(str::to_string)
+                .map(str::to_owned)
             {
                 Some(existing) if !existing.is_empty() => {
                     upstream_request
@@ -620,7 +617,7 @@ impl ProxyHttp for GatewayProxy {
             .headers
             .get("host")
             .and_then(|value| value.to_str().ok())
-            .map(str::to_string)
+            .map(str::to_owned)
         {
             upstream_request.insert_header("X-Forwarded-Host", host).ok();
         }
@@ -871,7 +868,7 @@ impl ProxyHttp for GatewayProxy {
             .selected
             .as_ref()
             .map(|selection| selection.addr.to_string())
-            .unwrap_or_else(|| "-".to_string());
+            .unwrap_or_else(|| "-".to_owned());
 
         self.metrics
             .observe_request(route, session.req_header().method.as_str(), status, latency);
@@ -889,33 +886,30 @@ impl ProxyHttp for GatewayProxy {
                 .unwrap_or_else(|| session.req_header().uri.path());
             let bytes = ctx.response_body_buffer.len() as u64;
 
-            match error {
-                Some(error) => info!(
-                    request_id = %ctx.request_id,
-                    client = ?ctx.client_ip,
-                    method = %session.req_header().method,
-                    path = %original_path,
-                    status,
-                    route = %route,
-                    upstream = %upstream,
-                    bytes,
-                    latency_ms = latency.as_millis(),
-                    error = %error,
-                    "access"
-                ),
-                None => info!(
-                    request_id = %ctx.request_id,
-                    client = ?ctx.client_ip,
-                    method = %session.req_header().method,
-                    path = %original_path,
-                    status,
-                    route = %route,
-                    upstream = %upstream,
-                    bytes,
-                    latency_ms = latency.as_millis(),
-                    "access"
-                ),
-            }
+            if let Some(error) = error { info!(
+                request_id = %ctx.request_id,
+                client = ?ctx.client_ip,
+                method = %session.req_header().method,
+                path = %original_path,
+                status,
+                route = %route,
+                upstream = %upstream,
+                bytes,
+                latency_ms = latency.as_millis(),
+                error = %error,
+                "access"
+            ) } else { info!(
+                request_id = %ctx.request_id,
+                client = ?ctx.client_ip,
+                method = %session.req_header().method,
+                path = %original_path,
+                status,
+                route = %route,
+                upstream = %upstream,
+                bytes,
+                latency_ms = latency.as_millis(),
+                "access"
+            ) }
         }
     }
 }
@@ -928,7 +922,7 @@ mod tests {
     fn accepts_a_normal_request_id() {
         assert_eq!(
             sanitize_request_id(" 8bc9-4db2_abc.1 "),
-            Some("8bc9-4db2_abc.1".to_string())
+            Some("8bc9-4db2_abc.1".to_owned())
         );
     }
 
@@ -945,7 +939,7 @@ mod tests {
     #[test]
     fn a_quote_is_allowed_because_the_error_body_is_escaped() {
         // Visible ASCII is safe: `render_error` escapes it through serde_json.
-        assert_eq!(sanitize_request_id("a\"b"), Some("a\"b".to_string()));
+        assert_eq!(sanitize_request_id("a\"b"), Some("a\"b".to_owned()));
     }
 
     #[test]

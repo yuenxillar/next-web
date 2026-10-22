@@ -18,7 +18,7 @@ impl CircuitBreakerService {
     /// Build a breaker from its configuration.
     pub(crate) fn from_config(id: &str, config: &BreakerConfig) -> Self {
         Self {
-            id: id.to_string(),
+            id: id.to_owned(),
             controller: CircuitBreakerController::with_permits(
                 config.enabled,
                 config.failure_threshold,

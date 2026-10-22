@@ -30,7 +30,7 @@ impl GatewayFilter for SetPathFilter {
 
         let original_query = request_header.uri.query().map(str::to_owned);
         let (path, query) = match template.split_once('?') {
-            Some((path, query)) => (path.to_string(), Some(query.to_string())),
+            Some((path, query)) => (path.to_owned(), Some(query.to_owned())),
             None => (template, original_query),
         };
 

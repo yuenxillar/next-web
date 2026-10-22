@@ -145,7 +145,7 @@ fn handle(mut stream: TcpStream, behavior: Behavior, requests: Arc<Mutex<Vec<Rec
             stream.write_all(&body).ok();
         }
         Behavior::Echo => {
-            let body = request.target.clone().into_bytes();
+            let body = request.target.into_bytes();
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                 body.len()
@@ -198,13 +198,13 @@ fn read_request(stream: &mut TcpStream) -> Option<RecordedRequest> {
 
     let request_line = lines.next()?;
     let mut parts = request_line.split_whitespace();
-    let method = parts.next()?.to_string();
-    let target = parts.next()?.to_string();
+    let method = parts.next()?.to_owned();
+    let target = parts.next()?.to_owned();
 
     let headers: Vec<(String, String)> = lines
         .filter(|line| !line.is_empty())
         .filter_map(|line| line.split_once(':'))
-        .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_string()))
+        .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_owned()))
         .collect();
 
     let content_length = headers
@@ -367,7 +367,7 @@ fn parse_response(raw: &[u8]) -> HttpResponse {
     let headers: Vec<(String, String)> = lines
         .filter(|line| !line.is_empty())
         .filter_map(|line| line.split_once(':'))
-        .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_string()))
+        .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_owned()))
         .collect();
 
     let body = &raw[header_end.min(raw.len())..];

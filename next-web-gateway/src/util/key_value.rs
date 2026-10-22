@@ -14,7 +14,7 @@ impl From<Vec<&str>> for KeyValue<String> {
         if value.len() == 2 {
             KeyValue {
                 k: value[0].into(),
-                v: value[1].to_string(),
+                v: value[1].to_owned(),
             }
         } else {
             KeyValue {
@@ -29,8 +29,8 @@ impl From<Vec<&str>> for KeyValue<String, String> {
     fn from(value: Vec<&str>) -> Self {
         if value.len() == 2 {
             KeyValue {
-                k: value[0].to_string(),
-                v: value[1].to_string(),
+                k: value[0].to_owned(),
+                v: value[1].to_owned(),
             }
         } else {
             KeyValue {
@@ -53,8 +53,8 @@ impl From<(&str, &str)> for KeyValue<Box<str>, Box<str>> {
 impl From<(&str, &str)> for KeyValue<String, String> {
     fn from(value: (&str, &str)) -> Self {
         Self {
-            k: value.0.to_string(),
-            v: value.1.to_string(),
+            k: value.0.to_owned(),
+            v: value.1.to_owned(),
         }
     }
 }

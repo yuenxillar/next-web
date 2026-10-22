@@ -30,7 +30,7 @@ impl PathPattern {
 
         for (index, name) in self.variables.iter().enumerate() {
             if let Some(value) = captures.get(index + 1) {
-                variables.insert(name.clone(), value.as_str().to_string());
+                variables.insert(name.clone(), value.as_str().to_owned());
             }
         }
 
@@ -48,7 +48,7 @@ pub struct PathRoutePredicateFactory {
 impl RoutePredicate for PathRoutePredicateFactory {
     fn matches(&self, session: &mut pingora::protocols::http::ServerSession) -> bool {
         // `uri.path()` excludes the query string, unlike `raw_path()`.
-        let path = session.req_header().uri.path().to_string();
+        let path = session.req_header().uri.path().to_owned();
 
         self.paths.iter().any(|pattern| pattern.is_match(&path))
     }
@@ -73,7 +73,7 @@ fn normalize_path_pattern(pattern: &str) -> Option<String> {
     }
 
     if pattern.starts_with('/') {
-        Some(pattern.to_string())
+        Some(pattern.to_owned())
     } else {
         Some(format!("/{pattern}"))
     }
@@ -124,7 +124,7 @@ fn ant_pattern_to_regex_source(pattern: &str) -> (String, Vec<String>) {
                 let mut name: String = chars[index + 1..end].iter().collect();
 
                 if let Some(stripped) = name.strip_prefix('*') {
-                    name = stripped.to_string();
+                    name = stripped.to_owned();
                     regex.push_str("(.*)");
                 } else {
                     regex.push_str("([^/]+)");
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn path_captures_named_variables() {
         let pattern = build_path_pattern("/api/{version}/users").unwrap();
-        assert_eq!(pattern.variables, vec!["version".to_string()]);
+        assert_eq!(pattern.variables, vec!["version".to_owned()]);
 
         let variables = pattern.capture("/api/v1/users").unwrap();
         assert_eq!(variables.get("version").map(String::as_str), Some("v1"));

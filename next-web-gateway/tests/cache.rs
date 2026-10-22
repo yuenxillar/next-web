@@ -29,7 +29,7 @@ next:
 fn a_cache_hit_returns_the_cached_body() {
     let upstream = MockUpstream::start(Behavior::Respond(
         200,
-        vec![("Content-Type".to_string(), "text/plain".to_string())],
+        vec![("Content-Type".to_owned(), "text/plain".to_owned())],
         b"cached-body".to_vec(),
     ));
     let document = cache_route(upstream.addr);
@@ -66,7 +66,7 @@ fn a_cache_hit_returns_the_cached_body() {
 fn a_response_that_sets_a_cookie_is_not_cached() {
     let upstream = MockUpstream::start(Behavior::Respond(
         200,
-        vec![("Set-Cookie".to_string(), "session=secret".to_string())],
+        vec![("Set-Cookie".to_owned(), "session=secret".to_owned())],
         b"personal".to_vec(),
     ));
     let document = cache_route(upstream.addr);
@@ -92,7 +92,7 @@ fn a_response_that_sets_a_cookie_is_not_cached() {
 fn a_response_with_an_unsupported_vary_is_not_cached() {
     let upstream = MockUpstream::start(Behavior::Respond(
         200,
-        vec![("Vary".to_string(), "X-Tenant".to_string())],
+        vec![("Vary".to_owned(), "X-Tenant".to_owned())],
         b"tenant-a".to_vec(),
     ));
     let document = cache_route(upstream.addr);

@@ -85,7 +85,7 @@ impl RouteServiceManager {
                 continue;
             }
 
-            let path = session.req_header().uri.path().to_string();
+            let path = session.req_header().uri.path().to_owned();
             let path_variables = self.capture_variables(route_id, &path);
 
             return Some(RouteMatch {
@@ -254,8 +254,8 @@ mod tests {
 
     fn route(id: &str, order: i32, uri: &str) -> RouteConfig {
         RouteConfig {
-            id: id.to_string(),
-            uri: uri.to_string(),
+            id: id.to_owned(),
+            uri: uri.to_owned(),
             order,
             predicates: Vec::new(),
             filters: Vec::new(),

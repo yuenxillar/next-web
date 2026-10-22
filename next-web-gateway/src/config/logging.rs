@@ -39,7 +39,7 @@ impl Default for LoggingConfig {
 }
 
 fn default_level() -> String {
-    "info".to_string()
+    "info".to_owned()
 }
 
 fn default_true() -> bool {

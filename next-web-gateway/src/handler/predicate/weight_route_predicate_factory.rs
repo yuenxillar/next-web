@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn configure_range_sets_expected_window() {
-        let mut predicate = WeightRoutePredicateFactory::new("group1".to_string(), 8);
+        let mut predicate = WeightRoutePredicateFactory::new("group1".to_owned(), 8);
         predicate.configure_range(2, 10);
 
         assert_eq!(predicate.range_start, 2);
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn a_route_only_owns_its_window() {
-        let mut predicate = WeightRoutePredicateFactory::new("group".to_string(), 2);
+        let mut predicate = WeightRoutePredicateFactory::new("group".to_owned(), 2);
         predicate.configure_range(8, 10);
 
         assert!(predicate.owns_bucket(8));

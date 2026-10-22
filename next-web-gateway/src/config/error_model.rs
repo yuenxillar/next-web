@@ -35,5 +35,5 @@ impl Default for ErrorConfig {
 }
 
 fn default_request_id_header() -> String {
-    "X-Request-Id".to_string()
+    "X-Request-Id".to_owned()
 }

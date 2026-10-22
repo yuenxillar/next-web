@@ -14,7 +14,7 @@ impl RoutePredicate for HostRoutePredicateFactory {
         // authority is the fallback (D11).
         let request = session.req_header();
         let remote_host = match request.headers.get("Host") {
-            Some(value) => value.to_str().map(str::to_string).ok(),
+            Some(value) => value.to_str().map(str::to_owned).ok(),
             None => request.uri.authority().map(|authority| authority.to_string()),
         };
         let Some(remote_host) = remote_host else {
@@ -46,13 +46,13 @@ fn normalize_host(host: &str) -> String {
     if let Some(stripped) = host.strip_prefix('[')
         && let Some((ipv6, _)) = stripped.split_once(']')
     {
-        return ipv6.to_string();
+        return ipv6.to_owned();
     }
 
     if host.matches(':').count() == 1 {
         return host
             .split_once(':')
-            .map(|(name, _)| name.to_string())
+            .map(|(name, _)| name.to_owned())
             .unwrap_or(host);
     }
 

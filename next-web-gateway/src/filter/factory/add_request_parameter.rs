@@ -77,7 +77,7 @@ pub(crate) fn merge_query(
 
     match (original_query.is_empty(), appended.is_empty()) {
         (true, _) => appended,
-        (false, true) => original_query.to_string(),
+        (false, true) => original_query.to_owned(),
         (false, false) => format!("{original_query}&{appended}"),
     }
 }

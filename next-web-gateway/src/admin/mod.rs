@@ -108,7 +108,7 @@ impl AdminService {
                 Some(RouteSnapshot {
                     id: config.id.clone(),
                     uri: config.uri.clone(),
-                    scheme: scheme.to_string(),
+                    scheme: scheme.to_owned(),
                     upstreams: config
                         .upstreams
                         .iter()
@@ -130,7 +130,7 @@ impl AdminService {
         };
 
         match path {
-            "/health/live" => json(200, "{\"status\":\"live\"}".to_string()),
+            "/health/live" => json(200, "{\"status\":\"live\"}".to_owned()),
             "/health/ready" => {
                 let ready = self.is_ready();
                 let status = if ready { 200 } else { 503 };
@@ -154,7 +154,7 @@ impl AdminService {
                     self.started.elapsed().as_secs()
                 ),
             ),
-            _ => json(404, "{\"error\":\"Not Found\"}".to_string()),
+            _ => json(404, "{\"error\":\"Not Found\"}".to_owned()),
         }
     }
 }
@@ -166,7 +166,7 @@ impl ProxyHttp for AdminService {
     fn new_ctx(&self) -> Self::CTX {}
 
     async fn request_filter(&self, session: &mut Session, _ctx: &mut Self::CTX) -> pingora::Result<bool> {
-        let path = session.req_header().uri.path().to_string();
+        let path = session.req_header().uri.path().to_owned();
         let response = self.respond(&path);
 
         let mut header = ResponseHeader::build(response.status, None)?;

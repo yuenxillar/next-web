@@ -206,7 +206,7 @@ mod tests {
     fn apply_filter(body: &str, config: &str) -> String {
         let filter = RemoveJsonAttributesResponseBodyFilter::from(config);
         let mut ctx = test_ctx();
-        let mut response_body = Some(Bytes::from(body.to_string()));
+        let mut response_body = Some(Bytes::from(body.to_owned()));
         let mut exchange = crate::server::DefaultServerWebExchange::new(
             &mut ctx,
             crate::context::HeaderAndBody::with_resp_body(&mut response_body),
@@ -226,7 +226,7 @@ mod tests {
     fn parses_optional_recursive_flag() {
         let filter = RemoveJsonAttributesResponseBodyFilter::from("id,color,true");
 
-        assert_eq!(filter.names, vec!["id".to_string(), "color".to_string()]);
+        assert_eq!(filter.names, vec!["id".to_owned(), "color".to_owned()]);
         assert!(filter.recursive);
     }
 

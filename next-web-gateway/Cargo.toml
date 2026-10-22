@@ -3,12 +3,11 @@ name = "next-web-gateway"
 version = "0.1.0"
 edition = "2024"
 
-# The rust lints the design requires (S5).
-[lints.rust]
-unsafe_code = "forbid"
-missing_docs = "warn"
-unreachable_pub = "warn"
-rust_2018_idioms = { level = "warn", priority = -1 }
+# The lints the design requires (S5): inherit the workspace table, which
+# carries `unsafe_code = "forbid"`, `missing_docs`, `unreachable_pub`,
+# `rust_2018_idioms` and the clippy set.
+[lints]
+workspace = true
 
 [[bin]]
 name = "next-web-gateway"

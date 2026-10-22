@@ -40,7 +40,7 @@ impl GatewayFilter for RequestRateLimiterFilter {
             .request_header()
             .and_then(|header| header.headers.get("x-forwarded-for"))
             .and_then(|value| value.to_str().ok())
-            .map(str::to_string);
+            .map(str::to_owned);
 
         let context = exchange.request_context();
         let client = context.client_ip.and_then(|direct| {
@@ -63,12 +63,12 @@ impl GatewayFilter for RequestRateLimiterFilter {
                 .respond_with_text(
                     429,
                     vec![
-                        ("Retry-After".to_string(), "1".to_string()),
+                        ("Retry-After".to_owned(), "1".to_owned()),
                         (
-                            "X-RateLimit-Limit".to_string(),
+                            "X-RateLimit-Limit".to_owned(),
                             self.rate_limit.to_string(),
                         ),
-                        ("X-RateLimit-Remaining".to_string(), "0".to_string()),
+                        ("X-RateLimit-Remaining".to_owned(), "0".to_owned()),
                     ],
                     "Too many requests",
                 )

@@ -97,20 +97,20 @@ fn split_authority(authority: &str) -> Result<(String, u16), ConfigError> {
 
         let port = match tail.strip_prefix(':') {
             Some(port) => parse_port(port)?,
-            None => return Ok((host.to_string(), 0)),
+            None => return Ok((host.to_owned(), 0)),
         };
 
-        return Ok((host.to_string(), port));
+        return Ok((host.to_owned(), port));
     }
 
     match authority.rsplit_once(':') {
-        Some((host, port)) if !host.contains(':') => Ok((host.to_string(), parse_port(port)?)),
+        Some((host, port)) if !host.contains(':') => Ok((host.to_owned(), parse_port(port)?)),
         // A bare IPv6 address without brackets, or a host without a port.
         Some(_) => Err(ConfigError::new(
             "routes.uri",
             format!("`{authority}` is not a valid authority"),
         )),
-        None => Ok((authority.to_string(), 0)),
+        None => Ok((authority.to_owned(), 0)),
     }
 }
 

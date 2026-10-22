@@ -14,7 +14,7 @@ use serde::{Deserialize, Deserializer};
 pub fn parse_duration(raw: &str) -> Result<Duration, String> {
     let text = raw.trim();
     if text.is_empty() {
-        return Err("duration is empty".to_string());
+        return Err("duration is empty".to_owned());
     }
 
     let (number, unit) = split_number_and_unit(text)?;

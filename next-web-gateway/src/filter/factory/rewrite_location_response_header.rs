@@ -32,7 +32,7 @@ impl GatewayFilter for RewriteLocationResponseHeaderFilter {
         let header_name = self.location_header_name.as_deref().unwrap_or("Location");
         let location = match response_header.headers.get(header_name) {
             Some(value) => match value.to_str() {
-                Ok(value) => value.to_string(),
+                Ok(value) => value.to_owned(),
                 Err(_) => return chain.filter(exchange).await,
             },
             None => return chain.filter(exchange).await,
@@ -77,7 +77,7 @@ impl GatewayFilter for RewriteLocationResponseHeaderFilter {
 
         // Rewrite the header in place after all path and host adjustments are resolved.
         response_header
-            .insert_header(header_name.to_string(), rewritten_location)
+            .insert_header(header_name.to_owned(), rewritten_location)
             .ok();
 
         chain.filter(exchange).await
@@ -113,12 +113,12 @@ fn strip_version_prefix(path: &str) -> String {
     if first_segment.is_some_and(is_version_segment) {
         let remaining = segments.collect::<Vec<_>>();
         if remaining.is_empty() {
-            "/".to_string()
+            "/".to_owned()
         } else {
             format!("/{}", remaining.join("/"))
         }
     } else {
-        path.to_string()
+        path.to_owned()
     }
 }
 
@@ -139,7 +139,7 @@ struct ParsedLocation {
 impl ParsedLocation {
     fn parse(value: &str) -> Self {
         let (scheme, remainder) = if let Some((scheme, remainder)) = value.split_once("://") {
-            (Some(scheme.to_string()), remainder)
+            (Some(scheme.to_owned()), remainder)
         } else {
             (None, value)
         };
@@ -147,15 +147,15 @@ impl ParsedLocation {
         let (authority, path_and_query) = if scheme.is_some() {
             match remainder.find('/') {
                 Some(index) => (Some(remainder[..index].to_string()), &remainder[index..]),
-                None => (Some(remainder.to_string()), "/"),
+                None => (Some(remainder.to_owned()), "/"),
             }
         } else {
             (None, remainder)
         };
 
         let (path, query) = match path_and_query.split_once('?') {
-            Some((path, query)) => (path.to_string(), Some(query.to_string())),
-            None => (path_and_query.to_string(), None),
+            Some((path, query)) => (path.to_owned(), Some(query.to_owned())),
+            None => (path_and_query.to_owned(), None),
         };
 
         Self {

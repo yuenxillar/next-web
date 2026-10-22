@@ -139,8 +139,8 @@ mod tests {
         assert_eq!(
             filter.headers,
             vec![
-                "Access-Control-Allow-Credentials".to_string(),
-                "Access-Control-Allow-Origin".to_string()
+                "Access-Control-Allow-Credentials".to_owned(),
+                "Access-Control-Allow-Origin".to_owned()
             ]
         );
         assert_eq!(filter.strategy, DedupeStrategy::RetainFirst);
@@ -155,8 +155,8 @@ mod tests {
         assert_eq!(
             filter.headers,
             vec![
-                "Access-Control-Allow-Origin".to_string(),
-                "Access-Control-Allow-Credentials".to_string()
+                "Access-Control-Allow-Origin".to_owned(),
+                "Access-Control-Allow-Credentials".to_owned()
             ]
         );
         assert_eq!(filter.strategy, DedupeStrategy::RetainUnique);
@@ -187,10 +187,10 @@ mod tests {
             .headers
             .get_all("Access-Control-Allow-Origin")
             .iter()
-            .map(|value| value.to_str().unwrap().to_string())
+            .map(|value| value.to_str().unwrap().to_owned())
             .collect();
 
-        assert_eq!(values, vec!["https://a.example".to_string()]);
+        assert_eq!(values, vec!["https://a.example".to_owned()]);
     }
 
     #[test]
@@ -221,14 +221,14 @@ mod tests {
             .headers
             .get_all("Access-Control-Allow-Origin")
             .iter()
-            .map(|value| value.to_str().unwrap().to_string())
+            .map(|value| value.to_str().unwrap().to_owned())
             .collect();
 
         assert_eq!(
             values,
             vec![
-                "https://a.example".to_string(),
-                "https://b.example".to_string()
+                "https://a.example".to_owned(),
+                "https://b.example".to_owned()
             ]
         );
     }

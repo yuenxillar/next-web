@@ -43,7 +43,7 @@ impl ZonedDateTimeRoutePredicateFactory {
 pub(crate) fn parse_zoned_datetime(raw: &str) -> Result<DateTime<FixedOffset>, String> {
     let raw = raw.trim();
     if raw.is_empty() {
-        return Err("timestamp is empty".to_string());
+        return Err("timestamp is empty".to_owned());
     }
 
     let (stamp, zone) = match raw.split_once('[') {

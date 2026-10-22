@@ -6,7 +6,7 @@ use tracing::warn;
 /// Replace `{name}` placeholders with the captured path variables.
 pub(crate) fn substitute_variables(template: &str, variables: &HashMap<String, String>) -> String {
     if variables.is_empty() || !template.contains('{') {
-        return template.to_string();
+        return template.to_owned();
     }
 
     let mut out = String::with_capacity(template.len());
@@ -88,7 +88,7 @@ pub(crate) fn strip_prefix_segments(path: &str, offset: usize) -> String {
         .collect::<Vec<_>>();
 
     if offset >= segments.len() {
-        return "/".to_string();
+        return "/".to_owned();
     }
 
     let mut stripped = format!("/{}", segments[offset..].join("/"));
@@ -102,11 +102,11 @@ fn normalize_path(path: &str) -> String {
     let trimmed = path.trim();
 
     if trimmed.is_empty() || trimmed == "/" {
-        return "/".to_string();
+        return "/".to_owned();
     }
 
     if trimmed.starts_with('/') {
-        trimmed.to_string()
+        trimmed.to_owned()
     } else {
         format!("/{trimmed}")
     }
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn substitutes_known_variables() {
         let mut variables = HashMap::new();
-        variables.insert("version".to_string(), "v2".to_string());
+        variables.insert("version".to_owned(), "v2".to_owned());
 
         assert_eq!(
             substitute_variables("/{version}/users", &variables),
@@ -140,8 +140,8 @@ mod tests {
     #[test]
     fn handles_several_placeholders() {
         let mut variables = HashMap::new();
-        variables.insert("a".to_string(), "1".to_string());
-        variables.insert("b".to_string(), "2".to_string());
+        variables.insert("a".to_owned(), "1".to_owned());
+        variables.insert("b".to_owned(), "2".to_owned());
 
         assert_eq!(substitute_variables("/{a}/{b}", &variables), "/1/2");
     }

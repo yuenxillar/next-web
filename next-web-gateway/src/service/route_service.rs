@@ -110,7 +110,7 @@ impl TryFrom<RouteConfig> for RoutePredicateService {
         let upstream = route
             .uri
             .split_once("://")
-            .map(|(_, authority)| authority.to_string())
+            .map(|(_, authority)| authority.to_owned())
             .unwrap_or_else(|| route.uri.clone());
 
         Ok(Self {

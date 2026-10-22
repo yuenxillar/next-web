@@ -314,7 +314,7 @@ impl TryFrom<&str> for DefaultGatewayFilter {
                     ));
                 }
                 Self::CircuitBreaker(CircuitBreakerFilter {
-                    breaker_id: breaker_id.to_string(),
+                    breaker_id: breaker_id.to_owned(),
                 })
             }
 
@@ -401,7 +401,7 @@ impl TryFrom<&str> for DefaultGatewayFilter {
                 let error_message = args
                     .get(1)
                     .cloned()
-                    .unwrap_or_else(|| "Request header size exceeded".to_string());
+                    .unwrap_or_else(|| "Request header size exceeded".to_owned());
                 Self::RequestHeaderSize(RequestHeaderSizeFilter {
                     max_size,
                     error_message,
@@ -615,7 +615,7 @@ fn require_names(spec: &FilterSpec) -> Result<Vec<String>, ConfigError> {
     Ok(spec
         .args
         .iter()
-        .map(|name| name.trim().to_string())
+        .map(|name| name.trim().to_owned())
         .filter(|name| !name.is_empty())
         .collect())
 }

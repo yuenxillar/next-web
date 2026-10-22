@@ -41,7 +41,7 @@ impl GatewayFilter for RewriteResponseHeaderFilter {
             .get_all(&self.header)
             .iter()
             .filter_map(|value| value.to_str().ok())
-            .map(str::to_string)
+            .map(str::to_owned)
             .collect();
 
         if values.is_empty() {

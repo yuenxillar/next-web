@@ -23,12 +23,12 @@ fn host_labels(host: &str) -> Vec<String> {
 
     let host = if let Some(stripped) = host.strip_prefix('[') {
         match stripped.split_once(']') {
-            Some((ipv6, _)) => ipv6.to_string(),
+            Some((ipv6, _)) => ipv6.to_owned(),
             None => host.clone(),
         }
     } else if host.matches(':').count() == 1 {
         host.split_once(':')
-            .map(|(name, _)| name.to_string())
+            .map(|(name, _)| name.to_owned())
             .unwrap_or(host.clone())
     } else {
         host
@@ -36,7 +36,7 @@ fn host_labels(host: &str) -> Vec<String> {
 
     host.split('.')
         .filter(|label| !label.is_empty())
-        .map(str::to_string)
+        .map(str::to_owned)
         .collect()
 }
 

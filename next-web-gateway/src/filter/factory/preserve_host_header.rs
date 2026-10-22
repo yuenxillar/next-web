@@ -26,7 +26,7 @@ impl GatewayFilter for PreserveHostHeaderFilter {
             .request_header()
             .and_then(|request_header| request_header.headers.get("host"))
             .and_then(|value| value.to_str().ok())
-            .map(str::to_string)
+            .map(str::to_owned)
             .or_else(|| {
                 exchange
                     .request_header()
@@ -34,7 +34,7 @@ impl GatewayFilter for PreserveHostHeaderFilter {
                         request_header
                             .uri
                             .authority()
-                            .map(|authority| authority.as_str().to_string())
+                            .map(|authority| authority.as_str().to_owned())
                     })
             });
 

@@ -68,7 +68,7 @@ pub fn render_error(
         .ok();
     if !request_id.is_empty() {
         header
-            .insert_header(config.request_id_header.clone(), request_id.to_string())
+            .insert_header(config.request_id_header.clone(), request_id.to_owned())
             .ok();
     }
 

@@ -68,15 +68,12 @@ impl StaticUpstreams {
 
             let mut addresses = Vec::new();
             for upstream in &route.upstreams {
-                let addr = match upstream.addr.parse::<SocketAddr>() {
-                    Ok(addr) => addr,
-                    Err(_) => {
-                        errors.push(ConfigError::new(
-                            format!("routes.{}.upstreams.addr", route.id),
-                            format!("`{}` is not a `IP:port` address", upstream.addr),
-                        ));
-                        continue;
-                    }
+                let addr = if let Ok(addr) = upstream.addr.parse::<SocketAddr>() { addr } else {
+                    errors.push(ConfigError::new(
+                        format!("routes.{}.upstreams.addr", route.id),
+                        format!("`{}` is not a `IP:port` address", upstream.addr),
+                    ));
+                    continue;
                 };
 
                 for _ in 0..upstream.weight.max(1) {

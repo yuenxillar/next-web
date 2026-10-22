@@ -10,11 +10,11 @@ use super::duration::{
 
 /// Anonymous defaults used when a field is omitted from the configuration.
 fn default_bind() -> String {
-    "0.0.0.0:8080".to_string()
+    "0.0.0.0:8080".to_owned()
 }
 
 fn default_admin_bind() -> String {
-    "127.0.0.1:9001".to_string()
+    "127.0.0.1:9001".to_owned()
 }
 
 fn default_graceful_shutdown() -> Duration {

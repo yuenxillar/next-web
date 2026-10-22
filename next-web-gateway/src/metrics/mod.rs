@@ -41,7 +41,7 @@ impl Metrics {
         };
 
         let counter = requests
-            .entry((route.to_string(), method.to_string(), status))
+            .entry((route.to_owned(), method.to_owned(), status))
             .or_default();
         counter.count = counter.count.saturating_add(1);
         counter.duration_millis = counter.duration_millis.saturating_add(millis);
@@ -61,7 +61,7 @@ impl Metrics {
         };
 
         let counter = errors
-            .entry((route.to_string(), kind.to_string()))
+            .entry((route.to_owned(), kind.to_owned()))
             .or_insert(0);
         *counter = counter.saturating_add(1);
     }
@@ -104,7 +104,7 @@ impl Metrics {
             Err(poisoned) => poisoned.into_inner(),
         };
 
-        states.insert(breaker.to_string(), state);
+        states.insert(breaker.to_owned(), state);
     }
 
     /// Render the Prometheus text exposition format.
@@ -160,8 +160,7 @@ impl Metrics {
                     }
                     cumulative = cumulative.saturating_add(bucket_sum);
                     out.push_str(&format!(
-                        "gateway_request_duration_seconds_bucket{{route=\"{route}\",le=\"{}\"}} {cumulative}\n",
-                        bound
+                        "gateway_request_duration_seconds_bucket{{route=\"{route}\",le=\"{bound}\"}} {cumulative}\n"
                     ));
                 }
 

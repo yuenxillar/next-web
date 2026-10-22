@@ -78,8 +78,8 @@ mod tests {
         metadata.client.read_timeout = read_timeout.map(std::time::Duration::from_secs);
 
         RouteConfig {
-            id: id.to_string(),
-            uri: uri.to_string(),
+            id: id.to_owned(),
+            uri: uri.to_owned(),
             order: 0,
             predicates: Vec::new(),
             filters: Vec::new(),
@@ -91,8 +91,8 @@ mod tests {
     fn selection(tls: bool) -> UpstreamSelection {
         UpstreamSelection {
             addr: "10.0.0.1:443".parse::<SocketAddr>().unwrap(),
-            sni: "example.com".to_string(),
-            host_header: "example.com".to_string(),
+            sni: "example.com".to_owned(),
+            host_header: "example.com".to_owned(),
             tls,
             group_key: 7,
         }

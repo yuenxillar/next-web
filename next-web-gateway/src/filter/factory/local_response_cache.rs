@@ -170,7 +170,7 @@ impl LocalResponseCacheManager {
             return;
         }
 
-        let bucket = routes.entry(route_id.clone()).or_default();
+        let bucket = routes.entry(route_id).or_default();
 
         if bucket.entries.contains_key(&key) {
             remove_entry(bucket, &key);
@@ -335,7 +335,7 @@ fn remove_entry(bucket: &mut RouteResponseCache, key: &str) {
 
 fn touch_key(bucket: &mut RouteResponseCache, key: &str) {
     bucket.order.retain(|existing| existing != key);
-    bucket.order.push_back(key.to_string());
+    bucket.order.push_back(key.to_owned());
 }
 
 fn evict_expired_entries(bucket: &mut RouteResponseCache, now: Instant) {
@@ -418,7 +418,7 @@ fn extract_cacheable_headers(response_header: &ResponseHeader) -> Vec<(String, S
                 HeaderNameVariant::Case(case_name) => {
                     String::from_utf8_lossy(case_name.as_slice()).into_owned()
                 }
-                HeaderNameVariant::Titled(name) => name.to_string(),
+                HeaderNameVariant::Titled(name) => name.to_owned(),
             };
 
             if is_hop_by_hop_header(header_name.as_str()) {
@@ -501,7 +501,7 @@ fn materialize_cached_headers(entry: &CachedResponseEntry) -> Vec<(String, Strin
         })
         .collect();
 
-    headers.push(("Age".to_string(), age_seconds.to_string()));
+    headers.push(("Age".to_owned(), age_seconds.to_string()));
     headers
 }
 
@@ -539,7 +539,7 @@ fn rewrite_cache_control_value(value: &str, seconds: u64) -> Option<String> {
                 found = true;
                 format!("max-age={seconds}")
             } else {
-                directive.to_string()
+                directive.to_owned()
             }
         })
         .collect::<Vec<_>>();
@@ -636,7 +636,7 @@ mod tests {
     fn rewrites_max_age_directive_only_when_present() {
         assert_eq!(
             rewrite_cache_control_value("public, max-age=3600, must-revalidate", 120),
-            Some("public, max-age=120, must-revalidate".to_string())
+            Some("public, max-age=120, must-revalidate".to_owned())
         );
         assert_eq!(rewrite_cache_control_value("public, immutable", 120), None);
     }
@@ -647,10 +647,10 @@ mod tests {
             status: 200,
             headers: vec![
                 (
-                    "Cache-Control".to_string(),
-                    "public, max-age=300".to_string(),
+                    "Cache-Control".to_owned(),
+                    "public, max-age=300".to_owned(),
                 ),
-                ("Content-Type".to_string(), "application/json".to_string()),
+                ("Content-Type".to_owned(), "application/json".to_owned()),
             ],
             body: Bytes::from_static(br#"{"ok":true}"#),
             stored_at: Instant::now(),
@@ -674,21 +674,21 @@ mod tests {
         let manager = LocalResponseCacheManager::default();
 
         manager.put(
-            "route-a".to_string(),
-            "/one".to_string(),
+            "route-a".to_owned(),
+            "/one".to_owned(),
             Duration::from_secs(60),
             180,
             200,
-            vec![("Content-Type".to_string(), "text/plain".to_string())],
+            vec![("Content-Type".to_owned(), "text/plain".to_owned())],
             Bytes::from("first-body"),
         );
         manager.put(
-            "route-a".to_string(),
-            "/two".to_string(),
+            "route-a".to_owned(),
+            "/two".to_owned(),
             Duration::from_secs(60),
             180,
             200,
-            vec![("Content-Type".to_string(), "text/plain".to_string())],
+            vec![("Content-Type".to_owned(), "text/plain".to_owned())],
             Bytes::from("second-body"),
         );
 

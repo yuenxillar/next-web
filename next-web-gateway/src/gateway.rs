@@ -250,7 +250,7 @@ pub fn init_logging(cli: &Cli, config: Option<&GatewayConfig>) {
         .log_level
         .clone()
         .or_else(|| config.map(|config| config.logging.level.clone()))
-        .unwrap_or_else(|| "info".to_string());
+        .unwrap_or_else(|| "info".to_owned());
 
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(level));
 
@@ -336,7 +336,7 @@ next:
     #[test]
     fn check_returns_the_route_ids() {
         let gateway = Gateway::parse_str(VALID).unwrap();
-        assert_eq!(gateway.check().unwrap(), vec!["users".to_string()]);
+        assert_eq!(gateway.check().unwrap(), vec!["users".to_owned()]);
     }
 
     #[test]
