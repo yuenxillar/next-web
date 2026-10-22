@@ -35,7 +35,10 @@ pub struct RequestContext {
     /// Host to send upstream, set by `SetRequestHostHeader`.
     pub upstream_host_override: Option<String>,
     /// Upstream selected for this request.
-    pub selected: Option<UpstreamSelection>,
+    ///
+    /// Shared with the peer that was built from it, so recording the selection
+    /// costs one atomic increment instead of cloning two strings.
+    pub selected: Option<Arc<UpstreamSelection>>,
     /// Path as received, before any rewrite.
     pub original_request_path: Option<String>,
     /// Bytes of request body seen so far.
@@ -51,7 +54,10 @@ pub struct RequestContext {
     /// Whether the response body is being buffered for a body filter.
     pub buffer_response_body: bool,
     /// Buffered response body.
-    pub response_body_buffer: Vec<u8>,
+    ///
+    /// `BytesMut` because the buffer is handed to pingora as `Bytes` once the
+    /// body is complete: `freeze()` takes ownership instead of copying.
+    pub response_body_buffer: bytes::BytesMut,
     /// Set when the buffer exceeded its limit and filtering was abandoned.
     pub buffer_overflowed: bool,
     /// Response cache manager, when the route caches.

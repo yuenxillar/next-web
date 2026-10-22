@@ -19,17 +19,22 @@ const NEGATIVE_TTL: Duration = Duration::from_secs(5);
 const DEFAULT_CAPACITY: usize = 1024;
 
 struct Entry {
+    /// Port this entry was resolved for.
+    port: u16,
     /// `None` when the last lookup for this name failed.
     addresses: Option<Vec<SocketAddr>>,
     resolved_at: Instant,
 }
 
 /// Resolves host names off the proxy thread and caches the result.
+///
+/// Entries are grouped by host so the lookup takes the borrowed `&str` and never
+/// builds a `host:port` string on the request path.
 pub struct DnsCache {
     ttl: Duration,
     negative_ttl: Duration,
     capacity: usize,
-    entries: Mutex<HashMap<String, Entry>>,
+    entries: Mutex<HashMap<Box<str>, Vec<Entry>>>,
 }
 
 impl Default for DnsCache {
@@ -64,19 +69,20 @@ impl DnsCache {
             return Ok(vec![SocketAddr::new(ip, port)]);
         }
 
-        let key = format!("{host}:{port}");
-
         {
             let entries = self.entries.lock().await;
-            if let Some(entry) = entries.get(&key) {
-                let ttl = if entry.addresses.is_some() {
+            if let Some(found) = entries
+                .get(host)
+                .and_then(|group| group.iter().find(|entry| entry.port == port))
+            {
+                let ttl = if found.addresses.is_some() {
                     self.ttl
                 } else {
                     self.negative_ttl
                 };
 
-                if entry.resolved_at.elapsed() < ttl {
-                    return match entry.addresses.clone() {
+                if found.resolved_at.elapsed() < ttl {
+                    return match found.addresses.clone() {
                         Some(addresses) => Ok(addresses),
                         None => Err(format!("`{host}` does not resolve (cached failure)")),
                     };
@@ -94,7 +100,7 @@ impl DnsCache {
             Err(error) => (None, Some(format!("failed to resolve `{host}`: {error}"))),
         };
 
-        self.store(key, addresses.clone()).await;
+        self.store(host, port, addresses.clone()).await;
 
         match (addresses, error) {
             (Some(addresses), _) => Ok(addresses),
@@ -108,33 +114,52 @@ impl DnsCache {
     /// Evicting exactly one entry keeps the rest of the cache warm; clearing the
     /// whole map on overflow would drop every name at once and send the next
     /// thousand requests to the resolver.
-    async fn store(&self, key: String, addresses: Option<Vec<SocketAddr>>) {
+    async fn store(&self, host: &str, port: u16, addresses: Option<Vec<SocketAddr>>) {
         let mut entries = self.entries.lock().await;
+        let resolved_at = Instant::now();
 
-        if entries.len() >= self.capacity && !entries.contains_key(&key) {
+        // Update in place when the host (and port) is already cached.
+        if let Some(group) = entries.get_mut(host)
+            && let Some(existing) = group.iter_mut().find(|entry| entry.port == port)
+        {
+            existing.addresses = addresses;
+            existing.resolved_at = resolved_at;
+            return;
+        }
+
+        let total: usize = entries.values().map(Vec::len).sum();
+        if total >= self.capacity {
             let oldest = entries
                 .iter()
-                .min_by_key(|(_, entry)| entry.resolved_at)
-                .map(|(key, _)| key.clone());
+                .flat_map(|(host, group)| {
+                    group
+                        .iter()
+                        .map(move |entry| (host.clone(), entry.port, entry.resolved_at))
+                })
+                .min_by_key(|(_, _, resolved_at)| *resolved_at)
+                .map(|(host, port, _)| (host, port));
 
-            if let Some(oldest) = oldest {
-                entries.remove(&oldest);
+            if let Some((oldest_host, oldest_port)) = oldest
+                && let Some(group) = entries.get_mut(oldest_host.as_ref())
+            {
+                group.retain(|entry| entry.port != oldest_port);
+                if group.is_empty() {
+                    entries.remove(oldest_host.as_ref());
+                }
             }
         }
 
-        entries.insert(
-            key,
-            Entry {
-                addresses,
-                resolved_at: Instant::now(),
-            },
-        );
+        entries.entry(host.into()).or_default().push(Entry {
+            port,
+            addresses,
+            resolved_at,
+        });
     }
 
     /// Number of cached names, for tests and diagnostics.
     #[cfg(test)]
     async fn len(&self) -> usize {
-        self.entries.lock().await.len()
+        self.entries.lock().await.values().map(Vec::len).sum()
     }
 }
 

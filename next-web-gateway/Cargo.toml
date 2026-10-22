@@ -34,7 +34,6 @@ hashbrown       = { workspace = true }
 bytes           = { workspace = true }
 form_urlencoded = { workspace = true }
 rand            = { workspace = true }
-uuid            = { workspace = true }
 # Parses the PEM bundle behind `upstream.tls.ca_file`.
 rustls-pemfile  = { workspace = true }
 

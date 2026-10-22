@@ -15,8 +15,6 @@
 //!    entry.
 //! 6. `logging` writes one access log line and updates the metrics.
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -377,7 +375,32 @@ fn request_id(header: &RequestHeader, config: &ErrorConfig) -> String {
         .get(config.request_id_header.as_str())
         .and_then(|value| value.to_str().ok())
         .and_then(sanitize_request_id)
-        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string())
+        .unwrap_or_else(next_request_id)
+}
+
+/// Generate a UUID shaped request id without a per-request randomness syscall.
+///
+/// A process wide random seed mixed with an atomic counter keeps the ids unique
+/// and unguessable enough for correlation, and costs one `format!` instead of a
+/// call into the platform RNG on every request.
+fn next_request_id() -> String {
+    static SEED: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+    let seed = *SEED.get_or_init(rand::random::<u64>);
+    let counter = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+    let high = seed ^ counter.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    let low = counter.rotate_left(29).wrapping_mul(0xC2B2_AE3D_27D4_EB4F) ^ seed.rotate_left(17);
+
+    // `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`
+    let time_low = (high >> 32) as u32;
+    let time_mid = (high >> 16) as u16;
+    let time_hi = ((high & 0x0fff) as u16) | 0x4000;
+    let clock = (((low >> 48) as u16) & 0x3fff) | 0x8000;
+    let node = low & 0x0000_ffff_ffff_ffff;
+
+    format!("{time_low:08x}-{time_mid:04x}-{time_hi:04x}-{clock:04x}-{node:012x}")
 }
 
 /// Keep a caller supplied request id only when it is safe to echo.
@@ -406,11 +429,27 @@ fn client_ip(session: &Session) -> Option<std::net::IpAddr> {
 }
 
 /// Hash used as the load balancer key.
+///
+/// FNV-1a over the client address and the path: a `DefaultHasher` would set up
+/// SipHash state on every request for a value that only picks a backend, where
+/// collision quality is irrelevant and speed is not.
 fn selection_key(ctx: &RequestContext, path: &str) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    ctx.client_ip.hash(&mut hasher);
-    path.hash(&mut hasher);
-    hasher.finish()
+    const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+    let mut hash = FNV_OFFSET;
+    let bytes: Vec<u8> = match ctx.client_ip {
+        Some(std::net::IpAddr::V4(ip)) => ip.octets().to_vec(),
+        Some(std::net::IpAddr::V6(ip)) => ip.octets().to_vec(),
+        None => vec![0],
+    };
+
+    for byte in bytes.iter().copied().chain(path.as_bytes().iter().copied()) {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+
+    hash
 }
 
 /// Classify an upstream failure for the `gateway_upstream_errors_total` counter.
@@ -597,13 +636,13 @@ impl ProxyHttp for GatewayProxy {
             }
         };
 
-        ctx.selected = Some(selection.clone());
         let peer = build_peer(
             &selection,
             &self.config.upstream,
             route_config,
             self.ca.as_ref(),
         );
+        ctx.selected = Some(Arc::new(selection));
         Ok(Box::new(peer))
     }
 
@@ -835,7 +874,7 @@ impl ProxyHttp for GatewayProxy {
             );
             ctx.buffer_overflowed = true;
             ctx.buffer_response_body = false;
-            let mut flushed = Bytes::from(std::mem::take(&mut ctx.response_body_buffer));
+            let mut flushed = std::mem::take(&mut ctx.response_body_buffer).freeze();
             let mut combined = Vec::with_capacity(flushed.len() + chunk.len());
             combined.extend_from_slice(&flushed);
             combined.extend_from_slice(&chunk);
@@ -850,7 +889,7 @@ impl ProxyHttp for GatewayProxy {
             return Ok(None);
         }
 
-        let mut buffered = Bytes::from(std::mem::take(&mut ctx.response_body_buffer));
+        let mut buffered = std::mem::take(&mut ctx.response_body_buffer).freeze();
         self.routes.apply_body_filters(ctx, &mut buffered);
         store_local_cache_entry(ctx, Some(&buffered));
         ctx.buffer_response_body = false;
@@ -938,11 +977,6 @@ impl ProxyHttp for GatewayProxy {
             .unwrap_or(0);
         let latency = Duration::from_millis(ctx.elapsed_millis() as u64);
         let route = ctx.route_id.as_deref().unwrap_or("-");
-        let upstream = ctx
-            .selected
-            .as_ref()
-            .map(|selection| selection.addr.to_string())
-            .unwrap_or_else(|| "-".to_owned());
 
         self.metrics
             .observe_request(route, session.req_header().method.as_str(), status, latency);
@@ -951,6 +985,12 @@ impl ProxyHttp for GatewayProxy {
         }
 
         if self.config.logging.access_log {
+            // Formatted here, not before: an access line is the only reader.
+            let upstream = ctx
+                .selected
+                .as_ref()
+                .map(|selection| selection.addr.to_string())
+                .unwrap_or_else(|| "-".to_owned());
             // The path the client asked for, even after `StripPrefix`/
             // `RewritePath` changed what goes upstream.
             let original_path = ctx
@@ -1024,7 +1064,18 @@ mod tests {
 
     #[test]
     fn a_generated_id_is_always_accepted() {
-        let generated = uuid::Uuid::new_v4().to_string();
+        let generated = super::next_request_id();
         assert_eq!(sanitize_request_id(&generated), Some(generated));
+    }
+
+    #[test]
+    fn generated_ids_are_uuid_shaped_and_distinct() {
+        let first = super::next_request_id();
+        let second = super::next_request_id();
+
+        assert_eq!(first.len(), 36, "uuid shape: {first}");
+        assert_eq!(first.as_bytes()[14], b'4', "version nibble: {first}");
+        assert!(matches!(first.as_bytes()[19], b'8' | b'9' | b'a' | b'b'));
+        assert_ne!(first, second);
     }
 }
