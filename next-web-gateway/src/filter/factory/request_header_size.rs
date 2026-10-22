@@ -89,6 +89,9 @@ mod tests {
             [("host", b"example.com".as_slice())].into_iter(),
         );
 
-        assert_eq!(size, "GET / HTTP/1.1\r\n".len() + "host: example.com\r\n".len() + 2);
+        assert_eq!(
+            size,
+            "GET / HTTP/1.1\r\n".len() + "host: example.com\r\n".len() + 2
+        );
     }
 }

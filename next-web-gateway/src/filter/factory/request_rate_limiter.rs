@@ -64,10 +64,7 @@ impl GatewayFilter for RequestRateLimiterFilter {
                     429,
                     vec![
                         ("Retry-After".to_owned(), "1".to_owned()),
-                        (
-                            "X-RateLimit-Limit".to_owned(),
-                            self.rate_limit.to_string(),
-                        ),
+                        ("X-RateLimit-Limit".to_owned(), self.rate_limit.to_string()),
                         ("X-RateLimit-Remaining".to_owned(), "0".to_owned()),
                     ],
                     "Too many requests",
@@ -80,7 +77,10 @@ impl GatewayFilter for RequestRateLimiterFilter {
 }
 
 /// One bucket per client address, never one bucket per route.
-pub(crate) fn rate_limit_key(route_id: Option<&str>, client_ip: Option<std::net::IpAddr>) -> String {
+pub(crate) fn rate_limit_key(
+    route_id: Option<&str>,
+    client_ip: Option<std::net::IpAddr>,
+) -> String {
     match client_ip {
         Some(ip) => ip.to_string(),
         None => format!("unresolved:{}", route_id.unwrap_or("global")),

@@ -57,7 +57,7 @@ pub(crate) fn apply_secure_headers(response_header: &mut ResponseHeader) {
 mod tests {
     use pingora::http::ResponseHeader;
 
-    use super::{apply_secure_headers, SECURE_HEADERS};
+    use super::{SECURE_HEADERS, apply_secure_headers};
 
     #[test]
     fn secure_headers_are_all_applied() {
@@ -82,7 +82,9 @@ mod tests {
         response
             .insert_header("X-Frame-Options", "ALLOWALL")
             .unwrap();
-        response.insert_header("Strict-Transport-Security", "max-age=0").unwrap();
+        response
+            .insert_header("Strict-Transport-Security", "max-age=0")
+            .unwrap();
 
         apply_secure_headers(&mut response);
 

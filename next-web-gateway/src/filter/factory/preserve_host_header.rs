@@ -28,14 +28,12 @@ impl GatewayFilter for PreserveHostHeaderFilter {
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned)
             .or_else(|| {
-                exchange
-                    .request_header()
-                    .and_then(|request_header| {
-                        request_header
-                            .uri
-                            .authority()
-                            .map(|authority| authority.as_str().to_owned())
-                    })
+                exchange.request_header().and_then(|request_header| {
+                    request_header
+                        .uri
+                        .authority()
+                        .map(|authority| authority.as_str().to_owned())
+                })
             });
 
         if let Some(host) = host {

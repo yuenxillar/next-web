@@ -15,10 +15,19 @@ use crate::proxy::GatewayProxy;
 
 /// Command line contract of the binary. Every flag has an environment variable.
 #[derive(Debug, Clone, Parser)]
-#[command(name = "next-web-gateway", version, about = "A Spring Cloud Gateway equivalent")]
+#[command(
+    name = "next-web-gateway",
+    version,
+    about = "A Spring Cloud Gateway equivalent"
+)]
 pub struct Cli {
     /// Path to the configuration file.
-    #[arg(short, long, env = "NEXT_WEB_GATEWAY_CONFIG", default_value = "application.yaml")]
+    #[arg(
+        short,
+        long,
+        env = "NEXT_WEB_GATEWAY_CONFIG",
+        default_value = "application.yaml"
+    )]
     pub config: PathBuf,
 
     /// Override `next.gateway.server.bind`.
@@ -306,7 +315,7 @@ pub fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{Cli, Gateway, EXIT_CONFIG};
+    use super::{Cli, EXIT_CONFIG, Gateway};
     use clap::Parser;
 
     const VALID: &str = "\
@@ -327,8 +336,8 @@ next:
 
     #[test]
     fn cli_reads_the_check_flag_and_config_path() {
-        let cli =
-            Cli::try_parse_from(["next-web-gateway", "--check", "--config", "gateway.yaml"]).unwrap();
+        let cli = Cli::try_parse_from(["next-web-gateway", "--check", "--config", "gateway.yaml"])
+            .unwrap();
         assert!(cli.check);
         assert_eq!(cli.config.to_string_lossy(), "gateway.yaml");
     }

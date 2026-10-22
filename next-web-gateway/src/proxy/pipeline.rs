@@ -17,8 +17,8 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -29,21 +29,21 @@ use pingora::upstreams::peer::HttpPeer;
 use tracing::{error, info, warn};
 
 use crate::circuit_breaker::breaker_controller::Outcome;
-use crate::circuit_breaker::circuit_state::CircuitState;
 use crate::circuit_breaker::circuit_breaker_service_manager::CircuitBreakerServiceManager;
+use crate::circuit_breaker::circuit_state::CircuitState;
 use crate::config::{ErrorConfig, GatewayConfig, RouteConfig};
 use crate::context::{HeaderAndBody, RequestContext};
 use crate::error::GatewayError;
 use crate::filter::factory::local_response_cache::{
-    capture_response_for_local_cache, serve_from_local_cache_if_present, store_local_cache_entry,
-    LocalResponseCacheManager,
+    LocalResponseCacheManager, capture_response_for_local_cache, serve_from_local_cache_if_present,
+    store_local_cache_entry,
 };
 use crate::filter::spec::FilterPhase;
 use crate::handler::predicate::RouteServiceManager;
 use crate::metrics::Metrics;
 use crate::proxy::error_response::{render_error, status_for_error};
 use crate::service::route_service::RouteWork;
-use crate::upstream::{build_peer, DnsCache, StaticUpstreams, UpstreamResolver, UpstreamSelection};
+use crate::upstream::{DnsCache, StaticUpstreams, UpstreamResolver, UpstreamSelection, build_peer};
 
 /// Maximum response body buffered for a body filter, in bytes.
 const MAX_BUFFER_BYTES: usize = 8 * 1024 * 1024;
@@ -226,7 +226,8 @@ impl GatewayProxy {
     /// record a failure, otherwise a half open permit would never be released.
     fn record_upstream_failure(&self, ctx: &mut RequestContext, error: &pingora::Error) {
         let route = ctx.route_id.as_deref().unwrap_or("-");
-        self.metrics.observe_upstream_error(route, upstream_error_kind(error));
+        self.metrics
+            .observe_upstream_error(route, upstream_error_kind(error));
 
         let Some(breaker_id) = ctx.fallback_id.clone() else {
             return;
@@ -309,11 +310,7 @@ impl GatewayProxy {
 }
 
 /// Write a complete response to the downstream.
-async fn write_response(
-    session: &mut Session,
-    mut header: ResponseHeader,
-    body: Bytes,
-) {
+async fn write_response(session: &mut Session, mut header: ResponseHeader, body: Bytes) {
     let status = header.status.as_u16();
     // A 204/304 never carries a body, and a HEAD reply carries the headers of the
     // equivalent GET only. Sending one anyway desynchronises the connection.
@@ -339,9 +336,7 @@ async fn write_response(
         return;
     }
 
-    if send_body
-        && let Err(error) = session.write_response_body(Some(body), true).await
-    {
+    if send_body && let Err(error) = session.write_response_body(Some(body), true).await {
         error!("failed to write the response body: {error}");
     }
 }
@@ -419,7 +414,11 @@ impl ProxyHttp for GatewayProxy {
         }
     }
 
-    async fn request_filter(&self, session: &mut Session, ctx: &mut Self::CTX) -> pingora::Result<bool> {
+    async fn request_filter(
+        &self,
+        session: &mut Session,
+        ctx: &mut Self::CTX,
+    ) -> pingora::Result<bool> {
         ctx.started = Some(Instant::now());
         ctx.client_ip = client_ip(session);
 
@@ -428,10 +427,7 @@ impl ProxyHttp for GatewayProxy {
         let header_name = self.config.error.request_id_header.clone();
         let id = request_id(session.req_header(), &self.config.error);
         ctx.request_id = id.clone();
-        session
-            .req_header_mut()
-            .insert_header(header_name, id)
-            .ok();
+        session.req_header_mut().insert_header(header_name, id).ok();
 
         let Some(route) = self.routes.match_route(session) else {
             return self.respond_directly(session, ctx, 404).await;
@@ -446,7 +442,11 @@ impl ProxyHttp for GatewayProxy {
         // Request header filters, exactly once per request.
         if let Err(error) = self
             .routes
-            .filter_phase(ctx, FilterPhase::RequestHeader, HeaderAndBody::with_req_header(header))
+            .filter_phase(
+                ctx,
+                FilterPhase::RequestHeader,
+                HeaderAndBody::with_req_header(header),
+            )
             .await
         {
             let status = ctx
@@ -457,7 +457,11 @@ impl ProxyHttp for GatewayProxy {
             return self.respond_directly(session, ctx, status).await;
         }
         if ctx.direct_response.is_some() {
-            let status = ctx.direct_response.as_ref().map(|r| r.status).unwrap_or(500);
+            let status = ctx
+                .direct_response
+                .as_ref()
+                .map(|r| r.status)
+                .unwrap_or(500);
             return self.respond_directly(session, ctx, status).await;
         }
 
@@ -588,10 +592,7 @@ impl ProxyHttp for GatewayProxy {
         }
 
         // Forwarding headers: appended, never overwritten.
-        let peer_ip = ctx
-            .client_ip
-            .map(|ip| ip.to_string())
-            .unwrap_or_default();
+        let peer_ip = ctx.client_ip.map(|ip| ip.to_string()).unwrap_or_default();
         if !peer_ip.is_empty() {
             match upstream_request
                 .headers
@@ -605,7 +606,9 @@ impl ProxyHttp for GatewayProxy {
                         .ok();
                 }
                 _ => {
-                    upstream_request.insert_header("X-Forwarded-For", peer_ip).ok();
+                    upstream_request
+                        .insert_header("X-Forwarded-For", peer_ip)
+                        .ok();
                 }
             }
         }
@@ -619,7 +622,9 @@ impl ProxyHttp for GatewayProxy {
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned)
         {
-            upstream_request.insert_header("X-Forwarded-Host", host).ok();
+            upstream_request
+                .insert_header("X-Forwarded-Host", host)
+                .ok();
         }
 
         // Host precedence: an explicit `SetRequestHostHeader`, then a preserved
@@ -735,7 +740,9 @@ impl ProxyHttp for GatewayProxy {
         if ctx.request_body_bytes > limit {
             warn!(
                 route = ctx.route_id.as_deref().unwrap_or("-"),
-                limit, seen = ctx.request_body_bytes, "request body exceeds the configured limit"
+                limit,
+                seen = ctx.request_body_bytes,
+                "request body exceeds the configured limit"
             );
             return ctx.respond_with_text(413, Vec::new(), "Request size exceeded");
         }
@@ -749,7 +756,8 @@ impl ProxyHttp for GatewayProxy {
         body: &mut Option<Bytes>,
         end_of_stream: bool,
         ctx: &mut Self::CTX,
-    ) -> pingora::Result<Option<Duration>> {        let Some(chunk) = body.take() else {
+    ) -> pingora::Result<Option<Duration>> {
+        let Some(chunk) = body.take() else {
             return Ok(None);
         };
 
@@ -790,7 +798,12 @@ impl ProxyHttp for GatewayProxy {
         Ok(None)
     }
 
-    fn suppress_error_log(&self, _session: &Session, _ctx: &Self::CTX, _error: &pingora::Error) -> bool {
+    fn suppress_error_log(
+        &self,
+        _session: &Session,
+        _ctx: &Self::CTX,
+        _error: &pingora::Error,
+    ) -> bool {
         false
     }
 
@@ -886,30 +899,34 @@ impl ProxyHttp for GatewayProxy {
                 .unwrap_or_else(|| session.req_header().uri.path());
             let bytes = ctx.response_body_buffer.len() as u64;
 
-            if let Some(error) = error { info!(
-                request_id = %ctx.request_id,
-                client = ?ctx.client_ip,
-                method = %session.req_header().method,
-                path = %original_path,
-                status,
-                route = %route,
-                upstream = %upstream,
-                bytes,
-                latency_ms = latency.as_millis(),
-                error = %error,
-                "access"
-            ) } else { info!(
-                request_id = %ctx.request_id,
-                client = ?ctx.client_ip,
-                method = %session.req_header().method,
-                path = %original_path,
-                status,
-                route = %route,
-                upstream = %upstream,
-                bytes,
-                latency_ms = latency.as_millis(),
-                "access"
-            ) }
+            if let Some(error) = error {
+                info!(
+                    request_id = %ctx.request_id,
+                    client = ?ctx.client_ip,
+                    method = %session.req_header().method,
+                    path = %original_path,
+                    status,
+                    route = %route,
+                    upstream = %upstream,
+                    bytes,
+                    latency_ms = latency.as_millis(),
+                    error = %error,
+                    "access"
+                )
+            } else {
+                info!(
+                    request_id = %ctx.request_id,
+                    client = ?ctx.client_ip,
+                    method = %session.req_header().method,
+                    path = %original_path,
+                    status,
+                    route = %route,
+                    upstream = %upstream,
+                    bytes,
+                    latency_ms = latency.as_millis(),
+                    "access"
+                )
+            }
         }
     }
 }

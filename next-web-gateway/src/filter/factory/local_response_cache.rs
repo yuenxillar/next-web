@@ -455,7 +455,8 @@ fn vary_is_supported(response_header: &ResponseHeader) -> bool {
         .all(|field| field.eq_ignore_ascii_case("accept-encoding"))
 }
 
-fn is_hop_by_hop_header(name: &str) -> bool {    matches!(
+fn is_hop_by_hop_header(name: &str) -> bool {
+    matches!(
         name.to_ascii_lowercase().as_str(),
         "connection"
             | "keep-alive"
@@ -478,11 +479,7 @@ fn materialize_cached_headers(entry: &CachedResponseEntry) -> Vec<(String, Strin
 
     // D11 requires an `Age` header: it tells the client how long ago the
     // response was generated.
-    let age_seconds = entry
-        .stored_at
-        .elapsed()
-        .as_secs()
-        .min(remaining_seconds);
+    let age_seconds = entry.stored_at.elapsed().as_secs().min(remaining_seconds);
 
     let mut headers: Vec<(String, String)> = entry
         .headers
@@ -615,9 +612,9 @@ fn parse_size_value(value: &str) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_cache_key, materialize_cached_headers, parse_duration_value, parse_size_value,
-        rewrite_cache_control_value, CachedResponseEntry, LocalResponseCacheFilter,
-        LocalResponseCacheManager,
+        CachedResponseEntry, LocalResponseCacheFilter, LocalResponseCacheManager, build_cache_key,
+        materialize_cached_headers, parse_duration_value, parse_size_value,
+        rewrite_cache_control_value,
     };
     use bytes::Bytes;
     use pingora::http::RequestHeader;
@@ -646,10 +643,7 @@ mod tests {
         let entry = CachedResponseEntry {
             status: 200,
             headers: vec![
-                (
-                    "Cache-Control".to_owned(),
-                    "public, max-age=300".to_owned(),
-                ),
+                ("Cache-Control".to_owned(), "public, max-age=300".to_owned()),
                 ("Content-Type".to_owned(), "application/json".to_owned()),
             ],
             body: Bytes::from_static(br#"{"ok":true}"#),
@@ -702,7 +696,10 @@ mod tests {
         request.insert_header("Range", "bytes=0-99").unwrap();
 
         let key = build_cache_key(&request);
-        assert!(key.starts_with("/resource?x=1|range=bytes=0-99|vary="), "{key}");
+        assert!(
+            key.starts_with("/resource?x=1|range=bytes=0-99|vary="),
+            "{key}"
+        );
     }
 
     #[test]
@@ -741,7 +738,9 @@ mod tests {
         let mut gzip = RequestHeader::build("GET", b"/resource", None).unwrap();
         gzip.insert_header("Accept-Encoding", "gzip").unwrap();
         let mut identity = RequestHeader::build("GET", b"/resource", None).unwrap();
-        identity.insert_header("Accept-Encoding", "identity").unwrap();
+        identity
+            .insert_header("Accept-Encoding", "identity")
+            .unwrap();
 
         assert_ne!(build_cache_key(&gzip), build_cache_key(&identity));
     }

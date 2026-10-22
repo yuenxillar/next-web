@@ -61,10 +61,7 @@ impl GatewayFilter for AddRequestParameterFilter {
 ///
 /// The original query is kept verbatim: re-encoding it would turn `%20` into
 /// `+`, reorder keys and collapse duplicates.
-pub(crate) fn merge_query(
-    original_query: &str,
-    parameters: &[KeyValue<String, String>],
-) -> String {
+pub(crate) fn merge_query(original_query: &str, parameters: &[KeyValue<String, String>]) -> String {
     let appended = parameters
         .iter()
         .map(|parameter| {

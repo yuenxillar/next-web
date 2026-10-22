@@ -43,7 +43,7 @@ use crate::filter::factory::set_response_header::SetResponseHeaderFilter;
 use crate::filter::factory::set_status::SetStatusFilter;
 use crate::filter::factory::strip_prefix::StripPrefixFilter;
 use crate::filter::gateway_filter_chain::GatewayFilterChain;
-use crate::filter::spec::{expect_args, unknown_name_error, FilterPhase, FilterSpec};
+use crate::filter::spec::{FilterPhase, FilterSpec, expect_args, unknown_name_error};
 use crate::server::ServerWebExchange;
 use crate::util::key_value::KeyValue;
 
@@ -197,10 +197,7 @@ impl DefaultGatewayFilter {
     }
 
     /// Clone the filters that belong to `phase` into a chain-ready list.
-    pub fn chain_for(
-        filters: &[Self],
-        phase: FilterPhase,
-    ) -> Vec<Arc<dyn GatewayFilter>> {
+    pub fn chain_for(filters: &[Self], phase: FilterPhase) -> Vec<Arc<dyn GatewayFilter>> {
         filters
             .iter()
             .filter(|filter| filter.phase() == phase)

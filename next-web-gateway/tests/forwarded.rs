@@ -2,9 +2,14 @@
 
 mod support;
 
-use support::{get, Behavior, MockUpstream, TestGateway};
+use support::{Behavior, MockUpstream, TestGateway, get};
 
-fn document(upstream: std::net::SocketAddr, trusted: &str, predicate: &str, filters: &str) -> String {
+fn document(
+    upstream: std::net::SocketAddr,
+    trusted: &str,
+    predicate: &str,
+    filters: &str,
+) -> String {
     format!(
         "\
 next:
@@ -47,13 +52,17 @@ fn a_trusted_proxy_header_selects_the_client() {
 
     let allowed = get(gateway.addr, "/x", &[("X-Forwarded-For", "203.0.113.9")]);
     assert_eq!(
-        allowed.status, 200,
+        allowed.status,
+        200,
         "a client inside the range must match: {}",
         allowed.text()
     );
 
     let denied = get(gateway.addr, "/x", &[("X-Forwarded-For", "198.51.100.1")]);
-    assert_eq!(denied.status, 404, "a client outside the range must not match");
+    assert_eq!(
+        denied.status, 404,
+        "a client outside the range must not match"
+    );
 }
 
 #[test]
@@ -89,18 +98,31 @@ fn the_rate_limiter_buckets_per_forwarded_client() {
     // Two requests from one client fill its bucket...
     for _ in 0..2 {
         assert_eq!(
-            get(gateway.addr, "/limited", &[("X-Forwarded-For", "203.0.113.1")]).status,
+            get(
+                gateway.addr,
+                "/limited",
+                &[("X-Forwarded-For", "203.0.113.1")]
+            )
+            .status,
             200
         );
     }
-    let blocked = get(gateway.addr, "/limited", &[("X-Forwarded-For", "203.0.113.1")]);
+    let blocked = get(
+        gateway.addr,
+        "/limited",
+        &[("X-Forwarded-For", "203.0.113.1")],
+    );
     assert_eq!(
         blocked.status, 429,
         "the third request of one client must be limited"
     );
 
     // ...while a different client behind the same proxy still gets through.
-    let other = get(gateway.addr, "/limited", &[("X-Forwarded-For", "203.0.113.2")]);
+    let other = get(
+        gateway.addr,
+        "/limited",
+        &[("X-Forwarded-For", "203.0.113.2")],
+    );
     assert_eq!(
         other.status, 200,
         "another client must have its own bucket, otherwise every client behind \

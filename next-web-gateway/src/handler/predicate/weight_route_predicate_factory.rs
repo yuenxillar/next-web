@@ -72,7 +72,7 @@ pub(crate) fn draw_bucket(total_weight: u32) -> u32 {
 mod tests {
     use std::collections::HashSet;
 
-    use super::{draw_bucket, WeightRoutePredicateFactory};
+    use super::{WeightRoutePredicateFactory, draw_bucket};
 
     #[test]
     fn configure_range_sets_expected_window() {

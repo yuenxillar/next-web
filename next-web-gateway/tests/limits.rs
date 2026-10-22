@@ -2,7 +2,7 @@
 
 mod support;
 
-use support::{get, request, with_upstream, Behavior, MockUpstream, TestGateway};
+use support::{Behavior, MockUpstream, TestGateway, get, request, with_upstream};
 
 #[test]
 fn rate_limiter_returns_429_with_retry_after() {

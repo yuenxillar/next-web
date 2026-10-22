@@ -2,7 +2,7 @@
 
 mod support;
 
-use support::{get, with_upstream, Behavior, MockUpstream, TestGateway};
+use support::{Behavior, MockUpstream, TestGateway, get, with_upstream};
 
 #[test]
 fn upstream_500_passes_through_and_trips_the_breaker() {
@@ -40,11 +40,17 @@ fn upstream_500_passes_through_and_trips_the_breaker() {
     });
 
     let first = get(gateway.addr, "/api", &[]);
-    assert_eq!(first.status, 500, "the 5xx is passed through: {}", first.text());
+    assert_eq!(
+        first.status,
+        500,
+        "the 5xx is passed through: {}",
+        first.text()
+    );
 
     let second = get(gateway.addr, "/api", &[]);
     assert_eq!(
-        second.status, 503,
+        second.status,
+        503,
         "the open breaker must reject the second call, got {}",
         second.text()
     );
@@ -75,7 +81,8 @@ fn an_unresolvable_upstream_is_a_bad_gateway() {
     let response = get(gateway.addr, "/broken", &[]);
 
     assert_eq!(
-        response.status, 502,
+        response.status,
+        502,
         "a name that does not resolve is an upstream fault: {}",
         response.text()
     );

@@ -9,8 +9,8 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::config::{ConfigError, ConfigErrors, GatewayConfig};
 use crate::upstream::{UpstreamResolver, UpstreamUri};
@@ -68,7 +68,9 @@ impl StaticUpstreams {
 
             let mut addresses = Vec::new();
             for upstream in &route.upstreams {
-                let addr = if let Ok(addr) = upstream.addr.parse::<SocketAddr>() { addr } else {
+                let addr = if let Ok(addr) = upstream.addr.parse::<SocketAddr>() {
+                    addr
+                } else {
                     errors.push(ConfigError::new(
                         format!("routes.{}.upstreams.addr", route.id),
                         format!("`{}` is not a `IP:port` address", upstream.addr),
@@ -153,7 +155,11 @@ next:
             .filter_map(|_| upstreams.select("users", b"key"))
             .collect();
 
-        assert_eq!(selected.len(), 2, "expected both backends, got {selected:?}");
+        assert_eq!(
+            selected.len(),
+            2,
+            "expected both backends, got {selected:?}"
+        );
     }
 
     #[test]

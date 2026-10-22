@@ -2,7 +2,7 @@
 
 mod support;
 
-use support::{get, with_upstream, Behavior};
+use support::{Behavior, get, with_upstream};
 
 const PING_ROUTE: &str = "\
 - id: ping
@@ -32,9 +32,17 @@ fn the_admin_listener_answers_health_and_metrics() {
 
     let metrics = get(gateway.admin, "/metrics", &[]);
     assert_eq!(metrics.status, 200);
-    assert!(metrics.text().contains("# TYPE gateway_requests_total counter"));
+    assert!(
+        metrics
+            .text()
+            .contains("# TYPE gateway_requests_total counter")
+    );
 
     let routes = get(gateway.admin, "/routes", &[]);
     assert_eq!(routes.status, 200);
-    assert!(routes.text().contains("\"id\":\"ping\""), "{}", routes.text());
+    assert!(
+        routes.text().contains("\"id\":\"ping\""),
+        "{}",
+        routes.text()
+    );
 }

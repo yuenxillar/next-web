@@ -1,8 +1,8 @@
 //! Mapping of pingora errors to status codes, and rendering of the error body.
 
 use bytes::Bytes;
-use pingora::http::ResponseHeader;
 use pingora::ErrorType;
+use pingora::http::ResponseHeader;
 
 use crate::config::{ErrorConfig, ErrorFormat};
 

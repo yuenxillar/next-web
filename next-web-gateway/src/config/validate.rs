@@ -16,16 +16,8 @@ const SCHEMES: [&str; 3] = ["http", "https", "lb"];
 pub(crate) fn validate(config: &GatewayConfig) -> Vec<ConfigError> {
     let mut errors = Vec::new();
 
-    validate_bind(
-        "server.bind",
-        &config.server.bind,
-        &mut errors,
-    );
-    validate_bind(
-        "server.admin.bind",
-        &config.server.admin.bind,
-        &mut errors,
-    );
+    validate_bind("server.bind", &config.server.bind, &mut errors);
+    validate_bind("server.admin.bind", &config.server.admin.bind, &mut errors);
 
     validate_trusted_proxies(&config.trusted_proxies, &mut errors);
     validate_server_knobs(config, &mut errors);
@@ -185,7 +177,10 @@ fn validate_uri(uri: &str, path: &str, errors: &mut Vec<ConfigError>) -> Option<
     let Some((scheme, rest)) = uri.split_once("://") else {
         errors.push(ConfigError::new(
             path,
-            format!("`{uri}` has no scheme, expected one of {}", SCHEMES.join(", ")),
+            format!(
+                "`{uri}` has no scheme, expected one of {}",
+                SCHEMES.join(", ")
+            ),
         ));
         return None;
     };

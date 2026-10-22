@@ -111,10 +111,9 @@ impl RouteServiceManager {
             .route_predicate_factory
             .iter()
             .find_map(|factory| match factory {
-                RoutePredicateFactory::PathPredicates(paths) => paths
-                    .paths
-                    .iter()
-                    .find_map(|pattern| pattern.capture(path)),
+                RoutePredicateFactory::PathPredicates(paths) => {
+                    paths.paths.iter().find_map(|pattern| pattern.capture(path))
+                }
                 _ => None,
             })
             .unwrap_or_default()
@@ -266,7 +265,11 @@ mod tests {
 
     #[test]
     fn new_sorts_routes_by_order_then_id() {
-        let routes = vec![route("b", 10, "http://h:1"), route("a", 10, "http://h:1"), route("c", 5, "http://h:1")];
+        let routes = vec![
+            route("b", 10, "http://h:1"),
+            route("a", 10, "http://h:1"),
+            route("c", 5, "http://h:1"),
+        ];
         let services = routes
             .into_iter()
             .map(|route| RoutePredicateService::try_from(route).unwrap())
@@ -282,11 +285,19 @@ mod tests {
         let response = DefaultGatewayFilter::try_from("AddResponseHeader=X-B, 1").unwrap();
 
         assert_eq!(
-            DefaultGatewayFilter::chain_for(&[request.clone(), response.clone()], crate::filter::spec::FilterPhase::RequestHeader).len(),
+            DefaultGatewayFilter::chain_for(
+                &[request.clone(), response.clone()],
+                crate::filter::spec::FilterPhase::RequestHeader
+            )
+            .len(),
             1
         );
         assert_eq!(
-            DefaultGatewayFilter::chain_for(&[request, response], crate::filter::spec::FilterPhase::ResponseHeader).len(),
+            DefaultGatewayFilter::chain_for(
+                &[request, response],
+                crate::filter::spec::FilterPhase::ResponseHeader
+            )
+            .len(),
             1
         );
     }

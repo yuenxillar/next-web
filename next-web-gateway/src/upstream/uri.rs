@@ -92,7 +92,10 @@ impl UpstreamUri {
 fn split_authority(authority: &str) -> Result<(String, u16), ConfigError> {
     if let Some(rest) = authority.strip_prefix('[') {
         let (host, tail) = rest.split_once(']').ok_or_else(|| {
-            ConfigError::new("routes.uri", format!("`{authority}` has an unclosed bracket"))
+            ConfigError::new(
+                "routes.uri",
+                format!("`{authority}` has an unclosed bracket"),
+            )
         })?;
 
         let port = match tail.strip_prefix(':') {
@@ -115,9 +118,8 @@ fn split_authority(authority: &str) -> Result<(String, u16), ConfigError> {
 }
 
 fn parse_port(port: &str) -> Result<u16, ConfigError> {
-    port.parse::<u16>().map_err(|_| {
-        ConfigError::new("routes.uri", format!("`{port}` is not a valid port"))
-    })
+    port.parse::<u16>()
+        .map_err(|_| ConfigError::new("routes.uri", format!("`{port}` is not a valid port")))
 }
 
 #[cfg(test)]

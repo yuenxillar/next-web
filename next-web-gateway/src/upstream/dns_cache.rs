@@ -122,11 +122,6 @@ mod tests {
     #[tokio::test]
     async fn reports_a_name_that_does_not_resolve() {
         let cache = DnsCache::default();
-        assert!(
-            cache
-                .resolve("does-not-exist.invalid", 80)
-                .await
-                .is_err()
-        );
+        assert!(cache.resolve("does-not-exist.invalid", 80).await.is_err());
     }
 }

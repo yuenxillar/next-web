@@ -174,7 +174,10 @@ mod tests {
 
         let filter = DedupeResponseHeaderFilter::from("Access-Control-Allow-Origin");
         let mut ctx = test_ctx();
-        let mut exchange = crate::server::DefaultServerWebExchange::new(&mut ctx, crate::context::HeaderAndBody::with_resp_header(&mut response));
+        let mut exchange = crate::server::DefaultServerWebExchange::new(
+            &mut ctx,
+            crate::context::HeaderAndBody::with_resp_header(&mut response),
+        );
 
         futures::executor::block_on(filter.filter(
             &mut exchange,
@@ -208,7 +211,10 @@ mod tests {
 
         let filter = DedupeResponseHeaderFilter::from("Access-Control-Allow-Origin RETAIN_UNIQUE");
         let mut ctx = test_ctx();
-        let mut exchange = crate::server::DefaultServerWebExchange::new(&mut ctx, crate::context::HeaderAndBody::with_resp_header(&mut response));
+        let mut exchange = crate::server::DefaultServerWebExchange::new(
+            &mut ctx,
+            crate::context::HeaderAndBody::with_resp_header(&mut response),
+        );
 
         futures::executor::block_on(filter.filter(
             &mut exchange,

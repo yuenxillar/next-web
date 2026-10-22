@@ -2,7 +2,7 @@
 
 mod support;
 
-use support::{get, with_upstream, Behavior};
+use support::{Behavior, get, with_upstream};
 
 #[test]
 fn request_id_is_generated_and_echoed() {
@@ -39,7 +39,11 @@ fn an_incoming_request_id_is_reused() {
 ";
     let (_upstream, gateway) = with_upstream(Behavior::Echo, template);
 
-    let response = get(gateway.addr, "/ping", &[("X-Request-Id", "caller-supplied")]);
+    let response = get(
+        gateway.addr,
+        "/ping",
+        &[("X-Request-Id", "caller-supplied")],
+    );
 
     assert_eq!(response.status, 200);
     assert_eq!(
@@ -74,7 +78,10 @@ fn metrics_endpoint_counts_the_request_once() {
         .find(|line| line.starts_with("gateway_requests_total{route=\"ping\""))
         .unwrap_or_default();
 
-    assert!(line.ends_with(" 3"), "expected exactly 3 requests, got `{line}`");
+    assert!(
+        line.ends_with(" 3"),
+        "expected exactly 3 requests, got `{line}`"
+    );
 }
 
 #[test]

@@ -6,8 +6,8 @@ use std::time::Instant;
 
 use bytes::Bytes;
 use pingora::{
-    http::{RequestHeader, ResponseHeader},
     Result,
+    http::{RequestHeader, ResponseHeader},
 };
 
 use crate::filter::factory::local_response_cache::{

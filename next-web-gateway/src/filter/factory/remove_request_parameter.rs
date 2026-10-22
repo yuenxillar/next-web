@@ -6,7 +6,7 @@ use crate::filter::gateway_filter_chain::GatewayFilterChain;
 use crate::server::ServerWebExchange;
 use std::collections::HashSet;
 
-use form_urlencoded::{parse, Serializer};
+use form_urlencoded::{Serializer, parse};
 use pingora::http::RequestHeader;
 use tracing::warn;
 
@@ -126,9 +126,16 @@ mod tests {
             names: names.iter().map(|name| name.to_string()).collect(),
         };
         let mut ctx = test_ctx();
-        let mut exchange = crate::server::DefaultServerWebExchange::new(&mut ctx, crate::context::HeaderAndBody::with_req_header(&mut request));
+        let mut exchange = crate::server::DefaultServerWebExchange::new(
+            &mut ctx,
+            crate::context::HeaderAndBody::with_req_header(&mut request),
+        );
 
-        futures::executor::block_on(filter.filter(&mut exchange, &crate::handler::DefaultGatewayFilterChain::default())).unwrap();
+        futures::executor::block_on(filter.filter(
+            &mut exchange,
+            &crate::handler::DefaultGatewayFilterChain::default(),
+        ))
+        .unwrap();
         drop(exchange);
 
         request

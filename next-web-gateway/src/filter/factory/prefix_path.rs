@@ -28,8 +28,7 @@ impl GatewayFilter for PrefixPathFilter {
         // Prefix the configured path while preserving the original query string.
         let rewritten_path = join_paths(self.path.as_ref(), request_header.uri.path());
         set_request_path(request_header, &rewritten_path, query.as_deref());
-        
-        
+
         chain.filter(exchange).await
     }
 }

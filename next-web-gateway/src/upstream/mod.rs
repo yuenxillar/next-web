@@ -58,7 +58,8 @@ pub fn build_peer(
     peer.options.verify_hostname = tls.verify_hostname && !insecure;
 
     let client = &route.metadata.client;
-    peer.options.connection_timeout = Some(client.connect_timeout.unwrap_or(config.connect_timeout));
+    peer.options.connection_timeout =
+        Some(client.connect_timeout.unwrap_or(config.connect_timeout));
     peer.options.read_timeout = Some(client.read_timeout.unwrap_or(config.read_timeout));
     peer.options.write_timeout = Some(client.write_timeout.unwrap_or(config.write_timeout));
     peer.options.idle_timeout = Some(config.idle_timeout);
@@ -70,7 +71,7 @@ pub fn build_peer(
 mod tests {
     use std::net::SocketAddr;
 
-    use super::{build_peer, UpstreamSelection};
+    use super::{UpstreamSelection, build_peer};
     use crate::config::{RouteConfig, RouteMetadata, UpstreamConfig};
 
     fn route(id: &str, uri: &str, read_timeout: Option<u64>) -> RouteConfig {
@@ -122,7 +123,11 @@ mod tests {
 
         let mut config = UpstreamConfig::default();
         config.tls.insecure_skip_verify = true;
-        let peer = build_peer(&selection(true), &config, &route("a", "https://example.com", None));
+        let peer = build_peer(
+            &selection(true),
+            &config,
+            &route("a", "https://example.com", None),
+        );
 
         assert!(!peer.options.verify_cert);
         assert!(!peer.options.verify_hostname);
@@ -141,7 +146,10 @@ mod tests {
             peer.options.read_timeout,
             Some(std::time::Duration::from_secs(9))
         );
-        assert_eq!(peer.options.connection_timeout, Some(config.connect_timeout));
+        assert_eq!(
+            peer.options.connection_timeout,
+            Some(config.connect_timeout)
+        );
         assert_eq!(peer.group_key, 7);
     }
 }

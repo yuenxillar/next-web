@@ -4,8 +4,8 @@
 //! or a filter, so a broken route configuration cannot take the health endpoint
 //! down with it.
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -165,12 +165,18 @@ impl ProxyHttp for AdminService {
 
     fn new_ctx(&self) -> Self::CTX {}
 
-    async fn request_filter(&self, session: &mut Session, _ctx: &mut Self::CTX) -> pingora::Result<bool> {
+    async fn request_filter(
+        &self,
+        session: &mut Session,
+        _ctx: &mut Self::CTX,
+    ) -> pingora::Result<bool> {
         let path = session.req_header().uri.path().to_owned();
         let response = self.respond(&path);
 
         let mut header = ResponseHeader::build(response.status, None)?;
-        header.insert_header("Content-Type", response.content_type).ok();
+        header
+            .insert_header("Content-Type", response.content_type)
+            .ok();
         header
             .insert_header("Content-Length", response.body.len().to_string())
             .ok();
@@ -198,8 +204,8 @@ impl ProxyHttp for AdminService {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use std::sync::atomic::AtomicBool;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
 
     use crate::config::GatewayConfig;
     use crate::handler::predicate::RouteServiceManager;
@@ -244,16 +250,28 @@ next:
     fn routes_endpoint_lists_the_configuration() {
         let response = service().respond("/routes");
         assert_eq!(response.status, 200);
-        assert!(response.body.contains("\"id\":\"users\""), "{}", response.body);
+        assert!(
+            response.body.contains("\"id\":\"users\""),
+            "{}",
+            response.body
+        );
         assert!(response.body.contains("10.0.0.1:8080"), "{}", response.body);
-        assert!(response.body.contains("Path=/api/users/**"), "{}", response.body);
+        assert!(
+            response.body.contains("Path=/api/users/**"),
+            "{}",
+            response.body
+        );
     }
 
     #[test]
     fn metrics_endpoint_returns_prometheus_text() {
         let response = service().respond("/metrics");
         assert_eq!(response.status, 200);
-        assert!(response.body.contains("# TYPE gateway_requests_total counter"));
+        assert!(
+            response
+                .body
+                .contains("# TYPE gateway_requests_total counter")
+        );
     }
 
     #[test]

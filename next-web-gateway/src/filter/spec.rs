@@ -74,7 +74,11 @@ impl FilterSpec {
 }
 
 /// Check that a filter received between `min` and `max` arguments.
-pub(crate) fn expect_args(spec: &FilterSpec, min: usize, max: usize) -> Result<&[String], ConfigError> {
+pub(crate) fn expect_args(
+    spec: &FilterSpec,
+    min: usize,
+    max: usize,
+) -> Result<&[String], ConfigError> {
     let count = spec.args.len();
     if count < min || count > max {
         let expected = if min == max {
@@ -114,7 +118,12 @@ fn closest_name<'a>(name: &str, known: &[&'a str]) -> Option<&'a str> {
     let lowered = name.to_ascii_lowercase();
     known
         .iter()
-        .map(|candidate| (edit_distance(&lowered, &candidate.to_ascii_lowercase()), *candidate))
+        .map(|candidate| {
+            (
+                edit_distance(&lowered, &candidate.to_ascii_lowercase()),
+                *candidate,
+            )
+        })
         .filter(|(distance, candidate)| {
             *distance <= 2 || candidate.to_ascii_lowercase().starts_with(&lowered)
         })
@@ -144,7 +153,7 @@ fn edit_distance(left: &str, right: &str) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{expect_args, unknown_name_error, FilterPhase, FilterSpec};
+    use super::{FilterPhase, FilterSpec, expect_args, unknown_name_error};
     use crate::filter::gateway_filter::DefaultGatewayFilter;
 
     #[test]
@@ -166,10 +175,7 @@ mod tests {
         );
 
         let legacy = DefaultGatewayFilter::try_from("AddRequestHeader=X-A: 1").unwrap();
-        assert_eq!(
-            legacy.header_pairs(),
-            &[("X-A".to_owned(), "1".to_owned())]
-        );
+        assert_eq!(legacy.header_pairs(), &[("X-A".to_owned(), "1".to_owned())]);
     }
 
     #[test]

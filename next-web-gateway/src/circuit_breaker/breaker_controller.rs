@@ -5,8 +5,8 @@
 //! `wait_duration_in_open_state`; after that at most `half_open_permits`
 //! concurrent probes are admitted, and one success closes it again.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use tokio::sync::Mutex;
@@ -196,11 +196,11 @@ impl CircuitBreakerController {
     }
 
     fn release_probe(&self) {
-        let _ = self
-            .half_open_in_flight
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |value| {
-                value.checked_sub(1)
-            });
+        let _ =
+            self.half_open_in_flight
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |value| {
+                    value.checked_sub(1)
+                });
     }
 
     fn trip(&self, state: &mut CircuitBreakerState) {

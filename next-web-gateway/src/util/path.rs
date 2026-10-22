@@ -33,7 +33,11 @@ pub(crate) fn substitute_variables(template: &str, variables: &HashMap<String, S
     out
 }
 
-pub(crate) fn set_request_path(request_header: &mut RequestHeader, path: &str, query: Option<&str>) {
+pub(crate) fn set_request_path(
+    request_header: &mut RequestHeader,
+    path: &str,
+    query: Option<&str>,
+) {
     let path_and_query = build_path_and_query(path, query);
 
     // Rebuild the URI from a normalized path/query pair and keep the request mutable in place.

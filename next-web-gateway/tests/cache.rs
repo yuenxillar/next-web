@@ -2,7 +2,7 @@
 
 mod support;
 
-use support::{get, Behavior, MockUpstream, TestGateway};
+use support::{Behavior, MockUpstream, TestGateway, get};
 
 fn cache_route(upstream: std::net::SocketAddr) -> String {
     format!(
@@ -45,7 +45,8 @@ fn a_cache_hit_returns_the_cached_body() {
     assert_eq!(first.status, 200, "{}", first.text());
     assert_eq!(first.text(), "cached-body");
     assert_eq!(
-        second.status, 200,
+        second.status,
+        200,
         "a cache hit must answer with the cached status, got {}: {}",
         second.status,
         second.text()

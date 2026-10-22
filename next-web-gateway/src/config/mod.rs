@@ -35,9 +35,7 @@ use serde::Deserialize;
 pub use duration::parse_duration;
 pub use error_model::{ErrorConfig, ErrorFormat};
 pub use logging::{LogFormat, LoggingConfig};
-pub use route::{
-    BreakerConfig, ClientMetadata, RouteConfig, RouteMetadata, UpstreamConfigEntry,
-};
+pub use route::{BreakerConfig, ClientMetadata, RouteConfig, RouteMetadata, UpstreamConfigEntry};
 pub use server::{AdminConfig, ServerConfig};
 pub use upstream::{HealthCheckConfig, TlsConfig, UpstreamConfig};
 pub use validate::is_valid_bind;
@@ -188,17 +186,16 @@ impl std::str::FromStr for GatewayConfig {
 
     /// Parse a configuration document.
     fn from_str(text: &str) -> Result<Self, ConfigErrors> {
-        let root: RootFile = match serde_path_to_error::deserialize(
-            serde_yaml::Deserializer::from_str(text),
-        ) {
-            Ok(root) => root,
-            Err(error) => {
-                return Err(ConfigErrors::new(vec![ConfigError::new(
-                    error.path().to_string(),
-                    error.inner().to_string(),
-                )]));
-            }
-        };
+        let root: RootFile =
+            match serde_path_to_error::deserialize(serde_yaml::Deserializer::from_str(text)) {
+                Ok(root) => root,
+                Err(error) => {
+                    return Err(ConfigErrors::new(vec![ConfigError::new(
+                        error.path().to_string(),
+                        error.inner().to_string(),
+                    )]));
+                }
+            };
 
         let config = match (root.next.and_then(|next| next.gateway), root.gateway) {
             (Some(_), Some(_)) => {
@@ -236,7 +233,7 @@ impl std::str::FromStr for GatewayConfig {
 mod tests {
     use std::str::FromStr;
 
-    use super::{parse_duration, ConfigError, GatewayConfig};
+    use super::{ConfigError, GatewayConfig, parse_duration};
 
     #[test]
     fn parses_duration_units() {
@@ -258,10 +255,8 @@ mod tests {
         assert!(GatewayConfig::from_str("next:\n  gateway:\n    routes: []\n").is_ok());
         assert!(GatewayConfig::from_str("gateway:\n  routes: []\n").is_ok());
         assert!(
-            GatewayConfig::from_str(
-                "next:\n  gateway:\n    routes: []\ngateway:\n  routes: []\n"
-            )
-            .is_err()
+            GatewayConfig::from_str("next:\n  gateway:\n    routes: []\ngateway:\n  routes: []\n")
+                .is_err()
         );
     }
 
@@ -301,14 +296,17 @@ mod tests {
 
     #[test]
     fn rejects_unknown_scheme() {
-        let text = errors_for("next:\n  gateway:\n    routes:\n      - id: a\n        uri: ftp://host:21\n");
+        let text = errors_for(
+            "next:\n  gateway:\n    routes:\n      - id: a\n        uri: ftp://host:21\n",
+        );
         assert!(text.contains("routes[0].uri"), "{text}");
         assert!(text.contains("ftp"), "{text}");
     }
 
     #[test]
     fn rejects_uri_without_authority() {
-        let text = errors_for("next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'http://'\n");
+        let text =
+            errors_for("next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'http://'\n");
         assert!(text.contains("routes[0].uri"), "{text}");
     }
 
@@ -343,7 +341,8 @@ mod tests {
     fn accepts_health_checking_explicitly_disabled() {
         use std::str::FromStr;
 
-        let yaml = "next:\n  gateway:\n    upstream:\n      health_check:\n        enabled: false\n";
+        let yaml =
+            "next:\n  gateway:\n    upstream:\n      health_check:\n        enabled: false\n";
         let config = GatewayConfig::from_str(yaml).expect("an explicit `enabled: false` is valid");
 
         assert!(!config.upstream.health_check.enabled);
@@ -359,7 +358,9 @@ mod tests {
 
     #[test]
     fn rejects_invalid_port() {
-        let text = errors_for("next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'http://host:notaport'\n");
+        let text = errors_for(
+            "next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'http://host:notaport'\n",
+        );
         assert!(text.contains("routes[0].uri"), "{text}");
     }
 
@@ -498,7 +499,12 @@ next:
         assert_eq!(config.logging.format, super::LogFormat::Json);
         assert_eq!(config.error.format, super::ErrorFormat::Text);
         assert_eq!(
-            config.routes[0].metadata.client.read_timeout.unwrap().as_secs(),
+            config.routes[0]
+                .metadata
+                .client
+                .read_timeout
+                .unwrap()
+                .as_secs(),
             5
         );
         assert_eq!(config.breakers["main"].half_open_permits, 2);

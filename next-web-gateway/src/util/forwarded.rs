@@ -20,10 +20,7 @@ pub(crate) fn set_trusted_proxies(networks: Vec<IpNetwork>) {
 
 /// The installed trusted proxy list. Empty means "trust nobody".
 pub(crate) fn trusted_proxies() -> &'static [IpNetwork] {
-    TRUSTED_PROXIES
-        .get()
-        .map(Vec::as_slice)
-        .unwrap_or_default()
+    TRUSTED_PROXIES.get().map(Vec::as_slice).unwrap_or_default()
 }
 
 /// Resolve the client address from the direct peer and `X-Forwarded-For`.

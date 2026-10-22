@@ -37,7 +37,10 @@ pub struct ServerConfig {
     #[serde(default)]
     pub threads: usize,
     /// How long in-flight requests may finish after a shutdown signal.
-    #[serde(default = "default_graceful_shutdown", deserialize_with = "deserialize_duration")]
+    #[serde(
+        default = "default_graceful_shutdown",
+        deserialize_with = "deserialize_duration"
+    )]
     pub graceful_shutdown: Duration,
     /// Downstream keep-alive timeout.
     ///

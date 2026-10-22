@@ -15,7 +15,10 @@ impl RoutePredicate for HostRoutePredicateFactory {
         let request = session.req_header();
         let remote_host = match request.headers.get("Host") {
             Some(value) => value.to_str().map(str::to_owned).ok(),
-            None => request.uri.authority().map(|authority| authority.to_string()),
+            None => request
+                .uri
+                .authority()
+                .map(|authority| authority.to_string()),
         };
         let Some(remote_host) = remote_host else {
             return false;

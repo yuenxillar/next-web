@@ -2,7 +2,7 @@
 
 mod support;
 
-use support::{get, request, with_upstream, Behavior};
+use support::{Behavior, get, request, with_upstream};
 
 #[test]
 fn unmatched_path_returns_404() {
@@ -17,7 +17,11 @@ fn unmatched_path_returns_404() {
     let response = get(gateway.addr, "/nope", &[]);
 
     assert_eq!(response.status, 404, "{}", response.text());
-    assert!(response.text().contains("\"status\":404"), "{}", response.text());
+    assert!(
+        response.text().contains("\"status\":404"),
+        "{}",
+        response.text()
+    );
 }
 
 #[test]
@@ -63,7 +67,13 @@ fn set_request_host_header_overrides_the_upstream_host() {
 ";
     let (upstream, gateway) = with_upstream(Behavior::Echo, template);
 
-    let response = request(gateway.addr, "GET", "/echo", &[("Host", "client.example")], None);
+    let response = request(
+        gateway.addr,
+        "GET",
+        "/echo",
+        &[("Host", "client.example")],
+        None,
+    );
 
     assert_eq!(response.status, 200);
     let recorded = upstream.last_request().expect("upstream request");
@@ -127,7 +137,13 @@ fn preserve_host_header_keeps_the_original_host() {
 ";
     let (upstream, gateway) = with_upstream(Behavior::Echo, template);
 
-    let response = request(gateway.addr, "GET", "/echo", &[("Host", "client.example")], None);
+    let response = request(
+        gateway.addr,
+        "GET",
+        "/echo",
+        &[("Host", "client.example")],
+        None,
+    );
 
     assert_eq!(response.status, 200);
     let recorded = upstream.last_request().expect("upstream request");
@@ -144,7 +160,13 @@ fn the_upstream_host_defaults_to_the_backend() {
 ";
     let (upstream, gateway) = with_upstream(Behavior::Echo, template);
 
-    let response = request(gateway.addr, "GET", "/echo", &[("Host", "client.example")], None);
+    let response = request(
+        gateway.addr,
+        "GET",
+        "/echo",
+        &[("Host", "client.example")],
+        None,
+    );
 
     assert_eq!(response.status, 200);
     let recorded = upstream.last_request().expect("upstream request");

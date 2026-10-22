@@ -13,17 +13,17 @@ use super::cookie_route_predicate_factory::CookieRoutePredicateFactory;
 use super::header_route_predicate_factory::HeaderRoutePredicateFactory;
 use super::host_route_predicate_factory::HostRoutePredicateFactory;
 use super::mehod_route_predicate_factory::MethodRoutePredicateFactory;
-use super::path_route_predicate_factory::{build_path_pattern, PathRoutePredicateFactory};
+use super::path_route_predicate_factory::{PathRoutePredicateFactory, build_path_pattern};
 use super::query_route_predicate_factory::QueryRoutePredicateFactory;
 use super::remote_addr_route_predicate_factory::RemoteAddrRoutePredicateFactory;
 use super::route_predicate::RoutePredicate;
 use super::weight_route_predicate_factory::WeightRoutePredicateFactory;
 use super::x_forwarded_remote_addr_route_predicate_factory::XForwardedRemoteAddrRoutePredicateFactory;
 use super::zoned_datetime_route_predicate_factory::{
-    after, before, between, ZonedDateTimeRoutePredicateFactory,
+    ZonedDateTimeRoutePredicateFactory, after, before, between,
 };
 use crate::config::ConfigError;
-use crate::filter::spec::{unknown_name_error, FilterSpec};
+use crate::filter::spec::{FilterSpec, unknown_name_error};
 use crate::util::key_value::KeyValue;
 
 /// Every predicate name the parser accepts.
@@ -117,10 +117,7 @@ impl TryFrom<&str> for RoutePredicateFactory {
                 match value {
                     Ok(predicate) => RoutePredicateFactory::ZonedDateTimePredicates(predicate),
                     Err(error) => {
-                        return Err(ConfigError::new(
-                            format!("predicates.{name}"),
-                            error,
-                        ));
+                        return Err(ConfigError::new(format!("predicates.{name}"), error));
                     }
                 }
             }
@@ -345,13 +342,17 @@ fn parse_ip_network(source: &str) -> Option<IpNetwork> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_ip_network, RoutePredicateFactory};
+    use super::{RoutePredicateFactory, parse_ip_network};
 
     #[test]
     fn between_with_missing_boundary_is_an_error() {
         let error =
             RoutePredicateFactory::try_from("Between=2024-01-01T00:00:00+00:00").unwrap_err();
-        assert!(error.message.contains("two timestamps"), "{}", error.message);
+        assert!(
+            error.message.contains("two timestamps"),
+            "{}",
+            error.message
+        );
     }
 
     #[test]

@@ -189,10 +189,7 @@ fn read_request(stream: &mut TcpStream) -> Option<RecordedRequest> {
         }
     }
 
-    let header_end = buffer
-        .windows(4)
-        .position(|window| window == b"\r\n\r\n")?
-        + 4;
+    let header_end = buffer.windows(4).position(|window| window == b"\r\n\r\n")? + 4;
     let head = String::from_utf8_lossy(&buffer[..header_end]).into_owned();
     let mut lines = head.split("\r\n");
 
@@ -280,8 +277,8 @@ pub fn request(
     headers: &[(&str, &str)],
     body: Option<&[u8]>,
 ) -> HttpResponse {
-    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(2))
-        .expect("connect to the gateway");
+    let mut stream =
+        TcpStream::connect_timeout(&addr, Duration::from_secs(2)).expect("connect to the gateway");
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .expect("read timeout");
@@ -303,7 +300,9 @@ pub fn request(
     }
     head.push_str("\r\n");
 
-    stream.write_all(head.as_bytes()).expect("write request head");
+    stream
+        .write_all(head.as_bytes())
+        .expect("write request head");
     if let Some(body) = body {
         stream.write_all(body).expect("write request body");
     }
@@ -331,7 +330,9 @@ pub fn post_chunked(addr: SocketAddr, target: &str, chunks: &[&[u8]]) -> HttpRes
         "POST {target} HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\
          Transfer-Encoding: chunked\r\n\r\n"
     );
-    stream.write_all(head.as_bytes()).expect("write request head");
+    stream
+        .write_all(head.as_bytes())
+        .expect("write request head");
 
     for chunk in chunks {
         stream
@@ -471,8 +472,7 @@ impl TestGateway {
         let admin_port = free_port();
         let document = build(proxy_port, admin_port);
 
-        let config_path =
-            std::env::temp_dir().join(format!("next-web-gateway-{proxy_port}.yaml"));
+        let config_path = std::env::temp_dir().join(format!("next-web-gateway-{proxy_port}.yaml"));
         std::fs::write(&config_path, document.clone()).expect("write the test configuration");
 
         let log_path = std::env::temp_dir().join(format!("next-web-gateway-{proxy_port}.log"));
@@ -490,8 +490,12 @@ impl TestGateway {
             .spawn()
             .expect("start the gateway binary");
 
-        let addr: SocketAddr = format!("127.0.0.1:{proxy_port}").parse().expect("proxy address");
-        let admin: SocketAddr = format!("127.0.0.1:{admin_port}").parse().expect("admin address");
+        let addr: SocketAddr = format!("127.0.0.1:{proxy_port}")
+            .parse()
+            .expect("proxy address");
+        let admin: SocketAddr = format!("127.0.0.1:{admin_port}")
+            .parse()
+            .expect("admin address");
 
         let deadline = Instant::now() + Duration::from_secs(15);
         while Instant::now() < deadline {
@@ -511,7 +515,9 @@ impl TestGateway {
                 let _ = std::fs::remove_file(&config_path);
                 let _ = std::fs::remove_file(&log_path);
                 let _ = std::fs::remove_file(&out_path);
-                return Err(format!("exited with {status}, config:\n{document}\nlog:\n{log}"));
+                return Err(format!(
+                    "exited with {status}, config:\n{document}\nlog:\n{log}"
+                ));
             }
 
             std::thread::sleep(Duration::from_millis(25));

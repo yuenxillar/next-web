@@ -5,8 +5,8 @@
 //! blocks.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::Duration;
 
 /// Latency histogram bucket boundaries, in milliseconds.
@@ -89,7 +89,8 @@ impl Metrics {
     }
 
     /// Total number of finished requests.
-    pub fn request_total(&self) -> u64 {        let requests = match self.requests.lock() {
+    pub fn request_total(&self) -> u64 {
+        let requests = match self.requests.lock() {
             Ok(requests) => requests,
             Err(poisoned) => poisoned.into_inner(),
         };
@@ -205,7 +206,9 @@ impl Metrics {
             }
         }
 
-        out.push_str("# HELP gateway_circuit_state Circuit breaker state: 0 closed, 1 open, 2 half open.\n");
+        out.push_str(
+            "# HELP gateway_circuit_state Circuit breaker state: 0 closed, 1 open, 2 half open.\n",
+        );
         out.push_str("# TYPE gateway_circuit_state gauge\n");
         {
             let states = match self.circuit_states.lock() {
@@ -278,9 +281,14 @@ mod tests {
         metrics.observe_request("users", "GET", 200, Duration::from_millis(12));
 
         let text = metrics.render_prometheus();
-        assert!(text.contains("# TYPE gateway_requests_total counter"), "{text}");
         assert!(
-            text.contains("gateway_requests_total{route=\"users\",method=\"GET\",status=\"200\"} 1"),
+            text.contains("# TYPE gateway_requests_total counter"),
+            "{text}"
+        );
+        assert!(
+            text.contains(
+                "gateway_requests_total{route=\"users\",method=\"GET\",status=\"200\"} 1"
+            ),
             "{text}"
         );
         assert!(
@@ -315,7 +323,11 @@ mod tests {
     fn inflight_never_goes_negative() {
         let metrics = Metrics::default();
         metrics.record_inflight(-1);
-        assert!(metrics.render_prometheus().contains("gateway_inflight_requests 0"));
+        assert!(
+            metrics
+                .render_prometheus()
+                .contains("gateway_inflight_requests 0")
+        );
     }
 
     #[test]
@@ -326,6 +338,9 @@ mod tests {
 
         let text = metrics.render_prometheus();
         assert!(text.contains("gateway_local_cache_hits_total 1"), "{text}");
-        assert!(text.contains("gateway_local_cache_misses_total 1"), "{text}");
+        assert!(
+            text.contains("gateway_local_cache_misses_total 1"),
+            "{text}"
+        );
     }
 }

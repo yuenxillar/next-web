@@ -2,7 +2,7 @@
 
 mod support;
 
-use support::{get, request, Behavior, MockUpstream, TestGateway};
+use support::{Behavior, MockUpstream, TestGateway, get, request};
 
 #[test]
 fn round_robin_spreads_requests_across_two_upstreams() {
@@ -50,7 +50,11 @@ fn unreachable_upstream_returns_502() {
     let response = get(gateway.addr, "/broken", &[]);
 
     assert_eq!(response.status, 502, "{}", response.text());
-    assert!(response.text().contains("\"status\":502"), "{}", response.text());
+    assert!(
+        response.text().contains("\"status\":502"),
+        "{}",
+        response.text()
+    );
 }
 
 #[test]

@@ -25,9 +25,9 @@ impl RoutePredicate for QueryRoutePredicateFactory {
 }
 
 fn query_matches(query: &str, name: &str, regex: Option<&Regex>) -> bool {
-    let Some(value) = parse(query.as_bytes()).find_map(|(key, value)| {
-        (key.as_ref() == name).then(|| value.into_owned())
-    }) else {
+    let Some(value) = parse(query.as_bytes())
+        .find_map(|(key, value)| (key.as_ref() == name).then(|| value.into_owned()))
+    else {
         return false;
     };
 

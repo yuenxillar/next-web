@@ -12,16 +12,28 @@ use super::duration::deserialize as deserialize_duration;
 #[serde(deny_unknown_fields)]
 pub struct UpstreamConfig {
     /// TCP connect timeout.
-    #[serde(default = "default_connect_timeout", deserialize_with = "deserialize_duration")]
+    #[serde(
+        default = "default_connect_timeout",
+        deserialize_with = "deserialize_duration"
+    )]
     pub connect_timeout: Duration,
     /// Time allowed to read the upstream response.
-    #[serde(default = "default_read_timeout", deserialize_with = "deserialize_duration")]
+    #[serde(
+        default = "default_read_timeout",
+        deserialize_with = "deserialize_duration"
+    )]
     pub read_timeout: Duration,
     /// Time allowed to write the upstream request.
-    #[serde(default = "default_write_timeout", deserialize_with = "deserialize_duration")]
+    #[serde(
+        default = "default_write_timeout",
+        deserialize_with = "deserialize_duration"
+    )]
     pub write_timeout: Duration,
     /// Idle connection reuse timeout.
-    #[serde(default = "default_idle_timeout", deserialize_with = "deserialize_duration")]
+    #[serde(
+        default = "default_idle_timeout",
+        deserialize_with = "deserialize_duration"
+    )]
     pub idle_timeout: Duration,
     /// Passive health checking for `lb://` upstreams.
     #[serde(default)]
@@ -79,7 +91,10 @@ pub struct HealthCheckConfig {
     #[serde(default)]
     pub enabled: bool,
     /// Interval between two health check rounds.
-    #[serde(default = "default_health_interval", deserialize_with = "deserialize_duration")]
+    #[serde(
+        default = "default_health_interval",
+        deserialize_with = "deserialize_duration"
+    )]
     pub interval: Duration,
 }
 

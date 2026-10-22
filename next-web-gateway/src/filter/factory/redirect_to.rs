@@ -19,9 +19,12 @@ impl GatewayFilter for RedirectToFilter {
         _chain: &dyn GatewayFilterChain,
     ) -> Result<(), GatewayError> {
         // Short-circuit the proxy flow and send a redirect directly to the downstream client.
-        exchange.request_context().respond_with_empty(
-            self.status,
-            vec![("Location".to_owned(), self.url.to_string())],
-        ).map_err(|_| GatewayError::ServerRejectsRequest)
+        exchange
+            .request_context()
+            .respond_with_empty(
+                self.status,
+                vec![("Location".to_owned(), self.url.to_string())],
+            )
+            .map_err(|_| GatewayError::ServerRejectsRequest)
     }
 }
