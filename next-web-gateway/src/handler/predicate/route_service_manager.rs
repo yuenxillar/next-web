@@ -62,8 +62,10 @@ impl RouteServiceManager {
     /// Return the first route whose predicates all match.
     pub fn match_route(&self, session: &mut Session) -> Option<RouteMatch> {
         // One bucket per request, shared by every route of the same weight
-        // group, so an 8:2 split really delivers 8:2.
-        let mut group_buckets: HashMap<String, u32> = HashMap::new();
+        // group, so an 8:2 split really delivers 8:2. Allocated lazily: most
+        // configurations have no `Weight` predicate at all.
+        let mut group_buckets: Option<HashMap<String, u32>> = None;
+        let mut path: Option<String> = None;
 
         for route_id in &self.ordered_route_ids {
             let service = self.services.get(route_id)?;
@@ -73,7 +75,8 @@ impl RouteServiceManager {
                 .iter()
                 .all(|factory| match factory {
                     RoutePredicateFactory::WeightPredicates(weight) => {
-                        let bucket = *group_buckets
+                        let buckets = group_buckets.get_or_insert_with(HashMap::new);
+                        let bucket = *buckets
                             .entry(weight.group.clone())
                             .or_insert_with(|| draw_bucket(weight.total_weight));
                         weight.owns_bucket(bucket)
@@ -85,8 +88,9 @@ impl RouteServiceManager {
                 continue;
             }
 
-            let path = session.req_header().uri.path().to_owned();
-            let path_variables = self.capture_variables(route_id, &path);
+            // Only a route with capture patterns pays for the path string.
+            let path = path.get_or_insert_with(|| session.req_header().uri.path().to_owned());
+            let path_variables = self.capture_variables(route_id, path);
 
             return Some(RouteMatch {
                 route_id: service.id.clone(),
@@ -133,10 +137,7 @@ impl RouteServiceManager {
             return Ok(());
         };
 
-        let chain = DefaultGatewayFilterChain::new(DefaultGatewayFilter::chain_for(
-            &service.filters,
-            phase,
-        ));
+        let chain = DefaultGatewayFilterChain::new(service.chain_for(phase));
         let mut exchange = DefaultServerWebExchange::new(ctx, header_and_body);
 
         crate::filter::gateway_filter_chain::GatewayFilterChain::filter(&chain, &mut exchange)

@@ -11,20 +11,23 @@ use crate::{
 };
 
 /// Runs a list of filters in order.
+///
+/// The list is built once per route and phase, so a request only borrows it: no
+/// per-request filtering, cloning or `Arc` allocation on the hot path.
 pub(crate) struct DefaultGatewayFilterChain {
-    filters: Vec<Arc<dyn GatewayFilter>>,
+    filters: Arc<[Arc<dyn GatewayFilter>]>,
 }
 
 impl DefaultGatewayFilterChain {
     /// Build a chain from the filters of one phase.
-    pub(crate) fn new(filters: Vec<Arc<dyn GatewayFilter>>) -> Self {
+    pub(crate) fn new(filters: Arc<[Arc<dyn GatewayFilter>]>) -> Self {
         Self { filters }
     }
 }
 
 impl Default for DefaultGatewayFilterChain {
     fn default() -> Self {
-        Self::new(Vec::new())
+        Self::new(Arc::from(Vec::new()))
     }
 }
 

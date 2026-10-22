@@ -1,9 +1,12 @@
 //! A parsed route: predicates, filters and the upstream it proxies to.
 
+use std::sync::Arc;
+
 use tracing::debug;
 
 use crate::config::{ConfigError, ConfigErrors, RouteConfig, RouteMetadata};
-use crate::filter::gateway_filter::DefaultGatewayFilter;
+use crate::filter::gateway_filter::{DefaultGatewayFilter, GatewayFilter};
+use crate::filter::spec::FilterPhase;
 use crate::handler::predicate::RoutePredicateFactory;
 use crate::util::rate_limiter::RateLimiter;
 
@@ -22,12 +25,30 @@ pub struct RoutePredicateService {
     pub route_predicate_factory: Vec<RoutePredicateFactory>,
     /// Filters applied in declaration order.
     pub filters: Vec<DefaultGatewayFilter>,
+    /// `RequestHeader` filters, built once so a request never re-filters or
+    /// re-clones the filter list.
+    pub request_header_chain: Arc<[Arc<dyn GatewayFilter>]>,
+    /// `ResponseHeader` filters.
+    pub response_header_chain: Arc<[Arc<dyn GatewayFilter>]>,
+    /// `ResponseBody` filters.
+    pub response_body_chain: Arc<[Arc<dyn GatewayFilter>]>,
     /// Circuit breaker referenced by the route, if any.
     pub fallback_id: String,
     /// Route level rate limiter, migrated into a filter when configured.
     pub rate_limiter: Option<RateLimiter>,
     /// Optional per-route metadata.
     pub metadata: Option<RouteMetadata>,
+}
+
+impl RoutePredicateService {
+    /// The prebuilt chain for `phase`.
+    pub fn chain_for(&self, phase: FilterPhase) -> Arc<[Arc<dyn GatewayFilter>]> {
+        match phase {
+            FilterPhase::RequestHeader => self.request_header_chain.clone(),
+            FilterPhase::ResponseHeader => self.response_header_chain.clone(),
+            FilterPhase::ResponseBody => self.response_body_chain.clone(),
+        }
+    }
 }
 
 /// How a route reaches its upstream.
@@ -119,6 +140,18 @@ impl TryFrom<RouteConfig> for RoutePredicateService {
             work,
             upstream,
             route_predicate_factory: predicates,
+            request_header_chain: Arc::from(DefaultGatewayFilter::chain_for(
+                &filters,
+                FilterPhase::RequestHeader,
+            )),
+            response_header_chain: Arc::from(DefaultGatewayFilter::chain_for(
+                &filters,
+                FilterPhase::ResponseHeader,
+            )),
+            response_body_chain: Arc::from(DefaultGatewayFilter::chain_for(
+                &filters,
+                FilterPhase::ResponseBody,
+            )),
             filters,
             fallback_id,
             rate_limiter: None,

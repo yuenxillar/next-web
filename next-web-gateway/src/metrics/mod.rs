@@ -20,10 +20,58 @@ struct RequestCounter {
     buckets: [u64; BUCKETS.len() + 1],
 }
 
+/// The counters of one route, grouped by method.
+///
+/// A `Vec` of methods keeps the hot path allocation free: the method is looked
+/// up by comparing the borrowed `&str`, and only a never-seen method allocates.
+#[derive(Default)]
+struct RouteMetrics {
+    methods: Vec<(Box<str>, HashMap<u16, RequestCounter>)>,
+}
+
+impl RouteMetrics {
+    /// Counter for `method`/`status`, creating the slot on first use.
+    fn counter(&mut self, method: &str, status: u16) -> &mut RequestCounter {
+        let mut slot = self
+            .methods
+            .iter()
+            .position(|(name, _)| name.as_ref() == method);
+
+        if slot.is_none() {
+            self.methods.push((method.into(), HashMap::new()));
+            slot = Some(self.methods.len() - 1);
+        }
+
+        self.methods[slot.unwrap_or_default()]
+            .1
+            .entry(status)
+            .or_default()
+    }
+
+    /// Sum of every counter of this route.
+    fn totals(&self) -> (u64, u64, [u64; BUCKETS.len() + 1]) {
+        let mut count = 0_u64;
+        let mut duration_millis = 0_u64;
+        let mut buckets = [0_u64; BUCKETS.len() + 1];
+
+        for (_, statuses) in &self.methods {
+            for counter in statuses.values() {
+                count = count.saturating_add(counter.count);
+                duration_millis = duration_millis.saturating_add(counter.duration_millis);
+                for (index, value) in counter.buckets.iter().enumerate() {
+                    buckets[index] = buckets[index].saturating_add(*value);
+                }
+            }
+        }
+
+        (count, duration_millis, buckets)
+    }
+}
+
 /// Counters and gauges for one gateway process.
 #[derive(Default)]
 pub struct Metrics {
-    requests: Mutex<HashMap<(String, String, u16), RequestCounter>>,
+    requests: Mutex<HashMap<Box<str>, RouteMetrics>>,
     upstream_errors: Mutex<HashMap<(String, String), u64>>,
     circuit_states: Mutex<HashMap<String, u8>>,
     cache_hits: AtomicU64,
@@ -33,6 +81,9 @@ pub struct Metrics {
 
 impl Metrics {
     /// Record one finished request.
+    ///
+    /// No allocation happens on the steady-state path: the route and method are
+    /// looked up through their borrowed `&str`, and the status is a `u16` key.
     pub fn observe_request(&self, route: &str, method: &str, status: u16, elapsed: Duration) {
         let millis = elapsed.as_millis() as u64;
         let mut requests = match self.requests.lock() {
@@ -40,9 +91,9 @@ impl Metrics {
             Err(poisoned) => poisoned.into_inner(),
         };
 
-        let counter = requests
-            .entry((route.to_owned(), method.to_owned(), status))
-            .or_default();
+        let route_metrics = requests.entry(route.into()).or_default();
+        let counter = route_metrics.counter(method, status);
+
         counter.count = counter.count.saturating_add(1);
         counter.duration_millis = counter.duration_millis.saturating_add(millis);
 
@@ -95,7 +146,10 @@ impl Metrics {
             Err(poisoned) => poisoned.into_inner(),
         };
 
-        requests.values().map(|counter| counter.count).sum()
+        requests
+            .values()
+            .map(|route| route.totals().0)
+            .fold(0_u64, u64::saturating_add)
     }
 
     /// Record the state of one breaker: `0` closed, `1` open, `2` half open.
@@ -120,18 +174,43 @@ impl Metrics {
                 Err(poisoned) => poisoned.into_inner(),
             };
 
-            let mut keys: Vec<_> = requests.keys().cloned().collect();
-            keys.sort();
+            let mut routes: Vec<&str> = requests.keys().map(|key| key.as_ref()).collect();
+            routes.sort_unstable();
 
-            for key in keys {
-                let Some(counter) = requests.get(&key) else {
+            for route in routes {
+                let Some(route_metrics) = requests.get(route) else {
                     continue;
                 };
-                let (route, method, status) = &key;
-                out.push_str(&format!(
-                    "gateway_requests_total{{route=\"{route}\",method=\"{method}\",status=\"{status}\"}} {}\n",
-                    counter.count
-                ));
+
+                let mut methods: Vec<&str> = route_metrics
+                    .methods
+                    .iter()
+                    .map(|(method, _)| method.as_ref())
+                    .collect();
+                methods.sort_unstable();
+
+                for method in methods {
+                    let Some((_, statuses)) = route_metrics
+                        .methods
+                        .iter()
+                        .find(|(name, _)| name.as_ref() == method)
+                    else {
+                        continue;
+                    };
+
+                    let mut codes: Vec<u16> = statuses.keys().copied().collect();
+                    codes.sort_unstable();
+
+                    for status in codes {
+                        let Some(counter) = statuses.get(&status) else {
+                            continue;
+                        };
+                        out.push_str(&format!(
+                            "gateway_requests_total{{route=\"{route}\",method=\"{method}\",status=\"{status}\"}} {}\n",
+                            counter.count
+                        ));
+                    }
+                }
             }
         }
 
@@ -143,34 +222,23 @@ impl Metrics {
                 Err(poisoned) => poisoned.into_inner(),
             };
 
-            let mut routes: Vec<&str> = requests.keys().map(|key| key.0.as_str()).collect();
+            let mut routes: Vec<&str> = requests.keys().map(|key| key.as_ref()).collect();
             routes.sort_unstable();
-            routes.dedup();
 
             for route in routes {
-                let mut cumulative = 0_u64;
-                let mut total = 0_u64;
-                let mut millis = 0_u64;
+                let Some(route_metrics) = requests.get(route) else {
+                    continue;
+                };
+                let (total, millis, buckets) = route_metrics.totals();
 
+                let mut cumulative = 0_u64;
                 for (index, bound) in BUCKETS.iter().enumerate() {
-                    let mut bucket_sum = 0_u64;
-                    for ((counter_route, _, _), counter) in requests.iter() {
-                        if counter_route == route {
-                            bucket_sum = bucket_sum.saturating_add(counter.buckets[index]);
-                        }
-                    }
-                    cumulative = cumulative.saturating_add(bucket_sum);
+                    cumulative = cumulative.saturating_add(buckets[index]);
                     out.push_str(&format!(
                         "gateway_request_duration_seconds_bucket{{route=\"{route}\",le=\"{bound}\"}} {cumulative}\n"
                     ));
                 }
 
-                for ((counter_route, _, _), counter) in requests.iter() {
-                    if counter_route == route {
-                        total = total.saturating_add(counter.count);
-                        millis = millis.saturating_add(counter.duration_millis);
-                    }
-                }
                 out.push_str(&format!(
                     "gateway_request_duration_seconds_bucket{{route=\"{route}\",le=\"+Inf\"}} {total}\n"
                 ));

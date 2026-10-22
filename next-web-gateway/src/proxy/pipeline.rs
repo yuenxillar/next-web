@@ -73,6 +73,8 @@ pub struct GatewayProxy {
     metrics: Arc<Metrics>,
     ready: Arc<AtomicBool>,
     ca: Option<Arc<crate::upstream::CaBundle>>,
+    /// Route id to its position in `config.routes`, so lookups stay O(1).
+    route_index: std::collections::HashMap<String, usize>,
 }
 
 impl GatewayProxy {
@@ -151,6 +153,13 @@ impl GatewayProxy {
 
         let upstreams = Arc::new(upstreams);
 
+        let route_index: std::collections::HashMap<String, usize> = config
+            .routes
+            .iter()
+            .enumerate()
+            .map(|(index, route)| (route.id.clone(), index))
+            .collect();
+
         // Active health checking of `lb://` backends. The checker is a daemon
         // thread that feeds the same map `select` consults, so a dead instance
         // leaves the pool between two requests instead of only after a 502.
@@ -171,6 +180,7 @@ impl GatewayProxy {
             metrics: Arc::new(Metrics::default()),
             ready: Arc::new(AtomicBool::new(true)),
             ca,
+            route_index,
         })
     }
 
@@ -218,7 +228,11 @@ impl GatewayProxy {
     }
 
     fn route_config(&self, route_id: &str) -> Option<&RouteConfig> {
-        self.config.routes.iter().find(|route| route.id == route_id)
+        // Indexed once at startup: a linear scan here would put the route count
+        // on the hot path of every request.
+        self.route_index
+            .get(route_id)
+            .and_then(|index| self.config.routes.get(*index))
     }
 
     /// Build the "no upstream" error, recording the failure first.
