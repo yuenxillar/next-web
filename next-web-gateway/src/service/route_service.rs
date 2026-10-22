@@ -94,6 +94,16 @@ impl TryFrom<RouteConfig> for RoutePredicateService {
             return Err(ConfigErrors::new(errors));
         }
 
+        // `CircuitBreaker=<id>` binds the route to a breaker; the proxy enforces
+        // it, so the id is lifted out of the parsed filter list here.
+        let fallback_id = filters
+            .iter()
+            .find_map(|filter| match filter {
+                DefaultGatewayFilter::CircuitBreaker(filter) => Some(filter.breaker_id.clone()),
+                _ => None,
+            })
+            .unwrap_or_default();
+
         debug!("route `{}` parsed with {} filters", route.id, filters.len());
 
         let work = RouteWork::from(route.uri.as_str());
@@ -110,7 +120,7 @@ impl TryFrom<RouteConfig> for RoutePredicateService {
             upstream,
             route_predicate_factory: predicates,
             filters,
-            fallback_id: String::new(),
+            fallback_id,
             rate_limiter: None,
             metadata: Some(route.metadata),
         })

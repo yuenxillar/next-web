@@ -3,16 +3,15 @@ name = "next-web-gateway"
 version = "0.1.0"
 edition = "2021"
 
-# [[example]]
-# name = "basic_usage"
-# path = "examples/basic_usage.rs"
-
+[[bin]]
+name = "next-web-gateway"
+path = "src/bin/next_web_gateway.rs"
 
 [dependencies]
 pingora         = { workspace = true }
 pingora-limits  = { workspace = true}
 
-tokio           = { workspace = true, features = ["fs"] }
+tokio           = { workspace = true, features = ["fs", "time"] }
 
 serde           = { workspace = true }
 serde_yaml      = { workspace = true }
@@ -20,24 +19,25 @@ serde_json      = { workspace = true }
 serde_path_to_error = { workspace = true }
 async-trait     = { workspace = true }
 regex           = { workspace = true }
+clap            = { workspace = true, features = ["env"] }
 
 ipnetwork       = { workspace = true }
 chrono          = { workspace = true }
 chrono-tz       = { workspace = true }
-matchit         = { workspace = true }
 hashbrown       = { workspace = true }
 bytes           = { workspace = true }
 form_urlencoded = { workspace = true }
-futures         = { workspace = true }
 rand            = { workspace = true }
 uuid            = { workspace = true }
 
 tracing             = { workspace = true }
 tracing-subscriber  = { workspace = true }
-tracing-appender    = { workspace = true }
 
-#jemallocator = { workspace = true, optional = true }
+[dev-dependencies]
+futures             = { workspace = true }
+tokio-rustls        = { workspace = true }
+rustls              = { workspace = true }
+rustls-pemfile      = { workspace = true }
 
 [features]
 default = []
-#global-allocator = ["jemallocator"]

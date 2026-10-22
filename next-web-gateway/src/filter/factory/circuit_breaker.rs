@@ -1,14 +1,22 @@
+//! `CircuitBreaker` filter: binds a route to a breaker defined under `breakers`.
+//!
+//! The filter itself does not change the exchange. `upstream_peer` reserves the
+//! probe through the registry and `response_filter` records the outcome, so the
+//! filter exists to declare the binding, to validate the id at startup and to
+//! make the breaker visible in `/routes`.
+
 use async_trait::async_trait;
 
 use crate::error::GatewayError;
 use crate::filter::gateway_filter::GatewayFilter;
 use crate::filter::gateway_filter_chain::GatewayFilterChain;
 use crate::server::ServerWebExchange;
-use crate::util::key_value::KeyValue;
 
-#[derive(Debug, Clone)]
+/// Declares which breaker guards the route.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CircuitBreakerFilter {
-    pub headers: Vec<KeyValue<String, String>>,
+    /// Id of the breaker under `next.gateway.breakers`.
+    pub breaker_id: String,
 }
 
 #[async_trait]
@@ -18,17 +26,6 @@ impl GatewayFilter for CircuitBreakerFilter {
         exchange: &mut dyn ServerWebExchange,
         chain: &dyn GatewayFilterChain,
     ) -> Result<(), GatewayError> {
-        let response_header = match exchange.response_header() {
-            Some(response_header) => response_header,
-            None => return chain.filter(exchange).await,
-        };
-
-        self.headers.iter().for_each(|header| {
-            response_header
-                .append_header(header.k.clone(), header.v.as_str())
-                .ok();
-        });
-
         chain.filter(exchange).await
     }
 }

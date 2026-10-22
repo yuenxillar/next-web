@@ -18,12 +18,15 @@ mod server;
 mod service;
 mod util;
 
+pub mod admin;
 pub mod circuit_breaker;
 pub mod config;
+pub mod gateway;
 pub mod metrics;
 pub mod proxy;
 pub mod upstream;
 
+pub use gateway::Gateway;
 pub use proxy::GatewayProxy;
 
 /// A component with an explicit ordering value.

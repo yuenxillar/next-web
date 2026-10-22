@@ -71,7 +71,7 @@ pub struct GatewayProxy {
 
 impl GatewayProxy {
     /// Assemble the proxy from a validated configuration.
-    pub async fn new(config: GatewayConfig) -> Result<Self, crate::config::ConfigErrors> {
+    pub fn new(config: GatewayConfig) -> Result<Self, crate::config::ConfigErrors> {
         let mut route_services = Vec::with_capacity(config.routes.len());
         let mut errors = Vec::new();
 
@@ -86,7 +86,36 @@ impl GatewayProxy {
             return Err(crate::config::ConfigErrors::new(errors));
         }
 
-        let upstreams = StaticUpstreams::build(&config).await?;
+        // A `CircuitBreaker=<id>` that names an undefined breaker is a typo, not
+        // a silent no-op.
+        let mut errors = Vec::new();
+        for route in &route_services {
+            if !route.fallback_id.is_empty() && !config.breakers.contains_key(&route.fallback_id) {
+                errors.push(crate::config::ConfigError::new(
+                    format!("routes.{}.filters", route.id),
+                    format!(
+                        "unknown circuit breaker `{}`, defined breakers: {}",
+                        route.fallback_id,
+                        if config.breakers.is_empty() {
+                            "none".to_string()
+                        } else {
+                            config
+                                .breakers
+                                .keys()
+                                .cloned()
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        }
+                    ),
+                ));
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(crate::config::ConfigErrors::new(errors));
+        }
+
+        let upstreams = StaticUpstreams::build(&config)?;
         let breakers = CircuitBreakerServiceManager::from_config(&config.breakers);
         let cache = config
             .local_response_cache_enabled()
@@ -106,6 +135,11 @@ impl GatewayProxy {
     /// Routes, for the admin listener.
     pub fn routes(&self) -> &RouteServiceManager {
         &self.routes
+    }
+
+    /// Shared route table, for the admin listener.
+    pub fn shared_routes(&self) -> Arc<RouteServiceManager> {
+        self.routes.clone()
     }
 
     /// Metrics, for the admin listener.

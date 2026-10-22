@@ -18,6 +18,7 @@ use crate::filter::factory::add_request_header::AddRequestHeaderFilter;
 use crate::filter::factory::add_request_headers_if_not_present::AddRequestHeaderIfNotPresentFilter;
 use crate::filter::factory::add_request_parameter::AddRequestParameterFilter;
 use crate::filter::factory::add_response_header::AddResponseHeaderFilter;
+use crate::filter::factory::circuit_breaker::CircuitBreakerFilter;
 use crate::filter::factory::dedupe_response_header::DedupeResponseHeaderFilter;
 use crate::filter::factory::local_response_cache::LocalResponseCacheFilter;
 use crate::filter::factory::map_request_header::MapRequestHeaderFilter;
@@ -60,6 +61,7 @@ pub const KNOWN_FILTERS: &[&str] = &[
     "AddRequestHeadersIfNotPresent",
     "AddRequestParameter",
     "AddResponseHeader",
+    "CircuitBreaker",
     "DedupeResponseHeader",
     "LocalResponseCache",
     "MapRequestHeader",
@@ -110,6 +112,8 @@ pub enum DefaultGatewayFilter {
     AddRequestParameter(AddRequestParameterFilter),
     /// Append response headers.
     AddResponseHeader(AddResponseHeaderFilter),
+    /// Bind the route to a circuit breaker.
+    CircuitBreaker(CircuitBreakerFilter),
     /// Collapse duplicated response header values.
     DedupeResponseHeader(DedupeResponseHeaderFilter),
     /// Serve and store responses from the in-process cache.
@@ -240,6 +244,7 @@ impl GatewayFilter for DefaultGatewayFilter {
             AddRequestHeader,
             AddRequestHeaderIfNotPresent,
             AddResponseHeader,
+            CircuitBreaker,
             AddRequestParameter,
             DedupeResponseHeader,
             MapRequestHeader,
@@ -299,6 +304,20 @@ impl TryFrom<&str> for DefaultGatewayFilter {
             "AddResponseHeader" => Self::AddResponseHeader(AddResponseHeaderFilter {
                 headers: parse_pairs(&spec)?,
             }),
+
+            "CircuitBreaker" => {
+                let args = expect_args(&spec, 1, 1)?;
+                let breaker_id = args[0].trim();
+                if breaker_id.is_empty() {
+                    return Err(ConfigError::new(
+                        "filters.CircuitBreaker",
+                        "expects the id of a breaker defined under `breakers`",
+                    ));
+                }
+                Self::CircuitBreaker(CircuitBreakerFilter {
+                    breaker_id: breaker_id.to_string(),
+                })
+            }
 
             "DedupeResponseHeader" => {
                 let filter = DedupeResponseHeaderFilter::from(spec.args.join(",").as_str());

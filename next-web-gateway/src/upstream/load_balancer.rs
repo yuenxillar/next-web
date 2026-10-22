@@ -41,7 +41,7 @@ pub struct StaticUpstreams {
 
 impl StaticUpstreams {
     /// Build one pool per `lb://` route.
-    pub async fn build(config: &GatewayConfig) -> Result<Self, ConfigErrors> {
+    pub fn build(config: &GatewayConfig) -> Result<Self, ConfigErrors> {
         let mut pools = HashMap::new();
         let mut errors = Vec::new();
 
@@ -148,11 +148,9 @@ next:
         GatewayConfig::from_str(yaml).unwrap()
     }
 
-    #[tokio::test]
-    async fn round_robin_rotates_across_two_upstreams() {
-        let upstreams = StaticUpstreams::build(&config_with_two_upstreams())
-            .await
-            .unwrap();
+    #[test]
+    fn round_robin_rotates_across_two_upstreams() {
+        let upstreams = StaticUpstreams::build(&config_with_two_upstreams()).unwrap();
 
         let selected: HashSet<_> = (0..4)
             .filter_map(|_| upstreams.select("users", b"key"))
@@ -161,18 +159,16 @@ next:
         assert_eq!(selected.len(), 2, "expected both backends, got {selected:?}");
     }
 
-    #[tokio::test]
-    async fn an_unknown_route_selects_nothing() {
-        let upstreams = StaticUpstreams::build(&config_with_two_upstreams())
-            .await
-            .unwrap();
+    #[test]
+    fn an_unknown_route_selects_nothing() {
+        let upstreams = StaticUpstreams::build(&config_with_two_upstreams()).unwrap();
 
         assert!(upstreams.select("missing", b"key").is_none());
         assert!(!upstreams.is_ready("missing"));
     }
 
-    #[tokio::test]
-    async fn weights_are_honoured_exactly() {
+    #[test]
+    fn weights_are_honoured_exactly() {
         let yaml = "\
 next:
   gateway:
@@ -186,7 +182,7 @@ next:
             weight: 1
 ";
         let config = GatewayConfig::from_str(yaml).unwrap();
-        let upstreams = StaticUpstreams::build(&config).await.unwrap();
+        let upstreams = StaticUpstreams::build(&config).unwrap();
 
         let heavy: std::net::SocketAddr = "10.0.0.1:8080".parse().unwrap();
         let light: std::net::SocketAddr = "10.0.0.2:8080".parse().unwrap();
@@ -204,8 +200,8 @@ next:
         assert_eq!((heavy_count, light_count), (30, 10));
     }
 
-    #[tokio::test]
-    async fn a_route_without_upstreams_is_reported() {
+    #[test]
+    fn a_route_without_upstreams_is_reported() {
         // `GatewayConfig` already rejects this, so build the error path directly.
         let yaml = "\
 next:
@@ -215,7 +211,7 @@ next:
         uri: http://backend:8080
 ";
         let config = GatewayConfig::from_str(yaml).unwrap();
-        let upstreams = StaticUpstreams::build(&config).await.unwrap();
+        let upstreams = StaticUpstreams::build(&config).unwrap();
 
         assert!(upstreams.is_empty());
         assert_eq!(upstreams.len(), 0);
