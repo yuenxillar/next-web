@@ -12,14 +12,14 @@ use ipnetwork::IpNetwork;
 static TRUSTED_PROXIES: OnceLock<Vec<IpNetwork>> = OnceLock::new();
 
 /// Install the trusted proxy list once, at startup.
-pub fn set_trusted_proxies(networks: Vec<IpNetwork>) {
+pub(crate) fn set_trusted_proxies(networks: Vec<IpNetwork>) {
     if TRUSTED_PROXIES.set(networks).is_err() {
         tracing::warn!("trusted proxies were already installed, ignoring the new list");
     }
 }
 
 /// The installed trusted proxy list. Empty means "trust nobody".
-pub fn trusted_proxies() -> &'static [IpNetwork] {
+pub(crate) fn trusted_proxies() -> &'static [IpNetwork] {
     TRUSTED_PROXIES
         .get()
         .map(Vec::as_slice)
@@ -31,7 +31,7 @@ pub fn trusted_proxies() -> &'static [IpNetwork] {
 /// Returns the direct peer when it is not trusted, otherwise the rightmost
 /// forwarded entry that is not itself a trusted proxy. `None` means the client
 /// cannot be determined, which callers must treat as a rejection.
-pub fn resolve_client(
+pub(crate) fn resolve_client(
     direct: IpAddr,
     forwarded: Option<&str>,
     trusted: &[IpNetwork],
@@ -53,7 +53,7 @@ pub fn resolve_client(
 }
 
 /// Collapse an IPv4-mapped IPv6 address onto its IPv4 form.
-pub fn normalize_ip(ip: IpAddr) -> IpAddr {
+pub(crate) fn normalize_ip(ip: IpAddr) -> IpAddr {
     match ip {
         IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),
         IpAddr::V4(v4) => IpAddr::V4(v4),

@@ -11,13 +11,13 @@ use crate::{
 };
 
 /// Runs a list of filters in order.
-pub struct DefaultGatewayFilterChain {
+pub(crate) struct DefaultGatewayFilterChain {
     filters: Vec<Arc<dyn GatewayFilter>>,
 }
 
 impl DefaultGatewayFilterChain {
     /// Build a chain from the filters of one phase.
-    pub fn new(filters: Vec<Arc<dyn GatewayFilter>>) -> Self {
+    pub(crate) fn new(filters: Vec<Arc<dyn GatewayFilter>>) -> Self {
         Self { filters }
     }
 }

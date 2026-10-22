@@ -1,3 +1,3 @@
 //! Route parsing.
 
-pub mod route_service;
+pub(crate) mod route_service;

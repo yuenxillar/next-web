@@ -3,13 +3,12 @@ name = "next-web-gateway"
 version = "0.1.0"
 edition = "2024"
 
-# The two rust lints the design requires (S5). `unreachable_pub` is deliberately
-# not enabled yet: the crate exposes an internal surface that its own integration
-# tests and the admin listener consume, and trimming it needs a `pub` ->
-# `pub(crate)` sweep tracked in the readiness ledger.
+# The rust lints the design requires (S5).
 [lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
 
 [[bin]]
 name = "next-web-gateway"

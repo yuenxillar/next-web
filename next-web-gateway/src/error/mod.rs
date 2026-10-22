@@ -1,4 +1,5 @@
+//! Gateway level errors.
+
 mod gateway_error;
 
-
-pub use gateway_error::GatewayError;
+pub(crate) use gateway_error::GatewayError;

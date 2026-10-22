@@ -30,7 +30,7 @@ pub enum FilterPhase {
 
 /// A parsed filter expression: the name plus its comma separated arguments.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FilterSpec {
+pub(crate) struct FilterSpec {
     /// Filter name, exactly as written in the configuration.
     pub name: String,
     /// Arguments after the first `=`, trimmed and comma separated.
@@ -39,7 +39,7 @@ pub struct FilterSpec {
 
 impl FilterSpec {
     /// Split `Name=arg1, arg2` into a name and its arguments.
-    pub fn parse(raw: &str) -> Result<Self, ConfigError> {
+    pub(crate) fn parse(raw: &str) -> Result<Self, ConfigError> {
         let text = raw.trim();
         if text.is_empty() {
             return Err(ConfigError::new("filters", "empty filter expression"));
@@ -74,7 +74,7 @@ impl FilterSpec {
 }
 
 /// Check that a filter received between `min` and `max` arguments.
-pub fn expect_args(spec: &FilterSpec, min: usize, max: usize) -> Result<&[String], ConfigError> {
+pub(crate) fn expect_args(spec: &FilterSpec, min: usize, max: usize) -> Result<&[String], ConfigError> {
     let count = spec.args.len();
     if count < min || count > max {
         let expected = if min == max {
@@ -95,7 +95,7 @@ pub fn expect_args(spec: &FilterSpec, min: usize, max: usize) -> Result<&[String
 }
 
 /// Build the error raised for an unknown filter or predicate name.
-pub fn unknown_name_error(kind: &str, name: &str, known: &[&str]) -> ConfigError {
+pub(crate) fn unknown_name_error(kind: &str, name: &str, known: &[&str]) -> ConfigError {
     let suggestion = closest_name(name, known)
         .map(|candidate| format!(", did you mean `{candidate}`?"))
         .unwrap_or_else(|| ". ".to_string());

@@ -12,5 +12,8 @@ mod weight_route_predicate_factory;
 mod x_forwarded_remote_addr_route_predicate_factory;
 mod zoned_datetime_route_predicate_factory;
 
-pub use route_predicate_factory::{RoutePredicateFactory, KNOWN_PREDICATES};
-pub use route_service_manager::RouteServiceManager;
+/// Re-exported at the crate root for the documentation drift test.
+pub use route_predicate_factory::KNOWN_PREDICATES;
+
+pub(crate) use route_predicate_factory::RoutePredicateFactory;
+pub(crate) use route_service_manager::RouteServiceManager;

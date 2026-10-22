@@ -1,5 +1,5 @@
 use pingora::protocols::http::server::Session;
 
-pub trait RoutePredicate {
+pub(crate) trait RoutePredicate {
     fn matches(&self, session: &mut Session) -> bool;
 }

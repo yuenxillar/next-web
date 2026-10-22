@@ -33,7 +33,7 @@ impl Default for LocalResponseCacheFilter {
 }
 
 impl LocalResponseCacheFilter {
-    pub fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         !self.ttl.is_zero() && self.max_size_bytes > 0
     }
 }
@@ -90,7 +90,7 @@ pub struct PendingLocalResponseCacheEntry {
 }
 
 #[derive(Debug, Clone)]
-pub struct CachedResponseEntry {
+pub(crate) struct CachedResponseEntry {
     pub status: u16,
     pub headers: Vec<(String, String)>,
     pub body: Bytes,
@@ -113,11 +113,11 @@ struct RouteResponseCache {
 }
 
 impl LocalResponseCacheManager {
-    pub fn shared() -> Arc<Self> {
+    pub(crate) fn shared() -> Arc<Self> {
         Arc::new(Self::default())
     }
 
-    pub fn get(&self, route_id: &str, key: &str) -> Option<CachedResponseEntry> {
+    pub(crate) fn get(&self, route_id: &str, key: &str) -> Option<CachedResponseEntry> {
         let mut routes = self.routes.lock().ok()?;
         let now = Instant::now();
         let bucket = routes.get_mut(route_id)?;
@@ -136,7 +136,7 @@ impl LocalResponseCacheManager {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn put(
+    pub(crate) fn put(
         &self,
         route_id: String,
         key: String,
@@ -196,7 +196,7 @@ impl LocalResponseCacheManager {
 ///
 /// Returns `true` when the request was answered from the cache, so the proxy can
 /// record the hit.
-pub fn serve_from_local_cache_if_present(
+pub(crate) fn serve_from_local_cache_if_present(
     filter: &LocalResponseCacheFilter,
     ctx: &mut RequestContext,
     request_header: &RequestHeader,
@@ -239,7 +239,7 @@ pub fn serve_from_local_cache_if_present(
     Ok(true)
 }
 
-pub fn capture_response_for_local_cache(
+pub(crate) fn capture_response_for_local_cache(
     filter: &LocalResponseCacheFilter,
     ctx: &mut RequestContext,
     response_header: &mut ResponseHeader,
@@ -296,7 +296,7 @@ pub fn capture_response_for_local_cache(
     });
 }
 
-pub fn store_local_cache_entry(ctx: &mut RequestContext, body: Option<&Bytes>) {
+pub(crate) fn store_local_cache_entry(ctx: &mut RequestContext, body: Option<&Bytes>) {
     let Some(pending) = ctx.pending_local_response_cache.take() else {
         return;
     };

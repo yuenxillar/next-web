@@ -4,7 +4,7 @@ use pingora::http::RequestHeader;
 use tracing::warn;
 
 /// Replace `{name}` placeholders with the captured path variables.
-pub fn substitute_variables(template: &str, variables: &HashMap<String, String>) -> String {
+pub(crate) fn substitute_variables(template: &str, variables: &HashMap<String, String>) -> String {
     if variables.is_empty() || !template.contains('{') {
         return template.to_string();
     }
@@ -33,7 +33,7 @@ pub fn substitute_variables(template: &str, variables: &HashMap<String, String>)
     out
 }
 
-pub fn set_request_path(request_header: &mut RequestHeader, path: &str, query: Option<&str>) {
+pub(crate) fn set_request_path(request_header: &mut RequestHeader, path: &str, query: Option<&str>) {
     let path_and_query = build_path_and_query(path, query);
 
     // Rebuild the URI from a normalized path/query pair and keep the request mutable in place.
@@ -48,7 +48,7 @@ pub fn set_request_path(request_header: &mut RequestHeader, path: &str, query: O
     }
 }
 
-pub fn build_path_and_query(path: &str, query: Option<&str>) -> String {
+pub(crate) fn build_path_and_query(path: &str, query: Option<&str>) -> String {
     let normalized_path = normalize_path(path);
 
     match query.filter(|value| !value.is_empty()) {
@@ -57,7 +57,7 @@ pub fn build_path_and_query(path: &str, query: Option<&str>) -> String {
     }
 }
 
-pub fn join_paths(prefix: &str, path: &str) -> String {
+pub(crate) fn join_paths(prefix: &str, path: &str) -> String {
     let normalized_prefix = normalize_path(prefix);
     let normalized_path = normalize_path(path);
 
@@ -76,7 +76,7 @@ pub fn join_paths(prefix: &str, path: &str) -> String {
     )
 }
 
-pub fn strip_prefix_segments(path: &str, offset: usize) -> String {
+pub(crate) fn strip_prefix_segments(path: &str, offset: usize) -> String {
     if offset == 0 {
         return normalize_path(path);
     }

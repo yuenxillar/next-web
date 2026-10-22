@@ -1,7 +1,7 @@
 //! Small string helpers shared by the predicate implementations.
 
 /// Utilities used by the route predicates.
-pub struct StrUtil;
+pub(crate) struct StrUtil;
 
 impl StrUtil {
     /// Match a host against an ANT style pattern.
@@ -9,7 +9,7 @@ impl StrUtil {
     /// `*` matches exactly one label, `**` matches zero or more labels, and a
     /// literal label must be equal (case insensitive, port and trailing dot
     /// ignored).
-    pub fn host_match(host: &str, pattern: &str) -> bool {
+    pub(crate) fn host_match(host: &str, pattern: &str) -> bool {
         let host = host_labels(host);
         let pattern = host_labels(pattern);
 

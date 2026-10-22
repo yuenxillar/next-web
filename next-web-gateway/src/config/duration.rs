@@ -60,7 +60,7 @@ fn split_number_and_unit(text: &str) -> Result<(&str, &'static str), String> {
 }
 
 /// Deserialize a duration field using [`parse_duration`].
-pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -69,7 +69,7 @@ where
 }
 
 /// Deserialize an optional duration field using [`parse_duration`].
-pub fn deserialize_option<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
+pub(crate) fn deserialize_option<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
 where
     D: Deserializer<'de>,
 {

@@ -12,7 +12,7 @@ use crate::filter::gateway_filter_chain::GatewayFilterChain;
 use crate::server::ServerWebExchange;
 
 /// The hardening headers applied by the filter, in the Spring Cloud Gateway set.
-pub const SECURE_HEADERS: &[(&str, &str)] = &[
+pub(crate) const SECURE_HEADERS: &[(&str, &str)] = &[
     ("X-XSS-Protection", "1 ; mode=block"),
     ("Strict-Transport-Security", "max-age=631138519"),
     ("X-Frame-Options", "DENY"),

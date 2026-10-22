@@ -6,7 +6,7 @@ use super::circuit_breaker_controller::CircuitBreakerController;
 
 /// A breaker plus the id routes use to reference it.
 #[derive(Clone)]
-pub struct CircuitBreakerService {
+pub(crate) struct CircuitBreakerService {
     /// Unique identifier of the breaker.
     pub id: String,
 
@@ -16,7 +16,7 @@ pub struct CircuitBreakerService {
 
 impl CircuitBreakerService {
     /// Build a breaker from its configuration.
-    pub fn from_config(id: &str, config: &BreakerConfig) -> Self {
+    pub(crate) fn from_config(id: &str, config: &BreakerConfig) -> Self {
         Self {
             id: id.to_string(),
             controller: CircuitBreakerController::with_permits(
