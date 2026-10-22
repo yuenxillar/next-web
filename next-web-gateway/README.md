@@ -79,7 +79,7 @@ next:
       write_timeout: 30s
       idle_timeout: 60s
       health_check:
-        enabled: true
+        enabled: false           # health checking is not implemented; `true` is rejected
         interval: 5s
       tls:
         verify_cert: true
@@ -285,6 +285,10 @@ Gateway generated responses also pass through the response filters, so `SecureHe
   `rustls`, so it has no TLS connector at all: an `https://` route is rejected at startup with
   the reason instead of failing every request at runtime (502). Enabling one of pingora's TLS
   features and deleting the guard in `config/validate.rs` is the whole change.
+  `upstream.tls.insecure_skip_verify: true` is rejected too, because there is nothing to skip.
+- **Health checking is not implemented.** `upstream.health_check.enabled: true` is rejected at
+  startup; dead backends surface as 502 and as breaker failures (this is what makes the static
+  load balancer's "no active health check" note above safe to rely on).
 - **`upstream.tls.ca_file` is rejected at startup.** This build cannot install a custom trust
   anchor, and accepting the key would silently fail every request to a private CA.
 - **`server.keepalive` and `server.max_connection` are rejected at startup** because pingora 0.9

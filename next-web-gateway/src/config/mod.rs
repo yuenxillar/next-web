@@ -331,6 +331,33 @@ mod tests {
     }
 
     #[test]
+    fn rejects_health_checking_because_it_is_not_implemented() {
+        let text = errors_for(
+            "next:\n  gateway:\n    upstream:\n      health_check:\n        enabled: true\n",
+        );
+        assert!(text.contains("health_check.enabled"), "{text}");
+        assert!(text.contains("not implemented"), "{text}");
+    }
+
+    #[test]
+    fn accepts_health_checking_explicitly_disabled() {
+        use std::str::FromStr;
+
+        let yaml = "next:\n  gateway:\n    upstream:\n      health_check:\n        enabled: false\n";
+        let config = GatewayConfig::from_str(yaml).expect("an explicit `enabled: false` is valid");
+
+        assert!(!config.upstream.health_check.enabled);
+    }
+
+    #[test]
+    fn rejects_insecure_skip_verify_because_tls_is_unavailable() {
+        let text = errors_for(
+            "next:\n  gateway:\n    upstream:\n      tls:\n        insecure_skip_verify: true\n",
+        );
+        assert!(text.contains("insecure_skip_verify"), "{text}");
+    }
+
+    #[test]
     fn rejects_invalid_port() {
         let text = errors_for("next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'http://host:notaport'\n");
         assert!(text.contains("routes[0].uri"), "{text}");

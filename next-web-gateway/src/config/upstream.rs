@@ -69,11 +69,14 @@ fn default_true() -> bool {
 }
 
 /// TCP health checking of `lb://` backends.
+///
+/// Not implemented in this build: `enabled: true` is rejected at startup so an
+/// operator never believes dead backends are being drained when they are not.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HealthCheckConfig {
     /// Whether health checks run at all.
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub enabled: bool,
     /// Interval between two health check rounds.
     #[serde(default = "default_health_interval", deserialize_with = "deserialize_duration")]
@@ -83,7 +86,7 @@ pub struct HealthCheckConfig {
 impl Default for HealthCheckConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enabled: false,
             interval: default_health_interval(),
         }
     }
