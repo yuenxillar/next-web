@@ -652,14 +652,8 @@ impl ProxyHttp for GatewayProxy {
         e: &pingora::Error,
         ctx: &mut Self::CTX,
     ) -> FailToProxy {
-        self.metrics
-            .observe_request(
-                ctx.route_id.as_deref().unwrap_or("-"),
-                "-",
-                status_for_error(e),
-                Duration::from_millis(ctx.elapsed_millis() as u64),
-            );
-
+        // Metrics are recorded once, from `logging`, which pingora calls for
+        // every request including the failing ones.
         let status = match ctx.direct_response.as_ref() {
             Some(response) => response.status,
             None => status_for_error(e),
