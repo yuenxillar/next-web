@@ -4,18 +4,17 @@ mod support;
 
 use support::{get, with_upstream, Behavior};
 
+const PING_ROUTE: &str = "\
+- id: ping
+  uri: \"http://{upstream}\"
+  predicates:
+    - Path=/ping
+";
+
 #[test]
 fn a_request_reaches_the_mock_upstream_through_the_gateway() {
-    let template = "\
-      - id: ping
-        uri: \"http://{upstream}\"
-        predicates:
-          - Path=/ping
-";
-    let (_upstream, gateway) = with_upstream(
-        Behavior::Respond(200, vec![], b"pong".to_vec()),
-        template,
-    );
+    let (_upstream, gateway) =
+        with_upstream(Behavior::Respond(200, vec![], b"pong".to_vec()), PING_ROUTE);
 
     let response = get(gateway.addr, "/ping", &[]);
 
@@ -25,16 +24,8 @@ fn a_request_reaches_the_mock_upstream_through_the_gateway() {
 
 #[test]
 fn the_admin_listener_answers_health_and_metrics() {
-    let template = "\
-      - id: ping
-        uri: \"http://{upstream}\"
-        predicates:
-          - Path=/ping
-";
-    let (_upstream, gateway) = with_upstream(
-        Behavior::Respond(200, vec![], b"pong".to_vec()),
-        template,
-    );
+    let (_upstream, gateway) =
+        with_upstream(Behavior::Respond(200, vec![], b"pong".to_vec()), PING_ROUTE);
 
     let live = get(gateway.admin, "/health/live", &[]);
     assert_eq!(live.status, 200, "{}", live.text());

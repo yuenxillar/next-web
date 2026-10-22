@@ -284,7 +284,15 @@ pub fn request(
         .set_read_timeout(Some(Duration::from_secs(5)))
         .expect("read timeout");
 
-    let mut head = format!("{method} {target} HTTP/1.1\r\nHost: test\r\nConnection: close\r\n");
+    let caller_sets_host = headers
+        .iter()
+        .any(|(name, _)| name.eq_ignore_ascii_case("host"));
+
+    let mut head = format!("{method} {target} HTTP/1.1\r\n");
+    if !caller_sets_host {
+        head.push_str("Host: test\r\n");
+    }
+    head.push_str("Connection: close\r\n");
     for (name, value) in headers {
         head.push_str(&format!("{name}: {value}\r\n"));
     }
@@ -307,6 +315,35 @@ pub fn request(
 /// GET helper.
 pub fn get(addr: SocketAddr, target: &str, headers: &[(&str, &str)]) -> HttpResponse {
     request(addr, "GET", target, headers, None)
+}
+
+/// POST a chunked body, so no `Content-Length` is advertised.
+pub fn post_chunked(addr: SocketAddr, target: &str, chunks: &[&[u8]]) -> HttpResponse {
+    let mut stream =
+        TcpStream::connect_timeout(&addr, Duration::from_secs(2)).expect("connect to the gateway");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .expect("read timeout");
+
+    let head = format!(
+        "POST {target} HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\
+         Transfer-Encoding: chunked\r\n\r\n"
+    );
+    stream.write_all(head.as_bytes()).expect("write request head");
+
+    for chunk in chunks {
+        stream
+            .write_all(format!("{:x}\r\n", chunk.len()).as_bytes())
+            .expect("write chunk size");
+        stream.write_all(chunk).expect("write chunk");
+        stream.write_all(b"\r\n").expect("write chunk terminator");
+    }
+    stream.write_all(b"0\r\n\r\n").expect("write last chunk");
+    stream.flush().ok();
+
+    let mut raw = Vec::new();
+    stream.read_to_end(&mut raw).expect("read the response");
+    parse_response(&raw)
 }
 
 fn parse_response(raw: &[u8]) -> HttpResponse {
@@ -385,6 +422,7 @@ pub struct TestGateway {
     child: Child,
     config_path: std::path::PathBuf,
     log_path: std::path::PathBuf,
+    out_path: std::path::PathBuf,
 }
 
 impl TestGateway {
@@ -413,24 +451,42 @@ impl TestGateway {
     }
 
     /// Start the gateway from a document built with the two listener ports.
-    pub fn start_with(build: impl FnOnce(u16, u16) -> String) -> Self {
+    pub fn start_with(build: impl Fn(u16, u16) -> String) -> Self {
+        // Ports are picked by binding and releasing them, so a busy port is a
+        // real possibility when several test binaries run in parallel. Retry a
+        // few times before failing.
+        let mut last_log = String::new();
+
+        for _ in 0..3 {
+            match Self::try_start(&build) {
+                Ok(gateway) => return gateway,
+                Err(log) => last_log = log,
+            }
+        }
+
+        panic!("the gateway did not start after 3 attempts; last log:\n{last_log}");
+    }
+
+    fn try_start(build: &impl Fn(u16, u16) -> String) -> Result<Self, String> {
         let proxy_port = free_port();
         let admin_port = free_port();
         let document = build(proxy_port, admin_port);
 
         let config_path =
             std::env::temp_dir().join(format!("next-web-gateway-{proxy_port}.yaml"));
-        std::fs::write(&config_path, document).expect("write the test configuration");
+        std::fs::write(&config_path, document.clone()).expect("write the test configuration");
 
         let log_path = std::env::temp_dir().join(format!("next-web-gateway-{proxy_port}.log"));
         let log = std::fs::File::create(&log_path).expect("create the gateway log");
+        let out_path = std::env::temp_dir().join(format!("next-web-gateway-{proxy_port}.out"));
+        let out = std::fs::File::create(&out_path).expect("create the gateway stdout");
 
-        let child = Command::new(env!("CARGO_BIN_EXE_next-web-gateway"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_next-web-gateway"))
             .arg("--config")
             .arg(&config_path)
             .arg("--log-level")
             .arg("info")
-            .stdout(Stdio::null())
+            .stdout(Stdio::from(out))
             .stderr(Stdio::from(log))
             .spawn()
             .expect("start the gateway binary");
@@ -438,34 +494,43 @@ impl TestGateway {
         let addr: SocketAddr = format!("127.0.0.1:{proxy_port}").parse().expect("proxy address");
         let admin: SocketAddr = format!("127.0.0.1:{admin_port}").parse().expect("admin address");
 
-        let gateway = Self {
-            addr,
-            admin,
-            child,
-            config_path,
-            log_path,
-        };
-
-        gateway.wait_until_ready();
-        gateway
-    }
-
-    fn wait_until_ready(&self) {
         let deadline = Instant::now() + Duration::from_secs(15);
-
         while Instant::now() < deadline {
-            if TcpStream::connect_timeout(&self.admin, Duration::from_millis(50)).is_ok() {
-                return;
+            if TcpStream::connect_timeout(&admin, Duration::from_millis(50)).is_ok() {
+                return Ok(Self {
+                    addr,
+                    admin,
+                    child,
+                    config_path,
+                    log_path,
+                    out_path,
+                });
             }
+
+            if let Ok(Some(status)) = child.try_wait() {
+                let log = std::fs::read_to_string(&log_path).unwrap_or_default();
+                let _ = std::fs::remove_file(&config_path);
+                let _ = std::fs::remove_file(&log_path);
+                let _ = std::fs::remove_file(&out_path);
+                return Err(format!("exited with {status}, config:\n{document}\nlog:\n{log}"));
+            }
+
             std::thread::sleep(Duration::from_millis(25));
         }
 
-        let log = std::fs::read_to_string(&self.log_path).unwrap_or_default();
-        let config = std::fs::read_to_string(&self.config_path).unwrap_or_default();
-        panic!(
-            "the gateway did not start listening on {}; log:\n{log}\nconfig:\n{config}",
-            self.admin
-        );
+        let _ = child.kill();
+        let _ = child.wait();
+        let log = std::fs::read_to_string(&log_path).unwrap_or_default();
+        let _ = std::fs::remove_file(&config_path);
+        let _ = std::fs::remove_file(&log_path);
+        let _ = std::fs::remove_file(&out_path);
+
+        Err(format!("timed out, config:\n{document}\nlog:\n{log}"))
+    }
+
+    /// Everything the gateway wrote to stdout so far.
+    pub fn stdout(&self) -> String {
+        std::fs::read_to_string(&self.out_path).unwrap_or_default()
     }
 }
 
@@ -486,20 +551,30 @@ pub fn free_port() -> u16 {
     port
 }
 
-/// Re-indent a YAML block whose first line lost its leading whitespace.
+/// Re-indent a YAML block so its list items sit under a `routes:` key at four
+/// spaces. A `\`-continued literal loses the indentation of its first line, so
+/// the block is normalised by its common leading whitespace first.
 fn indent_first_line(block: &str) -> String {
-    let block = block.trim_end();
-    let starts_with_space = block
-        .chars()
-        .next()
-        .map(char::is_whitespace)
-        .unwrap_or(true);
+    let lines: Vec<&str> = block
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .collect();
 
-    if block.is_empty() || starts_with_space {
-        block.to_string()
-    } else {
-        format!("      {block}")
+    if lines.is_empty() {
+        return String::new();
     }
+
+    let common = lines
+        .iter()
+        .map(|line| line.len() - line.trim_start().len())
+        .min()
+        .unwrap_or(0);
+
+    lines
+        .iter()
+        .map(|line| format!("      {}", &line[common.min(line.len())..]))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Run `body` against a mock upstream and a gateway route pointing at it.

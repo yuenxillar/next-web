@@ -186,6 +186,16 @@ impl RouteServiceManager {
             _ => None,
         })
     }
+
+    /// The `RequestSize` limit configured on the route, if any.
+    pub fn request_size_limit(&self, route_id: Option<&str>) -> Option<u64> {
+        let route_id = route_id?;
+        let service = self.services.get(route_id)?;
+        service.filters.iter().find_map(|filter| match filter {
+            DefaultGatewayFilter::RequestSize(filter) => Some(filter.max_size),
+            _ => None,
+        })
+    }
 }
 
 impl Default for RouteServiceManager {

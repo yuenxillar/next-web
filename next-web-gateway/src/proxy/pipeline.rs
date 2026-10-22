@@ -190,6 +190,14 @@ impl GatewayProxy {
             }
         };
 
+        // Headers a filter attached when it rejected the request (Retry-After,
+        // X-RateLimit-*, Location for RedirectTo) must survive the rendering.
+        if let Some(direct) = ctx.direct_response.as_ref() {
+            for (name, value) in &direct.headers {
+                header.insert_header(name.clone(), value.as_str()).ok();
+            }
+        }
+
         // Gateway generated responses go through the response filters too, so
         // `SecureHeaders` and `AddResponseHeader` apply to errors as well.
         self.routes
@@ -200,6 +208,11 @@ impl GatewayProxy {
             )
             .await
             .ok();
+
+        // Throttled and unavailable responses tell the client when to retry.
+        if matches!(status, 429 | 503) && !header.headers.contains_key("retry-after") {
+            header.insert_header("Retry-After", "1").ok();
+        }
 
         write_response(session, header, body).await;
         Ok(true)
@@ -265,15 +278,8 @@ impl ProxyHttp for GatewayProxy {
         ctx.started = Some(Instant::now());
         ctx.client_ip = client_ip(session);
 
-        let Some(route) = self.routes.match_route(session) else {
-            return self.respond_directly(session, ctx, 404).await;
-        };
-
-        ctx.route_id = Some(route.route_id.clone());
-        ctx.fallback_id = (!route.fallback_id.is_empty()).then(|| route.fallback_id.clone());
-        ctx.path_variables = route.path_variables.clone();
-
-        // Request id and forwarding headers must exist before the filters run.
+        // The request id must exist before anything can answer, including the
+        // 404 for an unmatched route.
         let header_name = self.config.error.request_id_header.clone();
         let id = request_id(session.req_header(), &self.config.error);
         ctx.request_id = id.clone();
@@ -281,6 +287,14 @@ impl ProxyHttp for GatewayProxy {
             .req_header_mut()
             .insert_header(header_name, id)
             .ok();
+
+        let Some(route) = self.routes.match_route(session) else {
+            return self.respond_directly(session, ctx, 404).await;
+        };
+
+        ctx.route_id = Some(route.route_id.clone());
+        ctx.fallback_id = (!route.fallback_id.is_empty()).then(|| route.fallback_id.clone());
+        ctx.path_variables = route.path_variables.clone();
 
         let header = session.req_header_mut();
 
@@ -508,14 +522,41 @@ impl ProxyHttp for GatewayProxy {
         Ok(())
     }
 
+    async fn request_body_filter(
+        &self,
+        _session: &mut Session,
+        body: &mut Option<Bytes>,
+        _end_of_stream: bool,
+        ctx: &mut Self::CTX,
+    ) -> pingora::Result<()> {
+        if let Some(chunk) = body.as_ref() {
+            ctx.request_body_bytes = ctx.request_body_bytes.saturating_add(chunk.len() as u64);
+        }
+
+        // A chunked request carries no `Content-Length`, so the limit can only
+        // be enforced while the body streams through.
+        let Some(limit) = self.routes.request_size_limit(ctx.route_id.as_deref()) else {
+            return Ok(());
+        };
+
+        if ctx.request_body_bytes > limit {
+            warn!(
+                route = ctx.route_id.as_deref().unwrap_or("-"),
+                limit, seen = ctx.request_body_bytes, "request body exceeds the configured limit"
+            );
+            return ctx.respond_with_text(413, Vec::new(), "Request size exceeded");
+        }
+
+        Ok(())
+    }
+
     fn response_body_filter(
         &self,
         _session: &mut Session,
         body: &mut Option<Bytes>,
         end_of_stream: bool,
         ctx: &mut Self::CTX,
-    ) -> pingora::Result<Option<Duration>> {
-        let Some(chunk) = body.take() else {
+    ) -> pingora::Result<Option<Duration>> {        let Some(chunk) = body.take() else {
             return Ok(None);
         };
 
@@ -671,7 +712,7 @@ impl ProxyHttp for GatewayProxy {
                     method = %session.req_header().method,
                     path = %session.req_header().uri.path(),
                     status,
-                    route,
+                    route = %route,
                     upstream = %upstream,
                     latency_ms = latency.as_millis(),
                     error = %error,
@@ -683,7 +724,7 @@ impl ProxyHttp for GatewayProxy {
                     method = %session.req_header().method,
                     path = %session.req_header().uri.path(),
                     status,
-                    route,
+                    route = %route,
                     upstream = %upstream,
                     latency_ms = latency.as_millis(),
                     "access"
