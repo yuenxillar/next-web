@@ -6,10 +6,7 @@ use std::{
     },
 };
 
-use next_web_core::{
-    any::{AnyError, AnyValue},
-    async_trait,
-};
+use next_web_core::{any::AnyError, async_trait};
 use next_web_retry::{
     backoff::{back_off_context::BackOffContext, back_off_policy::BackOffPolicy},
     error::retry_error::RetryError,

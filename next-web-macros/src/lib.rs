@@ -1272,3 +1272,34 @@ pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn on_transition(attr: TokenStream, item: TokenStream) -> TokenStream {
     crate::state_machine::on_transition::impl_macro_on_transition(attr, item)
 }
+
+/// Makes the machine of a configuration part of the application context.
+///
+/// The attribute sits on `impl StateMachineConfigurer<S, E> for T`, keeps the
+/// block and submits the configuration to the inventory of the framework, so the
+/// application builds the machine while it configures the context and a component
+/// injects `Arc<dyn StateMachine<S, E>>`.
+///
+/// The configuration has to be a unit struct which derives `Clone`.
+///
+/// # Arguments
+/// * `name = ".."` - the bean name of the machine, `stateMachine` by default
+///
+/// # Example
+/// ```ignore
+/// #[derive(Clone)]
+/// struct OrderStateMachineConfig;
+///
+/// #[state_machine(name = "orderStateMachine")]
+/// impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig {
+///     fn config_configure(&mut self, config: &mut StateMachineConfigurationBuilder<..>)
+///         -> Result<(), BoxError> {
+///         config.with_configuration()?.machine_id(String::from("orderStateMachine"));
+///         Ok(())
+///     }
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn state_machine(attr: TokenStream, item: TokenStream) -> TokenStream {
+    crate::state_machine::state_machine::impl_macro_state_machine(attr, item)
+}

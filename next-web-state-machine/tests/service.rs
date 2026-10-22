@@ -305,3 +305,33 @@ async fn a_failed_release_still_stops_the_machine() {
     );
     assert!(machine.state().is_none());
 }
+
+#[tokio::test]
+async fn release_all_stops_every_acquired_machine() {
+    let service = service();
+
+    let first = service
+        .acquire_state_machine("first")
+        .await
+        .expect("the first machine is acquired");
+    let second = service
+        .acquire_state_machine("second")
+        .await
+        .expect("the second machine is acquired");
+
+    assert!(first.is_running());
+    assert!(second.is_running());
+
+    service
+        .release_all()
+        .await
+        .expect("every machine is released");
+
+    assert!(!first.is_running(), "the first machine is stopped");
+    assert!(!second.is_running(), "the second machine is stopped");
+
+    service
+        .release_all()
+        .await
+        .expect("releasing nothing is not an error");
+}

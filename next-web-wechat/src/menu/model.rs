@@ -54,11 +54,11 @@ pub struct ItemBody {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct QueryMenuRespnose {
-    is_menu_open: u64,
-    selfmenu_info: SelfmenuInfo,
+    pub is_menu_open: u64,
+    pub selfmenu_info: SelfmenuInfo,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SelfmenuInfo {
-    button: Vec<HashMap<Cow<'static, str>, Cow<'static, str>>>,
+    pub button: Vec<HashMap<Cow<'static, str>, Cow<'static, str>>>,
 }

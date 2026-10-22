@@ -432,21 +432,6 @@ impl CronUtil {
         Ok(desc)
     }
 
-    /// 获取星期几的中文名称
-    /// Get Chinese name for day of week
-    fn day_of_week_name(day: u8) -> &'static str {
-        match day {
-            0 | 7 => "星期日",
-            1 => "星期一",
-            2 => "星期二",
-            3 => "星期三",
-            4 => "星期四",
-            5 => "星期五",
-            6 => "星期六",
-            _ => "未知",
-        }
-    }
-
     /// 获取星期几的英文名称
     /// Get English name for day of week
     fn day_of_week_name_en(day: u8) -> &'static str {

@@ -1,23 +1,24 @@
 use std::sync::Arc;
 
-use next_web::core::{async_trait, messaging::Message, messaging::generic_message::GenericMessage};
+use next_web::core::{async_trait, messaging::GenericMessage, messaging::Message};
 use next_web_core::{any::AnyValue, error::BoxError};
 use next_web_state_machine::{
-    autoconfigure::state_machine_auto_configuration::StateMachineAutoConfiguration,
+    StateContext, StateMachine,
+    autoconfigure::StateMachineAutoConfiguration,
     config::{
         action::StateMachineAction,
         builders::{
-            state_machine_config_builder::StateMachineConfigBuilder,
-            state_machine_configuration_configurer::StateMachineConfigurationConfigurer,
-            state_machine_configurer::StateMachineConfigurer,
-            state_machine_state_configurer::StateMachineStateConfigurer,
-            state_machine_transition_configurer::StateMachineTransitionConfigurer,
+            StateMachineConfigBuilder, StateMachineConfigurationBuilder,
+            StateMachineConfigurationConfigurer, StateMachineConfigurer, StateMachineModelBuilder,
+            StateMachineStateBuilder, StateMachineStateConfigurer, StateMachineTransitionBuilder,
+            StateMachineTransitionConfigurer,
         },
-        common::configurer::Configurer,
+        common::Configurer,
         state_machine_config::StateMachineConfig,
     },
-    listener::state_machine_listener::StateMachineListener,
-    state_context::StateContext,
+    listener::StateMachineListener,
+    state::StateMachineState,
+    transition::StateMachineTransition,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -48,75 +49,55 @@ struct OrderStateMachineConfig;
 impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig {
     fn config_configure(
         &mut self,
-        config: &mut next_web_state_machine::config::builders::state_machine_configuration_builder::StateMachineConfigurationBuilder<OrderState, OrderEvent>,
+        config: &mut StateMachineConfigurationBuilder<OrderState, OrderEvent>,
     ) -> Result<(), next_web_core::error::BoxError> {
         struct DefaultListener;
 
         impl StateMachineListener<OrderState, OrderEvent> for DefaultListener {
             fn state_changed(
                 &self,
-                _from: &dyn next_web_state_machine::state::StateMachineState<OrderState, OrderEvent>,
-                _to: &dyn next_web_state_machine::state::StateMachineState<OrderState, OrderEvent>,
+                _from: &dyn StateMachineState<OrderState, OrderEvent>,
+                _to: &dyn StateMachineState<OrderState, OrderEvent>,
             ) {
             }
 
-            fn state_entered(
-                &self,
-                _state: &dyn next_web_state_machine::state::StateMachineState<OrderState, OrderEvent>,
-            ) {
-            }
+            fn state_entered(&self, _state: &dyn StateMachineState<OrderState, OrderEvent>) {}
 
-            fn state_exited(
-                &self,
-                _state: &dyn next_web_state_machine::state::StateMachineState<OrderState, OrderEvent>,
-            ) {
-            }
+            fn state_exited(&self, _state: &dyn StateMachineState<OrderState, OrderEvent>) {}
 
             fn event_not_accepted(&self, _event: &dyn Message<OrderEvent>) {}
 
-            fn transition(
-                &self,
-                transition: &dyn next_web_state_machine::transition::StateMachineTransition<
-                    OrderState,
-                    OrderEvent,
-                >,
-            ) {
+            fn transition(&self, transition: &dyn StateMachineTransition<OrderState, OrderEvent>) {
                 println!("kind: {:?}", transition.kind())
             }
 
             fn transition_started(
                 &self,
-                _transition: &dyn next_web_state_machine::transition::StateMachineTransition<
-                    OrderState,
-                    OrderEvent,
-                >,
+                _transition: &dyn StateMachineTransition<OrderState, OrderEvent>,
             ) {
             }
 
             fn transition_ended(
                 &self,
-                _transition: &dyn next_web_state_machine::transition::StateMachineTransition<
-                    OrderState,
-                    OrderEvent,
-                >,
+                _transition: &dyn StateMachineTransition<OrderState, OrderEvent>,
             ) {
             }
 
             fn state_machine_started(
                 &self,
-                _state_machine: &dyn next_web_state_machine::StateMachine<OrderState, OrderEvent>,
+                _state_machine: &dyn StateMachine<OrderState, OrderEvent>,
             ) {
             }
 
             fn state_machine_stopped(
                 &self,
-                _state_machine: &dyn next_web_state_machine::StateMachine<OrderState, OrderEvent>,
+                _state_machine: &dyn StateMachine<OrderState, OrderEvent>,
             ) {
             }
 
             fn state_machine_error(
                 &self,
-                _state_machine: &dyn next_web_state_machine::StateMachine<OrderState, OrderEvent>,
+                _state_machine: &dyn StateMachine<OrderState, OrderEvent>,
                 _error: &dyn std::error::Error,
             ) {
             }
@@ -135,14 +116,14 @@ impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig 
 
     fn model_configure(
         &mut self,
-        model: &mut next_web_state_machine::config::builders::state_machine_model_builder::StateMachineModelBuilder<OrderState, OrderEvent>,
+        _model: &mut StateMachineModelBuilder<OrderState, OrderEvent>,
     ) -> Result<(), next_web_core::error::BoxError> {
         Ok(())
     }
 
     fn state_configure(
         &mut self,
-        states: &mut next_web_state_machine::config::builders::state_machine_state_builder::StateMachineStateBuilder<OrderState, OrderEvent>,
+        states: &mut StateMachineStateBuilder<OrderState, OrderEvent>,
     ) -> Result<(), next_web_core::error::BoxError> {
         states
             .with_states()?
@@ -165,7 +146,7 @@ impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig 
 
     fn transition_configure(
         &mut self,
-        transitions: &mut next_web_state_machine::config::builders::state_machine_transition_builder::StateMachineTransitionBuilder<OrderState, OrderEvent>,
+        transitions: &mut StateMachineTransitionBuilder<OrderState, OrderEvent>,
     ) -> Result<(), next_web_core::error::BoxError> {
         #[derive(Clone)]
         struct PayAction;

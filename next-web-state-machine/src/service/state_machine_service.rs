@@ -61,4 +61,12 @@ where
         machine_id: &str,
         persist: bool,
     ) -> Result<(), BoxError>;
+
+    /// Releases every machine the service holds.
+    ///
+    /// An application calls this when it shuts down, so the machines are
+    /// persisted and stopped instead of keeping their triggers armed.
+    async fn release_all(&self) -> Result<(), BoxError> {
+        Ok(())
+    }
 }

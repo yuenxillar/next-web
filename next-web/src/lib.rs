@@ -78,19 +78,15 @@ pub use validator;
 pub use next_web_core as core;
 pub use next_web_singletons as singletons;
 
+/// The inventory the auto-registration of the framework is built on.
+pub use inventory;
+
 #[cfg(feature = "enable-i18n")]
 pub use web::i18n;
 
 #[cfg(feature = "enable-state-machine")]
 pub use next_web_state_machine as state_machine;
 
-/// Marks a function as the handler of a state machine transition.
-///
-/// The generated code targets [`state_machine`](crate::state_machine), so an
-/// application needs no extra dependency. A project which depends on the state
-/// machine crate directly passes `crate = next_web_state_machine`.
-#[cfg(feature = "enable-state-machine")]
-pub use next_web_macros::on_transition;
 
 #[cfg(feature = "enable-websocket")]
 pub use next_web_websocket as ws;

@@ -61,6 +61,7 @@ pub mod trigger;
 
 mod state_machine;
 
+pub use state_context::StateContext;
 pub use state_machine::{BoxedStateAction, BoxedStateGuard, StateMachine, StateMachineId};
 pub use state_machine_exception::{
     StateMachineErrorKind, StateMachineException, execution_error, state_machine_error,

@@ -71,7 +71,9 @@ also asserts every step and stops the machine.
 - States and transitions, including internal, external and local transitions.
 - Guards, entry actions, exit actions and state actions.
 - Composite states: a state which owns a submachine forwards events to it.
-- Orthogonal regions, fork and join.
+- Orthogonal regions. Fork and join pseudo states are **experimental**: the
+  sequential behaviour is covered by tests, the assembly of a model which declares
+  them and their synchronization between regions under concurrency are not.
 - Deferred events, which a state postpones until it is left.
 - History pseudo states.
 - Timed transitions, which start counting when the source state of the
@@ -110,6 +112,11 @@ state action policy with its timeout, and the region execution policy.
 
 ## Not supported
 
+- **A production use of fork and join**: the two pseudo states are experimental.
+  A model which declares them is assembled by paths the tests do not cover, and
+  whether a join which waits for several regions fires once under concurrent
+  events is unverified. A machine which needs parallel branches to meet should
+  coordinate with events instead, until the behaviour is pinned by tests.
 - **Parallel region execution**: the runtime processes the events of a machine
   one at a time. `RegionExecutionPolicy::Parallel` is rejected when the machine
   is built; `Sequential` is accepted because it describes what the runtime does.
@@ -154,6 +161,42 @@ It reports nanoseconds per event for a two state cycle under these conditions:
 Compare the numbers within one run on one machine; they are not a promise about
 another machine. The release build matters: a debug build measures the debug
 profile of this crate and of its dependencies.
+
+## In a next_web application
+
+An application which depends on the umbrella crate with `enable-state-machine`
+declares a machine by implementing `StateMachineConfigurer` as usual, marks the
+implementation, and injects the machine where it is needed:
+
+```rust
+#[derive(Clone)]
+struct OrderStateMachineConfig;
+
+#[next_web::state_machine(name = "orderStateMachine")]
+impl StateMachineConfigurer<OrderState, OrderEvent> for OrderStateMachineConfig {
+    // config_configure, model_configure, state_configure, transition_configure
+}
+
+#[component]
+struct OrderService {
+    machine: Arc<dyn StateMachine<OrderState, OrderEvent>>,
+}
+```
+
+What the framework does with the annotation:
+
+- the configuration is submitted to the inventory of the framework;
+- while the application context is configured, the machine is built, started when
+  its configuration asks for it, and registered under the bean name the attribute
+  declares (`stateMachine` when it names none) and by the type
+  `Arc<dyn StateMachine<S, E>>`;
+- two configurations which name their machine the same way stop the startup with
+  an error which names both of them.
+
+The configuration has to be a unit struct which derives `Clone`. When two
+machines share one state and event type, inject
+`Vec<(String, Arc<dyn StateMachine<S, E>>)>` instead, which carries the bean
+names.
 
 ## Feature flags
 

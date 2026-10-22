@@ -12,6 +12,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use next_web::macros::statemachine::on_transition;
 use next_web::state_machine::config::base_state_machine_factory::BaseStateMachineFactory;
 use next_web::state_machine::config::model::configuration_data::ConfigurationData;
 use next_web::state_machine::config::model::default_state_machine_model::DefaultStateMachineModel;
@@ -27,7 +28,7 @@ use next_web_core::messaging::generic_message::GenericMessage;
 static AUDITS: AtomicUsize = AtomicUsize::new(0);
 
 /// Runs when the machine leaves the state 1 for the state 2 on the event 100.
-#[next_web::on_transition(source = 1, target = 2, event = 100)]
+#[on_transition(source = 1, target = 2, event = 100)]
 fn audit(_context: &dyn StateContext<i32, i32>) -> Result<(), BoxError> {
     AUDITS.fetch_add(1, Ordering::SeqCst);
 

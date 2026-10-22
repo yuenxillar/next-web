@@ -46,5 +46,19 @@ pub mod security {
 #[cfg(feature = "enable-retry")]
 pub use next_web_macros::retryable;
 
+#[cfg(feature = "enable-state-machine")]
+pub mod statemachine {
+
+    /// The attributes of the state machine.
+    ///
+    /// `on_transition` marks the handler of a transition, `state_machine` makes the
+    /// machine of a configuration part of the application context. The crate root
+    /// re-exports both, so an application writes `#[on_transition(..)]` and
+    /// `#[state_machine(..)]`.
+    pub use next_web_macros::state_machine;
+
+    pub use next_web_macros::on_transition;
+}
+
 #[cfg(feature = "enable-i18n")]
 pub mod i18n {}

@@ -185,6 +185,25 @@ where
 
         persisted.and(stopped)
     }
+
+    async fn release_all(&self) -> Result<(), BoxError> {
+        let machine_ids: Vec<String> = self.machines.lock().await.keys().cloned().collect();
+
+        let mut first_error: Option<BoxError> = None;
+
+        for machine_id in machine_ids {
+            if let Err(error) = self.release_state_machine(&machine_id).await
+                && first_error.is_none()
+            {
+                first_error = Some(error);
+            }
+        }
+
+        match first_error {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
+    }
 }
 
 /// Checks whether an error reports that no persisted state exists.

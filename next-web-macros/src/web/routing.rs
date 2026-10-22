@@ -61,25 +61,36 @@ fn impl_item_fn(
     Logic::add_args(&mut item_fn, headers);
 
     // Collect dependencies before generate_block rewrites FindSingleton parameters.
-    let singleton_dependencies = item_fn.sig.inputs.iter().filter_map(|arg| {
-        let FnArg::Typed(pat_type) = arg else { return None };
-        let inner = find_singleton_inner_type(pat_type.ty.as_ref())?;
-        let name = if pat_type.attrs.iter().any(|attr| attr.path().is_ident("find")) {
-            let binding = find_singleton_binding(pat_type.pat.as_ref())?;
-            let name = crate::util::name::field_name_to_singleton_name(&binding.to_string());
-            quote!(#name.to_owned().into())
-        } else {
-            let default_name = default_singleton_name(inner);
-            quote!(#default_name.into())
-        };
-        Some(quote! {
-            __context.register_singleton_dependency(
-                ::next_web::singletons::factory::support::Key::new::<#inner>(
-                    #name
-                )
-            );
+    let singleton_dependencies = item_fn
+        .sig
+        .inputs
+        .iter()
+        .filter_map(|arg| {
+            let FnArg::Typed(pat_type) = arg else {
+                return None;
+            };
+            let inner = find_singleton_inner_type(pat_type.ty.as_ref())?;
+            let name = if pat_type
+                .attrs
+                .iter()
+                .any(|attr| attr.path().is_ident("find"))
+            {
+                let binding = find_singleton_binding(pat_type.pat.as_ref())?;
+                let name = crate::util::name::field_name_to_singleton_name(&binding.to_string());
+                quote!(#name.to_owned().into())
+            } else {
+                let default_name = default_singleton_name(inner);
+                quote!(#default_name.into())
+            };
+            Some(quote! {
+                __context.register_singleton_dependency(
+                    ::next_web::singletons::factory::support::Key::new::<#inner>(
+                        #name
+                    )
+                );
+            })
         })
-    }).collect::<Vec<_>>();
+        .collect::<Vec<_>>();
 
     let block = match generate_block(&mut item_fn, consume, produce) {
         Ok(stream) => stream,
@@ -157,7 +168,7 @@ fn impl_item_fn(
             }
         }
 
-        ::next_web::submit_handler!(#name);
+        ::next_web::submit_http_handler!(#name);
     };
 
     // println!("token stream: {}", stream.to_string());
@@ -166,7 +177,9 @@ fn impl_item_fn(
 }
 
 fn find_singleton_inner_type(ty: &Type) -> Option<&Type> {
-    let Type::Path(type_path) = ty else { return None };
+    let Type::Path(type_path) = ty else {
+        return None;
+    };
     let segment = type_path.path.segments.last()?;
     if segment.ident != "FindSingleton" {
         return None;
@@ -352,7 +365,9 @@ fn generate_block(
     let mut variables = Vec::new();
 
     for (index, fn_arg) in item.sig.inputs.iter_mut().enumerate() {
-        let FnArg::Typed(pat_type) = fn_arg else { continue };
+        let FnArg::Typed(pat_type) = fn_arg else {
+            continue;
+        };
         let has_find_attr = pat_type
             .attrs
             .iter()

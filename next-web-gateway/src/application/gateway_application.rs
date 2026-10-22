@@ -6,7 +6,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use pingora::prelude::background_service;
-use pingora::services::{Service, ServiceWithDependents};
+use pingora::services::ServiceWithDependents;
 use pingora::{prelude::Opt, proxy::http_proxy_service, server::Server};
 
 #[cfg(unix)]

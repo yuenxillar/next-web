@@ -19,3 +19,14 @@ pub mod state_machine_state_configurer;
 pub mod state_machine_transition_builder;
 /// Configurer interface exposing the transitions.
 pub mod state_machine_transition_configurer;
+
+pub use state_machine_config_builder::StateMachineConfigBuilder;
+pub use state_machine_configuration_builder::StateMachineConfigurationBuilder;
+pub use state_machine_configuration_configurer::StateMachineConfigurationConfigurer;
+pub use state_machine_configurer::StateMachineConfigurer;
+pub use state_machine_model_builder::StateMachineModelBuilder;
+pub use state_machine_model_configurer::StateMachineModelConfigurer;
+pub use state_machine_state_builder::StateMachineStateBuilder;
+pub use state_machine_state_configurer::StateMachineStateConfigurer;
+pub use state_machine_transition_builder::StateMachineTransitionBuilder;
+pub use state_machine_transition_configurer::StateMachineTransitionConfigurer;

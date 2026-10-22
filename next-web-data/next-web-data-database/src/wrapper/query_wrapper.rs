@@ -62,7 +62,7 @@ impl QueryWrapper for RBatis {
         V: DeserializeOwned,
     {
         let (sql, args) = wrapper.generate_sql_with_args();
-        self.query_decode(&sql, args).await
+        self.exec_decode(&sql, args).await
     }
 
     async fn select_by_id<T, V>(&self, id: V) -> Result<T>
@@ -70,7 +70,7 @@ impl QueryWrapper for RBatis {
         T: DeserializeOwned + TableName + Send,
         V: Into<rbs::Value> + Send,
     {
-        self.query_decode(
+        self.exec_decode(
             &format!("SELECT * FROM {} WHERE id = ?", T::table_name()),
             vec![id.into()],
         )
@@ -87,7 +87,7 @@ impl QueryWrapper for RBatis {
             .into_iter()
             .map(Into::<rbs::Value>::into)
             .collect::<Vec<_>>();
-        self.query_decode(
+        self.exec_decode(
             &format!(
                 "SELECT * FROM {} WHERE id IN ({})",
                 T::table_name(),

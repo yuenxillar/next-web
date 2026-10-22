@@ -105,6 +105,7 @@ impl WechatPayClient {
             authorization,
         })
     }
+
     fn validate_config(&self) -> WechatPayResult<()> {
         if self.config.app_id.trim().is_empty() {
             return Err(WechatPayError::InvalidConfig("app_id is empty".to_string()));

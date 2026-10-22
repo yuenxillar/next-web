@@ -186,6 +186,15 @@ impl AutoConfiguration for WebAutoConfiguration {
 
         self.run_auto_configurations(ctx).await?;
 
+        // The state machines an application declares are built once every
+        // auto-configuration ran, so a machine sees the singletons they
+        // contributed, and they are registered before the components which
+        // inject them are resolved.
+        #[cfg(feature = "enable-state-machine")]
+        crate::autoregister::state_machine_autoregister::apply_state_machines(ctx)
+            .await
+            .map_err(|error| -> Box<dyn Error> { error })?;
+
         // The tasks an application declared with `#[scheduled]` are resolved
         // after the auto-configurations, so that a task can depend on a
         // singleton an auto-configuration contributes.

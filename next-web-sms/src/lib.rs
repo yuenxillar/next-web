@@ -8,7 +8,7 @@ pub mod aliyun;
 pub mod tencent;
 
 /// 匹配手机号码的模块
-pub(crate) mod macthes {
+pub mod macthes {
     use regex::Regex;
     use std::sync::{Arc, LazyLock};
 

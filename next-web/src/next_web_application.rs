@@ -171,7 +171,7 @@ where
         #[cfg(not(feature = "enable-open-api"))]
         let mut context = RouterContext::new();
 
-        #[allow(unused_variables)]
+        #[allow(unused)]
         let mut router = InventoryHelper::iter::<&dyn HttpHandlerAutoRegister>()
             .into_iter()
             .fold(Router::new(), |router, handler| {

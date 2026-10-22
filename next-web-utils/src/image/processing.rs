@@ -40,7 +40,7 @@ pub fn compress_image(
         "jpeg" | "jpg" => ImageOutputFormat::Jpeg(quality),
         "png" => {
             // PNG压缩级别 (0-9)
-            let compression = (9 - (quality as f32 / 100.0 * 9.0) as u8).min(9);
+            // let compression = (9 - (quality as f32 / 100.0 * 9.0) as u8).min(9);
             ImageOutputFormat::Png
         }
         "webp" => {

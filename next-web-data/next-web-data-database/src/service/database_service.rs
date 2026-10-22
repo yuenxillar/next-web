@@ -35,7 +35,7 @@ impl DatabaseService {
                 let opts = MySqlConnectOptions::new()
                     .username(config.username().unwrap_or("root"))
                     .password(config.password().unwrap_or_default());
-                let mut pool = FastPool::new(ConnectionManager::new_options(MysqlDriver {}, opts))?;
+                let pool = FastPool::new(ConnectionManager::new_options(MysqlDriver {}, opts))?;
                 // Self::configure_pool(&mut pool, config);
                 rbs.init_pool(pool)?;
 
@@ -99,7 +99,7 @@ impl DatabaseService {
         &self.rbs
     }
 
-    pub(crate) fn mut_client(&mut self) -> &mut RBatis {
+    pub fn mut_client(&mut self) -> &mut RBatis {
         &mut self.rbs
     }
 

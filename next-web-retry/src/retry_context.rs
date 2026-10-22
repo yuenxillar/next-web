@@ -1,7 +1,7 @@
 use std::{any::Any, sync::Arc};
 
 use dashmap::DashMap;
-use next_web_core::{DynClone, any::AnyValue};
+use next_web_core::any::AnyValue;
 
 use crate::error::retry_error::RetryError;
 

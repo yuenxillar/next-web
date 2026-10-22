@@ -21,8 +21,4 @@ where
 
 pub struct DefaultRetryListener {}
 
-impl RetryListener for DefaultRetryListener {
-    // fn open<T, E: AnyError>(&self, context: &dyn RetryContext, call_back: &dyn RetryCallback<T, E>) -> bool {
-    //     true
-    // }
-}
+impl RetryListener for DefaultRetryListener {}
