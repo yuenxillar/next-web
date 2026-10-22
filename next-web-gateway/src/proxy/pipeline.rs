@@ -559,10 +559,15 @@ impl ProxyHttp for GatewayProxy {
         upstream_request: &mut RequestHeader,
         ctx: &mut Self::CTX,
     ) -> pingora::Result<()> {
-        ctx.original_request_path = upstream_request
-            .uri
-            .path_and_query()
-            .map(|value| value.as_str().to_string());
+        // `RewriteLocationResponseHeader` needs the path the *client* asked for;
+        // the access log reports it too, so the log shows the original target
+        // even after `StripPrefix`/`RewritePath`.
+        if ctx.original_request_path.is_none() {
+            ctx.original_request_path = upstream_request
+                .uri
+                .path_and_query()
+                .map(|value| value.as_str().to_string());
+        }
 
         for name in HOP_BY_HOP {
             upstream_request.remove_header(*name);
@@ -862,15 +867,25 @@ impl ProxyHttp for GatewayProxy {
         }
 
         if self.config.logging.access_log {
+            // The path the client asked for, even after `StripPrefix`/
+            // `RewritePath` changed what goes upstream.
+            let original_path = ctx
+                .original_request_path
+                .as_deref()
+                .map(|value| value.split('?').next().unwrap_or(value))
+                .unwrap_or_else(|| session.req_header().uri.path());
+            let bytes = ctx.response_body_buffer.len() as u64;
+
             match error {
                 Some(error) => info!(
                     request_id = %ctx.request_id,
                     client = ?ctx.client_ip,
                     method = %session.req_header().method,
-                    path = %session.req_header().uri.path(),
+                    path = %original_path,
                     status,
                     route = %route,
                     upstream = %upstream,
+                    bytes,
                     latency_ms = latency.as_millis(),
                     error = %error,
                     "access"
@@ -879,10 +894,11 @@ impl ProxyHttp for GatewayProxy {
                     request_id = %ctx.request_id,
                     client = ?ctx.client_ip,
                     method = %session.req_header().method,
-                    path = %session.req_header().uri.path(),
+                    path = %original_path,
                     status,
                     route = %route,
                     upstream = %upstream,
+                    bytes,
                     latency_ms = latency.as_millis(),
                     "access"
                 ),
