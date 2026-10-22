@@ -18,6 +18,34 @@ use crate::{
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
+/// Bridge the legacy properties types into the validated configuration types.
+fn to_route_config(route: &super::routes_properties::RoutesProperties) -> crate::config::RouteConfig {
+    let metadata = route.metadata.as_ref();
+    let client = metadata.and_then(|metadata| metadata.client.as_ref());
+
+    crate::config::RouteConfig {
+        id: route.id.clone(),
+        uri: route.uri.clone(),
+        order: route.order.unwrap_or(i32::MAX),
+        predicates: route.predicates.clone(),
+        filters: route.filters.clone(),
+        upstreams: Vec::new(),
+        metadata: crate::config::RouteMetadata {
+            client: crate::config::ClientMetadata {
+                connect_timeout: client
+                    .and_then(|client| client.connect_timeout)
+                    .map(std::time::Duration::from_millis),
+                read_timeout: client
+                    .and_then(|client| client.read_timeout)
+                    .map(std::time::Duration::from_millis),
+                write_timeout: client
+                    .and_then(|client| client.write_timeout)
+                    .map(std::time::Duration::from_millis),
+            },
+        },
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct GatewayApplicationProperties {
     pub routes: Vec<RoutesProperties>,
@@ -30,18 +58,33 @@ pub struct GatewayApplicationProperties {
 impl GatewayApplicationProperties {
     pub const CONFIG_ENV_VAR: &'static str = "NEXT_WEB_GATEWAY_CONFIG";
 
-    pub fn into_manager(&self) -> RouteServiceManager {
-        let mut services = self
-            .routes
-            .iter()
-            .map(|route| RoutePredicateService::from(route.clone()))
-            .collect::<Vec<RoutePredicateService>>();
+    pub fn into_manager(
+        &self,
+    ) -> std::result::Result<RouteServiceManager, crate::config::ConfigErrors> {
+        let mut errors = Vec::new();
+        let mut services = Vec::with_capacity(self.routes.len());
 
-        let mut seen_ids = std::collections::HashSet::new();
-        for service in services.iter() {
-            if !seen_ids.insert(service.id.clone()) {
-                panic!("Duplicate service id found: {}", service.id);
+        for route in &self.routes {
+            match RoutePredicateService::try_from(to_route_config(route)) {
+                Ok(service) => {
+                    if services
+                        .iter()
+                        .any(|seen: &RoutePredicateService| seen.id == service.id)
+                    {
+                        errors.push(crate::config::ConfigError::new(
+                            "routes",
+                            format!("duplicate route id `{}`", service.id),
+                        ));
+                    } else {
+                        services.push(service);
+                    }
+                }
+                Err(error) => errors.extend(error.errors().iter().cloned()),
             }
+        }
+
+        if !errors.is_empty() {
+            return Err(crate::config::ConfigErrors::new(errors));
         }
 
         services.sort_by(|a, b| a.order.cmp(&b.order));
@@ -49,7 +92,7 @@ impl GatewayApplicationProperties {
             .iter()
             .for_each(|service| info!("route service id: {}", service.id));
 
-        RouteServiceManager::new(services)
+        Ok(RouteServiceManager::new(services))
     }
 
     pub fn into_circuitbreaker_services(&self) -> Option<CircuitBreakerServiceManager> {

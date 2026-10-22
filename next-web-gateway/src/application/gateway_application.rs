@@ -58,7 +58,13 @@ pub trait GatewayApplication: Send + Sync {
                 return;
             }
         };
-        let route_service_manager = application_properties.into_manager();
+        let route_service_manager = match application_properties.into_manager() {
+            Ok(manager) => manager,
+            Err(error) => {
+                tracing::error!("invalid gateway routes: {error}");
+                return;
+            }
+        };
         let mut circuitbreaker_service_manager =
             application_properties.into_circuitbreaker_services();
 

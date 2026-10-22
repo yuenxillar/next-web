@@ -1,3 +1,10 @@
+//! The filter catalogue and its string DSL parser.
+//!
+//! Every filter belongs to exactly one [`FilterPhase`], and the parser rejects
+//! unknown names and malformed arguments at startup instead of silently
+//! disabling the filter.
+
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -5,6 +12,7 @@ use async_trait::async_trait;
 use pingora_limits::rate::Rate;
 use regex::Regex;
 
+use crate::config::ConfigError;
 use crate::error::GatewayError;
 use crate::filter::factory::add_request_header::AddRequestHeaderFilter;
 use crate::filter::factory::add_request_headers_if_not_present::AddRequestHeaderIfNotPresentFilter;
@@ -26,7 +34,6 @@ use crate::filter::factory::request_size::RequestSizeFilter;
 use crate::filter::factory::rewrite_location_response_header::RewriteLocationResponseHeaderFilter;
 use crate::filter::factory::rewrite_path::RewritePathFilter;
 use crate::filter::factory::rewrite_response_header::RewriteResponseHeaderFilter;
-use crate::filter::factory::save_session::SaveSessionFilter;
 use crate::filter::factory::secure_headers::SecureHeadersFilter;
 use crate::filter::factory::set_path::SetPathFilter;
 use crate::filter::factory::set_request_header::SetRequestHeaderFilter;
@@ -34,8 +41,8 @@ use crate::filter::factory::set_request_host_header::SetRequestHostHeaderFilter;
 use crate::filter::factory::set_response_header::SetResponseHeaderFilter;
 use crate::filter::factory::set_status::SetStatusFilter;
 use crate::filter::factory::strip_prefix::StripPrefixFilter;
-use crate::filter::factory::token_relay::TokenRelayFilter;
 use crate::filter::gateway_filter_chain::GatewayFilterChain;
+use crate::filter::spec::{expect_args, unknown_name_error, FilterPhase, FilterSpec};
 use crate::server::ServerWebExchange;
 use crate::util::key_value::KeyValue;
 
@@ -43,22 +50,48 @@ macro_rules! delegate_filter {
     ($self:ident, $exchange:ident, $chain:ident, $($variant:ident),*) => {
         match $self {
             $(Self::$variant(filter) => filter.filter($exchange, $chain).await,)*
-            Self::Nothing => $chain.filter($exchange).await,
         }
     };
 }
 
-/// Name key.
-pub const NAME_KEY: &str = "name";
+/// Every filter name the parser accepts.
+pub const KNOWN_FILTERS: &[&str] = &[
+    "AddRequestHeader",
+    "AddRequestHeadersIfNotPresent",
+    "AddRequestParameter",
+    "AddResponseHeader",
+    "DedupeResponseHeader",
+    "LocalResponseCache",
+    "MapRequestHeader",
+    "PrefixPath",
+    "PreserveHostHeader",
+    "RedirectTo",
+    "RemoveJsonAttributesResponseBody",
+    "RemoveRequestHeader",
+    "RemoveRequestParameter",
+    "RemoveResponseHeader",
+    "RequestHeaderSize",
+    "RequestRateLimiter",
+    "RequestSize",
+    "RewriteLocationResponseHeader",
+    "RewritePath",
+    "RewriteResponseHeader",
+    "SecureHeaders",
+    "SetPath",
+    "SetRequestHeader",
+    "SetRequestHostHeader",
+    "SetResponseHeader",
+    "SetStatus",
+    "StripPrefix",
+];
 
-/// Value key.
-pub const VALUE_KEY: &str = "value";
-
+/// A gateway filter, one variant per configuration name.
 #[async_trait]
 pub trait GatewayFilter
 where
     Self: Send + Sync,
 {
+    /// Run the filter; call `chain.filter(exchange)` to continue.
     async fn filter(
         &self,
         exchange: &mut dyn ServerWebExchange,
@@ -66,39 +99,107 @@ where
     ) -> Result<(), GatewayError>;
 }
 
+/// The built-in filter catalogue.
 #[derive(Debug, Clone)]
 pub enum DefaultGatewayFilter {
+    /// Append request headers.
     AddRequestHeader(AddRequestHeaderFilter),
+    /// Insert request headers that are not already present.
     AddRequestHeaderIfNotPresent(AddRequestHeaderIfNotPresentFilter),
+    /// Append query parameters to the upstream request.
     AddRequestParameter(AddRequestParameterFilter),
+    /// Append response headers.
     AddResponseHeader(AddResponseHeaderFilter),
+    /// Collapse duplicated response header values.
     DedupeResponseHeader(DedupeResponseHeaderFilter),
-    MapRequestHeader(MapRequestHeaderFilter),
-    PrefixPath(PrefixPathFilter),
-    PreserveHostHeader(PreserveHostHeaderFilter),
-    RedirectTo(RedirectToFilter),
+    /// Serve and store responses from the in-process cache.
     LocalResponseCache(LocalResponseCacheFilter),
+    /// Copy one request header onto another.
+    MapRequestHeader(MapRequestHeaderFilter),
+    /// Prefix the upstream request path.
+    PrefixPath(PrefixPathFilter),
+    /// Keep the downstream `Host` header.
+    PreserveHostHeader(PreserveHostHeaderFilter),
+    /// Answer with a redirect instead of proxying.
+    RedirectTo(RedirectToFilter),
+    /// Strip attributes from a JSON response body.
     RemoveJsonAttributesResponseBody(RemoveJsonAttributesResponseBodyFilter),
+    /// Remove request headers.
     RemoveRequestHeader(RemoveRequestHeaderFilter),
+    /// Remove query parameters from the upstream request.
     RemoveRequestParameter(RemoveRequestParameterFilter),
+    /// Remove response headers.
     RemoveResponseHeader(RemoveResponseHeaderFilter),
+    /// Reject requests whose header block is too large.
     RequestHeaderSize(RequestHeaderSizeFilter),
+    /// Limit request admission rate.
     RequestRateLimiter(RequestRateLimiterFilter),
+    /// Reject request bodies larger than a limit.
     RequestSize(RequestSizeFilter),
+    /// Rewrite the `Location` response header.
     RewriteLocationResponseHeader(RewriteLocationResponseHeaderFilter),
+    /// Rewrite the upstream request path with a regular expression.
     RewritePath(RewritePathFilter),
+    /// Rewrite a response header value with a regular expression.
     RewriteResponseHeader(RewriteResponseHeaderFilter),
-    SaveSession(SaveSessionFilter),
+    /// Add security hardening response headers.
     SecureHeaders(SecureHeadersFilter),
-    SetRequestHeader(SetRequestHeaderFilter),
+    /// Replace the upstream request path.
     SetPath(SetPathFilter),
+    /// Replace request headers.
+    SetRequestHeader(SetRequestHeaderFilter),
+    /// Replace the upstream `Host` header.
     SetRequestHostHeader(SetRequestHostHeaderFilter),
+    /// Replace response headers.
     SetResponseHeader(SetResponseHeaderFilter),
+    /// Replace the response status code.
     SetStatus(SetStatusFilter),
+    /// Drop leading path segments.
     StripPrefix(StripPrefixFilter),
-    TokenRelay(TokenRelayFilter),
+}
 
-    Nothing,
+impl DefaultGatewayFilter {
+    /// The proxy pass this filter runs in.
+    pub fn phase(&self) -> FilterPhase {
+        match self {
+            Self::RequestSize(_) => FilterPhase::RequestBody,
+            Self::RemoveJsonAttributesResponseBody(_) => FilterPhase::ResponseBody,
+            Self::AddResponseHeader(_)
+            | Self::DedupeResponseHeader(_)
+            | Self::LocalResponseCache(_)
+            | Self::RemoveResponseHeader(_)
+            | Self::RewriteLocationResponseHeader(_)
+            | Self::RewriteResponseHeader(_)
+            | Self::SecureHeaders(_)
+            | Self::SetResponseHeader(_)
+            | Self::SetStatus(_) => FilterPhase::ResponseHeader,
+            _ => FilterPhase::RequestHeader,
+        }
+    }
+
+    /// Whether this filter rewrites the response body.
+    pub fn modifies_response_body(&self) -> bool {
+        self.phase() == FilterPhase::ResponseBody
+    }
+
+    /// Configured `name, value` header pairs, for `name`/`value` style filters.
+    pub fn header_pairs(&self) -> Vec<(String, String)> {
+        let pairs = |headers: &[KeyValue<String, String>]| {
+            headers
+                .iter()
+                .map(|header| (header.k.clone(), header.v.clone()))
+                .collect()
+        };
+
+        match self {
+            Self::AddRequestHeader(filter) => pairs(&filter.headers),
+            Self::AddRequestHeaderIfNotPresent(filter) => pairs(&filter.headers),
+            Self::AddResponseHeader(filter) => pairs(&filter.headers),
+            Self::SetRequestHeader(filter) => pairs(&filter.headers),
+            Self::SetResponseHeader(filter) => pairs(&filter.headers),
+            _ => Vec::new(),
+        }
+    }
 }
 
 #[async_trait]
@@ -132,277 +233,383 @@ impl GatewayFilter for DefaultGatewayFilter {
             RewriteLocationResponseHeader,
             RewritePath,
             RewriteResponseHeader,
-            SaveSession,
             SecureHeaders,
             SetRequestHeader,
             SetPath,
             SetRequestHostHeader,
             SetResponseHeader,
             SetStatus,
-            StripPrefix,
-            TokenRelay
+            StripPrefix
         )
     }
 }
 
-impl DefaultGatewayFilter {
-    pub fn modifies_response_body(&self) -> bool {
-        matches!(self, Self::RemoveJsonAttributesResponseBody(_))
-    }
-}
+impl TryFrom<&str> for DefaultGatewayFilter {
+    type Error = ConfigError;
 
-impl From<&str> for DefaultGatewayFilter {
-    fn from(str: &str) -> Self {
-        if str.is_empty() {
-            return Self::Nothing;
-        }
+    /// Parse a filter expression, rejecting unknown names and bad arguments.
+    fn try_from(raw: &str) -> Result<Self, ConfigError> {
+        let spec = FilterSpec::parse(raw)?;
 
-        let (filter_name, value) = if let Some(pos) = str.find('=') {
-            (&str[..pos], &str[pos + 1..])
-        } else {
-            (str, "")
-        };
-
-        match filter_name.trim() {
+        let filter = match spec.name.as_str() {
             "AddRequestHeader" => Self::AddRequestHeader(AddRequestHeaderFilter {
-                headers: split_kv_pairs(value),
+                headers: parse_pairs(&spec)?,
             }),
 
-            "AddRequestHeaderIfNotPresent" => {
+            "AddRequestHeadersIfNotPresent" | "AddRequestHeaderIfNotPresent" => {
+                if spec.name != "AddRequestHeadersIfNotPresent" {
+                    tracing::warn!(
+                        "filter name `AddRequestHeaderIfNotPresent` is deprecated, use \
+                         `AddRequestHeadersIfNotPresent`"
+                    );
+                }
                 Self::AddRequestHeaderIfNotPresent(AddRequestHeaderIfNotPresentFilter {
-                    headers: split_kv_pairs(value),
+                    headers: parse_pairs(&spec)?,
                 })
             }
 
-            "AddRequestParameter" => {
-                let parameters = split_params(value, "&", ",");
-                if parameters.is_empty() {
-                    Self::Nothing
-                } else {
-                    Self::AddRequestParameter(AddRequestParameterFilter { parameters })
-                }
-            }
+            "AddRequestParameter" => Self::AddRequestParameter(AddRequestParameterFilter {
+                parameters: parse_parameter_pairs(&spec)?,
+            }),
 
             "AddResponseHeader" => Self::AddResponseHeader(AddResponseHeaderFilter {
-                headers: split_kv_pairs(value),
+                headers: parse_pairs(&spec)?,
             }),
 
             "DedupeResponseHeader" => {
-                let filter = DedupeResponseHeaderFilter::from(value);
+                let filter = DedupeResponseHeaderFilter::from(spec.args.join(",").as_str());
                 if filter.headers.is_empty() {
-                    Self::Nothing
+                    return Err(ConfigError::new(
+                        "filters.DedupeResponseHeader",
+                        "expects at least one header name",
+                    ));
+                }
+                Self::DedupeResponseHeader(filter)
+            }
+
+            "LocalResponseCache" => {
+                let filter = LocalResponseCacheFilter::from(spec.args.join(",").as_str());
+                if filter.is_valid() {
+                    Self::LocalResponseCache(filter)
                 } else {
-                    Self::DedupeResponseHeader(filter)
+                    return Err(ConfigError::new(
+                        "filters.LocalResponseCache",
+                        "expects `ttl, max-size-bytes` with both values greater than zero",
+                    ));
                 }
             }
 
             "MapRequestHeader" => {
-                if let Some((key, value)) = value.split_once(',') {
-                    Self::MapRequestHeader(MapRequestHeaderFilter {
-                        header: KeyValue::from((key, value)),
-                    })
-                } else {
-                    Self::Nothing
-                }
+                let args = expect_args(&spec, 2, 2)?;
+                Self::MapRequestHeader(MapRequestHeaderFilter {
+                    header: KeyValue::from((args[0].as_str(), args[1].as_str())),
+                })
             }
 
-            "PrefixPath" => Self::PrefixPath(PrefixPathFilter {
-                path: value.trim().into(),
-            }),
+            "PrefixPath" => {
+                let args = expect_args(&spec, 1, 1)?;
+                Self::PrefixPath(PrefixPathFilter {
+                    path: args[0].as_str().into(),
+                })
+            }
 
-            "PreserveHostHeader" => Self::PreserveHostHeader(PreserveHostHeaderFilter {}),
+            "PreserveHostHeader" => {
+                expect_args(&spec, 0, 0)?;
+                Self::PreserveHostHeader(PreserveHostHeaderFilter {})
+            }
 
             "RedirectTo" => {
-                if let Some((status_str, url)) = value.split_once(',') {
-                    if let Ok(status) = status_str.trim().parse() {
-                        Self::RedirectTo(RedirectToFilter {
-                            status,
-                            url: url.trim().into(),
-                        })
-                    } else {
-                        Self::Nothing
-                    }
-                } else {
-                    Self::Nothing
-                }
-            }
-
-            "LocalResponseCache" => {
-                let filter = LocalResponseCacheFilter::from(value);
-                if filter.is_valid() {
-                    Self::LocalResponseCache(filter)
-                } else {
-                    Self::Nothing
-                }
+                let args = expect_args(&spec, 2, 2)?;
+                let status = parse_number::<u16>(&spec, args[0].as_str(), 300, 399)?;
+                Self::RedirectTo(RedirectToFilter {
+                    status,
+                    url: args[1].as_str().into(),
+                })
             }
 
             "RemoveJsonAttributesResponseBody" => {
-                let filter = RemoveJsonAttributesResponseBodyFilter::from(value);
+                let filter =
+                    RemoveJsonAttributesResponseBodyFilter::from(spec.args.join(",").as_str());
                 if filter.names.is_empty() {
-                    Self::Nothing
-                } else {
-                    Self::RemoveJsonAttributesResponseBody(filter)
+                    return Err(ConfigError::new(
+                        "filters.RemoveJsonAttributesResponseBody",
+                        "expects at least one attribute name",
+                    ));
                 }
+                Self::RemoveJsonAttributesResponseBody(filter)
             }
 
             "RemoveRequestHeader" => Self::RemoveRequestHeader(RemoveRequestHeaderFilter {
-                headers: split_headers(value),
+                headers: require_names(&spec)?,
             }),
 
             "RemoveRequestParameter" => {
                 Self::RemoveRequestParameter(RemoveRequestParameterFilter {
-                    names: split_headers(value),
+                    names: require_names(&spec)?,
                 })
             }
 
             "RemoveResponseHeader" => Self::RemoveResponseHeader(RemoveResponseHeaderFilter {
-                headers: split_headers(value),
+                headers: require_names(&spec)?,
             }),
 
             "RequestHeaderSize" => {
-                if let Some((max_size_str, error_msg)) = value.split_once(',') {
-                    Self::RequestHeaderSize(RequestHeaderSizeFilter {
-                        max_size: max_size_str.trim().parse().unwrap_or(0),
-                        error_message: error_msg.trim().to_string(),
-                    })
-                } else {
-                    Self::RequestHeaderSize(RequestHeaderSizeFilter {
-                        max_size: value.trim().parse().unwrap_or(0),
-                        error_message: "Request header size exceeded".to_string(),
-                    })
-                }
+                let args = expect_args(&spec, 1, 2)?;
+                let max_size = parse_number::<u32>(&spec, args[0].as_str(), 1, u32::MAX)?;
+                let error_message = args
+                    .get(1)
+                    .cloned()
+                    .unwrap_or_else(|| "Request header size exceeded".to_string());
+                Self::RequestHeaderSize(RequestHeaderSizeFilter {
+                    max_size,
+                    error_message,
+                })
             }
 
-            "RequestRateLimiter" => Self::RequestRateLimiter(RequestRateLimiterFilter {
-                rate_limit: value.trim().parse().unwrap_or(0),
-                limiter: Arc::new(Rate::new(Duration::from_secs(1))),
-            }),
+            "RequestRateLimiter" => {
+                let args = expect_args(&spec, 1, 1)?;
+                let rate_limit = parse_number::<u32>(&spec, args[0].as_str(), 1, u32::MAX)?;
+                Self::RequestRateLimiter(RequestRateLimiterFilter {
+                    rate_limit,
+                    limiter: Arc::new(Rate::new(Duration::from_secs(1))),
+                })
+            }
 
-            "RequestSize" => Self::RequestSize(RequestSizeFilter {
-                max_size: value.trim().parse().unwrap_or(0),
-            }),
+            "RequestSize" => {
+                let args = expect_args(&spec, 1, 1)?;
+                let max_size = parse_number::<u64>(&spec, args[0].as_str(), 1, u64::MAX)?;
+                Self::RequestSize(RequestSizeFilter { max_size })
+            }
 
             "RewriteLocationResponseHeader" => {
-                let parts: Vec<&str> = value.split(',').map(|s| s.trim()).collect();
+                let args = expect_args(&spec, 1, 4)?;
+                let protocols_regex = match args.get(3) {
+                    Some(pattern) => Some(compile_regex(&spec, pattern)?),
+                    None => None,
+                };
                 Self::RewriteLocationResponseHeader(RewriteLocationResponseHeaderFilter {
-                    strip_version_mode: parts.get(0).map(|&s| s.into()).unwrap_or_default(),
-                    location_header_name: parts.get(1).map(|&s| Some(s.into())).unwrap_or_default(),
-                    host_value: parts.get(2).map(|&s| Some(s.into())).unwrap_or_default(),
-                    protocols_regex: parts.get(3).and_then(|&s| Regex::new(s).ok()),
+                    strip_version_mode: args[0].as_str().into(),
+                    location_header_name: args.get(1).map(|value| value.as_str().into()),
+                    host_value: args.get(2).map(|value| value.as_str().into()),
+                    protocols_regex,
+                })
+            }
+
+            "RewritePath" => {
+                let args = expect_args(&spec, 2, 2)?;
+                Self::RewritePath(RewritePathFilter {
+                    regex: compile_regex(&spec, &args[0])?,
+                    replacement: args[1].clone(),
                 })
             }
 
             "RewriteResponseHeader" => {
-                let parts: Vec<&str> = value.split(',').map(|s| s.trim()).collect();
-                if parts.len() >= 2 {
-                    let regex = parts.get(2).and_then(|&s| Regex::new(s).ok());
-                    Self::RewriteResponseHeader(RewriteResponseHeaderFilter {
-                        header: (KeyValue::from((parts[0], parts[1])), regex),
-                    })
-                } else {
-                    Self::Nothing
-                }
+                let args = expect_args(&spec, 2, 3)?;
+                let replacement = args.get(2).cloned().unwrap_or_default();
+                let regex = match args.get(1) {
+                    Some(pattern) => Some(compile_regex(&spec, pattern)?),
+                    None => None,
+                };
+                Self::RewriteResponseHeader(RewriteResponseHeaderFilter {
+                    header: (KeyValue::from((args[0].as_str(), replacement.as_str())), regex),
+                })
             }
 
-            "RewritePath" => {
-                if let Some((regex, replacement)) = value.split_once(',') {
-                    if let Ok(regex) = Regex::new(regex.trim()) {
-                        Self::RewritePath(RewritePathFilter {
-                            regex,
-                            replacement: replacement.trim().to_string(),
-                        })
-                    } else {
-                        Self::Nothing
-                    }
-                } else {
-                    Self::Nothing
-                }
+            "SecureHeaders" => {
+                expect_args(&spec, 0, 0)?;
+                Self::SecureHeaders(SecureHeadersFilter {})
             }
 
-            "SaveSession" => Self::SaveSession(SaveSessionFilter {}),
-            "SecureHeaders" => Self::SecureHeaders(SecureHeadersFilter {}),
+            "SetPath" => {
+                let args = expect_args(&spec, 1, 1)?;
+                Self::SetPath(SetPathFilter {
+                    path: args[0].clone(),
+                })
+            }
 
             "SetRequestHeader" => Self::SetRequestHeader(SetRequestHeaderFilter {
-                headers: split_kv_pairs(value),
+                headers: parse_pairs(&spec)?,
             }),
 
-            "SetPath" => Self::SetPath(SetPathFilter {
-                path: value.trim().to_string(),
-            }),
-
-            "SetRequestHostHeader" => Self::SetRequestHostHeader(SetRequestHostHeaderFilter {
-                host: value.trim().to_string(),
-            }),
+            "SetRequestHostHeader" => {
+                let args = expect_args(&spec, 1, 1)?;
+                Self::SetRequestHostHeader(SetRequestHostHeaderFilter {
+                    host: args[0].clone(),
+                })
+            }
 
             "SetResponseHeader" => Self::SetResponseHeader(SetResponseHeaderFilter {
-                headers: split_kv_pairs(value),
+                headers: parse_pairs(&spec)?,
             }),
 
-            "SetStatus" => Self::SetStatus(SetStatusFilter {
-                status: value.trim().parse().unwrap_or(200),
-            }),
+            "SetStatus" => {
+                let args = expect_args(&spec, 1, 1)?;
+                let status = parse_number::<u16>(&spec, args[0].as_str(), 100, 599)?;
+                Self::SetStatus(SetStatusFilter { status })
+            }
 
-            "StripPrefix" => Self::StripPrefix(StripPrefixFilter {
-                offset: value.trim().parse().unwrap_or(0),
-            }),
+            "StripPrefix" => {
+                let args = expect_args(&spec, 1, 1)?;
+                let offset = parse_number::<usize>(&spec, args[0].as_str(), 0, usize::MAX)?;
+                Self::StripPrefix(StripPrefixFilter { offset })
+            }
 
-            "TokenRelay" => Self::TokenRelay(TokenRelayFilter {}),
+            "SaveSession" | "TokenRelay" => {
+                return Err(ConfigError::new(
+                    format!("filters.{}", spec.name),
+                    format!(
+                        "`{}` needs an authentication backend, which this gateway does not \
+                         provide yet",
+                        spec.name
+                    ),
+                ));
+            }
 
-            _ => Self::Nothing,
-        }
+            name => return Err(unknown_name_error("filter", name, KNOWN_FILTERS)),
+        };
+
+        Ok(filter)
     }
 }
 
-fn split(str: &str) -> Vec<KeyValue<String, String>> {
-    str.trim()
-        .split(',')
-        .map(|s| s.trim().split(":").collect::<Vec<&str>>())
-        .map(|s| Into::<KeyValue<String, String>>::into(s))
-        .collect()
+/// Parse `name, value, name, value` or the legacy `name: value` arguments.
+fn parse_pairs(spec: &FilterSpec) -> Result<Vec<KeyValue<String, String>>, ConfigError> {
+    if spec.args.is_empty() {
+        return Err(ConfigError::new(
+            format!("filters.{}", spec.name),
+            "expects at least one `name, value` pair",
+        ));
+    }
+
+    let mut pairs = Vec::new();
+    let mut index = 0;
+    while index < spec.args.len() {
+        let argument = &spec.args[index];
+        if let Some((name, value)) = argument.split_once(':') {
+            tracing::warn!(
+                "filter `{}` uses the legacy `name: value` syntax, prefer `name, value`",
+                spec.name
+            );
+            push_pair(&mut pairs, name, value)?;
+            index += 1;
+        } else {
+            let Some(value) = spec.args.get(index + 1) else {
+                return Err(ConfigError::new(
+                    format!("filters.{}", spec.name),
+                    format!("`{}` has no value", argument.trim()),
+                ));
+            };
+            push_pair(&mut pairs, argument, value)?;
+            index += 2;
+        }
+    }
+
+    Ok(pairs)
 }
 
-fn split_kv_pairs(str: &str) -> Vec<KeyValue<String, String>> {
-    str.trim()
-        .split(',')
-        .filter_map(|pair| {
-            let mut parts = pair.trim().splitn(2, ':');
-            let key = parts.next()?.trim();
-            let value = parts.next()?.trim();
-            if key.is_empty() || value.is_empty() {
-                None
-            } else {
-                Some(KeyValue::from((key, value)))
+/// Parse `name, value & name, value` query parameter pairs.
+fn parse_parameter_pairs(spec: &FilterSpec) -> Result<Vec<KeyValue<String, String>>, ConfigError> {
+    let raw = spec.args.join(",");
+    let mut pairs = Vec::new();
+
+    for chunk in raw.split('&') {
+        let chunk = chunk.trim();
+        if chunk.is_empty() {
+            continue;
+        }
+
+        let (name, value) = match chunk.split_once(',').or_else(|| chunk.split_once(':')) {
+            Some(pair) => pair,
+            None => {
+                return Err(ConfigError::new(
+                    format!("filters.{}", spec.name),
+                    format!("expected `name, value` in `{chunk}`"),
+                ));
             }
-        })
-        .collect()
+        };
+        push_pair(&mut pairs, name, value)?;
+    }
+
+    if pairs.is_empty() {
+        return Err(ConfigError::new(
+            format!("filters.{}", spec.name),
+            "expects at least one `name, value` pair",
+        ));
+    }
+
+    Ok(pairs)
 }
 
-fn split_headers(str: &str) -> Vec<String> {
-    str.trim()
-        .split(',')
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .map(String::from)
-        .collect()
+fn push_pair(
+    pairs: &mut Vec<KeyValue<String, String>>,
+    name: &str,
+    value: &str,
+) -> Result<(), ConfigError> {
+    let name = name.trim();
+    let value = value.trim();
+
+    if name.is_empty() {
+        return Err(ConfigError::new(
+            "filters",
+            "header or parameter name must not be empty",
+        ));
+    }
+    if value.is_empty() {
+        return Err(ConfigError::new(
+            "filters",
+            format!("value for `{name}` must not be empty"),
+        ));
+    }
+
+    pairs.push(KeyValue::from((name, value)));
+    Ok(())
 }
 
-fn split_params<'a>(
-    input: &'a str,
-    param_delimiter: &'a str,
-    kv_delimiter: &'a str,
-) -> Vec<KeyValue<String, String>> {
-    input
-        .trim()
-        .split(param_delimiter)
-        .filter_map(|param| {
-            let mut parts = param.trim().splitn(2, kv_delimiter);
-            let key = parts.next()?.trim();
-            let value = parts.next()?.trim();
-            if key.is_empty() || value.is_empty() {
-                None
-            } else {
-                Some(KeyValue::from((key, value)))
-            }
-        })
-        .collect()
+fn require_names(spec: &FilterSpec) -> Result<Vec<String>, ConfigError> {
+    if spec.args.is_empty() {
+        return Err(ConfigError::new(
+            format!("filters.{}", spec.name),
+            "expects at least one name",
+        ));
+    }
+
+    Ok(spec
+        .args
+        .iter()
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .collect())
+}
+
+fn compile_regex(spec: &FilterSpec, pattern: &str) -> Result<Regex, ConfigError> {
+    Regex::new(pattern).map_err(|error| {
+        ConfigError::new(
+            format!("filters.{}", spec.name),
+            format!("invalid regular expression `{pattern}`: {error}"),
+        )
+    })
+}
+
+fn parse_number<T>(spec: &FilterSpec, raw: &str, min: T, max: T) -> Result<T, ConfigError>
+where
+    T: FromStr + PartialOrd + std::fmt::Display,
+{
+    let value = raw.trim().parse::<T>().map_err(|_| {
+        ConfigError::new(
+            format!("filters.{}", spec.name),
+            format!(
+                "`{}` is not a valid number, expected {min} to {max}",
+                raw.trim()
+            ),
+        )
+    })?;
+
+    if value < min || value > max {
+        return Err(ConfigError::new(
+            format!("filters.{}", spec.name),
+            format!("`{value}` is out of range, expected {min} to {max}"),
+        ));
+    }
+
+    Ok(value)
 }

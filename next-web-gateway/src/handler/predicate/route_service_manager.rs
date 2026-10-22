@@ -3,6 +3,7 @@ use pingora::{proxy::Session, Result};
 use std::sync::Arc;
 
 use crate::{
+    config::RouteMetadata,
     context::{HeaderAndBody, RequestContext},
     filter::{
         factory::local_response_cache::LocalResponseCacheFilter,
@@ -10,9 +11,8 @@ use crate::{
         gateway_filter_chain::GatewayFilterChain,
     },
     handler::DefaultGatewayFilterChain,
-    properties::routes_properties::RouteMetadata,
-    service::route_service::{RoutePredicateService, RouteWork},
     server::DefaultServerWebExchange,
+    service::route_service::{RoutePredicateService, RouteWork},
 };
 
 use super::route_predicate_factory::RoutePredicateFactory;
@@ -260,7 +260,9 @@ mod tests {
                 order: 0,
                 work: RouteWork::Http,
                 upstream: "svc-high".to_string(),
-                route_predicate_factory: vec![(&"Weight=group1,8".to_string()).into()],
+                route_predicate_factory: vec![
+                    RoutePredicateFactory::try_from("Weight=group1,8").unwrap(),
+                ],
                 filters: Vec::new(),
                 fallback_id: String::new(),
                 rate_limiter: None,
@@ -271,7 +273,9 @@ mod tests {
                 order: 1,
                 work: RouteWork::Http,
                 upstream: "svc-low".to_string(),
-                route_predicate_factory: vec![(&"Weight=group1,2".to_string()).into()],
+                route_predicate_factory: vec![
+                    RoutePredicateFactory::try_from("Weight=group1,2").unwrap(),
+                ],
                 filters: Vec::new(),
                 fallback_id: String::new(),
                 rate_limiter: None,
@@ -310,8 +314,8 @@ mod tests {
             upstream: "svc-chain".to_string(),
             route_predicate_factory: Vec::new(),
             filters: vec![
-                DefaultGatewayFilter::from("AddResponseHeader=X-Response:ignored"),
-                DefaultGatewayFilter::from("AddRequestHeader=X-Request:passed"),
+                DefaultGatewayFilter::try_from("AddResponseHeader=X-Response, ignored").unwrap(),
+                DefaultGatewayFilter::try_from("AddRequestHeader=X-Request, passed").unwrap(),
             ],
             fallback_id: String::new(),
             rate_limiter: None,

@@ -106,7 +106,7 @@ impl ProxyHttp for NextGatewayApplication {
         let client_metadata = route_predicate_result
             .metadata
             .as_ref()
-            .map(|v| v.client.as_ref());
+            .map(|v| &v.client);
 
         // Request upstream through routing working mode
         match route_work {
@@ -124,29 +124,25 @@ impl ProxyHttp for NextGatewayApplication {
                     }
                 };
 
-                if let Some(metadata) = client_metadata {
-                    if let Some(client) = metadata {
-                        set_request_timeout(
-                            &mut http_peer,
-                            client.connect_timeout,
-                            client.read_timeout,
-                            client.write_timeout,
-                        );
-                    }
+                if let Some(client) = client_metadata {
+                    set_request_timeout(
+                        &mut http_peer,
+                        client.connect_timeout,
+                        client.read_timeout,
+                        client.write_timeout,
+                    );
                 }
                 return Ok(Box::new(http_peer));
             }
             &RouteWork::Https => {
                 let mut http_peer = HttpPeer::new(sevice_name, true, "".into());
-                if let Some(metadata) = client_metadata {
-                    if let Some(client) = metadata {
-                        set_request_timeout(
-                            &mut http_peer,
-                            client.connect_timeout,
-                            client.read_timeout,
-                            client.write_timeout,
-                        );
-                    }
+                if let Some(client) = client_metadata {
+                    set_request_timeout(
+                        &mut http_peer,
+                        client.connect_timeout,
+                        client.read_timeout,
+                        client.write_timeout,
+                    );
                 }
 
                 return Ok(Box::new(http_peer));
@@ -400,11 +396,17 @@ impl ProxyHttp for NextGatewayApplication {
 
 pub fn set_request_timeout(
     http: &mut HttpPeer,
-    connection_timeout: Option<u64>,
-    read_timeout: Option<u64>,
-    write_timeout: Option<u64>,
+    connection_timeout: Option<Duration>,
+    read_timeout: Option<Duration>,
+    write_timeout: Option<Duration>,
 ) {
-    connection_timeout.map(|v| http.options.connection_timeout = Some(Duration::from_millis(v)));
-    read_timeout.map(|v| http.options.read_timeout = Some(Duration::from_millis(v)));
-    write_timeout.map(|v| http.options.write_timeout = Some(Duration::from_millis(v)));
+    if let Some(value) = connection_timeout {
+        http.options.connection_timeout = Some(value);
+    }
+    if let Some(value) = read_timeout {
+        http.options.read_timeout = Some(value);
+    }
+    if let Some(value) = write_timeout {
+        http.options.write_timeout = Some(value);
+    }
 }
