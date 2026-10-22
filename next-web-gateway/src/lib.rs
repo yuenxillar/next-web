@@ -12,6 +12,7 @@ mod context;
 pub mod application;
 pub mod circuit_breaker;
 pub mod config;
+pub mod upstream;
 
 
 pub trait Ordered {
