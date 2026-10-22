@@ -11,7 +11,8 @@ use crate::filter::gateway_filter::GatewayFilter;
 use crate::filter::gateway_filter_chain::GatewayFilterChain;
 use crate::server::ServerWebExchange;
 
-/// The hardening headers applied by the filter, in the Spring Cloud Gateway set.
+/// The hardening headers applied by the filter, matching
+/// `SecureHeadersGatewayFilterFactory` in Spring Cloud Gateway.
 pub(crate) const SECURE_HEADERS: &[(&str, &str)] = &[
     ("X-XSS-Protection", "1 ; mode=block"),
     ("Strict-Transport-Security", "max-age=631138519"),
@@ -21,10 +22,17 @@ pub(crate) const SECURE_HEADERS: &[(&str, &str)] = &[
     (
         "Content-Security-Policy",
         "default-src 'self' https:; font-src 'self' https: data:; img-src 'self' https: data:; \
-         object-src 'none'; script-src https:; style-src 'self' https: 'unsafe-inline'",
+         object-src 'none'; script-src 'self' https: 'unsafe-inline'; \
+         style-src 'self' https: 'unsafe-inline'",
     ),
     ("X-Download-Options", "noopen"),
     ("X-Permitted-Cross-Domain-Policies", "none"),
+    (
+        "Cache-Control",
+        "no-cache, no-store, max-age=0, must-revalidate",
+    ),
+    ("Pragma", "no-cache"),
+    ("Expires", "0"),
 ];
 
 /// Adds the hardening headers to every response.
@@ -102,5 +110,33 @@ mod tests {
                 .and_then(|value| value.to_str().ok()),
             Some("max-age=631138519")
         );
+    }
+}
+
+#[cfg(test)]
+mod spring_parity {
+    use super::SECURE_HEADERS;
+
+    #[test]
+    fn the_set_matches_spring_cloud_gateway() {
+        let mut names: Vec<_> = SECURE_HEADERS.iter().map(|(name, _)| *name).collect();
+        names.sort_unstable();
+
+        let mut expected = vec![
+            "Cache-Control",
+            "Content-Security-Policy",
+            "Expires",
+            "Pragma",
+            "Referrer-Policy",
+            "Strict-Transport-Security",
+            "X-Content-Type-Options",
+            "X-Download-Options",
+            "X-Frame-Options",
+            "X-Permitted-Cross-Domain-Policies",
+            "X-XSS-Protection",
+        ];
+        expected.sort_unstable();
+
+        assert_eq!(names, expected);
     }
 }

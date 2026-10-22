@@ -40,3 +40,58 @@ impl GatewayFilter for SetPathFilter {
         chain.filter(exchange).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use pingora::http::RequestHeader;
+
+    use super::SetPathFilter;
+    use crate::filter::gateway_filter::GatewayFilter;
+
+    fn apply(template: &str, variables: &[(&str, &str)]) -> RequestHeader {
+        let mut request = RequestHeader::build("GET", b"/old/path?a=1", None).unwrap();
+        let filter = SetPathFilter {
+            path: template.to_owned(),
+        };
+        let variables: HashMap<String, String> = variables
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+
+        {
+            let mut ctx = crate::context::RequestContext {
+                path_variables: variables,
+                ..crate::context::RequestContext::default()
+            };
+            let mut exchange = crate::server::DefaultServerWebExchange::new(
+                &mut ctx,
+                crate::context::HeaderAndBody::with_req_header(&mut request),
+            );
+            futures::executor::block_on(filter.filter(
+                &mut exchange,
+                &crate::handler::DefaultGatewayFilterChain::default(),
+            ))
+            .unwrap();
+        }
+
+        request
+    }
+
+    #[test]
+    fn substitutes_captured_variables_and_keeps_the_query() {
+        let request = apply("/new/{id}", &[("id", "42")]);
+
+        assert_eq!(request.uri.path(), "/new/42");
+        assert_eq!(request.uri.query(), Some("a=1"));
+    }
+
+    #[test]
+    fn a_query_in_the_template_replaces_the_original_one() {
+        let request = apply("/new?b=2", &[]);
+
+        assert_eq!(request.uri.path(), "/new");
+        assert_eq!(request.uri.query(), Some("b=2"));
+    }
+}
