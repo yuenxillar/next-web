@@ -20,6 +20,8 @@ pub struct UpstreamSelection {
     pub addr: SocketAddr,
     /// SNI / host name sent in the TLS handshake, never empty for `https`.
     pub sni: String,
+    /// Value written to the upstream `Host` header.
+    pub host_header: String,
     /// Whether the connection uses TLS.
     pub tls: bool,
     /// Connection reuse group, so routes never share sockets.
@@ -90,6 +92,7 @@ mod tests {
         UpstreamSelection {
             addr: "10.0.0.1:443".parse::<SocketAddr>().unwrap(),
             sni: "example.com".to_string(),
+            host_header: "example.com".to_string(),
             tls,
             group_key: 7,
         }

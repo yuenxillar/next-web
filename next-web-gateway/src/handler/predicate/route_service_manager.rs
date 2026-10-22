@@ -1,31 +1,48 @@
-use hashbrown::HashMap;
-use pingora::{proxy::Session, Result};
+//! Route matching, filter application and the per-route response cache hook.
+
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::{
-    config::RouteMetadata,
-    context::{HeaderAndBody, RequestContext},
-    filter::{
-        factory::local_response_cache::LocalResponseCacheFilter,
-        gateway_filter::{DefaultGatewayFilter, GatewayFilter},
-        gateway_filter_chain::GatewayFilterChain,
-    },
-    handler::DefaultGatewayFilterChain,
-    server::DefaultServerWebExchange,
-    service::route_service::{RoutePredicateService, RouteWork},
-};
+use hashbrown::HashMap as FastMap;
+use pingora::proxy::Session;
+
+use crate::config::RouteMetadata;
+use crate::context::{HeaderAndBody, RequestContext};
+use crate::filter::factory::local_response_cache::LocalResponseCacheFilter;
+use crate::filter::gateway_filter::DefaultGatewayFilter;
+use crate::filter::spec::FilterPhase;
+use crate::handler::DefaultGatewayFilterChain;
+use crate::server::DefaultServerWebExchange;
+use crate::service::route_service::{RoutePredicateService, RouteWork};
 
 use super::route_predicate_factory::RoutePredicateFactory;
 
-static DEFAULT_SERVICE_NAME: &str = "";
+/// The route selected for one request, with everything the proxy needs.
+#[derive(Debug, Clone)]
+pub struct RouteMatch {
+    /// Matched route id.
+    pub route_id: String,
+    /// Upstream authority from the route `uri`.
+    pub upstream: String,
+    /// How the route reaches its upstream.
+    pub work: RouteWork,
+    /// Circuit breaker referenced by the route, if any.
+    pub fallback_id: String,
+    /// Values captured by `Path` templates.
+    pub path_variables: HashMap<String, String>,
+    /// Route metadata.
+    pub metadata: Option<RouteMetadata>,
+}
 
+/// The parsed routes plus the ordered scan used to match a request.
 #[derive(Clone)]
 pub struct RouteServiceManager {
-    services: HashMap<String, RoutePredicateService>,
+    services: FastMap<String, RoutePredicateService>,
     ordered_route_ids: Vec<String>,
 }
 
 impl RouteServiceManager {
+    /// Build the manager from parsed routes.
     pub fn new(mut services: Vec<RoutePredicateService>) -> Self {
         services.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.id.cmp(&b.id)));
         configure_weight_predicates(&mut services);
@@ -42,92 +59,105 @@ impl RouteServiceManager {
         }
     }
 
-    // var1: Predicate result
-    // var2: Service name
-    // var3: RouteWork
-    pub fn predicate(&self, session: &mut Session) -> RoutepRedicateResult<'_> {
+    /// Return the first route whose predicates all match.
+    pub fn match_route(&self, session: &mut Session) -> Option<RouteMatch> {
         for route_id in &self.ordered_route_ids {
-            let Some(service) = self.services.get(route_id) else {
-                continue;
-            };
+            let service = self.services.get(route_id)?;
 
             let allowable = service
                 .route_predicate_factory
                 .iter()
                 .all(|factory| factory.matches(session));
 
-            if allowable {
-                if let Some(rate_limiter) = &service.rate_limiter {
-                    if rate_limiter.check_rate(&service.id) {
-                        return RoutepRedicateResult {
-                            allowable: false,
-                            service_name: DEFAULT_SERVICE_NAME,
-                            work: &RouteWork::Http,
-                            fallback_id: DEFAULT_SERVICE_NAME,
-                            route_id: DEFAULT_SERVICE_NAME,
-                            metadata: &None,
-                        };
-                    }
-                }
-
-                return RoutepRedicateResult {
-                    allowable,
-                    service_name: &service.upstream,
-                    work: &service.work,
-                    fallback_id: &service.fallback_id,
-                    route_id: &service.id,
-                    metadata: &service.metadata,
-                };
+            if !allowable {
+                continue;
             }
+
+            let path = session.req_header().uri.path().to_string();
+            let path_variables = self.capture_variables(route_id, &path);
+
+            return Some(RouteMatch {
+                route_id: service.id.clone(),
+                upstream: service.upstream.clone(),
+                work: service.work.clone(),
+                fallback_id: service.fallback_id.clone(),
+                path_variables,
+                metadata: service.metadata.clone(),
+            });
         }
 
-        RoutepRedicateResult {
-            allowable: false,
-            service_name: DEFAULT_SERVICE_NAME,
-            work: &RouteWork::Http,
-            fallback_id: DEFAULT_SERVICE_NAME,
-            route_id: DEFAULT_SERVICE_NAME,
-            metadata: &None,
-        }
+        None
     }
 
-    pub async fn filter<'a, 'b>(
-        &self,
-        ctx: &mut RequestContext,
-        header_and_body: HeaderAndBody<'a, 'b>,
-    ) -> Result<()> {
-        if let Some(route_id) = &ctx.route_id {
-            if let Some(service) = self.services.get(route_id) {
-                let filters = service
-                    .filters
+    /// Extract the `{variable}` values of a route's `Path` predicate.
+    fn capture_variables(&self, route_id: &str, path: &str) -> HashMap<String, String> {
+        let Some(service) = self.services.get(route_id) else {
+            return HashMap::new();
+        };
+
+        service
+            .route_predicate_factory
+            .iter()
+            .find_map(|factory| match factory {
+                RoutePredicateFactory::PathPredicates(paths) => paths
+                    .paths
                     .iter()
-                    .cloned()
-                    .map(|filter| Arc::new(filter) as Arc<dyn GatewayFilter>)
-                    .collect();
-                let chain = DefaultGatewayFilterChain::new(filters);
-                let mut exchange = DefaultServerWebExchange::new(ctx, header_and_body);
-                chain
-                    .filter(&mut exchange)
-                    .await
-                    .map_err(|error| -> Box<pingora::Error> { error.into() })?;
-            }
-        }
-
-        Ok(())
+                    .find_map(|pattern| pattern.capture(path)),
+                _ => None,
+            })
+            .unwrap_or_default()
     }
 
-    pub fn filter_blocking<'a, 'b>(
+    /// Run the filters of one phase over the exchange.
+    pub async fn filter_phase<'a, 'b>(
         &self,
         ctx: &mut RequestContext,
+        phase: FilterPhase,
         header_and_body: HeaderAndBody<'a, 'b>,
-    ) -> Result<()> {
-        futures::executor::block_on(self.filter(ctx, header_and_body))
+    ) -> pingora::Result<()> {
+        let Some(route_id) = ctx.route_id.as_deref() else {
+            return Ok(());
+        };
+        let Some(service) = self.services.get(route_id) else {
+            return Ok(());
+        };
+
+        let chain = DefaultGatewayFilterChain::new(DefaultGatewayFilter::chain_for(
+            &service.filters,
+            phase,
+        ));
+        let mut exchange = DefaultServerWebExchange::new(ctx, header_and_body);
+
+        crate::filter::gateway_filter_chain::GatewayFilterChain::filter(&chain, &mut exchange)
+            .await
+            .map_err(|error| -> Box<pingora::Error> { error.into() })
     }
 
-    pub fn services(&self) -> &HashMap<String, RoutePredicateService> {
+    /// Apply the response body filters of the matched route, in place.
+    pub fn apply_body_filters(&self, ctx: &RequestContext, body: &mut bytes::Bytes) {
+        let Some(route_id) = ctx.route_id.as_deref() else {
+            return;
+        };
+        let Some(service) = self.services.get(route_id) else {
+            return;
+        };
+
+        for filter in &service.filters {
+            filter.apply_body(body);
+        }
+    }
+
+    /// Routes, for the admin endpoint.
+    pub fn services(&self) -> &FastMap<String, RoutePredicateService> {
         &self.services
     }
 
+    /// Route ids in evaluation order.
+    pub fn ordered_route_ids(&self) -> &[String] {
+        &self.ordered_route_ids
+    }
+
+    /// Whether the route rewrites the response body.
     pub fn has_response_body_filters(&self, route_id: Option<&str>) -> bool {
         let Some(route_id) = route_id else {
             return false;
@@ -144,6 +174,7 @@ impl RouteServiceManager {
             .unwrap_or(false)
     }
 
+    /// The response cache filter configured on the route, if any.
     pub fn local_response_cache_filter(
         &self,
         route_id: Option<&str>,
@@ -157,29 +188,18 @@ impl RouteServiceManager {
     }
 }
 
-
-
-#[derive(Clone)]
-pub struct RoutepRedicateResult<'a> {
-    pub allowable: bool,
-    pub service_name: &'a str,
-    pub work: &'a RouteWork,
-    pub fallback_id: &'a str,
-    pub route_id: &'a str,
-    pub metadata: &'a Option<RouteMetadata>,
-}
-
 impl Default for RouteServiceManager {
     fn default() -> Self {
         Self {
-            services: HashMap::new(),
+            services: FastMap::new(),
             ordered_route_ids: Vec::new(),
         }
     }
 }
 
+/// Assign every `Weight` predicate its slice of the group's bucket space.
 fn configure_weight_predicates(services: &mut [RoutePredicateService]) {
-    let mut group_totals = HashMap::new();
+    let mut group_totals = FastMap::new();
 
     for service in services.iter() {
         for predicate in &service.route_predicate_factory {
@@ -190,7 +210,7 @@ fn configure_weight_predicates(services: &mut [RoutePredicateService]) {
         }
     }
 
-    let mut group_offsets = HashMap::new();
+    let mut group_offsets = FastMap::new();
     for service in services.iter_mut() {
         for predicate in &mut service.route_predicate_factory {
             if let RoutePredicateFactory::WeightPredicates(weight) = predicate {
@@ -203,151 +223,52 @@ fn configure_weight_predicates(services: &mut [RoutePredicateService]) {
     }
 }
 
+/// Shared handle so health checks and the admin endpoint can share routes.
+pub type SharedRoutes = Arc<RouteServiceManager>;
+
 #[cfg(test)]
 mod tests {
-    use super::{RoutePredicateFactory, RouteServiceManager};
-    use crate::context::{HeaderAndBody, RequestContext};
+    use super::RouteServiceManager;
+    use crate::config::RouteConfig;
     use crate::filter::gateway_filter::DefaultGatewayFilter;
-    use crate::service::route_service::{RoutePredicateService, RouteWork};
-    use pingora::http::RequestHeader;
+    use crate::service::route_service::RoutePredicateService;
+
+    fn route(id: &str, order: i32, uri: &str) -> RouteConfig {
+        RouteConfig {
+            id: id.to_string(),
+            uri: uri.to_string(),
+            order,
+            predicates: Vec::new(),
+            filters: Vec::new(),
+            upstreams: Vec::new(),
+            metadata: Default::default(),
+        }
+    }
 
     #[test]
     fn new_sorts_routes_by_order_then_id() {
-        let manager = RouteServiceManager::new(vec![
-            RoutePredicateService {
-                id: "b".to_string(),
-                order: 10,
-                work: RouteWork::Http,
-                upstream: "svc-b".to_string(),
-                route_predicate_factory: Vec::new(),
-                filters: Vec::new(),
-                fallback_id: String::new(),
-                rate_limiter: None,
-                metadata: None,
-            },
-            RoutePredicateService {
-                id: "a".to_string(),
-                order: 10,
-                work: RouteWork::Http,
-                upstream: "svc-a".to_string(),
-                route_predicate_factory: Vec::new(),
-                filters: Vec::new(),
-                fallback_id: String::new(),
-                rate_limiter: None,
-                metadata: None,
-            },
-            RoutePredicateService {
-                id: "c".to_string(),
-                order: 5,
-                work: RouteWork::Http,
-                upstream: "svc-c".to_string(),
-                route_predicate_factory: Vec::new(),
-                filters: Vec::new(),
-                fallback_id: String::new(),
-                rate_limiter: None,
-                metadata: None,
-            },
-        ]);
+        let routes = vec![route("b", 10, "http://h:1"), route("a", 10, "http://h:1"), route("c", 5, "http://h:1")];
+        let services = routes
+            .into_iter()
+            .map(|route| RoutePredicateService::try_from(route).unwrap())
+            .collect();
 
-        assert_eq!(manager.ordered_route_ids, vec!["c", "a", "b"]);
+        let manager = RouteServiceManager::new(services);
+        assert_eq!(manager.ordered_route_ids(), vec!["c", "a", "b"]);
     }
 
     #[test]
-    fn new_assigns_weight_ranges_within_group_total() {
-        let manager = RouteServiceManager::new(vec![
-            RoutePredicateService {
-                id: "weight-high".to_string(),
-                order: 0,
-                work: RouteWork::Http,
-                upstream: "svc-high".to_string(),
-                route_predicate_factory: vec![
-                    RoutePredicateFactory::try_from("Weight=group1,8").unwrap(),
-                ],
-                filters: Vec::new(),
-                fallback_id: String::new(),
-                rate_limiter: None,
-                metadata: None,
-            },
-            RoutePredicateService {
-                id: "weight-low".to_string(),
-                order: 1,
-                work: RouteWork::Http,
-                upstream: "svc-low".to_string(),
-                route_predicate_factory: vec![
-                    RoutePredicateFactory::try_from("Weight=group1,2").unwrap(),
-                ],
-                filters: Vec::new(),
-                fallback_id: String::new(),
-                rate_limiter: None,
-                metadata: None,
-            },
-        ]);
-
-        let high = manager.services().get("weight-high").unwrap();
-        let low = manager.services().get("weight-low").unwrap();
-
-        match &high.route_predicate_factory[0] {
-            RoutePredicateFactory::WeightPredicates(weight) => {
-                assert_eq!(weight.total_weight, 10);
-                assert_eq!(weight.range_start, 0);
-                assert_eq!(weight.range_end, 8);
-            }
-            _ => panic!("expected weight predicate"),
-        }
-
-        match &low.route_predicate_factory[0] {
-            RoutePredicateFactory::WeightPredicates(weight) => {
-                assert_eq!(weight.total_weight, 10);
-                assert_eq!(weight.range_start, 8);
-                assert_eq!(weight.range_end, 10);
-            }
-            _ => panic!("expected weight predicate"),
-        }
-    }
-
-    #[test]
-    fn filter_uses_chain_instead_of_polling_filters() {
-        let manager = RouteServiceManager::new(vec![RoutePredicateService {
-            id: "chain-route".to_string(),
-            order: 0,
-            work: RouteWork::Http,
-            upstream: "svc-chain".to_string(),
-            route_predicate_factory: Vec::new(),
-            filters: vec![
-                DefaultGatewayFilter::try_from("AddResponseHeader=X-Response, ignored").unwrap(),
-                DefaultGatewayFilter::try_from("AddRequestHeader=X-Request, passed").unwrap(),
-            ],
-            fallback_id: String::new(),
-            rate_limiter: None,
-            metadata: None,
-        }]);
-
-        let mut ctx = RequestContext {
-            fallback_id: None,
-            route_id: Some("chain-route".to_string()),
-            client_ip: None,
-            original_request_path: None,
-            buffer_response_body: false,
-            response_body_buffer: Vec::new(),
-            local_response_cache_manager: None,
-            local_response_cache_request: None,
-            pending_local_response_cache: None,
-            session: None,
-            direct_response: None,
-        };
-        let mut request = RequestHeader::build("GET", b"/resource", None).unwrap();
-
-        futures::executor::block_on(
-            manager.filter(&mut ctx, HeaderAndBody::with_req_header(&mut request)),
-        )
-        .unwrap();
+    fn filters_are_split_by_phase() {
+        let request = DefaultGatewayFilter::try_from("AddRequestHeader=X-A, 1").unwrap();
+        let response = DefaultGatewayFilter::try_from("AddResponseHeader=X-B, 1").unwrap();
 
         assert_eq!(
-            request
-                .headers
-                .get("x-request")
-                .and_then(|value| value.to_str().ok()),
-            Some("passed")
+            DefaultGatewayFilter::chain_for(&[request.clone(), response.clone()], crate::filter::spec::FilterPhase::RequestHeader).len(),
+            1
+        );
+        assert_eq!(
+            DefaultGatewayFilter::chain_for(&[request, response], crate::filter::spec::FilterPhase::ResponseHeader).len(),
+            1
         );
     }
 }

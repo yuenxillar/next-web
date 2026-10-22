@@ -170,6 +170,16 @@ impl GatewayConfig {
     pub fn graceful_shutdown(&self) -> Duration {
         self.server.graceful_shutdown
     }
+
+    /// Whether any route enables the in-process response cache.
+    pub fn local_response_cache_enabled(&self) -> bool {
+        self.routes.iter().any(|route| {
+            route
+                .filters
+                .iter()
+                .any(|filter| filter.starts_with("LocalResponseCache"))
+        })
+    }
 }
 
 impl std::str::FromStr for GatewayConfig {

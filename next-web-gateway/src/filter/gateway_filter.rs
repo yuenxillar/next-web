@@ -182,6 +182,30 @@ impl DefaultGatewayFilter {
         self.phase() == FilterPhase::ResponseBody
     }
 
+    /// Apply a response body filter synchronously.
+    ///
+    /// Body filters run on the proxy thread from `response_body_filter`, which
+    /// is not async; keeping them sync removes the `block_on` that used to run
+    /// a future on the worker thread.
+    pub fn apply_body(&self, body: &mut bytes::Bytes) {
+        if let Self::RemoveJsonAttributesResponseBody(filter) = self {
+            filter.apply(body);
+        }
+    }
+
+    /// Clone the filters that belong to `phase` into a chain-ready list.
+    pub fn chain_for(
+        filters: &[Self],
+        phase: FilterPhase,
+    ) -> Vec<Arc<dyn GatewayFilter>> {
+        filters
+            .iter()
+            .filter(|filter| filter.phase() == phase)
+            .cloned()
+            .map(|filter| Arc::new(filter) as Arc<dyn GatewayFilter>)
+            .collect()
+    }
+
     /// Configured `name, value` header pairs, for `name`/`value` style filters.
     pub fn header_pairs(&self) -> Vec<(String, String)> {
         let pairs = |headers: &[KeyValue<String, String>]| {

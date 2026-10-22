@@ -1,5 +1,37 @@
+use std::collections::HashMap;
+
 use pingora::http::RequestHeader;
 use tracing::warn;
+
+/// Replace `{name}` placeholders with the captured path variables.
+pub fn substitute_variables(template: &str, variables: &HashMap<String, String>) -> String {
+    if variables.is_empty() || !template.contains('{') {
+        return template.to_string();
+    }
+
+    let mut out = String::with_capacity(template.len());
+    let mut rest = template;
+
+    while let Some(start) = rest.find('{') {
+        let Some(offset) = rest[start..].find('}') else {
+            break;
+        };
+        let end = start + offset;
+        let name = &rest[start + 1..end];
+
+        out.push_str(&rest[..start]);
+        match variables.get(name) {
+            Some(value) => out.push_str(value),
+            // Leave an unknown placeholder untouched so a typo stays visible.
+            None => out.push_str(&rest[start..=end]),
+        }
+
+        rest = &rest[end + 1..];
+    }
+
+    out.push_str(rest);
+    out
+}
 
 pub fn set_request_path(request_header: &mut RequestHeader, path: &str, query: Option<&str>) {
     let path_and_query = build_path_and_query(path, query);
@@ -77,5 +109,40 @@ fn normalize_path(path: &str) -> String {
         trimmed.to_string()
     } else {
         format!("/{trimmed}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::substitute_variables;
+
+    #[test]
+    fn substitutes_known_variables() {
+        let mut variables = HashMap::new();
+        variables.insert("version".to_string(), "v2".to_string());
+
+        assert_eq!(
+            substitute_variables("/{version}/users", &variables),
+            "/v2/users"
+        );
+    }
+
+    #[test]
+    fn leaves_unknown_variables_untouched() {
+        assert_eq!(
+            substitute_variables("/{missing}/users", &HashMap::new()),
+            "/{missing}/users"
+        );
+    }
+
+    #[test]
+    fn handles_several_placeholders() {
+        let mut variables = HashMap::new();
+        variables.insert("a".to_string(), "1".to_string());
+        variables.insert("b".to_string(), "2".to_string());
+
+        assert_eq!(substitute_variables("/{a}/{b}", &variables), "/1/2");
     }
 }

@@ -1,27 +1,33 @@
-use crate::properties::circuit_breaker_properties::CircuitBreakerProperties;
+//! One circuit breaker instance, created from its configuration.
+
+use crate::config::BreakerConfig;
 
 use super::circuit_breaker_controller::CircuitBreakerController;
 
+/// A breaker plus the id routes use to reference it.
 #[derive(Clone)]
 pub struct CircuitBreakerService {
-    // The unique identifier of the circuit breaker.
+    /// Unique identifier of the breaker.
     pub id: String,
 
-    // Is the circuit breaker active or not.
+    /// Whether the breaker may open at all.
     pub active: bool,
 
-    // The controller of the circuit breaker.
+    /// The state machine.
     pub controller: CircuitBreakerController,
 }
 
-impl Into<CircuitBreakerService> for CircuitBreakerProperties {
-    fn into(self) -> CircuitBreakerService {
-        CircuitBreakerService {
-            id: self.id,
-            active: self.enabled,
-            controller: CircuitBreakerController::new(
-                self.failure_threshold.unwrap_or(10),
-                std::time::Duration::from_secs(self.wait_duration_in_open_state.unwrap_or(5)),
+impl CircuitBreakerService {
+    /// Build a breaker from its configuration.
+    pub fn from_config(id: &str, config: &BreakerConfig) -> Self {
+        Self {
+            id: id.to_string(),
+            active: config.enabled,
+            controller: CircuitBreakerController::with_permits(
+                config.enabled,
+                config.failure_threshold,
+                config.wait_duration_in_open_state,
+                config.half_open_permits,
             ),
         }
     }

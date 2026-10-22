@@ -21,7 +21,7 @@ pub use query_route_predicate_factory::QueryRoutePredicateFactory;
 pub use remote_addr_route_predicate_factory::RemoteAddrRoutePredicateFactory;
 pub use route_predicate::RoutePredicate;
 pub use route_predicate_factory::RoutePredicateFactory;
-pub use route_service_manager::RouteServiceManager;
+pub use route_service_manager::{RouteMatch, RouteServiceManager};
 pub use weight_route_predicate_factory::WeightRoutePredicateFactory;
 pub use x_forwarded_remote_addr_route_predicate_factory::XForwardedRemoteAddrRoutePredicateFactory;
 pub use zoned_datetime_route_predicate_factory::ZonedDateTimeRoutePredicateFactory;

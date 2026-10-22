@@ -41,6 +41,66 @@ impl From<&str> for RemoveJsonAttributesResponseBodyFilter {
     }
 }
 
+impl RemoveJsonAttributesResponseBodyFilter {
+    /// Remove the configured attributes from a JSON body, in place.
+    ///
+    /// Non-JSON bodies are left untouched with a warning, so a mislabelled
+    /// response never loses content.
+    pub fn apply(&self, body: &mut Bytes) {
+        if self.names.is_empty() || body.is_empty() {
+            return;
+        }
+
+        let names: HashSet<&str> = self.names.iter().map(String::as_str).collect();
+        let mut json = match serde_json::from_slice::<Value>(body.as_ref()) {
+            Ok(json) => json,
+            Err(error) => {
+                warn!(
+                    target: "gateway_filter",
+                    "response body is not JSON, leaving it unchanged: {error}"
+                );
+                return;
+            }
+        };
+
+        if self.recursive {
+            strip_recursive(&mut json, &names);
+        } else if let Value::Object(map) = &mut json {
+            for name in &names {
+                map.remove(*name);
+            }
+        }
+
+        match serde_json::to_vec(&json) {
+            Ok(encoded) => *body = Bytes::from(encoded),
+            Err(error) => warn!(
+                target: "gateway_filter",
+                "failed to re-encode the filtered JSON body: {error}"
+            ),
+        }
+    }
+}
+
+/// Remove every occurrence of the names at any depth.
+fn strip_recursive(value: &mut Value, names: &HashSet<&str>) {
+    match value {
+        Value::Object(map) => {
+            for name in names {
+                map.remove(*name);
+            }
+            for child in map.values_mut() {
+                strip_recursive(child, names);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                strip_recursive(item, names);
+            }
+        }
+        _ => {}
+    }
+}
+
 #[async_trait]
 impl GatewayFilter for RemoveJsonAttributesResponseBodyFilter {
     async fn filter(
@@ -139,19 +199,7 @@ mod tests {
     use crate::filter::gateway_filter::GatewayFilter;
 
     fn test_ctx() -> crate::context::RequestContext {
-        crate::context::RequestContext {
-            fallback_id: None,
-            route_id: None,
-            client_ip: None,
-            original_request_path: None,
-            buffer_response_body: false,
-            response_body_buffer: Vec::new(),
-            local_response_cache_manager: None,
-            local_response_cache_request: None,
-            pending_local_response_cache: None,
-            session: None,
-            direct_response: None,
-        }
+        crate::context::RequestContext::default()
     }
 
     fn apply_filter(body: &str, config: &str) -> String {

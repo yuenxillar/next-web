@@ -48,19 +48,7 @@ mod tests {
     use crate::filter::gateway_filter::GatewayFilter;
 
     fn test_ctx() -> crate::context::RequestContext {
-        crate::context::RequestContext {
-            fallback_id: None,
-            route_id: None,
-            client_ip: None,
-            original_request_path: None,
-            buffer_response_body: false,
-            response_body_buffer: Vec::new(),
-            local_response_cache_manager: None,
-            local_response_cache_request: None,
-            pending_local_response_cache: None,
-            session: None,
-            direct_response: None,
-        }
+        crate::context::RequestContext::default()
     }
 
     #[test]
