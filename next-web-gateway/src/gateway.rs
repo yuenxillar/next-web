@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use clap::Parser;
-use pingora::prelude::Opt;
 use pingora::proxy::http_proxy_service;
 use pingora::server::Server;
 use pingora::services::ServiceWithDependents;
@@ -185,13 +184,17 @@ impl Gateway {
         let ready = proxy.readiness();
         let admin = AdminService::new(Arc::new(self.config.clone()), routes, metrics, ready);
 
-        let mut server = match Server::new(Opt::default()) {
-            Ok(server) => server,
-            Err(error) => {
-                eprintln!("failed to start the server: {error}");
-                std::process::exit(EXIT_RUNTIME);
-            }
-        };
+        // Apply the listener settings that pingora can honour instead of
+        // silently running on its defaults.
+        let mut conf = pingora::server::configuration::ServerConf::default();
+        if self.config.server.threads > 0 {
+            conf.threads = self.config.server.threads;
+        }
+        let shutdown = self.config.server.graceful_shutdown.as_secs().max(1);
+        conf.grace_period_seconds = Some(shutdown);
+        conf.graceful_shutdown_timeout_seconds = Some(shutdown);
+
+        let mut server = Server::new_with_opt_and_conf(None, conf);
 
         server.bootstrap();
 

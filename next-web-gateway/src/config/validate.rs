@@ -28,6 +28,7 @@ pub(crate) fn validate(config: &GatewayConfig) -> Vec<ConfigError> {
     );
 
     validate_trusted_proxies(&config.trusted_proxies, &mut errors);
+    validate_server_knobs(config, &mut errors);
     validate_breakers(config, &mut errors);
     validate_routes(config, &mut errors);
 
@@ -51,6 +52,26 @@ pub fn is_valid_bind(value: &str) -> bool {
     match value.rsplit_once(':') {
         Some((host, port)) if !host.is_empty() => port.parse::<u16>().is_ok(),
         _ => false,
+    }
+}
+
+/// Reject listener knobs that pingora cannot apply.
+///
+/// Accepting them would leave an operator believing a limit is in force when it
+/// is not, which is the failure mode A1 exists to prevent.
+fn validate_server_knobs(config: &GatewayConfig, errors: &mut Vec<ConfigError>) {
+    if config.server.keepalive.is_some() {
+        errors.push(ConfigError::new(
+            "server.keepalive",
+            "downstream keep-alive is not configurable in this build; remove the key",
+        ));
+    }
+
+    if config.server.max_connection != 0 {
+        errors.push(ConfigError::new(
+            "server.max_connection",
+            "connection limiting is not implemented in this build; remove the key",
+        ));
     }
 }
 

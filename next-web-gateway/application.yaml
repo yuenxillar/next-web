@@ -4,7 +4,6 @@ next:
       bind: "0.0.0.0:8080"
       threads: 0
       graceful_shutdown: 30s
-      keepalive: 60s
       admin:
         enabled: true
         bind: "127.0.0.1:9001"

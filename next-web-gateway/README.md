@@ -64,8 +64,8 @@ next:
       bind: "0.0.0.0:8080"
       threads: 0                  # 0 = let pingora decide
       graceful_shutdown: 30s
-      keepalive: 60s
-      max_connection: 0           # 0 = unlimited
+      # `keepalive` and `max_connection` are rejected: pingora 0.9 exposes no
+      # downstream knob for them, and an accepted no-op key is worse than none.
       admin:
         enabled: true
         bind: "127.0.0.1:9001"
@@ -282,9 +282,9 @@ Gateway generated responses also pass through the response filters, so `SecureHe
   `no-store` request bypasses the cache entirely.
 - **`upstream.tls.ca_file` is rejected at startup.** This build cannot install a custom trust
   anchor, and accepting the key would silently fail every request to a private CA.
-- **`server.threads`, `keepalive`, `max_connection` and `graceful_shutdown` are parsed and
-  validated but not yet applied**; the listener settings come from pingora's defaults. They are
-  listed here so the gap is visible rather than assumed.
+- **`server.keepalive` and `server.max_connection` are rejected at startup** because pingora 0.9
+  exposes no downstream knob for them. `server.threads` and `server.graceful_shutdown` *are*
+  applied to pingora's `ServerConf`.
 
 ## Roadmap
 

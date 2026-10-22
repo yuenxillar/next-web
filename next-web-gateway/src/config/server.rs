@@ -4,7 +4,9 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-use super::duration::deserialize as deserialize_duration;
+use super::duration::{
+    deserialize as deserialize_duration, deserialize_option as deserialize_optional_duration,
+};
 
 /// Anonymous defaults used when a field is omitted from the configuration.
 fn default_bind() -> String {
@@ -19,11 +21,12 @@ fn default_graceful_shutdown() -> Duration {
     Duration::from_secs(30)
 }
 
-fn default_keepalive() -> Duration {
-    Duration::from_secs(60)
-}
-
 /// Downstream listener settings.
+///
+/// Only the keys that can actually be applied are accepted: `threads` and
+/// `graceful_shutdown` map onto pingora's `ServerConf`, while `keepalive` and
+/// `max_connection` are rejected at startup because pingora 0.9 exposes no
+/// downstream knob for them. Accepting them would be a silent no-op.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ServerConfig {
@@ -37,9 +40,13 @@ pub struct ServerConfig {
     #[serde(default = "default_graceful_shutdown", deserialize_with = "deserialize_duration")]
     pub graceful_shutdown: Duration,
     /// Downstream keep-alive timeout.
-    #[serde(default = "default_keepalive", deserialize_with = "deserialize_duration")]
-    pub keepalive: Duration,
+    ///
+    /// Not supported: rejected at startup when present.
+    #[serde(default, deserialize_with = "deserialize_optional_duration")]
+    pub keepalive: Option<Duration>,
     /// Maximum concurrent downstream connections; `0` means unlimited.
+    ///
+    /// Not supported: any non-zero value is rejected at startup.
     #[serde(default)]
     pub max_connection: usize,
     /// Admin listener settings.
@@ -53,7 +60,7 @@ impl Default for ServerConfig {
             bind: default_bind(),
             threads: 0,
             graceful_shutdown: default_graceful_shutdown(),
-            keepalive: default_keepalive(),
+            keepalive: None,
             max_connection: 0,
             admin: AdminConfig::default(),
         }
