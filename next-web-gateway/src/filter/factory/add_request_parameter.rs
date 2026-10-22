@@ -1,16 +1,18 @@
+//! `AddRequestParameter` filter: appends query parameters to the upstream request.
+
 use async_trait::async_trait;
+use form_urlencoded::Serializer;
 
 use crate::error::GatewayError;
 use crate::filter::gateway_filter::GatewayFilter;
 use crate::filter::gateway_filter_chain::GatewayFilterChain;
 use crate::server::ServerWebExchange;
-use crate::{util::key_value::KeyValue};
-use form_urlencoded::{parse, Serializer};
-use std::collections::HashMap;
-use tracing::warn;
+use crate::util::key_value::KeyValue;
 
+/// Appends configured query parameters to the upstream request.
 #[derive(Debug, Clone)]
 pub struct AddRequestParameterFilter {
+    /// Parameters appended in declaration order.
     pub parameters: Vec<KeyValue<String, String>>,
 }
 
@@ -26,32 +28,27 @@ impl GatewayFilter for AddRequestParameterFilter {
             None => return chain.filter(exchange).await,
         };
 
-        // Skip the rewrite when there is nothing to merge into the query string.
         if self.parameters.is_empty() {
             return chain.filter(exchange).await;
         }
 
-        let uri = &request_header.uri;
-        let path = uri.path();
-        let query = uri.query().unwrap_or("");
-        let scheme = uri.scheme().map(|s| s.as_str()).unwrap_or("");
-        let authority = uri.authority().map(|a| a.as_str()).unwrap_or("");
+        let uri = request_header.uri.clone();
+        let query = merge_query(uri.query().unwrap_or(""), &self.parameters);
+        let path_and_query = format!("{}?{query}", uri.path());
 
-        // Merge the configured parameters on top of the existing query string.
-        let new_query = merge_queries(query, &self.parameters);
+        let rebuilt = match uri.authority() {
+            Some(authority) => match uri.scheme_str() {
+                Some(scheme) => format!("{scheme}://{authority}{path_and_query}"),
+                None => path_and_query,
+            },
+            None => path_and_query,
+        };
 
-        // Rebuild the URI using the original path and authority.
-        let new_uri_str = build_uri_string(scheme, authority, path, &new_query);
-
-        // Parse and update the proxied request URI in place.
-        match new_uri_str.parse() {
-            Ok(new_uri) => request_header.set_uri(new_uri),
-            Err(error) => {
-                warn!(
-                    target: "gateway_filter",
-                    "Failed to parse modified URI: {}, original_uri: {}",
-                    error,
-                    uri
+        match rebuilt.parse() {
+            Ok(uri) => request_header.set_uri(uri),
+            Err(_) => {
+                tracing::warn!(
+                    "failed to rebuild the request URI after adding parameters: {rebuilt}"
                 );
             }
         }
@@ -60,59 +57,52 @@ impl GatewayFilter for AddRequestParameterFilter {
     }
 }
 
-/// Merge query parameters where new values override existing keys.
-fn merge_queries(original_query: &str, new_parameters: &[KeyValue<String, String>]) -> String {
-    if new_parameters.is_empty() {
-        return original_query.to_string();
+/// Append parameters to the query string without touching existing pairs.
+///
+/// The original query is kept verbatim: re-encoding it would turn `%20` into
+/// `+`, reorder keys and collapse duplicates.
+pub(crate) fn merge_query(
+    original_query: &str,
+    parameters: &[KeyValue<String, String>],
+) -> String {
+    let appended = parameters
+        .iter()
+        .map(|parameter| {
+            let mut pair = Serializer::new(String::new());
+            pair.append_pair(&parameter.k, &parameter.v);
+            pair.finish()
+        })
+        .collect::<Vec<_>>()
+        .join("&");
+
+    match (original_query.is_empty(), appended.is_empty()) {
+        (true, _) => appended,
+        (false, true) => original_query.to_string(),
+        (false, false) => format!("{original_query}&{appended}"),
     }
-
-    // A map is enough here because later parameters are meant to override earlier ones.
-    let mut param_map: HashMap<String, String> = HashMap::new();
-
-    // Load the original query first.
-    for (key, value) in parse(original_query.as_bytes()) {
-        param_map.insert(key.into_owned(), value.into_owned());
-    }
-
-    // Then overwrite with the configured parameters.
-    for param in new_parameters {
-        param_map.insert(param.k.clone(), param.v.clone());
-    }
-
-    // Serialize the merged map back into a query string.
-    let mut serializer = Serializer::new(String::with_capacity(
-        original_query.len() + new_parameters.len() * 20,
-    ));
-    for (key, value) in param_map {
-        serializer.append_pair(&key, &value);
-    }
-
-    serializer.finish()
 }
 
-/// Build a full URI string from the individual URI components.
-fn build_uri_string(scheme: &str, authority: &str, path: &str, query: &str) -> String {
-    let mut uri_string = String::new();
+#[cfg(test)]
+mod tests {
+    use super::merge_query;
+    use crate::util::key_value::KeyValue;
 
-    // Preserve the original scheme when the upstream request uses an absolute URI.
-    if !scheme.is_empty() {
-        uri_string.push_str(scheme);
-        uri_string.push_str("://");
+    fn parameters() -> Vec<KeyValue<String, String>> {
+        vec![KeyValue::from(("s", "1"))]
     }
 
-    // Preserve the authority for absolute URIs as well.
-    if !authority.is_empty() {
-        uri_string.push_str(authority);
+    #[test]
+    fn add_request_parameter_preserves_duplicate_keys_and_order() {
+        assert_eq!(merge_query("t=a&t=b", &parameters()), "t=a&t=b&s=1");
     }
 
-    // The path is always required.
-    uri_string.push_str(path);
-
-    // Append the query only when it exists.
-    if !query.is_empty() {
-        uri_string.push('?');
-        uri_string.push_str(query);
+    #[test]
+    fn add_request_parameter_appends_to_an_empty_query() {
+        assert_eq!(merge_query("", &parameters()), "s=1");
     }
 
-    uri_string
+    #[test]
+    fn add_request_parameter_keeps_percent_encoding() {
+        assert_eq!(merge_query("q=a%20b", &parameters()), "q=a%20b&s=1");
+    }
 }
