@@ -42,10 +42,9 @@ impl GatewayFilter for RewriteLocationResponseHeaderFilter {
 
         if let (Some(regex), Some(scheme)) =
             (&self.protocols_regex, parsed_location.scheme.as_deref())
+            && !regex.is_match(scheme)
         {
-            if !regex.is_match(scheme) {
-                return chain.filter(exchange).await;
-            }
+            return chain.filter(exchange).await;
         }
 
         let rewritten_path = match self.strip_version_mode.to_ascii_uppercase().as_str() {

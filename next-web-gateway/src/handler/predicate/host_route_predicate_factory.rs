@@ -39,10 +39,10 @@ fn normalize_host(host: &str) -> String {
         return host;
     }
 
-    if let Some(stripped) = host.strip_prefix('[') {
-        if let Some((ipv6, _)) = stripped.split_once(']') {
-            return ipv6.to_string();
-        }
+    if let Some(stripped) = host.strip_prefix('[')
+        && let Some((ipv6, _)) = stripped.split_once(']')
+    {
+        return ipv6.to_string();
     }
 
     if host.matches(':').count() == 1 {

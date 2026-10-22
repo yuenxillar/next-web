@@ -442,23 +442,18 @@ impl ProxyHttp for GatewayProxy {
         }
 
         // Reserve a breaker probe before connecting.
-        if let Some(breaker_id) = ctx.fallback_id.clone() {
-            if let Some(breakers) = self.breakers.as_ref() {
-                if let Some(service) = breakers.services.get(&breaker_id) {
-                    if let Err(rejection) = service.controller.try_acquire().await {
-                        warn!(breaker = %service.id, "circuit breaker is open, rejecting");
-                        // Tell the client when the breaker will probe again
-                        // instead of a hard coded second.
-                        let retry_after = rejection.retry_after.as_secs().max(1).to_string();
-                        ctx.respond_with_empty(
-                            503,
-                            vec![("Retry-After".to_string(), retry_after)],
-                        )
-                        .ok();
-                        return self.respond_directly(session, ctx, 503).await;
-                    }
-                }
-            }
+        if let Some(breaker_id) = ctx.fallback_id.clone()
+            && let Some(breakers) = self.breakers.as_ref()
+            && let Some(service) = breakers.services.get(&breaker_id)
+            && let Err(rejection) = service.controller.try_acquire().await
+        {
+            warn!(breaker = %service.id, "circuit breaker is open, rejecting");
+            // Tell the client when the breaker will probe again instead of a
+            // hard coded second.
+            let retry_after = rejection.retry_after.as_secs().max(1).to_string();
+            ctx.respond_with_empty(503, vec![("Retry-After".to_string(), retry_after)])
+                .ok();
+            return self.respond_directly(session, ctx, 503).await;
         }
 
         self.metrics.record_inflight(1);
@@ -619,17 +614,16 @@ impl ProxyHttp for GatewayProxy {
         upstream_response: &mut ResponseHeader,
         ctx: &mut Self::CTX,
     ) -> pingora::Result<()> {
-        if let Some(breaker_id) = ctx.fallback_id.clone() {
-            if let Some(breakers) = self.breakers.as_ref() {
-                if let Some(service) = breakers.services.get(&breaker_id) {
-                    let outcome = if upstream_response.status.as_u16() >= 500 {
-                        Outcome::Failure
-                    } else {
-                        Outcome::Success
-                    };
-                    service.controller.process(outcome).await;
-                }
-            }
+        if let Some(breaker_id) = ctx.fallback_id.clone()
+            && let Some(breakers) = self.breakers.as_ref()
+            && let Some(service) = breakers.services.get(&breaker_id)
+        {
+            let outcome = if upstream_response.status.as_u16() >= 500 {
+                Outcome::Failure
+            } else {
+                Outcome::Success
+            };
+            service.controller.process(outcome).await;
         }
 
         // The correlation id belongs on every response the client sees, proxied

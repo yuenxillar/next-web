@@ -26,18 +26,21 @@ impl GatewayFilter for RequestSizeFilter {
             return chain.filter(exchange).await;
         }
 
-        if let Some(content_length) = request_header.headers.get("content-length") {
-            if let Ok(content_length) = content_length.to_str() {
-                if let Ok(size) = content_length.parse::<u64>() {
-                    // Reject requests that already advertise a body larger than the configured limit.
-                    if size > self.max_size {
-                        return exchange
-                            .request_context()
-                            .respond_with_text(413, Vec::new(), "Request size exceeded")
-                            .map_err(|_| GatewayError::ServerRejectsRequest);
-                    }
-                }
-            }
+        // Reject a request that already advertises a body larger than the limit;
+        // a chunked body is caught while it streams in the proxy.
+        let advertised = request_header
+            .headers
+            .get("content-length")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<u64>().ok());
+
+        if let Some(size) = advertised
+            && size > self.max_size
+        {
+            return exchange
+                .request_context()
+                .respond_with_text(413, Vec::new(), "Request size exceeded")
+                .map_err(|_| GatewayError::ServerRejectsRequest);
         }
 
         chain.filter(exchange).await

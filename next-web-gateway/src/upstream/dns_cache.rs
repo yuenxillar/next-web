@@ -58,10 +58,10 @@ impl DnsCache {
 
         {
             let entries = self.entries.lock().await;
-            if let Some(entry) = entries.get(&key) {
-                if entry.resolved_at.elapsed() < self.ttl {
-                    return Ok(entry.addresses.clone());
-                }
+            if let Some(entry) = entries.get(&key)
+                && entry.resolved_at.elapsed() < self.ttl
+            {
+                return Ok(entry.addresses.clone());
             }
         }
 
