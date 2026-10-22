@@ -24,22 +24,54 @@ fn unmatched_path_returns_404() {
 fn order_decides_between_overlapping_routes() {
     let template = "\
 - id: first
-  uri: \"http://{upstream}/first\"
+  uri: \"http://{upstream}\"
   order: 10
   predicates:
     - Path=/api/**
+  filters:
+    - AddRequestHeader=X-Route-Winner, first
 - id: second
-  uri: \"http://{upstream}/second\"
+  uri: \"http://{upstream}\"
   order: 20
   predicates:
     - Path=/api/**
+  filters:
+    - AddRequestHeader=X-Route-Winner, second
 ";
-    let (_upstream, gateway) = with_upstream(Behavior::Echo, template);
+    let (upstream, gateway) = with_upstream(Behavior::Echo, template);
 
     let response = get(gateway.addr, "/api/users", &[]);
 
     assert_eq!(response.status, 200);
-    assert!(response.text().starts_with("/api/users"), "{}", response.text());
+    let recorded = upstream.last_request().expect("upstream request");
+    assert_eq!(
+        recorded.header("x-route-winner"),
+        Some("first"),
+        "the lower order must win"
+    );
+}
+
+#[test]
+fn set_request_host_header_overrides_the_upstream_host() {
+    let template = "\
+- id: echo
+  uri: \"http://{upstream}\"
+  predicates:
+    - Path=/echo/**
+  filters:
+    - SetRequestHostHeader=api.internal
+";
+    let (upstream, gateway) = with_upstream(Behavior::Echo, template);
+
+    let response = request(gateway.addr, "GET", "/echo", &[("Host", "client.example")], None);
+
+    assert_eq!(response.status, 200);
+    let recorded = upstream.last_request().expect("upstream request");
+    assert_eq!(
+        recorded.header("host"),
+        Some("api.internal"),
+        "SetRequestHostHeader must win over the default host rewrite"
+    );
 }
 
 #[test]

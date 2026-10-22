@@ -162,7 +162,8 @@ impl LocalResponseCacheManager {
         };
 
         if entry.size > max_size_bytes {
-            routes.remove(&route_id);
+            // One oversized response must not flush the whole route: skip this
+            // entry and leave the siblings alone.
             return;
         }
 
@@ -188,29 +189,36 @@ impl LocalResponseCacheManager {
     }
 }
 
+/// Serve a cached response when one is present and fresh.
+///
+/// Returns `true` when the request was answered from the cache, so the proxy can
+/// record the hit.
 pub fn serve_from_local_cache_if_present(
     filter: &LocalResponseCacheFilter,
     ctx: &mut RequestContext,
     request_header: &RequestHeader,
-) -> pingora::Result<()> {
+) -> pingora::Result<bool> {
     ctx.local_response_cache_request = None;
     ctx.pending_local_response_cache = None;
 
     let Some(manager) = ctx.local_response_cache_manager.as_ref() else {
-        return Ok(());
+        return Ok(false);
     };
 
     let Some(route_id) = ctx.route_id.clone() else {
-        return Ok(());
+        return Ok(false);
     };
 
     if !filter.is_valid() || !is_cacheable_get_request(request_header) {
-        return Ok(());
+        return Ok(false);
     }
 
     let request_cache_control = read_cache_control_header(&request_header.headers, "cache-control");
-    if request_cache_control.no_store {
-        return Ok(());
+    // `no-store` and `no-cache` both bypass the cache entirely: a `no-cache`
+    // client asked to revalidate, and answering it with a synthetic 304 would be
+    // a protocol lie.
+    if request_cache_control.no_store || request_cache_control.no_cache {
+        return Ok(false);
     }
 
     let key = build_cache_key(request_header);
@@ -220,15 +228,12 @@ pub fn serve_from_local_cache_if_present(
     });
 
     let Some(entry) = manager.get(&route_id, &key) else {
-        return Ok(());
+        return Ok(false);
     };
 
     let headers = materialize_cached_headers(&entry);
-    if request_cache_control.no_cache {
-        return ctx.respond_with_empty(304, headers);
-    }
-
-    ctx.respond_with_body(entry.status, headers, entry.body)
+    ctx.respond_with_body(entry.status, headers, entry.body)?;
+    Ok(true)
 }
 
 pub fn capture_response_for_local_cache(
@@ -253,6 +258,26 @@ pub fn capture_response_for_local_cache(
     let response_cache_control =
         read_cache_control_header(&response_header.headers, "cache-control");
     if response_cache_control.no_store || response_cache_control.private {
+        return;
+    }
+
+    // A response that hands out a cookie is user specific; caching it would
+    // replay one client's session to another.
+    if response_header.headers.contains_key("set-cookie") {
+        tracing::debug!(
+            route = %request_state.route_id,
+            "not caching a response that sets a cookie"
+        );
+        return;
+    }
+
+    // The cache key cannot honour an arbitrary `Vary` contract, so anything
+    // beyond `accept-encoding` (already part of the key) is not cached.
+    if !vary_is_supported(response_header) {
+        tracing::debug!(
+            route = %request_state.route_id,
+            "not caching a response with an unsupported Vary header"
+        );
         return;
     }
 
@@ -408,8 +433,26 @@ fn extract_cacheable_headers(response_header: &ResponseHeader) -> Vec<(String, S
     headers
 }
 
-fn is_hop_by_hop_header(name: &str) -> bool {
-    matches!(
+/// Whether the response's `Vary` list is one the cache key already covers.
+///
+/// `accept-encoding` is part of the key, so it is fine; anything else would need
+/// the entry to remember per-header values, which the cache does not do.
+fn vary_is_supported(response_header: &ResponseHeader) -> bool {
+    let Some(vary) = response_header
+        .headers
+        .get("vary")
+        .and_then(|value| value.to_str().ok())
+    else {
+        return true;
+    };
+
+    vary.split(',')
+        .map(str::trim)
+        .filter(|field| !field.is_empty())
+        .all(|field| field.eq_ignore_ascii_case("accept-encoding"))
+}
+
+fn is_hop_by_hop_header(name: &str) -> bool {    matches!(
         name.to_ascii_lowercase().as_str(),
         "connection"
             | "keep-alive"

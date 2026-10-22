@@ -74,11 +74,15 @@ pub fn render_error(
 
     let body = match config.format {
         ErrorFormat::Json => {
-            let route = route.unwrap_or("");
-            Bytes::from(format!(
-                "{{\"status\":{status},\"error\":\"{reason}\",\"route\":\"{route}\",\
-                 \"requestId\":\"{request_id}\"}}"
-            ))
+            // Built through serde_json so a caller controlled value can never
+            // break the document.
+            let document = serde_json::json!({
+                "status": status,
+                "error": reason,
+                "route": route.unwrap_or(""),
+                "requestId": request_id,
+            });
+            Bytes::from(document.to_string())
         }
         ErrorFormat::Text => Bytes::from(format!("{status} {reason}\n")),
     };
@@ -157,5 +161,17 @@ mod tests {
 
         assert_eq!(String::from_utf8(body.to_vec()).unwrap(), "404 Not Found\n");
         assert_eq!(reason_phrase(404), "Not Found");
+    }
+
+    #[test]
+    fn a_hostile_request_id_cannot_break_the_json_document() {
+        let config = ErrorConfig::default();
+        let (_, body) = render_error(&config, 429, Some("users"), "\"},{\"evil\":\"1").unwrap();
+
+        let parsed: serde_json::Value =
+            serde_json::from_slice(&body).expect("the error body must stay valid JSON");
+
+        assert_eq!(parsed["status"], 429);
+        assert_eq!(parsed["requestId"], "\"},{\"evil\":\"1");
     }
 }

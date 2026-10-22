@@ -30,12 +30,16 @@ pub struct RequestContext {
     pub client_ip: Option<std::net::IpAddr>,
     /// Downstream `Host`, preserved when `PreserveHostHeader` is configured.
     pub original_host: Option<String>,
+    /// Host to send upstream, set by `SetRequestHostHeader`.
+    pub upstream_host_override: Option<String>,
     /// Upstream selected for this request.
     pub selected: Option<UpstreamSelection>,
     /// Path as received, before any rewrite.
     pub original_request_path: Option<String>,
     /// Bytes of request body seen so far.
     pub request_body_bytes: u64,
+    /// Whether this request was counted in the inflight gauge.
+    pub inflight_counted: bool,
     /// When the request started, used for latency logs.
     pub started: Option<Instant>,
     /// Whether the response body is being buffered for a body filter.

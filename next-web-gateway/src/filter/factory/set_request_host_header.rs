@@ -16,12 +16,10 @@ impl GatewayFilter for SetRequestHostHeaderFilter {
         exchange: &mut dyn ServerWebExchange,
         chain: &dyn GatewayFilterChain,
     ) -> Result<(), GatewayError> {
-        if let Some(request_header) = exchange.request_header() {
-            // Set the upstream Host header explicitly so H1 and H2 forwarding use the same host.
-            request_header
-                .insert_header("Host".to_string(), self.host.as_str())
-                .ok();
-        }
+        // The proxy rewrites `Host` from the upstream authority by default, so
+        // the filter records the desired value on the context and the proxy
+        // honours it.
+        exchange.request_context().upstream_host_override = Some(self.host.clone());
 
         chain.filter(exchange).await
     }

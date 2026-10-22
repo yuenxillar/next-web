@@ -84,6 +84,8 @@ next:
       tls:
         verify_cert: true
         verify_hostname: true
+        # Custom CA bundles are rejected at startup in this build: use the
+        # system trust store instead.
         ca_file: null
         insecure_skip_verify: false
     error:
@@ -275,7 +277,14 @@ Gateway generated responses also pass through the response filters, so `SecureHe
 - **`SaveSession` and `TokenRelay` are rejected at startup** because there is no authentication
   backend to relay a session or a token from.
 - **`LocalResponseCache` is opt-in per route** and stores bodies in process memory; it is not
-  shared between worker processes.
+  shared between worker processes. A response is only cached when it is a `200`/`206`/`301` that
+  carries neither `Set-Cookie` nor a `Vary` field other than `accept-encoding`; a `no-cache` or
+  `no-store` request bypasses the cache entirely.
+- **`upstream.tls.ca_file` is rejected at startup.** This build cannot install a custom trust
+  anchor, and accepting the key would silently fail every request to a private CA.
+- **`server.threads`, `keepalive`, `max_connection` and `graceful_shutdown` are parsed and
+  validated but not yet applied**; the listener settings come from pingora's defaults. They are
+  listed here so the gap is visible rather than assumed.
 
 ## Roadmap
 

@@ -34,8 +34,23 @@ impl GatewayFilter for RequestRateLimiterFilter {
         exchange: &mut dyn ServerWebExchange,
         chain: &dyn GatewayFilterChain,
     ) -> Result<(), GatewayError> {
+        // Reading the forwarded chain needs the request header, so resolve the
+        // bucket before borrowing the context mutably.
+        let forwarded = exchange
+            .request_header()
+            .and_then(|header| header.headers.get("x-forwarded-for"))
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_string);
+
         let context = exchange.request_context();
-        let key = rate_limit_key(context.route_id.as_deref(), context.client_ip);
+        let client = context.client_ip.and_then(|direct| {
+            crate::util::forwarded::resolve_client(
+                direct,
+                forwarded.as_deref(),
+                crate::util::forwarded::trusted_proxies(),
+            )
+        });
+        let key = rate_limit_key(context.route_id.as_deref(), client);
 
         // `Rate::rate()` reports the previous window, so it lags by a second and
         // lets a burst through. `observe()` returns the count seen so far in the

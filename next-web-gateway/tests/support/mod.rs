@@ -369,9 +369,9 @@ fn parse_response(raw: &[u8]) -> HttpResponse {
         .collect();
 
     let body = &raw[header_end.min(raw.len())..];
-    let chunked = headers
-        .iter()
-        .any(|(name, value)| name == "transfer-encoding" && value.contains("chunked"));
+    let chunked = headers.iter().any(|(name, value)| {
+        name == "transfer-encoding" && value.to_ascii_lowercase().contains("chunked")
+    });
 
     HttpResponse {
         status,

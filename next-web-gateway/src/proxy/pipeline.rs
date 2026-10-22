@@ -86,8 +86,17 @@ impl GatewayProxy {
             return Err(crate::config::ConfigErrors::new(errors));
         }
 
-        // A `CircuitBreaker=<id>` that names an undefined breaker is a typo, not
-        // a silent no-op.
+        // A trust anchor that is accepted but never applied would silently fail
+        // every request to a private CA, so it is rejected instead.
+        if config.upstream.tls.ca_file.is_some() {
+            return Err(crate::config::ConfigErrors::new(vec![
+                crate::config::ConfigError::new(
+                    "upstream.tls.ca_file",
+                    "custom CA bundles are not supported by this build; use the system \
+                     trust store, or `insecure_skip_verify` only for development",
+                ),
+            ]));
+        }
         let mut errors = Vec::new();
         for route in &route_services {
             if !route.fallback_id.is_empty() && !config.breakers.contains_key(&route.fallback_id) {
@@ -120,6 +129,24 @@ impl GatewayProxy {
         let cache = config
             .local_response_cache_enabled()
             .then(LocalResponseCacheManager::shared);
+
+        // Install the trusted proxy list once, before any request is served:
+        // the XFF predicate and the rate limiter both read it.
+        let mut trusted = Vec::with_capacity(config.trusted_proxies.len());
+        for entry in &config.trusted_proxies {
+            match entry.parse() {
+                Ok(network) => trusted.push(network),
+                Err(error) => {
+                    return Err(crate::config::ConfigErrors::new(vec![
+                        crate::config::ConfigError::new(
+                            "trusted_proxies",
+                            format!("`{entry}` is not an IP address or CIDR block: {error}"),
+                        ),
+                    ]));
+                }
+            }
+        }
+        crate::util::forwarded::set_trusted_proxies(trusted);
 
         Ok(Self {
             config: Arc::new(config),
@@ -171,43 +198,94 @@ impl GatewayProxy {
         self.config.routes.iter().find(|route| route.id == route_id)
     }
 
+    /// Build the "no upstream" error, recording the failure first.
+    fn no_upstream_error(&self, ctx: &mut RequestContext) -> Box<pingora::Error> {
+        let error: Box<pingora::Error> = GatewayError::ServerNoUpstreamServices.into();
+        self.record_upstream_failure(ctx, &error);
+        error
+    }
+
+    /// Count an upstream failure and record it against the route's breaker.
+    ///
+    /// Called from every path that ends an upstream attempt without a response:
+    /// a connect failure, a proxy error and a `upstream_peer` failure all have to
+    /// record a failure, otherwise a half open permit would never be released.
+    fn record_upstream_failure(&self, ctx: &mut RequestContext, error: &pingora::Error) {
+        let route = ctx.route_id.as_deref().unwrap_or("-");
+        self.metrics.observe_upstream_error(route, upstream_error_kind(error));
+
+        let Some(breaker_id) = ctx.fallback_id.clone() else {
+            return;
+        };
+        let Some(breakers) = self.breakers.clone() else {
+            return;
+        };
+
+        tokio::spawn(async move {
+            if let Some(service) = breakers.services.get(&breaker_id) {
+                service.controller.process(Outcome::Failure).await;
+            }
+        });
+    }
+
     /// Write a gateway generated response and report the exchange as handled.
+    ///
+    /// When a filter already produced the response (a cache hit, a rejection, a
+    /// redirect) that response *is* the reply: its status, headers and body are
+    /// used verbatim. `render_error` only runs for the statuses the proxy maps
+    /// from a pingora error, where no filter produced a body.
     async fn respond_directly(
         &self,
         session: &mut Session,
         ctx: &mut RequestContext,
         status: u16,
     ) -> pingora::Result<bool> {
-        let route = ctx.route_id.as_deref();
-        let rendered = render_error(&self.config.error, status, route, ctx.request_id.as_str());
-
-        let (mut header, body) = match rendered {
-            Ok(rendered) => rendered,
-            Err(error) => {
-                error!("failed to build the error response for {status}: {error}");
-                session.respond_error(500).await?;
-                return Ok(true);
+        let (mut header, body) = match ctx.direct_response.take() {
+            Some(direct) => {
+                let mut header = ResponseHeader::build(direct.status, None)?;
+                for (name, value) in &direct.headers {
+                    header.insert_header(name.clone(), value.as_str()).ok();
+                }
+                if !header.headers.contains_key("content-type") {
+                    header
+                        .insert_header("Content-Type", "text/plain; charset=utf-8")
+                        .ok();
+                }
+                (header, direct.body)
+            }
+            None => {
+                let route = ctx.route_id.as_deref();
+                match render_error(&self.config.error, status, route, ctx.request_id.as_str()) {
+                    Ok(rendered) => rendered,
+                    Err(error) => {
+                        error!("failed to build the error response for {status}: {error}");
+                        session.respond_error(500).await?;
+                        return Ok(true);
+                    }
+                }
             }
         };
 
-        // Headers a filter attached when it rejected the request (Retry-After,
-        // X-RateLimit-*, Location for RedirectTo) must survive the rendering.
-        if let Some(direct) = ctx.direct_response.as_ref() {
-            for (name, value) in &direct.headers {
-                header.insert_header(name.clone(), value.as_str()).ok();
-            }
+        // The correlation id belongs on every generated response.
+        if !ctx.request_id.is_empty() && !header.headers.contains_key("x-request-id") {
+            let name = self.config.error.request_id_header.clone();
+            let id = ctx.request_id.clone();
+            header.insert_header(name, id).ok();
         }
 
         // Gateway generated responses go through the response filters too, so
         // `SecureHeaders` and `AddResponseHeader` apply to errors as well.
-        self.routes
+        if let Err(error) = self
+            .routes
             .filter_phase(
                 ctx,
                 FilterPhase::ResponseHeader,
                 HeaderAndBody::with_resp_header(&mut header),
             )
             .await
-            .ok();
+        {
+            warn!("a response filter failed on a generated response: {error}");
+        }
 
         // Throttled and unavailable responses tell the client when to retry.
         if matches!(status, 429 | 503) && !header.headers.contains_key("retry-after") {
@@ -236,14 +314,33 @@ async fn write_response(session: &mut Session, mut header: ResponseHeader, body:
 }
 
 /// Request id from the configured header, or a fresh UUID.
+///
+/// A caller supplied id is echoed into response headers, into the JSON error
+/// body and into the access log, so it is restricted to a short run of visible
+/// ASCII: anything else could break the header or the JSON document.
 fn request_id(header: &RequestHeader, config: &ErrorConfig) -> String {
     header
         .headers
         .get(config.request_id_header.as_str())
         .and_then(|value| value.to_str().ok())
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
+        .and_then(sanitize_request_id)
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string())
+}
+
+/// Keep a caller supplied request id only when it is safe to echo.
+pub(crate) fn sanitize_request_id(raw: &str) -> Option<String> {
+    const MAX_LEN: usize = 128;
+
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed.len() > MAX_LEN {
+        return None;
+    }
+
+    if !trimmed.chars().all(|ch| ch.is_ascii_graphic()) {
+        return None;
+    }
+
+    Some(trimmed.to_string())
 }
 
 /// Downstream peer address, if the connection is an IP socket.
@@ -261,6 +358,21 @@ fn selection_key(ctx: &RequestContext, path: &str) -> u64 {
     ctx.client_ip.hash(&mut hasher);
     path.hash(&mut hasher);
     hasher.finish()
+}
+
+/// Classify an upstream failure for the `gateway_upstream_errors_total` counter.
+fn upstream_error_kind(error: &pingora::Error) -> &'static str {
+    match error.etype() {
+        pingora::ErrorType::ConnectTimedout
+        | pingora::ErrorType::ReadTimedout
+        | pingora::ErrorType::WriteTimedout
+        | pingora::ErrorType::TLSHandshakeTimedout => "timeout",
+        pingora::ErrorType::ConnectError
+        | pingora::ErrorType::ConnectProxyFailure
+        | pingora::ErrorType::TLSHandshakeFailure => "connect",
+        pingora::ErrorType::ReadError | pingora::ErrorType::WriteError => "reset",
+        _ => "other",
+    }
 }
 
 #[async_trait]
@@ -320,8 +432,16 @@ impl ProxyHttp for GatewayProxy {
         if let Some(breaker_id) = ctx.fallback_id.clone() {
             if let Some(breakers) = self.breakers.as_ref() {
                 if let Some(service) = breakers.services.get(&breaker_id) {
-                    if service.controller.try_acquire().await.is_err() {
+                    if let Err(rejection) = service.controller.try_acquire().await {
                         warn!(breaker = %service.id, "circuit breaker is open, rejecting");
+                        // Tell the client when the breaker will probe again
+                        // instead of a hard coded second.
+                        let retry_after = rejection.retry_after.as_secs().max(1).to_string();
+                        ctx.respond_with_empty(
+                            503,
+                            vec![("Retry-After".to_string(), retry_after)],
+                        )
+                        .ok();
                         return self.respond_directly(session, ctx, 503).await;
                     }
                 }
@@ -329,6 +449,7 @@ impl ProxyHttp for GatewayProxy {
         }
 
         self.metrics.record_inflight(1);
+        ctx.inflight_counted = true;
         Ok(false)
     }
 
@@ -357,7 +478,9 @@ impl ProxyHttp for GatewayProxy {
             RouteWork::LB => {
                 let key = group_key.to_be_bytes();
                 let Some(addr) = self.upstreams.select(&route_id, &key) else {
-                    return Err(GatewayError::ServerNoUpstreamServices.into());
+                    // A half open probe that never reaches an upstream must still
+                    // record a failure, or its permit would leak forever.
+                    return Err(self.no_upstream_error(ctx));
                 };
                 UpstreamSelection {
                     addr,
@@ -369,17 +492,16 @@ impl ProxyHttp for GatewayProxy {
             }
             RouteWork::Http | RouteWork::Https => {
                 let tls = route.work == RouteWork::Https;
-                let addresses = self
-                    .dns
-                    .resolve(&parsed.host, parsed.port)
-                    .await
-                    .map_err(|error| {
+                let addresses = match self.dns.resolve(&parsed.host, parsed.port).await {
+                    Ok(addresses) => addresses,
+                    Err(error) => {
                         warn!(route = %route_id, "upstream name resolution failed: {error}");
-                        GatewayError::ServerNoUpstreamServices
-                    })?;
+                        return Err(self.no_upstream_error(ctx));
+                    }
+                };
 
                 let Some(addr) = addresses.first().copied() else {
-                    return Err(GatewayError::ServerNoUpstreamServices.into());
+                    return Err(self.no_upstream_error(ctx));
                 };
 
                 UpstreamSelection {
@@ -420,7 +542,8 @@ impl ProxyHttp for GatewayProxy {
             .routes
             .local_response_cache_filter(ctx.route_id.as_deref())
         {
-            serve_from_local_cache_if_present(cache, ctx, upstream_request)?;
+            let hit = serve_from_local_cache_if_present(cache, ctx, upstream_request)?;
+            self.metrics.record_cache_lookup(hit);
         }
 
         // Forwarding headers: appended, never overwritten.
@@ -458,13 +581,20 @@ impl ProxyHttp for GatewayProxy {
             upstream_request.insert_header("X-Forwarded-Host", host).ok();
         }
 
-        // Host default: the upstream authority, unless the route preserves it.
-        if ctx.original_host.is_none() {
-            if let Some(selection) = ctx.selected.as_ref() {
-                upstream_request
-                    .insert_header("Host", selection.host_header.clone())
-                    .ok();
-            }
+        // Host precedence: an explicit `SetRequestHostHeader`, then a preserved
+        // downstream host, then the upstream authority.
+        let host = ctx
+            .upstream_host_override
+            .clone()
+            .or_else(|| ctx.original_host.clone())
+            .or_else(|| {
+                ctx.selected
+                    .as_ref()
+                    .map(|selection| selection.host_header.clone())
+            });
+
+        if let Some(host) = host {
+            upstream_request.insert_header("Host", host).ok();
         }
 
         Ok(())
@@ -487,6 +617,18 @@ impl ProxyHttp for GatewayProxy {
                     service.controller.process(outcome).await;
                 }
             }
+        }
+
+        // The correlation id belongs on every response the client sees, proxied
+        // ones included.
+        if !ctx.request_id.is_empty()
+            && !upstream_response
+                .headers
+                .contains_key(self.config.error.request_id_header.as_str())
+        {
+            let name = self.config.error.request_id_header.clone();
+            let id = ctx.request_id.clone();
+            upstream_response.insert_header(name, id).ok();
         }
 
         self.routes
@@ -610,15 +752,7 @@ impl ProxyHttp for GatewayProxy {
         ctx: &mut Self::CTX,
         client_reused: bool,
     ) -> Box<pingora::Error> {
-        if let Some(breaker_id) = ctx.fallback_id.clone() {
-            if let Some(breakers) = self.breakers.clone() {
-                tokio::spawn(async move {
-                    if let Some(service) = breakers.services.get(&breaker_id) {
-                        service.controller.process(Outcome::Failure).await;
-                    }
-                });
-            }
-        }
+        self.record_upstream_failure(ctx, &e);
 
         let mut e = e.more_context(format!("Peer: {peer}"));
         e.retry
@@ -633,16 +767,7 @@ impl ProxyHttp for GatewayProxy {
         ctx: &mut Self::CTX,
         e: Box<pingora::Error>,
     ) -> Box<pingora::Error> {
-        if let Some(breaker_id) = ctx.fallback_id.clone() {
-            if let Some(breakers) = self.breakers.clone() {
-                tokio::spawn(async move {
-                    if let Some(service) = breakers.services.get(&breaker_id) {
-                        service.controller.process(Outcome::Failure).await;
-                    }
-                });
-            }
-        }
-
+        self.record_upstream_failure(ctx, &e);
         e
     }
 
@@ -697,7 +822,9 @@ impl ProxyHttp for GatewayProxy {
 
         self.metrics
             .observe_request(route, session.req_header().method.as_str(), status, latency);
-        self.metrics.record_inflight(-1);
+        if ctx.inflight_counted {
+            self.metrics.record_inflight(-1);
+        }
 
         if self.config.logging.access_log {
             match error {
@@ -726,5 +853,40 @@ impl ProxyHttp for GatewayProxy {
                 ),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_request_id;
+
+    #[test]
+    fn accepts_a_normal_request_id() {
+        assert_eq!(
+            sanitize_request_id(" 8bc9-4db2_abc.1 "),
+            Some("8bc9-4db2_abc.1".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_ids_that_could_break_a_header_or_a_json_body() {
+        assert!(sanitize_request_id("").is_none());
+        assert!(sanitize_request_id("   ").is_none());
+        assert!(sanitize_request_id("line\nbreak").is_none());
+        assert!(sanitize_request_id("tab\there").is_none());
+        assert!(sanitize_request_id("h\u{e9}llo").is_none());
+        assert!(sanitize_request_id(&"a".repeat(129)).is_none());
+    }
+
+    #[test]
+    fn a_quote_is_allowed_because_the_error_body_is_escaped() {
+        // Visible ASCII is safe: `render_error` escapes it through serde_json.
+        assert_eq!(sanitize_request_id("a\"b"), Some("a\"b".to_string()));
+    }
+
+    #[test]
+    fn a_generated_id_is_always_accepted() {
+        let generated = uuid::Uuid::new_v4().to_string();
+        assert_eq!(sanitize_request_id(&generated), Some(generated));
     }
 }

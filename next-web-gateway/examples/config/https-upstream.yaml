@@ -1,5 +1,5 @@
-# TLS upstream. Certificate and host name verification are on by default; point
-# `ca_file` at a PEM bundle when the backend uses a private CA.
+# TLS upstream. Certificate and host name verification are on by default.
+# `ca_file` is rejected at startup in this build: use the system trust store.
 next:
   gateway:
     server:

@@ -94,6 +94,11 @@ impl Gateway {
         })
     }
 
+    /// The parsed configuration.
+    pub fn config(&self) -> &GatewayConfig {
+        &self.config
+    }
+
     /// Apply the command line overrides.
     pub fn with_overrides(mut self, cli: &Cli) -> Self {
         self.bind = cli.bind.clone();
@@ -219,7 +224,8 @@ pub fn main() {
         }
     };
 
-    init_logging(&cli, None);
+    let document = gateway.config().clone();
+    init_logging(&cli, Some(&document));
 
     if cli.check {
         match gateway.check() {

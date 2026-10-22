@@ -42,6 +42,15 @@ fn an_incoming_request_id_is_reused() {
     let response = get(gateway.addr, "/ping", &[("X-Request-Id", "caller-supplied")]);
 
     assert_eq!(response.status, 200);
+    assert_eq!(
+        response.header("x-request-id"),
+        Some("caller-supplied"),
+        "the caller's correlation id must be echoed back"
+    );
+
+    // A hostile id is not echoed: it could break the header or the JSON body.
+    let rejected = get(gateway.addr, "/ping", &[("X-Request-Id", "a b")]);
+    assert_ne!(rejected.header("x-request-id"), Some("a b"));
 }
 
 #[test]

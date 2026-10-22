@@ -48,7 +48,17 @@ fn upstream_500_passes_through_and_trips_the_breaker() {
         "the open breaker must reject the second call, got {}",
         second.text()
     );
-    assert_eq!(second.header("retry-after"), Some("1"));
+
+    // The hint comes from `wait_duration_in_open_state: 30s`, not a constant.
+    let retry_after: u64 = second
+        .header("retry-after")
+        .expect("Retry-After")
+        .parse()
+        .expect("Retry-After must be a number of seconds");
+    assert!(
+        (1..=30).contains(&retry_after),
+        "Retry-After must reflect the open window, got {retry_after}"
+    );
 }
 
 #[test]
