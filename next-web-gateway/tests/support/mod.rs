@@ -6,7 +6,9 @@
 //! binary, the CLI, the config loader and both listeners, which is what the
 //! acceptance criteria are about.
 
-#![allow(dead_code)]
+// A shared helper module compiled into every integration test crate: each crate
+// uses a different subset, so unused items and "unreachable" `pub` are expected.
+#![allow(dead_code, missing_docs, unreachable_pub)]
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
