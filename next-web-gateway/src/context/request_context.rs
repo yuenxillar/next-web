@@ -14,7 +14,9 @@ use pingora::{
 pub struct RequestContext {
     pub fallback_id: Option<String>,
     pub route_id: Option<String>,
-    
+    /// Downstream peer address, resolved once by the proxy.
+    pub client_ip: Option<std::net::IpAddr>,
+
     pub original_request_path: Option<String>,
     pub buffer_response_body: bool,
     pub response_body_buffer: Vec<u8>,

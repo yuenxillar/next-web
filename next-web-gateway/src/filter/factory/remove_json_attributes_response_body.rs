@@ -142,6 +142,7 @@ mod tests {
         crate::context::RequestContext {
             fallback_id: None,
             route_id: None,
+            client_ip: None,
             original_request_path: None,
             buffer_response_body: false,
             response_body_buffer: Vec::new(),

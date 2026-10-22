@@ -8,6 +8,7 @@ use pingora::proxy::{FailToProxy, ProxyHttp};
 use pingora::upstreams::peer::HttpPeer;
 use tracing::{error, warn};
 
+use crate::circuit_breaker::circuit_breaker_controller::Outcome;
 use crate::circuit_breaker::circuit_breaker_service_manager::CircuitBreakerServiceManager;
 use crate::circuit_breaker::circuit_state::CircuitState;
 use crate::context::{HeaderAndBody, RequestContext};
@@ -56,6 +57,7 @@ impl ProxyHttp for NextGatewayApplication {
         Self::CTX {
             fallback_id: None,
             route_id: None,
+            client_ip: None,
             original_request_path: None,
             buffer_response_body: false,
             response_body_buffer: Vec::new(),
@@ -102,6 +104,12 @@ impl ProxyHttp for NextGatewayApplication {
         let route_work = route_predicate_result.work;
 
         ctx.route_id = Some(route_predicate_result.route_id.into());
+
+        ctx.client_ip = session.client_addr().and_then(|addr| match addr {
+            pingora::protocols::l4::socket::SocketAddr::Inet(addr) => Some(addr.ip()),
+            #[cfg(unix)]
+            pingora::protocols::l4::socket::SocketAddr::Unix(_) => None,
+        });
 
         let client_metadata = route_predicate_result
             .metadata
@@ -189,7 +197,14 @@ impl ProxyHttp for NextGatewayApplication {
         if let Some(id) = ctx.fallback_id.as_ref() {
             if let Some(manager) = self.circuit_breaker_service_manager.as_ref() {
                 if let Some(service) = manager.services.get(id) {
-                    service.controller.process(true).await;
+                    // A 5xx is a failure: counting it as success is why a broken
+                    // backend never tripped the breaker.
+                    let outcome = if upstream_response.status.as_u16() >= 500 {
+                        Outcome::Failure
+                    } else {
+                        Outcome::Success
+                    };
+                    service.controller.process(outcome).await;
                 }
             }
         }
@@ -272,7 +287,7 @@ impl ProxyHttp for NextGatewayApplication {
             if let Some(manager) = self.circuit_breaker_service_manager.clone() {
                 tokio::spawn(async move {
                     if let Some(service) = manager.services.get(&id) {
-                        service.controller.process(false).await;
+                        service.controller.process(Outcome::Failure).await;
                     }
                 });
             }
@@ -296,7 +311,7 @@ impl ProxyHttp for NextGatewayApplication {
             if let Some(manager) = self.circuit_breaker_service_manager.clone() {
                 tokio::spawn(async move {
                     if let Some(service) = manager.services.get(&id) {
-                        service.controller.process(false).await;
+                        service.controller.process(Outcome::Failure).await;
                     }
                 });
             }

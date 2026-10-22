@@ -325,6 +325,7 @@ mod tests {
         let mut ctx = RequestContext {
             fallback_id: None,
             route_id: Some("chain-route".to_string()),
+            client_ip: None,
             original_request_path: None,
             buffer_response_body: false,
             response_body_buffer: Vec::new(),

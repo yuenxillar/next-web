@@ -355,11 +355,26 @@ fn build_cache_key(request_header: &RequestHeader) -> String {
         .and_then(|value| value.to_str().ok())
         .unwrap_or("");
 
-    if range.is_empty() {
-        path_and_query.to_string()
-    } else {
-        format!("{path_and_query}|range={range}")
+    // Responses differ per credential, per cookie jar, per accepted encoding and
+    // per host. Hashing them into the key keeps one client's body from being
+    // served to another, without writing secrets into the key itself.
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for name in [
+        "authorization",
+        "cookie",
+        "accept-encoding",
+        "host",
+        "vary",
+        "accept-language",
+    ] {
+        if let Some(value) = request_header.headers.get(name) {
+            std::hash::Hash::hash(&name, &mut hasher);
+            std::hash::Hash::hash(value.as_bytes(), &mut hasher);
+        }
     }
+    let variance = std::hash::Hasher::finish(&hasher);
+
+    format!("{path_and_query}|range={range}|vary={variance:016x}")
 }
 
 fn is_cacheable_status(status: u16) -> bool {
@@ -626,7 +641,49 @@ mod tests {
         let mut request = RequestHeader::build("GET", b"/resource?x=1", None).unwrap();
         request.insert_header("Range", "bytes=0-99").unwrap();
 
-        assert_eq!(build_cache_key(&request), "/resource?x=1|range=bytes=0-99");
+        let key = build_cache_key(&request);
+        assert!(key.starts_with("/resource?x=1|range=bytes=0-99|vary="), "{key}");
+    }
+
+    #[test]
+    fn cache_key_separates_authorization_and_cookie() {
+        let mut anonymous = RequestHeader::build("GET", b"/resource", None).unwrap();
+        let mut authenticated = RequestHeader::build("GET", b"/resource", None).unwrap();
+        authenticated
+            .insert_header("Authorization", "Bearer token-a")
+            .unwrap();
+        authenticated.insert_header("Cookie", "session=a").unwrap();
+
+        let mut other_user = RequestHeader::build("GET", b"/resource", None).unwrap();
+        other_user
+            .insert_header("Authorization", "Bearer token-b")
+            .unwrap();
+
+        assert_ne!(
+            build_cache_key(&anonymous),
+            build_cache_key(&authenticated),
+            "an anonymous response must not be shared with an authenticated one"
+        );
+        assert_ne!(
+            build_cache_key(&authenticated),
+            build_cache_key(&other_user),
+            "two credentials must not share a cache entry"
+        );
+        assert_eq!(
+            build_cache_key(&anonymous),
+            build_cache_key(&RequestHeader::build("GET", b"/resource", None).unwrap()),
+            "identical requests must share a cache entry"
+        );
+    }
+
+    #[test]
+    fn cache_key_separates_accept_encoding() {
+        let mut gzip = RequestHeader::build("GET", b"/resource", None).unwrap();
+        gzip.insert_header("Accept-Encoding", "gzip").unwrap();
+        let mut identity = RequestHeader::build("GET", b"/resource", None).unwrap();
+        identity.insert_header("Accept-Encoding", "identity").unwrap();
+
+        assert_ne!(build_cache_key(&gzip), build_cache_key(&identity));
     }
 
     #[test]
