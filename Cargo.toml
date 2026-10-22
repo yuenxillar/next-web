@@ -88,8 +88,8 @@ csv = { version = "1.3.1" }
 printpdf = { version = "0.8.2" }
 
 # proxy
-pingora         = { version = "0.8.0", features = ["lb", "proxy"] }
-pingora-limits  = "0.8.0"
+pingora         = { version = "0.9.0", features = ["lb", "proxy"] }
+pingora-limits  = "0.9.0"
 
 # pay
 wechat-pay-rust-sdk = { version = "0.2.18" }
