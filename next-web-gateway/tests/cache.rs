@@ -113,6 +113,85 @@ fn a_response_with_an_unsupported_vary_is_not_cached() {
 }
 
 #[test]
+fn a_204_is_not_reframed_when_a_body_filter_is_configured() {
+    let upstream = MockUpstream::start(Behavior::Respond(204, vec![], Vec::new()));
+    let document = format!(
+        "\
+next:
+  gateway:
+    server:
+      bind: \"127.0.0.1:{{proxy}}\"
+      admin:
+        enabled: true
+        bind: \"127.0.0.1:{{admin}}\"
+    routes:
+      - id: no-content
+        uri: \"http://{}\"
+        predicates:
+          - Path=/nocontent
+        filters:
+          - RemoveJsonAttributesResponseBody=secret
+",
+        upstream.addr
+    );
+    let gateway = TestGateway::start_with(|proxy, admin| {
+        document
+            .replace("{proxy}", &proxy.to_string())
+            .replace("{admin}", &admin.to_string())
+    });
+
+    let response = get(gateway.addr, "/nocontent", &[]);
+
+    assert_eq!(response.status, 204);
+    assert_eq!(
+        response.header("transfer-encoding"),
+        None,
+        "a 204 must not be reframed as chunked"
+    );
+    assert!(
+        response.text().is_empty(),
+        "a 204 must carry no body, got {:?}",
+        response.text()
+    );
+}
+
+#[test]
+fn a_head_response_carries_no_body() {
+    let upstream = MockUpstream::start(Behavior::Respond(200, vec![], b"payload".to_vec()));
+    let document = format!(
+        "\
+next:
+  gateway:
+    server:
+      bind: \"127.0.0.1:{{proxy}}\"
+      admin:
+        enabled: true
+        bind: \"127.0.0.1:{{admin}}\"
+    routes:
+      - id: head
+        uri: \"http://{}\"
+        predicates:
+          - Path=/head
+",
+        upstream.addr
+    );
+    let gateway = TestGateway::start_with(|proxy, admin| {
+        document
+            .replace("{proxy}", &proxy.to_string())
+            .replace("{admin}", &admin.to_string())
+    });
+
+    let response = support::request(gateway.addr, "HEAD", "/head", &[], None);
+
+    assert_eq!(response.status, 200);
+    assert!(
+        response.text().is_empty(),
+        "HEAD must not return a body, got {:?}",
+        response.text()
+    );
+}
+
+#[test]
 fn a_no_cache_request_bypasses_the_cache() {
     let upstream = MockUpstream::start(Behavior::Respond(200, vec![], b"fresh".to_vec()));
     let document = cache_route(upstream.addr);

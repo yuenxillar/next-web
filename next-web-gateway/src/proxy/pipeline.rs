@@ -311,17 +311,39 @@ impl GatewayProxy {
 }
 
 /// Write a complete response to the downstream.
-async fn write_response(session: &mut Session, mut header: ResponseHeader, body: Bytes) {
-    header
-        .insert_header("Content-Length", body.len().to_string())
-        .ok();
+async fn write_response(
+    session: &mut Session,
+    mut header: ResponseHeader,
+    body: Bytes,
+) {
+    let status = header.status.as_u16();
+    // A 204/304 never carries a body, and a HEAD reply carries the headers of the
+    // equivalent GET only. Sending one anyway desynchronises the connection.
+    let body_allowed = !matches!(status, 204 | 304) && status >= 200;
+    let is_head = session.req_header().method.as_str() == "HEAD";
 
-    if let Err(error) = session.write_response_header(Box::new(header), false).await {
+    header.remove_header("Transfer-Encoding");
+
+    if body_allowed {
+        header
+            .insert_header("Content-Length", body.len().to_string())
+            .ok();
+    }
+
+    let send_body = body_allowed && !is_head && !body.is_empty();
+    let end_of_stream = !send_body;
+
+    if let Err(error) = session
+        .write_response_header(Box::new(header), end_of_stream)
+        .await
+    {
         error!("failed to write the response header: {error}");
         return;
     }
 
-    if let Err(error) = session.write_response_body(Some(body), true).await {
+    if send_body
+        && let Err(error) = session.write_response_body(Some(body), true).await
+    {
         error!("failed to write the response body: {error}");
     }
 }
@@ -653,10 +675,16 @@ impl ProxyHttp for GatewayProxy {
             capture_response_for_local_cache(cache, ctx, upstream_response);
         }
 
-        let must_buffer = self
-            .routes
-            .has_response_body_filters(ctx.route_id.as_deref())
-            || ctx.pending_local_response_cache.is_some();
+        // A response that cannot carry a body must not be re-framed as chunked,
+        // and there is nothing for a body filter to rewrite.
+        let status = upstream_response.status.as_u16();
+        let bodyless = matches!(status, 204 | 304) || status < 200;
+
+        let must_buffer = !bodyless
+            && (self
+                .routes
+                .has_response_body_filters(ctx.route_id.as_deref())
+                || ctx.pending_local_response_cache.is_some());
 
         if must_buffer {
             ctx.buffer_response_body = true;
