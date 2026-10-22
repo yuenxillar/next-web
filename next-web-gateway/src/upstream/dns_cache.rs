@@ -13,17 +13,21 @@ use tokio::sync::Mutex;
 
 /// Default time a resolved name stays cached.
 const DEFAULT_TTL: Duration = Duration::from_secs(30);
+/// How long a failed lookup is remembered before it is retried.
+const NEGATIVE_TTL: Duration = Duration::from_secs(5);
 /// Maximum number of cached names.
 const DEFAULT_CAPACITY: usize = 1024;
 
 struct Entry {
-    addresses: Vec<SocketAddr>,
+    /// `None` when the last lookup for this name failed.
+    addresses: Option<Vec<SocketAddr>>,
     resolved_at: Instant,
 }
 
 /// Resolves host names off the proxy thread and caches the result.
 pub struct DnsCache {
     ttl: Duration,
+    negative_ttl: Duration,
     capacity: usize,
     entries: Mutex<HashMap<String, Entry>>,
 }
@@ -32,6 +36,7 @@ impl Default for DnsCache {
     fn default() -> Self {
         Self {
             ttl: DEFAULT_TTL,
+            negative_ttl: NEGATIVE_TTL,
             capacity: DEFAULT_CAPACITY,
             entries: Mutex::new(HashMap::new()),
         }
@@ -43,12 +48,17 @@ impl DnsCache {
     pub fn new(ttl: Duration, capacity: usize) -> Self {
         Self {
             ttl,
-            capacity: capacity.max(1),
+            negative_ttl: NEGATIVE_TTL.min(ttl),
+            capacity: capacity.max(2),
             entries: Mutex::new(HashMap::new()),
         }
     }
 
     /// Resolve `host:port`, using the cache when the entry is still fresh.
+    ///
+    /// A failed lookup is remembered for a short while: a name that does not
+    /// resolve is usually a configuration error, and retrying it on every
+    /// request would put the resolver on the request path for free.
     pub async fn resolve(&self, host: &str, port: u16) -> Result<Vec<SocketAddr>, String> {
         if let Ok(ip) = host.parse::<std::net::IpAddr>() {
             return Ok(vec![SocketAddr::new(ip, port)]);
@@ -58,35 +68,73 @@ impl DnsCache {
 
         {
             let entries = self.entries.lock().await;
-            if let Some(entry) = entries.get(&key)
-                && entry.resolved_at.elapsed() < self.ttl
-            {
-                return Ok(entry.addresses.clone());
+            if let Some(entry) = entries.get(&key) {
+                let ttl = if entry.addresses.is_some() {
+                    self.ttl
+                } else {
+                    self.negative_ttl
+                };
+
+                if entry.resolved_at.elapsed() < ttl {
+                    return match entry.addresses.clone() {
+                        Some(addresses) => Ok(addresses),
+                        None => Err(format!("`{host}` does not resolve (cached failure)")),
+                    };
+                }
             }
         }
 
-        let addresses = tokio::net::lookup_host((host, port))
+        let resolved = tokio::net::lookup_host((host, port))
             .await
-            .map_err(|error| format!("failed to resolve `{host}`: {error}"))?
-            .collect::<Vec<_>>();
+            .map(|addresses| addresses.collect::<Vec<_>>());
 
-        if addresses.is_empty() {
-            return Err(format!("`{host}` resolved to no address"));
+        let (addresses, error) = match resolved {
+            Ok(addresses) if !addresses.is_empty() => (Some(addresses), None),
+            Ok(_) => (None, Some(format!("`{host}` resolved to no address"))),
+            Err(error) => (None, Some(format!("failed to resolve `{host}`: {error}"))),
+        };
+
+        self.store(key, addresses.clone()).await;
+
+        match (addresses, error) {
+            (Some(addresses), _) => Ok(addresses),
+            (None, Some(error)) => Err(error),
+            (None, None) => Err(format!("`{host}` resolved to no address")),
         }
+    }
 
+    /// Insert one entry, evicting the oldest when the cache is full.
+    ///
+    /// Evicting exactly one entry keeps the rest of the cache warm; clearing the
+    /// whole map on overflow would drop every name at once and send the next
+    /// thousand requests to the resolver.
+    async fn store(&self, key: String, addresses: Option<Vec<SocketAddr>>) {
         let mut entries = self.entries.lock().await;
-        if entries.len() >= self.capacity {
-            entries.clear();
+
+        if entries.len() >= self.capacity && !entries.contains_key(&key) {
+            let oldest = entries
+                .iter()
+                .min_by_key(|(_, entry)| entry.resolved_at)
+                .map(|(key, _)| key.clone());
+
+            if let Some(oldest) = oldest {
+                entries.remove(&oldest);
+            }
         }
+
         entries.insert(
             key,
             Entry {
-                addresses: addresses.clone(),
+                addresses,
                 resolved_at: Instant::now(),
             },
         );
+    }
 
-        Ok(addresses)
+    /// Number of cached names, for tests and diagnostics.
+    #[cfg(test)]
+    async fn len(&self) -> usize {
+        self.entries.lock().await.len()
     }
 }
 
@@ -123,5 +171,47 @@ mod tests {
     async fn reports_a_name_that_does_not_resolve() {
         let cache = DnsCache::default();
         assert!(cache.resolve("does-not-exist.invalid", 80).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_failed_lookup_is_cached_briefly() {
+        let cache = DnsCache::default();
+
+        let first = cache
+            .resolve("does-not-exist.invalid", 80)
+            .await
+            .unwrap_err();
+        assert!(!first.contains("cached"));
+
+        let second = cache
+            .resolve("does-not-exist.invalid", 80)
+            .await
+            .unwrap_err();
+        assert!(
+            second.contains("cached"),
+            "the second lookup must come from the negative cache, got `{second}`"
+        );
+        assert_eq!(cache.len().await, 1);
+    }
+
+    #[tokio::test]
+    async fn a_full_cache_evicts_one_entry_instead_of_all() {
+        let cache = DnsCache::new(Duration::from_secs(30), 2);
+
+        // Literal IPs bypass the cache, so use names that actually get stored.
+        if cache.resolve("localhost", 80).await.is_err() {
+            // A sandbox without a hosts entry cannot resolve localhost.
+            return;
+        }
+        cache.resolve("localhost", 81).await.ok();
+        assert_eq!(cache.len().await, 2);
+
+        // A third name overflows the capacity of two.
+        cache.resolve("does-not-exist.invalid", 80).await.ok();
+        assert_eq!(
+            cache.len().await,
+            2,
+            "the cache must stay at capacity rather than drop everything"
+        );
     }
 }

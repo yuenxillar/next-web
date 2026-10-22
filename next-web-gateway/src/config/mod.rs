@@ -330,23 +330,20 @@ mod tests {
     }
 
     #[test]
-    fn rejects_health_checking_because_it_is_not_implemented() {
-        let text = errors_for(
-            "next:\n  gateway:\n    upstream:\n      health_check:\n        enabled: true\n",
-        );
-        assert!(text.contains("health_check.enabled"), "{text}");
-        assert!(text.contains("not implemented"), "{text}");
-    }
-
-    #[test]
-    fn accepts_health_checking_explicitly_disabled() {
+    fn health_checking_is_on_by_default_and_can_be_turned_off() {
         use std::str::FromStr;
 
-        let yaml =
-            "next:\n  gateway:\n    upstream:\n      health_check:\n        enabled: false\n";
-        let config = GatewayConfig::from_str(yaml).expect("an explicit `enabled: false` is valid");
+        let default = GatewayConfig::from_str("next:\n  gateway:\n    routes: []\n").unwrap();
+        assert!(default.upstream.health_check.enabled);
+
+        let off = "next:\n  gateway:\n    upstream:\n      health_check:\n        enabled: false\n        interval: 2s\n";
+        let config = GatewayConfig::from_str(off).expect("an explicit `enabled: false` is valid");
 
         assert!(!config.upstream.health_check.enabled);
+        assert_eq!(
+            config.upstream.health_check.interval,
+            std::time::Duration::from_secs(2)
+        );
     }
 
     #[test]

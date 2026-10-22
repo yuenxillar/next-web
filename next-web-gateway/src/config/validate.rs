@@ -65,15 +65,6 @@ fn validate_server_knobs(config: &GatewayConfig, errors: &mut Vec<ConfigError>) 
             "connection limiting is not implemented in this build; remove the key",
         ));
     }
-
-    // A health check that never runs would hide dead backends behind 502s.
-    if config.upstream.health_check.enabled {
-        errors.push(ConfigError::new(
-            "upstream.health_check.enabled",
-            "health checking is not implemented in this build; dead backends surface as \
-             502 and as breaker failures. Remove the key or set `enabled: false`",
-        ));
-    }
 }
 
 fn validate_trusted_proxies(entries: &[String], errors: &mut Vec<ConfigError>) {

@@ -79,7 +79,7 @@ next:
       write_timeout: 30s
       idle_timeout: 60s
       health_check:
-        enabled: false           # health checking is not implemented; `true` is rejected
+        enabled: true            # TCP probe of every `lb://` backend
         interval: 5s
       tls:
         verify_cert: true
@@ -268,9 +268,11 @@ Gateway generated responses also pass through the response filters, so `SecureHe
 - **No global filter chain yet.** Phase 1 runs the forwarding headers, hop-by-hop stripping,
   request id and metrics inside the proxy rather than as ordered global filters.
 - **Weights are exact.** The load balancer repeats a backend `weight` times in its rotation, so a
-  3:1 configuration really produces 3:1 rather than a statistical approximation. It also means
-  there is no active health checking in Phase 1: a dead backend surfaces as 502 and as breaker
-  failures instead of being drained.
+  3:1 configuration really produces 3:1 rather than a statistical approximation.
+- **Health checking is a TCP probe, not an HTTP one.** Every `health_check.interval` the gateway
+  opens a TCP connection to each `lb://` backend; a failure removes it from the rotation until a
+  later probe succeeds, and a pool with no healthy backend answers 503. There is no `/actuator`
+  or custom health path, and no per-route override.
 - **`XForwardedRemoteAddr` arguments are the client ranges**, and the trusted proxy list comes
   from the global `trusted_proxies` setting.
 - **`RequestRateLimiter` takes a bare rate.** The key is always the client address; there is no
@@ -287,9 +289,6 @@ Gateway generated responses also pass through the response filters, so `SecureHe
   The connector needs a trust store at startup: a configured `ca_file` wins, then the
   `SSL_CERT_FILE` environment variable, then the platform store. On a host where the platform
   store cannot be read (some CI sandboxes), set one of the first two.
-- **Health checking is not implemented.** `upstream.health_check.enabled: true` is rejected at
-  startup; dead backends surface as 502 and as breaker failures (this is what makes the static
-  load balancer's "no active health check" note above safe to rely on).
 - **`server.keepalive` and `server.max_connection` are rejected at startup** because pingora 0.9
   exposes no downstream knob for them. `server.threads` and `server.graceful_shutdown` *are*
   applied to pingora's `ServerConf`.

@@ -149,10 +149,22 @@ impl GatewayProxy {
         }
         crate::util::forwarded::set_trusted_proxies(trusted);
 
+        let upstreams = Arc::new(upstreams);
+
+        // Active health checking of `lb://` backends. The checker is a daemon
+        // thread that feeds the same map `select` consults, so a dead instance
+        // leaves the pool between two requests instead of only after a 502.
+        if config.upstream.health_check.enabled && !upstreams.is_empty() {
+            upstreams.spawn_health_checker(
+                config.upstream.health_check.interval,
+                config.upstream.connect_timeout,
+            );
+        }
+
         Ok(Self {
             config: Arc::new(config),
             routes: Arc::new(RouteServiceManager::new(route_services)),
-            upstreams: Arc::new(upstreams),
+            upstreams,
             dns: DnsCache::default(),
             breakers: Some(Arc::new(breakers)),
             cache,
@@ -587,6 +599,11 @@ impl ProxyHttp for GatewayProxy {
         upstream_request: &mut RequestHeader,
         ctx: &mut Self::CTX,
     ) -> pingora::Result<()> {
+        // Time spent on the upstream side, reported by the access log.
+        if ctx.upstream_started.is_none() {
+            ctx.upstream_started = Some(Instant::now());
+        }
+
         // `RewriteLocationResponseHeader` needs the path the *client* asked for;
         // the access log reports it too, so the log shows the original target
         // even after `StripPrefix`/`RewritePath`.
@@ -675,6 +692,13 @@ impl ProxyHttp for GatewayProxy {
         upstream_response: &mut ResponseHeader,
         ctx: &mut Self::CTX,
     ) -> pingora::Result<()> {
+        // Time to the upstream response headers, for the access log.
+        if ctx.upstream_ms.is_none() {
+            ctx.upstream_ms = ctx
+                .upstream_started
+                .map(|started| started.elapsed().as_millis());
+        }
+
         if let Some(breaker_id) = ctx.fallback_id.clone()
             && let Some(breakers) = self.breakers.as_ref()
             && let Some(service) = breakers.services.get(&breaker_id)
@@ -931,6 +955,7 @@ impl ProxyHttp for GatewayProxy {
                     status,
                     route = %route,
                     upstream = %upstream,
+                    upstream_ms = ctx.upstream_ms,
                     bytes,
                     latency_ms = latency.as_millis(),
                     error = %error,
@@ -945,6 +970,7 @@ impl ProxyHttp for GatewayProxy {
                     status,
                     route = %route,
                     upstream = %upstream,
+                    upstream_ms = ctx.upstream_ms,
                     bytes,
                     latency_ms = latency.as_millis(),
                     "access"

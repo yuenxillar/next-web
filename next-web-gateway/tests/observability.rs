@@ -118,6 +118,14 @@ fn access_log_has_one_line_per_request() {
     );
     assert!(log.contains("request_id="), "log was:\n{log}");
     assert!(log.contains("route=ping"), "log was:\n{log}");
+    assert!(
+        log.contains("upstream_ms="),
+        "the access line must report the upstream time, log was:\n{log}"
+    );
+    assert!(
+        log.contains("bytes="),
+        "the access line must report the response size, log was:\n{log}"
+    );
 }
 
 #[test]

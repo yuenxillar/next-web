@@ -44,6 +44,10 @@ pub struct RequestContext {
     pub inflight_counted: bool,
     /// When the request started, used for latency logs.
     pub started: Option<Instant>,
+    /// When the request was handed to the upstream side of the proxy.
+    pub upstream_started: Option<Instant>,
+    /// Milliseconds from `upstream_started` to the upstream response headers.
+    pub upstream_ms: Option<u128>,
     /// Whether the response body is being buffered for a body filter.
     pub buffer_response_body: bool,
     /// Buffered response body.
