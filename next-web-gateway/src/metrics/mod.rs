@@ -139,6 +139,7 @@ impl Metrics {
             for route in routes {
                 let mut cumulative = 0_u64;
                 let mut total = 0_u64;
+                let mut millis = 0_u64;
 
                 for (index, bound) in BUCKETS.iter().enumerate() {
                     let mut bucket_sum = 0_u64;
@@ -157,6 +158,7 @@ impl Metrics {
                 for ((counter_route, _, _), counter) in requests.iter() {
                     if counter_route == route {
                         total = total.saturating_add(counter.count);
+                        millis = millis.saturating_add(counter.duration_millis);
                     }
                 }
                 out.push_str(&format!(
@@ -164,6 +166,10 @@ impl Metrics {
                 ));
                 out.push_str(&format!(
                     "gateway_request_duration_seconds_count{{route=\"{route}\"}} {total}\n"
+                ));
+                out.push_str(&format!(
+                    "gateway_request_duration_seconds_sum{{route=\"{route}\"}} {}\n",
+                    millis as f64 / 1000.0
                 ));
             }
         }
@@ -232,6 +238,15 @@ mod tests {
         );
         assert!(
             text.contains("gateway_request_duration_seconds_bucket{route=\"users\",le=\"25\"}"),
+            "{text}"
+        );
+        assert!(
+            text.contains("gateway_request_duration_seconds_count{route=\"users\"} 1"),
+            "{text}"
+        );
+        // Without `_sum` Prometheus cannot compute an average.
+        assert!(
+            text.contains("gateway_request_duration_seconds_sum{route=\"users\"} 0.012"),
             "{text}"
         );
         assert!(text.contains("gateway_inflight_requests 0"), "{text}");

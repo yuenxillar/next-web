@@ -94,6 +94,8 @@ pub struct CachedResponseEntry {
     pub status: u16,
     pub headers: Vec<(String, String)>,
     pub body: Bytes,
+    /// When this entry was stored, rendered as the `Age` header.
+    pub stored_at: Instant,
     pub expires_at: Instant,
     pub size: usize,
 }
@@ -158,6 +160,7 @@ impl LocalResponseCacheManager {
             size: calculate_entry_size(&key, &headers, &body),
             headers,
             body,
+            stored_at: Instant::now(),
             expires_at: Instant::now() + ttl,
         };
 
@@ -473,9 +476,18 @@ fn materialize_cached_headers(entry: &CachedResponseEntry) -> Vec<(String, Strin
         .saturating_duration_since(Instant::now())
         .as_secs();
 
-    entry
+    // D11 requires an `Age` header: it tells the client how long ago the
+    // response was generated.
+    let age_seconds = entry
+        .stored_at
+        .elapsed()
+        .as_secs()
+        .min(remaining_seconds);
+
+    let mut headers: Vec<(String, String)> = entry
         .headers
         .iter()
+        .filter(|(name, _)| !name.eq_ignore_ascii_case("age"))
         .map(|(name, value)| {
             if name.eq_ignore_ascii_case(CACHE_CONTROL) {
                 (
@@ -487,7 +499,10 @@ fn materialize_cached_headers(entry: &CachedResponseEntry) -> Vec<(String, Strin
                 (name.clone(), value.clone())
             }
         })
-        .collect()
+        .collect();
+
+    headers.push(("Age".to_string(), age_seconds.to_string()));
+    headers
 }
 
 fn rewrite_response_max_age(response_header: &mut ResponseHeader, ttl_seconds: u64) {
@@ -638,6 +653,7 @@ mod tests {
                 ("Content-Type".to_string(), "application/json".to_string()),
             ],
             body: Bytes::from_static(br#"{"ok":true}"#),
+            stored_at: Instant::now(),
             expires_at: Instant::now() + Duration::from_secs(120),
             size: 0,
         };
