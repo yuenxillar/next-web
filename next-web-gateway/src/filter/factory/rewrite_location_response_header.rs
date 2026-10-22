@@ -24,6 +24,7 @@ impl GatewayFilter for RewriteLocationResponseHeaderFilter {
         chain: &dyn GatewayFilterChain,
     ) -> Result<(), GatewayError> {
         let original_request_path = exchange.request_context().original_request_path.clone();
+        let downstream_host = exchange.request_context().original_host.clone();
         let response_header = match exchange.response_header() {
             Some(response_header) => response_header,
             None => return chain.filter(exchange).await,
@@ -66,12 +67,21 @@ impl GatewayFilter for RewriteLocationResponseHeaderFilter {
 
         let path_and_query =
             build_path_and_query(&rewritten_path, parsed_location.query.as_deref());
+
+        // Spring Cloud Gateway replaces the authority with the *request's* host
+        // unless `hostValue` is configured, so an internal host name never leaks
+        // to the client.
+        let authority = self
+            .host_value
+            .as_deref()
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .or(downstream_host)
+            .or_else(|| parsed_location.authority.clone());
+
         let rewritten_location = build_location(
             parsed_location.scheme.as_deref(),
-            self.host_value
-                .as_deref()
-                .filter(|value| !value.is_empty())
-                .or(parsed_location.authority.as_deref()),
+            authority.as_deref(),
             &path_and_query,
         );
 

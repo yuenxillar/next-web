@@ -1,8 +1,7 @@
 //! `PreserveHostHeader` filter: keeps the downstream `Host` on the upstream request.
 //!
 //! The proxy rewrites `Host` to the upstream authority by default. This filter
-//! records the original value on the request context, and the proxy leaves it
-//! alone when it is set.
+//! asks the proxy to keep the client's value instead.
 
 use async_trait::async_trait;
 
@@ -22,22 +21,27 @@ impl GatewayFilter for PreserveHostHeaderFilter {
         exchange: &mut dyn ServerWebExchange,
         chain: &dyn GatewayFilterChain,
     ) -> Result<(), GatewayError> {
-        let host = exchange
-            .request_header()
-            .and_then(|request_header| request_header.headers.get("host"))
-            .and_then(|value| value.to_str().ok())
-            .map(str::to_owned)
-            .or_else(|| {
-                exchange.request_header().and_then(|request_header| {
-                    request_header
-                        .uri
-                        .authority()
-                        .map(|authority| authority.as_str().to_owned())
-                })
+        exchange.request_context().preserve_host = true;
+
+        // Fall back to the request target's authority when there is no header.
+        if exchange.request_context().original_host.is_none() {
+            let host = exchange.request_header().and_then(|request_header| {
+                request_header
+                    .headers
+                    .get("host")
+                    .and_then(|value| value.to_str().ok())
+                    .map(str::to_owned)
+                    .or_else(|| {
+                        request_header
+                            .uri
+                            .authority()
+                            .map(|authority| authority.as_str().to_owned())
+                    })
             });
 
-        if let Some(host) = host {
-            exchange.request_context().original_host = Some(host);
+            if let Some(host) = host {
+                exchange.request_context().original_host = Some(host);
+            }
         }
 
         chain.filter(exchange).await

@@ -28,8 +28,10 @@ pub struct RequestContext {
     pub fallback_id: Option<String>,
     /// Downstream peer address, resolved once by the proxy.
     pub client_ip: Option<std::net::IpAddr>,
-    /// Downstream `Host`, preserved when `PreserveHostHeader` is configured.
+    /// Downstream `Host` as the client sent it.
     pub original_host: Option<String>,
+    /// Whether `PreserveHostHeader` asked for the downstream `Host` to win.
+    pub preserve_host: bool,
     /// Host to send upstream, set by `SetRequestHostHeader`.
     pub upstream_host_override: Option<String>,
     /// Upstream selected for this request.

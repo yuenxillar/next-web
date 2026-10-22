@@ -429,6 +429,20 @@ impl ProxyHttp for GatewayProxy {
         ctx.request_id = id.clone();
         session.req_header_mut().insert_header(header_name, id).ok();
 
+        // Record the host the client used: `PreserveHostHeader` forwards it and
+        // `RewriteLocationResponseHeader` hands it back in `Location`, so an
+        // internal upstream host never leaks to the client.
+        if ctx.original_host.is_none()
+            && let Some(host) = session
+                .req_header()
+                .headers
+                .get("host")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned)
+        {
+            ctx.original_host = Some(host);
+        }
+
         let Some(route) = self.routes.match_route(session) else {
             return self.respond_directly(session, ctx, 404).await;
         };
@@ -628,11 +642,16 @@ impl ProxyHttp for GatewayProxy {
         }
 
         // Host precedence: an explicit `SetRequestHostHeader`, then a preserved
-        // downstream host, then the upstream authority.
+        // downstream host (only when `PreserveHostHeader` asked for it), then the
+        // upstream authority.
         let host = ctx
             .upstream_host_override
             .clone()
-            .or_else(|| ctx.original_host.clone())
+            .or_else(|| {
+                ctx.preserve_host
+                    .then(|| ctx.original_host.clone())
+                    .flatten()
+            })
             .or_else(|| {
                 ctx.selected
                     .as_ref()
