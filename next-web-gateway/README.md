@@ -229,6 +229,7 @@ Metrics:
 | `gateway_requests_total` | counter | `route`, `method`, `status` |
 | `gateway_request_duration_seconds` | histogram | `route` |
 | `gateway_upstream_errors_total` | counter | `route`, `kind` |
+| `gateway_circuit_state` | gauge | `breaker` (`0` closed, `1` open, `2` half open) |
 | `gateway_inflight_requests` | gauge | — |
 | `gateway_local_cache_hits_total`, `gateway_local_cache_misses_total` | counter | — |
 

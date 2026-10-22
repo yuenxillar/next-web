@@ -29,6 +29,7 @@ use pingora::upstreams::peer::HttpPeer;
 use tracing::{error, info, warn};
 
 use crate::circuit_breaker::breaker_controller::Outcome;
+use crate::circuit_breaker::circuit_state::CircuitState;
 use crate::circuit_breaker::circuit_breaker_service_manager::CircuitBreakerServiceManager;
 use crate::config::{ErrorConfig, GatewayConfig, RouteConfig};
 use crate::context::{HeaderAndBody, RequestContext};
@@ -470,6 +471,8 @@ impl ProxyHttp for GatewayProxy {
             && let Err(rejection) = service.controller.try_acquire().await
         {
             warn!(breaker = %service.id, "circuit breaker is open, rejecting");
+            self.metrics
+                .set_circuit_state(&service.id, CircuitState::Open.into());
             // Tell the client when the breaker will probe again instead of a
             // hard coded second.
             let retry_after = rejection.retry_after.as_secs().max(1).to_string();
@@ -657,6 +660,10 @@ impl ProxyHttp for GatewayProxy {
                 Outcome::Success
             };
             service.controller.process(outcome).await;
+
+            // Keep the `gateway_circuit_state` gauge in step with the machine.
+            let state = service.controller.state().await;
+            self.metrics.set_circuit_state(&service.id, state.into());
         }
 
         // The correlation id belongs on every response the client sees, proxied

@@ -11,6 +11,16 @@ pub enum CircuitState {
     HalfOpen,
 }
 
+impl From<CircuitState> for u8 {
+    fn from(state: CircuitState) -> Self {
+        match state {
+            CircuitState::Closed => 0,
+            CircuitState::Open => 1,
+            CircuitState::HalfOpen => 2,
+        }
+    }
+}
+
 impl fmt::Display for CircuitState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

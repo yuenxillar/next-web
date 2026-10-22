@@ -25,6 +25,7 @@ struct RequestCounter {
 pub struct Metrics {
     requests: Mutex<HashMap<(String, String, u16), RequestCounter>>,
     upstream_errors: Mutex<HashMap<(String, String), u64>>,
+    circuit_states: Mutex<HashMap<String, u8>>,
     cache_hits: AtomicU64,
     cache_misses: AtomicU64,
     inflight: AtomicI64,
@@ -88,13 +89,22 @@ impl Metrics {
     }
 
     /// Total number of finished requests.
-    pub fn request_total(&self) -> u64 {
-        let requests = match self.requests.lock() {
+    pub fn request_total(&self) -> u64 {        let requests = match self.requests.lock() {
             Ok(requests) => requests,
             Err(poisoned) => poisoned.into_inner(),
         };
 
         requests.values().map(|counter| counter.count).sum()
+    }
+
+    /// Record the state of one breaker: `0` closed, `1` open, `2` half open.
+    pub fn set_circuit_state(&self, breaker: &str, state: u8) {
+        let mut states = match self.circuit_states.lock() {
+            Ok(states) => states,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+
+        states.insert(breaker.to_string(), state);
     }
 
     /// Render the Prometheus text exposition format.
@@ -196,6 +206,27 @@ impl Metrics {
             }
         }
 
+        out.push_str("# HELP gateway_circuit_state Circuit breaker state: 0 closed, 1 open, 2 half open.\n");
+        out.push_str("# TYPE gateway_circuit_state gauge\n");
+        {
+            let states = match self.circuit_states.lock() {
+                Ok(states) => states,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+
+            let mut breakers: Vec<_> = states.keys().cloned().collect();
+            breakers.sort();
+
+            for breaker in breakers {
+                let Some(state) = states.get(&breaker) else {
+                    continue;
+                };
+                out.push_str(&format!(
+                    "gateway_circuit_state{{breaker=\"{breaker}\"}} {state}\n"
+                ));
+            }
+        }
+
         out.push_str("# HELP gateway_inflight_requests Requests currently proxied.\n");
         out.push_str("# TYPE gateway_inflight_requests gauge\n");
         out.push_str(&format!(
@@ -224,6 +255,23 @@ mod tests {
     use std::time::Duration;
 
     use super::Metrics;
+
+    #[test]
+    fn a_breaker_state_is_exported_as_a_gauge() {
+        let metrics = Metrics::default();
+        metrics.set_circuit_state("user-service", 1);
+
+        let text = metrics.render_prometheus();
+
+        assert!(
+            text.contains("# TYPE gateway_circuit_state gauge"),
+            "{text}"
+        );
+        assert!(
+            text.contains("gateway_circuit_state{breaker=\"user-service\"} 1"),
+            "{text}"
+        );
+    }
 
     #[test]
     fn prometheus_exposition_has_help_type_and_labels() {
