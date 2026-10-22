@@ -127,8 +127,8 @@ a deprecation warning.
 | Scheme | Meaning |
 |---|---|
 | `http://host:port` | Proxy to a fixed authority over plain HTTP |
-| `https://host:port` | Proxy to a fixed authority over TLS |
 | `lb://name` | Round robin across the route's `upstreams`, weighted by `weight` |
+| `https://host:port` | **Rejected at startup** in this build: pingora is compiled without a TLS backend, so such a route could only ever answer 502 |
 
 Validation collects every problem and reports them together with a document path, for example
 `routes[1].upstreams[0].addr: 'svc.local:8080' is not a 'IP:port' address`.
@@ -281,12 +281,12 @@ Gateway generated responses also pass through the response filters, so `SecureHe
   shared between worker processes. A response is only cached when it is a `200`/`206`/`301` that
   carries neither `Set-Cookie` nor a `Vary` field other than `accept-encoding`; a `no-cache` or
   `no-store` request bypasses the cache entirely.
+- **TLS upstreams are unavailable.** pingora is built here without `openssl`, `boringssl` or
+  `rustls`, so it has no TLS connector at all: an `https://` route is rejected at startup with
+  the reason instead of failing every request at runtime (502). Enabling one of pingora's TLS
+  features and deleting the guard in `config/validate.rs` is the whole change.
 - **`upstream.tls.ca_file` is rejected at startup.** This build cannot install a custom trust
   anchor, and accepting the key would silently fail every request to a private CA.
-- **`insecure_skip_verify` does not work yet**: a self-signed backend fails the handshake even
-  with the flag set, so `https://` upstreams only work when the backend chains to the system
-  trust store. `tests/tls.rs` reproduces it and the case is marked `#[ignore]` rather than
-  dropped.
 - **`server.keepalive` and `server.max_connection` are rejected at startup** because pingora 0.9
   exposes no downstream knob for them. `server.threads` and `server.graceful_shutdown` *are*
   applied to pingora's `ServerConf`.

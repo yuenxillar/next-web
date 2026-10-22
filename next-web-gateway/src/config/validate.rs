@@ -184,6 +184,19 @@ fn validate_uri(uri: &str, path: &str, errors: &mut Vec<ConfigError>) -> Option<
         return None;
     }
 
+    // This build of pingora carries no TLS backend, so an `https://` route
+    // could only ever answer 502. Fail at startup instead (A1).
+    if scheme == "https" {
+        errors.push(ConfigError::new(
+            path,
+            "TLS upstreams are unavailable: this build of pingora has no TLS \
+             backend compiled in, so an `https://` route can never connect. \
+             Use `http://` or `lb://`, or rebuild with pingora's `openssl`, \
+             `boringssl` or `rustls` feature and remove this guard",
+        ));
+        return None;
+    }
+
     let authority = rest.split('/').next().unwrap_or_default();
     if authority.is_empty() {
         errors.push(ConfigError::new(path, "uri has an empty authority"));

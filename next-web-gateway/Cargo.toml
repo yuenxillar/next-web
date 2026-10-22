@@ -42,9 +42,6 @@ tracing-subscriber  = { workspace = true }
 
 [dev-dependencies]
 futures             = { workspace = true }
-tokio-rustls        = { workspace = true }
-rustls              = { workspace = true }
-rustls-pemfile      = { workspace = true }
 
 [features]
 default = []

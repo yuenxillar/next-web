@@ -315,10 +315,19 @@ mod tests {
     #[test]
     fn rejects_an_authority_without_a_host() {
         let text = errors_for(
-            "next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'https://:443'\n",
+            "next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'http://:8080'\n",
         );
         assert!(text.contains("routes[0].uri"), "{text}");
         assert!(text.contains("host"), "{text}");
+    }
+
+    #[test]
+    fn rejects_an_https_route_because_this_build_has_no_tls_backend() {
+        let text = errors_for(
+            "next:\n  gateway:\n    routes:\n      - id: a\n        uri: 'https://example.com'\n",
+        );
+        assert!(text.contains("routes[0].uri"), "{text}");
+        assert!(text.contains("TLS upstreams are unavailable"), "{text}");
     }
 
     #[test]
