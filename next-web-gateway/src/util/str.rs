@@ -1,59 +1,95 @@
-use crate::util::key_value::KeyValue;
+//! Small string helpers shared by the predicate implementations.
 
+/// Utilities used by the route predicates.
 pub struct StrUtil;
 
 impl StrUtil {
-    // Header=X-Request-Id, ch.p
-    pub fn parse_kv_one_and_option(str: &str) -> KeyValue<Option<String>> {
-        str.trim()
-            .split_once(',')
-            .map(|(n, v)| KeyValue {
-                k: n.into(),
-                v: Some(v.to_string()),
-            })
-            .unwrap_or(KeyValue {
-                k: str.trim().into(),
-                v: None,
-            })
+    /// Match a host against an ANT style pattern.
+    ///
+    /// `*` matches exactly one label, `**` matches zero or more labels, and a
+    /// literal label must be equal (case insensitive, port and trailing dot
+    /// ignored).
+    pub fn host_match(host: &str, pattern: &str) -> bool {
+        let host = host_labels(host);
+        let pattern = host_labels(pattern);
+
+        labels_match(&host, &pattern)
+    }
+}
+
+/// Lowercase and split a host into labels, dropping the port and empty labels.
+fn host_labels(host: &str) -> Vec<String> {
+    let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
+
+    let host = if let Some(stripped) = host.strip_prefix('[') {
+        match stripped.split_once(']') {
+            Some((ipv6, _)) => ipv6.to_string(),
+            None => host.clone(),
+        }
+    } else if host.matches(':').count() == 1 {
+        host.split_once(':')
+            .map(|(name, _)| name.to_string())
+            .unwrap_or(host.clone())
+    } else {
+        host
+    };
+
+    host.split('.')
+        .filter(|label| !label.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Glob match two label sequences, where `**` swallows zero or more labels.
+fn labels_match(host: &[String], pattern: &[String]) -> bool {
+    let Some((first, rest)) = pattern.split_first() else {
+        return host.is_empty();
+    };
+
+    if first == "**" {
+        // `**` matches zero or more labels, so try every split point.
+        return (0..=host.len()).any(|skip| labels_match(&host[skip..], rest));
     }
 
-    // **.baidu.**
-    pub fn parse_wildcard_pattern(pattern: &str) -> Option<usize> {
-        let parts: Vec<&str> = pattern.split('.').collect();
+    let Some((host_first, host_rest)) = host.split_first() else {
+        return false;
+    };
 
-        // 记录 ** 的位置
-        let mut wildcard_positions = Vec::new();
-        for (index, part) in parts.iter().enumerate() {
-            if *part == "**" {
-                wildcard_positions.push(index);
-            }
-        }
-        if wildcard_positions.len() == 1 {
-            return Some(wildcard_positions[0]);
-        }
-        return Some(wildcard_positions.iter().sum::<usize>() + 1);
+    if first != "*" && first != host_first {
+        return false;
     }
 
-    pub fn host_match(host: &str, rule: &str) -> bool {
-        if host.eq(rule) {
-            return true;
-        }
+    labels_match(host_rest, rest)
+}
 
-        let host_parts: Vec<&str> = host.split('.').collect();
-        let rule_parts: Vec<&str> = rule.split('.').collect();
+#[cfg(test)]
+mod tests {
+    use super::StrUtil;
 
-        // 检查 host 地址和规则的段数是否一致
-        if host_parts.len() != rule_parts.len() {
-            return false;
-        }
+    #[test]
+    fn exact_host_matches() {
+        assert!(StrUtil::host_match("example.com", "example.com"));
+        assert!(!StrUtil::host_match("a.example.com", "example.com"));
+    }
 
-        // 逐段匹配
-        for (host_part, rule_part) in host_parts.iter().zip(rule_parts.iter()) {
-            if *rule_part != "**" && *host_part != *rule_part {
-                return false;
-            }
-        }
+    #[test]
+    fn single_star_matches_exactly_one_label() {
+        assert!(StrUtil::host_match("a.example.com", "*.example.com"));
+        assert!(!StrUtil::host_match("a.b.example.com", "*.example.com"));
+        assert!(!StrUtil::host_match("example.com", "*.example.com"));
+    }
 
-        true
+    #[test]
+    fn double_star_matches_zero_or_more_labels() {
+        assert!(StrUtil::host_match("example.com", "**.example.com"));
+        assert!(StrUtil::host_match("a.example.com", "**.example.com"));
+        assert!(StrUtil::host_match("a.b.example.com", "**.example.com"));
+        assert!(!StrUtil::host_match("example.org", "**.example.com"));
+    }
+
+    #[test]
+    fn port_and_case_are_ignored() {
+        assert!(StrUtil::host_match("Example.COM:8080", "example.com"));
+        assert!(StrUtil::host_match("example.com.", "example.com"));
     }
 }

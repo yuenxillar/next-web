@@ -21,19 +21,22 @@ impl RoutePredicate for CookieRoutePredicateFactory {
     }
 }
 
+/// Match the first cookie with the given name against the optional pattern.
 fn cookie_matches(cookie_header: &str, name: &str, regex: Option<&Regex>) -> bool {
-    cookie_header
+    let Some(value) = cookie_header
         .split(';')
         .filter_map(|cookie| cookie.trim().split_once('='))
-        .any(|(cookie_name, cookie_value)| {
-            if cookie_name.trim() != name {
-                return false;
-            }
-
-            regex
-                .map(|compiled| compiled.is_match(cookie_value.trim()))
-                .unwrap_or(true)
+        .find_map(|(cookie_name, cookie_value)| {
+            (cookie_name.trim() == name).then(|| cookie_value.trim())
         })
+    else {
+        return false;
+    };
+
+    match regex {
+        None => true,
+        Some(regex) => regex.is_match(value),
+    }
 }
 
 #[cfg(test)]
@@ -52,5 +55,15 @@ mod tests {
         let regex = Regex::new(r"^ab").unwrap();
         assert!(cookie_matches("session=abc", "session", Some(&regex)));
         assert!(!cookie_matches("session=xyz", "session", Some(&regex)));
+    }
+
+    #[test]
+    fn cookie_uses_the_first_value_with_that_name() {
+        let regex = Regex::new("^(?:first)$").unwrap();
+        assert!(cookie_matches(
+            "session=first; session=second",
+            "session",
+            Some(&regex)
+        ));
     }
 }

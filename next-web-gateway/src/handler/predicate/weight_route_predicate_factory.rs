@@ -1,18 +1,24 @@
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+//! `Weight` predicate: distributes a route group across weighted buckets.
 
 use super::route_predicate::RoutePredicate;
 
+/// The `Weight` predicate.
 #[derive(Debug, Clone)]
 pub struct WeightRoutePredicateFactory {
+    /// Route group; every route in a group shares the bucket space.
     pub group: String,
+    /// Relative weight of this route inside the group.
     pub weight: u32,
+    /// First bucket owned by this route.
     pub range_start: u32,
+    /// One past the last bucket owned by this route.
     pub range_end: u32,
+    /// Sum of the weights of the whole group.
     pub total_weight: u32,
 }
 
 impl WeightRoutePredicateFactory {
+    /// Build a predicate for a group and a weight.
     pub fn new(group: String, weight: u32) -> Self {
         Self {
             group,
@@ -23,62 +29,49 @@ impl WeightRoutePredicateFactory {
         }
     }
 
+    /// Assign this route the half open bucket window `range_start..range_start+weight`.
     pub fn configure_range(&mut self, range_start: u32, total_weight: u32) {
         self.total_weight = total_weight;
         self.range_start = range_start;
         self.range_end = range_start.saturating_add(self.weight);
     }
+
+    /// Whether a freshly drawn bucket belongs to this route.
+    pub fn owns_bucket(&self, bucket: u32) -> bool {
+        self.weight > 0
+            && self.total_weight > 0
+            && self.range_start < self.range_end
+            && self.range_start <= bucket
+            && bucket < self.range_end
+    }
 }
 
 impl RoutePredicate for WeightRoutePredicateFactory {
-    fn matches(&self, session: &mut pingora::protocols::http::ServerSession) -> bool {
+    fn matches(&self, _session: &mut pingora::protocols::http::ServerSession) -> bool {
         if self.weight == 0 || self.total_weight == 0 || self.range_start >= self.range_end {
             return false;
         }
 
-        let request_key = request_hash_key(session, &self.group);
-        let Some(bucket) = bucket_for_key(&request_key, self.total_weight) else {
-            return false;
-        };
-
-        self.range_start <= bucket && bucket < self.range_end
+        // Spring re-randomises for every evaluation, so the split is a stable
+        // ratio over many requests rather than a sticky per-client choice.
+        self.owns_bucket(random_bucket(self.total_weight))
     }
 }
 
-fn request_hash_key(session: &pingora::protocols::http::ServerSession, group: &str) -> String {
-    let header = session.req_header();
-    let method = header.method.as_str();
-    let path_and_query = header
-        .uri
-        .path_and_query()
-        .map(|value| value.as_str())
-        .unwrap_or_else(|| header.uri.path());
-    let host = header
-        .headers
-        .get("Host")
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or_default();
-    let remote_addr = session
-        .client_addr()
-        .map(|addr| format!("{addr:?}"))
-        .unwrap_or_default();
-
-    format!("{group}|{method}|{host}|{path_and_query}|{remote_addr}")
-}
-
-fn bucket_for_key(key: &str, total_weight: u32) -> Option<u32> {
+/// Draw a bucket uniformly from `0..total_weight`.
+fn random_bucket(total_weight: u32) -> u32 {
     if total_weight == 0 {
-        return None;
+        return 0;
     }
 
-    let mut hasher = DefaultHasher::new();
-    key.hash(&mut hasher);
-    Some((hasher.finish() % total_weight as u64) as u32)
+    rand::random::<u32>() % total_weight
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{bucket_for_key, WeightRoutePredicateFactory};
+    use std::collections::HashSet;
+
+    use super::{random_bucket, WeightRoutePredicateFactory};
 
     #[test]
     fn configure_range_sets_expected_window() {
@@ -91,11 +84,29 @@ mod tests {
     }
 
     #[test]
-    fn bucket_for_key_is_stable_and_bounded() {
-        let first = bucket_for_key("group1|GET|example.com|/test|127.0.0.1", 10).unwrap();
-        let second = bucket_for_key("group1|GET|example.com|/test|127.0.0.1", 10).unwrap();
+    fn bucket_is_bounded_by_the_group_weight() {
+        for _ in 0..1_000 {
+            assert!(random_bucket(10) < 10);
+        }
+    }
 
-        assert_eq!(first, second);
-        assert!(first < 10);
+    #[test]
+    fn bucket_is_randomised_per_request() {
+        let buckets: HashSet<u32> = (0..200).map(|_| random_bucket(10)).collect();
+        assert!(
+            buckets.len() > 1,
+            "expected several distinct buckets, got {buckets:?}"
+        );
+    }
+
+    #[test]
+    fn a_route_only_owns_its_window() {
+        let mut predicate = WeightRoutePredicateFactory::new("group".to_string(), 2);
+        predicate.configure_range(8, 10);
+
+        assert!(predicate.owns_bucket(8));
+        assert!(predicate.owns_bucket(9));
+        assert!(!predicate.owns_bucket(7));
+        assert!(!predicate.owns_bucket(10));
     }
 }

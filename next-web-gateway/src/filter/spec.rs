@@ -56,9 +56,11 @@ impl FilterSpec {
         }
 
         let args = match rest {
-            Some(rest) if !rest.trim().is_empty() => {
-                rest.split(',').map(|arg| arg.trim().to_string()).collect()
-            }
+            Some(rest) if !rest.trim().is_empty() => rest
+                .split(',')
+                .map(|arg| arg.trim().to_string())
+                .filter(|arg| !arg.is_empty())
+                .collect(),
             _ => Vec::new(),
         };
 

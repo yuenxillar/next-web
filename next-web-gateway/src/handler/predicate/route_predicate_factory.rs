@@ -265,10 +265,9 @@ impl TryFrom<&str> for RoutePredicateFactory {
             }
 
             "XForwardedRemoteAddr" => {
-                let trusted_networks =
-                    parse_networks(&spec, "predicates.XForwardedRemoteAddr")?;
+                let remote_addrs = parse_networks(&spec, "predicates.XForwardedRemoteAddr")?;
                 RoutePredicateFactory::XForwardedRemoteAddr(
-                    XForwardedRemoteAddrRoutePredicateFactory { trusted_networks },
+                    XForwardedRemoteAddrRoutePredicateFactory { remote_addrs },
                 )
             }
 
@@ -296,12 +295,15 @@ fn name_and_pattern(spec: &FilterSpec) -> Result<(String, Option<Regex>), Config
     }
 
     let pattern = match spec.args.get(1).map(|pattern| pattern.trim()) {
-        Some(pattern) if !pattern.is_empty() => Some(Regex::new(pattern).map_err(|error| {
-            ConfigError::new(
-                format!("predicates.{}", spec.name),
-                format!("invalid regular expression `{pattern}`: {error}"),
-            )
-        })?),
+        Some(pattern) if !pattern.is_empty() => {
+            let anchored = format!("^(?:{pattern})$");
+            Some(Regex::new(&anchored).map_err(|error| {
+                ConfigError::new(
+                    format!("predicates.{}", spec.name),
+                    format!("invalid regular expression `{pattern}`: {error}"),
+                )
+            })?)
+        }
         _ => None,
     };
 
@@ -400,5 +402,30 @@ mod tests {
     #[test]
     fn remote_addr_rejects_an_invalid_cidr() {
         assert!(RoutePredicateFactory::try_from("RemoteAddr=10.0.0.0/33").is_err());
+    }
+
+    #[test]
+    fn header_pattern_is_anchored() {
+        use super::name_and_pattern;
+        use crate::filter::spec::FilterSpec;
+
+        let spec = FilterSpec::parse("Header=X-Test, abc").unwrap();
+        let (_, regex) = name_and_pattern(&spec).unwrap();
+        let regex = regex.unwrap();
+
+        assert!(regex.is_match("abc"));
+        assert!(!regex.is_match("xabc"));
+    }
+
+    #[test]
+    fn header_without_pattern_has_no_regex() {
+        use super::name_and_pattern;
+        use crate::filter::spec::FilterSpec;
+
+        let spec = FilterSpec::parse("Header=X-Test,").unwrap();
+        let (name, regex) = name_and_pattern(&spec).unwrap();
+
+        assert_eq!(name, "X-Test");
+        assert!(regex.is_none());
     }
 }

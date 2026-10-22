@@ -1,39 +1,70 @@
+//! `Header` predicate: matches when any value of a header matches.
+
+use regex::Regex;
+
 use super::route_predicate::RoutePredicate;
 use crate::util::key_value::KeyValue;
 
+/// The `Header` predicate.
 #[derive(Debug, Clone)]
 pub struct HeaderRoutePredicateFactory {
+    /// Header name in `k`, the configured pattern in `v` (informational).
     pub header: KeyValue<Option<String>>,
-    pub regex: Option<regex::Regex>,
+    /// Anchored pattern compiled at configuration time.
+    pub regex: Option<Regex>,
 }
 
 impl RoutePredicate for HeaderRoutePredicateFactory {
     fn matches(&self, session: &mut pingora::protocols::http::ServerSession) -> bool {
-        let header_name = self.header.k.as_ref();
+        let values = session
+            .req_header()
+            .headers
+            .get_all(self.header.k.as_ref())
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .collect::<Vec<_>>();
 
-        // 1. 检查头是否存在
-        if let Some(header_value_bytes) = session.req_header().headers.get(header_name) {
-            // 2. 尝试将 header 值转换为字符串
-            //    使用 `from_utf8_lossy` 比 `to_str().unwrap_or("")` 更安全，能处理部分非 UTF-8
-            let header_value_str = String::from_utf8_lossy(header_value_bytes.as_bytes());
+        matches_values(&values, self.regex.as_ref())
+    }
+}
 
-            // 3. 核心逻辑：根据 self.header.v 的值决定匹配策略
-            match &self.header.v {
-                // v 为 None：只要头存在就匹配成功
-                None => {
-                    return true;
-                }
-                // v 为 Some(_)：需要进一步检查
-                Some(_) => {
-                    // 如果提供了正则表达式，则使用正则匹配
-                    if let Some(ref regex) = self.regex {
-                        return regex.is_match(&header_value_str);
-                    }
-                    return false;
-                }
-            }
-        }
+/// Whether any of the header values satisfies the predicate.
+///
+/// A predicate without a pattern only requires the header to be present, which
+/// is also what `Header=X-Test,` means in the configuration.
+fn matches_values(values: &[&str], regex: Option<&Regex>) -> bool {
+    if values.is_empty() {
+        return false;
+    }
 
-        false
+    match regex {
+        None => true,
+        Some(regex) => values.iter().any(|value| regex.is_match(value)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::matches_values;
+    use regex::Regex;
+
+    #[test]
+    fn header_name_only_matches_when_present() {
+        assert!(matches_values(&["anything"], None));
+        assert!(!matches_values(&[], None));
+    }
+
+    #[test]
+    fn header_matches_any_of_several_values() {
+        let regex = Regex::new("^(?:token-)").unwrap();
+        assert!(matches_values(&["other", "token-abc"], Some(&regex)));
+        assert!(!matches_values(&["other", "second"], Some(&regex)));
+    }
+
+    #[test]
+    fn header_regex_is_fully_anchored() {
+        let regex = Regex::new("^(?:abc)$").unwrap();
+        assert!(matches_values(&["abc"], Some(&regex)));
+        assert!(!matches_values(&["xabc"], Some(&regex)));
     }
 }

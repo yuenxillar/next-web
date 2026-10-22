@@ -324,7 +324,7 @@ admin 监听器（独立 `ProxyHttp` 实现，单独 `http_proxy_service`）：
 
 - **默认 `[]` = 谁都不信。** 于是：
   - `RequestRateLimiter` 的限流 key 取**直连对端地址**；只有 `trusted_proxies` 非空且直连对端命中时，才从 `X-Forwarded-For` 里**从右往左**跳过受信代理，取第一个不受信的地址作为 key。
-  - `XForwardedRemoteAddr` 谓词的受信列表**用谓词自己的参数**（与 SCG 一致：该谓词的参数就是 trusted proxies），语义改为「先确认直连对端在该列表内；是则从 XFF 右往左跳过受信代理取第一个不受信地址；否则直接看不命中」。谓词参数非法 → 启动失败。
+  - `XForwardedRemoteAddr` 谓词的参数是**要匹配的客户端网段**（与 SCG 一致），受信代理列表来自全局 `trusted_proxies`：直连对端不在受信列表内 → 完全不看 XFF，直接用直连地址；在列表内 → 从 XFF 右往左跳过受信代理，取第一个不受信地址再与参数比对。谓词参数非法 → 启动失败。
 - `X-Forwarded-*` 的**追加**行为不受此配置影响（永远追加，不覆盖客户端已有值）。
 
 ### D16 [决定] 熔断器配置位置
