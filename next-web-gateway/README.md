@@ -283,6 +283,10 @@ Gateway generated responses also pass through the response filters, so `SecureHe
   `no-store` request bypasses the cache entirely.
 - **`upstream.tls.ca_file` is rejected at startup.** This build cannot install a custom trust
   anchor, and accepting the key would silently fail every request to a private CA.
+- **`insecure_skip_verify` does not work yet**: a self-signed backend fails the handshake even
+  with the flag set, so `https://` upstreams only work when the backend chains to the system
+  trust store. `tests/tls.rs` reproduces it and the case is marked `#[ignore]` rather than
+  dropped.
 - **`server.keepalive` and `server.max_connection` are rejected at startup** because pingora 0.9
   exposes no downstream knob for them. `server.threads` and `server.graceful_shutdown` *are*
   applied to pingora's `ServerConf`.
