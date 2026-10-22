@@ -62,6 +62,26 @@ fn upstream_500_passes_through_and_trips_the_breaker() {
 }
 
 #[test]
+fn an_unresolvable_upstream_is_a_bad_gateway() {
+    // `.invalid` is reserved by RFC 2606 and never resolves.
+    let template = "\
+- id: broken
+  uri: \"http://does-not-exist.invalid\"
+  predicates:
+    - Path=/broken/**
+";
+    let (_upstream, gateway) = with_upstream(Behavior::Echo, template);
+
+    let response = get(gateway.addr, "/broken", &[]);
+
+    assert_eq!(
+        response.status, 502,
+        "a name that does not resolve is an upstream fault: {}",
+        response.text()
+    );
+}
+
+#[test]
 fn gateway_error_body_is_json_and_carries_request_id() {
     let template = "\
 - id: ping

@@ -10,6 +10,8 @@ pub enum GatewayError {
     ServerNoRoute,
     /// The matched route has no reachable upstream.
     ServerNoUpstreamServices,
+    /// The upstream's name could not be resolved.
+    ServerUpstreamDnsFailure,
     /// A filter rejected the request.
     ServerRejectsRequest,
     /// Anything else the gateway failed to do.
@@ -22,6 +24,9 @@ impl GatewayError {
         match self {
             Self::ServerNoRoute => 404,
             Self::ServerNoUpstreamServices => 503,
+            // A name that does not resolve is an upstream fault, not a missing
+            // pool, so it is a bad gateway rather than "service unavailable".
+            Self::ServerUpstreamDnsFailure => 502,
             Self::ServerRejectsRequest => 400,
             Self::ServerError => 500,
         }
@@ -35,6 +40,7 @@ impl std::fmt::Display for GatewayError {
             GatewayError::ServerRejectsRequest => "Server rejects the request",
             GatewayError::ServerError => "Server error",
             GatewayError::ServerNoUpstreamServices => "No upstream services available",
+            GatewayError::ServerUpstreamDnsFailure => "The upstream name could not be resolved",
         })
     }
 }
@@ -62,6 +68,7 @@ mod tests {
     fn status_mapping_is_explicit() {
         assert_eq!(GatewayError::ServerNoRoute.status(), 404);
         assert_eq!(GatewayError::ServerNoUpstreamServices.status(), 503);
+        assert_eq!(GatewayError::ServerUpstreamDnsFailure.status(), 502);
         assert_eq!(GatewayError::ServerRejectsRequest.status(), 400);
         assert_eq!(GatewayError::ServerError.status(), 500);
     }

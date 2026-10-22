@@ -10,14 +10,18 @@ pub struct HostRoutePredicateFactory {
 
 impl RoutePredicate for HostRoutePredicateFactory {
     fn matches(&self, session: &mut ServerSession) -> bool {
-        let Some(host_header) = session.req_header().headers.get("Host") else {
-            return false;
+        // HTTP/1.0 requests and some proxies omit `Host`; the request target's
+        // authority is the fallback (D11).
+        let request = session.req_header();
+        let remote_host = match request.headers.get("Host") {
+            Some(value) => value.to_str().map(str::to_string).ok(),
+            None => request.uri.authority().map(|authority| authority.to_string()),
         };
-        let Ok(remote_host) = host_header.to_str() else {
+        let Some(remote_host) = remote_host else {
             return false;
         };
 
-        let remote_host = normalize_host(remote_host);
+        let remote_host = normalize_host(&remote_host);
         if remote_host.is_empty() {
             return false;
         }

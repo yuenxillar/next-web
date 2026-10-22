@@ -34,15 +34,30 @@ impl GatewayFilter for RewriteResponseHeaderFilter {
             None => return chain.filter(exchange).await,
         };
 
-        if let Some(value) = response_header
+        // Every value of a multi-valued header (`Set-Cookie`, `Warning`,
+        // `Link`) is rewritten, not just the first one.
+        let values: Vec<String> = response_header
             .headers
-            .get(&self.header)
-            .and_then(|value| value.to_str().ok())
-        {
-            let rewritten = rewrite_value(value, &self.regex, &self.replacement);
-            if rewritten != value {
+            .get_all(&self.header)
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .map(str::to_string)
+            .collect();
+
+        if values.is_empty() {
+            return chain.filter(exchange).await;
+        }
+
+        let rewritten: Vec<String> = values
+            .iter()
+            .map(|value| rewrite_value(value, &self.regex, &self.replacement))
+            .collect();
+
+        if rewritten != values {
+            response_header.remove_header(&self.header);
+            for value in rewritten {
                 response_header
-                    .insert_header(self.header.clone(), rewritten)
+                    .append_header(self.header.clone(), value)
                     .ok();
             }
         }

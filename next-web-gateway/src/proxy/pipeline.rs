@@ -523,16 +523,22 @@ impl ProxyHttp for GatewayProxy {
             RouteWork::Http | RouteWork::Https => {
                 let tls = route.work == RouteWork::Https;
                 let addresses = match self.dns.resolve(&parsed.host, parsed.port).await {
-                    Ok(addresses) => addresses,
+                    Ok(addresses) if !addresses.is_empty() => addresses,
+                    Ok(_) => return Err(self.no_upstream_error(ctx)),
                     Err(error) => {
                         warn!(route = %route_id, "upstream name resolution failed: {error}");
-                        return Err(self.no_upstream_error(ctx));
+                        let failure: Box<pingora::Error> =
+                            GatewayError::ServerUpstreamDnsFailure.into();
+                        self.record_upstream_failure(ctx, &failure);
+                        return Err(failure);
                     }
                 };
 
-                let Some(addr) = addresses.first().copied() else {
-                    return Err(self.no_upstream_error(ctx));
-                };
+                // A name with several A records is load balanced, not pinned to
+                // the first one: a dead first address must not fail every
+                // request until the TTL expires.
+                let index = (group_key % addresses.len() as u64) as usize;
+                let addr = addresses[index];
 
                 UpstreamSelection {
                     addr,
