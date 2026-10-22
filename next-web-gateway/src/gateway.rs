@@ -65,6 +65,9 @@ pub struct Gateway {
     config_path: Option<PathBuf>,
     bind: Option<String>,
     admin_bind: Option<String>,
+    daemon: bool,
+    upgrade: bool,
+    test: bool,
 }
 
 impl Gateway {
@@ -78,6 +81,9 @@ impl Gateway {
             config_path: Some(path.to_path_buf()),
             bind: None,
             admin_bind: None,
+            daemon: false,
+            upgrade: false,
+            test: false,
         })
     }
 
@@ -90,6 +96,9 @@ impl Gateway {
             config_path: None,
             bind: None,
             admin_bind: None,
+            daemon: false,
+            upgrade: false,
+            test: false,
         })
     }
 
@@ -102,6 +111,9 @@ impl Gateway {
     pub fn with_overrides(mut self, cli: &Cli) -> Self {
         self.bind = cli.bind.clone();
         self.admin_bind = cli.admin_bind.clone();
+        self.daemon = cli.daemon;
+        self.upgrade = cli.upgrade;
+        self.test = cli.test;
         self
     }
 
@@ -194,7 +206,17 @@ impl Gateway {
         conf.grace_period_seconds = Some(shutdown);
         conf.graceful_shutdown_timeout_seconds = Some(shutdown);
 
-        let mut server = Server::new_with_opt_and_conf(None, conf);
+        // `-d`/`-u`/`-t` are pingora flags: forwarding them means `--daemon`
+        // really backgrounds the process and `--test` really validates the
+        // startup instead of being parsed and dropped.
+        let opt = pingora::server::configuration::Opt {
+            daemon: self.daemon,
+            upgrade: self.upgrade,
+            test: self.test,
+            ..Default::default()
+        };
+
+        let mut server = Server::new_with_opt_and_conf(Some(opt), conf);
 
         server.bootstrap();
 
