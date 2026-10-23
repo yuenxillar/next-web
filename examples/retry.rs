@@ -1,79 +1,45 @@
-use std::error::Error;
+use next_web::retry::{
+    error::retry_error::RetryError, retry_callback::with_fn, retry_context::RetryContext,
+    retry_operations::RetryOperations, support::retry_template::RetryTemplate,
+};
 
-use next_web::macros::retryable;
-use next_web::retry::error::retry_error::RetryError;
-use next_web::retry::retry_callback::with_fn;
-use next_web::retry::retry_operations::RetryOperations;
-use next_web::retry::support::retry_template::RetryTemplate;
-use next_web::util::LocalDateTime;
-
-#[allow(unused)]
-#[derive(Debug)]
-enum TestMatch {
-    A,
-    B(u64),
-}
-
-#[retryable(max_attempts = 4, delay = 1000, backoff = test_backoff, retry_for = [TestMatch::A, TestMatch::B(123)], multiplier = 2)]
-fn test_retry() -> Result<(), TestMatch> {
-    let timestamp_sec = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    println!("{}", LocalDateTime::now());
-    match timestamp_sec % 2 {
-        0 => Err(TestMatch::B(123)),
-        _ => Err(TestMatch::A),
-    }
-}
-
-#[allow(unused)]
-fn test_backoff(error: &TestMatch) {
-    println!("function test_retry backoff: {:?}", error);
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum TestRetryError {
-    Default(String),
-}
-
-impl Error for TestRetryError {}
-impl std::fmt::Display for TestRetryError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "TestRetryError: {}", self.to_string())
-    }
-}
-
+/// A retryable operation that fails a few times before it succeeds.
+///
+/// The closure stores its own progress in the retry context, which is the supported way to
+/// carry state across the attempts of one retry block.
 #[tokio::main]
 async fn main() {
-    let result = RetryTemplate::builder()
+    let template = RetryTemplate::builder()
         .max_attempts(4)
-        .exponential_backoff(1000, 6000, 2.0, false)
-        .build()
-        .execute(with_fn(|ctx| {
-            Box::pin(async move {
-                let retry_count = ctx.get_attribute("retryCount");
-                let value = retry_count
-                    .map(|s| s.as_u64().unwrap_or_default())
-                    .unwrap_or_default();
+        .exponential_backoff(500, 2.0, 4_000)
+        .build();
 
-                if value < 4 {
-                    if value > 0 {
-                        println!(
-                            "Retry Count: {}, timestamp: {}",
-                            value,
-                            LocalDateTime::timestamp()
-                        );
-                    }
-                    ctx.set_attribute("retryCount", (value + 1).into());
-                    return Err(RetryError::Any(Box::new(TestRetryError::Default(
-                        "test retry error".to_string(),
-                    ))));
+    let result = template
+        .execute(with_fn(|context: &dyn RetryContext| {
+            Box::pin(async move {
+                let attempt = context
+                    .get_attribute("attempt")
+                    .and_then(|value| value.as_u64())
+                    .unwrap_or_default()
+                    + 1;
+                context.set_attribute("attempt", attempt.into());
+
+                println!(
+                    "attempt {attempt} at retry count {}",
+                    context.get_retry_count()
+                );
+
+                if attempt < 4 {
+                    return Err(RetryError::custom("the dependency is not ready yet"));
                 }
 
-                Ok(())
+                Ok(attempt)
             })
         }))
         .await;
-    println!("result: {:?}", result);
+
+    match result {
+        Ok(attempts) => println!("succeeded after {attempts} attempts"),
+        Err(error) => println!("gave up: {error}"),
+    }
 }

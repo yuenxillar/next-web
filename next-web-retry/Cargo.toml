@@ -10,7 +10,14 @@ repository.workspace = true
 [dependencies]
 next-web-core   = { workspace = true }
 serde           = { workspace = true }
-tokio           = { workspace = true, features = ["sync"]}
+tokio           = { workspace = true, features = ["sync", "time"]}
 tracing         = { workspace = true }
 rand            = { workspace = true }
 dashmap         = { workspace = true }
+indexmap        = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde_json = { workspace = true }

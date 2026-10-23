@@ -18,7 +18,6 @@ next-web-data-database  = { path = "../next-web-data/next-web-data-database", ve
 next-web-state-machine  = { path = "../next-web-state-machine", version = "*" }
 next-web-xxl-job        = { path = "../next-web-xxl-job", version = "*" }
 next-web-mail           = { path = "../next-web-mail", version = "*" }
-next-web-ip             = { path = "../next-web-ip", version = "*" }
 next-web-document       = { path = "../next-web-document", version = "*", features = [] }
 next-web-retry          = { path = "../next-web-retry", version = "*" }
 next-web-resilience     = { path = "../next-web-resilience", version = "*" }
@@ -27,7 +26,7 @@ next-web-pay-alipay     = { path = "../next-web-pay/next-web-pay-alipay", versio
 # next-web-data-database = { path = "../next-web-data-database", version = "*" }
 # next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "*" }
 
-tokio           = { workspace = true, features = ["sync"]}
+tokio           = { workspace = true, features = ["sync", "net"]}
 serde           = { workspace = true }
 serde_json      = { workspace = true }
 
@@ -142,6 +141,10 @@ path = "redis.rs"
 [[bin]]
 name = "retry"
 path = "retry.rs"
+
+[[bin]]
+name = "retry_metrics"
+path = "retry_metrics.rs"
 
 [[bin]]
 name = "resilience"

@@ -1,0 +1,100 @@
+name: retry
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "next-web-retry/**"
+      - "next-web/**"
+      - "next-web-ai/**"
+      - "examples/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/retry.yml"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: retry-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  retry:
+    name: retry (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.98.1"
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Toolchain
+        run: rustc -vV && cargo -vV
+
+      - name: Format
+        run: cargo fmt -p next-web-retry --check
+
+      - name: Clippy
+        # `--no-deps` keeps the gate on this crate: the workspace has pre-existing clippy
+        # findings in next-web-context and next-web-core, and `-D warnings` would fail on them.
+        run: cargo clippy -p next-web-retry --all-targets --locked --no-deps -- -D warnings
+
+      - name: Test
+        run: cargo test -p next-web-retry --locked
+
+      - name: Docs
+        run: cargo doc -p next-web-retry --no-deps --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  consumers:
+    name: consumers (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.98.1"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: The facade feature
+        run: cargo check -p next-web --features enable-retry --locked
+
+      - name: The AI crate
+        run: cargo check -p next-web-ai --locked
+
+      - name: The retry example
+        run: cargo check -p next-web-examples --bin retry --locked
+
+      - name: The metrics example
+        run: cargo check -p next-web-examples --bin retry_metrics --locked
+
+  deny:
+    name: deny (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@cargo-deny
+
+      - name: Dependency policy
+        # Informational for now: it reports the state of the whole workspace against deny.toml.
+        # Remove `continue-on-error` once the findings are fixed and the gate is required.
+        run: cargo deny check advisories bans licenses sources

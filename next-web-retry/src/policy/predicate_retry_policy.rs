@@ -1,47 +1,53 @@
-use std::{any::Any, sync::Arc};
+//! A policy that decides with a predicate over the last error.
 
-use next_web_core::{Named, any::AnyError, async_trait};
+use std::sync::Arc;
+
+use next_web_core::Named;
 
 use crate::{
     Predicate, context::retry_context_support::RetryContextSupport, error::retry_error::RetryError,
-    retry_policy::RetryPolicy,
+    retry_context::RetryContext, retry_policy::RetryPolicy,
 };
 
+/// A policy that decides with a predicate over the last error.
+///
+/// Use it when classification needs more than a white or black list: a predicate can look
+/// at anything the error exposes. Like
+/// [`BinaryErrorClassifierRetryPolicy`](super::binary_error_classifier_retry_policy::BinaryErrorClassifierRetryPolicy)
+/// it does not count attempts, so compose it with a counting policy for a bounded retry.
 #[derive(Clone)]
 pub struct PredicateRetryPolicy {
     predicate: Arc<dyn Predicate<RetryError>>,
 }
 
 impl PredicateRetryPolicy {
+    /// Creates a policy from a predicate.
     pub fn new(predicate: Arc<dyn Predicate<RetryError>>) -> Self {
         Self { predicate }
     }
+
+    /// Returns the predicate of this policy.
+    pub fn predicate(&self) -> &Arc<dyn Predicate<RetryError>> {
+        &self.predicate
+    }
 }
 
-#[async_trait]
 impl RetryPolicy for PredicateRetryPolicy {
-    async fn can_retry(&self, context: &dyn crate::retry_context::RetryContext) -> bool {
+    fn can_retry(&self, context: &dyn RetryContext) -> bool {
         match context.get_last_error() {
             Some(error) => self.predicate.test(&error),
             None => true,
         }
     }
 
-    fn open(
-        &self,
-        _context: Option<&dyn crate::retry_context::RetryContext>,
-    ) -> Arc<dyn crate::retry_context::RetryContext> {
-        Arc::new(RetryContextSupport::default())
+    fn open(&self, parent: Option<Arc<dyn RetryContext>>) -> Arc<dyn RetryContext> {
+        Arc::new(RetryContextSupport::with_parent(parent))
     }
 
-    fn close(&self, _context: &dyn crate::retry_context::RetryContext) {}
+    fn close(&self, _context: &dyn RetryContext) {}
 
-    fn register_error(
-        &self,
-        context: &dyn crate::retry_context::RetryContext,
-        error: Option<&dyn AnyError>,
-    ) {
-        let any: &dyn Any = context;
+    fn register_error(&self, context: &dyn RetryContext, error: &RetryError) {
+        let any: &dyn std::any::Any = context;
         if let Some(context) = any.downcast_ref::<RetryContextSupport>() {
             context.register_error(error);
         }
@@ -56,42 +62,36 @@ impl Named for PredicateRetryPolicy {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::sync::Arc;
 
-    #[tokio::test]
-    async fn predicate_retry_policy_allows_first_attempt() {
+    use super::PredicateRetryPolicy;
+    use crate::{error::retry_error::RetryError, retry_policy::RetryPolicy};
+
+    #[test]
+    fn the_first_attempt_is_always_allowed() {
         let policy = PredicateRetryPolicy::new(Arc::new(|_: &RetryError| false));
         let context = policy.open(None);
 
-        assert!(policy.can_retry(context.as_ref()).await);
+        assert!(policy.can_retry(context.as_ref()));
     }
 
-    #[tokio::test]
-    async fn predicate_retry_policy_uses_last_error() {
-        let policy = PredicateRetryPolicy::new(Arc::new(
-            |error: &RetryError| matches!(error, RetryError::Custom(message) if message == "failed"),
-        ));
+    #[test]
+    fn the_predicate_sees_the_last_error() {
+        let policy =
+            PredicateRetryPolicy::new(Arc::new(|error: &RetryError| error.message() == "failed"));
         let context = policy.open(None);
-        let error = RetryError::Custom("failed".to_string())
-            .as_any_error()
-            .expect("custom retry error should convert to AnyError");
-
-        policy.register_error(context.as_ref(), Some(error.as_ref()));
+        policy.register_error(context.as_ref(), &RetryError::custom("failed"));
 
         assert_eq!(context.get_retry_count(), 1);
-        assert!(policy.can_retry(context.as_ref()).await);
+        assert!(policy.can_retry(context.as_ref()));
     }
 
-    #[tokio::test]
-    async fn predicate_retry_policy_can_reject_last_error() {
+    #[test]
+    fn a_rejecting_predicate_stops_the_retry() {
         let policy = PredicateRetryPolicy::new(Arc::new(|_: &RetryError| false));
         let context = policy.open(None);
-        let error = RetryError::Custom("failed".to_string())
-            .as_any_error()
-            .expect("custom retry error should convert to AnyError");
+        policy.register_error(context.as_ref(), &RetryError::custom("failed"));
 
-        policy.register_error(context.as_ref(), Some(error.as_ref()));
-
-        assert!(!policy.can_retry(context.as_ref()).await);
+        assert!(!policy.can_retry(context.as_ref()));
     }
 }

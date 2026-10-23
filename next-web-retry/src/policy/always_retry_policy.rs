@@ -1,33 +1,42 @@
-use std::{any::Any, sync::Arc};
+//! A policy that always allows another attempt.
 
-use next_web_core::{Named, any::AnyError, async_trait};
+use std::sync::Arc;
 
-use crate::{context::retry_context_support::RetryContextSupport, retry_policy::RetryPolicy};
+use next_web_core::Named;
 
-#[derive(Clone, Default)]
+use crate::{
+    context::retry_context_support::RetryContextSupport, error::retry_error::RetryError,
+    retry_context::RetryContext, retry_policy::RetryPolicy,
+};
+
+/// A policy that always allows another attempt.
+///
+/// Use it for retries that must continue until the callback succeeds, together with a
+/// mechanism that can stop them from outside, such as a timeout in the callback or a
+/// listener that marks the context exhausted.
+#[derive(Clone, Copy, Default, Debug)]
 pub struct AlwaysRetryPolicy;
 
-#[async_trait]
+impl AlwaysRetryPolicy {
+    /// Creates the policy.
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 impl RetryPolicy for AlwaysRetryPolicy {
-    async fn can_retry(&self, _context: &dyn crate::retry_context::RetryContext) -> bool {
+    fn can_retry(&self, _context: &dyn RetryContext) -> bool {
         true
     }
 
-    fn open(
-        &self,
-        _context: Option<&dyn crate::retry_context::RetryContext>,
-    ) -> Arc<dyn crate::retry_context::RetryContext> {
-        Arc::new(RetryContextSupport::default())
+    fn open(&self, parent: Option<Arc<dyn RetryContext>>) -> Arc<dyn RetryContext> {
+        Arc::new(RetryContextSupport::with_parent(parent))
     }
 
-    fn close(&self, _context: &dyn crate::retry_context::RetryContext) {}
+    fn close(&self, _context: &dyn RetryContext) {}
 
-    fn register_error(
-        &self,
-        context: &dyn crate::retry_context::RetryContext,
-        error: Option<&dyn AnyError>,
-    ) {
-        let any: &dyn Any = context;
+    fn register_error(&self, context: &dyn RetryContext, error: &RetryError) {
+        let any: &dyn std::any::Any = context;
         if let Some(context) = any.downcast_ref::<RetryContextSupport>() {
             context.register_error(error);
         }
@@ -42,23 +51,21 @@ impl Named for AlwaysRetryPolicy {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::error::retry_error::RetryError;
+    use super::AlwaysRetryPolicy;
+    use crate::{error::retry_error::RetryError, retry_policy::RetryPolicy};
 
-    #[tokio::test]
-    async fn always_retry_policy_records_errors_and_keeps_retrying() {
-        let policy = AlwaysRetryPolicy;
+    #[test]
+    fn every_failure_allows_another_attempt() {
+        let policy = AlwaysRetryPolicy::new();
         let context = policy.open(None);
-        let error = RetryError::Custom("failed".to_string())
-            .as_any_error()
-            .expect("custom retry error should convert to AnyError");
 
-        assert!(policy.can_retry(context.as_ref()).await);
+        for _ in 0..100 {
+            policy.register_error(context.as_ref(), &RetryError::custom("failed"));
+        }
 
-        policy.register_error(context.as_ref(), Some(error.as_ref()));
-
-        assert_eq!(context.get_retry_count(), 1);
+        assert!(policy.can_retry(context.as_ref()));
+        assert_eq!(context.get_retry_count(), 100);
         assert!(context.get_last_error().is_some());
-        assert!(policy.can_retry(context.as_ref()).await);
+        assert_eq!(policy.get_max_attempts(), 0);
     }
 }
