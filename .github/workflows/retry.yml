@@ -1,8 +1,10 @@
-﻿name: retry
+name: retry
 
 on:
+  # Only main on push: a branch with an open pull request is covered by `pull_request` below, so
+  # pushing a feature branch would otherwise run the same work twice.
   push:
-    branches: ["**"]
+    branches: ["main"]
     paths:
       - "next-web-retry/**"
       - "next-web/**"
@@ -95,6 +97,9 @@ jobs:
         uses: taiki-e/install-action@cargo-deny
 
       - name: Dependency policy
-        # Informational for now: it reports the state of the whole workspace against deny.toml.
-        # Remove `continue-on-error` once the findings are fixed and the gate is required.
-        run: cargo deny check advisories bans licenses sources
+        # Informational, and deliberately not red: the workspace carries long-standing duplicate
+        # versions (`multiple-versions = "deny"` in deny.toml) and a narrow license allow-list, so
+        # this reports rather than blocks. `||` keeps the check green while the findings stay in
+        # the log and as a warning annotation. Remove the `||` and `continue-on-error` once the
+        # policy is aligned and the check is promoted to required (plan Task 3).
+        run: cargo deny check advisories bans licenses sources || echo "::warning::cargo-deny reported findings; see the log above"

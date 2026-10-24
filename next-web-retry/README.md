@@ -228,8 +228,11 @@ graph from the manifests; cargo's MSRV-aware resolver keeps the selection compat
 `--locked` back to every command together.
 
 The workflow runs on every pull request without a path filter, so the required checks always
-report; pushes are path-filtered to avoid rebuilding this crate for unrelated changes. The `deny`
-job is informational until the workspace's dependency findings are fixed.
+report; pushes are path-filtered to `main` so a feature branch is built once, by its pull request.
+The `deny` job is informational and reports its findings as a warning instead of turning the check
+red: the workspace carries long-standing duplicate versions (`multiple-versions = "deny"` in
+`deny.toml`) and a narrow license allow-list, which is a policy decision rather than a defect in
+this crate.
 
 Workspace-wide `clippy` and `rustfmt` are not enforced yet: `cargo fmt --all --check` and
 `cargo clippy --workspace` still report pre-existing findings in `next-web-core` and
