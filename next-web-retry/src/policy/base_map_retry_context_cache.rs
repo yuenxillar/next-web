@@ -27,7 +27,7 @@ pub type FromValue<V> = Arc<dyn Fn(&V) -> Option<Arc<dyn RetryContext>> + Send +
 /// serves both the strong-reference cache and the cache that may lose entries. Entries are
 /// ordered by use: reading an entry moves it to the back, and a cache configured to evict
 /// drops the least recently used entry when it is full.
-pub struct AbstractMapRetryContextCache<V> {
+pub struct BaseMapRetryContextCache<V> {
     capacity: AtomicUsize,
     fail_if_full: bool,
     map: Mutex<IndexMap<String, V>>,
@@ -35,7 +35,7 @@ pub struct AbstractMapRetryContextCache<V> {
     from_value: FromValue<V>,
 }
 
-impl<V> AbstractMapRetryContextCache<V>
+impl<V> BaseMapRetryContextCache<V>
 where
     V: Clone + Send + Sync + 'static,
 {
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<V> RetryContextCache for AbstractMapRetryContextCache<V>
+impl<V> RetryContextCache for BaseMapRetryContextCache<V>
 where
     V: Clone + Send + Sync + 'static,
 {
@@ -147,7 +147,7 @@ where
     }
 }
 
-impl<V> Clone for AbstractMapRetryContextCache<V>
+impl<V> Clone for BaseMapRetryContextCache<V>
 where
     V: Clone + Send + Sync + 'static,
 {
@@ -171,7 +171,7 @@ pub fn default_capacity() -> usize {
 mod tests {
     use std::sync::Arc;
 
-    use super::AbstractMapRetryContextCache;
+    use super::BaseMapRetryContextCache;
     use crate::{
         context::retry_context_support::RetryContextSupport,
         policy::retry_context_cache::RetryContextCache, retry_context::RetryContext,
@@ -180,8 +180,8 @@ mod tests {
     fn strong_cache(
         capacity: usize,
         remove_eldest_entries: bool,
-    ) -> AbstractMapRetryContextCache<Arc<dyn RetryContext>> {
-        AbstractMapRetryContextCache::new(
+    ) -> BaseMapRetryContextCache<Arc<dyn RetryContext>> {
+        BaseMapRetryContextCache::new(
             capacity,
             remove_eldest_entries,
             Arc::new(|context: Arc<dyn RetryContext>| context),

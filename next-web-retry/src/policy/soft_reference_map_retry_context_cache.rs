@@ -8,7 +8,7 @@ use std::{
 use crate::{error::retry_error::RetryError, retry_context::RetryContext};
 
 use super::{
-    abstract_map_retry_context_cache::AbstractMapRetryContextCache,
+    base_map_retry_context_cache::BaseMapRetryContextCache,
     retry_context_cache::{DEFAULT_CAPACITY, RetryContextCache},
 };
 
@@ -21,7 +21,7 @@ use super::{
 /// retry state yields under memory pressure instead of pinning contexts forever.
 #[derive(Clone)]
 pub struct SoftReferenceMapRetryContextCache {
-    inner: AbstractMapRetryContextCache<Weak<dyn RetryContext>>,
+    inner: BaseMapRetryContextCache<Weak<dyn RetryContext>>,
 }
 
 impl SoftReferenceMapRetryContextCache {
@@ -40,7 +40,7 @@ impl SoftReferenceMapRetryContextCache {
     /// Creates a cache with the given capacity.
     pub fn with_capacity_and_eviction(capacity: usize, remove_eldest_entries: bool) -> Self {
         Self {
-            inner: AbstractMapRetryContextCache::new(
+            inner: BaseMapRetryContextCache::new(
                 capacity,
                 remove_eldest_entries,
                 Arc::new(|context: Arc<dyn RetryContext>| Arc::downgrade(&context)),
@@ -57,7 +57,7 @@ impl Default for SoftReferenceMapRetryContextCache {
 }
 
 impl Deref for SoftReferenceMapRetryContextCache {
-    type Target = AbstractMapRetryContextCache<Weak<dyn RetryContext>>;
+    type Target = BaseMapRetryContextCache<Weak<dyn RetryContext>>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner

@@ -5,8 +5,8 @@
 //! bounds the attempts, a classifier policy decides which errors deserve them, and
 //! [`composite_retry_policy::CompositeRetryPolicy`] combines both.
 
-pub mod abstract_map_retry_context_cache;
 pub mod always_retry_policy;
+pub mod base_map_retry_context_cache;
 pub mod binary_error_classifier_retry_policy;
 pub mod circuit_breaker_retry_policy;
 pub mod composite_retry_policy;
@@ -21,8 +21,8 @@ pub mod simple_retry_policy;
 pub mod soft_reference_map_retry_context_cache;
 pub mod timeout_retry_policy;
 
-pub use abstract_map_retry_context_cache::AbstractMapRetryContextCache;
 pub use always_retry_policy::AlwaysRetryPolicy;
+pub use base_map_retry_context_cache::BaseMapRetryContextCache;
 pub use binary_error_classifier_retry_policy::BinaryErrorClassifierRetryPolicy;
 pub use circuit_breaker_retry_policy::CircuitBreakerRetryPolicy;
 pub use composite_retry_policy::CompositeRetryPolicy;

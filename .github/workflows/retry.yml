@@ -1,4 +1,4 @@
-name: retry
+﻿name: retry
 
 on:
   push:
@@ -47,13 +47,13 @@ jobs:
       - name: Clippy
         # `--no-deps` keeps the gate on this crate: the workspace has pre-existing clippy
         # findings in next-web-context and next-web-core, and `-D warnings` would fail on them.
-        run: cargo clippy -p next-web-retry --all-targets --locked --no-deps -- -D warnings
+        run: cargo clippy -p next-web-retry --all-targets --no-deps -- -D warnings
 
       - name: Test
-        run: cargo test -p next-web-retry --locked
+        run: cargo test -p next-web-retry
 
       - name: Docs
-        run: cargo doc -p next-web-retry --no-deps --locked
+        run: cargo doc -p next-web-retry --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
 
@@ -72,16 +72,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: The facade feature
-        run: cargo check -p next-web --features enable-retry --locked
+        run: cargo check -p next-web --features enable-retry
 
       - name: The AI crate
-        run: cargo check -p next-web-ai --locked
+        run: cargo check -p next-web-ai
 
       - name: The retry example
-        run: cargo check -p next-web-examples --bin retry --locked
+        run: cargo check -p next-web-examples --bin retry
 
       - name: The metrics example
-        run: cargo check -p next-web-examples --bin retry_metrics --locked
+        run: cargo check -p next-web-examples --bin retry_metrics
 
   deny:
     name: deny (informational)

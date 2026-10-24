@@ -127,7 +127,7 @@ without the builder through [`ErrorTypeClassifier`](next-web-retry/src/classifie
 
 ## Configuration is validated early
 
-A misconfigured template panics at build time — for example selecting two retry policies, or
+A misconfigured template panics at build time 鈥?for example selecting two retry policies, or
 asking for an exponential back off whose maximum is below its initial interval. These are startup
 errors; discovering them while serving traffic would be worse.
 
@@ -171,8 +171,8 @@ rate instead (the second alert below).
 The label value is the callback's label, or `retry.unknown` when it has none. Keep labels static:
 the registry folds names beyond 256 into `other`, but a label built from an item id still turns one
 metric into a useless `other` bucket. `failed` means the block handed an error back to its caller
-without using up its attempts — a stateful retry that will be presented again, a vetoed retry, or an
-interrupted wait. `aborted` means the block did not finish at all — a panic or a cancelled call — so
+without using up its attempts 鈥?a stateful retry that will be presented again, a vetoed retry, or an
+interrupted wait. `aborted` means the block did not finish at all 鈥?a panic or a cancelled call 鈥?so
 it must never be read as success.
 
 Wiring is three lines, and
@@ -213,13 +213,19 @@ toolchain the workspace declares (`rust-version = "1.98.1"`):
 | Check | Command |
 |-------|---------|
 | Format | `cargo fmt -p next-web-retry --check` |
-| Clippy | `cargo clippy -p next-web-retry --all-targets --locked --no-deps -- -D warnings` |
-| Test | `cargo test -p next-web-retry --locked` |
-| Docs | `RUSTDOCFLAGS="-D warnings" cargo doc -p next-web-retry --no-deps --locked` |
+| Clippy | `cargo clippy -p next-web-retry --all-targets --no-deps -- -D warnings` |
+| Test | `cargo test -p next-web-retry` |
+| Docs | `RUSTDOCFLAGS="-D warnings" cargo doc -p next-web-retry --no-deps` |
 | Consumers | `cargo check -p next-web --features enable-retry`, `-p next-web-ai`, and the `retry` and `retry_metrics` example bins |
 
 `--no-deps` keeps the clippy gate on this crate: the workspace still has pre-existing clippy
 findings in `next-web-context` and `next-web-core`, and `-D warnings` would fail on them.
+
+The commands do not pass `--locked`: this repository ignores `Cargo.lock` (`.gitignore`), so a
+checkout has no lock file and `--locked` fails during resolution. Each job therefore resolves the
+graph from the manifests; cargo's MSRV-aware resolver keeps the selection compatible with
+`rust-version = "1.98.1"`. If reproducible CI is wanted later, commit `Cargo.lock` and add
+`--locked` back to every command together.
 
 The workflow runs on every pull request without a path filter, so the required checks always
 report; pushes are path-filtered to avoid rebuilding this crate for unrelated changes. The `deny`

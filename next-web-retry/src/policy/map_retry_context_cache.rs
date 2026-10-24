@@ -5,7 +5,7 @@ use std::{ops::Deref, sync::Arc};
 use crate::{error::retry_error::RetryError, retry_context::RetryContext};
 
 use super::{
-    abstract_map_retry_context_cache::AbstractMapRetryContextCache,
+    base_map_retry_context_cache::BaseMapRetryContextCache,
     retry_context_cache::{DEFAULT_CAPACITY, RetryContextCache},
 };
 
@@ -17,7 +17,7 @@ use super::{
 /// was built.
 #[derive(Clone)]
 pub struct MapRetryContextCache {
-    inner: AbstractMapRetryContextCache<Arc<dyn RetryContext>>,
+    inner: BaseMapRetryContextCache<Arc<dyn RetryContext>>,
 }
 
 impl MapRetryContextCache {
@@ -40,7 +40,7 @@ impl MapRetryContextCache {
     /// item that may still be retried.
     pub fn with_capacity_and_eviction(capacity: usize, remove_eldest_entries: bool) -> Self {
         Self {
-            inner: AbstractMapRetryContextCache::new(
+            inner: BaseMapRetryContextCache::new(
                 capacity,
                 remove_eldest_entries,
                 Arc::new(|context: Arc<dyn RetryContext>| context),
@@ -57,7 +57,7 @@ impl Default for MapRetryContextCache {
 }
 
 impl Deref for MapRetryContextCache {
-    type Target = AbstractMapRetryContextCache<Arc<dyn RetryContext>>;
+    type Target = BaseMapRetryContextCache<Arc<dyn RetryContext>>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
