@@ -1,0 +1,203 @@
+[package]
+name = "next-web-examples"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+[dependencies]
+next-web                = { path = "../next-web", version = "*", features = ["full", "enable-resilience", "enable-state-machine"]}
+next-web-core           = { path = "../next-web-core", version = "*" }
+next-web-context        = { path = "../next-web-context", version = "*" }
+next-web-ai             = { path = "../next-web-ai", version = "*", features = ["deep-seek"]}
+next-web-mqtt           = { path = "../next-web-mqtt", version = "*" }
+next-web-websocket      = { path = "../next-web-websocket", version = "*" }
+next-web-security       = { path = "../next-web-security", version = "*" }
+next-web-data-redis     = { path = "../next-web-data/next-web-data-redis", version = "*", features = []}
+next-web-data-database  = { path = "../next-web-data/next-web-data-database", version = "*" }
+next-web-state-machine  = { path = "../next-web-state-machine", version = "*" }
+next-web-xxl-job        = { path = "../next-web-xxl-job", version = "*" }
+next-web-mail           = { path = "../next-web-mail", version = "*" }
+next-web-document       = { path = "../next-web-document", version = "*", features = [] }
+next-web-retry          = { path = "../next-web-retry", version = "*" }
+next-web-resilience     = { path = "../next-web-resilience", version = "*" }
+next-web-pay-alipay     = { path = "../next-web-pay/next-web-pay-alipay", version = "*" }
+
+# next-web-data-database = { path = "../next-web-data-database", version = "*" }
+# next-web-data-mongodb = { path = "../next-web-data-mongodb", version = "*" }
+
+tokio           = { workspace = true, features = ["sync", "net"]}
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+
+rust_xlsxwriter = { workspace = true }
+axum            = { version = "0.8.4", features = ["default", "multipart", "query"] }
+tokio-util      = { workspace = true }
+futures         = { workspace = true }
+utoipa          = { workspace = true }
+
+tracing         = { workspace = true }
+
+[dev-dependencies]
+# The tests of the OAuth 2.0 examples build signed requests and authorization
+# requests the way a client of an authorization server does.
+base64          = { workspace = true }
+sha2            = { workspace = true }
+urlencoding     = { workspace = true }
+form_urlencoded = { workspace = true }
+# The tests of the authorization server reach the endpoints of the server over
+# HTTP, the way a client and a resource server do.
+reqwest         = { workspace = true }
+jsonwebtoken    = { workspace = true }
+
+[features]
+default = []
+# Enables the OAuth 2.0 support the `oauth2` example exercises.
+oauth2 = [
+    "next-web-security/oauth2-client",
+    "next-web-security/oauth2-resource-server",
+    "next-web-security/oauth2-authorization-server",
+]
+
+[[bin]]
+name = "ai"
+path = "ai.rs"
+
+[[bin]]
+name = "open_api"
+path = "open_api.rs"
+
+[[bin]]
+name = "oauth2_client"
+path = "oauth2_client.rs"
+required-features = ["oauth2"]
+
+[[bin]]
+name = "oauth2_resource_server"
+path = "oauth2_resource_server.rs"
+required-features = ["oauth2"]
+
+[[bin]]
+name = "oauth2_authorization_server"
+path = "oauth2_authorization_server.rs"
+required-features = ["oauth2"]
+
+[[bin]]
+name = "application"
+path = "application.rs"
+
+[[bin]]
+name = "application_event"
+path = "application_event.rs"
+
+[[bin]]
+name = "auto_configuration"
+path = "auto_configuration.rs"
+
+[[bin]]
+name = "background_service"
+path = "background_service.rs"
+
+[[bin]]
+name = "data"
+path = "data.rs"
+
+[[bin]]
+name = "database"
+path = "database.rs"
+
+[[bin]]
+name = "vaild"
+path = "vaild.rs"
+
+[[bin]]
+name = "desensitize"
+path = "desensitize.rs"
+
+[[bin]]
+name = "i18n"
+path = "i18n.rs"
+
+[[bin]]
+name = "mail"
+path = "mail.rs"
+
+[[bin]]
+name = "mqtt"
+path = "mqtt.rs"
+
+[[bin]]
+name = "pay"
+path = "pay.rs"
+
+[[bin]]
+name = "properties"
+path = "properties.rs"
+
+[[bin]]
+name = "redis"
+path = "redis.rs"
+
+[[bin]]
+name = "retry"
+path = "retry.rs"
+
+[[bin]]
+name = "retry_metrics"
+path = "retry_metrics.rs"
+
+[[bin]]
+name = "resilience"
+path = "resilience.rs"
+
+[[bin]]
+name = "resilience_configured"
+path = "resilience_configured.rs"
+
+[[bin]]
+name = "scheduled"
+path = "scheduled.rs"
+
+[[bin]]
+name = "security"
+path = "security.rs"
+
+[[bin]]
+name = "singleton"
+path = "singleton.rs"
+
+[[bin]]
+name = "state_machine"
+path = "state_machine.rs"
+
+[[bin]]
+name = "state_machine_basic"
+path = "state_machine_basic.rs"
+
+[[bin]]
+name = "state_machine_hierarchy"
+path = "state_machine_hierarchy.rs"
+
+[[bin]]
+name = "state_machine_service"
+path = "state_machine_service.rs"
+
+[[bin]]
+name = "state_machine_handler"
+path = "state_machine_handler.rs"
+
+[[bin]]
+name = "stream"
+path = "stream.rs"
+
+[[bin]]
+name = "template"
+path = "template.rs"
+
+[[bin]]
+name = "ws"
+path = "ws.rs"
+
+[[bin]]
+name = "xxl_job"
+path = "xxl_job.rs"

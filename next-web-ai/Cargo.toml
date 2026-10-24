@@ -1,0 +1,35 @@
+[package]
+name = "next-web-ai"
+version = "0.1.0"
+edition = "2021"
+description = "Next Web Ai!"
+keywords = ["next-web", "ai"]
+license.workspace = true
+
+[dependencies]
+next-web-core = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+bytes = { workspace = true, features = ["serde"] }
+futures-core = { workspace = true}
+futures-util = { workspace = true}
+reqwest = { workspace = true, features = ["stream"]}
+tokio = { workspace = true, features = ["sync"]}
+anyhow = { workspace = true}
+tracing = { workspace = true }
+
+next-web-retry = { workspace = true }
+
+[dev-dependencies]
+tokio.workspace = true
+
+
+
+[features]
+default = ["deep-seek", "mcp-server"]
+
+deep-seek = []
+
+mcp-server = []

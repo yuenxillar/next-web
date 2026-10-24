@@ -1,0 +1,29 @@
+[package]
+name = "next-web-websocket"
+version = "0.2.0"
+description = "WebSocket support for Next Web applications"
+readme = "README.md"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+axum            = { workspace = true, features = ["ws"] }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+tracing         = { workspace = true }
+futures         = { workspace = true }
+flume           = { workspace = true }
+matchit         = { workspace = true }
+tokio           = { workspace = true }
+dashmap         = { workspace = true }
+rand            = { workspace = true }
+
+next-web-context    = { workspace = true }
+next-web-core       = { workspace = true }
+next-web-macros     = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
+tokio-tungstenite = { workspace = true }

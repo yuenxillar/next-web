@@ -1,0 +1,30 @@
+//! One module per filter implementation.
+
+pub(crate) mod add_request_header;
+pub(crate) mod add_request_headers_if_not_present;
+pub(crate) mod add_request_parameter;
+pub(crate) mod add_response_header;
+pub(crate) mod circuit_breaker;
+pub(crate) mod dedupe_response_header;
+pub(crate) mod local_response_cache;
+pub(crate) mod map_request_header;
+pub(crate) mod prefix_path;
+pub(crate) mod preserve_host_header;
+pub(crate) mod redirect_to;
+pub(crate) mod remove_json_attributes_response_body;
+pub(crate) mod remove_request_header;
+pub(crate) mod remove_request_parameter;
+pub(crate) mod remove_response_header;
+pub(crate) mod request_header_size;
+pub(crate) mod request_rate_limiter;
+pub(crate) mod request_size;
+pub(crate) mod rewrite_location_response_header;
+pub(crate) mod rewrite_path;
+pub(crate) mod rewrite_response_header;
+pub(crate) mod secure_headers;
+pub(crate) mod set_path;
+pub(crate) mod set_request_header;
+pub(crate) mod set_request_host_header;
+pub(crate) mod set_response_header;
+pub(crate) mod set_status;
+pub(crate) mod strip_prefix;

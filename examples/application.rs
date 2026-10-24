@@ -1,0 +1,47 @@
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicU32, Ordering},
+};
+
+use next_web::{
+    Application, NextWebApplication,
+    macros::bind::{get_mapping, singleton},
+};
+use next_web_core::env::ConfigurableEnvironment;
+
+#[derive(Default)]
+struct TestApplication;
+
+impl Application for TestApplication {}
+
+#[get_mapping(path = "/hello")]
+async fn hello() -> &'static str {
+    "Hello World!"
+}
+
+#[get_mapping(path = "/env")]
+async fn env(
+    #[find] application_environment: FindSingleton<Arc<dyn ConfigurableEnvironment>>,
+) -> String {
+    application_environment.get_property_or_default("next.application.name", "unknown")
+}
+
+#[get_mapping(path = "/change")]
+async fn change(FindSingleton(app_store): FindSingleton<AppStore>) -> &'static str {
+    app_store.len.fetch_add(1, Ordering::Relaxed);
+    app_store.active.fetch_not(Ordering::Relaxed);
+
+    "Ok"
+}
+
+#[derive(Clone, Default)]
+#[singleton(default)]
+struct AppStore {
+    pub len: Arc<AtomicU32>,
+    pub active: Arc<AtomicBool>,
+}
+
+#[tokio::main]
+async fn main() {
+    NextWebApplication::<TestApplication>::default().run().await
+}

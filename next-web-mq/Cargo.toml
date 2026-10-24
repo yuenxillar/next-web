@@ -1,0 +1,29 @@
+[package]
+name = "next-web-mq"
+version = "0.1.1"
+edition = "2021"
+description = "Next Web Mq"
+authors.workspace = true
+readme.workspace = true
+license.workspace = true
+
+
+[dependencies]
+next-web-core = { workspace = true }
+next-web-macros = { workspace = true }
+
+amqprs = { workspace = true, optional = true }
+rocketmq = { workspace = true, optional = true }
+
+serde = { workspace = true }
+tracing =  { workspace = true }
+
+
+
+tokio = { workspace = true }
+
+
+[features]
+default = ["enable_rabbitmq"]
+enable_rabbitmq = ["amqprs"]
+enable_rocketmq = ["rocketmq"]

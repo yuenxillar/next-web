@@ -1,0 +1,3 @@
+mod authentication_configuration;
+
+pub use authentication_configuration::AuthenticationConfiguration;

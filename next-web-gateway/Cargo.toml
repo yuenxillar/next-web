@@ -1,0 +1,50 @@
+[package]
+name = "next-web-gateway"
+version = "0.1.0"
+edition = "2024"
+
+# The lints the design requires (S5): inherit the workspace table, which
+# carries `unsafe_code = "forbid"`, `missing_docs`, `unreachable_pub`,
+# `rust_2018_idioms` and the clippy set.
+[lints]
+workspace = true
+
+[[bin]]
+name = "next-web-gateway"
+path = "src/bin/next_web_gateway.rs"
+
+[dependencies]
+pingora         = { workspace = true, features = ["lb", "proxy", "rustls"]}
+pingora-limits  = { workspace = true}
+
+tokio           = { workspace = true, features = ["fs", "time"] }
+
+serde           = { workspace = true }
+serde_yaml      = { workspace = true }
+serde_json      = { workspace = true }
+serde_path_to_error = { workspace = true }
+async-trait     = { workspace = true }
+regex           = { workspace = true }
+clap            = { workspace = true, features = ["env"] }
+
+ipnetwork       = { workspace = true }
+chrono          = { workspace = true }
+chrono-tz       = { workspace = true }
+hashbrown       = { workspace = true }
+bytes           = { workspace = true }
+form_urlencoded = { workspace = true }
+rand            = { workspace = true }
+# Parses the PEM bundle behind `upstream.tls.ca_file`.
+rustls-pemfile  = { workspace = true }
+
+tracing             = { workspace = true }
+tracing-subscriber  = { workspace = true }
+
+[dev-dependencies]
+futures             = { workspace = true }
+# The TLS upstream tests serve a real handshake against a fixture certificate.
+tokio-rustls        = { workspace = true }
+rustls              = { workspace = true }
+
+[features]
+default = []

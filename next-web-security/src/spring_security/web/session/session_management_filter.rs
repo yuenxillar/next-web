@@ -1,0 +1,221 @@
+use std::sync::Arc;
+
+use next_web_core::{
+    any::AnyValue,
+    async_trait,
+    http::{
+        filter::{FilterError, HttpFilter, HttpFilterChain},
+        HttpRequest, HttpResponse,
+    },
+    Named,
+};
+use tracing::debug;
+
+use crate::{
+    authentication::AuthenticationTrustResolverImpl,
+    authorization::AuthenticationTrustResolver,
+    core::context::{SecurityContextHolder, SecurityContextHolderStrategy},
+    web::{
+        authentication::{
+            session::{SessionAuthenticationStrategy, SessionFixationProtectionStrategy},
+            AuthenticationFailureHandler, SimpleUrlAuthenticationFailureHandler,
+        },
+        context::SecurityContextRepository,
+        session::InvalidSessionStrategy,
+    },
+};
+
+/// Detects that a user has been authenticated since the start of the request and, if they
+/// have, calls the configured `SessionAuthenticationStrategy` to perform any
+/// session-related activity such as activating session-fixation protection mechanisms or
+/// checking for multiple concurrent logins.
+#[derive(Clone)]
+pub struct SessionManagementFilter {
+    /// The security context holder strategy to use.
+    security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
+
+    /// The security context repository to use.
+    security_context_repository: Arc<dyn SecurityContextRepository>,
+
+    /// The session authentication strategy to invoke when a user authenticates.
+    session_authentication_strategy: Arc<dyn SessionAuthenticationStrategy>,
+
+    /// The trust resolver used to determine if an authentication is authenticated.
+    /// Defaults to `AuthenticationTrustResolverImpl`.
+    trust_resolver: Arc<dyn AuthenticationTrustResolver>,
+
+    /// Optional strategy to handle invalid (expired) session IDs.
+    /// If not set, an invalid session request will simply pass through the filter chain.
+    invalid_session_strategy: Option<Arc<dyn InvalidSessionStrategy>>,
+
+    /// The handler invoked when the session authentication strategy raises an
+    /// `AuthenticationError`, indicating the user is not allowed to be authenticated
+    /// for this session (typically because they already have too many sessions open).
+    failure_handler: Arc<dyn AuthenticationFailureHandler>,
+}
+
+impl SessionManagementFilter {
+    /// Constant used to ensure a single invocation of this filter per request.
+    const FILTER_APPLIED: &'static str = "__next_web_security_session_mgmt_filter_applied";
+
+    /// Creates a new `SessionManagementFilter` with the given security context repository
+    /// and session authentication strategy.
+    ///
+    /// # Parameters
+    /// * `security_context_repository` - The repository used to load and save the
+    ///   security context. Must not be null.
+    /// * `session_authentication_strategy` - The strategy used to perform session-related
+    ///   activity (e.g., session-fixation protection, concurrency control) when a user
+    ///   authenticates. Must not be null.
+    pub fn new(
+        security_context_repository: Arc<dyn SecurityContextRepository>,
+        session_authentication_strategy: Arc<dyn SessionAuthenticationStrategy>,
+    ) -> Self {
+        Self {
+            security_context_holder_strategy: SecurityContextHolder::get_context_holder_strategy(),
+            security_context_repository,
+            session_authentication_strategy,
+            trust_resolver: Arc::new(AuthenticationTrustResolverImpl::default()),
+            invalid_session_strategy: None,
+            failure_handler: Arc::new(SimpleUrlAuthenticationFailureHandler::new("/login")),
+        }
+    }
+
+    /// Creates a new `SessionManagementFilter` with the given security context repository,
+    /// using the default session fixation protection strategy.
+    pub fn with_security_context_repository(
+        security_context_repository: Arc<dyn SecurityContextRepository>,
+    ) -> Self {
+        Self::new(
+            security_context_repository,
+            Arc::new(SessionFixationProtectionStrategy::default()),
+        )
+    }
+
+    /// Sets the strategy which will be invoked instead of allowing the filter chain to
+    /// proceed, if the user agent requests an invalid session ID. If the property is not
+    /// set, no action will be taken.
+    ///
+    /// # Parameters
+    /// * `invalid_session_strategy` - The strategy to invoke. Typically a
+    ///   `SimpleRedirectInvalidSessionStrategy`.
+    pub fn set_invalid_session_strategy(
+        &mut self,
+        invalid_session_strategy: Arc<dyn InvalidSessionStrategy>,
+    ) {
+        self.invalid_session_strategy = Some(invalid_session_strategy);
+    }
+
+    /// The handler which will be invoked if the `SessionAuthenticationStrategy`
+    /// raises an `AuthenticationError`, indicating that the user is not allowed
+    /// to be authenticated for this session (typically because they already have
+    /// too many sessions open).
+    pub fn set_authentication_failure_handler(
+        &mut self,
+        failure_handler: Arc<dyn AuthenticationFailureHandler>,
+    ) {
+        self.failure_handler = failure_handler;
+    }
+
+    /// Sets the `AuthenticationTrustResolver` to be used. The default is
+    /// `AuthenticationTrustResolverImpl`.
+    ///
+    /// # Parameters
+    /// * `trust_resolver` - The `AuthenticationTrustResolver` to use. Cannot be null.
+    pub fn set_trust_resolver(&mut self, trust_resolver: Arc<dyn AuthenticationTrustResolver>) {
+        self.trust_resolver = trust_resolver;
+    }
+
+    /// Sets the `SecurityContextHolderStrategy` to use. The default action is to use
+    /// the strategy stored in `SecurityContextHolder`.
+    ///
+    /// # Parameters
+    /// * `security_context_holder_strategy` - The strategy to use. Cannot be null.
+    pub fn set_security_context_holder_strategy(
+        &mut self,
+        security_context_holder_strategy: Arc<dyn SecurityContextHolderStrategy>,
+    ) {
+        self.security_context_holder_strategy = security_context_holder_strategy;
+    }
+}
+
+#[async_trait]
+impl HttpFilter for SessionManagementFilter {
+    async fn do_filter(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        filter_chain: &dyn HttpFilterChain,
+    ) -> Result<(), FilterError> {
+        // Ensure the filter is only applied once per request.
+        if request.get_attribute(Self::FILTER_APPLIED).is_some() {
+            return filter_chain.do_filter(request, response).await;
+        }
+
+        request.set_attribute(Self::FILTER_APPLIED, AnyValue::Boolean(true));
+
+        if !self.security_context_repository.contains_context(request) {
+            let context = self.security_context_holder_strategy.get_context();
+            let authentication = context.get_authentication();
+
+            if self
+                .trust_resolver
+                .is_authenticated(authentication.as_deref())
+            {
+                // The user has been authenticated during the current request, so
+                // call the session strategy.
+                if let Some(authentication) = authentication.as_ref() {
+                    match self
+                        .session_authentication_strategy
+                        .on_authentication(authentication, request, response)
+                        .await
+                    {
+                        Ok(()) => {
+                            // Eagerly save the security context to make it available
+                            // for any possible re-entrant requests which may occur
+                            // before the current request completes. SEC-1396.
+                            let context = self.security_context_holder_strategy.get_context();
+                            self.security_context_repository
+                                .save_context(&context, request, response)
+                                .await;
+                        }
+                        Err(ex) => {
+                            // The session strategy can reject the authentication.
+                            debug!(
+                                "SessionAuthenticationStrategy rejected the authentication object: {:?}",
+                                ex
+                            );
+                            self.security_context_holder_strategy.clear_context();
+                            self.failure_handler
+                                .on_authentication_failure(request, response, &ex)?;
+                            return Ok(());
+                        }
+                    }
+                }
+            } else {
+                // No security context or authentication present. Check for a
+                // session timeout.
+                if request.requested_session_id().is_some()
+                    && !request.is_requested_session_id_valid()
+                {
+                    if let Some(invalid_session_strategy) = self.invalid_session_strategy.as_ref() {
+                        request
+                            .requested_session_id()
+                            .map(|sid| debug!("Request requested invalid session id {}", sid));
+
+                        invalid_session_strategy.on_invalid_session_detected(request, response)?;
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        filter_chain.do_filter(request, response).await
+    }
+}
+
+impl Named for SessionManagementFilter {
+    fn name(&self) -> &str {
+        "SessionManagementFilter"
+    }
+}

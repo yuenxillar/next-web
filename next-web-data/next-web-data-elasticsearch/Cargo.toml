@@ -1,0 +1,18 @@
+[package]
+name = "next-web-data-elasticsearch"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+next-web-context = { workspace = true }
+next-web-core = { workspace = true }
+next-web-macros = { workspace = true }
+
+tokio = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+
+elasticsearch = { workspace = true }
+
+[features]
+rustls-tls = ["elasticsearch/rustls-tls"]

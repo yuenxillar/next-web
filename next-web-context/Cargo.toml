@@ -1,0 +1,29 @@
+[package]
+name = "next-web-context"
+description = "Application context, dependency injection, event, and message-source layer for Next Web"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+
+
+[dependencies]
+next-web-singletons     = { workspace = true }
+tokio                   = { workspace = true, features = ["time", "sync"] }
+
+arc-swap.workspace      = true
+async-trait.workspace   = true
+indexmap.workspace      = true
+inventory.workspace     = true
+serde_json.workspace    = true
+serde_yaml.workspace    = true
+tracing.workspace       = true
+
+[dev-dependencies]
+tokio                   = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "time", "sync"] }
+
+[lints]
+workspace = true

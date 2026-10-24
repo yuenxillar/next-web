@@ -1,0 +1,15 @@
+// use crate::auth::models::login_type::LoginType;
+
+// #[async_trait]
+// pub trait AuthenticationService: Send + Sync {
+
+//     async fn user_id(&self, req_header: &HeaderMap) -> String;
+
+//     async fn login_type(&self, req_header: &HeaderMap) -> LoginType;
+
+//     /// Returns the roles of the user with the given `user_id` and `login_type`.
+//     async fn user_role(&self, user_id: &str) -> Option<Vec<String>>;
+
+//     /// Returns the permission of the user with the given `user_id` and `login_type`.
+//     async fn user_permission(&self, user_id: &str) ->  Option<Vec<String>>;
+// }

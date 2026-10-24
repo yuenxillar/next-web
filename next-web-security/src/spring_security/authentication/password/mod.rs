@@ -1,0 +1,5 @@
+mod compromised_password_checker;
+mod compromised_password_decision;
+
+pub use compromised_password_checker::CompromisedPasswordChecker;
+pub use compromised_password_decision::CompromisedPasswordDecision;

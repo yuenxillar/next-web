@@ -1,0 +1,33 @@
+[package]
+name = "next-web-macros"
+version = "0.2.1"
+edition = "2021"
+description = "Procedural macros for routing, dependency injection, configuration, scheduling, retry, and validation in Next Web"
+license.workspace = true
+repository.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+next-web-context = { workspace = true }
+
+syn         = { workspace = true, features = ["full"] }
+quote       = { workspace = true }
+proc-macro2 = { workspace = true }
+from-attr   = { workspace = true }
+inventory   = { workspace = true }
+zyn         = { workspace = true }
+
+[features]
+default = ["data", "auto-register"]
+
+data = []
+open-api = []
+embed-resources = []
+auto-register = []
+# The `#[rate_limiter]`, `#[circuit_breaker]`, `#[bulkhead]`, `#[time_limiter]`
+# and `#[retry]` attributes, which guard a function with the patterns of the
+# `next-web-resilience` crate. Off by default, so a build that does not use them
+# pays nothing for them.
+resilience = []

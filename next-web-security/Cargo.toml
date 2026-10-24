@@ -1,0 +1,55 @@
+[package]
+name = "next-web-security"
+version = "0.1.0"
+edition = "2021"
+description = "Security, authentication, and authorization support for Next Web"
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+next-web-core.workspace     = true
+next-web-context.workspace  = true
+next-web-macros.workspace   = true
+next-web-singletons.workspace = true
+
+tokio.workspace         = true
+serde.workspace         = true
+serde_json.workspace    = true
+bcrypt.workspace        = true
+chrono.workspace        = true
+base64.workspace        = true
+flate2.workspace        = true
+quick-xml.workspace     = true
+futures.workspace       = true
+urlencoding.workspace   = true
+hex.workspace           = true
+hmac.workspace          = true
+jsonwebtoken.workspace  = true
+rand.workspace          = true
+reqwest.workspace       = true
+md5.workspace           = true
+rsa.workspace           = true
+sha2.workspace          = true
+tracing.workspace       = true
+ciborium.workspace      = true
+coset.workspace         = true
+p256.workspace          = true
+simple_asn1.workspace   = true
+
+
+[features]
+default = ["T2"]
+T1 = ["web"]
+T2 = []
+
+web = []
+oauth2-authorization-server = []
+oauth2-resource-server = []
+oauth2-client = []
+
+[dev-dependencies]
+axum.workspace = true
+tracing-subscriber.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+rustls-pemfile.workspace = true

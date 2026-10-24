@@ -1,0 +1,281 @@
+use bytes::Bytes;
+use futures_core::stream::BoxStream;
+use futures_util::StreamExt;
+use next_web_core::error::BoxError;
+use reqwest::{
+    header::{HeaderMap, HeaderValue, CONTENT_TYPE},
+    Client,
+};
+use serde::{Deserialize, Deserializer};
+use std::time::Duration;
+use tracing::debug;
+
+use crate::ai::deep_seek::chat_model::ChatModel;
+
+const ERROR: [u8; 8] = [123, 34, 101, 114, 114, 111, 114, 34];
+const DATA: [u8; 6] = [100, 97, 116, 97, 58, 32];
+const DONE: [u8; 12] = [100, 97, 116, 97, 58, 32, 91, 68, 79, 78, 69, 93];
+
+#[derive(Clone)]
+pub struct DeepSeekApi {
+    pub(crate) api_key: Option<Box<str>>,
+    pub(crate) chat_model: ChatModel,
+    pub(crate) client: Client,
+}
+
+impl DeepSeekApi {
+    const BASE_URL: &'static str = "https://api.deepseek.com";
+
+    pub fn new(api_key: impl Into<Box<str>>, chat_model: ChatModel) -> Self {
+        let headers = HeaderMap::from_iter([(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/json; charset=utf-8"),
+        )]);
+        let client = Client::builder()
+            .default_headers(headers)
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(60))
+            .build()
+            .expect("Failed to create DeepSeek API client with API key");
+        let api_key = api_key.into();
+        Self {
+            api_key: Some(api_key),
+            chat_model,
+            client,
+        }
+    }
+
+    pub fn without_api_key(chat_model: ChatModel) -> Self {
+        let headers = HeaderMap::from_iter([(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/json; charset=utf-8"),
+        )]);
+        let client = Client::builder()
+            .default_headers(headers)
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(60))
+            .build()
+            .expect("Failed to create DeepSeek API client without API key");
+        Self {
+            api_key: None,
+            chat_model,
+            client,
+        }
+    }
+
+    pub async fn chat_completion_entity(
+        &self,
+        req: &ChatCompletionRequest,
+    ) -> Result<ChatApiRespnose, BoxError> {
+        let api_key = self
+            .api_key
+            .as_deref()
+            .ok_or_else(|| "DEEPSEEK_API_KEY is not configured".to_string())?;
+        let body = serde_json::to_string(req)?;
+        let resp = self
+            .client
+            .post(Self::BASE_URL)
+            .bearer_auth(api_key)
+            .body(body)
+            .send()
+            .await?;
+        if !req.stream {
+            return Ok(ChatApiRespnose::Data(resp.json().await?));
+        }
+
+        // SSE stream
+        let stream = resp.bytes_stream().then(|data| async move {
+            data.map(|data| {
+                // Check for error message
+                if data.starts_with(&ERROR) {
+                    return Err(String::from_utf8(data.to_vec())
+                        .unwrap_or("Unknown error".into())
+                        .into());
+                }
+
+                if data.starts_with(&DONE) {
+                    debug!("deepseek stream completed");
+                }
+
+                data.split(|&s| s == b'\n')
+                    .filter(|line| line.starts_with(&DATA))
+                    .map(|line| {
+                        serde_json::from_slice::<ChatCompletion>(&line[6..]).map_err(Into::into)
+                    })
+                    .collect::<Result<Vec<ChatCompletion>, BoxError>>()
+                    .map_err(Into::into)
+            })
+            .unwrap_or_else(|err| Err(err.into()))
+        });
+
+        Ok(ChatApiRespnose::DataStream(Box::pin(stream)))
+    }
+}
+
+pub enum ChatApiRespnose {
+    Data(ChatCompletion),
+    DataStream(BoxStream<'static, Result<Vec<ChatCompletion>, BoxError>>),
+}
+
+impl Default for DeepSeekApi {
+    fn default() -> Self {
+        std::env::var("DEEPSEEK_API_KEY")
+            .map(|api_key| Self::new(api_key, ChatModel::Chat))
+            .unwrap_or_else(|_| Self::without_api_key(ChatModel::Chat))
+    }
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct ChatCompletionRequest {
+    pub(crate) messages: Vec<ChatCompletionMessage>,
+    pub(crate) model: Box<str>,
+    pub(crate) stream: bool,
+    pub(crate) temperature: Option<f32>,
+}
+
+impl ChatCompletionRequest {
+    pub fn new(
+        messages: Vec<ChatCompletionMessage>,
+        model: impl Into<Box<str>>,
+        stream: bool,
+    ) -> Self {
+        Self {
+            messages,
+            model: model.into(),
+            stream,
+            temperature: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ChatCompletionMessage {
+    pub(crate) role: Box<str>,
+
+    #[serde(deserialize_with = "deserialize_bytes")]
+    pub(crate) content: Bytes,
+}
+
+impl ChatCompletionMessage {
+    pub fn new(role: impl Into<Box<str>>, content: impl Into<Bytes>) -> Self {
+        Self {
+            role: role.into(),
+            content: content.into(),
+        }
+    }
+
+    pub fn with_slice<S>(role: S, content: &[u8]) -> Self
+    where
+        S: Into<Box<str>>,
+    {
+        Self {
+            role: role.into(),
+            content: Bytes::copy_from_slice(content),
+        }
+    }
+
+    pub fn set_content<T>(&mut self, content: T)
+    where
+        T: Into<Bytes>,
+    {
+        self.content = content.into();
+    }
+}
+
+///
+/// {
+///  "id": "9710a6c0-1b51-427b-b95d-b6734ec46270",
+///  "object": "chat.completion",
+///  "created": 1754571706,
+///  "model": "deepseek-chat",
+///  "choices": [
+///    {
+///      "index": 0,
+///      "message": {
+///        "role": "assistant",
+///        "content": "Hello! 😊 How can I assist you today?"
+///      },
+///      "logprobs": null,
+///      "finish_reason": "stop"
+///    }
+///  ],
+///  "usage": {
+///    "prompt_tokens": 11,
+///    "completion_tokens": 11,
+///    "total_tokens": 22,
+///    "prompt_tokens_details": {
+///      "cached_tokens": 0
+///    },
+///    "prompt_cache_hit_tokens": 0,
+///    "prompt_cache_miss_tokens": 11
+///  },
+///  "system_fingerprint": "fp_8802369eaa_prod0623_fp8_kvcache"
+/// }
+///
+///
+///
+#[derive(Debug, serde::Deserialize)]
+pub struct ChatCompletion {
+    pub id: Box<str>,
+    pub object: Box<str>,
+    pub created: u64,
+    pub model: Box<str>,
+    pub choices: Vec<Choice>,
+    pub usage: Option<Usage>,
+    pub system_fingerprint: Box<str>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Usage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u64,
+    pub prompt_tokens_details: PromptTokensDetails,
+    pub prompt_cache_hit_tokens: u32,
+    pub prompt_cache_miss_tokens: u32,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PromptTokensDetails {
+    pub cached_tokens: u32,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Choice {
+    pub index: u32,
+    pub delta: Option<DeltaContent>,
+    pub message: Option<ChatCompletionMessage>,
+    pub logprobs: Option<Box<str>>,
+    pub finish_reason: Option<Box<str>>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct DeltaContent {
+    #[serde(deserialize_with = "deserialize_bytes")]
+    pub content: Bytes,
+}
+
+#[derive(Clone)]
+pub struct DefaultUsage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u64,
+}
+
+impl crate::chat::meta_data::usage::Usage for DefaultUsage {
+    fn get_prompt_tokens(&self) -> u32 {
+        self.prompt_tokens
+    }
+
+    fn get_completion_tokens(&self) -> u32 {
+        self.completion_tokens
+    }
+}
+
+pub(crate) fn deserialize_bytes<'de, D>(deserializer: D) -> Result<Bytes, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let vec: Vec<u8> = Vec::deserialize(deserializer)?;
+    Ok(Bytes::from(vec))
+}
