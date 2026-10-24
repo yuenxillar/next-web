@@ -52,9 +52,21 @@ pub(crate) async fn shutdown_signal() -> &'static str {
 
     #[cfg(unix)]
     let terminate = async {
-        tokio::signal::unix::SignalKind::terminate()
-            .then(|signal| signal.recv())
-            .await;
+        // A `SignalKind` is not a future: it has to be installed as a signal stream first, and
+        // that installation can fail. Falling back to `pending` keeps the select arm quiet instead
+        // of turning a broken handler into an immediate shutdown at startup.
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                signal.recv().await;
+            }
+            Err(error) => {
+                tracing::warn!(
+                    %error,
+                    "failed to install the SIGTERM handler; shutdown falls back to Ctrl+C"
+                );
+                std::future::pending::<()>().await;
+            }
+        }
     };
 
     #[cfg(not(unix))]
