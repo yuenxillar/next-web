@@ -1,11 +1,13 @@
 use next_web_macros::configuration_properties;
 
 use crate::autoconfigure::{
-    redis_cluster_properties::RedisClusterProperties, redis_lock_properties::RedisLockProperties,
+    redis_cluster_properties::RedisClusterProperties, 
     redis_sentinel_properties::RedisSentinelProperties,
 };
 #[cfg(feature = "distributed-lock")]
 use crate::lock::RedisLockConfig;
+#[cfg(feature = "distributed-lock")]
+use crate::autoconfigure::redis_lock_properties::RedisLockProperties;
 
 /// Configuration properties for Redis.
 ///

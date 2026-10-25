@@ -5,7 +5,6 @@
 //! outside it reads the fields, so the block can move or grow without touching
 //! the rest of the properties.
 
-#[cfg(feature = "distributed-lock")]
 use crate::lock::RedisLockConfig;
 
 /// Configuration bound from `next.data.redis.lock`.
@@ -49,7 +48,6 @@ enum DurationValue {
     Text(String),
 }
 
-#[cfg(feature = "distributed-lock")]
 impl DurationValue {
     /// The duration in milliseconds, accepting `100ms`, `30s`, `2m` or a bare number.
     fn millis(&self) -> Result<u64, String> {
@@ -60,7 +58,6 @@ impl DurationValue {
     }
 }
 
-#[cfg(feature = "distributed-lock")]
 fn parse_duration_millis(value: &str) -> Result<u64, String> {
     let value = value.trim();
     let (number, multiplier) = if let Some(number) = value.strip_suffix("ms") {
@@ -162,9 +159,9 @@ mod lock_tests {
             r#"
 enabled: true
 mode: cluster
-watchdog-timeout: 5s
-retry-interval: 200ms
-command-timeout: 1s
+watchdog_timeout: 5s
+retry_interval: 200ms
+command_timeout: 1s
 cluster:
   urls:
     - redis://127.0.0.1:7000
