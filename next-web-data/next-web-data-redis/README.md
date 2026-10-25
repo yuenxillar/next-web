@@ -84,6 +84,14 @@ let other = service.get_lock("order:42"); // new token: contends
 assert!(other.try_lock().await?.is_none());
 ```
 
+Do not mix lease kinds on one handle. Every acquisition level re-arms the key's
+TTL, so the last one wins: taking `lock()` (30 s watchdog) and then
+`try_lock_for_with_lease(w, 150ms)` and releasing the short one leaves the key
+with a 150 ms TTL while the watchdog guard still believes it holds the lock for
+another 10 s. Redisson's protocol does the same, so this is wire-compatible
+rather than a bug, but it is the one way the per-handle rule can shorten a lease
+you thought you had.
+
 ### Guards must be unlocked explicitly
 
 `Drop` cannot perform a Redis round trip, so dropping a guard without unlocking
