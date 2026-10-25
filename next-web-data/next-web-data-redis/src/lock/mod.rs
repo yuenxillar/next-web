@@ -18,6 +18,7 @@ mod redisson_lock;
 pub mod redlock;
 pub mod retry;
 pub mod rlock;
+pub mod service;
 #[cfg(test)]
 mod test_support;
 
