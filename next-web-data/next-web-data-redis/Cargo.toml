@@ -13,7 +13,7 @@ next-web-macros = { workspace = true }
 
 serde = { workspace = true }
 tracing = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
 futures = { workspace = true }
 
 
@@ -23,7 +23,8 @@ uuid = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 
 [features]
-default = []
+default = ["distributed-lock"]
 deadpol = ["deadpool-redis"]
 distributed-lock = ["redis/cluster-async", "dep:uuid", "dep:thiserror"]
 
+sentinel = ["redis/cluster-async"]
