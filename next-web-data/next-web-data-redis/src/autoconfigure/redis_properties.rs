@@ -1,16 +1,19 @@
 use next_web_macros::configuration_properties;
 
+use crate::autoconfigure::{
+    redis_cluster_properties::RedisClusterProperties,
+    redis_sentinel_properties::RedisSentinelProperties,
+};
 #[cfg(feature = "distributed-lock")]
-use crate::service::lock::{RedisLockConfig, RedisLockMode};
+use crate::lock::{RedisLockConfig, RedisLockMode};
 
-/// Configuration properties for the Redis starter.
+/// Configuration properties for Redis.
 ///
 /// These values are typically bound from the `next.data.redis` prefix in `application.yaml`.
-
 #[configuration_properties(prefix = "next.data.redis", dynamic)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct RedisProperties {
-    /// Full Redis connection URL (e.g., `redis://[:password@]host:port[/database]`).
+    /// Full Redis connection URL (e.g., `redis://user:password@host:port/database`).
     ///
     /// If provided, individual components (host, port, etc.) will override
     /// the corresponding values parsed from the URL.
@@ -58,6 +61,18 @@ pub struct RedisProperties {
     /// When `true`, the client will negotiate RESP3 during connection handshake.
     /// If the server does not support RESP3, it automatically falls back to RESP2.
     resp3: Option<bool>,
+
+    /// Cluster properties for connecting to a Redis cluster.
+    ///
+    /// When set, the client bootstraps from the given cluster nodes and
+    /// follows redirects across the cluster.
+    cluster: Option<RedisClusterProperties>,
+
+    /// Sentinel properties for connecting to Redis via Sentinel.
+    ///
+    /// When set, the client discovers the master (or replica) node through
+    /// the configured Sentinel instances.
+    sentinel: Option<RedisSentinelProperties>,
 
     /// Distributed lock configuration. Ignored unless the `distributed-lock`
     /// Cargo feature is enabled.
@@ -175,19 +190,6 @@ impl RedisProperties {
     }
 }
 
-#[cfg(all(test, feature = "distributed-lock"))]
-mod lock_tests {
-    use super::*;
-
-    #[test]
-    fn lock_duration_accepts_human_units() {
-        assert_eq!(parse_duration_millis("100ms").unwrap(), 100);
-        assert_eq!(parse_duration_millis("30s").unwrap(), 30_000);
-        assert_eq!(parse_duration_millis("2m").unwrap(), 120_000);
-        assert!(parse_duration_millis("soon").is_err());
-    }
-}
-
 impl RedisProperties {
     /// Return the Redis URL.
     pub fn url(&self) -> Option<&str> {
@@ -233,6 +235,16 @@ impl RedisProperties {
     /// Defaults to `false`.
     pub fn is_resp3(&self) -> bool {
         self.resp3.unwrap_or_default()
+    }
+
+    /// Returns the cluster properties, or `None` if not configured.
+    pub fn cluster(&self) -> Option<&RedisClusterProperties> {
+        self.cluster.as_ref()
+    }
+
+    /// Returns the sentinel properties, or `None` if not configured.
+    pub fn sentinel(&self) -> Option<&RedisSentinelProperties> {
+        self.sentinel.as_ref()
     }
 
     #[cfg(feature = "distributed-lock")]
@@ -304,5 +316,32 @@ impl RedisProperties {
     /// Set whether to use RESP3 protocol.
     pub fn set_resp3(&mut self, resp3: bool) {
         self.resp3 = Some(resp3);
+    }
+
+    /// Sets the cluster properties.
+    ///
+    /// Wraps the given properties in `Some` and stores them.
+    pub fn set_cluster(&mut self, cluster: RedisClusterProperties) {
+        self.cluster = Some(cluster)
+    }
+
+    /// Sets the sentinel properties.
+    ///
+    /// Wraps the given properties in `Some` and stores them.
+    pub fn set_sentinel(&mut self, sentinel: RedisSentinelProperties) {
+        self.sentinel = Some(sentinel)
+    }
+}
+
+#[cfg(all(test, feature = "distributed-lock"))]
+mod lock_tests {
+    use super::*;
+
+    #[test]
+    fn lock_duration_accepts_human_units() {
+        assert_eq!(parse_duration_millis("100ms").unwrap(), 100);
+        assert_eq!(parse_duration_millis("30s").unwrap(), 30_000);
+        assert_eq!(parse_duration_millis("2m").unwrap(), 120_000);
+        assert!(parse_duration_millis("soon").is_err());
     }
 }
