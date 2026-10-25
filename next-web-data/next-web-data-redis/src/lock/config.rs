@@ -78,8 +78,7 @@ mod tests {
         ));
 
         let too_long = RedisLockConfig {
-            command_timeout: Duration::from_millis(u64::MAX)
-                .saturating_add(Duration::from_secs(1)),
+            command_timeout: Duration::from_millis(u64::MAX).saturating_add(Duration::from_secs(1)),
             ..Default::default()
         };
         assert!(matches!(

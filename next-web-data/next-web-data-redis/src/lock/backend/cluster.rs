@@ -26,10 +26,7 @@ impl ClusterLockBackend {
     /// `command_timeout` becomes the client's own response timeout, which is
     /// what bounds a blocking script call: a synchronous socket read cannot be
     /// cancelled from the outside the way a future can.
-    pub fn new(
-        urls: Vec<String>,
-        command_timeout: Duration,
-    ) -> Result<Self, RedisLockError> {
+    pub fn new(urls: Vec<String>, command_timeout: Duration) -> Result<Self, RedisLockError> {
         if urls.is_empty() {
             return Err(RedisLockError::InvalidConfiguration(
                 "cluster mode requires at least one Redis URL".to_string(),

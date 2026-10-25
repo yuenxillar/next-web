@@ -12,6 +12,8 @@ use crate::lock::error::RedisLockError;
 use crate::lock::protocol::{LockRequest, ScriptReply};
 
 pub mod cluster;
+#[cfg(test)]
+pub mod memory;
 
 /// Asynchronous transport a lock runs its scripts on.
 #[async_trait]
@@ -52,11 +54,8 @@ pub trait LockBackend: Send + Sync + 'static {
 /// synchronous client directly.
 pub trait BlockingLockBackend: Send + Sync + 'static {
     /// Run one lock script atomically.
-    fn eval(
-        &self,
-        request: &LockRequest,
-        timeout: Duration,
-    ) -> Result<ScriptReply, RedisLockError>;
+    fn eval(&self, request: &LockRequest, timeout: Duration)
+    -> Result<ScriptReply, RedisLockError>;
 
     /// Wait until `name` is no longer held, or `timeout` elapses.
     fn wait_for_unlock(
