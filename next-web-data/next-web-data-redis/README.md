@@ -39,6 +39,18 @@ let guard = lock.lock().await?;
 guard.unlock().await?;
 ```
 
+To watch the lock actually behave, run the workspace example. It walks through
+every capability against a real server, prints what it observed and exits
+non-zero on the first check that fails:
+
+```text
+REDIS_URL=redis://:password@127.0.0.1:6379/0 \
+  cargo run --manifest-path examples/Cargo.toml --bin redis_lock
+```
+
+Set `REDLOCK_URLS` to three or more comma-separated URLs to include the quorum
+lock; it is skipped otherwise.
+
 ### Two APIs, one protocol
 
 | | asynchronous | blocking |

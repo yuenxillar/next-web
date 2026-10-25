@@ -139,6 +139,10 @@ name = "redis"
 path = "redis.rs"
 
 [[bin]]
+name = "redis_lock"
+path = "redis_lock.rs"
+
+[[bin]]
 name = "retry"
 path = "retry.rs"
 
