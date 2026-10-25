@@ -1,13 +1,9 @@
 //! The asynchronous reentrant lock.
 
-use std::{
-    future::Future,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{future::Future, sync::Arc, time::Duration};
 
 use crate::lock::{
-    async_lock::{guard::RedisLockGuard, waiter, watchdog::RenewalTask},
+    async_lock::{guard::RedisLockGuard, watchdog::RenewalTask},
     backend::LockBackend,
     config::RedisLockConfig,
     error::RedisLockError,
@@ -19,36 +15,8 @@ use crate::lock::{
         commands::{acquire, force_unlock, status},
         keys::channel_name,
     },
+    retry::{Deadline, next_delay},
 };
-
-/// How long a caller is willing to keep retrying.
-#[derive(Debug, Clone, Copy)]
-enum Deadline {
-    /// Attempt once and give up.
-    Once,
-    /// Retry for as long as it takes.
-    Forever,
-    /// Retry until this instant.
-    Until(Instant),
-}
-
-impl Deadline {
-    /// The time left, or `None` when the caller should stop.
-    fn remaining(&self) -> Option<Option<Duration>> {
-        match self {
-            Self::Once => None,
-            Self::Forever => Some(None),
-            Self::Until(until) => {
-                let now = Instant::now();
-                if now >= *until {
-                    None
-                } else {
-                    Some(Some(until.saturating_duration_since(now)))
-                }
-            }
-        }
-    }
-}
 
 /// A reentrant distributed lock on one Redis deployment.
 ///
@@ -149,7 +117,7 @@ impl RedisLock {
         wait: Duration,
     ) -> Result<Option<RedisLockGuard>, RedisLockError> {
         self.acquire_with(
-            Self::deadline(wait),
+            Deadline::after(wait),
             Lease::watchdog(self.config.watchdog_timeout),
         )
         .await
@@ -165,7 +133,7 @@ impl RedisLock {
         wait: Duration,
         lease: Duration,
     ) -> Result<Option<RedisLockGuard>, RedisLockError> {
-        self.acquire_with(Self::deadline(wait), Lease::fixed(lease))
+        self.acquire_with(Deadline::after(wait), Lease::fixed(lease))
             .await
     }
 
@@ -264,15 +232,6 @@ impl RedisLock {
         }
     }
 
-    /// Turn a caller's wait budget into a deadline.
-    fn deadline(wait: Duration) -> Deadline {
-        match Instant::now().checked_add(wait) {
-            Some(until) => Deadline::Until(until),
-            // An unrepresentable instant is already "forever".
-            None => Deadline::Forever,
-        }
-    }
-
     /// Shared acquisition loop.
     async fn acquire_with(
         &self,
@@ -297,7 +256,7 @@ impl RedisLock {
                     let Some(remaining) = deadline.remaining() else {
                         return Ok(None);
                     };
-                    let delay = waiter::next_delay(
+                    let delay = next_delay(
                         remaining,
                         self.config.retry_interval,
                         Some(Duration::from_millis(ttl.max(0) as u64)),

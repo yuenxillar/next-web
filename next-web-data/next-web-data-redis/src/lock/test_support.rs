@@ -11,6 +11,7 @@ use std::sync::Arc;
 use crate::lock::{
     async_lock::RedisLock,
     backend::memory::MemoryLockBackend,
+    blocking::BlockingRedisLock,
     config::RedisLockConfig,
     ownership::{LockOwner, OwnerToken},
 };
@@ -37,4 +38,23 @@ pub(crate) fn test_lock_with(
     config: RedisLockConfig,
 ) -> RedisLock {
     RedisLock::new(backend, name, new_owner_token(), Arc::new(config))
+}
+
+/// A blocking lock handle on `name` over the in-memory backend.
+pub(crate) fn test_blocking_lock(backend: Arc<MemoryLockBackend>, name: &str) -> BlockingRedisLock {
+    BlockingRedisLock::new(
+        backend,
+        name,
+        new_owner_token(),
+        Arc::new(RedisLockConfig::default()),
+    )
+}
+
+/// A blocking lock handle with a specific configuration.
+pub(crate) fn test_blocking_lock_with(
+    backend: Arc<MemoryLockBackend>,
+    name: &str,
+    config: RedisLockConfig,
+) -> BlockingRedisLock {
+    BlockingRedisLock::new(backend, name, new_owner_token(), Arc::new(config))
 }

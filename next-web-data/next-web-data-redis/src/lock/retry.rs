@@ -1,14 +1,54 @@
-//! How long a contender waits before its next acquisition attempt.
+//! The retry policy both lock flavours share: how long to wait, and when to stop.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+/// How long a caller is willing to keep retrying.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Deadline {
+    /// Attempt once and give up.
+    Once,
+    /// Retry for as long as it takes.
+    Forever,
+    /// Retry until this instant.
+    Until(Instant),
+}
+
+impl Deadline {
+    /// A deadline `wait` from now, or [`Deadline::Forever`] when the instant is
+    /// not representable (a wait that long is "forever" in practice).
+    pub(crate) fn after(wait: Duration) -> Self {
+        match Instant::now().checked_add(wait) {
+            Some(until) => Self::Until(until),
+            None => Self::Forever,
+        }
+    }
+
+    /// The time left, or `None` when the caller should stop.
+    ///
+    /// `Some(None)` means there is no bound at all.
+    pub(crate) fn remaining(&self) -> Option<Option<Duration>> {
+        match self {
+            Self::Once => None,
+            Self::Forever => Some(None),
+            Self::Until(until) => {
+                let now = Instant::now();
+                if now >= *until {
+                    None
+                } else {
+                    Some(Some(until.saturating_duration_since(now)))
+                }
+            }
+        }
+    }
+}
 
 /// The delay before the next attempt, or `None` when the caller should stop.
 ///
 /// Three bounds apply and the smallest wins: the time the caller has left, the
 /// configured retry interval, and the TTL Redis reported for the lock that is in
-/// the way. Waiting exactly for the TTL would race the release, so the retry
-/// interval usually wins and the wait is woken early by Pub/Sub anyway. The
-/// one-millisecond floor keeps a zero-length wait from spinning.
+/// the way. The retry interval usually wins because the wait is woken early by
+/// Pub/Sub anyway. The one-millisecond floor keeps a zero-length wait from
+/// spinning.
 pub(crate) fn next_delay(
     remaining: Option<Duration>,
     retry_interval: Duration,
@@ -76,5 +116,16 @@ mod tests {
             next_delay(None, Duration::ZERO, None),
             Some(Duration::from_millis(1))
         );
+    }
+
+    #[test]
+    fn a_deadline_reports_no_time_left_once_it_has_passed() {
+        let deadline = Deadline::Until(Instant::now() - Duration::from_millis(1));
+        assert!(deadline.remaining().is_none());
+
+        let unbounded = Deadline::Forever.remaining();
+        assert_eq!(unbounded, Some(None));
+
+        assert!(Deadline::Once.remaining().is_none());
     }
 }

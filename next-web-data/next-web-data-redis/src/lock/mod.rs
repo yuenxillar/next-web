@@ -7,6 +7,7 @@
 
 pub mod async_lock;
 pub mod backend;
+pub mod blocking;
 pub mod config;
 pub mod error;
 pub mod guard;
@@ -15,6 +16,7 @@ pub mod ownership;
 pub mod protocol;
 mod redisson_lock;
 pub mod redlock;
+pub mod retry;
 pub mod rlock;
 #[cfg(test)]
 mod test_support;
