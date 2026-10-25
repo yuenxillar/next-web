@@ -325,13 +325,16 @@ impl BlockingLockBackend for MemoryLockBackend {
     ) -> Result<ScriptReply, RedisLockError> {
         let delay = self.state().eval_delay;
         if let Some(delay) = delay {
-            let started = Instant::now();
-            std::thread::sleep(delay);
-            if started.elapsed() > timeout {
+            // Model a socket read timeout: a call that would outlast its budget
+            // gives up *at* the budget instead of running to completion. Without
+            // this the double cannot prove that a bounded caller is bounded.
+            if delay > timeout {
+                std::thread::sleep(timeout);
                 return Err(RedisLockError::CommandTimeout {
                     script: request.script().name(),
                 });
             }
+            std::thread::sleep(delay);
         }
 
         self.eval_now(request)

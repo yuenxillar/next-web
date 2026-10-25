@@ -175,7 +175,14 @@ impl LockBackend for RedisTemplate {
         request: &LockRequest,
         timeout: Duration,
     ) -> Result<ScriptReply, RedisLockError> {
-        let mut connection = self.lock_connection().await?;
+        // The timeout has to cover acquiring the connection too, not just the
+        // command: a node that accepts the socket and never answers would
+        // otherwise hang here for as long as the OS allows.
+        let mut connection = tokio::time::timeout(timeout, self.lock_connection())
+            .await
+            .map_err(|_| RedisLockError::CommandTimeout {
+                script: request.script().name(),
+            })??;
 
         let value = tokio::time::timeout(timeout, request.invoke_async(&mut connection))
             .await

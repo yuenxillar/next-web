@@ -35,6 +35,10 @@ impl ClusterLockBackend {
 
         let client = ClusterClient::builder(urls)
             .response_timeout(command_timeout)
+            // Both bounds are needed: `response_timeout` only covers a node that
+            // answered, so a seed whose port is filtered would otherwise wait for
+            // the OS TCP timeout on every call.
+            .connection_timeout(command_timeout)
             .build()?;
 
         Ok(Self {
@@ -50,7 +54,13 @@ impl LockBackend for ClusterLockBackend {
         request: &LockRequest,
         timeout: Duration,
     ) -> Result<ScriptReply, RedisLockError> {
-        let mut connection = self.client.get_async_connection().await?;
+        // Cluster discovery is outside the command itself, so it needs the same
+        // bound: `get_async_connection` re-reads the topology on every call.
+        let mut connection = tokio::time::timeout(timeout, self.client.get_async_connection())
+            .await
+            .map_err(|_| RedisLockError::CommandTimeout {
+                script: request.script().name(),
+            })??;
 
         let value = tokio::time::timeout(timeout, request.invoke_async(&mut connection))
             .await

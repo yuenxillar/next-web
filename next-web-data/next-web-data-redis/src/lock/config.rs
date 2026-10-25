@@ -35,7 +35,9 @@ impl RedisLockConfig {
     /// # Errors
     ///
     /// Returns [`RedisLockError::InvalidDuration`] naming the offending field
-    /// when a duration is zero or cannot be expressed in milliseconds.
+    /// when a duration is zero or cannot be expressed in milliseconds, and
+    /// [`RedisLockError::InvalidConfiguration`] when `command_timeout` does not
+    /// fit inside one watchdog renewal interval.
     pub fn validate(&self) -> Result<(), RedisLockError> {
         for (field, value) in [
             ("watchdog_timeout", self.watchdog_timeout),
@@ -45,6 +47,20 @@ impl RedisLockConfig {
             if value.is_zero() || value.as_millis() > u64::MAX as u128 {
                 return Err(RedisLockError::InvalidDuration { field });
             }
+        }
+
+        // The watchdog renews every `watchdog_timeout / 3` and may spend two
+        // command timeouts on a single renewal. Anything slower than one
+        // interval can let the lease expire while the guard still believes it
+        // holds the lock, which is exactly the mutual exclusion the lock exists
+        // to provide.
+        if self.command_timeout > self.watchdog_timeout / 3 {
+            return Err(RedisLockError::InvalidConfiguration(format!(
+                "command_timeout ({:?}) must not exceed a third of watchdog_timeout ({:?}): \
+                 a renewal that cannot finish inside one renewal interval may let the lease \
+                 expire while the guard still holds it",
+                self.command_timeout, self.watchdog_timeout
+            )));
         }
 
         Ok(())
@@ -87,5 +103,31 @@ mod tests {
                 field: "command_timeout"
             })
         ));
+    }
+
+    #[test]
+    fn a_command_timeout_that_outlives_a_renewal_interval_is_rejected() {
+        // The watchdog renews every watchdog_timeout/3 and may spend two
+        // command timeouts on one renewal. If that budget exceeds the interval,
+        // the lease can expire while the guard still reports that it holds it.
+        let config = RedisLockConfig {
+            watchdog_timeout: Duration::from_secs(1),
+            command_timeout: Duration::from_secs(3),
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            config.validate(),
+            Err(RedisLockError::InvalidConfiguration(message))
+                if message.contains("command_timeout") && message.contains("watchdog_timeout")
+        ));
+
+        // The defaults keep a third of the watchdog timeout as headroom.
+        let safe = RedisLockConfig {
+            watchdog_timeout: Duration::from_secs(30),
+            command_timeout: Duration::from_secs(3),
+            ..Default::default()
+        };
+        assert!(safe.validate().is_ok());
     }
 }

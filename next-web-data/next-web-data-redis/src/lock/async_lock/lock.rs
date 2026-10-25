@@ -245,10 +245,23 @@ impl RedisLock {
 
         loop {
             let request = acquire(&self.name, self.owner.as_str(), lease.duration)?;
-            let reply = self
-                .backend
-                .eval(&request, self.config.command_timeout)
-                .await?;
+
+            // Never spend more than the caller has left: an attempt that starts
+            // with 100ms of budget left must not be handed a 3s command timeout.
+            let attempt_timeout = match deadline.remaining() {
+                Some(Some(remaining)) => self.config.command_timeout.min(remaining),
+                _ => self.config.command_timeout,
+            };
+
+            let reply = match self.backend.eval(&request, attempt_timeout).await {
+                Ok(reply) => reply,
+                // A call that ran out because the caller's own budget ran out is
+                // a failed acquisition, not a backend failure.
+                Err(RedisLockError::CommandTimeout { .. }) if deadline.expired() => {
+                    return Ok(None);
+                }
+                Err(error) => return Err(error),
+            };
 
             match reply {
                 ScriptReply::Nil => return Ok(Some(self.grant(lease))),
@@ -413,6 +426,7 @@ mod tests {
         let backend = MemoryLockBackend::new_shared();
         let config = RedisLockConfig {
             watchdog_timeout: Duration::from_millis(90),
+            command_timeout: Duration::from_millis(20),
             ..RedisLockConfig::default()
         };
         let lock = test_lock_with(backend.clone(), "orders", config);
@@ -432,6 +446,7 @@ mod tests {
         let backend = MemoryLockBackend::new_shared();
         let config = RedisLockConfig {
             watchdog_timeout: Duration::from_millis(90),
+            command_timeout: Duration::from_millis(20),
             ..RedisLockConfig::default()
         };
         let lock = test_lock_with(backend.clone(), "orders", config);
@@ -473,5 +488,38 @@ mod tests {
 
         assert_eq!(result.unwrap(), Err("boom"));
         assert!(!lock.is_locked().await.unwrap());
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use std::time::Instant;
+
+    use super::*;
+    use crate::lock::{
+        backend::memory::MemoryLockBackend, config::RedisLockConfig, test_support::test_lock_with,
+    };
+
+    #[tokio::test]
+    async fn try_lock_for_never_exceeds_its_budget() {
+        // Every script call is slower than the wait budget: the attempt has to be
+        // capped by the time the caller has left, not by command_timeout.
+        let backend = MemoryLockBackend::new_shared();
+        backend.set_eval_delay(Duration::from_millis(300));
+        let config = RedisLockConfig {
+            command_timeout: Duration::from_millis(300),
+            ..RedisLockConfig::default()
+        };
+        let lock = test_lock_with(backend, "orders", config);
+
+        let started = Instant::now();
+        let acquired = lock.try_lock_for(Duration::from_millis(100)).await.unwrap();
+
+        assert!(acquired.is_none());
+        assert!(
+            started.elapsed() < Duration::from_millis(250),
+            "try_lock_for spent {:?} on a 100ms budget",
+            started.elapsed()
+        );
     }
 }

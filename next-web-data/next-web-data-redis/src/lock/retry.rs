@@ -40,6 +40,14 @@ impl Deadline {
             }
         }
     }
+
+    /// Whether a bounded deadline has already passed.
+    pub(crate) fn expired(&self) -> bool {
+        match self {
+            Self::Until(until) => Instant::now() >= *until,
+            Self::Once | Self::Forever => false,
+        }
+    }
 }
 
 /// The delay before the next attempt, or `None` when the caller should stop.
