@@ -5,7 +5,7 @@ use crate::autoconfigure::{
     redis_sentinel_properties::RedisSentinelProperties,
 };
 #[cfg(feature = "distributed-lock")]
-use crate::lock::{RedisLockConfig, RedisLockMode};
+use crate::lock::RedisLockConfig;
 
 /// Configuration properties for Redis.
 ///
@@ -247,20 +247,39 @@ impl RedisProperties {
         self.sentinel.as_ref()
     }
 
+    /// Whether distributed locks should be enabled.
     #[cfg(feature = "distributed-lock")]
     pub fn lock_enabled(&self) -> bool {
         self.lock.enabled
     }
 
+    /// Whether the lock deployment is a Redis Cluster rather than a standalone server.
+    #[cfg(feature = "distributed-lock")]
+    pub fn lock_uses_cluster(&self) -> bool {
+        matches!(self.lock.mode, RedisLockPropertyMode::Cluster)
+    }
+
+    /// The cluster seed URLs the locks should use.
+    #[cfg(feature = "distributed-lock")]
+    pub fn lock_cluster_urls(&self) -> &[String] {
+        &self.lock.cluster.urls
+    }
+
+    /// The independent deployment URLs a quorum lock should use.
+    ///
+    /// Fewer than three entries means no quorum lock is configured.
+    #[cfg(feature = "distributed-lock")]
+    pub fn lock_redlock_urls(&self) -> &[String] {
+        &self.lock.redlock.urls
+    }
+
+    /// The timing knobs the lock service is built with.
+    ///
+    /// Topology is not part of the returned value: it decides which constructor
+    /// the auto-configuration calls.
     #[cfg(feature = "distributed-lock")]
     pub fn lock_config(&self) -> Result<RedisLockConfig, String> {
         let mut config = RedisLockConfig::default();
-        config.mode = match self.lock.mode {
-            RedisLockPropertyMode::Direct => RedisLockMode::Direct,
-            RedisLockPropertyMode::Cluster => RedisLockMode::Cluster,
-        };
-        config.cluster_urls = self.lock.cluster.urls.clone();
-        config.redlock_urls = self.lock.redlock.urls.clone();
         if let Some(value) = &self.lock.watchdog_timeout {
             config.watchdog_timeout = std::time::Duration::from_millis(value.millis()?);
         }

@@ -37,8 +37,10 @@ pub mod core;
 
 #[cfg(feature = "distributed-lock")]
 pub use crate::lock::{
-    LockError, LockGuard, RedisDistributedLockService, RedisLock, RedisLockConfig, RedisLockMode,
-    RedisRedLock, UnlockResult,
+    BlockingLockBackend, BlockingRedLock, BlockingRedLockGuard, BlockingRedisLock,
+    BlockingRedisLockGuard, LockBackend, LockRequest, LockScript, RedLock, RedLockGuard, RedisLock,
+    RedisLockConfig, RedisLockError, RedisLockGuard, RedisLockService, ScriptArg, ScriptReply,
+    UnlockOutcome,
 };
 
 pub use redis::{AsyncCommands, Commands, RedisError, aio::MultiplexedConnection};

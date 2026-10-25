@@ -6,13 +6,13 @@ use std::{
     process::{Command, Stdio},
 };
 
-use next_web_data_redis::{
-    RedisDistributedLockService, RedisLockConfig, RedisLockMode, UnlockResult,
-};
+use next_web_data_redis::{RedisLockConfig, RedisLockService, UnlockOutcome};
 
-fn test_service() -> Option<RedisDistributedLockService> {
+fn test_service() -> Option<RedisLockService> {
     let url = std::env::var("NEXT_WEB_TEST_REDIS_URL").ok()?;
-    RedisDistributedLockService::with_direct(url, RedisLockConfig::default()).ok()
+    let template = next_web_data_redis::core::redis_template::RedisTemplate::with_url(url).ok()?;
+
+    RedisLockService::from_template(&template, RedisLockConfig::default()).ok()
 }
 
 fn urls_from_env(name: &str) -> Vec<String> {
@@ -33,34 +33,86 @@ async fn direct_lock_is_reentrant_and_owner_safe() {
     let lock = service.get_lock(&name);
     let other_owner = service.get_lock(&name);
 
-    let first = lock.try_acquire().await.unwrap().unwrap();
-    let second = lock.clone().try_acquire().await.unwrap().unwrap();
+    let first = lock.try_lock().await.unwrap().unwrap();
+    let second = lock.clone().try_lock().await.unwrap().unwrap();
     assert_eq!(lock.hold_count().await.unwrap(), 2);
-    assert!(other_owner.try_acquire().await.unwrap().is_none());
-    assert_eq!(second.unlock().await.unwrap(), UnlockResult::Reentrant);
-    assert_eq!(first.unlock().await.unwrap(), UnlockResult::Released);
+    assert!(other_owner.try_lock().await.unwrap().is_none());
+    assert_eq!(second.unlock().await.unwrap(), UnlockOutcome::Reentrant);
+    assert_eq!(first.unlock().await.unwrap(), UnlockOutcome::Released);
 
-    let acquired = other_owner.try_acquire().await.unwrap().unwrap();
+    let acquired = other_owner.try_lock().await.unwrap().unwrap();
     acquired.unlock().await.unwrap();
 }
 
 #[tokio::test]
 #[ignore = "requires NEXT_WEB_TEST_REDIS_URL"]
-async fn explicit_lease_expires_without_watchdog() {
+async fn a_blocking_lock_excludes_the_async_lock() {
     let service = test_service().expect("NEXT_WEB_TEST_REDIS_URL must contain a Redis URL");
-    let name = format!("next-web:test-lease:{}", uuid::Uuid::new_v4());
-    let lock = service.get_lock(&name);
-    let contender = service.get_lock(&name);
+    let name = format!("next-web:test-blocking:{}", uuid::Uuid::new_v4());
 
-    let guard = lock
-        .try_acquire_for_with_lease(Duration::from_millis(50), Duration::from_millis(150))
+    let blocking = service.get_blocking_lock(&name);
+    let guard = tokio::task::spawn_blocking(move || blocking.try_lock())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    assert!(service.get_lock(&name).try_lock().await.unwrap().is_none());
+
+    tokio::task::spawn_blocking(move || guard.unlock())
         .await
         .unwrap()
         .unwrap();
-    tokio::time::sleep(Duration::from_millis(250)).await;
-    let contender_guard = contender.try_acquire().await.unwrap().unwrap();
-    contender_guard.unlock().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires NEXT_WEB_TEST_REDIS_URL"]
+async fn every_script_matches_the_in_memory_double() {
+    let service = test_service().expect("NEXT_WEB_TEST_REDIS_URL must contain a Redis URL");
+    let name = format!("next-web:test-scripts:{}", uuid::Uuid::new_v4());
+    let lock = service.get_lock(&name);
+    let contender = service.get_lock(&name);
+    let intruder = service.get_lock(&name);
+
+    let guard = lock.try_lock().await.unwrap().unwrap();
+    assert!(intruder.try_lock().await.unwrap().is_none());
+    assert!(lock.is_held_by_owner().await.unwrap());
+    assert!(lock.remaining_lease().await.unwrap().is_some());
+
+    // force_unlock is owner-agnostic and notifies the channel.
+    assert!(intruder.force_unlock().await.unwrap());
+    assert!(!lock.is_locked().await.unwrap());
+    // The owner's level is gone, so releasing it is refused.
     assert!(guard.unlock().await.is_err());
+
+    let acquired = contender.try_lock().await.unwrap().unwrap();
+    acquired.unlock().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires NEXT_WEB_TEST_REDIS_URL"]
+async fn an_explicit_lease_expires_without_a_watchdog() {
+    let service = test_service().expect("NEXT_WEB_TEST_REDIS_URL must contain a Redis URL");
+    let name = format!("next-web:test-lease:{}", uuid::Uuid::new_v4());
+
+    let guard = service
+        .get_lock(&name)
+        .try_lock_for_with_lease(Duration::from_millis(50), Duration::from_millis(150))
+        .await
+        .unwrap()
+        .unwrap();
+
+    tokio::time::sleep(Duration::from_millis(250)).await;
+
+    let contender = service.get_lock(&name).try_lock().await.unwrap().unwrap();
+    contender.unlock().await.unwrap();
+
+    // A fixed lease has no watchdog, so nothing was "lost": the field is simply
+    // gone by the time the guard tries to release it.
+    assert!(matches!(
+        guard.unlock().await,
+        Err(next_web_data_redis::RedisLockError::NotOwner)
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -83,14 +135,13 @@ async fn java_redisson_4_7_and_rust_are_mutually_exclusive() {
     stdout.read_line(&mut ready).unwrap();
     assert_eq!(ready.trim(), "LOCKED");
 
-    let service =
-        RedisDistributedLockService::with_direct(&url, RedisLockConfig::default()).unwrap();
+    let service = test_service().expect("NEXT_WEB_TEST_REDIS_URL must contain a Redis URL");
     let lock = service.get_lock(&name);
-    assert!(lock.try_acquire().await.unwrap().is_none());
+    assert!(lock.try_lock().await.unwrap().is_none());
     assert!(child.wait().unwrap().success());
 
     let guard = lock
-        .try_acquire_for(Duration::from_secs(1))
+        .try_lock_for(Duration::from_secs(1))
         .await
         .unwrap()
         .unwrap();
@@ -102,15 +153,17 @@ async fn java_redisson_4_7_and_rust_are_mutually_exclusive() {
 async fn cluster_lock_round_trip() {
     let urls = urls_from_env("NEXT_WEB_TEST_REDIS_CLUSTER_URLS");
     assert!(!urls.is_empty(), "cluster seed URLs must be configured");
-    let service = RedisDistributedLockService::with_cluster(urls, RedisLockConfig::default())
+
+    let service = RedisLockService::from_cluster(urls, RedisLockConfig::default())
         .expect("invalid cluster configuration");
     let lock = service.get_lock(format!("next-web:cluster:{{{}}}", uuid::Uuid::new_v4()));
     let guard = lock
-        .try_acquire_for(Duration::from_secs(2))
+        .try_lock_for(Duration::from_secs(2))
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(guard.unlock().await.unwrap(), UnlockResult::Released);
+
+    assert_eq!(guard.unlock().await.unwrap(), UnlockOutcome::Released);
 }
 
 #[tokio::test]
@@ -121,20 +174,25 @@ async fn redlock_reaches_quorum_and_releases_all_nodes() {
         urls.len() >= 3,
         "at least three Redis URLs must be configured"
     );
-    let primary_url = urls[0].clone();
-    let config = RedisLockConfig {
-        mode: RedisLockMode::Direct,
-        redlock_urls: urls,
-        ..RedisLockConfig::default()
-    };
-    let service = RedisDistributedLockService::with_direct(primary_url, config).unwrap();
+
+    let nodes = urls
+        .iter()
+        .map(|url| {
+            next_web_data_redis::core::redis_template::RedisTemplate::with_url(url)
+                .map(std::sync::Arc::new)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let service = RedisLockService::new(nodes, RedisLockConfig::default()).unwrap();
+
     let lock = service
-        .get_redlock(format!("next-web:redlock:{}", uuid::Uuid::new_v4()))
+        .get_red_lock(format!("next-web:redlock:{}", uuid::Uuid::new_v4()))
         .unwrap();
     let guard = lock
-        .try_acquire_for(Duration::from_secs(2))
+        .try_lock_for(Duration::from_secs(2))
         .await
         .unwrap()
         .unwrap();
+
     guard.unlock().await.unwrap();
 }

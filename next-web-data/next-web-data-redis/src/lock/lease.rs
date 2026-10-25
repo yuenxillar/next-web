@@ -69,11 +69,6 @@ impl NodeLease {
     pub fn is_lost(&self) -> bool {
         self.lost.load(Ordering::Acquire)
     }
-
-    /// Mark this lease as lost, which the guard reports as [`super::error::RedisLockError::WatchdogLost`].
-    pub fn mark_lost(&self) {
-        self.lost.store(true, Ordering::Release);
-    }
 }
 
 #[cfg(test)]
@@ -97,11 +92,12 @@ mod tests {
     }
 
     #[test]
-    fn a_lease_starts_held_and_can_be_marked_lost() {
+    fn a_lease_starts_held_and_reports_what_the_watchdog_sets() {
         let lease = NodeLease::new(0, Lease::watchdog(Duration::from_secs(30)));
         assert!(!lease.is_lost());
 
-        lease.mark_lost();
+        // The watchdog owns the same flag, so setting it is the whole signal.
+        lease.lost.store(true, std::sync::atomic::Ordering::Release);
         assert!(lease.is_lost());
     }
 }

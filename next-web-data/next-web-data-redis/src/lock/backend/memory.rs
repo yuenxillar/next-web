@@ -24,7 +24,6 @@ use crate::lock::protocol::{LockRequest, ScriptArg, ScriptReply};
 struct MemoryLock {
     counts: HashMap<String, u32>,
     expires_at: Option<Instant>,
-    channel: String,
 }
 
 impl MemoryLock {
@@ -192,7 +191,6 @@ impl MemoryLockBackend {
                     MemoryLock {
                         counts,
                         expires_at: Some(Instant::now() + Duration::from_millis(lease as u64)),
-                        channel: channel_of(request),
                     },
                 );
                 Ok(ScriptReply::Nil)

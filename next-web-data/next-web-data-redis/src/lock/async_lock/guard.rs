@@ -9,7 +9,6 @@ use crate::lock::{
     backend::LockBackend,
     error::{RedisLockError, UnlockOutcome},
     guard::GuardCore,
-    lease::NodeLease,
     protocol::commands::unlock,
 };
 
@@ -100,11 +99,6 @@ impl RedisLockGuard {
     /// is the whole operation.
     fn stop_watchdogs(&mut self) {
         self.watchdogs.clear();
-    }
-
-    /// The lease records this guard holds, for the quorum flavour.
-    pub(crate) fn leases(&self) -> &[NodeLease] {
-        &self.core.leases
     }
 }
 

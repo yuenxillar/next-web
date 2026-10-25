@@ -84,12 +84,16 @@ mod tests {
         let core = core(leases);
 
         // 3 nodes, quorum 2: one loss is tolerated.
-        core.leases[0].mark_lost();
+        core.leases[0]
+            .lost
+            .store(true, std::sync::atomic::Ordering::Release);
         assert!(!core.is_lost());
         assert_eq!(core.lost(), 1);
 
         // Two losses drop below the quorum.
-        core.leases[1].mark_lost();
+        core.leases[1]
+            .lost
+            .store(true, std::sync::atomic::Ordering::Release);
         assert!(core.is_lost());
         assert_eq!(core.lost(), 2);
     }
