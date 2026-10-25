@@ -192,13 +192,28 @@ async fn redlock_reaches_quorum_and_releases_all_nodes() {
     let lock = service
         .get_red_lock(format!("next-web:redlock:{}", uuid::Uuid::new_v4()))
         .unwrap();
+    assert_eq!(lock.quorum(), 2);
+    assert_eq!(lock.node_count(), urls.len());
+
     let guard = lock
         .try_lock_for(Duration::from_secs(2))
         .await
         .unwrap()
         .unwrap();
+    // Every node answered, so every node granted a level.
+    assert_eq!(guard.node_count(), urls.len());
+    assert!(!guard.is_lost());
 
-    guard.unlock().await.unwrap();
+    // Releasing has to reach a quorum, which means the keys are gone on a
+    // majority of the deployments rather than just on the first one.
+    assert_eq!(guard.unlock().await.unwrap(), UnlockOutcome::Released);
+
+    let again = lock
+        .try_lock_for(Duration::from_secs(2))
+        .await
+        .unwrap()
+        .unwrap();
+    again.unlock().await.unwrap();
 }
 
 #[tokio::test]

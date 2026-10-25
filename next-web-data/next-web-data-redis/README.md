@@ -156,16 +156,35 @@ so `cargo test` needs no Redis:
 cargo test -p next-web-data-redis --features distributed-lock --lib
 ```
 
-The live-Redis tests are ignored by default and read `NEXT_WEB_TEST_REDIS_URL`,
-comma-separated `NEXT_WEB_TEST_REDIS_CLUSTER_URLS`, and comma-separated
-`NEXT_WEB_TEST_REDLOCK_URLS`. The Java interoperability test additionally reads
-`NEXT_WEB_TEST_REDISSON_CLASSPATH`, which must contain the local Redisson 4.7.0
-core build and its runtime dependencies.
+The live tests are ignored by default. They read:
+
+| variable | used by |
+|---|---|
+| `NEXT_WEB_TEST_REDIS_URL` | every single-node test |
+| `NEXT_WEB_TEST_REDIS_CLUSTER_URLS` | `cluster_lock_round_trip` |
+| `NEXT_WEB_TEST_REDLOCK_URLS` | `redlock_reaches_quorum_and_releases_all_nodes` (three or more) |
+| `NEXT_WEB_TEST_REDISSON_CLASSPATH` | `java_redisson_4_7_and_rust_are_mutually_exclusive` |
+
+For the interoperability test, the Redisson 4.7.0 shaded jar plus `slf4j-api` is
+enough — no source build needed:
+
+```text
+https://repo1.maven.org/maven2/org/redisson/redisson-all/4.7.0/redisson-all-4.7.0.jar
+https://repo1.maven.org/maven2/org/slf4j/slf4j-api/2.0.16/slf4j-api-2.0.16.jar
+```
 
 ```text
 cargo test -p next-web-data-redis --features distributed-lock -- --ignored
 ```
 
 `every_script_matches_the_in_memory_double` is the one test that keeps the
-in-memory emulation honest against the real scripts. It is also the only test
-that can catch a divergence between the two, and it requires a live server.
+in-memory emulation honest against the real scripts: it exercises all five
+through the public API, so a divergence in a return code, the reentrancy
+counting or the publish-on-full-release rule shows up there.
+
+Last verified against a real server (`redis://192.168.1.250:6379`, Redis
+protocol, Redisson 4.7.0 from Maven Central): the eight non-cluster live tests
+all passed, including the watchdog renewal, the Pub/Sub wake-up and the Java
+interoperability check. `cluster_lock_round_trip` has not been run — it needs a
+real Redis Cluster.
+
