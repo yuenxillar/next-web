@@ -38,7 +38,7 @@ impl RedisAutoConfiguration {
                 let redis_template = match self
                     .redis_properties
                     .url()
-                    .filter(|s| StringUtils::has_text(*s))
+                    .filter(|s| StringUtils::has_text(s))
                 {
                     Some(url) => RedisTemplate::with_url(url)?,
                     None => RedisTemplate::with_properties(&self.redis_properties)?,

@@ -7,7 +7,7 @@ pub trait Topic {
     where
         S: Into<String>,
     {
-        return ChannelTopic::new(channel_name);
+        ChannelTopic::new(channel_name)
     }
 
     /// Create a new PatternTopic for channel subscriptions based on a pattern.

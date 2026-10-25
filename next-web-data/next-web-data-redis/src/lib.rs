@@ -1,26 +1,18 @@
 //! Redis starter support for the `next-web` ecosystem.
 //!
 //! This crate is intentionally organized like a Spring Boot starter:
-//! - `properties`: configuration objects bound from `application.yaml`
-//! - `auto_register`: framework entry that registers Redis infrastructure automatically
-//! - `service`: ready-to-use Redis services
-//! - `core`: optional advanced capabilities such as distributed locks and expired-key listeners
+//! - `autoconfigure`: configuration bound from `application.yaml` and the
+//!   registration that wires Redis into the application context
+//! - `connection`: message and listener types for Pub/Sub
+//! - `core`: `RedisTemplate`, the listener container, and the distributed locks
+//! - `lock`: the asynchronous and blocking distributed locks
 //!
 //! # Quick Start
 //!
 //! 1. Add this crate as a dependency.
-//! 2. Call [`enable`] once during startup so cross-crate auto-registration metadata is linked.
-//! 3. Configure Redis under the `next.data.redis` prefix.
-//! 4. Resolve [`RedisService`] from the application context and use it directly.
-//!
-//! ```ignore
-//! use next_web_data_redis::enable;
-//!
-//! fn main() {
-//!     enable();
-//!     // Start your next-web application here.
-//! }
-//! ```
+//! 2. Configure Redis under the `next.data.redis` prefix.
+//! 3. Resolve [`RedisTemplate`](crate::core::redis_template::RedisTemplate) from
+//!    the application context and use it directly.
 //!
 //! ```yaml
 //! next:
@@ -30,6 +22,9 @@
 //!       port: 6379
 //!       database: 0
 //! ```
+//!
+//! Distributed locks are opt-in through `next.data.redis.lock.enabled`; see the
+//! crate README for the asynchronous and blocking APIs.
 
 pub mod autoconfigure;
 pub mod connection;

@@ -63,24 +63,17 @@ impl RedisTemplate {
     pub fn with_properties(properties: &RedisProperties) -> Result<Self, Box<dyn Error>> {
         let mut redis_template = Self::with_url(properties.to_url())?;
 
-        let connection_config =
-            if properties.connect_timeout().is_some() || properties.response_timeout().is_some() {
-                let config = AsyncConnectionConfig::default()
-                    .set_response_timeout(
-                        properties
-                            .response_timeout()
-                            .map(|time| Duration::from_millis(time)),
-                    )
-                    .set_connection_timeout(
-                        properties
-                            .connect_timeout()
-                            .map(|time| Duration::from_millis(time)),
-                    );
+        let connection_config = if properties.connect_timeout().is_some()
+            || properties.response_timeout().is_some()
+        {
+            let config = AsyncConnectionConfig::default()
+                .set_response_timeout(properties.response_timeout().map(Duration::from_millis))
+                .set_connection_timeout(properties.connect_timeout().map(Duration::from_millis));
 
-                Arc::new(config).into()
-            } else {
-                Default::default()
-            };
+            Arc::new(config).into()
+        } else {
+            Default::default()
+        };
 
         redis_template.connection_config = connection_config;
 

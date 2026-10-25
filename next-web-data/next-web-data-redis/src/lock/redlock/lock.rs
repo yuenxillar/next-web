@@ -262,17 +262,17 @@ impl RedLock {
 
         for index in &acquired {
             let node = NodeLease::new(*index, lease);
-            if lease.watchdog {
-                if let Some(backend) = self.nodes.get(*index) {
-                    watchdogs.push(RenewalTask::spawn(
-                        backend.clone(),
-                        self.name.clone(),
-                        Arc::new(self.owner.clone()),
-                        lease,
-                        node.lost.clone(),
-                        self.config.command_timeout,
-                    ));
-                }
+            if lease.watchdog
+                && let Some(backend) = self.nodes.get(*index)
+            {
+                watchdogs.push(RenewalTask::spawn(
+                    backend.clone(),
+                    self.name.clone(),
+                    Arc::new(self.owner.clone()),
+                    lease,
+                    node.lost.clone(),
+                    self.config.command_timeout,
+                ));
             }
             leases.push(node);
         }
@@ -478,17 +478,17 @@ impl BlockingRedLock {
 
         for index in &acquired {
             let node = NodeLease::new(*index, lease);
-            if lease.watchdog {
-                if let Some(backend) = self.nodes.get(*index) {
-                    renewals.push(RenewalThread::spawn(
-                        backend.clone(),
-                        self.name.clone(),
-                        Arc::new(self.owner.clone()),
-                        lease,
-                        node.lost.clone(),
-                        self.config.command_timeout,
-                    ));
-                }
+            if lease.watchdog
+                && let Some(backend) = self.nodes.get(*index)
+            {
+                renewals.push(RenewalThread::spawn(
+                    backend.clone(),
+                    self.name.clone(),
+                    Arc::new(self.owner.clone()),
+                    lease,
+                    node.lost.clone(),
+                    self.config.command_timeout,
+                ));
             }
             leases.push(node);
         }
