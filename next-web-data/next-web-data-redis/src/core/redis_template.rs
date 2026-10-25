@@ -11,7 +11,7 @@ use crate::autoconfigure::redis_properties::RedisProperties;
 
 #[cfg(feature = "distributed-lock")]
 use crate::lock::{
-    backend::{BlockingLockBackend, LockBackend},
+    backend::{BlockingLockBackend, LockBackend, lock_is_gone},
     error::RedisLockError,
     protocol::{LockRequest, ScriptReply, commands::status},
 };
@@ -206,7 +206,7 @@ impl LockBackend for RedisTemplate {
 
         // `RedisTemplate` implements both backend traits, so the call has to say
         // which one it means.
-        if lock_is_gone(<Self as LockBackend>::eval(self, &status(name, ""), timeout).await?) {
+        if lock_is_gone(&<Self as LockBackend>::eval(self, &status(name, ""), timeout).await?) {
             return Ok(());
         }
 
@@ -239,7 +239,7 @@ impl BlockingLockBackend for RedisTemplate {
     ) -> Result<(), RedisLockError> {
         // A blocking caller has no subscription to wake it, so it polls. The
         // lock layer already bounded `timeout` by the retry interval.
-        if lock_is_gone(<Self as BlockingLockBackend>::eval(self, &status(name, ""), timeout)?) {
+        if lock_is_gone(&<Self as BlockingLockBackend>::eval(self, &status(name, ""), timeout)?) {
             return Ok(());
         }
 
@@ -247,15 +247,6 @@ impl BlockingLockBackend for RedisTemplate {
 
         Ok(())
     }
-}
-
-/// Whether a `status` reply says the lock key no longer exists.
-#[cfg(feature = "distributed-lock")]
-fn lock_is_gone(reply: ScriptReply) -> bool {
-    reply
-        .ints()
-        .and_then(|values| values.first())
-        .is_some_and(|exists| *exists == 0)
 }
 
 #[cfg(all(test, feature = "distributed-lock"))]
@@ -290,12 +281,5 @@ mod lock_backend_tests {
             status("orders", "c:1").keys(),
             ["orders".to_string()].as_slice()
         );
-    }
-
-    #[test]
-    fn a_missing_lock_key_reads_as_released() {
-        assert!(lock_is_gone(ScriptReply::Ints(vec![0, 0, -2])));
-        assert!(!lock_is_gone(ScriptReply::Ints(vec![1, 1, 30_000])));
-        assert!(!lock_is_gone(ScriptReply::Nil));
     }
 }

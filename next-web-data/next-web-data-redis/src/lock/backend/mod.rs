@@ -11,6 +11,8 @@ use next_web_core::async_trait;
 use crate::lock::error::RedisLockError;
 use crate::lock::protocol::{LockRequest, ScriptReply};
 
+pub mod cluster;
+
 /// Asynchronous transport a lock runs its scripts on.
 #[async_trait]
 pub trait LockBackend: Send + Sync + 'static {
@@ -70,6 +72,14 @@ pub trait BlockingLockBackend: Send + Sync + 'static {
     }
 }
 
+/// Whether a `status` reply says the lock key no longer exists.
+pub(crate) fn lock_is_gone(reply: &ScriptReply) -> bool {
+    reply
+        .ints()
+        .and_then(|values| values.first())
+        .is_some_and(|exists| *exists == 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,5 +91,12 @@ mod tests {
 
         assert!(asynchronous.is_none());
         assert!(blocking.is_none());
+    }
+
+    #[test]
+    fn a_missing_lock_key_reads_as_released() {
+        assert!(lock_is_gone(&ScriptReply::Ints(vec![0, 0, -2])));
+        assert!(!lock_is_gone(&ScriptReply::Ints(vec![1, 1, 30_000])));
+        assert!(!lock_is_gone(&ScriptReply::Nil));
     }
 }
