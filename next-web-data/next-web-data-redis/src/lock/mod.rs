@@ -5,6 +5,7 @@
 //! transport, ownership/guard lifecycle, standard `RLock`, and quorum
 //! `RedLock`.
 
+pub mod async_lock;
 pub mod backend;
 pub mod config;
 pub mod error;
@@ -15,6 +16,8 @@ pub mod protocol;
 mod redisson_lock;
 pub mod redlock;
 pub mod rlock;
+#[cfg(test)]
+mod test_support;
 
 pub mod lock_pub_sub;
 pub mod lock_renewal_scheduler;

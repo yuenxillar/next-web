@@ -4,7 +4,7 @@ use redis::Client;
 
 use crate::{
     connection::default_message::DefaultMessage,
-    listener::{
+    core::listener::{
         key_expiration_event_message_listener::KeyExpirationEventMessageListener, topic::Topic,
     },
 };
@@ -21,7 +21,7 @@ impl RedisMessageListenerContainer {
 
     /// Add message listener for Redis expired-key events.
     pub async fn add_message_listener<T>(
-        &mut self,
+        &self,
         message_listener: Arc<dyn KeyExpirationEventMessageListener>,
         topic: T,
     ) -> Result<(), Box<dyn Error>>

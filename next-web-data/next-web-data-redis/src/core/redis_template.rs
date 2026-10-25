@@ -224,9 +224,8 @@ impl BlockingLockBackend for RedisTemplate {
         request: &LockRequest,
         timeout: Duration,
     ) -> Result<ScriptReply, RedisLockError> {
-        let value = self.with_blocking_connection(timeout, |connection| {
-            request.invoke(connection)
-        })?;
+        let value =
+            self.with_blocking_connection(timeout, |connection| request.invoke(connection))?;
 
         ScriptReply::parse(value)
     }
@@ -239,7 +238,11 @@ impl BlockingLockBackend for RedisTemplate {
     ) -> Result<(), RedisLockError> {
         // A blocking caller has no subscription to wake it, so it polls. The
         // lock layer already bounded `timeout` by the retry interval.
-        if lock_is_gone(&<Self as BlockingLockBackend>::eval(self, &status(name, ""), timeout)?) {
+        if lock_is_gone(&<Self as BlockingLockBackend>::eval(
+            self,
+            &status(name, ""),
+            timeout,
+        )?) {
             return Ok(());
         }
 

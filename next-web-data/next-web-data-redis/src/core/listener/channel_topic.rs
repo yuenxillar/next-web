@@ -1,17 +1,17 @@
-use crate::listener::topic::Topic;
+use super::topic::Topic;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PatternTopic {
+pub struct ChannelTopic {
     name: String,
 }
 
-impl PatternTopic {
+impl ChannelTopic {
     pub fn new(name: impl Into<String>) -> Self {
         Self { name: name.into() }
     }
 }
 
-impl Topic for PatternTopic {
+impl Topic for ChannelTopic {
     fn get_topic(&self) -> &str {
         self.name.as_ref()
     }

@@ -1,4 +1,4 @@
-use crate::listener::{channel_topic::ChannelTopic, pattern_topic::PatternTopic};
+use crate::core::listener::{channel_topic::ChannelTopic, pattern_topic::PatternTopic};
 
 /// Topic for a Redis message. Acts a high-level abstraction on top of Redis low-level channels or patterns.
 pub trait Topic {
