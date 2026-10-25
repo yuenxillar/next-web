@@ -108,44 +108,47 @@ impl RedisAutoConfiguration {
         Ok(())
     }
 
+    /// Register the lock service when the lock block is enabled.
+    ///
+    /// Only compiled with the feature: everything it touches is feature-gated,
+    /// and a starter that does not build locks should not carry the dependency.
+    #[cfg(feature = "distributed-lock")]
     async fn redis_lock_auto_configuration(
         &self,
         ctx: &mut dyn ApplicationContext,
     ) -> Result<(), Box<dyn Error>> {
-        #[cfg(feature = "distributed-lock")]
-        {
-            if !self.redis_properties.lock_enabled() {
-                return Ok(());
-            }
+        if !self.redis_properties.lock_enabled() {
+            return Ok(());
+        }
 
-            let config =
-                self.redis_properties
-                    .lock_config()
-                    .map_err(|error| -> Box<dyn Error> {
-                        std::io::Error::new(std::io::ErrorKind::InvalidInput, error).into()
-                    })?;
+        let config = self
+            .redis_properties
+            .lock_config()
+            .map_err(|error| -> Box<dyn Error> {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, error).into()
+            })?;
 
-            let redlock_urls = self.redis_properties.lock_redlock_urls();
-            let service = if self.redis_properties.lock_uses_cluster() {
-                crate::lock::RedisLockService::from_cluster(
-                    self.redis_properties.lock_cluster_urls().to_vec(),
-                    config,
-                )?
-            } else if redlock_urls.len() >= 3 {
-                // Three or more independent deployments: one handle per URL so a
-                // quorum lock has genuinely separate nodes to talk to.
-                let nodes = redlock_urls
-                    .iter()
-                    .map(|url| {
-                        RedisTemplate::with_url(url)
-                            .map(std::sync::Arc::new)
-                            .map_err(|error| -> Box<dyn Error> { error })
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+        let redlock_urls = self.redis_properties.lock_redlock_urls();
+        let service = if self.redis_properties.lock_uses_cluster() {
+            crate::lock::RedisLockService::from_cluster(
+                self.redis_properties.lock_cluster_urls().to_vec(),
+                config,
+            )?
+        } else if redlock_urls.len() >= 3 {
+            // Three or more independent deployments: one handle per URL so a
+            // quorum lock has genuinely separate nodes to talk to.
+            let nodes = redlock_urls
+                .iter()
+                .map(|url| {
+                    RedisTemplate::with_url(url)
+                        .map(std::sync::Arc::new)
+                        .map_err(|error| -> Box<dyn Error> { error })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
 
-                crate::lock::RedisLockService::new(nodes, config)?
-            } else {
-                let redis_template = ctx
+            crate::lock::RedisLockService::new(nodes, config)?
+        } else {
+            let redis_template = ctx
                     .get_singleton_option_with_default_name::<RedisTemplate>()
                     .ok_or_else(|| -> Box<dyn Error> {
                         "RedisTemplate singleton is not registered in context; distributed locks cannot be enabled"
@@ -153,11 +156,10 @@ impl RedisAutoConfiguration {
                             .into()
                     })?;
 
-                crate::lock::RedisLockService::from_template(redis_template, config)?
-            };
+            crate::lock::RedisLockService::from_template(redis_template, config)?
+        };
 
-            ctx.insert_singleton_with_default_name(service);
-        }
+        ctx.insert_singleton_with_default_name(service);
 
         Ok(())
     }
@@ -170,6 +172,8 @@ impl AutoConfiguration for RedisAutoConfiguration {
         self.redis_message_listener_container_auto_configuration(ctx);
         self.redis_key_expiration_event_message_listener_auto_configuration(ctx)
             .await?;
+
+        #[cfg(feature = "distributed-lock")]
         self.redis_lock_auto_configuration(ctx).await?;
 
         Ok(())

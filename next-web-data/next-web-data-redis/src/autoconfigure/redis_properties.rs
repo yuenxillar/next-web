@@ -1,7 +1,7 @@
 use next_web_macros::configuration_properties;
 
 use crate::autoconfigure::{
-    redis_cluster_properties::RedisClusterProperties,
+    redis_cluster_properties::RedisClusterProperties, redis_lock_properties::RedisLockProperties,
     redis_sentinel_properties::RedisSentinelProperties,
 };
 #[cfg(feature = "distributed-lock")]
@@ -79,77 +79,6 @@ pub struct RedisProperties {
     #[cfg_attr(not(feature = "distributed-lock"), allow(dead_code))]
     #[serde(default)]
     lock: RedisLockProperties,
-}
-
-/// Configuration bound from `next.data.redis.lock`.
-#[derive(Debug, Clone, Default, serde::Deserialize)]
-#[serde(default, rename_all = "kebab-case")]
-pub struct RedisLockProperties {
-    enabled: bool,
-    mode: RedisLockPropertyMode,
-    watchdog_timeout: Option<DurationValue>,
-    retry_interval: Option<DurationValue>,
-    command_timeout: Option<DurationValue>,
-    cluster: RedisLockClusterProperties,
-    redlock: RedisRedLockProperties,
-}
-
-#[derive(Debug, Clone, Default, serde::Deserialize)]
-#[serde(default)]
-struct RedisLockClusterProperties {
-    urls: Vec<String>,
-}
-
-#[derive(Debug, Clone, Default, serde::Deserialize)]
-#[serde(default)]
-struct RedisRedLockProperties {
-    urls: Vec<String>,
-}
-
-#[cfg_attr(not(feature = "distributed-lock"), allow(dead_code))]
-#[derive(Debug, Clone, serde::Deserialize)]
-#[serde(untagged)]
-enum DurationValue {
-    Millis(u64),
-    Text(String),
-}
-
-#[cfg(feature = "distributed-lock")]
-impl DurationValue {
-    fn millis(&self) -> Result<u64, String> {
-        match self {
-            Self::Millis(value) => Ok(*value),
-            Self::Text(value) => parse_duration_millis(value),
-        }
-    }
-}
-
-#[cfg(feature = "distributed-lock")]
-fn parse_duration_millis(value: &str) -> Result<u64, String> {
-    let value = value.trim();
-    let (number, multiplier) = if let Some(number) = value.strip_suffix("ms") {
-        (number, 1)
-    } else if let Some(number) = value.strip_suffix('s') {
-        (number, 1_000)
-    } else if let Some(number) = value.strip_suffix('m') {
-        (number, 60_000)
-    } else {
-        (value, 1)
-    };
-    number
-        .trim()
-        .parse::<u64>()
-        .map_err(|_| format!("invalid duration: {value}"))?
-        .checked_mul(multiplier)
-        .ok_or_else(|| format!("duration is too large: {value}"))
-}
-
-#[derive(Debug, Clone, Copy, Default, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum RedisLockPropertyMode {
-    #[default]
-    Direct,
-    Cluster,
 }
 
 impl RedisProperties {
@@ -250,19 +179,19 @@ impl RedisProperties {
     /// Whether distributed locks should be enabled.
     #[cfg(feature = "distributed-lock")]
     pub fn lock_enabled(&self) -> bool {
-        self.lock.enabled
+        self.lock.enabled()
     }
 
     /// Whether the lock deployment is a Redis Cluster rather than a standalone server.
     #[cfg(feature = "distributed-lock")]
     pub fn lock_uses_cluster(&self) -> bool {
-        matches!(self.lock.mode, RedisLockPropertyMode::Cluster)
+        self.lock.uses_cluster()
     }
 
     /// The cluster seed URLs the locks should use.
     #[cfg(feature = "distributed-lock")]
     pub fn lock_cluster_urls(&self) -> &[String] {
-        &self.lock.cluster.urls
+        self.lock.cluster_urls()
     }
 
     /// The independent deployment URLs a quorum lock should use.
@@ -270,26 +199,17 @@ impl RedisProperties {
     /// Fewer than three entries means no quorum lock is configured.
     #[cfg(feature = "distributed-lock")]
     pub fn lock_redlock_urls(&self) -> &[String] {
-        &self.lock.redlock.urls
+        self.lock.redlock_urls()
     }
 
     /// The timing knobs the lock service is built with.
     ///
-    /// Topology is not part of the returned value: it decides which constructor
-    /// the auto-configuration calls.
+    /// # Errors
+    ///
+    /// Returns the offending duration text when one cannot be parsed.
     #[cfg(feature = "distributed-lock")]
     pub fn lock_config(&self) -> Result<RedisLockConfig, String> {
-        let mut config = RedisLockConfig::default();
-        if let Some(value) = &self.lock.watchdog_timeout {
-            config.watchdog_timeout = std::time::Duration::from_millis(value.millis()?);
-        }
-        if let Some(value) = &self.lock.retry_interval {
-            config.retry_interval = std::time::Duration::from_millis(value.millis()?);
-        }
-        if let Some(value) = &self.lock.command_timeout {
-            config.command_timeout = std::time::Duration::from_millis(value.millis()?);
-        }
-        Ok(config)
+        self.lock.config()
     }
 
     /// Set the Redis URL.
@@ -349,18 +269,5 @@ impl RedisProperties {
     /// Wraps the given properties in `Some` and stores them.
     pub fn set_sentinel(&mut self, sentinel: RedisSentinelProperties) {
         self.sentinel = Some(sentinel)
-    }
-}
-
-#[cfg(all(test, feature = "distributed-lock"))]
-mod lock_tests {
-    use super::*;
-
-    #[test]
-    fn lock_duration_accepts_human_units() {
-        assert_eq!(parse_duration_millis("100ms").unwrap(), 100);
-        assert_eq!(parse_duration_millis("30s").unwrap(), 30_000);
-        assert_eq!(parse_duration_millis("2m").unwrap(), 120_000);
-        assert!(parse_duration_millis("soon").is_err());
     }
 }

@@ -1,9 +1,7 @@
-use std::{
-    error::Error,
-    ops::Deref,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{error::Error, ops::Deref, sync::Arc, time::Duration};
+
+#[cfg(feature = "distributed-lock")]
+use std::sync::Mutex;
 
 use redis::{AsyncConnectionConfig, Client, RedisResult, aio::MultiplexedConnection};
 

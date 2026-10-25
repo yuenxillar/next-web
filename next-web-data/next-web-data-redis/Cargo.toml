@@ -22,6 +22,11 @@ deadpool-redis = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 
+[dev-dependencies]
+# The lock block has kebab-case keys and a duration syntax of its own; binding a
+# realistic block is the only way to pin both.
+serde_yaml = { workspace = true }
+
 [features]
 default = ["distributed-lock"]
 deadpol = ["deadpool-redis"]
