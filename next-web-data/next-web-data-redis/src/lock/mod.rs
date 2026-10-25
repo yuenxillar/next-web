@@ -6,13 +6,16 @@
 //! `RedLock`.
 
 pub mod backend;
+pub mod config;
+pub mod error;
+pub mod guard;
+pub mod lease;
+pub mod ownership;
 pub mod protocol;
 mod redisson_lock;
 pub mod redlock;
 pub mod rlock;
 
-pub mod config;
-pub mod error;
 pub mod lock_pub_sub;
 pub mod lock_renewal_scheduler;
 pub mod lock_scripts;
