@@ -1,6 +1,6 @@
 #![cfg(feature = "distributed-lock")]
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{
     io::BufRead,
     process::{Command, Stdio},
@@ -9,10 +9,14 @@ use std::{
 use next_web_data_redis::{RedisLockConfig, RedisLockService, UnlockOutcome};
 
 fn test_service() -> Option<RedisLockService> {
+    test_service_with(RedisLockConfig::default())
+}
+
+fn test_service_with(config: RedisLockConfig) -> Option<RedisLockService> {
     let url = std::env::var("NEXT_WEB_TEST_REDIS_URL").ok()?;
     let template = next_web_data_redis::core::redis_template::RedisTemplate::with_url(url).ok()?;
 
-    RedisLockService::from_template(&template, RedisLockConfig::default()).ok()
+    RedisLockService::from_template(&template, config).ok()
 }
 
 fn urls_from_env(name: &str) -> Vec<String> {
@@ -97,7 +101,7 @@ async fn an_explicit_lease_expires_without_a_watchdog() {
 
     let guard = service
         .get_lock(&name)
-        .try_lock_for_with_lease(Duration::from_millis(50), Duration::from_millis(150))
+        .try_lock_for_with_lease(Duration::from_secs(2), Duration::from_millis(150))
         .await
         .unwrap()
         .unwrap();
@@ -195,4 +199,71 @@ async fn redlock_reaches_quorum_and_releases_all_nodes() {
         .unwrap();
 
     guard.unlock().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires NEXT_WEB_TEST_REDIS_URL"]
+async fn a_watchdog_keeps_a_short_lease_alive() {
+    // A lease that would be long gone after three lifetimes, on a real server:
+    // only an actual renewal can keep the key alive this long.
+    let config = RedisLockConfig {
+        watchdog_timeout: Duration::from_secs(3),
+        command_timeout: Duration::from_secs(1),
+        ..RedisLockConfig::default()
+    };
+    let service =
+        test_service_with(config).expect("NEXT_WEB_TEST_REDIS_URL must contain a Redis URL");
+    let name = format!("next-web:test-watchdog:{}", uuid::Uuid::new_v4());
+    let lock = service.get_lock(&name);
+
+    let guard = lock.lock().await.unwrap();
+    tokio::time::sleep(Duration::from_millis(3500)).await;
+
+    assert!(
+        !guard.is_lost(),
+        "the watchdog lost a lease it should be renewing"
+    );
+    assert!(lock.is_held_by_owner().await.unwrap());
+    assert!(lock.remaining_lease().await.unwrap().is_some());
+    assert!(
+        service.get_lock(&name).try_lock().await.unwrap().is_none(),
+        "another owner acquired a lock the watchdog should still hold"
+    );
+
+    guard.unlock().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires NEXT_WEB_TEST_REDIS_URL"]
+async fn a_waiter_is_woken_by_the_release_notification() {
+    // A two-second retry interval makes polling unable to explain a fast
+    // acquisition: only the Pub/Sub notification can.
+    let config = RedisLockConfig {
+        retry_interval: Duration::from_secs(2),
+        ..RedisLockConfig::default()
+    };
+    let service =
+        test_service_with(config).expect("NEXT_WEB_TEST_REDIS_URL must contain a Redis URL");
+    let name = format!("next-web:test-wakeup:{}", uuid::Uuid::new_v4());
+    let holder = service.get_lock(&name);
+    let waiter = service.get_lock(&name);
+
+    let guard = holder.try_lock().await.unwrap().unwrap();
+    let release = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        guard.unlock().await.unwrap();
+    });
+
+    let started = Instant::now();
+    let acquired = waiter.try_lock_for(Duration::from_secs(10)).await.unwrap();
+    let waited = started.elapsed();
+
+    assert!(acquired.is_some());
+    assert!(
+        waited < Duration::from_millis(1500),
+        "waited {waited:?} despite a release at 300ms and a 2s retry interval"
+    );
+
+    acquired.unwrap().unlock().await.unwrap();
+    release.await.unwrap();
 }

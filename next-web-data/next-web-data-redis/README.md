@@ -68,6 +68,12 @@ Plus `is_locked()`, `is_held_by_owner()`, `hold_count()`, `remaining_lease()`,
 `force_unlock()`, and `with_lock(operation)`. `with_lock` always releases, and
 the operation's own error wins over a release error.
 
+`wait` bounds the whole call, connection setup included, and every attempt is
+capped by what is left of it. That is what keeps `try_lock_for` honest, but it
+means a budget shorter than one round trip reports not-acquired rather than
+attempting: against a remote server, `try_lock_for(50ms)` is a latency assertion,
+not a lock attempt. A budget of a second or more is a lock attempt.
+
 ### Reentrancy follows the handle
 
 Redisson identifies a lock holder by thread. A lock here is routinely held across

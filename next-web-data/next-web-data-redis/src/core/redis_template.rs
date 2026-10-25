@@ -107,7 +107,25 @@ impl RedisTemplate {
             return Ok(connection.clone());
         }
 
-        let connection = self.get_connection().await?;
+        let connection = match self.connection_config.as_ref() {
+            Some(config) => {
+                self.client
+                    .get_multiplexed_async_connection_with_config(config)
+                    .await?
+            }
+            None => {
+                // `redis` 1.8 gives a new async connection a 500ms response
+                // timeout by default, which would silently undercut a longer
+                // `command_timeout`. Every lock call is bounded by its own
+                // deadline in `eval`, so the connection must not bound it again.
+                let config = AsyncConnectionConfig::default().set_response_timeout(None);
+
+                self.client
+                    .get_multiplexed_async_connection_with_config(&config)
+                    .await?
+            }
+        };
+
         // Losing this race means another caller already installed an
         // equivalent connection; either one is usable.
         let _ = self.lock_connections.set(connection.clone());
@@ -201,8 +219,18 @@ impl LockBackend for RedisTemplate {
     ) -> Result<(), RedisLockError> {
         // Subscribe first: a release that happens between the existence check
         // and the wait would otherwise be missed and turn into a full timeout.
-        let mut pubsub = self.client.get_async_pubsub().await?;
-        pubsub.subscribe(channel).await?;
+        // Both steps carry the same budget, so a node that accepts the socket and
+        // then stalls cannot hold the caller.
+        let mut pubsub = tokio::time::timeout(timeout, self.client.get_async_pubsub())
+            .await
+            .map_err(|_| RedisLockError::CommandTimeout {
+                script: "wait_for_unlock",
+            })??;
+        tokio::time::timeout(timeout, pubsub.subscribe(channel))
+            .await
+            .map_err(|_| RedisLockError::CommandTimeout {
+                script: "wait_for_unlock",
+            })??;
 
         // `RedisTemplate` implements both backend traits, so the call has to say
         // which one it means.

@@ -111,6 +111,10 @@ impl BlockingRedisLock {
 
     /// Retry until `wait` elapses.
     ///
+    /// `wait` bounds the whole call, including opening the connection, and each
+    /// attempt is capped by whatever is left of it. A budget shorter than one
+    /// round trip therefore reports `Ok(None)` instead of attempting.
+    ///
     /// # Errors
     ///
     /// Returns the backend error.
