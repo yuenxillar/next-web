@@ -1,4 +1,4 @@
-use crate::connection::message::Message;
+use super::Message;
 
 /// Default message implementation.
 pub struct DefaultMessage {

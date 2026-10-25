@@ -6,10 +6,9 @@ use next_web::macros::bind::{post_mapping, singleton};
 use next_web::{Application, NextWebApplication};
 use next_web_core::async_trait;
 use next_web_data_redis::AsyncCommands;
-use next_web_data_redis::connection::default_message::DefaultMessage;
-use next_web_data_redis::connection::message::Message;
 use next_web_data_redis::core::listener::key_expiration_event_message_listener::KeyExpirationEventMessageListener;
 use next_web_data_redis::core::redis_template::RedisTemplate;
+use next_web_data_redis::core::{DefaultMessage, Message};
 
 #[singleton(binds = [Self::into_expired_key_listener])]
 #[derive(Clone)]

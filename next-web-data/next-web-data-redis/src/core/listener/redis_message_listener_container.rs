@@ -2,11 +2,9 @@ use std::{error::Error, sync::Arc};
 
 use redis::Client;
 
-use crate::{
-    connection::default_message::DefaultMessage,
-    core::listener::{
-        key_expiration_event_message_listener::KeyExpirationEventMessageListener, topic::Topic,
-    },
+use crate::core::DefaultMessage;
+use crate::core::listener::{
+    key_expiration_event_message_listener::KeyExpirationEventMessageListener, topic::Topic,
 };
 
 #[derive(Clone)]

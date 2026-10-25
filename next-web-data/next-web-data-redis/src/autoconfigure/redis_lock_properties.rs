@@ -13,7 +13,7 @@ use crate::lock::RedisLockConfig;
 /// Keys are kebab-case, matching the rest of the starter's configuration:
 /// `watchdog-timeout`, `retry-interval`, `command-timeout`.
 #[derive(Debug, Clone, Default, serde::Deserialize)]
-#[serde(default, rename_all = "kebab-case")]
+#[serde(default)]
 pub struct RedisLockProperties {
     enabled: bool,
     mode: RedisLockPropertyMode,

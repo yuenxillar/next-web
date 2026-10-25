@@ -27,8 +27,9 @@
 //! crate README for the asynchronous and blocking APIs.
 
 pub mod autoconfigure;
-pub mod connection;
 pub mod core;
+#[cfg(feature = "distributed-lock")]
+pub mod lock;
 
 #[cfg(feature = "distributed-lock")]
 pub use crate::lock::{
@@ -38,7 +39,4 @@ pub use crate::lock::{
     UnlockOutcome,
 };
 
-pub use redis::{AsyncCommands, Commands, RedisError, aio::MultiplexedConnection};
-
-#[cfg(feature = "distributed-lock")]
-pub mod lock;
+pub use redis::*;

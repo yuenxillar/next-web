@@ -1,6 +1,6 @@
 use next_web_core::async_trait;
 
-use crate::connection::default_message::DefaultMessage;
+use crate::core::DefaultMessage;
 
 pub const KEYEVENT_EXPIRED_TOPIC: &str = "__keyevent@*__:expired";
 
