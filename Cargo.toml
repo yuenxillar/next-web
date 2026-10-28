@@ -1,3 +1,15 @@
+[workspace.package]
+rust-version = "1.98.1"
+edition = "2024"
+version = "0.2.4"
+authors = ["Listening <yuenxillar@163.com>"]
+keywords = ["http", "web", "framework"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+homepage = "https://crates.io/crates/next-web"
+repository = "https://github.com/yuenxillar/next-web"
+include = ["**/*.rs", "Cargo.toml"]
+
 [workspace]
 members = [
     "next-web",
@@ -52,7 +64,7 @@ next-web-state-machine      = { path = "./next-web-state-machine", version = "0.
 next-web-websocket          = { path = "./next-web-websocket"       }
 
 # main dependencies
-tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }
 tokio-util = { version = "0.7.15" }
 tokio-tungstenite = {version = "0.30.0" }
 async-stream = { version = "0.3.6" }
@@ -207,18 +219,6 @@ tracing-subscriber = { version = "0.3.0", features = [
 ] }
 tera = { version = "2.4.0" }
 
-
-[workspace.package]
-rust-version = "1.98.1"
-edition = "2024"
-version = "0.2.0"
-authors = ["Listening <yuenxillar@163.com>"]
-keywords = ["http", "web", "framework"]
-license = "MIT OR Apache-2.0"
-readme = "README.md"
-homepage = "https://crates.io/crates/next-web"
-repository = "https://github.com/yuenxillar/next-web"
-include = ["**/*.rs", "Cargo.toml"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -1,0 +1,85 @@
+use std::sync::Arc;
+
+use next_web_core::async_trait;
+
+use crate::core::session::{
+    proxied_session::ProxiedSession, Session, SessionError, SessionId, SessionValue,
+};
+
+#[derive(Clone)]
+pub struct ImmutableProxiedSession(pub(crate) ProxiedSession);
+
+impl ImmutableProxiedSession {
+    pub fn new(delegate: Arc<dyn Session>) -> Self {
+        Self(ProxiedSession::new(delegate))
+    }
+
+    pub fn error<T>(&self) -> Result<T, SessionError> {
+        Err(SessionError::Invalid(Some(
+            "This session is immutable and read-only - it cannot be altered.
+            This is usually because the session has been stopped or expired already."
+                .to_string(),
+        )))
+    }
+}
+
+#[async_trait]
+impl Session for ImmutableProxiedSession {
+    fn id(&self) -> &SessionId {
+        self.0.id()
+    }
+
+    async fn start_timestamp(&self) -> i64 {
+        self.0.start_timestamp().await
+    }
+
+    async fn last_access_time(&self) -> Option<i64> {
+        self.0.last_access_time().await
+    }
+
+    async fn timeout(&self) -> Result<i64, SessionError> {
+        self.0.timeout().await
+    }
+
+    async fn set_timeout(&self, _timeout: i64) -> Result<(), SessionError> {
+        self.error()
+    }
+
+    async fn host(&self) -> Option<String> {
+        self.0.host().await
+    }
+
+    async fn touch(&self) -> Result<(), SessionError> {
+        self.error()
+    }
+
+    async fn stop(&self) -> Result<(), SessionError> {
+        self.error()
+    }
+
+    async fn attribute_keys(&self) -> Result<Vec<String>, SessionError> {
+        self.0.attribute_keys().await
+    }
+
+    async fn get_attribute(&self, key: &str) -> Option<SessionValue> {
+        self.0.get_attribute(key).await
+    }
+
+    async fn set_attribute(&self, _key: &str, _value: SessionValue) -> Result<(), SessionError> {
+        self.error()
+    }
+
+    async fn remove_attribute(&self, _key: &str) -> Result<Option<SessionValue>, SessionError> {
+        self.error()
+    }
+}
+
+// impl ValidatingSession for ImmutableProxiedSession {
+//     fn is_valid(&self) -> bool {
+//         self.0.is_valid()
+//     }
+
+//     fn validate(&self) -> Result<(), BoxError> {
+//         self.0.validate()
+//     }
+// }

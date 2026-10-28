@@ -25,22 +25,22 @@ Its goal is not only to answer "how do I write a route?", but also "how do I org
 
 ### Requirements
 
-- Rust 1.98.1 or newer
+- Rust newer
 - Cargo
 
 ### Add Dependencies
 
 ```toml
 [dependencies]
-next-web = "0.2"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+next-web = "0.2.4"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }
 ```
 
 To enable most optional capabilities at once, use the `full` feature:
 
 ```toml
 [dependencies]
-next-web = { version = "0.2", features = ["full"] }
+next-web = { version = "0.2.4", features = ["full"] }
 ```
 
 ### Minimal Example

@@ -12,6 +12,13 @@
 //! What it does not prove is the shipped script — no browser runs here — but it
 //! does prove every request and every check between the browser and the user.
 
+// The test drives the Spring Security style tree.
+#![cfg(feature = "v1")]
+
+// The virtual authenticator plays the browser's part only in a build that serves
+// the passkey ceremonies; the rest of the flow runs without them.
+#![cfg_attr(not(feature = "webauthn"), allow(dead_code))]
+
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{body::Body, http::Request, response::Response, Router};
@@ -141,7 +148,9 @@ fn user_details_service() -> Arc<dyn UserDetailsService> {
 /// Returns an HTTP security the way an application of this port configures one.
 ///
 /// The configurers are the ones `HttpSecurityConfiguration` applies by default,
-/// followed by the form login and the passkey login of the application.
+/// followed by the form login of the application and, when the build serves
+/// them, the passkey ceremonies.
+#[cfg_attr(not(feature = "webauthn"), allow(unused_variables))]
 fn http_security(origin: &str) -> HttpSecurity {
     let mut http = HttpSecurity::new(AuthenticationManagerBuilder::default(), shared_objects());
     http.csrf(|_| {})
@@ -156,6 +165,7 @@ fn http_security(origin: &str) -> HttpSecurity {
     http.form_login(|_| {});
 
     let user_details_service = user_details_service();
+    #[cfg(feature = "webauthn")]
     http.web_authn(|web_authn| {
         web_authn.rp_id("127.0.0.1");
         web_authn.rp_name("The application");
@@ -413,6 +423,11 @@ fn init_log() {
         .try_init();
 }
 
+/// The login page offers the passkey sign-in, and the script it loads is served.
+///
+/// Both belong to the ceremonies a build that enables the `webauthn` feature
+/// configures.
+#[cfg(feature = "webauthn")]
 #[tokio::test(flavor = "multi_thread")]
 async fn the_login_page_and_the_passkey_script_are_served() {
     let base = serve(http_security).await;
@@ -469,6 +484,7 @@ async fn a_form_login_signs_the_user_in() {
     );
 }
 
+#[cfg(feature = "webauthn")]
 #[tokio::test(flavor = "multi_thread")]
 async fn a_passkey_is_registered_and_then_signs_the_user_in() {
     init_log();

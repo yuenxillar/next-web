@@ -13,6 +13,9 @@
 //! its client certificate carries, which it first checks the handshake agreed
 //! on.
 
+// The test drives the Spring Security style tree.
+#![cfg(feature = "v1")]
+
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{

@@ -142,7 +142,7 @@ impl MqttClient {
         topics: Vec<Topic>,
         max_retries: usize,
     ) {
-        tokio::spawn(async move {
+        ::tokio::spawn(async move {
             let mut retries_remaining = max_retries;
 
             loop {

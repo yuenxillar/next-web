@@ -1,22 +1,12 @@
 use chrono::{DateTime, Datelike, Local, NaiveDate, Timelike};
 
-/// 本地日期时间工具
-///
-/// 提供一系列用于获取和格式化当前本地日期时间的静态方法。
-///
-/// # Local Date and Time Utility
+/// Local date and time utility.
 ///
 /// Provides a set of static methods for retrieving and formatting the current local date and time.
 pub struct LocalDateTime;
 
 impl LocalDateTime {
-    /// 获取当前时间的 `DateTime<Local>` 实例
-    ///
-    /// # Returns
-    ///
-    /// 当前的本地日期时间。
-    ///
-    /// # Get Current Local DateTime
+    /// Get the current `DateTime<Local>` instance.
     ///
     /// # Returns
     ///
@@ -25,15 +15,7 @@ impl LocalDateTime {
         Local::now()
     }
 
-    /// 获取当前日期时间的字符串表示（格式：YYYY-MM-DD HH:MM:SS.fff）
-    ///
-    /// # Returns
-    ///
-    /// 格式化后的时间字符串，精确到毫秒。
-    ///
-    /// # Get Current Date and Time as String
-    ///
-    /// Formats the current date and time as "YYYY-MM-DD HH:MM:SS.fff".
+    /// Get the current date and time as a string (format: YYYY-MM-DD HH:MM:SS.fff).
     ///
     /// # Returns
     ///
@@ -42,13 +24,7 @@ impl LocalDateTime {
         Self::_now().format("%Y-%m-%d %H:%M:%S%.3f").to_string()
     }
 
-    /// 获取当前时间的 Unix 时间戳（秒）
-    ///
-    /// # Returns
-    ///
-    /// 从 Unix 纪元（1970-01-01 00:00:00 UTC）到现在的秒数。
-    ///
-    /// # Get Current Unix Timestamp (Seconds)
+    /// Get the current Unix timestamp in seconds.
     ///
     /// # Returns
     ///
@@ -57,15 +33,7 @@ impl LocalDateTime {
         Self::_now().timestamp()
     }
 
-    /// 获取当前日期的字符串表示（格式：YYYY-MM-DD）
-    ///
-    /// # Returns
-    ///
-    /// 格式化的日期字符串。
-    ///
-    /// # Get Current Date as String
-    ///
-    /// Formats the current date as "YYYY-MM-DD".
+    /// Get the current date as a string (format: YYYY-MM-DD).
     ///
     /// # Returns
     ///
@@ -74,17 +42,8 @@ impl LocalDateTime {
         Self::_now().format("%Y-%m-%d").to_string()
     }
 
-    /// 获取用于保存文件的路径格式日期（格式：YYYY/MM/DD）
+    /// Get the current date formatted as a save path (format: YYYY/MM/DD).
     ///
-    /// 常用于日志、备份等需要按日期分层存储的场景。
-    ///
-    /// # Returns
-    ///
-    /// 分层的日期路径字符串。
-    ///
-    /// # Get Date for Save Path
-    ///
-    /// Formats the current date as "YYYY/MM/DD", suitable for directory paths.
     /// Commonly used for organizing logs or backups by date.
     ///
     /// # Returns
@@ -94,17 +53,7 @@ impl LocalDateTime {
         Self::_now().format("%Y/%m/%d").to_string()
     }
 
-    /// 使用自定义格式化字符串获取当前时间的字符串表示
-    ///
-    /// # Parameters
-    ///
-    /// * `format` - 符合 `chrono` 库规范的格式字符串。
-    ///
-    /// # Returns
-    ///
-    /// 根据指定格式生成的时间字符串。
-    ///
-    /// # Get Formatted Date and Time with Custom Format
+    /// Get the current time as a string using a custom format.
     ///
     /// # Parameters
     ///
@@ -117,13 +66,7 @@ impl LocalDateTime {
         Self::_now().format(format).to_string()
     }
 
-    /// 获取当前时间的毫秒级时间戳
-    ///
-    /// # Returns
-    ///
-    /// 从 Unix 纪元到现在的毫秒数。
-    ///
-    /// # Get Millisecond Timestamp
+    /// Get the current millisecond timestamp.
     ///
     /// # Returns
     ///
@@ -132,13 +75,7 @@ impl LocalDateTime {
         Self::_now().timestamp_millis()
     }
 
-    /// 获取当前时间的微秒级时间戳
-    ///
-    /// # Returns
-    ///
-    /// 从 Unix 纪元到现在的微秒数。
-    ///
-    /// # Get Microsecond Timestamp
+    /// Get the current microsecond timestamp.
     ///
     /// # Returns
     ///
@@ -147,38 +84,7 @@ impl LocalDateTime {
         Self::_now().timestamp_micros()
     }
 
-    /// 获取当前是星期几（中文）
-    ///
-    /// # Returns
-    ///
-    /// 星期一至星期日的中文字符串。
-    ///
-    /// # Get Day of Week in Chinese
-    ///
-    /// # Returns
-    ///
-    /// Chinese string representing the day of week (Monday to Sunday).
-    pub fn day_of_week_zh() -> String {
-        let weekday = Self::_now().weekday();
-        match weekday {
-            chrono::Weekday::Mon => "星期一",
-            chrono::Weekday::Tue => "星期二",
-            chrono::Weekday::Wed => "星期三",
-            chrono::Weekday::Thu => "星期四",
-            chrono::Weekday::Fri => "星期五",
-            chrono::Weekday::Sat => "星期六",
-            chrono::Weekday::Sun => "星期日",
-        }
-        .to_string()
-    }
-
-    /// 获取当前是星期几（英文缩写）
-    ///
-    /// # Returns
-    ///
-    /// "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"。
-    ///
-    /// # Get Day of Week in English (Abbreviated)
+    /// Get the current day of week in English (abbreviated).
     ///
     /// # Returns
     ///
@@ -187,13 +93,7 @@ impl LocalDateTime {
         Self::_now().format("%a").to_string()
     }
 
-    /// 获取当前年份
-    ///
-    /// # Returns
-    ///
-    /// 当前年份（例如：2025）。
-    ///
-    /// # Get Current Year
+    /// Get the current year.
     ///
     /// # Returns
     ///
@@ -202,13 +102,7 @@ impl LocalDateTime {
         Self::_now().year()
     }
 
-    /// 获取当前月份
-    ///
-    /// # Returns
-    ///
-    /// 1 到 12 之间的月份数字。
-    ///
-    /// # Get Current Month
+    /// Get the current month.
     ///
     /// # Returns
     ///
@@ -217,13 +111,7 @@ impl LocalDateTime {
         Self::_now().month()
     }
 
-    /// 获取当前是本月的第几天
-    ///
-    /// # Returns
-    ///
-    /// 1 到 31 之间的日期数字。
-    ///
-    /// # Get Day of Month
+    /// Get the current day of month.
     ///
     /// # Returns
     ///
@@ -232,13 +120,7 @@ impl LocalDateTime {
         Self::_now().day()
     }
 
-    /// 获取当前小时（24小时制）
-    ///
-    /// # Returns
-    ///
-    /// 0 到 23 之间的小时数。
-    ///
-    /// # Get Hour (24-hour clock)
+    /// Get the current hour (24-hour clock).
     ///
     /// # Returns
     ///
@@ -247,13 +129,7 @@ impl LocalDateTime {
         Self::_now().hour()
     }
 
-    /// 获取当前分钟
-    ///
-    /// # Returns
-    ///
-    /// 0 到 59 之间的分钟数。
-    ///
-    /// # Get Minute
+    /// Get the current minute.
     ///
     /// # Returns
     ///
@@ -262,13 +138,7 @@ impl LocalDateTime {
         Self::_now().minute()
     }
 
-    /// 获取当前秒数
-    ///
-    /// # Returns
-    ///
-    /// 0 到 59 之间的秒数（不包括闰秒）。
-    ///
-    /// # Get Second
+    /// Get the current second.
     ///
     /// # Returns
     ///
@@ -277,18 +147,7 @@ impl LocalDateTime {
         Self::_now().second()
     }
 
-    /// 将日期字符串按指定格式解析为 `NaiveDate`
-    ///
-    /// # Parameters
-    ///
-    /// * `date_str` - 要解析的日期字符串。
-    /// * `format` - 用于解析的格式字符串。
-    ///
-    /// # Returns
-    ///
-    /// 解析成功返回 `Some(NaiveDate)`，失败返回 `None`。
-    ///
-    /// # Parse Date String with Format
+    /// Parse a date string with a given format into `NaiveDate`.
     ///
     /// # Parameters
     ///
@@ -302,17 +161,7 @@ impl LocalDateTime {
         NaiveDate::parse_from_str(date_str, format).ok()
     }
 
-    /// 计算指定天数前的日期
-    ///
-    /// # Parameters
-    ///
-    /// * `days` - 要减去的天数。
-    ///
-    /// # Returns
-    ///
-    /// 指定天数前的日期字符串（格式：YYYY-MM-DD）。
-    ///
-    /// # Get Date Before N Days
+    /// Get the date N days before today.
     ///
     /// # Parameters
     ///
@@ -322,22 +171,11 @@ impl LocalDateTime {
     ///
     /// Date string (format: YYYY-MM-DD) from N days ago.
     pub fn date_before(days: u64) -> String {
-        let now = Self::_now();
-        let date = now.date_naive() - chrono::Duration::days(days as i64);
+        let date = Self::_now().date_naive() - chrono::Duration::days(days as i64);
         date.format("%Y-%m-%d").to_string()
     }
 
-    /// 计算指定天数后的日期
-    ///
-    /// # Parameters
-    ///
-    /// * `days` - 要增加的天数。
-    ///
-    /// # Returns
-    ///
-    /// 指定天数后的日期字符串（格式：YYYY-MM-DD）。
-    ///
-    /// # Get Date After N Days
+    /// Get the date N days after today.
     ///
     /// # Parameters
     ///
@@ -347,8 +185,195 @@ impl LocalDateTime {
     ///
     /// Date string (format: YYYY-MM-DD) from N days in the future.
     pub fn date_after(days: u64) -> String {
-        let now = Self::_now();
-        let date = now.date_naive() + chrono::Duration::days(days as i64);
+        let date = Self::_now().date_naive() + chrono::Duration::days(days as i64);
         date.format("%Y-%m-%d").to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Datelike, Local, NaiveDate, Timelike};
+
+    // ---------- helpers ----------
+
+    /// Validate the `YYYY-MM-DD HH:MM:SS.fff` format by inspecting bytes.
+    fn is_now_format(s: &str) -> bool {
+        // Length: 4+1+2+1+2+1+2+1+2+1+2+1+3 = 23
+        if s.len() != 23 {
+            return false;
+        }
+        let b = s.as_bytes();
+        let digit = |i: usize| b[i].is_ascii_digit();
+        (0..4).all(digit)
+            && b[4] == b'-'
+            && (5..7).all(digit)
+            && b[7] == b'-'
+            && (8..10).all(digit)
+            && b[10] == b' '
+            && (11..13).all(digit)
+            && b[13] == b':'
+            && (14..16).all(digit)
+            && b[16] == b':'
+            && (17..19).all(digit)
+            && b[19] == b'.'
+            && (20..23).all(digit)
+    }
+
+    /// Validate the `YYYY-MM-DD` format.
+    fn is_date_format(s: &str) -> bool {
+        s.len() == 10 && NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok()
+    }
+
+    // ---------- now / format ----------
+
+    #[test]
+    fn now_has_expected_format() {
+        let s = LocalDateTime::now();
+        assert!(is_now_format(&s), "unexpected format: {s}");
+    }
+
+    #[test]
+    fn now_is_close_to_system_time() {
+        // Sample the system clock before and after the call, then assert
+        // that now() falls inside the interval (5 ms tolerance).
+        let before = Local::now().timestamp_millis();
+        let s = LocalDateTime::now();
+        let after = Local::now().timestamp_millis();
+
+        let dt = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S%.3f")
+            .expect("parse now()");
+        let ts = dt.and_local_timezone(Local).unwrap().timestamp_millis();
+
+        assert!(
+            ts >= before - 5 && ts <= after + 5,
+            "now() ts={ts} not in [{before}, {after}]"
+        );
+    }
+
+    #[test]
+    fn date_matches_now_prefix() {
+        let now = LocalDateTime::now();
+        let date = LocalDateTime::date();
+        assert!(
+            now.starts_with(&date),
+            "date={date} not a prefix of now={now}"
+        );
+        assert!(is_date_format(&date));
+    }
+
+    #[test]
+    fn save_path_format() {
+        let p = LocalDateTime::save_path();
+        // Expected shape: YYYY/MM/DD, length 10
+        assert_eq!(p.len(), 10, "unexpected save_path: {p}");
+        let parts: Vec<&str> = p.split('/').collect();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0].len(), 4);
+        assert_eq!(parts[1].len(), 2);
+        assert_eq!(parts[2].len(), 2);
+        assert!(parts.iter().all(|s| s.parse::<u32>().is_ok()));
+    }
+
+    #[test]
+    fn with_format_custom() {
+        let s = LocalDateTime::with_format("%Y");
+        let year = LocalDateTime::year();
+        assert_eq!(s, year.to_string());
+    }
+
+    // ---------- timestamps ----------
+
+    #[test]
+    fn timestamp_and_millis_consistency() {
+        // Within the same second: millis/1000 should equal seconds,
+        // allowing a boundary difference of 1.
+        let secs = LocalDateTime::timestamp();
+        let millis = LocalDateTime::timestamp_millis();
+        let diff = (millis / 1000 - secs).abs();
+        assert!(diff <= 1, "secs={secs}, millis={millis}");
+    }
+
+    #[test]
+    fn timestamp_is_reasonable() {
+        let ts = LocalDateTime::timestamp();
+        // Sane bounds: 2020-01-01 .. 2100-01-01
+        assert!(ts > 1_577_836_800 && ts < 4_102_444_800, "ts={ts}");
+    }
+
+    // ---------- weekday / components ----------
+
+    #[test]
+    fn components_match_now() {
+        let now = Local::now();
+        assert_eq!(LocalDateTime::year(), now.year());
+        assert_eq!(LocalDateTime::month(), now.month());
+        assert_eq!(LocalDateTime::day(), now.day());
+        assert_eq!(LocalDateTime::hour(), now.hour());
+        assert_eq!(LocalDateTime::minute(), now.minute());
+        assert_eq!(LocalDateTime::second(), now.second());
+    }
+
+    #[test]
+    fn components_in_valid_ranges() {
+        assert!((1..=12).contains(&LocalDateTime::month()));
+        assert!((1..=31).contains(&LocalDateTime::day()));
+        assert!((0..=23).contains(&LocalDateTime::hour()));
+        assert!((0..=59).contains(&LocalDateTime::minute()));
+        assert!((0..=59).contains(&LocalDateTime::second()));
+    }
+
+    // ---------- parse_date ----------
+
+    #[test]
+    fn parse_date_valid() {
+        let d = LocalDateTime::parse_date("2025-03-14", "%Y-%m-%d").unwrap();
+        assert_eq!(d, NaiveDate::from_ymd_opt(2025, 3, 14).unwrap());
+    }
+
+    #[test]
+    fn parse_date_invalid_returns_none() {
+        assert!(LocalDateTime::parse_date("not-a-date", "%Y-%m-%d").is_none());
+        assert!(LocalDateTime::parse_date("2025-13-01", "%Y-%m-%d").is_none());
+        assert!(LocalDateTime::parse_date("2025-02-30", "%Y-%m-%d").is_none());
+    }
+
+    #[test]
+    fn parse_date_with_custom_format() {
+        let d = LocalDateTime::parse_date("14/03/2025", "%d/%m/%Y").unwrap();
+        assert_eq!(d, NaiveDate::from_ymd_opt(2025, 3, 14).unwrap());
+    }
+
+    // ---------- date_before / date_after ----------
+
+    #[test]
+    fn date_before_and_after_zero_are_today() {
+        let today = LocalDateTime::date();
+        assert_eq!(LocalDateTime::date_before(0), today);
+        assert_eq!(LocalDateTime::date_after(0), today);
+    }
+
+    #[test]
+    fn date_before_n_days() {
+        let expected = (Local::now().date_naive() - chrono::Duration::days(7))
+            .format("%Y-%m-%d")
+            .to_string();
+        assert_eq!(LocalDateTime::date_before(7), expected);
+    }
+
+    #[test]
+    fn date_after_n_days() {
+        let expected = (Local::now().date_naive() + chrono::Duration::days(30))
+            .format("%Y-%m-%d")
+            .to_string();
+        assert_eq!(LocalDateTime::date_after(30), expected);
+    }
+
+    #[test]
+    fn date_before_after_are_inverse() {
+        // before(5) + 5 days == today == after(5) - 5 days
+        let b = NaiveDate::parse_from_str(&LocalDateTime::date_before(5), "%Y-%m-%d").unwrap();
+        let a = NaiveDate::parse_from_str(&LocalDateTime::date_after(5), "%Y-%m-%d").unwrap();
+        assert_eq!((a - b).num_days(), 10);
     }
 }

@@ -25,22 +25,22 @@ Next Web 是一个基于 Tokio 与 Axum 的 Rust Web 应用框架。它借鉴 Sp
 
 ### 环境要求
 
-- Rust 1.98.1 或更高版本
+- Rust 较新版本
 - Cargo
 
 ### 添加依赖
 
 ```toml
 [dependencies]
-next-web = "0.2"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+next-web = "0.2.4"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }
 ```
 
 如果需要一次启用大部分可选能力，可以使用 `full` feature：
 
 ```toml
 [dependencies]
-next-web = { version = "0.2", features = ["full"] }
+next-web = { version = "0.2.4", features = ["full"] }
 ```
 
 ### 最小示例

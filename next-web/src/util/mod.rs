@@ -9,10 +9,12 @@ pub mod digester;
 pub mod aes;
 
 #[cfg(feature = "enable-thread-pool")]
-mod thread_pool_task_executor;
+mod thread_pool;
 
 #[cfg(feature = "enable-thread-pool")]
-pub use thread_pool_task_executor::ThreadPoolTaskExecutor;
+pub use thread_pool::{
+    Builder, ExecuteError, ExecutorMetrics, ExecutorState, TaskError, ThreadPool, WaitError,
+};
 
 mod amount;
 mod hash_slot;

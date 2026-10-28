@@ -11,6 +11,9 @@
 //! reaches the end of the chain, and a request it does not permit is stopped by the
 //! filter that authorizes it.
 
+// The test drives the Spring Security style tree.
+#![cfg(feature = "v1")]
+
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{body::Body, extract::Request, response::Response};
@@ -33,11 +36,15 @@ use next_web_security::{
     },
     core::userdetails::{User, UserDetailsService},
     provisioning::InMemoryUserDetailsManager,
-    saml2::registration::{InMemoryRelyingPartyRegistrationRepository, RelyingPartyRegistration},
     web::{
         security_filter_chain::SecurityFilterChain, session::ForceEagerSessionCreationFilter,
         util::matcher::PathPatternRequestMatcherBuilder,
     },
+};
+
+#[cfg(feature = "saml2")]
+use next_web_security::saml2::registration::{
+    InMemoryRelyingPartyRegistrationRepository, RelyingPartyRegistration,
 };
 
 /// A source of CORS configurations that configures none.
@@ -164,6 +171,7 @@ fn user_details_service() -> Arc<dyn UserDetailsService> {
 }
 
 /// Returns the registrations of the SAML 2.0 configurations.
+#[cfg(feature = "saml2")]
 fn relying_party_registrations() -> Arc<InMemoryRelyingPartyRegistrationRepository> {
     Arc::new(InMemoryRelyingPartyRegistrationRepository::new(vec![
         RelyingPartyRegistration::with_registration_id("okta")
@@ -243,26 +251,31 @@ fn maximal() -> HttpSecurity {
                     .password(Some("password".to_string()))
                     .build(),
             )]));
-        })
-        .web_authn(|web_authn| {
-            web_authn
-                .rp_id("localhost")
-                .user_details_service(user_details_service());
-        })
-        .saml2_login(|saml2| {
-            saml2
-                .relying_party_registration_repository(relying_party_registrations())
-                .user_details_service(user_details_service());
-        })
-        .saml2_metadata(|metadata| {
-            metadata.relying_party_registration_repository(relying_party_registrations());
-        })
-        .saml2_logout(|logout| {
-            logout.relying_party_registration_repository(relying_party_registrations());
-        })
-        .authorize_http_requests(|authorize| {
-            authorize.any_request().permit_all();
         });
+
+    #[cfg(feature = "webauthn")]
+    http.web_authn(|web_authn| {
+        web_authn
+            .rp_id("localhost")
+            .user_details_service(user_details_service());
+    });
+
+    #[cfg(feature = "saml2")]
+    http.saml2_login(|saml2| {
+        saml2
+            .relying_party_registration_repository(relying_party_registrations())
+            .user_details_service(user_details_service());
+    })
+    .saml2_metadata(|metadata| {
+        metadata.relying_party_registration_repository(relying_party_registrations());
+    })
+    .saml2_logout(|logout| {
+        logout.relying_party_registration_repository(relying_party_registrations());
+    });
+
+    http.authorize_http_requests(|authorize| {
+        authorize.any_request().permit_all();
+    });
     http.with(DefaultLoginPageConfigurer::default(), |_| {});
 
     #[cfg(feature = "oauth2-client")]
@@ -355,8 +368,11 @@ fn every_configuration_composes_into_one_ordered_chain() {
     assert_before(&names, "CorsFilter", "CsrfFilter");
     // The two logouts of an asserting party answer a signed message, so they run
     // before the filter that demands a CSRF token.
-    assert_before(&names, "Saml2LogoutRequestFilter", "CsrfFilter");
-    assert_before(&names, "Saml2LogoutResponseFilter", "CsrfFilter");
+    #[cfg(feature = "saml2")]
+    {
+        assert_before(&names, "Saml2LogoutRequestFilter", "CsrfFilter");
+        assert_before(&names, "Saml2LogoutResponseFilter", "CsrfFilter");
+    }
     assert_before(&names, "CsrfFilter", "LogoutFilter");
     // The endpoints of an authorization server are served before the filters that
     // authenticate a resource owner, so the credentials of a client are not read as
@@ -401,24 +417,42 @@ fn every_configuration_composes_into_one_ordered_chain() {
         "UsernamePasswordAuthenticationFilter",
         "DefaultResourcesFilter",
     );
+    // The passkey ceremonies run after the resources they are served from, and
+    // before the filters that authenticate a resource owner the other ways.
+    #[cfg(feature = "webauthn")]
+    {
+        assert_before(
+            &names,
+            "DefaultResourcesFilter",
+            "WebAuthnRegistrationFilter",
+        );
+        assert_before(
+            &names,
+            "WebAuthnRegistrationFilter",
+            "WebAuthnAuthenticationFilter",
+        );
+    }
+    #[cfg(all(feature = "webauthn", feature = "saml2"))]
+    assert_before(
+        &names,
+        "WebAuthnAuthenticationFilter",
+        "Saml2AuthenticationFilter",
+    );
+    #[cfg(feature = "saml2")]
+    assert_before(
+        &names,
+        "Saml2AuthenticationFilter",
+        "BasicAuthenticationFilter",
+    );
+    #[cfg(feature = "webauthn")]
+    assert_before(
+        &names,
+        "WebAuthnAuthenticationFilter",
+        "BasicAuthenticationFilter",
+    );
     assert_before(
         &names,
         "DefaultResourcesFilter",
-        "WebAuthnRegistrationFilter",
-    );
-    assert_before(
-        &names,
-        "WebAuthnRegistrationFilter",
-        "WebAuthnAuthenticationFilter",
-    );
-    assert_before(
-        &names,
-        "WebAuthnAuthenticationFilter",
-        "Saml2AuthenticationFilter",
-    );
-    assert_before(
-        &names,
-        "Saml2AuthenticationFilter",
         "BasicAuthenticationFilter",
     );
     assert_before(
@@ -465,7 +499,7 @@ fn every_configuration_composes_into_one_ordered_chain() {
     }
 
     // Every filter an application can expect is part of the chain.
-    #[allow(unused)]
+    #[allow(unused_mut)]
     let mut expected_filters = vec![
         "ForceEagerSessionCreationFilter",
         "SecurityContextHolderFilter",
@@ -482,14 +516,6 @@ fn every_configuration_composes_into_one_ordered_chain() {
         "DefaultResourcesFilter",
         "DefaultOneTimeTokenSubmitPageGeneratingFilter",
         "ConcurrentSessionFilter",
-        "DefaultWebAuthnRegistrationPageGeneratingFilter",
-        "WebAuthnRegistrationFilter",
-        "WebAuthnAuthenticationFilter",
-        "Saml2LogoutRequestFilter",
-        "Saml2LogoutResponseFilter",
-        "Saml2AuthenticationRequestFilter",
-        "Saml2AuthenticationFilter",
-        "Saml2MetadataFilter",
         "BasicAuthenticationFilter",
         "RequestCacheAwareFilter",
         "RememberMeAuthenticationFilter",
@@ -498,6 +524,24 @@ fn every_configuration_composes_into_one_ordered_chain() {
         "ErrorTranslationFilter",
         "AuthorizationFilter",
     ];
+    #[cfg(feature = "webauthn")]
+    {
+        expected_filters.extend([
+            "DefaultWebAuthnRegistrationPageGeneratingFilter",
+            "WebAuthnRegistrationFilter",
+            "WebAuthnAuthenticationFilter",
+        ]);
+    }
+    #[cfg(feature = "saml2")]
+    {
+        expected_filters.extend([
+            "Saml2LogoutRequestFilter",
+            "Saml2LogoutResponseFilter",
+            "Saml2AuthenticationRequestFilter",
+            "Saml2AuthenticationFilter",
+            "Saml2MetadataFilter",
+        ]);
+    }
     #[cfg(feature = "oauth2-client")]
     {
         expected_filters.extend([
@@ -532,6 +576,10 @@ fn every_configuration_composes_into_one_ordered_chain() {
         expected_filters.push("OidcBackChannelLogoutFilter");
     }
 
+    // Nothing a configuration contributes is dropped: the chain holds at least the
+    // filters the features of this build expect.
+    let expected_count = expected_filters.len();
+
     for expected in expected_filters {
         assert!(
             names.iter().any(|name| name == expected),
@@ -543,7 +591,7 @@ fn every_configuration_composes_into_one_ordered_chain() {
     // chain is sorted: a filter that was added without a position would panic while
     // the chain is built, which the call above already proved it does not.
     assert!(
-        names.len() > 30,
+        names.len() >= expected_count,
         "the chain of every configuration holds the filters of all of them, it was: {names:?}"
     );
 }

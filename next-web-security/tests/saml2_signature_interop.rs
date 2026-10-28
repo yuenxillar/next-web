@@ -11,6 +11,10 @@
 //! `idp-key-parameters.txt` holds the modulus and the exponent of the public key
 //! of the fixture, and the test builds the key from them.
 
+// The SAML 2.0 support, and the `rsa` that builds the key of the fixture, are
+// only part of a build that enables the feature.
+#![cfg(feature = "saml2")]
+
 use base64::{Engine, engine::general_purpose::STANDARD};
 use next_web_security::saml2::{
     login::{Saml2Response, SignatureVerifier, XmlSignatureVerifier},

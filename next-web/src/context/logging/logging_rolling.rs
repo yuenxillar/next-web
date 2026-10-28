@@ -43,11 +43,11 @@ const DAILY_DATE_PATTERN: &str = "%Y%m%d";
 
 /// The property of the maximum size of a single log file, which is used to
 /// report a value that cannot be read.
-const MAX_FILE_SIZE_PROPERTY: &str = "next.logging.file.max-file-size";
+const MAX_FILE_SIZE_PROPERTY: &str = "next.logging.file.max_file_size";
 
 /// The property of the maximum total size of the log files, which is used to
 /// report a value that cannot be read.
-const TOTAL_SIZE_CAP_PROPERTY: &str = "next.logging.file.total-size-cap";
+const TOTAL_SIZE_CAP_PROPERTY: &str = "next.logging.file.total_size_cap";
 
 /// The property of the time zone of the names of the log files, which is used
 /// to report a value that cannot be read.
@@ -1133,7 +1133,7 @@ mod tests {
             &directory,
             &[
                 ("next.logging.file.rotation", "daily"),
-                ("next.logging.file.max-file-size", "10MB"),
+                ("next.logging.file.max_file_size", "10MB"),
             ],
         );
         let period = NaiveDate::from_ymd_opt(2026, 9, 26)
@@ -1213,7 +1213,7 @@ mod tests {
             &directory,
             &[
                 ("next.logging.file.rotation", "daily"),
-                ("next.logging.file.max-file-size", "10MB"),
+                ("next.logging.file.max_file_size", "10MB"),
             ],
         );
         let period = NaiveDate::from_ymd_opt(2026, 9, 26)
@@ -1288,7 +1288,7 @@ mod tests {
             &directory,
             &[
                 ("next.logging.file.rotation", "daily"),
-                ("next.logging.file.max-file-size", "14B"),
+                ("next.logging.file.max_file_size", "14B"),
             ],
         );
         let mut writer = writer(policy, &clock);
@@ -1332,7 +1332,7 @@ mod tests {
             &directory,
             &[
                 ("next.logging.file.rotation", "never"),
-                ("next.logging.file.max-file-size", "20B"),
+                ("next.logging.file.max_file_size", "20B"),
             ],
         );
         let mut writer = writer(policy, &clock);
@@ -1408,7 +1408,7 @@ mod tests {
             &directory,
             &[
                 ("next.logging.file.rotation", "daily"),
-                ("next.logging.file.total-size-cap", "25B"),
+                ("next.logging.file.total_size_cap", "25B"),
             ],
         );
 
@@ -1443,7 +1443,7 @@ mod tests {
             &directory,
             &[
                 ("next.logging.file.rotation", "daily"),
-                ("next.logging.file.total-size-cap", "1B"),
+                ("next.logging.file.total_size_cap", "1B"),
                 ("next.logging.file.max-history", "0"),
             ],
         );
@@ -1487,8 +1487,8 @@ mod tests {
         let directory = directory("reports-the-values");
         let bound = LoggingProperties::from_environment(&environment(&[
             ("next.logging.file.path", directory.to_str().unwrap()),
-            ("next.logging.file.max-file-size", "10XB"),
-            ("next.logging.file.total-size-cap", "big"),
+            ("next.logging.file.max_file_size", "10XB"),
+            ("next.logging.file.total_size_cap", "big"),
             ("next.logging.file.timezone", "Tomorrow/Land"),
         ]))
         .unwrap();
