@@ -1,0 +1,281 @@
+use futures_core::stream::BoxStream;
+use futures_util::StreamExt;
+use next_web_core::{async_trait,error::BoxError};
+use next_web_retry::{
+    retry_callback::RetryCallback, retry_context::RetryContext, retry_operations::RetryOperations,
+    support::retry_template::RetryTemplate,
+};
+
+use crate::{
+    ai::deep_seek::{
+        api::deep_seek_api::{
+            ChatCompletion, ChatCompletionMessage, ChatCompletionRequest, DeepSeekApi, DefaultUsage,
+        },
+        deep_seek_chat_options::DeepSeekChatOptions,
+    },
+    chat::{
+        messages::{assistant_message::AssistantMessage, message_type::MessageType},
+        meta_data::{
+            chat_response_meta_data::ChatResponseMetadata, empty_usage::EmptyUsage, usage::Usage,
+        },
+        model::{
+            chat_model::ChatModel, chat_response::ChatResponse, generation::Generation,
+            streaming_chat_model::StreamingChatModel,
+        },
+        observation::{
+            chat_model_observation_context::ChatModelObservationContext,
+            chat_model_observation_documentation::ChatModelObservationDocumentation,
+            default_chat_model_observation_convention::DefaultChatModelObservationConvention,
+        },
+        prompt::{
+            chat_options::{ChatOptions, DefaultChatOptions},
+            prompt::Prompt,
+        },
+    },
+    model::{model::Model, model_request::ModelRequest, streaming_model::StreamingModel},
+    observation::{
+        conventions::ai_provider::AiProvider, noop_observation_registry::NoopObservationRegistry,
+        observation::Observable, observation_documentation::ObservationDocumentation,
+        observation_registry::ObservationRegistryImpl,
+    },
+};
+
+use super::api::deep_seek_api::ChatApiRespnose;
+
+struct DeepSeekEntityRetryCallback<'a> {
+    deep_seek_api: &'a DeepSeekApi,
+    request: &'a ChatCompletionRequest,
+}
+
+#[async_trait]
+impl RetryCallback<ChatApiRespnose> for DeepSeekEntityRetryCallback<'_> {
+    async fn do_with_retry(
+        &self,
+        _context: &dyn RetryContext,
+    ) -> Result<ChatApiRespnose, next_web_retry::error::retry_error::RetryError> {
+        self.deep_seek_api
+            .chat_completion_entity(self.request)
+            .await
+            .map_err(Into::into)
+    }
+}
+
+#[derive(Clone)]
+pub struct DeepSeekChatModel<T = DefaultChatModelObservationConvention, R = NoopObservationRegistry>
+{
+    // pub(crate) retry_template: RetryTemplate,
+    pub(crate) options: Option<DeepSeekChatOptions>,
+    pub(crate) deep_seek_api: DeepSeekApi,
+    pub(crate) observation_registry: R,
+    pub(crate) observation_convention: T,
+    pub(crate) retry_template: RetryTemplate,
+}
+
+impl DeepSeekChatModel {
+    pub fn new(deep_seek_api: DeepSeekApi, options: Option<DeepSeekChatOptions>) -> Self {
+        Self {
+            deep_seek_api,
+            options,
+            observation_registry: ObservationRegistryImpl::noop(),
+            observation_convention: Default::default(),
+            retry_template: Default::default(),
+        }
+    }
+
+    fn crate_request(
+        &self,
+        prompt: &Prompt,
+        stream: bool,
+    ) -> Result<ChatCompletionRequest, &'static str> {
+        let (system_messages, user_messages) = prompt.instructions().iter().fold(
+            (Vec::new(), Vec::new()),
+            |(mut sys, mut user), msg| {
+                let chat_completion_message =
+                    ChatCompletionMessage::with_slice(msg.message_type().as_ref(), msg.text());
+                match msg.message_type() {
+                    MessageType::System => sys.push(chat_completion_message),
+                    _ => user.push(chat_completion_message),
+                }
+                (sys, user)
+            },
+        );
+
+        if system_messages.len() > 1 {
+            return Err("Only one system message is allowed in the prompt");
+        }
+
+        let system_message = system_messages.first();
+
+        let request = ChatCompletionRequest {
+            messages: system_message
+                .cloned()
+                .into_iter()
+                .chain(user_messages.into_iter())
+                .collect(),
+            model: prompt.chat_options().get_model().into(),
+            stream,
+            temperature: None,
+        };
+
+        // if (this.defaultOptions != null) {
+        // 	request = ModelOptionsUtils.merge(this.defaultOptions, request, ChatCompletionRequest.class);
+        // }
+
+        // if (prompt.getOptions() != null) {
+        // 	var updatedRuntimeOptions = ModelOptionsUtils.copyToTarget(prompt.getOptions(), ChatOptions.class,
+        // 			QianFanChatOptions.class);
+        // 	request = ModelOptionsUtils.merge(updatedRuntimeOptions, request, ChatCompletionRequest.class);
+        // }
+
+        if let Some(options) = self.options.as_ref() {}
+
+        if let Some(options) = prompt.options() {}
+
+        Ok(request)
+    }
+
+    fn build_request_options(request: &ChatCompletionRequest) -> impl ChatOptions {
+        DefaultChatOptions {
+            model: request.model.to_string(),
+            ..Default::default()
+        }
+    }
+
+    fn to_metadata(chat_completion: &ChatCompletion, model: &str) -> ChatResponseMetadata {
+        let usage = chat_completion
+            .usage
+            .as_ref()
+            .map(|u| Box::new(Self::default_usage(u)) as Box<dyn Usage>)
+            .unwrap_or_else(|| Box::new(EmptyUsage))
+            .into();
+
+        ChatResponseMetadata {
+            id: chat_completion.id.to_owned(),
+            model: model.into(),
+            usage,
+        }
+    }
+
+    fn default_usage(usage: &super::api::deep_seek_api::Usage) -> DefaultUsage {
+        DefaultUsage {
+            prompt_tokens: usage.prompt_tokens,
+            completion_tokens: usage.completion_tokens,
+            total_tokens: usage.total_tokens,
+        }
+    }
+}
+
+#[async_trait]
+impl Model<Prompt, ChatResponse> for DeepSeekChatModel {
+    async fn call(&self, prompt: Prompt) -> Result<ChatResponse, BoxError> {
+        let req: ChatCompletionRequest = self.crate_request(&prompt, false)?;
+
+        // observe
+        let mut observation_context = ChatModelObservationContext::new(
+            prompt,
+            AiProvider::DeepSeek,
+            Box::new(Self::build_request_options(&req))
+        );
+
+        let observation_convention = Box::new(self.observation_convention.clone());
+        match ChatModelObservationDocumentation::ChatModelOperation.observation(
+            Some(observation_convention.clone()),
+            Some(observation_convention),
+            observation_context.clone(),
+            Box::new(self.observation_registry.clone())
+        ) {
+            Ok(observation) => observation,
+            Err(e) => return Err(e.into()),
+        }
+        .observe(async {
+            // execute
+            let chat_respnose = self
+                .retry_template
+                .execute(DeepSeekEntityRetryCallback {
+                    deep_seek_api: &self.deep_seek_api,
+                    request: &req,
+                })
+                .await?;
+
+            let chat_completion = match chat_respnose {
+                ChatApiRespnose::Data(chat_completion) => chat_completion,
+                _ => return Err("Chat completion is not entity".into()),
+            };
+
+            let text_content = chat_completion
+                .choices
+                .first()
+                .and_then(|s| s.message.as_ref().and_then(|s1| Some(s1.content.clone())))
+                .unwrap_or_default();
+
+            let assistant_message = AssistantMessage {
+                text_content,
+                metadata: None,
+                message_type: MessageType::Assistant,
+            };
+
+            let generations = vec![Generation::new(assistant_message)];
+            let chat_response_meta_data = Self::to_metadata(&chat_completion, &req.model);
+
+            let chat_response = ChatResponse::new(chat_response_meta_data, generations);
+            observation_context.set_response(chat_response.clone());
+
+            Ok(chat_response)
+        })
+        .await
+    }
+}
+
+#[async_trait]
+impl StreamingModel<Prompt, ChatResponse> for DeepSeekChatModel {
+    async fn stream(
+        &self,
+        prompt: Prompt,
+    ) -> Result<BoxStream<'static, Result<ChatResponse, BoxError>>, BoxError> {
+        let req: ChatCompletionRequest = self.crate_request(&prompt, true)?;
+        // execute
+        let chat_respnose = self.deep_seek_api.chat_completion_entity(&req).await?;
+
+        let stream = match chat_respnose {
+            ChatApiRespnose::DataStream(stream) => stream,
+            _ => return Err("Chat completion is not stream".into()),
+        };
+
+        let stream = stream.then(move |chat_completion| {
+            let model = req.model.clone();
+            async move {
+                let chat_completion = chat_completion?;
+                if chat_completion.is_empty() {
+                    return Ok(ChatResponse::new(
+                        ChatResponseMetadata::default(),
+                        Vec::new(),
+                    ));
+                }
+
+                let chat_response_meta_data = chat_completion
+                    .last()
+                    .map(|chat_completion| Self::to_metadata(chat_completion, model.as_ref()))
+                    .unwrap_or_default();
+                let generations: Vec<Generation> = chat_completion
+                    .iter()
+                    .flat_map(|response| &response.choices)
+                    .filter_map(|choice| choice.delta.as_ref())
+                    .map(|delta| {
+                        Generation::new(AssistantMessage {
+                            text_content: delta.content.clone(),
+                            metadata: None,
+                            message_type: MessageType::Assistant,
+                        })
+                    })
+                    .collect();
+
+                Ok(ChatResponse::new(chat_response_meta_data, generations))
+            }
+        });
+
+        Ok(stream.boxed())
+    }
+}
+
+impl ChatModel for DeepSeekChatModel {}
+impl StreamingChatModel for DeepSeekChatModel {}

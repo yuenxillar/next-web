@@ -1,0 +1,10 @@
+[package]
+name = "next-web-singletons"
+version = "0.2.0"
+description = "Lightweight singleton registry and lazy factory for Rust applications"
+keywords = ["next-web", "singletons"]
+readme = "README.md"
+
+edition.workspace = true
+repository.workspace = true
+license.workspace = true

@@ -1,0 +1,23 @@
+[package]
+name = "next-web-retry"
+version = "0.1.0"
+edition = "2024"
+description = "Retry templates and policies for Next Web applications"
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+
+[dependencies]
+next-web-core   = { workspace = true }
+serde           = { workspace = true }
+tokio           = { workspace = true, features = ["sync", "time"]}
+tracing         = { workspace = true }
+rand            = { workspace = true }
+dashmap         = { workspace = true }
+indexmap        = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde_json = { workspace = true }

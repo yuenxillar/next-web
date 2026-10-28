@@ -1,0 +1,26 @@
+[package]
+name = "next-web-mqtt"
+version = "0.2.0"
+description = "MQTT client integration for Next Web, with topic-based listeners and auto-configuration."
+readme = "./README.md"
+homepage = "https://crates.io/crates/next-web-mqtt"
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+next-web-context    = { workspace = true }
+next-web-core       = { workspace = true }
+next-web-macros     = { workspace = true }
+
+serde               = { workspace = true }
+rumqttc             = { workspace = true }
+
+tokio               = { workspace = true }
+tracing             = { workspace = true }
+
+
+[features]
+# Plain (`ws`) and TLS-secured (`wss`) WebSocket transports.
+ws        = ["rumqttc/websocket", "rumqttc/use-rustls"]
+
+trace-log = []

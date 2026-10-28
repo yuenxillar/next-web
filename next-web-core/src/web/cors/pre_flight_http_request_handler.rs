@@ -1,0 +1,45 @@
+use std::sync::Arc;
+
+use crate::{
+    error::BoxError,
+    http::{HttpRequest, HttpResponse},
+    web::cors::{CorsConfiguration, CorsProcessor, DefaultCorsProcessor, PreFlightRequestHandler},
+};
+
+#[derive(Clone)]
+pub struct PreFlightHttpRequestHandler {
+    cors_processor: Arc<dyn CorsProcessor>,
+    config: Option<CorsConfiguration>,
+}
+
+impl PreFlightHttpRequestHandler {
+    pub fn new<T>(cors_processor: T, config: Option<CorsConfiguration>) -> Self
+    where
+        T: CorsProcessor + 'static,
+    {
+        Self {
+            cors_processor: Arc::new(cors_processor),
+            config,
+        }
+    }
+
+    pub fn with_config(config: Option<CorsConfiguration>) -> Self {
+        Self {
+            cors_processor: Arc::new(DefaultCorsProcessor::default()),
+            config,
+        }
+    }
+}
+
+impl PreFlightRequestHandler for PreFlightHttpRequestHandler {
+    fn handle_pre_flight(
+        &self,
+        request: &dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+    ) -> Result<(), BoxError> {
+        self.cors_processor
+            .process_request(self.config.as_ref(), request, response)?;
+
+        Ok(())
+    }
+}

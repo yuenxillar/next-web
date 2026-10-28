@@ -1,0 +1,302 @@
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use next_web_core::any::AnyValue;
+use next_web_core::http::session::HttpSession;
+use next_web_core::http::{HeaderMap, HeaderValue, HttpRequestShare, ResourceDispatcher, Uri};
+use next_web_core::{
+    http::HttpRequest,
+    http::{header::CONTENT_TYPE, Cookie, HttpMethod},
+    web::ViewModel,
+};
+
+use next_web_context::Locale;
+
+use crate::web::savedrequest::SavedRequest;
+
+/// Provides request parameters, headers and cookies from either an original request or a
+/// saved request.
+///
+/// Note that not all request parameters in the original request are emulated by this
+/// wrapper. Nevertheless, the important data from the original request is emulated and
+/// this should prove adequate for most purposes (in particular standard HTTP GET and POST
+/// operations).
+///
+/// Added into a request by `RequestCacheAwareFilter`.
+pub struct SavedRequestAwareWrapper<'a> {
+    request: &'a mut dyn HttpRequest,
+    saved_request: Arc<dyn SavedRequest>,
+}
+
+impl<'a> SavedRequestAwareWrapper<'a> {
+    /// Creates a new instance that reads parameters, headers and cookies from the saved
+    /// request and delegates the remaining state to the wrapped request.
+    ///
+    /// # Arguments
+    ///
+    /// * `saved` - the saved request to source parameters, headers and cookies from
+    /// * `request` - the original request being wrapped
+    pub fn new(saved_request: Arc<dyn SavedRequest>, request: &'a mut dyn HttpRequest) -> Self {
+        Self {
+            request,
+            saved_request,
+        }
+    }
+}
+
+impl HttpRequest for SavedRequestAwareWrapper<'_> {
+    fn session(&self) -> Option<&dyn HttpSession> {
+        self.request.session()
+    }
+
+    fn session_mut(&mut self, create: bool) -> Option<&mut dyn HttpSession> {
+        self.request.session_mut(create)
+    }
+
+    fn change_session_id(&mut self) -> String {
+        self.request.change_session_id()
+    }
+
+    fn is_requested_session_id_valid(&self) -> bool {
+        self.request.is_requested_session_id_valid()
+    }
+
+    fn requested_session_id(&self) -> Option<&str> {
+        self.request.requested_session_id()
+    }
+
+    fn cookie(&self) -> Option<&Cookie> {
+        self.request.cookie()
+    }
+
+    fn cookies(&self) -> Option<&[Cookie]> {
+        self.request.cookies()
+    }
+
+    fn resource_dispatcher(&self) -> Option<&dyn ResourceDispatcher> {
+        self.request.resource_dispatcher()
+    }
+
+    fn method(&self) -> HttpMethod {
+        HttpMethod::from_str(self.saved_request.get_method()).unwrap_or(HttpMethod::default())
+    }
+
+    fn version(&self) -> next_web_core::http::HttpVersion {
+        self.request.version()
+    }
+
+    fn headers(&self) -> &HeaderMap<HeaderValue> {
+        self.request.headers()
+    }
+
+    /// Returns the first value of `name`, preferring the saved request.
+    ///
+    /// The saved request describes what the client originally asked for, so its
+    /// value wins; the request being served answers when the saved one has none,
+    /// so a header that only the current request carries is not lost.
+    fn header(&self, name: &str) -> Option<&str> {
+        self.saved_request
+            .get_header_values(name)
+            .first()
+            .copied()
+            .or_else(|| self.request.header(name))
+    }
+
+    /// Returns every value of `name` from both requests, without duplicates.
+    fn header_values(&self, name: &str) -> Vec<&str> {
+        let mut values = self.saved_request.get_header_values(name);
+        for value in self.request.header_values(name) {
+            if !values.contains(&value) {
+                values.push(value);
+            }
+        }
+
+        values
+    }
+
+    /// Returns the name of every header of both requests, without duplicates.
+    fn header_names(&self) -> Vec<&str> {
+        let mut names = self.saved_request.get_header_names();
+        for name in self.request.header_names() {
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+
+        names
+    }
+
+    fn uri(&self) -> &Uri {
+        self.request.uri()
+    }
+
+    fn query(&self) -> Option<&str> {
+        self.request.query()
+    }
+
+    fn parameter(&self, name: &str) -> Option<&str> {
+        self.request.parameter(name).or_else(|| {
+            self.saved_request
+                .get_parameter_values(name)
+                .and_then(|v| v.first().copied())
+        })
+    }
+
+    /// Returns the parameters of both requests, without duplicates.
+    ///
+    /// The ones the request being served carries come first, then the ones that
+    /// only the saved request has.
+    fn parameters(&self) -> Option<Vec<(Cow<'_, str>, Cow<'_, str>)>> {
+        let mut parameters = self.request.parameters().unwrap_or_default();
+
+        for name in self.saved_request.get_parameter_map().keys() {
+            let Some(values) = self.saved_request.get_parameter_values(name) else {
+                continue;
+            };
+
+            for value in values {
+                let pair = (Cow::Owned(name.clone()), Cow::Borrowed(value));
+                if !parameters.contains(&pair) {
+                    parameters.push(pair);
+                }
+            }
+        }
+
+        Some(parameters)
+    }
+
+    /// Returns the values of `name` from both requests, without duplicates.
+    ///
+    /// Both groups are kept. Keeping only the saved request's values, minus the
+    /// duplicates of the ones the request being served carries, would answer with
+    /// nothing at all when the two requests share every value.
+    fn parameter_values(&self, name: &str) -> Option<Vec<Cow<'_, str>>> {
+        let mut values = self.request.parameter_values(name).unwrap_or_default();
+
+        if let Some(saved) = self.saved_request.get_parameter_values(name) {
+            for value in saved {
+                if !values.iter().any(|existing| existing.as_ref() == value) {
+                    values.push(Cow::Borrowed(value));
+                }
+            }
+        }
+
+        if values.is_empty() {
+            None
+        } else {
+            Some(values)
+        }
+    }
+
+    /// Returns the body the wrapped request exposes.
+    ///
+    /// The saved request records the method, the headers, the cookies and the
+    /// parameters, but not a body, so a replay reads the body of the request being
+    /// served. This has to be forwarded explicitly: the trait's own default
+    /// answers `None`, so a wrapper that leaves it out silently loses the body of
+    /// the request it wraps.
+    fn body_bytes(&self) -> Option<&[u8]> {
+        self.request.body_bytes()
+    }
+
+    fn content_type(&self) -> Option<&str> {
+        self.header(CONTENT_TYPE.as_str())
+    }
+
+    fn path(&self) -> &str {
+        self.request.path()
+    }
+
+    fn host(&self) -> Option<&str> {
+        self.request.host()
+    }
+
+    fn scheme(&self) -> Option<&str> {
+        self.request.scheme()
+    }
+
+    fn server_port(&self) -> Option<u16> {
+        self.request.server_port()
+    }
+
+    fn server_name(&self) -> Option<String> {
+        self.request.server_name()
+    }
+
+    fn context_path(&self) -> Option<&str> {
+        self.request.context_path()
+    }
+
+    fn locale(&self) -> Option<Locale> {
+        Some(
+            self.saved_request
+                .get_locales()
+                .first()
+                .map(Clone::clone)
+                .unwrap_or(Locale::default()),
+        )
+    }
+
+    fn locales(&self) -> Option<Vec<Locale>> {
+        let mut locales = self.saved_request.get_locales();
+        if locales.is_empty() {
+            locales.push(Locale::default());
+        }
+
+        Some(locales)
+    }
+
+    fn get_attribute(&self, name: &str) -> Option<&AnyValue> {
+        self.request.get_attribute(name)
+    }
+
+    fn attributes(&self) -> Option<&HashMap<String, AnyValue>> {
+        self.request.attributes()
+    }
+
+    fn remove_attribute(&mut self, name: &str) {
+        self.request.remove_attribute(name);
+    }
+
+    fn set_attribute(&mut self, name: &str, value: AnyValue) {
+        self.request.set_attribute(name, value);
+    }
+
+    fn view_model(&self) -> Option<&ViewModel> {
+        self.request.view_model()
+    }
+
+    fn view_model_mut(&mut self) -> Option<&mut ViewModel> {
+        self.request.view_model_mut()
+    }
+
+    fn set_view_model(&mut self, model: ViewModel) {
+        self.request.set_view_model(model);
+    }
+
+    fn remove_view_model(&mut self) {
+        self.request.remove_view_model();
+    }
+
+    fn ready(&mut self) {
+        self.request.ready();
+    }
+
+    fn clean_up(&mut self) {
+        self.request.clean_up();
+    }
+
+    fn is_secure(&self) -> bool {
+        self.request.is_secure()
+    }
+
+    fn remote_addr(&self) -> Option<&std::net::SocketAddr> {
+        self.request.remote_addr()
+    }
+
+    fn shared(&mut self) -> &HttpRequestShare {
+        self.request.shared()
+    }
+}

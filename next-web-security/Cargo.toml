@@ -1,0 +1,116 @@
+[package]
+name = "next-web-security"
+description = "Security, authentication, and authorization support for Next Web"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+
+[dependencies]
+next-web-core.workspace     = true
+next-web-context.workspace  = true
+next-web-macros.workspace   = true
+next-web-singletons.workspace = true
+
+# The dependencies the core of the `v1` tree needs: the filter chain, the
+# session and request cache stores, the one-time tokens, the password encoders
+# and the X.509 client certificate authentication.
+tokio.workspace         = true
+serde.workspace         = true
+serde_json.workspace    = true
+tracing.workspace       = true
+chrono.workspace        = true
+rand.workspace          = true
+base64.workspace        = true
+hex.workspace           = true
+sha2.workspace          = true
+sha1.workspace          = true
+md5.workspace           = true
+bcrypt.workspace        = true
+urlencoding.workspace   = true
+simple_asn1.workspace   = true
+
+# `saml2`: the XML the asserting party posts and the DEFLATE encoding of a
+# redirect binding.
+quick-xml = { workspace = true, optional = true }
+flate2 = { workspace = true, optional = true }
+
+# `saml2`, `webauthn` and every `oauth2-*` feature sign or verify with RSA.
+rsa = { workspace = true, optional = true }
+
+# `webauthn`: the CBOR of a ceremony, the COSE key of a credential, and the
+# P-256 signature over the ceremony.
+ciborium = { workspace = true, optional = true }
+coset = { workspace = true, optional = true }
+p256 = { workspace = true, optional = true }
+
+# `oauth2-*`: the JWT an authorization server issues and a resource server
+# verifies, and the HTTP client a client uses for the token endpoint.
+jsonwebtoken = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+
+# `oauth2-authorization-server`: the HMAC a symmetric key signs with.
+hmac = { workspace = true, optional = true }
+
+# `v2`: the caches of a realm (`AuthenticationCache`, `AuthorizationCache`).
+dashmap = { workspace = true, optional = true }
+
+[features]
+default = ["v2-web"]
+
+# The Spring Security style tree (`src/v1`). It is the tree the protocol
+# features below extend.
+v1 = ["web"]
+
+# The Apache Shiro style core tree (`src/v2/core`): authentication,
+# authorization, realms, sessions and caches. It does not depend on the web
+# integration — the way Apache Shiro's `shiro-core` does not — and it needs
+# `dashmap` for the caches of a realm.
+v2 = ["dep:dashmap"]
+
+# The web integration of the v2 tree (`src/v2/web`): the filter chain, the
+# session cookie, and the HTTP authentication and authorization filters.
+v2-web = ["v2", "web"]
+
+# The marker of the web integration: the `web` module of a tree and the filters
+# and session managers that read and write HTTP requests and responses.
+web = []
+
+# SAML 2.0 relying party support: `saml2`, `web::saml2`, the `saml2*()`
+# configurers. Pulls `quick-xml`, `flate2` and `rsa`.
+saml2 = ["dep:quick-xml", "dep:flate2", "dep:rsa"]
+
+# WebAuthn (passkeys): `webauthn`, `web::webauthn`, the `web_authn()`
+# configurer. Pulls `ciborium`, `coset`, `p256` and `rsa`.
+webauthn = ["dep:ciborium", "dep:coset", "dep:p256", "dep:rsa"]
+
+# OAuth 2.0 client: `oauth2::client`, the `oauth2_login()` and `oauth2_client()`
+# configurers. Pulls `reqwest`, `jsonwebtoken` and `rsa`.
+oauth2-client = ["dep:reqwest", "dep:jsonwebtoken", "dep:rsa"]
+
+# OAuth 2.0 resource server: `oauth2::server::resource` and the
+# `oauth2_resource_server()` configurer. Pulls `reqwest`, `jsonwebtoken` and
+# `rsa`.
+oauth2-resource-server = ["dep:reqwest", "dep:jsonwebtoken", "dep:rsa"]
+
+# OAuth 2.0 authorization server: `oauth2::server::authorization` and the
+# `oauth2_authorization_server()` configurer. Pulls `jsonwebtoken`, `hmac` and
+# `rsa`.
+oauth2-authorization-server = ["dep:jsonwebtoken", "dep:hmac", "dep:rsa"]
+
+# Every side of OAuth 2.0 at once.
+oauth2 = ["oauth2-client", "oauth2-resource-server", "oauth2-authorization-server"]
+
+[dev-dependencies]
+axum.workspace = true
+tracing-subscriber.workspace = true
+# The X.509 test serves the chain over TLS with a client certificate.
+rustls.workspace = true
+tokio-rustls.workspace = true
+rustls-pemfile.workspace = true
+# The end-to-end tests drive the chain over a real socket, whatever feature the
+# crate is built with, so `reqwest` is a test dependency as well, and the virtual
+# authenticator of the passkey test builds a ceremony with `ciborium` and `p256`.
+reqwest = { workspace = true }
+ciborium = { workspace = true }
+p256 = { workspace = true }

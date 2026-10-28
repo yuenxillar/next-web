@@ -1,0 +1,6 @@
+{
+    "from_json": "This message is read from extra.json",
+    "errors": {
+        "not_found": "The page is not found, read from extra.json"
+    }
+}

@@ -1,0 +1,42 @@
+[package]
+name = "next-web-core"
+version = "0.2.0"
+description = "Core library for the Next Web framework, providing essential web server and middleware abstractions."
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+next-web-context    = { workspace = true }
+
+axum                = { workspace = true }
+tokio               = { workspace = true, features = ["sync"]}
+
+serde               = { workspace = true }
+serde_yaml          = { workspace = true }
+serde_path_to_error = { workspace = true }
+tera                = { workspace = true }
+
+tracing         = { workspace = true }
+dyn-clone       = { workspace = true }
+async-trait     = { workspace = true }
+sha2            = { workspace = true }
+headers         = { workspace = true }
+arc-swap        = { workspace = true }
+dashmap         = { workspace = true }
+uuid            = { workspace = true }
+regex           = { workspace = true }
+form_urlencoded = { workspace = true }
+indexmap        = { workspace = true }
+
+
+[features]
+default = ["trace-log"]
+
+embed-resources = []
+dev = []
+
+trace-log = []

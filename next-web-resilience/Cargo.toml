@@ -1,0 +1,43 @@
+[package]
+name = "next-web-resilience"
+version = "0.1.0"
+description = "Resilience patterns for Next Web applications: circuit breaker, rate limiter, bulkhead, retry and time limiter"
+rust-version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["resilience", "circuit-breaker", "rate-limiter", "bulkhead", "retry"]
+
+[dependencies]
+next-web-core              = { workspace = true }
+next-web-context           = { workspace = true, optional = true }
+next-web-macros            = { workspace = true, optional = true }
+
+tokio         = { workspace = true, features = ["sync", "time"] }
+tracing       = { workspace = true }
+thiserror     = { workspace = true }
+serde         = { workspace = true }
+dashmap       = { workspace = true }
+rand          = { workspace = true }
+parking_lot   = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["sync", "time", "macros", "rt-multi-thread", "test-util"] }
+
+[features]
+default = ["macros"]
+# The attribute macros — `#[rate_limiter]`, `#[circuit_breaker]`, `#[bulkhead]`,
+# `#[time_limiter]`, `#[retry]` — re-exported from the framework's macro crate.
+# Turn them off with `default-features = false` for a runtime-only build, which
+# then does not pull in a procedural macro crate at all.
+macros = ["dep:next-web-macros", "next-web-macros/resilience"]
+# Reading the configured instances out of the application's properties and
+# registering them, so `name = "..."` resolves to an instance whose settings come
+# from `application.yaml`. Needs the framework's dependency-injection crates, so
+# it is off by default: a runtime-only user does not pay for them.
+autoconfigure = ["dep:next-web-context", "dep:next-web-macros"]
+
+[lints]
+workspace = true

@@ -1,0 +1,22 @@
+[package]
+name = "next-web-state-machine"
+version = "0.2.0"
+description = "State machine modeling and runtime support for Next Web applications"
+rust-version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+next-web-core   = { workspace = true }
+next-web-macros = { workspace = true }
+
+tokio           = { workspace = true, features = ["sync", "time"] }
+
+futures         = { workspace = true }
+uuid            = { workspace = true }
+tracing         = { workspace = true }
+
+[lints]
+workspace = true

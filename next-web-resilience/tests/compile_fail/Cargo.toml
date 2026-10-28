@@ -1,0 +1,21 @@
+# A crate that is deliberately **not** a workspace member.
+#
+# `tests/compile_fail.rs` compiles the binaries under `src/bin` one at a time and
+# asserts on the diagnostics the macros produce. It has to be a real crate,
+# because the macros resolve the pattern instance through the caller's own
+# `next-web-resilience` dependency and expand differently depending on the
+# signature they are given.
+#
+# The `[workspace]` table is what keeps it out of the workspace above: without it
+# cargo would refuse to build a package that believes it belongs to a workspace
+# it is not listed in.
+[workspace]
+
+[package]
+name = "resilience-compile-fail"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+next-web-resilience = { path = "../.." }

@@ -1,0 +1,96 @@
+use crate::error::IllegalError;
+
+/// Trait for resolving properties against any underlying source.
+///
+/// A property resolver maps string keys to string values, optionally
+/// converting values to a requested target type and resolving `${...}`
+/// configuration property placeholders and `#{...}` environment variable
+/// placeholders embedded in text.
+///
+/// See [`Environment`](crate::env::Environment) and
+/// [`PropertySourcesLookup`](crate::env::PropertySourcesLookup).
+pub trait PropertyResolver {
+    /// Determine whether the given property key is available for resolution
+    /// — for example, if the value for the given key is not `None`.
+    fn contains_property(&self, key: &str) -> bool;
+
+    /// Resolve the property value associated with the given key,
+    /// or `None` if the key cannot be resolved.
+    ///
+    /// See [`get_property_or`](Self::get_property_or),
+    /// [`get_property_as`](Self::get_property_as),
+    /// [`get_required_property`](Self::get_required_property).
+    fn get_property(&self, key: &str) -> Option<String>;
+
+    /// Resolve the property value associated with the given key, or
+    /// `default_value` if the key cannot be resolved.
+    ///
+    /// The result is owned: a property value is produced while it is resolved,
+    /// so it cannot be borrowed from the resolver for as long as the given
+    /// default value lives.
+    ///
+    /// See [`get_property`](Self::get_property),
+    /// [`get_required_property`](Self::get_required_property).
+    fn get_property_or_default(&self, key: &str, default_value: &str) -> String;
+
+    // /// Resolve the property value associated with the given key, converted
+    // /// to the requested target type, or `None` if the key cannot be resolved.
+    // ///
+    // /// Returns an error if the value cannot be converted to `T`.
+    // ///
+    // /// See [`get_required_property_as`](Self::get_required_property_as).
+    // fn get_property_as<T>(&self, key: &str) -> Result<Option<T>, ConversionError>;
+
+    // /// Resolve the property value associated with the given key, converted
+    // /// to the requested target type, or `default_value` if the key cannot
+    // /// be resolved.
+    // ///
+    // /// Returns an error if the value cannot be converted to `T`.
+    // ///
+    // /// See [`get_required_property_as`](Self::get_required_property_as).
+    // fn get_property_as_or_default<T>(
+    //     &self,
+    //     key: &str,
+    //     default_value: T,
+    // ) -> Result<T, ConversionError>;
+
+    /// Resolve the property value associated with the given key.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ResolveError`] if the key cannot be resolved.
+    ///
+    /// See [`get_required_property_as`](Self::get_required_property_as).
+    fn get_required_property(&self, key: &str) -> Result<String, IllegalError>;
+
+    // /// Resolve the property value associated with the given key, converted
+    // /// to the requested target type.
+    // ///
+    // /// # Errors
+    // ///
+    // /// Returns [`ResolveError`] if the key cannot be resolved, or
+    // /// [`ConversionError`] if the value cannot be converted to `T`.
+    // fn get_required_property_as<T>(&self, key: &str) -> Result<T, IllegalError>;
+
+    /// Resolve `${...}` configuration property placeholders and `#{...}`
+    /// environment variable placeholders in the given text.
+    ///
+    /// A property placeholder is resolved by [`get_property`](Self::get_property).
+    /// An environment variable placeholder is resolved against the environment
+    /// variables of the process. Unresolvable placeholders with no default
+    /// value are ignored and passed through unchanged.
+    ///
+    /// # Panics
+    ///
+    /// Implementations may panic if `text` is empty in ways they cannot
+    /// represent. Callers should not pass `none`.
+    fn resolve_placeholders(&self, text: &str) -> String;
+
+    /// Resolve `${...}` configuration property placeholders and `#{...}`
+    /// environment variable placeholders in the given text.
+    ///
+    /// # Errors
+    ///
+    /// Returns a placeholder error if any placeholder cannot be resolved.
+    fn resolve_required_placeholders(&self, text: &str) -> Result<String, IllegalError>;
+}

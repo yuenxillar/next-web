@@ -1,0 +1,35 @@
+[package]
+name = "next-web-data-redis"
+version = "0.1.0"
+edition = "2024"
+description = "Redis data provider for Next Web Framework"
+readme = "README.md"
+license.workspace = true
+
+[dependencies]
+next-web-context.workspace = true
+next-web-core = { workspace = true }
+next-web-macros = { workspace = true }
+
+serde = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
+futures = { workspace = true }
+
+
+redis = { workspace = true }
+deadpool-redis = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
+
+[dev-dependencies]
+# The lock block has kebab-case keys and a duration syntax of its own; binding a
+# realistic block is the only way to pin both.
+serde_yaml = { workspace = true }
+
+[features]
+default = ["distributed-lock"]
+deadpol = ["deadpool-redis"]
+distributed-lock = ["redis/cluster-async", "dep:uuid", "dep:thiserror"]
+
+sentinel = ["redis/cluster-async"]

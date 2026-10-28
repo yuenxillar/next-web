@@ -1,0 +1,32 @@
+# Load balanced route with two instances, a breaker and rate limiting.
+next:
+  gateway:
+    server:
+      bind: "127.0.0.1:8080"
+      admin:
+        enabled: true
+        bind: "127.0.0.1:9001"
+    breakers:
+      user-service:
+        failure_threshold: 5
+        wait_duration_in_open_state: 10s
+        half_open_permits: 1
+    routes:
+      - id: users
+        uri: "lb://user-service"
+        predicates:
+          - Path=/api/users/**
+          - Method=GET,POST
+        filters:
+          - StripPrefix=1
+          - RequestRateLimiter=200
+          - CircuitBreaker=user-service
+        upstreams:
+          - addr: "10.1.0.11:8080"
+            weight: 3
+          - addr: "10.1.0.12:8080"
+            weight: 1
+        metadata:
+          client:
+            connect_timeout: 1s
+            read_timeout: 10s

@@ -1,0 +1,58 @@
+[package]
+name = "next-web-code-generator"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85.0"
+authors = ["Listening <yuenxillar@163.com>"]
+keywords = ["codegen", "cli", "template", "mysql", "postgres"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+homepage = "https://crates.io/crates/next-web-code-generator"
+repository = "https://github.com/yuenxillar/next-web"
+include = ["src/**/*.rs", "Cargo.toml"]
+description = "Standalone CLI code generator for Rust projects driven by database schema metadata."
+
+[[bin]]
+name = "codegen"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.94"
+async-std = "1.13.0"
+chrono = { version = "0.4.40", default-features = true }
+clap = { version = "4.5.37", features = ["derive"] }
+regex = "1.11.1"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.133"
+sqlx = { version = "0.8.2", default-features = false, features = ["runtime-async-std-rustls", "mysql"] }
+thiserror = "2.0.8"
+toml = "=0.8.2"
+
+[features]
+default = []
+postgres = ["sqlx/postgres"]
+
+[lints.rust]
+unsafe_code = "forbid"
+rust_2018_idioms = { level = "warn", priority = -1 }
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+[lints.clippy]
+await_holding_lock = "warn"
+if_let_mutex = "warn"
+mem_forget = "warn"
+enum_glob_use = "warn"
+macro_use_imports = "warn"
+match_same_arms = "warn"
+single_match_else = "warn"
+implicit_clone = "warn"
+redundant_clone = "warn"
+inefficient_to_string = "warn"
+str_to_string = "warn"
+uninlined_format_args = "warn"
+option_option = "warn"
+todo = "warn"
+
+[workspace]
+members = ["."]

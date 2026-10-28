@@ -1,0 +1,11 @@
+body {
+    margin: 0;
+    padding: 2rem;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #f5f7fa;
+    color: #1f2933;
+}
+
+h1 {
+    color: #2f5bd7;
+}

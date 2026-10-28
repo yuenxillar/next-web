@@ -1,0 +1,11 @@
+use crate::config::security_builder::SecurityBuilder;
+
+pub trait SecurityConfigurer<O, B: SecurityBuilder<O>>
+where
+    Self: Send + Sync,
+    O: Send + Sync,
+{
+    fn init(&mut self, builder: &mut B);
+
+    fn configure(&mut self, builder: &mut B);
+}

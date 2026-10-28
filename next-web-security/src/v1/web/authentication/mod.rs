@@ -1,0 +1,101 @@
+pub mod logout;
+pub mod ott;
+pub mod preauth;
+pub mod rememberme;
+pub mod session;
+
+pub mod switchuser;
+pub mod ui;
+pub mod www;
+
+mod anonymous_authentication_filter;
+mod authentication_converter;
+mod authentication_failure_handler;
+mod authentication_filter;
+mod authentication_success_handler;
+mod base_authentication_processing_filter;
+mod base_authentication_target_url_request_handler;
+mod basic_authentication_entry_point;
+mod basic_authentication_filter;
+mod delegating_authentication_entry_point;
+mod forward_authentication_failure_handler;
+mod forward_authentication_success_handler;
+mod http403_forbidden_entry_point;
+mod http_status_entry_point;
+mod login_url_authentication_entry_point;
+mod remember_me_authentication_filter;
+mod remember_me_services;
+mod saved_request_aware_authentication_success_handler;
+mod simple_url_authentication_failure_handler;
+mod simple_url_authentication_success_handler;
+mod username_password_authentication_filter;
+mod web_authentication_details;
+mod web_authentication_details_source;
+
+pub use anonymous_authentication_filter::AnonymousAuthenticationFilter;
+pub use authentication_converter::AuthenticationConverter;
+pub use authentication_failure_handler::AuthenticationFailureHandler;
+pub use authentication_filter::AuthenticationFilter;
+pub use authentication_success_handler::AuthenticationSuccessHandler;
+pub use base_authentication_processing_filter::{
+    BaseAuthenticationProcessingFilter, BaseAuthenticationProcessingFilterExt,
+};
+pub use base_authentication_target_url_request_handler::BaseAuthenticationTargetUrlRequestHandler;
+pub use basic_authentication_entry_point::BasicAuthenticationEntryPoint;
+pub use basic_authentication_filter::BasicAuthenticationFilter;
+pub use delegating_authentication_entry_point::{
+    DelegatingAuthenticationEntryPoint, DelegatingAuthenticationEntryPointBuilder,
+};
+pub use forward_authentication_failure_handler::ForwardAuthenticationFailureHandler;
+pub use forward_authentication_success_handler::ForwardAuthenticationSuccessHandler;
+pub use http403_forbidden_entry_point::Http403ForbiddenEntryPoint;
+pub use http_status_entry_point::HttpStatusEntryPoint;
+pub use login_url_authentication_entry_point::LoginUrlAuthenticationEntryPoint;
+pub use remember_me_authentication_filter::RememberMeAuthenticationFilter;
+pub use remember_me_services::RememberMeServices;
+pub use saved_request_aware_authentication_success_handler::SavedRequestAwareAuthenticationSuccessHandler;
+pub use simple_url_authentication_failure_handler::SimpleUrlAuthenticationFailureHandler;
+pub use simple_url_authentication_success_handler::SimpleUrlAuthenticationSuccessHandler;
+pub use username_password_authentication_filter::UsernamePasswordAuthenticationFilter;
+pub use web_authentication_details::WebAuthenticationDetails;
+pub use web_authentication_details_source::WebAuthenticationDetailsSource;
+
+pub type AuthPrincipal = std::sync::Arc<dyn Identity>;
+
+pub trait Identity
+where
+    Self: std::any::Any,
+    Self: std::fmt::Display,
+    Self: Send + Sync,
+{
+    fn as_any(&self) -> &dyn std::any::Any;
+
+    /// Returns the name this principal is known by, when it is a user of the
+    /// application.
+    ///
+    /// The name of an authentication is the user name of a user details
+    /// principal, not the display form of the object; every other principal
+    /// answers with nothing, and its display form is the name.
+    fn principal_name(&self) -> Option<&str> {
+        None
+    }
+}
+
+impl Identity for String {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn principal_name(&self) -> Option<&str> {
+        Some(self)
+    }
+}
+
+/// Returns the name of a principal, the way the name of an authentication is
+/// defined.
+pub fn principal_name(principal: &dyn Identity) -> std::borrow::Cow<'_, str> {
+    match principal.principal_name() {
+        Some(name) => std::borrow::Cow::Owned(name.to_string()),
+        None => std::borrow::Cow::Owned(principal.to_string()),
+    }
+}

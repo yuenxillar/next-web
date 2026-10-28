@@ -1,0 +1,27 @@
+use std::collections::HashMap;
+
+use next_web_core::any::AnyValue;
+use next_web_core::async_trait;
+use next_web_core::error::BoxError;
+use next_web_core::http::HttpRequest;
+use next_web_core::http::HttpResponse;
+
+///
+/// Handshake interceptor trait
+/// Custom logic can be executed before and after WebSocket handshake, for example:
+/// - Identity verification
+/// - Request/Response Check
+/// - Pass properties to WebSocket session
+#[async_trait]
+pub trait HandshakeInterceptor
+where
+    Self: Send + Sync,
+{
+    /// Called before handshake processing
+    async fn before_handshake(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        attributes: &mut HashMap<String, AnyValue>,
+    ) -> Result<bool, BoxError>;
+}
