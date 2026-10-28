@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use next_web_core::{
     async_trait,
-   http::{HttpRequest, HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 
 use crate::{
@@ -65,7 +65,9 @@ impl DerefMut for AuthenticationFilter {
 impl Default for AuthenticationFilter {
     fn default() -> Self {
         Self {
-            success_url: Default::default(),
+            // The page a successful login returns to when the application names
+            // none of its own.
+            success_url: Self::DEFAULT_SUCCESS_URL.to_string(),
             access_control_filter: Default::default(),
         }
     }

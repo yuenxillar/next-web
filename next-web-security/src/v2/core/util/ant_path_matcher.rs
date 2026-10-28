@@ -428,4 +428,17 @@ mod tests {
         assert!(!matcher.is_pattern("/test"));
         assert!(!matcher.is_pattern("/"));
     }
+
+    #[test]
+    fn a_trailing_double_star_matches_the_path_it_is_declared_for() {
+        let matcher = AntPathMatcher::new();
+
+        // A chain declared for `/admin/**` is the chain of `/admin` as well: the
+        // `**` matches no segment, which is what Apache Shiro and the Ant
+        // matcher of Spring do. A request to the base path must not fall through
+        // to a chain declared for `/**`.
+        assert!(matcher.matches("/admin/**", "/admin"));
+        assert!(matcher.matches("/admin/**", "/admin/"));
+        assert!(matcher.matches("/admin/**", "/admin/reports"));
+    }
 }

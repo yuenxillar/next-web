@@ -56,17 +56,24 @@ hmac = { workspace = true, optional = true }
 dashmap = { workspace = true, optional = true }
 
 [features]
-default = ["v2"]
+default = ["v2-web"]
 
 # The Spring Security style tree (`src/v1`). It is the tree the protocol
 # features below extend.
 v1 = ["web"]
 
-# The Apache Shiro style tree (`src/v2`). It includes the web integration, so it
-# enables the `web` feature, and it needs `dashmap` for the caches of a realm.
-v2 = ["web", "dep:dashmap"]
+# The Apache Shiro style core tree (`src/v2/core`): authentication,
+# authorization, realms, sessions and caches. It does not depend on the web
+# integration — the way Apache Shiro's `shiro-core` does not — and it needs
+# `dashmap` for the caches of a realm.
+v2 = ["dep:dashmap"]
 
-# The marker of the web integration both trees enable.
+# The web integration of the v2 tree (`src/v2/web`): the filter chain, the
+# session cookie, and the HTTP authentication and authorization filters.
+v2-web = ["v2", "web"]
+
+# The marker of the web integration: the `web` module of a tree and the filters
+# and session managers that read and write HTTP requests and responses.
 web = []
 
 # SAML 2.0 relying party support: `saml2`, `web::saml2`, the `saml2*()`

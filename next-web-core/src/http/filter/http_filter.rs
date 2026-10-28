@@ -47,6 +47,36 @@ where
         false
     }
 
+    /// Applies the success URL of the application to this filter.
+    ///
+    /// A filter that answers a successful login sends the client on to the page
+    /// the application configured for it; that page is a property of the
+    /// application, not of the filter.
+    ///
+    /// The default keeps the URL the filter was built with and reports `false`.
+    ///
+    /// # Arguments
+    ///
+    /// * `success_url` - The path of the page a successful login returns to.
+    fn apply_success_url(&mut self, _success_url: &str) -> bool {
+        false
+    }
+
+    /// Applies the unauthorized URL of the application to this filter.
+    ///
+    /// A filter that refuses a request answers with the page the application
+    /// configured for a refused request, or with 401 when the application
+    /// configured none.
+    ///
+    /// The default keeps the URL the filter was built with and reports `false`.
+    ///
+    /// # Arguments
+    ///
+    /// * `unauthorized_url` - The path of the page a refused request returns to.
+    fn apply_unauthorized_url(&mut self, _unauthorized_url: &str) -> bool {
+        false
+    }
+
     /// Renames this filter.
     ///
     /// A filter chain resolves a filter by the name it reports from

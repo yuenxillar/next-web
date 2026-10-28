@@ -1,15 +1,15 @@
 use std::collections::HashSet;
 
 use next_web_core::{
-    async_trait,
+    Named, Required, async_trait,
     http::{HttpRequest, HttpResponse},
-    Named, Required,
 };
 
 use crate::{
     core::util::{object::Object, web::WebUtils},
     web::filter::{
-        access_control_filter::AccessControlFilterExt, advice_filter::AdviceFilterExt,
+        access_control_filter::AccessControlFilterExt,
+        advice_filter::AdviceFilterExt,
         authz::authorization_filter::AuthorizationFilter,
         once_per_request_filter::OncePerRequestFilter,
         path_matching_filter::{PathMatchingFilter, PathMatchingFilterExt},
@@ -77,6 +77,11 @@ impl AdviceFilterExt for RolesAuthorizationFilter {
         <Self as Required<PathMatchingFilter>>::get_object(self)
             .pre_handle(request, response, ext)
             .await
+    }
+
+    fn apply_unauthorized_url(&mut self, unauthorized_url: &str) -> bool {
+        self.authorization_filter
+            .apply_unauthorized_url_if_absent(unauthorized_url)
     }
 }
 
@@ -191,8 +196,9 @@ mod tests {
     /// chain hands it over.
     fn request_of_an_anonymous_call() -> Request<Body> {
         let manager: Arc<dyn WebSecurityManager> = Arc::new(DefaultWebSecurityManager::default());
-        let subject: Box<dyn WebSubject> =
-            Box::new(WebDelegatingSubject::new(None, false, None, None, false, manager));
+        let subject: Box<dyn WebSubject> = Box::new(WebDelegatingSubject::new(
+            None, false, None, None, false, manager,
+        ));
 
         let mut request = Request::builder()
             .uri("/admin/reports")
@@ -220,10 +226,16 @@ mod tests {
 
         use crate::web::filter::access_control_filter::AccessControlFilterExt;
 
-        assert!(filter.is_access_allowed(&mut request, &mut response, None).await);
-        assert!(filter
-            .is_access_allowed(&mut request, &mut response, Some(Object::ListStr(vec![])))
-            .await);
+        assert!(
+            filter
+                .is_access_allowed(&mut request, &mut response, None)
+                .await
+        );
+        assert!(
+            filter
+                .is_access_allowed(&mut request, &mut response, Some(Object::ListStr(vec![])))
+                .await
+        );
     }
 
     #[tokio::test]
@@ -236,12 +248,16 @@ mod tests {
 
         // The subject of the call is anonymous: it holds no role, so a chain that
         // requires one refuses the request.
-        assert!(!filter
-            .is_access_allowed(&mut request, &mut response, roles(&["admin"]))
-            .await);
-        assert!(!filter
-            .is_access_allowed(&mut request, &mut response, roles(&["admin", "auditor"]))
-            .await);
+        assert!(
+            !filter
+                .is_access_allowed(&mut request, &mut response, roles(&["admin"]))
+                .await
+        );
+        assert!(
+            !filter
+                .is_access_allowed(&mut request, &mut response, roles(&["admin", "auditor"]))
+                .await
+        );
         // The filter refuses the request; what the client sees — a redirect to the
         // login page, or 401 — is the answer of the filter chain around it.
         let _ = &response;
@@ -323,9 +339,11 @@ mod allow_branch_tests {
         let mut request = request_of_root(manager_with_admin());
         let mut response = axum::response::Response::default();
 
-        assert!(filter
-            .is_access_allowed(&mut request, &mut response, roles(&["admin"]))
-            .await);
+        assert!(
+            filter
+                .is_access_allowed(&mut request, &mut response, roles(&["admin"]))
+                .await
+        );
     }
 
     #[tokio::test]
@@ -334,11 +352,15 @@ mod allow_branch_tests {
         let mut request = request_of_root(manager_with_admin());
         let mut response = axum::response::Response::default();
 
-        assert!(!filter
-            .is_access_allowed(&mut request, &mut response, roles(&["auditor"]))
-            .await);
-        assert!(!filter
-            .is_access_allowed(&mut request, &mut response, roles(&["admin", "auditor"]))
-            .await);
+        assert!(
+            !filter
+                .is_access_allowed(&mut request, &mut response, roles(&["auditor"]))
+                .await
+        );
+        assert!(
+            !filter
+                .is_access_allowed(&mut request, &mut response, roles(&["admin", "auditor"]))
+                .await
+        );
     }
 }

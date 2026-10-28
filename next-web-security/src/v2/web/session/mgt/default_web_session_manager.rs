@@ -6,7 +6,7 @@ use std::{
 use next_web_core::{
     any::AnyValue,
     async_trait,
-   http::{HttpRequest, HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 use tracing::{debug, error, trace};
 
@@ -18,13 +18,13 @@ use crate::{
         },
         event::{event_bus_aware::EventBusAware, support::default_event_bus::DefaultEventBus},
         session::{
+            Session, SessionError, SessionId,
             mgt::{
                 default_session_manager::DefaultSessionManager,
                 native_session_manager::NativeSessionManagerExt, session_context::SessionContext,
                 session_manager::SessionManager,
                 validating_session_manager::ValidatingSessionManagerExt,
             },
-            Session, SessionError, SessionId,
         },
     },
     web::{Cookie, SimpleCookie},
@@ -96,7 +96,7 @@ impl DefaultWebSessionManager {
     fn store_session_id(
         &self,
         session_id: &SessionId,
-        _req: &mut dyn HttpRequest,
+        req: &mut dyn HttpRequest,
         resp: &mut dyn HttpResponse,
     ) -> Result<(), &'static str> {
         // 校验id
@@ -109,6 +109,10 @@ impl DefaultWebSessionManager {
 
         let mut cookie = SimpleCookie::from(self.session_id_cookie.as_ref());
         cookie.set_value(session_id.to_string());
+        // The session of a login belongs to the whole application: a cookie of
+        // the login page alone would not be sent back on the next request, and
+        // the client would arrive without the session it was given.
+        cookie.set_path(req.context_path().unwrap_or("/").to_string());
         cookie.save_to(None, resp);
 
         trace!(
@@ -120,7 +124,11 @@ impl DefaultWebSessionManager {
     }
 
     fn remove_session_id_cookie(&self, req: &dyn HttpRequest, resp: &mut dyn HttpResponse) {
-        self.get_session_id_cookie().remove_from(req, resp);
+        // The cookie is removed under the path it was written for, so the
+        // browser deletes the one it holds.
+        let mut cookie = SimpleCookie::from(self.session_id_cookie.as_ref());
+        cookie.set_path(req.context_path().unwrap_or("/").to_string());
+        cookie.remove_from(req, resp);
     }
 
     fn get_session_id_cookie_value(
@@ -129,7 +137,9 @@ impl DefaultWebSessionManager {
         resp: &dyn HttpResponse,
     ) -> Option<String> {
         if !self.is_session_id_cookie_enabled() {
-            debug!("Session ID cookie is disabled - session id will not be acquired from a request cookie.");
+            debug!(
+                "Session ID cookie is disabled - session id will not be acquired from a request cookie."
+            );
             return None;
         }
 
@@ -301,7 +311,10 @@ impl SessionManager for DefaultWebSessionManager {
         req: &mut dyn HttpRequest,
         resp: &mut dyn HttpResponse,
     ) -> Result<Box<dyn Session>, AuthorizationError> {
-        let session = self.default_session_manager.start(context, req, resp).await?;
+        let session = self
+            .default_session_manager
+            .start(context, req, resp)
+            .await?;
 
         // The manager behind this one starts the session without knowing about the
         // cookie, and a session the client is not told the identifier of is a

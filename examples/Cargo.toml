@@ -162,9 +162,9 @@ path = "resilience_configured.rs"
 name = "scheduled"
 path = "scheduled.rs"
 
-[[bin]]
-name = "security"
-path = "security.rs"
+# [[bin]]
+# name = "security"
+# path = "security.rs"
 
 [[bin]]
 name = "singleton"

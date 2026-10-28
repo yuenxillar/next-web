@@ -2,9 +2,8 @@ use std::ops::{Deref, DerefMut};
 
 use next_web_core::http::StatusCode;
 use next_web_core::{
-    async_trait,
-    http::{HttpRequest, HttpResponse, HttpMethod},
-    Named, Required,
+    Named, Required, async_trait,
+    http::{HttpMethod, HttpRequest, HttpResponse},
 };
 use tracing::error;
 
@@ -88,7 +87,10 @@ impl AdviceFilterExt for LogoutFilter {
         // added for SHIRO-298:
 
         if let Err(ise) = subject.logout(request, response).await {
-            error!("Encountered session errror during logout.  This can generally safely be ignored: {}", ise);
+            error!(
+                "Encountered session errror during logout.  This can generally safely be ignored: {}",
+                ise
+            );
         }
 
         self.issue_redirect(request, response, redirect_url);

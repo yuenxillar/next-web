@@ -2,8 +2,8 @@ use next_web_core::Required;
 
 use crate::{
     core::session::{
-        mgt::{default_session_context::DefaultSessionContext, session_context::SessionContext},
         SessionId,
+        mgt::{default_session_context::DefaultSessionContext, session_context::SessionContext},
     },
     web::session::mgt::web_session_context::WebSessionContext,
 };
@@ -13,7 +13,6 @@ pub struct DefaultWebSessionContext {
 }
 
 impl DefaultWebSessionContext {
-
     pub fn new(default_session_context: DefaultSessionContext) -> Self {
         Self {
             default_session_context,

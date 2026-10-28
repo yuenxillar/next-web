@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use next_web_core::{
     async_trait,
     error::BoxError,
-   http::{HttpRequest, HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 
 use crate::web::filter::{
@@ -79,6 +79,32 @@ pub trait AdviceFilterExt: Send + Sync {
     ///
     /// * `login_url` - The path of the login page of the application.
     fn apply_login_url(&mut self, _login_url: &str) -> bool {
+        false
+    }
+
+    /// Applies the success URL of the application to this filter.
+    ///
+    /// The default keeps the URL the filter was built with and reports `false`;
+    /// a filter that answers a successful login takes the URL of the
+    /// application and reports `true`.
+    ///
+    /// # Arguments
+    ///
+    /// * `success_url` - The path of the page a successful login returns to.
+    fn apply_success_url(&mut self, _success_url: &str) -> bool {
+        false
+    }
+
+    /// Applies the unauthorized URL of the application to this filter.
+    ///
+    /// The default keeps the URL the filter was built with and reports `false`;
+    /// a filter that refuses a request takes the URL of the application and
+    /// reports `true`.
+    ///
+    /// # Arguments
+    ///
+    /// * `unauthorized_url` - The path of the page a refused request returns to.
+    fn apply_unauthorized_url(&mut self, _unauthorized_url: &str) -> bool {
         false
     }
 }

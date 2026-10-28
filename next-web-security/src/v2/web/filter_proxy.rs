@@ -1,26 +1,25 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    core::subject::{support::default_subject_context::DefaultSubjectContext, Subject},
+    core::subject::{Subject, support::default_subject_context::DefaultSubjectContext},
     web::{
         filter::mgt::path_matching_filter_chain_resolver::PathMatchingFilterChainResolver,
         filter_proxy_configure::FilterProxyConfigure,
-        subject::web_subject::WebSubject,
         mgt::{
             default_web_security_manager::DefaultWebSecurityManager,
             web_security_manager::WebSecurityManager,
         },
+        subject::web_subject::WebSubject,
     },
 };
 
 use next_web_core::util::indexmap::IndexMap;
 use next_web_core::{
-    async_trait,
+    Named, async_trait,
     http::{
-        filter::{FilterError, HttpFilter, HttpFilterChain},
         HttpRequest, HttpResponse, HttpResponseShare,
+        filter::{FilterError, HttpFilter, HttpFilterChain},
     },
-    Named,
 };
 
 use crate::core::util::nameable::Nameable;
@@ -138,7 +137,8 @@ impl HttpFilter for FilterProxy {
 
         // The subject serves this call: it is given the request and a response of
         // its own, shared by `Arc`, so a filter that works through the subject
-        // writes the headers of this response 鈥?the session id cookie above all 鈥?        // and they reach the client when the chain is done.
+        // writes the headers of this response — the session id cookie above all —
+        // and they reach the client when the chain is done.
         let call_response = Arc::new(Mutex::new(HttpResponseShare::default()));
         subject.attach_shared_context(Arc::new(req.shared().clone()), call_response.clone());
 
@@ -149,7 +149,9 @@ impl HttpFilter for FilterProxy {
         // subject that is actually serving this request.
         req.set_attribute(
             crate::core::util::web::WebUtils::SHARED_SUBJECT_KEY,
-            next_web_core::any::AnyValue::BoxedValue(Box::new(Arc::<dyn WebSubject>::from(subject))),
+            next_web_core::any::AnyValue::BoxedValue(Box::new(Arc::<dyn WebSubject>::from(
+                subject,
+            ))),
         );
 
         let chain_result = self.execute_chain(req, resp, orig_chain).await;
@@ -164,7 +166,9 @@ impl HttpFilter for FilterProxy {
             }
         }
 
-        req.clean_up();
+        // The request is not cleaned up here: the state of a request belongs to
+        // the lifecycle that prepared it, and a chain that lets the request
+        // through hands it to the routes, which still read that state.
         Ok(())
     }
 }

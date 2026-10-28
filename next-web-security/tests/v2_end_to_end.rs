@@ -9,7 +9,7 @@
 //!   the next request is allowed by;
 //! * a logged in account without the role is still refused.
 
-#![cfg(feature = "v2")]
+#![cfg(all(feature = "v2", feature = "web"))]
 
 use std::sync::{Arc, Mutex};
 
@@ -23,8 +23,7 @@ use next_web_core::util::indexmap::IndexMap;
 use next_web_core::{async_trait, Named};
 use next_web_security::core::realm::simple_account_realm::{SimpleAccount, SimpleAccountRealm};
 use next_web_security::web::{
-    filter_proxy::FilterProxy,
-    filter_proxy_configure::FilterProxyConfigure,
+    filter_proxy::FilterProxy, filter_proxy_configure::FilterProxyConfigure,
     mgt::default_web_security_manager::DefaultWebSecurityManager,
 };
 
@@ -82,7 +81,6 @@ fn proxy() -> FilterProxy {
     let mut configure = FilterProxyConfigure::default();
     configure.set_filter_chain_definition_map(chains);
 
-
     FilterProxy::new(security_manager(), configure)
 }
 
@@ -92,12 +90,12 @@ async fn call(
     method: &str,
     uri: &str,
     form: Option<&str>,
-    cookie: Option<&str>,
+    headers: &[(&str, &str)],
     calls: &Arc<Mutex<Vec<String>>>,
 ) -> Response<Body> {
     let mut builder = Request::builder().method(method).uri(uri);
-    if let Some(cookie) = cookie {
-        builder = builder.header("cookie", cookie);
+    for (name, value) in headers {
+        builder = builder.header(*name, *value);
     }
     let request = builder.body(Body::empty()).expect("the request is built");
 
@@ -106,9 +104,9 @@ async fn call(
         .await
         .expect("the body is read");
     let mut request = Request::from_parts(parts, Body::from(bytes.clone()));
-    request
-        .extensions_mut()
-        .insert(RequestBody::new(form.unwrap_or_default().as_bytes().to_vec()));
+    request.extensions_mut().insert(RequestBody::new(
+        form.unwrap_or_default().as_bytes().to_vec(),
+    ));
 
     let lifecycle = RequestLifecycle::begin(&mut request);
     let mut response = Response::default();
@@ -136,12 +134,44 @@ fn session_cookie(response: &Response<Body>) -> Option<String> {
         .find_map(|value| value.split(';').next().map(str::to_string))
 }
 
+/// The `Set-Cookie` header that gives the client its session.
+fn session_set_cookie(response: &Response<Body>) -> String {
+    response
+        .headers()
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .find(|value| value.starts_with("JSESSIONID="))
+        .map(str::to_string)
+        .expect("the response holds the session cookie")
+}
+
+/// The location a response redirects to.
+fn location_of(response: &Response<Body>) -> Option<&str> {
+    response
+        .headers()
+        .get("location")
+        .and_then(|value| value.to_str().ok())
+}
+
+/// A proxy whose API is guarded by the HTTP authentication filter of the tests.
+fn api_proxy(filter: &str) -> FilterProxy {
+    let mut chains = IndexMap::new();
+    chains.insert("/api/**".to_string(), filter.to_string());
+    chains.insert("/**".to_string(), "anon".to_string());
+
+    let mut configure = FilterProxyConfigure::default();
+    configure.set_filter_chain_definition_map(chains);
+
+    FilterProxy::new(security_manager(), configure)
+}
+
 #[tokio::test]
 async fn a_public_path_is_served_to_anyone() {
     let proxy = proxy();
     let calls = Arc::new(Mutex::new(Vec::new()));
 
-    let response = call(&proxy, "GET", "/public/hello", None, None, &calls).await;
+    let response = call(&proxy, "GET", "/public/hello", None, &[], &calls).await;
 
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
@@ -155,7 +185,7 @@ async fn an_administrative_path_is_refused_to_an_anonymous_request() {
     let proxy = proxy();
     let calls = Arc::new(Mutex::new(Vec::new()));
 
-    let response = call(&proxy, "GET", "/admin/reports", None, None, &calls).await;
+    let response = call(&proxy, "GET", "/admin/reports", None, &[], &calls).await;
 
     assert!(
         calls.lock().expect("the log is not poisoned").is_empty(),
@@ -174,13 +204,36 @@ async fn a_login_leaves_the_session_that_the_next_request_is_allowed_by() {
         "POST",
         "/login.jsp",
         Some("username=root&password=secret"),
-        None,
+        &[],
         &calls,
     )
     .await;
     let cookie = session_cookie(&response).expect("the login writes the session cookie");
 
-    let response = call(&proxy, "GET", "/admin/reports", None, Some(&cookie), &calls).await;
+    // The login returns the client to the success page of the application, and
+    // the cookie of the session is the cookie of the whole application: the
+    // login page alone would not see it again on the next request.
+    assert_eq!(response.status(), StatusCode::FOUND, "the login redirects");
+    assert_eq!(
+        location_of(&response),
+        Some("/"),
+        "the login returns to the success page"
+    );
+    assert!(
+        session_set_cookie(&response).contains("Path=/"),
+        "the session cookie belongs to every path: {}",
+        session_set_cookie(&response)
+    );
+
+    let response = call(
+        &proxy,
+        "GET",
+        "/admin/reports",
+        None,
+        &[("cookie", cookie.as_str())],
+        &calls,
+    )
+    .await;
 
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
@@ -189,8 +242,160 @@ async fn a_login_leaves_the_session_that_the_next_request_is_allowed_by() {
     );
 }
 
+/// The success page of the application is the page a login returns to.
 #[tokio::test]
-#[ignore = "same as the login above"]
+async fn the_success_url_of_the_application_is_the_page_a_login_returns_to() {
+    let mut chains = IndexMap::new();
+    chains.insert("/login.jsp".to_string(), "authc".to_string());
+    chains.insert("/**".to_string(), "anon".to_string());
+
+    let mut configure = FilterProxyConfigure::default();
+    configure.set_success_url("/home");
+    configure.set_filter_chain_definition_map(chains);
+
+    let proxy = FilterProxy::new(security_manager(), configure);
+    let calls = Arc::new(Mutex::new(Vec::new()));
+
+    let response = call(
+        &proxy,
+        "POST",
+        "/login.jsp",
+        Some("username=root&password=secret"),
+        &[],
+        &calls,
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::FOUND, "the login redirects");
+    assert_eq!(
+        location_of(&response),
+        Some("/home"),
+        "the login returns to the page of the application"
+    );
+}
+
+/// The unauthorized page of the application answers a refused request.
+#[tokio::test]
+async fn the_unauthorized_url_of_the_application_answers_a_refused_request() {
+    let mut chains = IndexMap::new();
+    chains.insert("/admin/**".to_string(), "roles[admin]".to_string());
+    chains.insert("/**".to_string(), "anon".to_string());
+
+    let mut configure = FilterProxyConfigure::default();
+    configure.set_unauthorized_url("/forbidden");
+    configure.set_filter_chain_definition_map(chains);
+
+    let proxy = FilterProxy::new(security_manager(), configure);
+    let calls = Arc::new(Mutex::new(Vec::new()));
+
+    let response = call(&proxy, "GET", "/admin/reports", None, &[], &calls).await;
+
+    assert!(
+        calls.lock().expect("the log is not poisoned").is_empty(),
+        "the application is not reached"
+    );
+    assert_eq!(
+        response.status(),
+        StatusCode::FOUND,
+        "the refusal redirects"
+    );
+    assert_eq!(
+        location_of(&response),
+        Some("/forbidden"),
+        "the refusal returns to the page of the application"
+    );
+}
+
+/// The Basic chain refuses an anonymous request with a challenge.
+#[tokio::test]
+async fn a_basic_chain_challenges_an_anonymous_request() {
+    let proxy = api_proxy("authcBasic");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+
+    let response = call(&proxy, "GET", "/api/data", None, &[], &calls).await;
+
+    assert!(
+        calls.lock().expect("the log is not poisoned").is_empty(),
+        "the application is not reached before the login"
+    );
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert!(
+        response.headers().get("www-authenticate").is_some(),
+        "the challenge names the scheme of the filter"
+    );
+}
+
+/// The Basic chain authenticates the credentials of the authorization header.
+#[tokio::test]
+async fn a_basic_chain_authenticates_the_credentials_of_the_header() {
+    let proxy = api_proxy("authcBasic");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+
+    // `root:secret` in the base64 of the Basic scheme.
+    let response = call(
+        &proxy,
+        "GET",
+        "/api/data",
+        None,
+        &[("authorization", "Basic cm9vdDpzZWNyZXQ=")],
+        &calls,
+    )
+    .await;
+
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "the credentials of the account are accepted"
+    );
+    assert_eq!(
+        *calls.lock().expect("the log is not poisoned"),
+        vec!["application"]
+    );
+}
+
+/// The Bearer chain refuses an anonymous request with a challenge.
+#[tokio::test]
+async fn a_bearer_chain_challenges_an_anonymous_request() {
+    let proxy = api_proxy("authcBearer");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+
+    let response = call(&proxy, "GET", "/api/data", None, &[], &calls).await;
+
+    assert!(
+        calls.lock().expect("the log is not poisoned").is_empty(),
+        "the application is not reached before the login"
+    );
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert!(
+        response.headers().get("www-authenticate").is_some(),
+        "the challenge names the scheme of the filter"
+    );
+}
+
+/// A bearer token that no realm of the application accepts is refused.
+#[tokio::test]
+async fn a_bearer_chain_refuses_a_token_no_realm_accepts() {
+    let proxy = api_proxy("authcBearer");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+
+    let response = call(
+        &proxy,
+        "GET",
+        "/api/data",
+        None,
+        &[("authorization", "Bearer a-token-no-realm-knows")],
+        &calls,
+    )
+    .await;
+
+    assert!(
+        calls.lock().expect("the log is not poisoned").is_empty(),
+        "the application is not reached with a token no realm accepts"
+    );
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
 async fn a_logged_in_account_without_the_role_is_still_refused() {
     let proxy = proxy();
     let calls = Arc::new(Mutex::new(Vec::new()));
@@ -200,13 +405,21 @@ async fn a_logged_in_account_without_the_role_is_still_refused() {
         "POST",
         "/login.jsp",
         Some("username=guest&password=guest"),
-        None,
+        &[],
         &calls,
     )
     .await;
     let cookie = session_cookie(&response).expect("the login writes the session cookie");
 
-    let response = call(&proxy, "GET", "/admin/reports", None, Some(&cookie), &calls).await;
+    let response = call(
+        &proxy,
+        "GET",
+        "/admin/reports",
+        None,
+        &[("cookie", cookie.as_str())],
+        &calls,
+    )
+    .await;
 
     assert!(
         calls.lock().expect("the log is not poisoned").is_empty(),
@@ -223,8 +436,7 @@ async fn diagnostic_the_chains_of_the_proxy() {
     use next_web_core::Required;
     use next_web_security::web::filter::{
         authz::roles_authorization_filter::RolesAuthorizationFilter,
-        once_per_request_filter::HttpFilterWrapper,
-        path_matching_filter::PathMatchingFilter,
+        once_per_request_filter::HttpFilterWrapper, path_matching_filter::PathMatchingFilter,
     };
 
     let proxy = proxy();
@@ -247,18 +459,20 @@ async fn diagnostic_the_chains_of_the_proxy() {
         "the chain of /admin/reports resolves; the chains are {names:?}"
     );
 
-    // The chain of `/admin/**` holds one filter — `roles[admin]` — and the
-    // configuration of the chain reaches the instance: the path it was declared
-    // for, with the role it requires.
+    // The chain of `/admin/**` holds the global filter of the application and —
+    // after it — the roles filter, which the configuration of the chain reached:
+    // the path it was declared for, with the role it requires.
     let chain = manager
         .get_chain("/admin/**")
         .expect("the administrative path has a chain of its own");
     let filters = chain.get_object();
 
-    assert_eq!(filters.len(), 1, "the chain is the roles filter");
-
-    let filter = (filters[0].as_ref() as &dyn Any)
-        .downcast_ref::<HttpFilterWrapper<RolesAuthorizationFilter>>()
+    let filter = filters
+        .iter()
+        .find_map(|filter| {
+            (filter.as_ref() as &dyn Any)
+                .downcast_ref::<HttpFilterWrapper<RolesAuthorizationFilter>>()
+        })
         .expect("the chain holds the roles filter of the port");
     let applied_paths =
         <RolesAuthorizationFilter as Required<PathMatchingFilter>>::get_object(&filter.0)
@@ -308,8 +522,13 @@ async fn the_login_url_of_the_application_reaches_the_filter_of_its_chain() {
     let chain = manager
         .get_chain("/signin")
         .expect("the login path has a chain of its own");
-    let filter = (chain.get_object()[0].as_ref() as &dyn Any)
-        .downcast_ref::<HttpFilterWrapper<FormAuthenticationFilter>>()
+    let filter = chain
+        .get_object()
+        .iter()
+        .find_map(|filter| {
+            (filter.as_ref() as &dyn Any)
+                .downcast_ref::<HttpFilterWrapper<FormAuthenticationFilter>>()
+        })
         .expect("the login chain holds the form filter of the port");
 
     assert_eq!(
@@ -348,9 +567,13 @@ async fn diagnostic_the_login_submission_reaches_the_authenticator() {
     let chain = manager
         .get_chain("/login.jsp")
         .expect("the login path has a chain of its own");
-    let filters = chain.get_object();
-    let filter = (filters[0].as_ref() as &dyn Any)
-        .downcast_ref::<HttpFilterWrapper<FormAuthenticationFilter>>()
+    let filter = chain
+        .get_object()
+        .iter()
+        .find_map(|filter| {
+            (filter.as_ref() as &dyn Any)
+                .downcast_ref::<HttpFilterWrapper<FormAuthenticationFilter>>()
+        })
         .expect("the login chain holds the form filter of the port");
 
     let builder = Request::builder()

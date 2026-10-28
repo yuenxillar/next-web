@@ -18,8 +18,9 @@ use crate::{
         },
         util::object::Object,
     },
-    web::subject::web_subject::WebSubject,
 };
+#[cfg(feature = "web")]
+use crate::web::subject::web_subject::WebSubject;
 use next_web_core::error::BoxError;
 #[cfg(feature = "web")]
 use next_web_core::http::HttpResponse;
@@ -118,7 +119,10 @@ where
         #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
     ) -> Result<(), BoxError> {
         let bytes = self.convert_principals_to_bytes(principals)?;
+        #[cfg(feature = "web")]
         ext.remember_serialized_identity(subject, &bytes, resp)?;
+        #[cfg(not(feature = "web"))]
+        ext.remember_serialized_identity(subject, &bytes)?;
         Ok(())
     }
 
@@ -162,6 +166,7 @@ where
     }
 }
 
+#[cfg(feature = "web")]
 impl<C> DefaultRememberMeManager<C>
 where
     C: CipherService,
@@ -172,11 +177,30 @@ where
         _token: &dyn AuthenticationToken,
         authc_info: &dyn AuthenticationInfo,
         ext: &dyn DefaultRememberMeManagerExt,
-
-        #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
+        resp: &mut dyn HttpResponse,
     ) -> Result<(), BoxError> {
         if let Some(principals) = self.get_identity_to_remember(subject, authc_info) {
             self._remember_identity(subject, principals.as_ref(), ext, resp)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(not(feature = "web"))]
+impl<C> DefaultRememberMeManager<C>
+where
+    C: CipherService,
+{
+    pub fn remember_identity(
+        &self,
+        subject: &dyn Subject,
+        _token: &dyn AuthenticationToken,
+        authc_info: &dyn AuthenticationInfo,
+        ext: &dyn DefaultRememberMeManagerExt,
+    ) -> Result<(), BoxError> {
+        if let Some(principals) = self.get_identity_to_remember(subject, authc_info) {
+            self._remember_identity(subject, principals.as_ref(), ext)?;
         }
 
         Ok(())

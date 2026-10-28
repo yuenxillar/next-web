@@ -4,14 +4,16 @@ use std::{
 };
 
 use next_web_core::{
-    async_trait,
+    Named, Required, async_trait,
     http::{HttpRequest, HttpResponse},
-    Named, Required,
 };
 use tracing::debug;
 
 use crate::{
-    core::authc::{authentication_token::AuthenticationToken, bearer_token::BearerToken},
+    core::{
+        authc::{authentication_token::AuthenticationToken, bearer_token::BearerToken},
+        util::object::Object,
+    },
     web::filter::{
         access_control_filter::AccessControlFilterExt,
         advice_filter::AdviceFilterExt,
@@ -20,7 +22,7 @@ use crate::{
             http_authentication_filter::{HttpAuthenticationFilter, HttpAuthenticationFilterExt},
         },
         once_per_request_filter::OncePerRequestFilter,
-        path_matching_filter::PathMatchingFilter,
+        path_matching_filter::{PathMatchingFilter, PathMatchingFilterExt},
     },
 };
 
@@ -45,10 +47,64 @@ impl BearerHttpAuthenticationFilter {
 }
 
 #[async_trait]
-impl AdviceFilterExt for BearerHttpAuthenticationFilter {}
+impl AdviceFilterExt for BearerHttpAuthenticationFilter {
+    async fn pre_handle(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        ext: Option<&dyn PathMatchingFilterExt>,
+    ) -> bool {
+        <Self as Required<PathMatchingFilter>>::get_object(self)
+            .pre_handle(request, response, ext)
+            .await
+    }
+}
 
 #[async_trait]
-impl AccessControlFilterExt for BearerHttpAuthenticationFilter {}
+impl AccessControlFilterExt for BearerHttpAuthenticationFilter {
+    async fn is_access_allowed(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        mapped_value: Option<Object>,
+    ) -> bool {
+        self.http_authentication_filter
+            .is_access_allowed(request, response, mapped_value)
+            .await
+    }
+
+    fn is_login_request(&self, request: &dyn HttpRequest, response: &dyn HttpResponse) -> bool {
+        self.is_login_attempt(request, response)
+    }
+
+    async fn on_access_denied(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        _mapped_value: Option<Object>,
+    ) -> bool {
+        let mut logged_in = false;
+
+        if self.is_login_attempt(request, response) {
+            // The token of a Bearer login is the token of the header, so this
+            // filter is the one that builds and authenticates it.
+            if let Ok(result) = self
+                .http_authentication_filter
+                .authenticating_filter
+                .execute_login(request, response, self)
+                .await
+            {
+                logged_in = result;
+            }
+        }
+
+        if !logged_in {
+            self.send_challenge(request, response);
+        }
+
+        logged_in
+    }
+}
 
 #[async_trait]
 impl AuthenticatingFilterExt for BearerHttpAuthenticationFilter {
@@ -64,7 +120,7 @@ impl AuthenticatingFilterExt for BearerHttpAuthenticationFilter {
         debug!("Attempting to execute login with auth header");
         let mut prin_cred = self
             .http_authentication_filter
-            .get_principals_and_credentials(&authz_header.unwrap(), request);
+            .get_principals_and_credentials(&authz_header.unwrap(), request, self);
 
         if prin_cred.is_none() || prin_cred.as_ref().map(|v| v.is_empty()).unwrap_or(true) {
             return self.create_bearer_token("", request);

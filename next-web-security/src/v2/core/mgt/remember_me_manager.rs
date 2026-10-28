@@ -75,14 +75,14 @@ where
 
     fn on_successful_login(
         &self,
-        subject: &mut dyn Subject,
+        subject: &dyn Subject,
         token: &dyn AuthenticationToken,
         info: &dyn AuthenticationInfo,
     );
 
     fn on_failed_login(
         &self,
-        subject: &mut dyn Subject,
+        subject: &dyn Subject,
         token: &dyn AuthenticationToken,
         ae: &AuthenticationError,
     );
@@ -95,7 +95,7 @@ where
 impl RememberMeManager for () {
     fn on_successful_login(
         &self,
-        subject: &mut dyn Subject,
+        subject: &dyn Subject,
         token: &dyn AuthenticationToken,
         info: &dyn AuthenticationInfo,
     ) {
@@ -105,17 +105,17 @@ impl RememberMeManager for () {
 
     fn on_failed_login(
         &self,
-        subject: &mut dyn Subject,
+        subject: &dyn Subject,
         token: &dyn AuthenticationToken,
         ae: &AuthenticationError,
     ) {
     }
 
-    fn on_logout(&self, subject: &mut dyn Subject) {}
+    fn on_logout(&self, subject: &dyn Subject) {}
 
     fn get_remembered_principals(
         &self,
-        subject_context: &mut dyn SubjectContext,
+        subject_context: &dyn SubjectContext,
     ) -> Option<Arc<dyn PrincipalCollection>> {
         None
     }

@@ -1,12 +1,12 @@
 use next_web_core::{
+    Named, Required,
     any::AnyValue,
     async_trait,
     error::BoxError,
     http::{
-        filter::{FilterError, HttpFilter, HttpFilterChain},
         HttpRequest, HttpResponse,
+        filter::{FilterError, HttpFilter, HttpFilterChain},
     },
-    Named, Required,
 };
 
 use crate::core::util::nameable::Nameable;
@@ -133,8 +133,10 @@ where
 
             filter_chain.do_filter(request, response).await
         } else if !_self.is_enabled() {
-            debug!("Filter '{:?}' is not enabled for the current request.  Proceeding without invoking this filter.",
-                    _self.get_name());
+            debug!(
+                "Filter '{:?}' is not enabled for the current request.  Proceeding without invoking this filter.",
+                _self.get_name()
+            );
             filter_chain.do_filter(request, response).await
         } else {
             trace!(
@@ -164,6 +166,14 @@ where
         // login page is the one it wraps, so the property is applied there.
         self.0.apply_login_url(login_url)
     }
+
+    fn apply_success_url(&mut self, success_url: &str) -> bool {
+        self.0.apply_success_url(success_url)
+    }
+
+    fn apply_unauthorized_url(&mut self, unauthorized_url: &str) -> bool {
+        self.0.apply_unauthorized_url(unauthorized_url)
+    }
 }
 
 #[async_trait]
@@ -184,6 +194,13 @@ where
             // itself — a redirect to the login page, an unauthorized status — so
             // the request is over and not failed. Apache Shiro's `AdviceFilter`
             // returns here as well.
+            //
+            // The response is marked as committed, which is how the layer of the
+            // application tells an answered request from one the routes still
+            // have to answer: a redirect or a `401` that was not committed would
+            // be replaced by the answer of the routes.
+            response.commit();
+
             return Ok(());
         }
 

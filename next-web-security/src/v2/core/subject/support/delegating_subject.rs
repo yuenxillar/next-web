@@ -7,23 +7,25 @@ use next_web_core::{
 };
 use tracing::{debug, warn};
 
-#[cfg(feature = "web")]
-use crate::{
-    core::{
-        authc::{authentication_token::AuthenticationToken, AuthenticationError},
-        authz::authorization_error::AuthorizationError,
-        session::{
-            mgt::{
-                default_session_context::DefaultSessionContext, session_context::SessionContext,
-            },
-            proxied_session::ProxiedSession,
-            Session, SessionError, SessionValue,
+use crate::core::{
+    authc::{authentication_token::AuthenticationToken, AuthenticationError},
+    authz::authorization_error::AuthorizationError,
+    session::{
+        mgt::{
+            default_session_context::DefaultSessionContext, session_context::SessionContext,
         },
-        subject::{principal_collection::PrincipalCollection, Subject},
-        util::object::Object,
+        proxied_session::ProxiedSession,
+        Session, SessionError, SessionValue,
     },
-    web::mgt::web_security_manager::WebSecurityManager,
+    subject::{principal_collection::PrincipalCollection, Subject},
+    util::object::Object,
 };
+#[cfg(not(feature = "web"))]
+use crate::core::mgt::security_manager::SecurityManager;
+#[cfg(feature = "web")]
+use crate::web::mgt::web_security_manager::WebSecurityManager;
+
+#[cfg(feature = "web")]
 use std::sync::Mutex;
 
 use std::{
@@ -41,8 +43,10 @@ pub struct DelegatingSubject {
     pub(crate) session: Option<Arc<dyn Session>>,
     session_creation_enabled: bool,
     /// The request of the call the subject serves, when it was given one.
+    #[cfg(feature = "web")]
     request_share: Option<Arc<HttpRequestShare>>,
     /// The response of the call the subject serves, when it was given one.
+    #[cfg(feature = "web")]
     response_share: Option<Arc<Mutex<HttpResponseShare>>>,
 
     #[cfg(not(feature = "web"))]
@@ -60,11 +64,13 @@ impl DelegatingSubject {
     ));
 
     /// Returns the request of the call the subject serves, when it was given one.
+    #[cfg(feature = "web")]
     pub fn request_share(&self) -> Option<&Arc<HttpRequestShare>> {
         self.request_share.as_ref()
     }
 
     /// Returns the response of the call the subject serves, when it was given one.
+    #[cfg(feature = "web")]
     pub fn response_share(&self) -> Option<&Arc<Mutex<HttpResponseShare>>> {
         self.response_share.as_ref()
     }
@@ -75,6 +81,7 @@ impl DelegatingSubject {
     ///
     /// * `request` - The snapshot of the request of the call.
     /// * `response` - The response of the call, shared with the filter chain.
+    #[cfg(feature = "web")]
     pub fn attach_shared_context(
         &mut self,
         request: Arc<HttpRequestShare>,
@@ -89,6 +96,7 @@ impl DelegatingSubject {
     /// # Arguments
     ///
     /// * `response` - The response a manager filled while it worked for the subject.
+    #[cfg(feature = "web")]
     fn merge_response_share(&self, response: &HttpResponseShare) {
         let Some(target) = self.response_share.as_ref() else {
             return;
@@ -106,6 +114,7 @@ impl DelegatingSubject {
         }
     }
 
+    #[cfg(feature = "web")]
     pub fn new(
         principals: Option<Arc<dyn PrincipalCollection>>,
         authenticated: bool,
@@ -124,7 +133,34 @@ impl DelegatingSubject {
             response_share: None,
             security_manager,
         };
-        if session.is_some() {}
+
+        let session = match session {
+            Some(session) => subject.decorate(session),
+            None => return subject,
+        };
+
+        subject.session = Some(session);
+        subject
+    }
+
+    #[cfg(not(feature = "web"))]
+    pub fn new(
+        principals: Option<Arc<dyn PrincipalCollection>>,
+        authenticated: bool,
+        host: Option<String>,
+        session: Option<Arc<dyn Session>>,
+        session_creation_enabled: bool,
+        security_manager: Arc<dyn SecurityManager>,
+    ) -> Self {
+        let mut subject = Self {
+            principals,
+            authenticated,
+            host,
+            session_creation_enabled,
+            session: None,
+            security_manager,
+        };
+
         let session = match session {
             Some(session) => subject.decorate(session),
             None => return subject,
@@ -139,7 +175,13 @@ impl DelegatingSubject {
         Arc::new(session)
     }
 
+    #[cfg(feature = "web")]
     pub fn get_security_manager(&self) -> &dyn WebSecurityManager {
+        self.security_manager.as_ref()
+    }
+
+    #[cfg(not(feature = "web"))]
+    pub fn get_security_manager(&self) -> &dyn SecurityManager {
         self.security_manager.as_ref()
     }
 
@@ -148,7 +190,13 @@ impl DelegatingSubject {
     /// The subject a login builds works through the manager of the subject it
     /// was built from, so the manager is handed over as the shared value both
     /// of them hold.
+    #[cfg(feature = "web")]
     pub fn get_owned_security_manager(&self) -> Arc<dyn WebSecurityManager> {
+        self.security_manager.clone()
+    }
+
+    #[cfg(not(feature = "web"))]
+    pub fn get_owned_security_manager(&self) -> Arc<dyn SecurityManager> {
         self.security_manager.clone()
     }
 
@@ -459,6 +507,7 @@ impl Subject for DelegatingSubject {
             // a session with that request: the web manager writes the session id
             // cookie into the response while it starts the session, which a manager
             // called without a request cannot do.
+            #[cfg(feature = "web")]
             let created = match self.request_share.clone() {
                 Some(request) => {
                     let mut request = (*request).clone();
@@ -484,6 +533,13 @@ impl Subject for DelegatingSubject {
                     .map_err(|error| error.to_string()),
             };
 
+            #[cfg(not(feature = "web"))]
+            let created = self
+                .security_manager
+                .start_session(&session_context)
+                .await
+                .map_err(|error| error.to_string());
+
             match created {
                 Ok(session) => self.session = Some(session),
                 Err(error) => {
@@ -504,9 +560,16 @@ impl Subject for DelegatingSubject {
         #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
     ) -> Result<(), AuthenticationError> {
         #[cfg(not(feature = "web"))]
-        return self._login(token).await;
+        {
+            let subject = self.security_manager.login(&*self, token).await?;
 
-        Ok(())
+            return self._login(subject).await;
+        }
+
+        #[cfg(feature = "web")]
+        {
+            Ok(())
+        }
     }
 
     async fn logout(
@@ -517,7 +580,7 @@ impl Subject for DelegatingSubject {
         #[cfg(not(feature = "web"))]
         {
             self.clear_run_as_identities_internal().await;
-            if let Err(error) = self.security_manager.logout(subject).await {
+            if let Err(error) = self.security_manager.logout(&*self).await {
                 debug!(
                     "Encountered session exception trying to log out subject.  This can generally safely be ignored. {:?}",
                     error
@@ -527,7 +590,10 @@ impl Subject for DelegatingSubject {
             return self._logout().await;
         }
 
-        Ok(())
+        #[cfg(feature = "web")]
+        {
+            Ok(())
+        }
     }
 
     // ======================================
@@ -589,9 +655,9 @@ impl Subject for DelegatingSubject {
 impl DelegatingSubject {
     /// Returns the context a session of this subject is created with.
     ///
-    /// The creation itself is wired when a session manager can be asked for a
-    /// session without the request the web manager reads its cookie from.
-    #[allow(dead_code)]
+    /// A subject of the core tree opens its session from this context alone; a
+    /// web subject gives the session the request of its call as well, so the
+    /// manager can write the session id cookie into the response.
     fn create_session_context(&self) -> impl SessionContext + 'static {
         let mut session_context = DefaultSessionContext::default();
         if let Some(host) = self.host.as_ref() {

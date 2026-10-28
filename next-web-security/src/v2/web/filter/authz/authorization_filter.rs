@@ -22,6 +22,21 @@ impl AuthorizationFilter {
     pub fn set_unauthorized_url(&mut self, unauthorized_url: impl ToString) {
         self.unauthorized_url = Some(unauthorized_url.to_string());
     }
+
+    /// Applies the unauthorized URL of the application when this filter has none
+    /// of its own.
+    ///
+    /// Returns `true` when the URL was taken, and `false` when the filter keeps
+    /// the one the application configured on it.
+    pub(crate) fn apply_unauthorized_url_if_absent(&mut self, unauthorized_url: &str) -> bool {
+        if self.unauthorized_url.is_some() {
+            return false;
+        }
+
+        self.set_unauthorized_url(unauthorized_url);
+
+        true
+    }
 }
 
 #[async_trait]

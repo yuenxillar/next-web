@@ -1,7 +1,6 @@
 use next_web_core::{
-    clone_box,
+    Required, clone_box,
     http::filter::{HttpFilter, HttpFilterChain},
-    Required,
 };
 
 use crate::web::{

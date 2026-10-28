@@ -5,7 +5,7 @@
 //! picks the chain a request falls into. The tests here hold that path: a request
 //! is resolved to the chain of its path, and the filters of that chain run.
 
-#![cfg(feature = "v2")]
+#![cfg(all(feature = "v2", feature = "web"))]
 
 use std::sync::{Arc, Mutex};
 

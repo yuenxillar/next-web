@@ -2,23 +2,26 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use next_web_core::{
+    Named, Required,
     any::AnyValue,
     async_trait,
-    http::{HttpRequest, HttpResponse, HttpMethod},
-    Named, Required,
+    http::{HttpMethod, HttpRequest, HttpResponse},
 };
 use tracing::{debug, trace};
 
 use crate::{
     core::{
-        authc::{authentication_token::AuthenticationToken, AuthenticationError},
+        authc::{AuthenticationError, authentication_token::AuthenticationToken},
         subject::Subject,
         util::{object::Object, web::WebUtils},
     },
     web::filter::{
         access_control_filter::{AccessControlFilter, AccessControlFilterExt},
         advice_filter::AdviceFilterExt,
-        authc::authenticating_filter::{AuthenticatingFilter, AuthenticatingFilterExt},
+        authc::{
+            authenticating_filter::{AuthenticatingFilter, AuthenticatingFilterExt},
+            authentication_filter::AuthenticationFilter,
+        },
         once_per_request_filter::OncePerRequestFilter,
         path_matching_filter::{PathMatchingFilter, PathMatchingFilterExt},
     },
@@ -156,6 +159,19 @@ impl AdviceFilterExt for FormAuthenticationFilter {
 
         true
     }
+
+    fn apply_success_url(&mut self, success_url: &str) -> bool {
+        // The application sets the page a login returns to once; a filter whose
+        // success URL was configured by the application itself keeps it.
+        let configured = self.authenticating_filter.get_success_url();
+        if configured != AuthenticationFilter::DEFAULT_SUCCESS_URL {
+            return false;
+        }
+
+        self.authenticating_filter.set_success_url(success_url);
+
+        true
+    }
 }
 
 impl Required<OncePerRequestFilter> for FormAuthenticationFilter {
@@ -259,7 +275,12 @@ impl AuthenticatingFilterExt for FormAuthenticationFilter {
     }
 
     fn is_remember_me(&self, request: &dyn HttpRequest) -> bool {
-        WebUtils::is_true(request, self.get_remember_me_param())
+        // A form submission carries the flag in the body of the post, so the
+        // parameter is read with the lookup that covers the query and the body.
+        request
+            .form_parameter(self.get_remember_me_param())
+            .map(|value| WebUtils::is_true_value(value.as_ref()))
+            .unwrap_or_default()
     }
 
     async fn on_login_success(

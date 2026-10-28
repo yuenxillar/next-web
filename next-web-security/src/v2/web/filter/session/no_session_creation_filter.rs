@@ -1,10 +1,10 @@
 use std::ops::{Deref, DerefMut};
 
 use next_web_core::{
+    Named, Required,
     any::AnyValue,
     async_trait,
     http::{HttpRequest, HttpResponse},
-    Named, Required,
 };
 
 use crate::{

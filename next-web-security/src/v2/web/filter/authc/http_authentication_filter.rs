@@ -128,20 +128,25 @@ impl HttpAuthenticationFilter {
         false
     }
 
+    /// Splits the authorization header and hands the scheme and the value to the
+    /// filter that knows the scheme.
+    ///
+    /// The scheme belongs to the filter the application configured — the Basic
+    /// filter decodes a user name and a password, the Bearer filter takes the
+    /// token — so the extension is passed in rather than resolved here: this
+    /// filter is the one extended, not the one that answers the login.
     pub fn get_principals_and_credentials(
         &self,
         authorization_header: &str,
         _request: &dyn HttpRequest,
+        ext: &dyn HttpAuthenticationFilterExt,
     ) -> Option<Vec<String>> {
         let auth_tokens = authorization_header.split(" ").collect::<Vec<&str>>();
         if auth_tokens.len() < 2 {
             return None;
         }
 
-        match self.get_http_authentication_filter_ext() {
-            Some(ext) => Some(ext.get_principals_and_credentials(auth_tokens[0], auth_tokens[1])),
-            None => return None,
-        }
+        Some(ext.get_principals_and_credentials(auth_tokens[0], auth_tokens[1]))
     }
 }
 
@@ -153,21 +158,17 @@ impl AccessControlFilterExt for HttpAuthenticationFilter {
         response: &mut dyn HttpResponse,
         mapped_value: Option<Object>,
     ) -> bool {
-        let http_method = request.method();
+        let http_method = request.method().to_string().to_uppercase();
 
         let methods =
             self.http_methods_from_options(mapped_value.as_ref().and_then(|v| v.as_list_str()));
 
-        let mut authc_required = methods.as_ref().map(|x| x.len() == 0).unwrap_or_default();
-
-        if let Some(methods) = methods.as_ref() {
-            for m in methods.iter() {
-                if http_method.to_string().eq(m) {
-                    authc_required = true;
-                    break;
-                }
-            }
-        }
+        // A path that names no method requires the filter for every request;
+        // a path that names methods requires it only for those methods.
+        let authc_required = match methods {
+            Some(methods) => methods.is_empty() || methods.contains(&http_method),
+            None => true,
+        };
 
         if authc_required {
             self.authenticating_filter
@@ -218,7 +219,13 @@ impl AuthenticatingFilterExt for HttpAuthenticationFilter {
         }
         debug!("Attempting to execute login with auth header");
 
-        let prin_cred = self.get_principals_and_credentials(&authz_header.unwrap(), request);
+        let Some(ext) = self.get_http_authentication_filter_ext() else {
+            return self
+                .authenticating_filter
+                .create_token("", "", request, response, self);
+        };
+
+        let prin_cred = self.get_principals_and_credentials(&authz_header.unwrap(), request, ext);
 
         if prin_cred.is_none() || prin_cred.as_ref().map(|v| v.len() < 2).unwrap_or(true) {
             let username = prin_cred

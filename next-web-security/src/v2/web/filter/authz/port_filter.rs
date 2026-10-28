@@ -1,9 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use next_web_core::{
-    async_trait,
+    Named, Required, async_trait,
     http::{HttpRequest, HttpResponse},
-    Named, Required,
 };
 
 use crate::{
@@ -114,6 +113,11 @@ impl AdviceFilterExt for PortFilter {
         <Self as Required<PathMatchingFilter>>::get_object(self)
             .pre_handle(request, response, ext)
             .await
+    }
+
+    fn apply_unauthorized_url(&mut self, unauthorized_url: &str) -> bool {
+        self.authorization_filter
+            .apply_unauthorized_url_if_absent(unauthorized_url)
     }
 }
 

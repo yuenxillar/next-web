@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use next_web_core::any::AnyValue;
-use next_web_core::http::{HttpRequest, HttpResponse};
 use next_web_core::http::HttpMethod;
+use next_web_core::http::{HttpRequest, HttpResponse};
 
 use crate::core::mgt::security_manager::SecurityManager;
 use crate::core::subject::Subject;
 use crate::core::util::redirect_view::RedirectView;
 use crate::web::subject::support::default_web_subject_context::DefaultWebSubjectContext;
 use crate::web::subject::support::web_delegating_subject::{
-    WebDelegatingSubject, DEFAULT_WEB_DELEGATING_SUBJECT_KEY,
+    DEFAULT_WEB_DELEGATING_SUBJECT_KEY, WebDelegatingSubject,
 };
 
 pub struct WebUtils;
@@ -103,21 +103,25 @@ impl WebUtils {
     }
 
     pub fn is_true(req: &dyn HttpRequest, param_name: &str) -> bool {
-        let value = Self::get_clean_param(req, param_name);
-        if let Some(value) = value {
-            if !value.is_empty()
-                && (value.eq_ignore_ascii_case("true")
-                    || value.eq_ignore_ascii_case("t")
-                    || value.eq_ignore_ascii_case("1")
-                    || value.eq_ignore_ascii_case("enabled")
-                    || value.eq_ignore_ascii_case("y")
-                    || value.eq_ignore_ascii_case("yes")
-                    || value.eq_ignore_ascii_case("on"))
-            {
-                return true;
-            }
-        }
-        false
+        Self::get_clean_param(req, param_name)
+            .map(Self::is_true_value)
+            .unwrap_or_default()
+    }
+
+    /// Returns whether a parameter value is one of the spellings of `true`.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value of the parameter.
+    pub fn is_true_value(value: &str) -> bool {
+        !value.is_empty()
+            && (value.eq_ignore_ascii_case("true")
+                || value.eq_ignore_ascii_case("t")
+                || value.eq_ignore_ascii_case("1")
+                || value.eq_ignore_ascii_case("enabled")
+                || value.eq_ignore_ascii_case("y")
+                || value.eq_ignore_ascii_case("yes")
+                || value.eq_ignore_ascii_case("on"))
     }
 
     /// The attribute the filter chain binds the subject of the call under.
@@ -193,7 +197,10 @@ mod tests {
         // leaves the decoding to the caller that needs it.
         let request = request("/login?username=root");
 
-        assert_eq!(WebUtils::get_clean_param(&request, "username"), Some("root"));
+        assert_eq!(
+            WebUtils::get_clean_param(&request, "username"),
+            Some("root")
+        );
         assert_eq!(WebUtils::get_clean_param(&request, "missing"), None);
     }
 
@@ -206,7 +213,10 @@ mod tests {
 
         for value in ["false", "0", "no", ""] {
             let request = request(&format!("/x?flag={value}"));
-            assert!(!WebUtils::is_true(&request, "flag"), "value {value} is not true");
+            assert!(
+                !WebUtils::is_true(&request, "flag"),
+                "value {value} is not true"
+            );
         }
 
         let request = request("/x");

@@ -4,15 +4,15 @@ use std::{
 };
 
 use next_web_core::{
-    async_trait,
+    Named, Required, async_trait,
     http::{HttpRequest, HttpResponse},
-    Named, Required,
 };
 
 use crate::{
     core::util::object::Object,
     web::filter::{
-        access_control_filter::AccessControlFilterExt, advice_filter::AdviceFilterExt,
+        access_control_filter::AccessControlFilterExt,
+        advice_filter::AdviceFilterExt,
         authz::permissions_authorization_filter::PermissionsAuthorizationFilter,
         once_per_request_filter::OncePerRequestFilter,
         path_matching_filter::{PathMatchingFilter, PathMatchingFilterExt},
@@ -108,6 +108,13 @@ impl AdviceFilterExt for HttpMethodPermissionFilter {
         <Self as Required<PathMatchingFilter>>::get_object(self)
             .pre_handle(request, response, ext)
             .await
+    }
+
+    fn apply_unauthorized_url(&mut self, unauthorized_url: &str) -> bool {
+        // The permission filter this one extends is the one that answers a
+        // refused request, so the URL belongs to it.
+        self.permissions_authorization_filter
+            .apply_unauthorized_url(unauthorized_url)
     }
 }
 

@@ -1,7 +1,6 @@
 use next_web_core::{
-    async_trait,
+    Named, Required, async_trait,
     http::{HttpRequest, HttpResponse},
-    Named, Required,
 };
 
 use crate::{

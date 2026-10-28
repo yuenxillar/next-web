@@ -85,6 +85,11 @@ tower = { workspace = true }
 # linked, so that its providers are discovered, and the feature that makes it read
 # the application's properties.
 next-web-resilience = { workspace = true, features = ["autoconfigure"] }
+# The production test of the `v2` web security integration runs a real
+# application, on a real socket, with the filter chain the application context
+# resolves; the client is a real HTTP client that keeps its cookies.
+next-web-security = { path = "../next-web-security" }
+reqwest = { workspace = true, features = ["cookies"] }
 
 [features]
 default = ["decrypt-properties"]

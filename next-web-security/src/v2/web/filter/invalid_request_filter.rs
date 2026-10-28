@@ -2,9 +2,8 @@ use std::ops::{Deref, DerefMut};
 
 use next_web_core::http::StatusCode;
 use next_web_core::{
-    async_trait,
+    Named, Required, async_trait,
     http::{HttpRequest, HttpResponse},
-    Named, Required,
 };
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
         access_control_filter::{AccessControlFilter, AccessControlFilterExt},
         advice_filter::AdviceFilterExt,
         once_per_request_filter::OncePerRequestFilter,
-        path_matching_filter::PathMatchingFilter,
+        path_matching_filter::{PathMatchingFilter, PathMatchingFilterExt},
     },
 };
 
@@ -190,7 +189,22 @@ impl AccessControlFilterExt for InvalidRequestFilter {
 }
 
 #[async_trait]
-impl AdviceFilterExt for InvalidRequestFilter {}
+#[async_trait]
+impl AdviceFilterExt for InvalidRequestFilter {
+    async fn pre_handle(
+        &self,
+        request: &mut dyn HttpRequest,
+        response: &mut dyn HttpResponse,
+        ext: Option<&dyn PathMatchingFilterExt>,
+    ) -> bool {
+        // The validity check is a path-configuration check: it runs for the path
+        // the filter was configured for — the path of the chain it serves — and
+        // only then is the request checked.
+        <Self as Required<PathMatchingFilter>>::get_object(self)
+            .pre_handle(request, response, ext)
+            .await
+    }
+}
 
 impl Required<OncePerRequestFilter> for InvalidRequestFilter {
     fn get_object(&self) -> &OncePerRequestFilter {

@@ -2,10 +2,9 @@ use std::ops::{Deref, DerefMut};
 
 use next_web_core::util::indexmap::IndexMap;
 use next_web_core::{
-    async_trait,
+    Named, async_trait,
     error::BoxError,
     http::{HttpRequest, HttpResponse},
-    Named,
 };
 use tracing::trace;
 
@@ -144,7 +143,9 @@ where
         ext: Option<&dyn PathMatchingFilterExt>,
     ) -> bool {
         if self.applied_paths.is_empty() {
-            trace!("applied_paths property is null or empty.  This Filter will passthrough immediately.");
+            trace!(
+                "applied_paths property is null or empty.  This Filter will passthrough immediately."
+            );
 
             return true;
         }
@@ -153,7 +154,10 @@ where
             // If the path does match, then pass on to the subclass implementation for specific checks
             //(first match 'wins'):
             if self.paths_match(path, request) {
-                trace!("Current requestURI matches pattern '{}'.  Determining filter chain execution...", path);
+                trace!(
+                    "Current requestURI matches pattern '{}'.  Determining filter chain execution...",
+                    path
+                );
                 let config = self.applied_paths.get(path);
                 return self
                     .is_filter_chain_continued(request, response, path, config.cloned(), ext)

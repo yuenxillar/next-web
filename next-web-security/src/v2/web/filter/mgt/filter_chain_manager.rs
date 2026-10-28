@@ -1,5 +1,5 @@
-use next_web_core::util::indexmap::IndexMap;
 use next_web_core::http::filter::{HttpFilter, HttpFilterChain};
+use next_web_core::util::indexmap::IndexMap;
 
 use crate::web::filter::mgt::named_filter_list::NamedFilterList;
 

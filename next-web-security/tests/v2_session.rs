@@ -5,7 +5,7 @@
 //! tests here hold that path: a session created through a subject is a session a
 //! later call finds, with what was written into it.
 
-#![cfg(feature = "v2")]
+#![cfg(all(feature = "v2", feature = "web"))]
 
 use std::sync::Arc;
 

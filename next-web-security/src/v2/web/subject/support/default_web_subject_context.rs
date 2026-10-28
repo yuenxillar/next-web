@@ -9,8 +9,8 @@ use crate::{
         },
         session::{Session, SessionId},
         subject::{
-            principal_collection::PrincipalCollection, subject_context::SubjectContext,
-            support::default_subject_context::DefaultSubjectContext, Subject,
+            Subject, principal_collection::PrincipalCollection, subject_context::SubjectContext,
+            support::default_subject_context::DefaultSubjectContext,
         },
         util::object::Object,
     },
@@ -26,7 +26,6 @@ pub struct DefaultWebSubjectContext {
 }
 
 impl DefaultWebSubjectContext {
-
     pub fn new(default_subject_context: DefaultSubjectContext) -> Self {
         Self {
             default_subject_context,

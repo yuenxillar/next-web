@@ -1,12 +1,10 @@
-use std::{any::Any, collections::HashMap};
+use std::collections::HashMap;
 
-use next_web_core::util::indexmap::IndexMap;
 use next_web_core::http::filter::HttpFilter;
+use next_web_core::util::indexmap::IndexMap;
 
 use crate::web::filter::{
     access_control_filter::AccessControlFilter,
-    authc::authentication_filter::AuthenticationFilter,
-    authz::authorization_filter::AuthorizationFilter,
     mgt::{
         default_filter::DefaultFilter, default_filter_chain_manager::DefaultFilterChainManager,
         filter_chain_manager::FilterChainManager,
@@ -91,19 +89,23 @@ impl FilterProxyConfigure {
     pub fn create_filter_chain_manager(mut self) -> DefaultFilterChainManager {
         let mut manager = DefaultFilterChainManager::default();
 
-        for (_, filter) in manager.get_filters() {
-            self.apply_global_properties_if_necessary(filter.as_mut());
-        }
-
         let len = self.get_filters().len();
         if len > 0 {
             let filters = self.filters.drain().collect::<Vec<_>>();
             for (name, mut filter) in filters {
                 self.apply_global_properties_if_necessary(filter.as_mut());
 
-                manager.add_filter(name, filter, false);
+                // The filter is the property of the application, so the chains
+                // use it as it is instead of creating their own instance.
+                manager.add_application_filter(name, filter);
             }
         }
+
+        // The pool of the manager holds every built-in filter before the chains
+        // are created, so the global filters can be checked and run by every
+        // chain.
+        manager.add_necessary_filters();
+        manager.set_global_filters(std::mem::take(&mut self.global_filters));
 
         // build up the chains:
         if let Some(chains) = self.filter_chain_definition_map.take() {
@@ -113,12 +115,6 @@ impl FilterProxyConfigure {
                 }
             }
         }
-
-        // add necessary filters
-        manager.add_necessary_filters();
-
-        // set the global filters
-        manager.set_global_filters(std::mem::take(&mut self.global_filters));
 
         // create the default chain, to match anything the path matching would have missed
         // TODO this assumes ANT path matching, which might be OK here
@@ -155,33 +151,22 @@ impl FilterProxyConfigure {
     }
 
     fn apply_success_url_if_necessary(&self, filter: &mut dyn HttpFilter) {
-        let success_url = self.get_success_url();
-        if let Some(url) = success_url {
-            if !url.is_empty() && filter.supports("AuthenticationFilter") {
-                if let Some(authc_filter) =
-                    (filter as &mut dyn Any).downcast_mut::<AuthenticationFilter>()
-                {
-                    let existing_success_url = authc_filter.get_success_url();
-                    if AuthenticationFilter::DEFAULT_SUCCESS_URL.eq(existing_success_url) {
-                        authc_filter.set_success_url(url);
-                    }
-                }
+        if let Some(url) = self.get_success_url() {
+            if !url.is_empty() {
+                // The filter that answers a login sends the client on to the
+                // page of the application; for every other filter there is no
+                // page to send it to.
+                filter.apply_success_url(url);
             }
         }
     }
 
     fn apply_unauthorized_url_if_necessary(&self, filter: &mut dyn HttpFilter) {
-        let unauthorized_url = self.get_unauthorized_url();
-        if let Some(url) = unauthorized_url {
-            if !url.is_empty() && filter.supports("AuthorizationFilter") {
-                if let Some(authz_filter) =
-                    (filter as &mut dyn Any).downcast_mut::<AuthorizationFilter>()
-                {
-                    let existing_unauthorized_url = authz_filter.get_unauthorized_url();
-                    if let None = existing_unauthorized_url {
-                        authz_filter.set_unauthorized_url(url);
-                    }
-                }
+        if let Some(url) = self.get_unauthorized_url() {
+            if !url.is_empty() {
+                // The filter that refuses a request answers with the page of
+                // the application; a filter that never refuses one has none.
+                filter.apply_unauthorized_url(url);
             }
         }
     }

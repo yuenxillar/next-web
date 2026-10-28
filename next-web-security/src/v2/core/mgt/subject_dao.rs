@@ -1,18 +1,24 @@
+use next_web_core::async_trait;
+
 #[cfg(not(feature = "web"))]
 use crate::core::subject::Subject;
 #[cfg(feature = "web")]
 use crate::web::subject::web_subject::WebSubject;
-#[cfg(feature = "web")]
-use next_web_core::async_trait;
 
+/// Stores the state of a subject where it outlives the call.
+///
+/// The tree without the web integration keeps that state in the session of the
+/// subject; the web integration does the same, through the subject of the web
+/// call. Both need the session, so both variants of the trait are asynchronous.
 #[cfg(not(feature = "web"))]
+#[async_trait]
 pub trait SubjectDAO
 where
-    Self: Send,
+    Self: Send + Sync,
 {
-    fn save(&self, subject: &dyn Subject);
+    async fn save(&self, subject: &dyn Subject);
 
-    fn delete(&self, subject: &dyn Subject);
+    async fn delete(&self, subject: &dyn Subject);
 }
 
 #[cfg(feature = "web")]

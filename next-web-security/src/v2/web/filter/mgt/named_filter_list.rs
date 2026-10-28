@@ -1,6 +1,6 @@
 use next_web_core::{
-    http::filter::{HttpFilter, HttpFilterChain},
     Required,
+    http::filter::{HttpFilter, HttpFilterChain},
 };
 
 pub trait NamedFilterList

@@ -4,17 +4,20 @@ use next_web_core::async_trait;
 
 #[cfg(feature = "web")]
 use crate::web::subject::web_subject::WebSubject;
-use crate::{
-    core::{
-        mgt::{session_storage_evaluator::SessionStorageEvaluator, subject_dao::SubjectDAO},
-        session::SessionValue,
-        subject::{
-            principal_collection::PrincipalCollection,
-            support::default_subject_context::DefaultSubjectContext, Subject,
-        },
+use crate::core::{
+    mgt::{session_storage_evaluator::SessionStorageEvaluator, subject_dao::SubjectDAO},
+    session::SessionValue,
+    subject::{
+        principal_collection::PrincipalCollection,
+        support::default_subject_context::DefaultSubjectContext, Subject,
     },
-    web::mgt::default_web_session_storage_evaluator::DefaultWebSessionStorageEvaluator,
 };
+
+#[cfg(feature = "web")]
+use crate::web::mgt::default_web_session_storage_evaluator::DefaultWebSessionStorageEvaluator;
+
+#[cfg(not(feature = "web"))]
+use crate::core::mgt::default_session_storage_evaluator::DefaultSessionStorageEvaluator;
 
 #[derive(Clone)]
 pub struct DefaultSubjectDAO {
@@ -43,14 +46,13 @@ impl DefaultSubjectDAO {
             .await
     }
 
-    async fn save_to_session(&self, subject: &dyn WebSubject) {
+    async fn save_to_session(&self, subject: &dyn Subject) {
         // performs merge logic, only updating the Subject's session if it does not match the current state:
         self.merge_principals(subject).await;
         self.merge_authentication_state(subject).await;
     }
 
-
-    async fn merge_principals(&self, subject: &dyn WebSubject) {
+    async fn merge_principals(&self, subject: &dyn Subject) {
         // The identity that belongs in the session: the identity the subject
         // serves, or — for a subject acting as another identity — the identity
         // it acts for, which is what the session must keep.
@@ -105,7 +107,7 @@ impl DefaultSubjectDAO {
         };
     }
 
-    async fn merge_authentication_state(&self, subject: &dyn WebSubject) {
+    async fn merge_authentication_state(&self, subject: &dyn Subject) {
         let session = subject.get_session();
 
         match session {
@@ -160,25 +162,56 @@ impl SubjectDAO for DefaultSubjectDAO {
     }
 
     async fn delete(&self, subject: &dyn WebSubject) {
-        if let Some(session) = subject.get_session() {
-            use crate::core::subject::support::default_subject_context::DefaultSubjectContext;
+        remove_stored_state(subject).await;
+    }
+}
 
-            session
-                .remove_attribute(DefaultSubjectContext::AUTHENTICATED_SESSION_KEY)
-                .await
-                .ok();
-            session
-                .remove_attribute(DefaultSubjectContext::PRINCIPALS_SESSION_KEY)
-                .await
-                .ok();
+#[cfg(not(feature = "web"))]
+#[async_trait]
+impl SubjectDAO for DefaultSubjectDAO {
+    async fn save(&self, subject: &dyn Subject) {
+        if self.is_session_storage_enabled(subject).await {
+            self.save_to_session(subject).await;
+        } else {
+            tracing::trace!(
+                "Session storage of subject state for Subject [{}] has been disabled: identity and
+                authentication state are expected to be initialized on every request or invocation.",
+                subject.get_principal().await.map(|principal| principal.to_string()).unwrap_or_default()
+            )
         }
+    }
+
+    async fn delete(&self, subject: &dyn Subject) {
+        remove_stored_state(subject).await;
+    }
+}
+
+/// Removes the state of a subject from its session, the way a logout does.
+async fn remove_stored_state(subject: &dyn Subject) {
+    if let Some(session) = subject.get_session() {
+        session
+            .remove_attribute(DefaultSubjectContext::AUTHENTICATED_SESSION_KEY)
+            .await
+            .ok();
+        session
+            .remove_attribute(DefaultSubjectContext::PRINCIPALS_SESSION_KEY)
+            .await
+            .ok();
     }
 }
 
 impl Default for DefaultSubjectDAO {
     fn default() -> Self {
+        #[cfg(feature = "web")]
+        let session_storage_evaluator: Box<dyn SessionStorageEvaluator> =
+            Box::new(DefaultWebSessionStorageEvaluator::default());
+
+        #[cfg(not(feature = "web"))]
+        let session_storage_evaluator: Box<dyn SessionStorageEvaluator> =
+            Box::new(DefaultSessionStorageEvaluator::default());
+
         Self {
-            session_storage_evaluator: Box::new(DefaultWebSessionStorageEvaluator::default()),
+            session_storage_evaluator,
         }
     }
 }

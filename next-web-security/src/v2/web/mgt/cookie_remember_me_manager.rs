@@ -1,6 +1,6 @@
 use std::{ops::Deref, sync::Arc};
 
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use next_web_core::{
     error::BoxError,
     http::{HttpRequest, HttpResponse},
@@ -10,8 +10,8 @@ use tracing::{debug, error, trace, warn};
 use crate::{
     core::{
         authc::{
-            authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
-            AuthenticationError,
+            AuthenticationError, authentication_info::AuthenticationInfo,
+            authentication_token::AuthenticationToken,
         },
         mgt::{
             default_remember_me_manager::{DefaultRememberMeManager, DefaultRememberMeManagerExt},
@@ -21,8 +21,8 @@ use crate::{
         util::web::WebUtils,
     },
     web::{
-        subject::{web_subject::WebSubject, web_subject_context::WebSubjectContext},
         Cookie, SimpleCookie,
+        subject::{web_subject::WebSubject, web_subject_context::WebSubjectContext},
     },
 };
 
@@ -232,12 +232,13 @@ impl DefaultRememberMeManagerExt for CookieRememberMeManager {
         serialized: &[u8],
         resp: &mut dyn HttpResponse,
     ) -> Result<(), BoxError> {
-        // base 64 encode it and store as a cookie:
-        let base64 = BASE64_STANDARD.decode(serialized)?;
+        // The bytes of the identity are base 64 encoded and stored as the value
+        // of the cookie; `get_remembered_serialized_identity` decodes them.
+        let base64 = BASE64_STANDARD.encode(serialized);
 
         let template = self.get_cookie();
         let mut cookie = SimpleCookie::from(template);
-        cookie.set_value(String::from_utf8(base64)?);
+        cookie.set_value(base64);
 
         cookie.save_to(None, resp);
 

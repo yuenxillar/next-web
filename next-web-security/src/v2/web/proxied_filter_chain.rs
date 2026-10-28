@@ -1,13 +1,13 @@
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 
 use next_web_core::{
     async_trait,
     http::{
-        filter::{FilterError, HttpFilter, HttpFilterChain},
         HttpRequest, HttpResponse,
+        filter::{FilterError, HttpFilter, HttpFilterChain},
     },
 };
 

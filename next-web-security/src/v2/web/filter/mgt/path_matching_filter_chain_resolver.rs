@@ -1,6 +1,4 @@
-use next_web_core::http::{
-    filter::HttpFilterChain, HttpRequest, HttpResponse,
-};
+use next_web_core::http::{HttpRequest, HttpResponse, filter::HttpFilterChain};
 use tracing::debug;
 
 use crate::{
@@ -48,7 +46,10 @@ impl PathMatchingFilterChainResolver {
         // as the chain name for the FilterChainManager's requirements
         for mut path_pattern in filter_chain_manager.get_chain_names() {
             if self.path_matches(path_pattern, request_uri) {
-                debug!("The chain [{}] matches the path [{}].", path_pattern, request_uri);
+                debug!(
+                    "The chain [{}] matches the path [{}].",
+                    path_pattern, request_uri
+                );
                 return Some(filter_chain_manager.proxy(original_chain, path_pattern));
             } else {
                 // in spring web, the requestURI "/resource/menus" ---- "resource/menus/" both can access the resource

@@ -2,15 +2,15 @@ use std::{any::Any, fmt::Display, sync::Arc};
 
 use next_web_core::{
     async_trait,
-   http::{HttpRequest, HttpResponse},
+    http::{HttpRequest, HttpResponse},
 };
 
 use crate::{
     core::{
         authc::{
-            authentication_info::AuthenticationInfo, authentication_token::AuthenticationToken,
-            authenticator::Authenticator,
-            pam::modular_realm_authenticator::ModularRealmAuthenticator, AuthenticationError,
+            AuthenticationError, authentication_info::AuthenticationInfo,
+            authentication_token::AuthenticationToken, authenticator::Authenticator,
+            pam::modular_realm_authenticator::ModularRealmAuthenticator,
         },
         authz::{
             authorization_error::AuthorizationError, authorizer::Authorizer,
@@ -24,14 +24,12 @@ use crate::{
         },
         realm::simple_account_realm::SimpleAccountRealm,
         session::{
-            mgt::{session_context::SessionContext, session_manager::SessionManager},
             Session, SessionError, SessionId,
+            mgt::{session_context::SessionContext, session_manager::SessionManager},
         },
         subject::{
-            principal_collection::PrincipalCollection,
-            subject_context::SubjectContext,
+            Subject, principal_collection::PrincipalCollection, subject_context::SubjectContext,
             support::default_subject_context::DefaultSubjectContext,
-            Subject,
         },
     },
     web::{
@@ -46,8 +44,7 @@ use crate::{
             default_web_session_manager::DefaultWebSessionManager,
         },
         subject::{
-            support::default_web_subject_context::DefaultWebSubjectContext,
-            web_subject::WebSubject,
+            support::default_web_subject_context::DefaultWebSubjectContext, web_subject::WebSubject,
         },
     },
 };
@@ -456,11 +453,17 @@ mod realm_wiring_tests {
     #[test]
     fn a_realm_given_to_the_manager_authorizes_through_it() {
         let mut realm = SimpleAccountRealm::with_name("iniRealm");
-        realm.add_account(SimpleAccount::new("root").with_role("admin").with_permission("printer:*"));
+        realm.add_account(
+            SimpleAccount::new("root")
+                .with_role("admin")
+                .with_permission("printer:*"),
+        );
 
         let manager = DefaultWebSecurityManager::from(realm);
-        let principals: Arc<dyn PrincipalCollection> =
-            Arc::new(SimplePrincipalCollection::new([Object::Str("root".to_string())], "iniRealm"));
+        let principals: Arc<dyn PrincipalCollection> = Arc::new(SimplePrincipalCollection::new(
+            [Object::Str("root".to_string())],
+            "iniRealm",
+        ));
 
         assert!(
             manager.has_role(Some(principals.as_ref()), "admin"),

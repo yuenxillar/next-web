@@ -1,17 +1,18 @@
 use std::ops::{Deref, DerefMut};
 
 use next_web_core::{
-    async_trait,
+    Named, Required, async_trait,
     error::BoxError,
     http::{HttpRequest, HttpResponse},
-    Named, Required,
 };
 
 use crate::{
     core::util::object::Object,
     web::filter::{
-        access_control_filter::AccessControlFilterExt, advice_filter::AdviceFilterExt,
-        authz::port_filter::PortFilter, once_per_request_filter::OncePerRequestFilter,
+        access_control_filter::AccessControlFilterExt,
+        advice_filter::AdviceFilterExt,
+        authz::port_filter::PortFilter,
+        once_per_request_filter::OncePerRequestFilter,
         path_matching_filter::{PathMatchingFilter, PathMatchingFilterExt},
     },
 };
@@ -72,6 +73,12 @@ impl AdviceFilterExt for SslFilter {
         <Self as Required<PathMatchingFilter>>::get_object(self)
             .pre_handle(request, response, ext)
             .await
+    }
+
+    fn apply_unauthorized_url(&mut self, unauthorized_url: &str) -> bool {
+        // The port filter underneath answers the refused request, so the URL
+        // belongs to it.
+        self.port_filter.apply_unauthorized_url(unauthorized_url)
     }
 
     async fn post_handle(

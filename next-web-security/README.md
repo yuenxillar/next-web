@@ -11,11 +11,12 @@ Two trees live in the crate:
 
 | Tree | Module root | Shape | Status |
 | --- | --- | --- | --- |
-| `v1` | `src/v1` | Spring Security 6 style: `HttpSecurity`, configurers, `WebSecurityConfigurer`, the security context | supported, and what this README documents |
-| `v2` | `src/v2` | Spring Security 7 style rewrite: security manager, realms, subjects | work in progress, not part of a default build |
+| `v2` | `src/v2` | Apache Shiro style: security manager, realms, subjects, sessions, and the filter chain | supported, and the default build; documented in [`src/v2/README.md`](src/v2/README.md) |
+| `v1` | `src/v1` | Spring Security 6 style: `HttpSecurity`, configurers, `WebSecurityConfigurer`, the security context | supported; documented in this README |
 
-Only the `v1` tree is documented here. The `v2` tree is still being translated and does not compile
-on its own yet.
+The two trees are mutually exclusive. The default features build the `v2` tree with its web
+integration (`v2-web`); the examples below configure the `v1` tree, which is built with
+`--no-default-features --features v1`.
 
 ## Installation
 
@@ -24,9 +25,9 @@ on its own yet.
 next-web-security = "0.2"
 ```
 
-A default build compiles the `v1` tree with the core web security only: the filter chain, sessions
-and the request cache, CSRF, headers, form / HTTP basic / X.509 / one-time-token / remember-me
-login, method security, the permission model, and the password encoders.
+A default build compiles the `v2` tree with its web integration: the security manager, realms,
+subjects, sessions, the filter chain, and the HTTP authentication and authorization filters. The
+`v1` tree below is built with `--no-default-features --features v1`.
 
 The protocol subsystems are opt-in, and each one brings only its own third-party dependencies with
 it:
@@ -40,7 +41,9 @@ next-web-security = { version = "0.2", features = ["saml2", "webauthn", "oauth2"
 
 | Feature | What it enables | Third-party crates it adds |
 | --- | --- | --- |
-| `v1` *(default)* | the whole `v1` tree below, minus the opt-in subsystems | — |
+| `v2-web` *(default)* | the `v2` core tree and its web integration: `src/v2/core` and `src/v2/web` | `dashmap` |
+| `v2` | the `v2` core tree alone: `src/v2/core`, without any dependency on the web integration | `dashmap` |
+| `v1` | the whole `v1` tree below, minus the opt-in subsystems | — |
 | `saml2` | `saml2`, `web::saml2`, and the `saml2_login()`, `saml2_metadata()`, `saml2_logout()` configurers | `quick-xml`, `flate2`, `rsa` |
 | `webauthn` | `webauthn`, `web::webauthn`, and the `web_authn()` configurer | `ciborium`, `coset`, `p256`, `rsa` |
 | `oauth2-client` | `oauth2::client`, the `oauth2_login()` and `oauth2_client()` configurers | `reqwest`, `jsonwebtoken`, `rsa` |
@@ -48,11 +51,11 @@ next-web-security = { version = "0.2", features = ["saml2", "webauthn", "oauth2"
 | `oauth2-authorization-server` | `oauth2::server::authorization` and the `oauth2_authorization_server()` configurer | `jsonwebtoken`, `hmac`, `rsa` |
 | `oauth2` | all three OAuth 2.0 sides at once | the union of the three above |
 | `web` | the marker the two trees share for the web integration | — |
-| `v2` | the rewrite in `src/v2` | — |
 
 `saml2`, `webauthn` and every `oauth2-*` feature pull `rsa`, because each of them signs or verifies
-with it; enabling two of them costs it once. Enabling any subsystem also enables `v1`, so a
-`default-features = false` build still gets a complete tree.
+with it; enabling two of them costs it once. The protocol features extend the `v1` tree, so they are
+built with `--no-default-features --features v1,saml2` — a build that enables `v1` together with the
+default `v2-web` is refused at compile time.
 
 Gated code is gated as a whole: with `saml2` off, the `saml2` module is not compiled, the
 `saml2_*()` methods are not on `HttpSecurity`, and `quick-xml` and `flate2` are not built.
@@ -63,7 +66,7 @@ Gated code is gated as a whole: with `saml2` off, the `saml2` module is not comp
 
 | Build | Crates |
 | --- | --- |
-| default (feature `v1`) | 129 |
+| default (feature `v2-web`) | 129 |
 | `saml2` | 148 |
 | `webauthn` | 165 |
 | `oauth2-authorization-server` | 147 |
@@ -171,10 +174,19 @@ The `v2` feature is the Apache Shiro 3.0.1 model, ported class by class: the
 `Subject` as the application-facing handle, `SecurityManager` behind it, realms
 that look accounts up, and the credentials matchers and authorization that decide
 what a login may do. The two trees are mutually exclusive — each is re-exported at
-the crate root — so a build enables exactly one of them (`default = ["v2"]`).
+the crate root — so a build enables exactly one of them.
+
+The tree is layered the way Shiro is: `v2` is the core — no HTTP at all — and
+`v2-web` adds the filter chain and the session cookie on top of it. The default
+features build `v2-web`. The two builds, the module map, and a complete example of
+each are documented in [`src/v2/README.md`](src/v2/README.md).
 
 ```toml
+# The core tree, without the web integration.
 next-web-security = { version = "0.2", default-features = false, features = ["v2"] }
+
+# The core tree and the web integration (the default build).
+next-web-security = { version = "0.2", features = ["v2-web"] }
 ```
 
 ```rust,ignore

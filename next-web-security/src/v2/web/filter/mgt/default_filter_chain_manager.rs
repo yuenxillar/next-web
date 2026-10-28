@@ -1,7 +1,8 @@
+use std::collections::HashSet;
 use std::vec;
 
-use next_web_core::util::indexmap::{map::Entry, IndexMap};
 use next_web_core::http::filter::{HttpFilter, HttpFilterChain};
+use next_web_core::util::indexmap::{IndexMap, map::Entry};
 use tracing::debug;
 
 use crate::web::filter::mgt::{
@@ -13,6 +14,13 @@ pub struct DefaultFilterChainManager {
     pub(crate) filters: IndexMap<String, Box<dyn HttpFilter>>,
     pub(crate) filter_chains: IndexMap<String, Box<dyn NamedFilterList>>,
     pub(crate) global_filter_names: Vec<String>,
+    /// The names of the filters the application registered itself.
+    ///
+    /// A filter of the port is created for each chain it serves, with the path
+    /// and the configuration of that chain; a filter the application registered
+    /// is its own instance, and it processes — or ignores — the configuration of
+    /// a chain itself, as Apache Shiro's `addToChain` does.
+    application_filter_names: HashSet<String>,
 }
 
 impl DefaultFilterChainManager {
@@ -41,8 +49,25 @@ impl DefaultFilterChainManager {
         let name = name.to_string();
         if !self.filters.contains_key(&name) || overwrite {
             filter.set_name(&name);
-            self.filters.insert(name, filter);
+            self.filters.insert(name.clone(), filter);
+            // The filter came from outside the manager: the application
+            // registered it, so the chains use it as it is.
+            self.application_filter_names.insert(name);
         }
+    }
+
+    /// Adds a filter the application registered.
+    ///
+    /// The filter is used by every chain that names it, as it is: the
+    /// configuration in brackets of a chain is handed to the filter only when
+    /// it was created by the port (see [`Self::add_to_chain`]).
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name the chains refer to the filter with.
+    /// * `filter` - The filter of the application.
+    pub fn add_application_filter(&mut self, name: impl ToString, filter: Box<dyn HttpFilter>) {
+        self.add_filter(name, filter, false);
     }
 
     pub(crate) fn add_necessary_filters(&mut self) {
@@ -158,7 +183,6 @@ impl FilterChainManager for DefaultFilterChainManager {
             chain_name, self.global_filter_names
         );
 
-
         // first add each of global filters
         if !self.global_filter_names.is_empty() {
             for filter_name in self.global_filter_names.clone() {
@@ -214,51 +238,63 @@ impl FilterChainManager for DefaultFilterChainManager {
             !chain_name.is_empty(),
             "chain_name cannot be null or empty."
         );
-        // The chain holds the filter of that name: the one the manager was given,
-        // and the built-in one of the port when it was given none. A name that is
-        // neither is a configuration error.
-        let mut filter = match self._get_box_filter(&filter_name) {
-            Some(filter) => {
-                // A filter the application registered is taken as it is: the
-                // configuration of a chain belongs to the filter instance, and a
-                // filter that does not process path configurations — which is
-                // what Shiro calls a `PathConfigProcessor` — ignores the one in
-                // brackets, as Shiro's own `addToChain` does for a filter that is
-                // not one.
-                if chain_specific_filter_config
-                    .map(|config| !config.is_empty())
-                    .unwrap_or_default()
-                {
-                    debug!(
-                        "The filter [{}] was configured by the application; the configuration of \
-                         the chain [{}] is not applied to it.",
-                        filter_name, chain_name
-                    );
-                }
 
-                filter
+        let filter = if self.application_filter_names.contains(&filter_name) {
+            // A filter the application registered is taken as it is: the
+            // configuration of a chain belongs to the filter instance, and a
+            // filter that does not process path configurations — which is what
+            // Shiro calls a `PathConfigProcessor` — ignores the one in brackets,
+            // as Shiro's own `addToChain` does for a filter that is not one.
+            if chain_specific_filter_config
+                .map(|config| !config.is_empty())
+                .unwrap_or_default()
+            {
+                debug!(
+                    "The filter [{}] was configured by the application; the configuration of \
+                     the chain [{}] is not applied to it.",
+                    filter_name, chain_name
+                );
             }
-            None => {
-                let filter = DefaultFilter::new_instance_and_process_path_config(
-                    &filter_name,
-                    chain_name,
-                    chain_specific_filter_config,
+
+            self._get_box_filter(&filter_name).unwrap_or_else(|| {
+                panic!(
+                    "There is no filter with name [{filter_name}] to apply to chain [{chain_name}] \
+                     in the pool of available Filters. Configure a filter with that name first."
                 )
-                .unwrap_or_else(|| {
-                    panic!(
-                        "There is no filter with name [{filter_name}] to apply to chain [{chain_name}] \
-                         in the pool of available Filters. Configure a filter with that name first."
-                    )
-                });
-                let name = filter_name.to_string();
-                let mut filter = filter;
-                filter.set_name(&name);
-                self.filters.insert(name, filter.clone());
+            })
+        } else {
+            // A filter of the port is created for the chain it serves, so the
+            // path and the configuration of the chain are the ones of the
+            // instance the chain runs. Reusing the instance of another chain
+            // would drop them: `authc` in a second chain would keep the paths of
+            // the first one only, and the chain would protect nothing.
+            //
+            // A global filter is added to a chain without a configuration of its
+            // own; the path of the chain is still processed, because that is the
+            // path the filter is asked about.
+            let mut filter = DefaultFilter::new_instance_and_process_path_config(
+                &filter_name,
+                chain_name,
+                Some(chain_specific_filter_config.unwrap_or_default()),
+            )
+            .unwrap_or_else(|| {
+                panic!(
+                    "There is no filter with name [{filter_name}] to apply to chain [{chain_name}] \
+                     in the pool of available Filters. Configure a filter with that name first."
+                )
+            });
 
-                filter
+            filter.set_name(&filter_name);
+
+            // One instance stays in the pool so the name is known to
+            // `add_necessary_filters` and to the global filter check; the chain
+            // runs the instance created for it.
+            if !self.filters.contains_key(&filter_name) {
+                self.filters.insert(filter_name.clone(), filter.clone());
             }
+
+            filter
         };
-        filter.set_name(&filter_name);
 
         let chain = self.ensure_chain(chain_name);
         chain.get_mut_object().push(filter);
@@ -297,6 +333,7 @@ impl Default for DefaultFilterChainManager {
             filters: IndexMap::new(),
             filter_chains: IndexMap::new(),
             global_filter_names: Vec::new(),
+            application_filter_names: HashSet::new(),
         };
         // manager.add_default_filters();
 

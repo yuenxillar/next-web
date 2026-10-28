@@ -197,7 +197,11 @@ impl SimpleCookie {
         Self::append(&mut cookie, Self::PATH_ATTRIBUTE_NAME, path);
         Self::append_expires(&mut cookie, max_age);
         if version > Self::DEFAULT_VERSION {
-            Self::append(&mut cookie, Self::VERSION_ATTRIBUTE_NAME, &version.to_string());
+            Self::append(
+                &mut cookie,
+                Self::VERSION_ATTRIBUTE_NAME,
+                &version.to_string(),
+            );
         }
         Self::append_secure(&mut cookie, secure);
         Self::append_http_only(&mut cookie, http_only);
@@ -432,22 +436,26 @@ impl Cookie for SimpleCookie {
     fn read_value(&self, req: &dyn HttpRequest, _resp: &dyn HttpResponse) -> Option<String> {
         let name = self.get_name().unwrap_or_default();
 
-        let Some(cookie) = req.cookie() else {
+        // A request carries several cookies — the session id, the remember-me
+        // identity, the cookies of the application — so the cookie of this name
+        // is looked up among them, not assumed to be the first one.
+        let Some(cookie) = req
+            .cookies()
+            .and_then(|cookies| cookies.iter().find(|cookie| cookie.name() == name))
+        else {
             debug!("No {} cookie value", name);
             return None;
         };
 
-        if cookie.name() != name {
-            return None;
-        }
-
+        // A cookie of another path is not sent for this path, and one a client
+        // sends anyway is ignored.
         let path = self.get_path().map(str::trim).unwrap_or_default();
-        if !path.is_empty() && self.path_matches(path, req.path()) {
-            warn!(
-                "Found {} cookie at path {}, but should be only used for {}",
+        if !path.is_empty() && !self.path_matches(path, req.path()) {
+            debug!(
+                "Found {} cookie at path {}, but it is not used for {}",
                 name,
-                req.path(),
-                path
+                path,
+                req.path()
             );
             return None;
         }
@@ -525,7 +533,10 @@ mod tests {
     fn a_session_cookie_is_only_its_name_and_its_value() {
         let cookie = cookie("rememberMe", "a-value");
 
-        assert_eq!(header(&cookie), "rememberMe=a-value; HttpOnly; SameSite=lax");
+        assert_eq!(
+            header(&cookie),
+            "rememberMe=a-value; HttpOnly; SameSite=lax"
+        );
         assert_eq!(cookie.get_max_age(), SimpleCookie::DEFAULT_MAX_AGE);
         assert_eq!(cookie.get_version(), SimpleCookie::DEFAULT_VERSION);
     }
@@ -542,12 +553,24 @@ mod tests {
         cookie.set_same_site(SameSite::Lax);
 
         let header = header(&cookie);
-        assert!(header.starts_with("rememberMe=a-value; "), "header was {header}");
-        assert!(header.contains("; Domain=example.org"), "header was {header}");
+        assert!(
+            header.starts_with("rememberMe=a-value; "),
+            "header was {header}"
+        );
+        assert!(
+            header.contains("; Domain=example.org"),
+            "header was {header}"
+        );
         assert!(header.contains("; Path=/app"), "header was {header}");
-        assert!(header.contains("; Max-Age=3600; Expires="), "header was {header}");
+        assert!(
+            header.contains("; Max-Age=3600; Expires="),
+            "header was {header}"
+        );
         assert!(header.contains("; Version=1"), "header was {header}");
-        assert!(header.ends_with("; Secure; HttpOnly; SameSite=lax"), "header was {header}");
+        assert!(
+            header.ends_with("; Secure; HttpOnly; SameSite=lax"),
+            "header was {header}"
+        );
     }
 
     #[test]
@@ -556,7 +579,10 @@ mod tests {
         cookie.set_max_age(0);
 
         let header = header(&cookie);
-        assert!(header.contains("; Max-Age=0; Expires="), "header was {header}");
+        assert!(
+            header.contains("; Max-Age=0; Expires="),
+            "header was {header}"
+        );
     }
 
     #[test]
@@ -566,7 +592,10 @@ mod tests {
 
         assert!(cookie.is_secure());
         let header = header(&cookie);
-        assert!(header.contains("; Secure; HttpOnly; SameSite=none"), "header was {header}");
+        assert!(
+            header.contains("; Secure; HttpOnly; SameSite=none"),
+            "header was {header}"
+        );
     }
 
     #[test]

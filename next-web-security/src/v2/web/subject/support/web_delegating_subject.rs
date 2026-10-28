@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use next_web_core::http::{HttpRequest, HttpResponse};
-use next_web_core::{async_trait, error::IllegalStateError, Required};
+use next_web_core::{Required, async_trait, error::IllegalStateError};
 
 use crate::{
     core::{
-        authc::{authentication_token::AuthenticationToken, AuthenticationError},
+        authc::{AuthenticationError, authentication_token::AuthenticationToken},
         authz::authorization_error::AuthorizationError,
-        session::{mgt::session_context::SessionContext, Session},
+        session::{Session, mgt::session_context::SessionContext},
         subject::{
+            Subject,
             principal_collection::PrincipalCollection,
             support::delegating_subject::{DelegatingSubject, DelegatingSubjectSupport},
-            Subject,
         },
         util::object::Object,
     },

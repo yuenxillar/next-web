@@ -1,14 +1,15 @@
 use std::{any::Any, fmt::Display, sync::Arc};
 
-use next_web_core::{
-    async_trait, clone_box,
-    http::{HttpRequest, HttpResponse},
-    Required,
-};
+use next_web_core::http::{HttpRequest, HttpResponse};
+use next_web_core::{async_trait, clone_box, Required};
+#[cfg(not(feature = "web"))]
+use next_web_core::error::BoxError;
 use tracing::{debug, info, trace, warn};
 
 #[cfg(feature = "web")]
 use crate::web::subject::{web_subject::WebSubject, web_subject_context::WebSubjectContext};
+#[cfg(not(feature = "web"))]
+use crate::core::subject::support::delegating_subject::DelegatingSubject;
 use crate::{
     core::{
         authc::{
@@ -48,8 +49,10 @@ use crate::{
             support::default_subject_context::DefaultSubjectContext, Subject,
         },
     },
-    web::subject::support::default_web_subject_context::DefaultWebSubjectContext,
 };
+
+#[cfg(feature = "web")]
+use crate::web::subject::support::default_web_subject_context::DefaultWebSubjectContext;
 
 #[derive(Clone)]
 pub struct DefaultSecurityManager<
@@ -329,6 +332,7 @@ where
     C: Clone,
     B: EventBus + Clone,
 {
+    #[cfg(feature = "web")]
     async fn _create_subject(
         &self,
         token: &dyn AuthenticationToken,
@@ -361,6 +365,37 @@ where
         self.create_subject(Arc::new(context), req, resp).await
     }
 
+    #[cfg(not(feature = "web"))]
+    async fn _create_subject(
+        &self,
+        token: &dyn AuthenticationToken,
+        info: &dyn AuthenticationInfo,
+        existing: Option<&dyn Subject>,
+    ) -> Box<dyn Subject> {
+        let mut context = self.create_subject_context();
+        context.set_authenticated(true);
+        context.set_authentication_token(clone_box(token));
+        context.set_authentication_info(clone_box(info));
+
+        if let Some(subject) = existing {
+            // The subject a login builds works through the manager of the
+            // subject that logged in, the way Apache Shiro's
+            // `createSubjectContext` hands the manager to the context. A subject
+            // built without a manager cannot answer the authorization questions
+            // of its caller, so the manager is carried over.
+            if let Some(manager) = (subject as &dyn Any)
+                .downcast_ref::<DelegatingSubject>()
+                .map(|subject| subject.get_owned_security_manager())
+            {
+                context.set_security_manager(manager);
+            }
+
+            context.set_subject(clone_box(subject));
+        }
+
+        self.create_subject(Arc::new(context)).await
+    }
+
     pub async fn resolve_session(&self, context: &mut dyn SubjectContext) {
         let session = self.resolve_context_session(context).await;
 
@@ -389,8 +424,8 @@ where
         #[cfg(not(feature = "web"))] context: &mut dyn SubjectContext,
 
         #[cfg(feature = "web")] context: &mut dyn WebSubjectContext,
-        req: &mut dyn HttpRequest,
-        resp: &mut dyn HttpResponse,
+        #[cfg(feature = "web")] req: &mut dyn HttpRequest,
+        #[cfg(feature = "web")] resp: &mut dyn HttpResponse,
     ) {
         let principals: Option<Arc<dyn PrincipalCollection>> = context.resolve_principals().await;
         if let None = principals {
@@ -398,7 +433,10 @@ where
                 "Found remembered PrincipalCollection.  Adding to the context to be used for subject construction by the SubjectFactory."
             );
 
+            #[cfg(feature = "web")]
             let principals = self.get_remembered_identity(context, req, resp);
+            #[cfg(not(feature = "web"))]
+            let principals = self.get_remembered_identity(context);
 
             if let Some(principals) = principals {
                 if !principals.is_empty() {
@@ -425,11 +463,14 @@ where
         let rmm = self.get_remember_me_manager();
         return match rmm {
             Some(rmm) => {
-                // #[cfg(not(feature = "web"))]
-                // rmm.get_remembered_principals(context)
-
                 #[cfg(feature = "web")]
-                rmm.get_remembered_principals(context, req, resp)
+                {
+                    rmm.get_remembered_principals(context, req, resp)
+                }
+                #[cfg(not(feature = "web"))]
+                {
+                    rmm.get_remembered_principals(context)
+                }
             }
             None => {
                 warn!(
@@ -456,11 +497,22 @@ where
         self.get_subject_factory().create_subject(context).await
     }
 
+    #[cfg(not(feature = "web"))]
+    pub async fn save(&self, subject: &dyn Subject) {
+        self.get_subject_dao().save(subject).await
+    }
+
     #[cfg(feature = "web")]
     pub async fn save(&self, subject: &dyn WebSubject) {
         self.get_subject_dao().save(subject).await
     }
 
+    #[cfg(not(feature = "web"))]
+    pub async fn delete(&self, subject: &dyn Subject) {
+        self.get_subject_dao().delete(subject).await
+    }
+
+    #[cfg(feature = "web")]
     pub async fn delete(&self, subject: &dyn WebSubject) {
         self.get_subject_dao().delete(subject).await
     }
@@ -713,6 +765,7 @@ where
     }
 }
 
+#[cfg(feature = "web")]
 #[async_trait]
 impl<D, F, S, A, T, R, C, B> SecurityManager for DefaultSecurityManager<D, F, S, A, T, R, C, B>
 where
@@ -814,6 +867,98 @@ where
         }
 
         let subject = self.do_create_subject(&context, req, resp).await;
+
+        if context.is_session_creation_enabled() {
+            self.save(subject.as_ref()).await;
+        }
+
+        subject
+    }
+}
+
+#[cfg(not(feature = "web"))]
+#[async_trait]
+impl<D, F, S, A, T, R, C, B> SecurityManager for DefaultSecurityManager<D, F, S, A, T, R, C, B>
+where
+    D: SubjectDAO,
+    F: SubjectFactory + Sync,
+    S: SessionManager,
+    A: Authorizer,
+    T: Authenticator + LogoutAware,
+    R: Realm + CacheManagerAware<C> + EventBusAware<B> + 'static,
+    R: Clone,
+    C: CacheManager + EventBusAware<B>,
+    C: Clone,
+    B: EventBus + Clone,
+{
+    async fn login(
+        &self,
+        subject: &dyn Subject,
+        token: &dyn AuthenticationToken,
+    ) -> Result<Box<dyn Subject>, AuthenticationError> {
+        let info = match self.authenticate(token).await {
+            Ok(info) => info,
+            Err(error) => {
+                if let Err(err) = self.on_failed_login(token, &error, subject) {
+                    info!(
+                        "on_failed_login method threw an error.  Logging and propagating original AuthenticationError. error: {:?}",
+                        err
+                    );
+                }
+                return Err(error);
+            }
+        };
+
+        let logged_in = self._create_subject(token, info.as_ref(), Some(subject)).await;
+
+        self.on_successful_login(token, info.as_ref(), logged_in.as_ref());
+
+        Ok(logged_in)
+    }
+
+    async fn logout(&self, subject: &dyn Subject) -> Result<(), BoxError> {
+        self.before_logout(subject);
+        if let Some(principals) = subject.get_principals().await {
+            if !principals.is_empty() {
+                debug!("Logging out subject with primary principal {}", "none");
+
+                let authc = self
+                    .sessions_security_manager
+                    .get_object()
+                    .get_object()
+                    .get_authenticator();
+
+                authc.on_logout(principals.as_ref());
+            }
+        }
+
+        self.delete(subject).await;
+
+        self.stop_session(subject).await;
+        Ok(())
+    }
+
+    async fn create_subject(&self, context: Arc<dyn SubjectContext>) -> Box<dyn Subject> {
+        let mut context = DefaultSubjectContext::new(context.as_ref()).await;
+
+        self.resolve_session(&mut context).await;
+        self.resolve_principals(&mut context).await;
+
+        // A subject whose identity is known but whose session is not yet open
+        // gets a session of its own: Apache Shiro opens it while the subject is
+        // saved, and the manager that starts it is the same.
+        if context.is_session_creation_enabled()
+            && context.get_session().is_none()
+            && context.resolve_principals().await.is_some()
+        {
+            let session_context = self.create_session_context(&mut context).await;
+            match self.start_session(&session_context).await {
+                Ok(session) => context.set_session(session),
+                Err(error) => debug!("Could not open the session of the subject: {error:?}"),
+            }
+        }
+
+        let subject = self.do_create_subject(&context).await;
 
         if context.is_session_creation_enabled() {
             self.save(subject.as_ref()).await;
